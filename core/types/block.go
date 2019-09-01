@@ -31,8 +31,8 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/rs/zerolog"
-	"golang.org/x/crypto/sha3"
 
+	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -113,7 +113,7 @@ type headerMarshaling struct {
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
 // RLP encoding.
 func (h *Header) Hash() common.Hash {
-	return RLPHash(h)
+	return hash.FromRLP(h)
 }
 
 // Size returns the approximate memory used by all internal contents. It is used
@@ -143,14 +143,6 @@ func (h *Header) GetShardState() (shard.ShardState, error) {
 		return nil, err
 	}
 	return shardState, nil
-}
-
-// RLPHash hashes the RLP representation of the given object.
-func RLPHash(x interface{}) (h common.Hash) {
-	hw := sha3.NewLegacyKeccak256()
-	rlp.Encode(hw, x)
-	hw.Sum(h[:0])
-	return h
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
@@ -454,7 +446,7 @@ func (c *writeCounter) Write(b []byte) (int, error) {
 
 // CalcUncleHash returns rlp hash of uncles.
 func CalcUncleHash(uncles []*Header) common.Hash {
-	return RLPHash(uncles)
+	return hash.FromRLP(uncles)
 }
 
 // WithSeal returns a new block with the data from b but the header replaced with
