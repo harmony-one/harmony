@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 )
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
@@ -72,7 +73,8 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 }
 
 // GetTransactionCount returns the number of transactions the given address has sent for the given block number
-func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
+func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, adr string, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
+	address := internal_common.ParseAddr(adr)
 	// Ask transaction pool for the nonce which includes pending transactions
 	if blockNr == rpc.PendingBlockNumber {
 		nonce, err := s.b.GetPoolNonce(ctx, address)
