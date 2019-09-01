@@ -1,4 +1,4 @@
-package types
+package block
 
 import (
 	"math/big"
@@ -88,4 +88,3 @@ func (h *Header) GetShardState() (shard.ShardState, error) {
 	}
 	return shardState, nil
 }
-

@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/internal/params"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -244,7 +245,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		utils.Logger().Error().Msg("failed to rlp-serialize genesis shard state")
 		os.Exit(1)
 	}
-	head := &types.Header{
+	head := &block.Header{
 		Number:         new(big.Int).SetUint64(g.Number),
 		Epoch:          big.NewInt(0),
 		ShardID:        g.ShardID,

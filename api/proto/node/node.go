@@ -11,6 +11,7 @@ import (
 	peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -148,7 +149,7 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 }
 
 // ConstructCrossLinkHeadersMessage constructs cross link header message to send to beacon chain
-func ConstructCrossLinkHeadersMessage(headers []*types.Header) []byte {
+func ConstructCrossLinkHeadersMessage(headers []*block.Header) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
 	byteBuffer.WriteByte(byte(Header))

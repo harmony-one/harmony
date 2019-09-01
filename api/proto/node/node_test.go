@@ -1,18 +1,19 @@
 package node
 
 import (
+	"math/big"
+	"reflect"
 	"strings"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
-
-	"math/big"
-	"reflect"
-	"testing"
 )
 
 var (
@@ -59,7 +60,7 @@ func TestConstructBlocksSyncMessage(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 
 	root := statedb.IntermediateRoot(false)
-	head := &types.Header{
+	head := &block.Header{
 		Number:  new(big.Int).SetUint64(uint64(10000)),
 		Epoch:   big.NewInt(0),
 		ShardID: 0,

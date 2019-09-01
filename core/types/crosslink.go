@@ -7,20 +7,22 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/harmony-one/harmony/block"
 )
 
 // CrossLink is only used on beacon chain to store the hash links from other shards
 type CrossLink struct {
-	ChainHeader *Header
+	ChainHeader *block.Header
 }
 
 // NewCrossLink returns a new cross link object
-func NewCrossLink(header *Header) CrossLink {
+func NewCrossLink(header *block.Header) CrossLink {
 	return CrossLink{header}
 }
 
 // Header returns header
-func (cl CrossLink) Header() *Header {
+func (cl CrossLink) Header() *block.Header {
 	return cl.ChainHeader
 }
 

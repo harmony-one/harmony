@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -22,7 +23,7 @@ type engineImpl struct{}
 var Engine = &engineImpl{}
 
 // SealHash returns the hash of a block prior to it being sealed.
-func (e *engineImpl) SealHash(header *types.Header) (hash common.Hash) {
+func (e *engineImpl) SealHash(header *block.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
 	// TODO: update with new fields
 	if err := rlp.Encode(hasher, []interface{}{
@@ -51,20 +52,20 @@ func (e *engineImpl) Seal(chain engine.ChainReader, block *types.Block, results 
 }
 
 // Author returns the author of the block header.
-func (e *engineImpl) Author(header *types.Header) (common.Address, error) {
+func (e *engineImpl) Author(header *block.Header) (common.Address, error) {
 	// TODO: implement this
 	return common.Address{}, nil
 }
 
 // Prepare is to prepare ...
 // TODO(RJ): fix it.
-func (e *engineImpl) Prepare(chain engine.ChainReader, header *types.Header) error {
+func (e *engineImpl) Prepare(chain engine.ChainReader, header *block.Header) error {
 	// TODO: implement prepare method
 	return nil
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
-func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *types.Header, seal bool) error {
+func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header, seal bool) error {
 	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parentHeader == nil {
 		return engine.ErrUnknownAncestor
@@ -80,7 +81,7 @@ func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *types.Header
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 // concurrently. The method returns a quit channel to abort the operations and
 // a results channel to retrieve the async verifications.
-func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.Header, seals []bool) (chan<- struct{}, <-chan error) {
 	abort, results := make(chan struct{}), make(chan error, len(headers))
 	for i := 0; i < len(headers); i++ {
 		results <- nil
@@ -89,7 +90,7 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*types.He
 }
 
 // retrievePublicKeysFromLastBlock finds the public keys of last block's committee
-func retrievePublicKeysFromLastBlock(bc engine.ChainReader, header *types.Header) ([]*bls.PublicKey, error) {
+func retrievePublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash)
 	if parentHeader == nil {
 		return nil, ctxerror.New("cannot find parent block header in DB",
@@ -123,7 +124,7 @@ func retrievePublicKeysFromLastBlock(bc engine.ChainReader, header *types.Header
 
 // VerifySeal implements Engine, checking whether the given block satisfies
 // the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
-func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *types.Header) error {
+func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) error {
 	if chain.CurrentHeader().Number.Uint64() <= uint64(1) {
 		return nil
 	}
@@ -159,7 +160,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *types.Header) 
 
 // Finalize implements Engine, accumulating the block rewards,
 // setting the final state and assembling the block.
-func (e *engineImpl) Finalize(chain engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt, outcxs []*types.CXReceipt, incxs []*types.CXReceiptsProof) (*types.Block, error) {
+func (e *engineImpl) Finalize(chain engine.ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt, outcxs []*types.CXReceipt, incxs []*types.CXReceiptsProof) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	if err := AccumulateRewards(chain, state, header); err != nil {
@@ -171,7 +172,7 @@ func (e *engineImpl) Finalize(chain engine.ChainReader, header *types.Header, st
 
 // QuorumForBlock returns the quorum for the given block header.
 func QuorumForBlock(
-	chain engine.ChainReader, h *types.Header,
+	chain engine.ChainReader, h *block.Header,
 ) (quorum int, err error) {
 	ss, err := chain.ReadShardState(h.Epoch)
 	if err != nil {

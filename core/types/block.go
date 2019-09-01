@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/rs/zerolog"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -73,14 +74,14 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 // a block's data contents (transactions and uncles) together.
 type Body struct {
 	Transactions     []*Transaction
-	Uncles           []*Header
+	Uncles           []*block.Header
 	IncomingReceipts CXReceiptsProofs
 }
 
 // Block represents an entire block in the Ethereum blockchain.
 type Block struct {
-	header           *Header
-	uncles           []*Header
+	header           *block.Header
+	uncles           []*block.Header
 	transactions     Transactions
 	incomingReceipts CXReceiptsProofs
 
@@ -126,18 +127,18 @@ type StorageBlock Block
 
 // "external" block encoding. used for eth protocol, etc.
 type extblock struct {
-	Header           *Header
+	Header           *block.Header
 	Txs              []*Transaction
-	Uncles           []*Header
+	Uncles           []*block.Header
 	IncomingReceipts CXReceiptsProofs
 }
 
 // [deprecated by eth/63]
 // "storage" block encoding. used for database.
 type storageblock struct {
-	Header *Header
+	Header *block.Header
 	Txs    []*Transaction
-	Uncles []*Header
+	Uncles []*block.Header
 	TD     *big.Int
 }
 
@@ -148,7 +149,7 @@ type storageblock struct {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs,
 // and receipts.
-func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof) *Block {
+func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof) *Block {
 	b := &Block{header: CopyHeader(header)}
 
 	// TODO: panic if len(txs) != len(receipts)
@@ -183,13 +184,13 @@ func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, outcxs []
 // NewBlockWithHeader creates a block with the given header data. The
 // header data is copied, changes to header and to the field values
 // will not affect the block.
-func NewBlockWithHeader(header *Header) *Block {
+func NewBlockWithHeader(header *block.Header) *Block {
 	return &Block{header: CopyHeader(header)}
 }
 
 // CopyHeader creates a deep copy of a block header to prevent side effects from
 // modifying a header variable.
-func CopyHeader(h *Header) *Header {
+func CopyHeader(h *block.Header) *block.Header {
 	// TODO: update with new fields
 	cpy := *h
 	if cpy.Time = new(big.Int); h.Time != nil {
@@ -265,7 +266,7 @@ func (b *StorageBlock) DecodeRLP(s *rlp.Stream) error {
 }
 
 // Uncles return uncles.
-func (b *Block) Uncles() []*Header {
+func (b *Block) Uncles() []*block.Header {
 	return b.uncles
 }
 
@@ -338,7 +339,7 @@ func (b *Block) OutgoingReceiptHash() common.Hash { return b.header.OutgoingRece
 func (b *Block) Extra() []byte { return common.CopyBytes(b.header.Extra) }
 
 // Header returns a copy of Header.
-func (b *Block) Header() *Header { return CopyHeader(b.header) }
+func (b *Block) Header() *block.Header { return CopyHeader(b.header) }
 
 // Body returns the non-header content of the block.
 func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles, b.incomingReceipts} }
@@ -369,13 +370,13 @@ func (c *writeCounter) Write(b []byte) (int, error) {
 }
 
 // CalcUncleHash returns rlp hash of uncles.
-func CalcUncleHash(uncles []*Header) common.Hash {
+func CalcUncleHash(uncles []*block.Header) common.Hash {
 	return hash.FromRLP(uncles)
 }
 
 // WithSeal returns a new block with the data from b but the header replaced with
 // the sealed one.
-func (b *Block) WithSeal(header *Header) *Block {
+func (b *Block) WithSeal(header *block.Header) *Block {
 	cpy := *header
 
 	return &Block{
@@ -386,11 +387,11 @@ func (b *Block) WithSeal(header *Header) *Block {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(transactions []*Transaction, uncles []*Header, incomingReceipts CXReceiptsProofs) *Block {
+func (b *Block) WithBody(transactions []*Transaction, uncles []*block.Header, incomingReceipts CXReceiptsProofs) *Block {
 	block := &Block{
 		header:           CopyHeader(b.header),
 		transactions:     make([]*Transaction, len(transactions)),
-		uncles:           make([]*Header, len(uncles)),
+		uncles:           make([]*block.Header, len(uncles)),
 		incomingReceipts: make([]*CXReceiptsProof, len(incomingReceipts)),
 	}
 	copy(block.transactions, transactions)

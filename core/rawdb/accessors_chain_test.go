@@ -27,10 +27,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/mock/gomock"
-	mock "github.com/harmony-one/harmony/core/rawdb/mock"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/harmony-one/harmony/block"
+	mock "github.com/harmony-one/harmony/core/rawdb/mock"
+	"github.com/harmony-one/harmony/core/types"
 )
 
 // Tests block header storage and retrieval operations.
@@ -38,7 +40,7 @@ func TestHeaderStorage(t *testing.T) {
 	db := ethdb.NewMemDatabase()
 
 	// Create a test header to move around the database and make sure it's really new
-	header := &types.Header{Number: big.NewInt(42), Extra: []byte("test header")}
+	header := &block.Header{Number: big.NewInt(42), Extra: []byte("test header")}
 	if entry := ReadHeader(db, header.Hash(), header.Number.Uint64()); entry != nil {
 		t.Fatalf("Non existent header returned: %v", entry)
 	}
@@ -71,7 +73,7 @@ func TestBodyStorage(t *testing.T) {
 	db := ethdb.NewMemDatabase()
 
 	// Create a test body to move around the database and make sure it's really new
-	body := &types.Body{Uncles: []*types.Header{{Extra: []byte("test header")}}}
+	body := &types.Body{Uncles: []*block.Header{{Extra: []byte("test header")}}}
 
 	hasher := sha3.NewLegacyKeccak256()
 	rlp.Encode(hasher, body)
@@ -109,7 +111,7 @@ func TestBlockStorage(t *testing.T) {
 	db := ethdb.NewMemDatabase()
 
 	// Create a test block to move around the database and make sure it's really new
-	block := types.NewBlockWithHeader(&types.Header{
+	block := types.NewBlockWithHeader(&block.Header{
 		Extra:       []byte("test block"),
 		TxHash:      types.EmptyRootHash,
 		ReceiptHash: types.EmptyRootHash,
@@ -169,7 +171,7 @@ func TestBlockStorage(t *testing.T) {
 // Tests that partial block contents don't get reassembled into full blocks.
 func TestPartialBlockStorage(t *testing.T) {
 	db := ethdb.NewMemDatabase()
-	block := types.NewBlockWithHeader(&types.Header{
+	block := types.NewBlockWithHeader(&block.Header{
 		Extra:       []byte("test block"),
 		TxHash:      types.EmptyRootHash,
 		ReceiptHash: types.EmptyRootHash,
@@ -249,9 +251,9 @@ func TestCanonicalMappingStorage(t *testing.T) {
 func TestHeadStorage(t *testing.T) {
 	db := ethdb.NewMemDatabase()
 
-	blockHead := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block header")})
-	blockFull := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block full")})
-	blockFast := types.NewBlockWithHeader(&types.Header{Extra: []byte("test block fast")})
+	blockHead := types.NewBlockWithHeader(&block.Header{Extra: []byte("test block header")})
+	blockFull := types.NewBlockWithHeader(&block.Header{Extra: []byte("test block full")})
+	blockFast := types.NewBlockWithHeader(&block.Header{Extra: []byte("test block fast")})
 
 	// Check that no head entries are in a pristine database
 	if entry := ReadHeadHeaderHash(db); entry != (common.Hash{}) {

@@ -7,6 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
+	block2 "github.com/harmony-one/harmony/block"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -126,7 +128,7 @@ func TestVrf(test *testing.T) {
 	tx1 := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
 	txs := []*types.Transaction{tx1}
 
-	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil, nil, nil)
+	block := types.NewBlock(&block2.Header{Number: big.NewInt(314)}, txs, nil, nil, nil)
 	blockHash := block.Hash()
 
 	dRand.vrf(blockHash)
