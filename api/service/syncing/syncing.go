@@ -217,6 +217,9 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	if len(peers) == 0 {
 		return ctxerror.New("[SYNC] no peers to connect to")
 	}
+	if ss.syncConfig != nil {
+		ss.syncConfig.CloseConnections()
+	}
 	ss.syncConfig = &SyncConfig{}
 	var wg sync.WaitGroup
 	for _, peer := range peers {
