@@ -159,9 +159,9 @@ func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Tr
 	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
 }
 
-// UpdateAddressStorage updates specific adr address.
-func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, explorerTransaction *Transaction, tx *types.Transaction) {
-	key := GetAddressKey(adr)
+// UpdateAddressStorage updates specific addr address.
+func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
+	key := GetAddressKey(addr)
 
 	var address Address
 	if data, err := storage.db.Get([]byte(key)); err == nil {
@@ -174,7 +174,7 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, expl
 	} else {
 		address.Balance = tx.Value()
 	}
-	address.ID = adr
+	address.ID = addr
 	address.TXs = append(address.TXs, explorerTransaction)
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
