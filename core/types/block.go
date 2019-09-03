@@ -102,14 +102,16 @@ type Block struct {
 
 // SetLastCommitSig sets the last block's commit group signature.
 func (b *Block) SetLastCommitSig(sig []byte, signers []byte) {
-	if len(sig) != len(b.header.LastCommitSignature) {
+	if len(sig) != len(b.header.LastCommitSignature()) {
 		utils.Logger().Warn().
 			Int("srcLen", len(sig)).
-			Int("dstLen", len(b.header.LastCommitSignature)).
+			Int("dstLen", len(b.header.LastCommitSignature())).
 			Msg("SetLastCommitSig: sig size mismatch")
 	}
-	copy(b.header.LastCommitSignature[:], sig[:])
-	b.header.LastCommitBitmap = append(signers[:0:0], signers...)
+	var sig2 [96]byte
+	copy(sig2[:], sig)
+	b.header.SetLastCommitSignature(sig2)
+	b.header.SetLastCommitBitmap(signers)
 }
 
 // DeprecatedTd is an old relic for extracting the TD of a block. It is in the
@@ -154,26 +156,26 @@ func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, out
 
 	// TODO: panic if len(txs) != len(receipts)
 	if len(txs) == 0 {
-		b.header.TxHash = EmptyRootHash
+		b.header.SetTxHash(EmptyRootHash)
 	} else {
-		b.header.TxHash = DeriveSha(Transactions(txs))
+		b.header.SetTxHash(DeriveSha(Transactions(txs)))
 		b.transactions = make(Transactions, len(txs))
 		copy(b.transactions, txs)
 	}
 
 	if len(receipts) == 0 {
-		b.header.ReceiptHash = EmptyRootHash
+		b.header.SetReceiptHash(EmptyRootHash)
 	} else {
-		b.header.ReceiptHash = DeriveSha(Receipts(receipts))
-		b.header.Bloom = CreateBloom(receipts)
+		b.header.SetReceiptHash(DeriveSha(Receipts(receipts)))
+		b.header.SetBloom(CreateBloom(receipts))
 	}
 
-	b.header.OutgoingReceiptHash = DeriveMultipleShardsSha(CXReceipts(outcxs))
+	b.header.SetOutgoingReceiptHash(DeriveMultipleShardsSha(CXReceipts(outcxs)))
 
 	if len(incxs) == 0 {
-		b.header.IncomingReceiptHash = EmptyRootHash
+		b.header.SetIncomingReceiptHash(EmptyRootHash)
 	} else {
-		b.header.IncomingReceiptHash = DeriveSha(CXReceiptsProofs(incxs))
+		b.header.SetIncomingReceiptHash(DeriveSha(CXReceiptsProofs(incxs)))
 		b.incomingReceipts = make(CXReceiptsProofs, len(incxs))
 		copy(b.incomingReceipts, incxs)
 	}
@@ -190,45 +192,14 @@ func NewBlockWithHeader(header *block.Header) *Block {
 
 // CopyHeader creates a deep copy of a block header to prevent side effects from
 // modifying a header variable.
+// TODO ek – no longer necessary
 func CopyHeader(h *block.Header) *block.Header {
-	// TODO: update with new fields
 	cpy := *h
-	if cpy.Time = new(big.Int); h.Time != nil {
-		cpy.Time.Set(h.Time)
-	}
-	if cpy.Number = new(big.Int); h.Number != nil {
-		cpy.Number.Set(h.Number)
-	}
-	if cpy.ViewID = new(big.Int); h.ViewID != nil {
-		cpy.ViewID.Set(h.ViewID)
-	}
-	if cpy.Epoch = new(big.Int); h.Epoch != nil {
-		cpy.Epoch.Set(h.Epoch)
-	}
-	if len(h.Extra) > 0 {
-		cpy.Extra = make([]byte, len(h.Extra))
-		copy(cpy.Extra, h.Extra)
-	}
-	if len(h.ShardState) > 0 {
-		cpy.ShardState = make([]byte, len(h.ShardState))
-		copy(cpy.ShardState, h.ShardState)
-	}
-	if len(h.Vrf) > 0 {
-		cpy.Vrf = make([]byte, len(h.Vrf))
-		copy(cpy.Vrf, h.Vrf)
-	}
-	if len(h.Vdf) > 0 {
-		cpy.Vdf = make([]byte, len(h.Vdf))
-		copy(cpy.Vdf, h.Vdf)
-	}
-	if len(h.CrossLinks) > 0 {
-		cpy.CrossLinks = make([]byte, len(h.CrossLinks))
-		copy(cpy.CrossLinks, h.CrossLinks)
-	}
-	if len(h.LastCommitBitmap) > 0 {
-		cpy.LastCommitBitmap = make([]byte, len(h.LastCommitBitmap))
-		copy(cpy.LastCommitBitmap, h.LastCommitBitmap)
-	}
+	// A field value object that lives outside of a header struct is never
+	// exposed to the outside for external modification, as its getter and
+	// setter always make a copy.  Therefore, we do not have to clone such
+	// fields, and multiple header structs can safely share the same field value
+	// objects.
 	return &cpy
 }
 
@@ -291,52 +262,52 @@ func (b *Block) Transaction(hash common.Hash) *Transaction {
 }
 
 // Number returns header number.
-func (b *Block) Number() *big.Int { return new(big.Int).Set(b.header.Number) }
+func (b *Block) Number() *big.Int { return b.header.Number() }
 
 // GasLimit returns header gas limit.
-func (b *Block) GasLimit() uint64 { return b.header.GasLimit }
+func (b *Block) GasLimit() uint64 { return b.header.GasLimit() }
 
 // GasUsed returns header gas used.
-func (b *Block) GasUsed() uint64 { return b.header.GasUsed }
+func (b *Block) GasUsed() uint64 { return b.header.GasUsed() }
 
 // Time is header time.
-func (b *Block) Time() *big.Int { return new(big.Int).Set(b.header.Time) }
+func (b *Block) Time() *big.Int { return b.header.Time() }
 
 // NumberU64 is the header number in uint64.
-func (b *Block) NumberU64() uint64 { return b.header.Number.Uint64() }
+func (b *Block) NumberU64() uint64 { return b.header.Number().Uint64() }
 
 // MixDigest is the header mix digest.
-func (b *Block) MixDigest() common.Hash { return b.header.MixDigest }
+func (b *Block) MixDigest() common.Hash { return b.header.MixDigest() }
 
 // ShardID is the header ShardID
-func (b *Block) ShardID() uint32 { return b.header.ShardID }
+func (b *Block) ShardID() uint32 { return b.header.ShardID() }
 
 // Epoch is the header Epoch
-func (b *Block) Epoch() *big.Int { return b.header.Epoch }
+func (b *Block) Epoch() *big.Int { return b.header.Epoch() }
 
 // Bloom returns header bloom.
-func (b *Block) Bloom() ethtypes.Bloom { return b.header.Bloom }
+func (b *Block) Bloom() ethtypes.Bloom { return b.header.Bloom() }
 
 // Coinbase returns header coinbase.
-func (b *Block) Coinbase() common.Address { return b.header.Coinbase }
+func (b *Block) Coinbase() common.Address { return b.header.Coinbase() }
 
 // Root returns header root.
-func (b *Block) Root() common.Hash { return b.header.Root }
+func (b *Block) Root() common.Hash { return b.header.Root() }
 
 // ParentHash return header parent hash.
-func (b *Block) ParentHash() common.Hash { return b.header.ParentHash }
+func (b *Block) ParentHash() common.Hash { return b.header.ParentHash() }
 
 // TxHash returns header tx hash.
-func (b *Block) TxHash() common.Hash { return b.header.TxHash }
+func (b *Block) TxHash() common.Hash { return b.header.TxHash() }
 
 // ReceiptHash returns header receipt hash.
-func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
+func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash() }
 
 // OutgoingReceiptHash returns header cross shard receipt hash.
-func (b *Block) OutgoingReceiptHash() common.Hash { return b.header.OutgoingReceiptHash }
+func (b *Block) OutgoingReceiptHash() common.Hash { return b.header.OutgoingReceiptHash() }
 
 // Extra returns header extra.
-func (b *Block) Extra() []byte { return common.CopyBytes(b.header.Extra) }
+func (b *Block) Extra() []byte { return b.header.Extra() }
 
 // Header returns a copy of Header.
 func (b *Block) Header() *block.Header { return CopyHeader(b.header) }
@@ -345,10 +316,10 @@ func (b *Block) Header() *block.Header { return CopyHeader(b.header) }
 func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles, b.incomingReceipts} }
 
 // Vdf returns header Vdf.
-func (b *Block) Vdf() []byte { return common.CopyBytes(b.header.Vdf) }
+func (b *Block) Vdf() []byte { return b.header.Vdf() }
 
 // Vrf returns header Vrf.
-func (b *Block) Vrf() []byte { return common.CopyBytes(b.header.Vrf) }
+func (b *Block) Vrf() []byte { return b.header.Vrf() }
 
 // Size returns the true RLP encoded storage size of the block, either by encoding
 // and returning it, or returning a previsouly cached value.
@@ -451,17 +422,17 @@ func (s blockSorter) Less(i, j int) bool {
 
 // Number checks if block b1 is less than block b2.
 func Number(b1, b2 *Block) bool {
-	return b1.header.Number.Cmp(b2.header.Number) < 0
+	return b1.header.Number().Cmp(b2.header.Number()) < 0
 }
 
 // AddVrf add vrf into block header
 func (b *Block) AddVrf(vrf []byte) {
-	b.header.Vrf = vrf
+	b.header.SetVrf(vrf)
 }
 
 // AddVdf add vdf into block header
 func (b *Block) AddVdf(vdf []byte) {
-	b.header.Vdf = vdf
+	b.header.SetVdf(vdf)
 }
 
 // AddShardState add shardState into block header
@@ -469,12 +440,12 @@ func (b *Block) AddShardState(shardState shard.State) error {
 	// Make a copy because State.Hash() internally sorts entries.
 	// Store the sorted copy.
 	shardState = append(shardState[:0:0], shardState...)
-	b.header.ShardStateHash = shardState.Hash()
+	b.header.SetShardStateHash(shardState.Hash())
 	data, err := rlp.EncodeToBytes(shardState)
 	if err != nil {
 		return err
 	}
-	b.header.ShardState = data
+	b.header.SetShardState(data)
 	return nil
 }
 

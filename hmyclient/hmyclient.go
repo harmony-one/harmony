@@ -107,10 +107,10 @@ func (c *Client) getBlock(ctx context.Context, method string, args ...interface{
 		return nil, err
 	}
 	// Quick-verify transaction. This mostly helps with debugging the server.
-	if head.TxHash == types.EmptyRootHash && len(body.Transactions) > 0 {
+	if head.TxHash() == types.EmptyRootHash && len(body.Transactions) > 0 {
 		return nil, fmt.Errorf("server returned non-empty transaction list but block header indicates no transactions")
 	}
-	if head.TxHash != types.EmptyRootHash && len(body.Transactions) == 0 {
+	if head.TxHash() != types.EmptyRootHash && len(body.Transactions) == 0 {
 		return nil, fmt.Errorf("server returned empty transaction list but block header indicates transactions")
 	}
 	// Fill the sender cache of transactions in the block.

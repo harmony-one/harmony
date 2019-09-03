@@ -171,7 +171,7 @@ func WriteHeader(db DatabaseWriter, header *block.Header) {
 	// Write the hash -> number mapping
 	var (
 		hash    = header.Hash()
-		number  = header.Number.Uint64()
+		number  = header.Number().Uint64()
 		encoded = encodeBlockNumber(number)
 	)
 	key := headerNumberKey(hash)
@@ -349,12 +349,7 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
 	WriteHeader(db, block.Header())
 	// TODO ek – maybe roll the below into WriteHeader()
-	epoch := block.Header().Epoch
-	if epoch == nil {
-		// backward compatibility
-		return
-	}
-	epoch = new(big.Int).Set(epoch)
+	epoch := block.Header().Epoch()
 	epochBlockNum := block.Number()
 	writeOne := func() {
 		if err := WriteEpochBlockNumber(db, epoch, epochBlockNum); err != nil {
@@ -368,7 +363,7 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 	}
 
 	// TODO: don't change epoch based on shard state presence
-	if len(block.Header().ShardState) > 0 && block.NumberU64() != 0 {
+	if len(block.Header().ShardState()) > 0 && block.NumberU64() != 0 {
 		// End-of-epoch block; record the next epoch after this block.
 		epoch = new(big.Int).Add(epoch, common.Big1)
 		epochBlockNum = new(big.Int).Add(epochBlockNum, common.Big1)
@@ -386,24 +381,24 @@ func DeleteBlock(db DatabaseDeleter, hash common.Hash, number uint64) {
 
 // FindCommonAncestor returns the last common ancestor of two block headers
 func FindCommonAncestor(db DatabaseReader, a, b *block.Header) *block.Header {
-	for bn := b.Number.Uint64(); a.Number.Uint64() > bn; {
-		a = ReadHeader(db, a.ParentHash, a.Number.Uint64()-1)
+	for bn := b.Number().Uint64(); a.Number().Uint64() > bn; {
+		a = ReadHeader(db, a.ParentHash(), a.Number().Uint64()-1)
 		if a == nil {
 			return nil
 		}
 	}
-	for an := a.Number.Uint64(); an < b.Number.Uint64(); {
-		b = ReadHeader(db, b.ParentHash, b.Number.Uint64()-1)
+	for an := a.Number().Uint64(); an < b.Number().Uint64(); {
+		b = ReadHeader(db, b.ParentHash(), b.Number().Uint64()-1)
 		if b == nil {
 			return nil
 		}
 	}
 	for a.Hash() != b.Hash() {
-		a = ReadHeader(db, a.ParentHash, a.Number.Uint64()-1)
+		a = ReadHeader(db, a.ParentHash(), a.Number().Uint64()-1)
 		if a == nil {
 			return nil
 		}
-		b = ReadHeader(db, b.ParentHash, b.Number.Uint64()-1)
+		b = ReadHeader(db, b.ParentHash(), b.Number().Uint64()-1)
 		if b == nil {
 			return nil
 		}
