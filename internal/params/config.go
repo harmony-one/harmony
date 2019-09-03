@@ -17,17 +17,17 @@ var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:        big.NewInt(1),
-		CrossLinkBlock: big.NewInt(589824), // 36 * 2^14
-		EIP155Block:    big.NewInt(589824), // 36 * 2^14
-		S3Block:        big.NewInt(589824), // 36 * 2^14
+		CrossLinkBlock: big.NewInt(655360), // 40 * 2^14
+		EIP155Block:    big.NewInt(655360), // 40 * 2^14
+		S3Block:        big.NewInt(655360), // 40 * 2^14
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
 		ChainID:        big.NewInt(2),
-		CrossLinkBlock: big.NewInt(0), // 36 * 2^14
-		EIP155Block:    big.NewInt(0), // 36 * 2^14
-		S3Block:        big.NewInt(0), // 36 * 2^14
+		CrossLinkBlock: big.NewInt(0),
+		EIP155Block:    big.NewInt(0),
+		S3Block:        big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
