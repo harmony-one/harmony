@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/accounts"
@@ -286,7 +288,11 @@ func processStressTestCommand() {
 
 		ks.Unlock(account, senderPass)
 
-		tx, _ = ks.SignTx(account, tx, nil)
+		chainConfig := params.MainnetChainConfig
+		if walletProfile.Profile != defaultProfile {
+			chainConfig = params.TestnetChainConfig
+		}
+		tx, _ = ks.SignTx(account, tx, chainConfig.ChainID)
 
 		if err := submitTransaction(tx, walletNode, uint32(shardID)); err != nil {
 			fmt.Println(ctxerror.New("submitTransaction failed",

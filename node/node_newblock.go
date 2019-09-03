@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -19,19 +18,18 @@ const (
 	PeriodicBlock = 200 * time.Millisecond
 )
 
-// WaitForConsensusReadyv2 listen for the readiness signal from consensus and generate new block for consensus.
+// WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
 // only leader will receive the ready signal
 // TODO: clean pending transactions for validators; or validators not prepare pending transactions
-func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{}) {
+func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
 
 		utils.Logger().Debug().
 			Msg("Waiting for Consensus ready")
+		// TODO: make local net start faster
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
-
-		var newBlock *types.Block
 
 		// Set up the very first deadline.
 		deadline := time.Now().Add(node.BlockPeriod)
@@ -49,91 +47,27 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 						continue
 					}
 
-					coinbase := node.Consensus.SelfAddress
-					if err := node.Worker.UpdateCurrent(coinbase); err != nil {
-						utils.Logger().Error().
-							Err(err).
-							Msg("Failed updating worker's state")
-						continue
-					}
-
-					// Normal tx block consensus
-					selectedTxs := node.getTransactionsForNewBlock(coinbase)
-					if err := node.Worker.UpdateCurrent(coinbase); err != nil {
-						utils.GetLogger().Error("Failed updating worker's state", "Error", err)
-					}
-					utils.Logger().Info().
+					utils.Logger().Debug().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
-						Int("selectedTxs", len(selectedTxs)).
-						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
+						Msg("=========Proposing New Block==========")
 
-					if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
-						ctxerror.Log15(utils.GetLogger().Error,
-							ctxerror.New("cannot commit transactions").
-								WithCause(err))
-					}
-					sig, mask, err := node.Consensus.LastCommitSig()
-					if err != nil {
-						ctxerror.Log15(utils.GetLogger().Error,
-							ctxerror.New("Cannot got commit signatures from last block").
-								WithCause(err))
-						continue
-					}
+					newBlock, err := node.proposeNewBlock()
 
-					// Propose cross shard receipts
-					receiptsList := node.proposeReceiptsProof()
-					if len(receiptsList) != 0 {
-						if err := node.Worker.CommitReceipts(receiptsList); err != nil {
-							ctxerror.Log15(utils.GetLogger().Error,
-								ctxerror.New("cannot commit receipts").
-									WithCause(err))
-						}
-					}
-
-					viewID := node.Consensus.GetViewID()
-					// add aggregated commit signatures from last block, except for the first two blocks
-
-					if node.NodeConfig.ShardID == 0 {
-						crossLinksToPropose, localErr := node.ProposeCrossLinkDataForBeaconchain()
-						if localErr == nil {
-							data, localErr := rlp.EncodeToBytes(crossLinksToPropose)
-							if localErr == nil {
-								newBlock, err = node.Worker.CommitWithCrossLinks(sig, mask, viewID, coinbase, data)
-								utils.Logger().Debug().
-									Uint64("blockNum", newBlock.NumberU64()).
-									Int("numCrossLinks", len(crossLinksToPropose)).
-									Msg("Successfully added cross links into new block")
-							} else {
-								utils.Logger().Debug().Err(localErr).Msg("ops0 ProposeCrossLinkDataForBeaconchain Failed")
-							}
-						} else {
-							utils.Logger().Debug().Err(localErr).Msg("ops1 ProposeCrossLinkDataForBeaconchain Failed")
-							newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
-						}
-					} else {
-						newBlock, err = node.Worker.Commit(sig, mask, viewID, coinbase)
-					}
-
-					if err != nil {
-						ctxerror.Log15(utils.GetLogger().Error,
-							ctxerror.New("cannot commit new block").
-								WithCause(err))
-						continue
-					} else if err := node.proposeShardStateWithoutBeaconSync(newBlock); err != nil {
-						ctxerror.Log15(utils.GetLogger().Error,
-							ctxerror.New("cannot add shard state").
-								WithCause(err))
-					} else {
+					if err == nil {
 						utils.Logger().Debug().
 							Uint64("blockNum", newBlock.NumberU64()).
 							Int("numTxs", newBlock.Transactions().Len()).
-							Msg("Successfully proposed new block")
+							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
+							Msg("=========Successfully Proposed New Block==========")
 
 						// Set deadline will be BlockPeriod from now at this place. Announce stage happens right after this.
 						deadline = time.Now().Add(node.BlockPeriod)
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
 						break
+					} else {
+						utils.Logger().Err(err).
+							Msg("!!!!!!!!!cannot commit new block!!!!!!!!!")
 					}
 				}
 			}
@@ -141,13 +75,62 @@ func (node *Node) WaitForConsensusReadyv2(readySignal chan struct{}, stopChan ch
 	}()
 }
 
-func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) error {
+func (node *Node) proposeNewBlock() (*types.Block, error) {
+	// Update worker's current header and state data in preparation to propose/process new transactions
+	coinbase := node.Consensus.SelfAddress
+
+	// Prepare transactions
+	selectedTxs := node.getTransactionsForNewBlock(coinbase)
+
+	if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
+		ctxerror.Log15(utils.GetLogger().Error,
+			ctxerror.New("cannot commit transactions").
+				WithCause(err))
+		return nil, err
+	}
+
+	// Prepare cross shard transaction receipts
+	receiptsList := node.proposeReceiptsProof()
+	if len(receiptsList) != 0 {
+		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
+			ctxerror.Log15(utils.GetLogger().Error,
+				ctxerror.New("cannot commit receipts").
+					WithCause(err))
+		}
+	}
+
+	// Prepare cross links
+	var crossLinks types.CrossLinks
+	if node.NodeConfig.ShardID == 0 {
+		crossLinksToPropose, localErr := node.ProposeCrossLinkDataForBeaconchain()
+		if localErr == nil {
+			crossLinks = crossLinksToPropose
+		} else {
+			utils.Logger().Debug().Err(localErr).Msg("Failed to propose cross links")
+		}
+	}
+
+	// Prepare shard state
+	shardState := node.Worker.ProposeShardStateWithoutBeaconSync()
+
+	// Prepare last commit signatures
+	sig, mask, err := node.Consensus.LastCommitSig()
+	if err != nil {
+		ctxerror.Log15(utils.GetLogger().Error,
+			ctxerror.New("Cannot get commit signatures from last block").
+				WithCause(err))
+		return nil, err
+	}
+
+	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
+}
+
+func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) types.ShardState {
 	if block == nil || !core.IsEpochLastBlock(block) {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
-	shardState := core.GetShardState(nextEpoch)
-	return block.AddShardState(shardState)
+	return core.GetShardState(nextEpoch)
 }
 
 func (node *Node) proposeShardState(block *types.Block) error {

@@ -123,7 +123,7 @@ func gasSStore(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, m
 	// The legacy gas metering only takes into consideration the current state
 	// Legacy rules should be applied if we are in Petersburg (removal of EIP-1283)
 	// OR Constantinople is not active
-	if evm.chainRules.IsPetersburg || !evm.chainRules.IsConstantinople {
+	if evm.chainRules.IsS3 {
 		// This checks for 3 scenario's and calculates gas accordingly:
 		//
 		// 1. From a zero-value address to a non-zero value         (NEW VALUE)
@@ -393,7 +393,7 @@ func gasCall(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem
 		gas            = gt.Calls
 		transfersValue = stack.Back(2).Sign() != 0
 		address        = common.BigToAddress(stack.Back(1))
-		eip158         = evm.ChainConfig().IsEIP158(evm.BlockNumber)
+		eip158         = evm.ChainConfig().IsS3(evm.BlockNumber)
 	)
 	if eip158 {
 		if transfersValue && evm.StateDB.Empty(address) {
@@ -459,11 +459,11 @@ func gasRevert(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, m
 func gasSuicide(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
 	var gas uint64
 	// EIP150 homestead gas reprice fork:
-	if evm.ChainConfig().IsEIP150(evm.BlockNumber) {
+	if evm.ChainConfig().IsS3(evm.BlockNumber) {
 		gas = gt.Suicide
 		var (
 			address = common.BigToAddress(stack.Back(0))
-			eip158  = evm.ChainConfig().IsEIP158(evm.BlockNumber)
+			eip158  = evm.ChainConfig().IsS3(evm.BlockNumber)
 		)
 
 		if eip158 {

@@ -32,7 +32,7 @@ func TestAddNewBlock(t *testing.T) {
 
 	selectedTxs := node.getTransactionsForNewBlock(common.Address{})
 	node.Worker.CommitTransactions(selectedTxs, common.Address{})
-	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
+	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
 	err = node.AddNewBlock(block)
 	if err != nil {
@@ -61,7 +61,7 @@ func TestVerifyNewBlock(t *testing.T) {
 
 	selectedTxs := node.getTransactionsForNewBlock(common.Address{})
 	node.Worker.CommitTransactions(selectedTxs, common.Address{})
-	block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
+	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
 	if err := node.VerifyNewBlock(block); err != nil {
 		t.Error("New block is not verified successfully:", err)

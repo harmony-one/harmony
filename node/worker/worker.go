@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/params"
 
@@ -85,6 +87,14 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 
 // SelectTransactionsForNewBlock selects transactions for new block.
 func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Transactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
+	// Must update to the correct current state before processing potential txns
+	if err := w.UpdateCurrent(coinbase); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msg("Failed updating worker's state before txn selection")
+		return types.Transactions{}, txs, types.Transactions{}
+	}
+
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
@@ -158,6 +168,14 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 // CommitTransactions commits transactions.
 func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Address) error {
+	// Must update to the correct current state before processing potential txns
+	if err := w.UpdateCurrent(coinbase); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msg("Failed updating worker's state before committing txns")
+		return err
+	}
+
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
@@ -258,8 +276,17 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 	return w.current.incxs
 }
 
-// CommitWithCrossLinks generate a new block with cross links for the new txs.
-func (w *Worker) CommitWithCrossLinks(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks []byte) (*types.Block, error) {
+// ProposeShardStateWithoutBeaconSync proposes the next shard state for next epoch.
+func (w *Worker) ProposeShardStateWithoutBeaconSync() types.ShardState {
+	if !core.ShardingSchedule.IsLastBlock(w.current.header.Number.Uint64()) {
+		return nil
+	}
+	nextEpoch := new(big.Int).Add(w.current.header.Epoch, common.Big1)
+	return core.GetShardState(nextEpoch)
+}
+
+// FinalizeNewBlock generate a new block for the next consensus round.
+func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks types.CrossLinks, shardState types.ShardState) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		copy(w.current.header.LastCommitSignature[:], sig[:])
 		w.current.header.LastCommitBitmap = append(signers[:0:0], signers...)
@@ -267,7 +294,33 @@ func (w *Worker) CommitWithCrossLinks(sig []byte, signers []byte, viewID uint64,
 	w.current.header.Coinbase = coinbase
 	w.current.header.ViewID = new(big.Int)
 	w.current.header.ViewID.SetUint64(viewID)
-	w.current.header.CrossLinks = crossLinks
+
+	// Cross Links
+	if crossLinks != nil && len(crossLinks) != 0 {
+		crossLinkData, err := rlp.EncodeToBytes(crossLinks)
+		if err == nil {
+			utils.Logger().Debug().
+				Uint64("blockNum", w.current.header.Number.Uint64()).
+				Int("numCrossLinks", len(crossLinks)).
+				Msg("Successfully proposed cross links into new block")
+			w.current.header.CrossLinks = crossLinkData
+		} else {
+			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed cross links")
+			return nil, err
+		}
+	}
+
+	// Shard State
+	if shardState != nil && len(shardState) != 0 {
+		w.current.header.ShardStateHash = shardState.Hash()
+		shardStateData, err := rlp.EncodeToBytes(shardState)
+		if err == nil {
+			w.current.header.ShardState = shardStateData
+		} else {
+			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed shard state")
+			return nil, err
+		}
+	}
 
 	s := w.current.state.Copy()
 
@@ -277,11 +330,6 @@ func (w *Worker) CommitWithCrossLinks(sig []byte, signers []byte, viewID uint64,
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 	return block, nil
-}
-
-// Commit generate a new block for the new txs.
-func (w *Worker) Commit(sig []byte, signers []byte, viewID uint64, coinbase common.Address) (*types.Block, error) {
-	return w.CommitWithCrossLinks(sig, signers, viewID, coinbase, []byte{})
 }
 
 // New create a new worker object.

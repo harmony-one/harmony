@@ -40,12 +40,16 @@ func TestUpdateStakingList(t *testing.T) {
 	node := New(host, consensus, testDBFactory, false)
 	node.BlockPeriod = 8 * time.Second
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 1; i++ {
 		selectedTxs := node.getTransactionsForNewBlock(common.Address{})
 		node.Worker.CommitTransactions(selectedTxs, common.Address{})
-		block, _ := node.Worker.Commit([]byte{}, []byte{}, 0, common.Address{})
+		block, err := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
-		err := node.AddNewBlock(block)
+		if err != nil {
+			t.Errorf("Error when finalizing block: %v", err)
+		}
+		block.Header()
+		err = node.AddNewBlock(block)
 		if err != nil {
 			t.Errorf("Error when adding new block: %v", err)
 		}

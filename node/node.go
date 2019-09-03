@@ -3,7 +3,6 @@ package node
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -370,8 +369,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
 		chainConfig = *params.MainnetChainConfig
 	}
-	// TODO: use 1 as mainnet, change to networkID instead
-	chainConfig.ChainID = big.NewInt(1)
 
 	collection := shardchain.NewCollection(
 		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig)

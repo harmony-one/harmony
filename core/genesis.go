@@ -155,7 +155,7 @@ func (e *GenesisMismatchError) Error() string {
 // The returned chain configuration is never nil.
 func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
 	if genesis != nil && genesis.Config == nil {
-		return params.AllEthashProtocolChanges, common.Hash{}, errGenesisNoConfig
+		return params.AllProtocolChanges, common.Hash{}, errGenesisNoConfig
 	}
 
 	// Just commit the new block if there is no stored genesis block.
@@ -217,7 +217,7 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	case ghash == params.TestnetGenesisHash:
 		return params.TestnetChainConfig
 	default:
-		return params.AllEthashProtocolChanges
+		return params.AllProtocolChanges
 	}
 }
 
@@ -286,7 +286,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 
 	config := g.Config
 	if config == nil {
-		config = params.AllEthashProtocolChanges
+		config = params.AllProtocolChanges
 	}
 	rawdb.WriteChainConfig(db, block.Hash(), config)
 	return block, nil
@@ -316,32 +316,6 @@ func DefaultGenesisBlock() *Genesis {
 		ExtraData: hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
 		GasLimit:  5000,
 		Alloc:     decodePrealloc("empty"),
-	}
-}
-
-// DeveloperGenesisBlock returns the 'geth --dev' genesis block. Note, this must
-// be seeded with the
-func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
-	// Override the default period to the user requested one
-	config := *params.AllCliqueProtocolChanges
-	config.Clique.Period = period
-
-	// Assemble and return the genesis with the precompiles and faucet pre-funded
-	return &Genesis{
-		Config:    &config,
-		ExtraData: append(append(make([]byte, 32), faucet[:]...), make([]byte, 65)...),
-		GasLimit:  6283185,
-		Alloc: map[common.Address]GenesisAccount{
-			common.BytesToAddress([]byte{1}): {Balance: big.NewInt(1)}, // ECRecover
-			common.BytesToAddress([]byte{2}): {Balance: big.NewInt(1)}, // SHA256
-			common.BytesToAddress([]byte{3}): {Balance: big.NewInt(1)}, // RIPEMD
-			common.BytesToAddress([]byte{4}): {Balance: big.NewInt(1)}, // Identity
-			common.BytesToAddress([]byte{5}): {Balance: big.NewInt(1)}, // ModExp
-			common.BytesToAddress([]byte{6}): {Balance: big.NewInt(1)}, // ECAdd
-			common.BytesToAddress([]byte{7}): {Balance: big.NewInt(1)}, // ECScalarMul
-			common.BytesToAddress([]byte{8}): {Balance: big.NewInt(1)}, // ECPairing
-			//faucet: {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(9))},
-		},
 	}
 }
 

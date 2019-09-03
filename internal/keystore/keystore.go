@@ -2,6 +2,7 @@ package keystore
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/harmony-one/harmony/accounts"
@@ -42,7 +43,7 @@ func Unlock(account accounts.Account) {
 // SignTx signs transaction using account key
 func SignTx(account accounts.Account, tx *types.Transaction) (*types.Transaction, error) {
 	if hmyKeystore != nil {
-		return hmyKeystore.SignTx(account, tx, nil)
+		return hmyKeystore.SignTx(account, tx, big.NewInt(1)) // TODO: use chainID from config
 	}
 	return tx, fmt.Errorf("un-initialized keystore")
 }

@@ -141,10 +141,10 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	}
 	// Update the state with pending changes
 	var root []byte
-	if config.IsByzantium(header.Number) {
+	if config.IsS3(header.Number) {
 		statedb.Finalise(true)
 	} else {
-		root = statedb.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
+		root = statedb.IntermediateRoot(config.IsS3(header.Number)).Bytes()
 	}
 	*usedGas += gas
 
@@ -188,7 +188,7 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *type
 			db.CreateAccount(*cx.To)
 		}
 		db.AddBalance(*cx.To, cx.Amount)
-		db.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
+		db.IntermediateRoot(config.IsS3(header.Number)).Bytes()
 	}
 	return nil
 }
