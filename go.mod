@@ -15,9 +15,13 @@ require (
 	github.com/ethereum/go-ethereum v1.8.27
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
+	github.com/go-toolsmith/astcopy v1.0.0 // indirect
+	github.com/go-toolsmith/astfmt v1.0.0 // indirect
+	github.com/go-toolsmith/astp v1.0.0 // indirect
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.1
-	github.com/golangci/golangci-lint v1.17.1
+	github.com/golangci/golangci-lint v1.17.0
+	github.com/golangci/ineffassign v0.0.0-20180808204949-42439a7714cc // indirect
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.2
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
@@ -46,6 +50,7 @@ require (
 	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90 // indirect
 	github.com/prometheus/common v0.4.1 // indirect
 	github.com/prometheus/procfs v0.0.3 // indirect
+	github.com/quasilyte/go-consistent v0.0.0-20190521200055-c6f3937de18c // indirect
 	github.com/rjeczalik/notify v0.9.2
 	github.com/rs/cors v1.6.0 // indirect
 	github.com/rs/zerolog v1.14.3
