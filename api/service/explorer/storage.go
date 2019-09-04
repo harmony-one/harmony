@@ -113,7 +113,6 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	// Store txs
 	for _, tx := range block.Transactions() {
 		if tx.To() == nil {
-			utils.Logger().Info().Msgf("LOL Tx id %s", tx.Hash().Hex())
 			continue
 		}
 

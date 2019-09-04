@@ -111,7 +111,6 @@ func NewBlock(block *types.Block, height int) *Block {
 
 // GetTransaction ...
 func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transaction {
-	utils.Logger().Info().Msgf("Tx id %s", tx.Hash().Hex())
 	if tx.To() == nil {
 		return nil
 	}
@@ -119,7 +118,6 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transacti
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
 	}
-	utils.Logger().Info().Msg("OK done")
 	return &Transaction{
 		ID:        tx.Hash().Hex(),
 		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
