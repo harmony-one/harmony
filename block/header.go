@@ -162,7 +162,7 @@ func (h *Header) Number() *big.Int {
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetNumber(newNumber *big.Int) {
-	h.fields.Number.Set(newNumber)
+	h.fields.Number = new(big.Int).Set(newNumber)
 }
 
 // GasLimit is the gas limit for transactions in this block.
@@ -196,7 +196,7 @@ func (h *Header) Time() *big.Int {
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetTime(newTime *big.Int) {
-	h.fields.Time.Set(newTime)
+	h.fields.Time = new(big.Int).Set(newTime)
 }
 
 // Extra is the extra data field of this block.
@@ -240,7 +240,7 @@ func (h *Header) ViewID() *big.Int {
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetViewID(newViewID *big.Int) {
-	h.fields.ViewID.Set(newViewID)
+	h.fields.ViewID = new(big.Int).Set(newViewID)
 }
 
 // Epoch is the epoch number of this block.
@@ -254,7 +254,7 @@ func (h *Header) Epoch() *big.Int {
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetEpoch(newEpoch *big.Int) {
-	h.fields.Epoch.Set(newEpoch)
+	h.fields.Epoch = new(big.Int).Set(newEpoch)
 }
 
 // ShardID is the shard ID to which this block belongs.
