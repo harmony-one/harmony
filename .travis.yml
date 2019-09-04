@@ -1,6 +1,6 @@
 language: go
 go:
-  - stable
+  - 1.12
 go_import_path: github.com/harmony-one/harmony
 install:
   - export GO111MODULE=on

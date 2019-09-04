@@ -2,7 +2,7 @@
 
 BUCKET=pub.harmony.one
 OS=$(uname -s)
-REL=r3
+REL=mainnet
 
 case "$OS" in
     Darwin)

@@ -25,6 +25,8 @@ const (
 	mainnetV0_3Epoch = 8
 	mainnetV0_4Epoch = 10
 	mainnetV1Epoch   = 12
+	mainnetV1_1Epoch = 19
+	mainnetV1_2Epoch = 21
 
 	mainnetMaxTxAmountLimit               = 1e3 // unit is interface{} One
 	mainnetMaxNumRecentTxsPerAccountLimit = 1e2
@@ -40,8 +42,14 @@ type mainnetSchedule struct{}
 
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case epoch.Cmp(big.NewInt(mainnetV1_2Epoch)) >= 0:
+		// twenty-first resharding epoch around 08/30/2019 11:35pm PDT
+		return mainnetV1_2
+	case epoch.Cmp(big.NewInt(mainnetV1_1Epoch)) >= 0:
+		// nineteenth resharding epoch around 08/27/2019 9:07pm PDT
+		return mainnetV1_1
 	case epoch.Cmp(big.NewInt(mainnetV1Epoch)) >= 0:
-		// tenth resharding epoch around 08/16/2019 11:00pm PDT
+		// twelfth resharding epoch around 08/16/2019 11:00pm PDT
 		return mainnetV1
 	case epoch.Cmp(big.NewInt(mainnetV0_4Epoch)) >= 0:
 		// tenth resharding epoch around 08/13/2019 9:00pm PDT
@@ -141,7 +149,7 @@ func (ms mainnetSchedule) GetNetworkID() NetworkID {
 	return MainNet
 }
 
-var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch)}
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch)}
 
 var mainnetV0 = MustNewInstance(4, 150, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch)
 var mainnetV0_1 = MustNewInstance(4, 152, 112, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_1, mainnetReshardingEpoch)
@@ -149,3 +157,5 @@ var mainnetV0_2 = MustNewInstance(4, 200, 148, genesis.HarmonyAccounts, genesis.
 var mainnetV0_3 = MustNewInstance(4, 210, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_3, mainnetReshardingEpoch)
 var mainnetV0_4 = MustNewInstance(4, 216, 148, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_4, mainnetReshardingEpoch)
 var mainnetV1 = MustNewInstance(4, 250, 170, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch)
+var mainnetV1_1 = MustNewInstance(4, 250, 170, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_1, mainnetReshardingEpoch)
+var mainnetV1_2 = MustNewInstance(4, 250, 170, genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_2, mainnetReshardingEpoch)
