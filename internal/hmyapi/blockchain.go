@@ -26,6 +26,14 @@ const (
 	defaultFromAddress = "0x0000000000000000000000000000000000000000"
 )
 
+// Constants for sharding structure.
+const (
+	MainNetHTTPPattern = "http://s%d.t.hmny.io:9500"
+	MainNetWSPattern   = "ws://s%d.t.hmny.io:9800"
+	TestNetHTTPPattern = "http://s%d.b.hmny.io:9500"
+	TestNetWSPattern   = "ws://s%d.s.hmny.io:9800"
+)
+
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockChainAPI struct {
@@ -64,61 +72,47 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 	return nil, err
 }
 
+// GenShardingStructure return sharding structure, given shard number and its patterns.
+func GenShardingStructure(shardNum, shardID uint32, httpPattern, wsPattern string) []map[string]interface{} {
+	res := []map[string]interface{}{}
+	for i := 0; i < int(shardNum); i++ {
+		res = append(res, map[string]interface{}{
+			"current": int(shardID) == i,
+			"shardID": i,
+			"http":    fmt.Sprintf(httpPattern, i),
+			"ws":      fmt.Sprintf(wsPattern, i),
+		})
+	}
+	return res
+}
+
 // GetShardingStructure returns an array of sharding structures.
 func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[string]interface{}, error) {
+	// Get header and number of shards.
+	header := s.b.CurrentBlock().Header()
+	numShard := core.ShardingSchedule.InstanceForEpoch(header.Epoch).NumShards()
+	// Return shareding structure for each case.
 	if core.ShardingSchedule.GetNetworkID() == shardingconfig.MainNet {
-		return []map[string]interface{}{
-			map[string]interface{}{
-				"current": s.b.GetShardID() == 0,
-				"shardID": "0",
-				"http":    "http://s0.t.hmny.io:9500",
-				"ws":      "ws://s0.t.hmny.io:9800",
-			},
-			map[string]interface{}{
-				"current": s.b.GetShardID() == 1,
-				"shardID": "1",
-				"http":    "http://s1.t.hmny.io:9500",
-				"ws":      "ws://s1.t.hmny.io:9800",
-			},
-			map[string]interface{}{
-				"shardID": "2",
-				"http":    "http://s2.t.hmny.io:9500",
-				"ws":      "ws://s2.t.hmny.io:9800",
-			},
-			map[string]interface{}{
-				"shardID": "3",
-				"http":    "http://s3.t.hmny.io:9500",
-				"ws":      "ws://s3.t.hmny.io:9800",
-			},
-		}, nil
+		s.b.CurrentBlock().Header()
+		return GenShardingStructure(numShard, s.b.GetShardID(), MainNetHTTPPattern, MainNetWSPattern), nil
 	} else if core.ShardingSchedule.GetNetworkID() == shardingconfig.TestNet {
-		return []map[string]interface{}{
-			map[string]interface{}{
-				"shardID": "0",
-				"http":    "http://s0.b.hmny.io:9500",
-				"ws":      "ws://s0.s.hmny.io:9800",
-			},
-			map[string]interface{}{
-				"shardID": "1",
-				"http":    "http://s1.b.hmny.io:9500",
-				"ws":      "ws://s1.s.hmny.io:9800",
-			},
-		}, nil
+		return GenShardingStructure(numShard, s.b.GetShardID(), TestNetHTTPPattern, TestNetWSPattern), nil
 	} else {
 		return []map[string]interface{}{
 			map[string]interface{}{
-				"shardID": "0",
+				"current": s.b.GetShardID() == 0,
+				"shardID": 0,
 				"http":    "http://127.0.0.1:9500",
 				"ws":      "ws://127.0.0.1:9800",
 			},
 			map[string]interface{}{
-				"shardID": "1",
+				"current": s.b.GetShardID() == 1,
+				"shardID": 1,
 				"http":    "http://127.0.0.1:9501",
 				"ws":      "ws://127.0.0.1:9801",
 			},
 		}, nil
 	}
-
 }
 
 // GetCode returns the code stored at the given address in the state for the given block number.
