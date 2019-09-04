@@ -33,7 +33,7 @@ func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64
 	}
 	var entry TxLookupEntry
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
-		utils.Logger().Error().Err(err).Bytes("hash", hash.Bytes()).Msg("Invalid transaction lookup entry RLP")
+		utils.Logger().Error().Err(err).Hex("hash", hash.Bytes()).Msg("Invalid transaction lookup entry RLP")
 		return common.Hash{}, 0, 0
 	}
 	return entry.BlockHash, entry.BlockIndex, entry.Index
