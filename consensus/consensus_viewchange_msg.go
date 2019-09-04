@@ -43,7 +43,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	}
 
 	consensus.getLogger().Debug().
-		Bytes("m1Payload", vcMsg.Payload).
+		Hex("m1Payload", vcMsg.Payload).
 		Str("pubKey", consensus.PubKey.SerializeToHexStr()).
 		Msg("[constructViewChangeMessage]")
 
