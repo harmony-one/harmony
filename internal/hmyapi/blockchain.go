@@ -71,37 +71,37 @@ func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[s
 			map[string]interface{}{
 				"current": s.b.GetShardID() == 0,
 				"shardID": "0",
-				"http":    "http://s0.t.hmy.io:9500",
-				"ws":      "ws://s0.t.hmy.io:9800",
+				"http":    "http://s0.t.hmny.io:9500",
+				"ws":      "ws://s0.t.hmny.io:9800",
 			},
 			map[string]interface{}{
 				"current": s.b.GetShardID() == 1,
 				"shardID": "1",
-				"http":    "http://s1.t.hmy.io:9500",
-				"ws":      "ws://s1.t.hmy.io:9800",
+				"http":    "http://s1.t.hmny.io:9500",
+				"ws":      "ws://s1.t.hmny.io:9800",
 			},
 			map[string]interface{}{
 				"shardID": "2",
-				"http":    "http://s2.t.hmy.io:9500",
-				"ws":      "ws://s2.t.hmy.io:9800",
+				"http":    "http://s2.t.hmny.io:9500",
+				"ws":      "ws://s2.t.hmny.io:9800",
 			},
 			map[string]interface{}{
 				"shardID": "3",
-				"http":    "http://s3.t.hmy.io:9500",
-				"ws":      "ws://s3.t.hmy.io:9800",
+				"http":    "http://s3.t.hmny.io:9500",
+				"ws":      "ws://s3.t.hmny.io:9800",
 			},
 		}, nil
 	} else if core.ShardingSchedule.GetNetworkID() == shardingconfig.TestNet {
 		return []map[string]interface{}{
 			map[string]interface{}{
 				"shardID": "0",
-				"http":    "http://s0.b.hmy.io:9500",
-				"ws":      "ws://s0.s.hmy.io:9800",
+				"http":    "http://s0.b.hmny.io:9500",
+				"ws":      "ws://s0.s.hmny.io:9800",
 			},
 			map[string]interface{}{
 				"shardID": "1",
-				"http":    "http://s1.b.hmy.io:9500",
-				"ws":      "ws://s1.s.hmy.io:9800",
+				"http":    "http://s1.b.hmny.io:9500",
+				"ws":      "ws://s1.s.hmny.io:9800",
 			},
 		}, nil
 	} else {
