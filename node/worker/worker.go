@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/params"
 
+	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
@@ -24,7 +25,7 @@ type environment struct {
 	state   *state.DB     // apply state changes here
 	gasPool *core.GasPool // available gas used to pack transactions
 
-	header   *types.Header
+	header   *block.Header
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 	outcxs   []*types.CXReceipt       // cross shard transaction receipts (source shard)
@@ -211,7 +212,7 @@ func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 		// ... except if parent has a resharding assignment it increases by 1.
 		epoch = epoch.Add(epoch, common.Big1)
 	}
-	header := &types.Header{
+	header := &block.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
@@ -224,7 +225,7 @@ func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 }
 
 // makeCurrent creates a new environment for the current cycle.
-func (w *Worker) makeCurrent(parent *types.Block, header *types.Header) error {
+func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 	state, err := w.chain.StateAt(parent.Root())
 	if err != nil {
 		return err
@@ -306,7 +307,7 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 		// ... except if parent has a resharding assignment it increases by 1.
 		epoch = epoch.Add(epoch, common.Big1)
 	}
-	header := &types.Header{
+	header := &block.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil),

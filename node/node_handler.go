@@ -25,6 +25,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -33,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/shard"
 )
 
 const (
@@ -264,7 +266,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 // BroadcastCrossLinkHeader is called by consensus leader to send the new header as cross link to beacon chain.
 func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig.GetBeaconGroupID())
-	headers := []*types.Header{}
+	headers := []*block.Header{}
 	lastLink, err := node.Beaconchain().ReadShardLastCrossLink(newBlock.ShardID())
 	var latestBlockNum uint64
 
@@ -472,7 +474,7 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 		// We aren't expecting to reshard, so proceed to sign
 		return nil
 	}
-	shardState := &types.ShardState{}
+	shardState := &shard.State{}
 	err := rlp.DecodeBytes(header.ShardState, shardState)
 	if err != nil {
 		return err
@@ -491,7 +493,7 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 			return ctxerror.New("cannot calculate expected shard state").
 				WithCause(err)
 		}
-		if types.CompareShardState(expected, proposed) != 0 {
+		if shard.CompareShardState(expected, proposed) != 0 {
 			// TODO ek – log state proposal differences
 			// TODO ek – this error should trigger view change
 			err := errors.New("shard state proposal is different from expected")
@@ -538,7 +540,7 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 					"leader proposed to continue against beacon decision")
 			}
 			// Did beaconchain say the same proposal?
-			if types.CompareCommittee(expected, &proposed) != 0 {
+			if shard.CompareCommittee(expected, &proposed) != 0 {
 				// TODO ek – log differences
 				// TODO ek – invoke view change
 				return errors.New("proposal differs from one in beacon chain")
@@ -647,7 +649,7 @@ func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
 		return err
 	}
 	epochShardStateMessage := proto_node.ConstructEpochShardStateMessage(
-		types.EpochShardState{
+		shard.EpochShardState{
 			Epoch:      newBlock.Header().Epoch.Uint64() + 1,
 			ShardState: shardState,
 		},
@@ -679,13 +681,13 @@ func (node *Node) AddNewBlock(newBlock *types.Block) error {
 type genesisNode struct {
 	ShardID     uint32
 	MemberIndex int
-	NodeID      types.NodeID
+	NodeID      shard.NodeID
 }
 
 var (
 	genesisCatalogOnce          sync.Once
 	genesisNodeByStakingAddress = make(map[common.Address]*genesisNode)
-	genesisNodeByConsensusKey   = make(map[types.BlsPublicKey]*genesisNode)
+	genesisNodeByConsensusKey   = make(map[shard.BlsPublicKey]*genesisNode)
 )
 
 func initGenesisCatalog() {
@@ -708,7 +710,7 @@ func getGenesisNodeByStakingAddress(address common.Address) *genesisNode {
 	return genesisNodeByStakingAddress[address]
 }
 
-func getGenesisNodeByConsensusKey(key types.BlsPublicKey) *genesisNode {
+func getGenesisNodeByConsensusKey(key shard.BlsPublicKey) *genesisNode {
 	genesisCatalogOnce.Do(initGenesisCatalog)
 	return genesisNodeByConsensusKey[key]
 }
@@ -832,7 +834,7 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 }
 
 /*
-func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
+func (node *Node) transitionIntoNextEpoch(shardState types.State) {
 	logger = logger.New(
 		"blsPubKey", hex.EncodeToString(node.Consensus.PubKey.Serialize()),
 		"curShard", node.Blockchain().ShardID(),
@@ -884,7 +886,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 */
 
 func findRoleInShardState(
-	key *bls.PublicKey, state types.ShardState,
+	key *bls.PublicKey, state shard.State,
 ) (shardID uint32, isLeader bool) {
 	keyBytes := key.Serialize()
 	for idx, shard := range state {

@@ -10,8 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/vdf/src/vdf_go"
+
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
@@ -20,7 +23,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
-	"github.com/harmony-one/vdf/src/vdf_go"
 )
 
 // handleMessageUpdate will update the consensus state according to received message
@@ -182,7 +184,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 	// verify validity of block header object
 	blockHeader := recvMsg.Payload
-	var headerObj types.Header
+	var headerObj block.Header
 	err = rlp.DecodeBytes(blockHeader, &headerObj)
 	if err != nil {
 		consensus.getLogger().Warn().
@@ -1203,7 +1205,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 }
 
 // ValidateVrfAndProof validates a VRF/Proof from hash of previous block
-func (consensus *Consensus) ValidateVrfAndProof(headerObj types.Header) bool {
+func (consensus *Consensus) ValidateVrfAndProof(headerObj block.Header) bool {
 	vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey)
 
 	var blockHash [32]byte
@@ -1275,7 +1277,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 }
 
 // ValidateVdfAndProof validates the VDF/proof in the current epoch
-func (consensus *Consensus) ValidateVdfAndProof(headerObj types.Header) bool {
+func (consensus *Consensus) ValidateVdfAndProof(headerObj block.Header) bool {
 	vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(headerObj.Epoch)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).

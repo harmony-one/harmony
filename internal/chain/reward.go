@@ -6,10 +6,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -23,7 +23,7 @@ var BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One)
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
 func AccumulateRewards(
-	bc engine.ChainReader, state *state.DB, header *types.Header,
+	bc engine.ChainReader, state *state.DB, header *block.Header,
 ) error {
 	blockNum := header.Number.Uint64()
 	if blockNum == 0 {

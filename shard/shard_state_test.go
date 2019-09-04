@@ -1,4 +1,4 @@
-package types
+package shard
 
 import (
 	"bytes"
@@ -65,7 +65,7 @@ func TestHash(t *testing.T) {
 			{common.Address{0x66}, blsPubKey6},
 		},
 	}
-	shardState1 := ShardState{com1, com2}
+	shardState1 := State{com1, com2}
 	h1 := shardState1.Hash()
 
 	com3 := Committee{
@@ -85,7 +85,7 @@ func TestHash(t *testing.T) {
 		},
 	}
 
-	shardState2 := ShardState{com3, com4}
+	shardState2 := State{com3, com4}
 	h2 := shardState2.Hash()
 
 	if bytes.Compare(h1[:], h2[:]) != 0 {
