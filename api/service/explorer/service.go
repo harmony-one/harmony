@@ -17,6 +17,7 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
@@ -25,6 +26,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants for explorer service.
@@ -207,7 +209,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 
 	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
 	curEpoch := int64(-1)
-	committee := &types.Committee{}
+	committee := &shard.Committee{}
 	for id, accountBlock := range accountBlocks {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
@@ -215,7 +217,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		block := NewBlock(accountBlock, id+fromInt-1)
 		if int64(block.Epoch) > curEpoch {
 			if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), block.Epoch))); err == nil {
-				committee = &types.Committee{}
+				committee = &shard.Committee{}
 				if err = rlp.DecodeBytes(bytes, committee); err != nil {
 					utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
 				}
@@ -377,7 +379,7 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
-	committee := &types.Committee{}
+	committee := &shard.Committee{}
 	if err := rlp.DecodeBytes(bytes, committee); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot decode committee data from DB")
 		w.WriteHeader(500)

@@ -4,13 +4,14 @@ import (
 	"encoding/hex"
 	"math/big"
 
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/shard"
 
 	"github.com/harmony-one/harmony/contracts/structs"
 
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -45,7 +46,7 @@ func (node *Node) UpdateStakingList(stakeInfoReturnValue *structs.StakeInfoRetur
 		}
 		// True if the token is still staked within the locking period.
 		if curEpoch-startEpoch <= lockPeriodCount.Uint64()*lockPeriodInEpochs {
-			blsPubKey := types.BlsPublicKey{}
+			blsPubKey := shard.BlsPublicKey{}
 			copy(blsPubKey[:32], stakeInfoReturnValue.BlsPubicKeys1[i][:])
 			copy(blsPubKey[32:48], stakeInfoReturnValue.BlsPubicKeys2[i][:16])
 			node.CurrentStakes[addr] = &structs.StakeInfo{

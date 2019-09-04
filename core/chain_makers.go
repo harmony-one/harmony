@@ -24,10 +24,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/internal/params"
 
+	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // BlockGen creates blocks for testing.
@@ -36,13 +38,13 @@ type BlockGen struct {
 	i       int
 	parent  *types.Block
 	chain   []*types.Block
-	header  *types.Header
+	header  *block.Header
 	statedb *state.DB
 
 	gasPool  *GasPool
 	txs      []*types.Transaction
 	receipts []*types.Receipt
-	uncles   []*types.Header
+	uncles   []*block.Header
 
 	config *params.ChainConfig
 	engine consensus_engine.Engine
@@ -128,7 +130,7 @@ func (b *BlockGen) TxNonce(addr common.Address) uint64 {
 }
 
 // AddUncle adds an uncle header to the generated block.
-func (b *BlockGen) AddUncle(h *types.Header) {
+func (b *BlockGen) AddUncle(h *block.Header) {
 	b.uncles = append(b.uncles, h)
 }
 
@@ -206,7 +208,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	return blocks, receipts
 }
 
-func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine) *types.Header {
+func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine) *block.Header {
 	var time *big.Int
 	if parent.Time() == nil {
 		time = big.NewInt(10)
@@ -214,7 +216,7 @@ func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *
 		time = new(big.Int).Add(parent.Time(), big.NewInt(10)) // block time is fixed at 10 seconds
 	}
 
-	return &types.Header{
+	return &block.Header{
 		Root:       state.IntermediateRoot(chain.Config().IsEIP158(parent.Number())),
 		ParentHash: parent.Hash(),
 		Coinbase:   parent.Coinbase(),
@@ -231,9 +233,9 @@ func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *
 }
 
 // makeHeaderChain creates a deterministic chain of headers rooted at parent.
-func makeHeaderChain(parent *types.Header, n int, engine consensus_engine.Engine, db ethdb.Database, seed int) []*types.Header {
+func makeHeaderChain(parent *block.Header, n int, engine consensus_engine.Engine, db ethdb.Database, seed int) []*block.Header {
 	blocks := makeBlockChain(types.NewBlockWithHeader(parent), n, engine, db, seed)
-	headers := make([]*types.Header, len(blocks))
+	headers := make([]*block.Header, len(blocks))
 	for i, block := range blocks {
 		headers[i] = block.Header()
 	}
@@ -258,9 +260,9 @@ func (cr *fakeChainReader) Config() *params.ChainConfig {
 	return cr.config
 }
 
-func (cr *fakeChainReader) CurrentHeader() *types.Header                            { return nil }
-func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *types.Header           { return nil }
-func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *types.Header          { return nil }
-func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *types.Header { return nil }
+func (cr *fakeChainReader) CurrentHeader() *block.Header                            { return nil }
+func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *block.Header           { return nil }
+func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *block.Header          { return nil }
+func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Header { return nil }
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
-func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (types.ShardState, error) { return nil, nil }
+func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (shard.State, error)      { return nil, nil }

@@ -38,6 +38,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	lru "github.com/hashicorp/golang-lru"
 
+	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -46,6 +47,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 var (
@@ -248,7 +250,7 @@ func IsEpochLastBlock(block *types.Block) bool {
 
 // IsEpochLastBlockByHeader returns whether this block is the last block of an epoch
 // given block header
-func IsEpochLastBlockByHeader(header *types.Header) bool {
+func IsEpochLastBlockByHeader(header *block.Header) bool {
 	return ShardingSchedule.IsLastBlock(header.Number.Uint64())
 }
 
@@ -725,11 +727,11 @@ func (bc *BlockChain) GetBlocksFromHash(hash common.Hash, n int) (blocks []*type
 
 // GetUnclesInChain retrieves all the uncles from a given block backwards until
 // a specific distance is reached.
-func (bc *BlockChain) GetUnclesInChain(block *types.Block, length int) []*types.Header {
-	uncles := []*types.Header{}
-	for i := 0; block != nil && i < length; i++ {
-		uncles = append(uncles, block.Uncles()...)
-		block = bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
+func (bc *BlockChain) GetUnclesInChain(b *types.Block, length int) []*block.Header {
+	uncles := []*block.Header{}
+	for i := 0; b != nil && i < length; i++ {
+		uncles = append(uncles, b.Uncles()...)
+		b = bc.GetBlock(b.ParentHash(), b.NumberU64()-1)
 	}
 	return uncles
 }
@@ -1207,7 +1209,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		coalescedLogs []*types.Log
 	)
 	// Start the parallel header verifier
-	headers := make([]*types.Header, len(chain))
+	headers := make([]*block.Header, len(chain))
 	seals := make([]bool, len(chain))
 
 	for i, block := range chain {
@@ -1669,7 +1671,7 @@ Error: %v
 // should be done or not. The reason behind the optional check is because some
 // of the header retrieval mechanisms already need to verify nonces, as well as
 // because nonces can be verified sparsely, not needing to check each.
-func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
+func (bc *BlockChain) InsertHeaderChain(chain []*block.Header, checkFreq int) (int, error) {
 	start := time.Now()
 	if i, err := bc.hc.ValidateHeaderChain(chain, checkFreq); err != nil {
 		return i, err
@@ -1682,7 +1684,7 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (i
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
-	whFunc := func(header *types.Header) error {
+	whFunc := func(header *block.Header) error {
 		bc.mu.Lock()
 		defer bc.mu.Unlock()
 
@@ -1702,7 +1704,7 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (i
 // without the real blocks. Hence, writing headers directly should only be done
 // in two scenarios: pure-header mode of operation (light clients), or properly
 // separated header/block phases (non-archive clients).
-func (bc *BlockChain) writeHeader(header *types.Header) error {
+func (bc *BlockChain) writeHeader(header *block.Header) error {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -1715,7 +1717,7 @@ func (bc *BlockChain) writeHeader(header *types.Header) error {
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
 // header is retrieved from the HeaderChain's internal cache.
-func (bc *BlockChain) CurrentHeader() *types.Header {
+func (bc *BlockChain) CurrentHeader() *block.Header {
 	return bc.hc.CurrentHeader()
 }
 
@@ -1733,13 +1735,13 @@ func (bc *BlockChain) GetTdByHash(hash common.Hash) *big.Int {
 
 // GetHeader retrieves a block header from the database by hash and number,
 // caching it if found.
-func (bc *BlockChain) GetHeader(hash common.Hash, number uint64) *types.Header {
+func (bc *BlockChain) GetHeader(hash common.Hash, number uint64) *block.Header {
 	return bc.hc.GetHeader(hash, number)
 }
 
 // GetHeaderByHash retrieves a block header from the database by hash, caching it if
 // found.
-func (bc *BlockChain) GetHeaderByHash(hash common.Hash) *types.Header {
+func (bc *BlockChain) GetHeaderByHash(hash common.Hash) *block.Header {
 	return bc.hc.GetHeaderByHash(hash)
 }
 
@@ -1769,7 +1771,7 @@ func (bc *BlockChain) GetAncestor(hash common.Hash, number, ancestor uint64, max
 
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
-func (bc *BlockChain) GetHeaderByNumber(number uint64) *types.Header {
+func (bc *BlockChain) GetHeaderByNumber(number uint64) *block.Header {
 	return bc.hc.GetHeaderByNumber(number)
 }
 
@@ -1805,10 +1807,10 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 }
 
 // ReadShardState retrieves sharding state given the epoch number.
-func (bc *BlockChain) ReadShardState(epoch *big.Int) (types.ShardState, error) {
+func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.State, error) {
 	cacheKey := string(epoch.Bytes())
 	if cached, ok := bc.shardStateCache.Get(cacheKey); ok {
-		shardState := cached.(types.ShardState)
+		shardState := cached.(shard.State)
 		return shardState, nil
 	}
 	shardState, err := rawdb.ReadShardState(bc.db, epoch)
@@ -1821,7 +1823,7 @@ func (bc *BlockChain) ReadShardState(epoch *big.Int) (types.ShardState, error) {
 
 // WriteShardState saves the given sharding state under the given epoch number.
 func (bc *BlockChain) WriteShardState(
-	epoch *big.Int, shardState types.ShardState,
+	epoch *big.Int, shardState shard.State,
 ) error {
 	shardState = shardState.DeepCopy()
 	err := rawdb.WriteShardState(bc.db, epoch, shardState)
@@ -1837,7 +1839,7 @@ func (bc *BlockChain) WriteShardState(
 func (bc *BlockChain) WriteShardStateBytes(
 	epoch *big.Int, shardState []byte,
 ) error {
-	decodeShardState := types.ShardState{}
+	decodeShardState := shard.State{}
 	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
 		return err
 	}
@@ -1897,7 +1899,7 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 func (bc *BlockChain) GetShardState(
 	epoch *big.Int,
 	stakeInfo *map[common.Address]*structs.StakeInfo,
-) (types.ShardState, error) {
+) (shard.State, error) {
 	shardState, err := bc.ReadShardState(epoch)
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err

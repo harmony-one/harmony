@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -20,7 +22,7 @@ import (
 func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 	if node.NodeConfig.ShardID == 0 {
 
-		var headers []*types.Header
+		var headers []*block.Header
 		err := rlp.DecodeBytes(msgPayload, &headers)
 		if err != nil {
 			utils.Logger().Error().
@@ -32,7 +34,7 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 		// Try to reprocess all the pending cross links
 		node.pendingClMutex.Lock()
 		crossLinkHeadersToProcess := node.pendingCrossLinks
-		node.pendingCrossLinks = []*types.Header{}
+		node.pendingCrossLinks = []*block.Header{}
 		node.pendingClMutex.Unlock()
 
 		firstCrossLinkBlock := core.ShardingSchedule.FirstCrossLinkBlock()
@@ -46,7 +48,7 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 		utils.Logger().Debug().
 			Msgf("[ProcessingHeader] number of crosslink headers to propose %d, firstCrossLinkBlock %d", len(crossLinkHeadersToProcess), firstCrossLinkBlock)
 
-		headersToQuque := []*types.Header{}
+		headersToQuque := []*block.Header{}
 
 		for _, header := range crossLinkHeadersToProcess {
 			if len(headersToQuque) > crossLinkBatchSize {
@@ -156,7 +158,7 @@ func (node *Node) compareCrosslinkWithReceipts(cxp *types.CXReceiptsProof) error
 }
 
 // VerifyCrosslinkHeader verifies the header is valid against the prevHeader.
-func (node *Node) VerifyCrosslinkHeader(prevHeader, header *types.Header) error {
+func (node *Node) VerifyCrosslinkHeader(prevHeader, header *block.Header) error {
 
 	// TODO: add fork choice rule
 	if prevHeader.Hash() != header.ParentHash {

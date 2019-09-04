@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/contracts/structs"
@@ -32,6 +33,7 @@ import (
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // State is a state of a node.
@@ -95,7 +97,7 @@ type Node struct {
 	ConfirmedBlockChannel chan *types.Block    // The channel to send confirmed blocks
 	BeaconBlockChannel    chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
 	DRand                 *drand.DRand         // The instance for distributed randomness protocol
-	pendingCrossLinks     []*types.Header
+	pendingCrossLinks     []*block.Header
 	pendingClMutex        sync.Mutex
 
 	pendingCXReceipts []*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
@@ -201,7 +203,7 @@ type Node struct {
 	// Next shard state
 	nextShardState struct {
 		// The received master shard state
-		master *types.EpochShardState
+		master *shard.EpochShardState
 
 		// When for a leader to propose the next shard state,
 		// or for a validator to wait for a proposal before view change.

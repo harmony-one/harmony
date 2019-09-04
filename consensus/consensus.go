@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 )
 
 const (
@@ -304,7 +305,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 // genesis accounts.
 // When used for block reward, it rewards only foundational nodes.
 type GenesisStakeInfoFinder struct {
-	byNodeKey map[types.BlsPublicKey][]*structs.StakeInfo
+	byNodeKey map[shard.BlsPublicKey][]*structs.StakeInfo
 	byAccount map[common.Address][]*structs.StakeInfo
 }
 
@@ -314,7 +315,7 @@ type GenesisStakeInfoFinder struct {
 func (f *GenesisStakeInfoFinder) FindStakeInfoByNodeKey(
 	key *bls.PublicKey,
 ) []*structs.StakeInfo {
-	var pk types.BlsPublicKey
+	var pk shard.BlsPublicKey
 	if err := pk.FromLibBLSPublicKey(key); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot convert BLS public key")
 		return nil
@@ -337,13 +338,13 @@ func (f *GenesisStakeInfoFinder) FindStakeInfoByAccount(
 // genesis nodes.
 func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
 	f := &GenesisStakeInfoFinder{
-		byNodeKey: make(map[types.BlsPublicKey][]*structs.StakeInfo),
+		byNodeKey: make(map[shard.BlsPublicKey][]*structs.StakeInfo),
 		byAccount: make(map[common.Address][]*structs.StakeInfo),
 	}
 	for idx, account := range genesis.HarmonyAccounts {
 		pub := &bls.PublicKey{}
 		pub.DeserializeHexStr(account.BlsPublicKey)
-		var blsPublicKey types.BlsPublicKey
+		var blsPublicKey shard.BlsPublicKey
 		if err := blsPublicKey.FromLibBLSPublicKey(pub); err != nil {
 			return nil, ctxerror.New("cannot convert BLS public key",
 				"accountIndex", idx,

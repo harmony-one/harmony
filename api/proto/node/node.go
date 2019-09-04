@@ -11,8 +11,10 @@ import (
 	peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -147,7 +149,7 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 }
 
 // ConstructCrossLinkHeadersMessage constructs cross link header message to send to beacon chain
-func ConstructCrossLinkHeadersMessage(headers []*types.Header) []byte {
+func ConstructCrossLinkHeadersMessage(headers []*block.Header) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
 	byteBuffer.WriteByte(byte(Header))
@@ -158,7 +160,7 @@ func ConstructCrossLinkHeadersMessage(headers []*types.Header) []byte {
 }
 
 // ConstructEpochShardStateMessage contructs epoch shard state message
-func ConstructEpochShardStateMessage(epochShardState types.EpochShardState) []byte {
+func ConstructEpochShardStateMessage(epochShardState shard.EpochShardState) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(ShardState))
 
@@ -172,8 +174,8 @@ func ConstructEpochShardStateMessage(epochShardState types.EpochShardState) []by
 }
 
 // DeserializeEpochShardStateFromMessage deserializes the shard state Message from bytes payload
-func DeserializeEpochShardStateFromMessage(payload []byte) (*types.EpochShardState, error) {
-	epochShardState := new(types.EpochShardState)
+func DeserializeEpochShardStateFromMessage(payload []byte) (*shard.EpochShardState, error) {
+	epochShardState := new(shard.EpochShardState)
 
 	r := bytes.NewBuffer(payload)
 	decoder := gob.NewDecoder(r)

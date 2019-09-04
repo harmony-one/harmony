@@ -20,6 +20,8 @@ package types
 import (
 	"bytes"
 	"testing"
+
+	"github.com/harmony-one/harmony/block"
 )
 
 var (
@@ -94,7 +96,7 @@ func TestBlock_SetLastCommitSig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &Block{header: &Header{}}
+			b := &Block{header: &block.Header{}}
 			b.SetLastCommitSig(tt.sig, tt.signers)
 			if !bytes.Equal(tt.sig, b.header.LastCommitSignature[:]) {
 				t.Errorf("signature mismatch: expected %+v, actual %+v",

@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants for storage.
@@ -126,7 +127,7 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 }
 
 // DumpCommittee commits validators for shardNum and epoch.
-func (storage *Storage) DumpCommittee(shardID uint32, epoch uint64, committee types.Committee) error {
+func (storage *Storage) DumpCommittee(shardID uint32, epoch uint64, committee shard.Committee) error {
 	batch := storage.db.NewBatch()
 	// Store committees.
 	committeeData, err := rlp.EncodeToBytes(committee)
