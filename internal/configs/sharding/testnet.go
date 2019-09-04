@@ -23,8 +23,6 @@ const (
 
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
-	testnetFirstCrossLinkBlock = 100
-
 	testnetMaxTxAmountLimit               = 1e3 // unit is in One
 	testnetMaxNumRecentTxsPerAccountLimit = 1e2
 	testnetMaxTxPoolSizeLimit             = 8000
@@ -70,12 +68,18 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-func (ts testnetSchedule) VdfDifficulty() int {
-	return testnetVdfDifficulty
+func (ts testnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
+	blocks := ts.BlocksPerEpoch()
+	switch {
+	case epochNum == 0:
+		return testnetEpochBlock1 - 1
+	default:
+		return testnetEpochBlock1 - 1 + blocks*epochNum
+	}
 }
 
-func (ts testnetSchedule) FirstCrossLinkBlock() uint64 {
-	return testnetFirstCrossLinkBlock
+func (ts testnetSchedule) VdfDifficulty() int {
+	return testnetVdfDifficulty
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

@@ -17,17 +17,17 @@ var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:        big.NewInt(1),
-		CrossLinkBlock: big.NewInt(655360), // 40 * 2^14
-		EIP155Block:    big.NewInt(655360), // 40 * 2^14
-		S3Block:        big.NewInt(655360), // 40 * 2^14
+		CrossLinkEpoch: big.NewInt(21),
+		EIP155Epoch:    big.NewInt(20),
+		S3Epoch:        big.NewInt(20),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
 		ChainID:        big.NewInt(2),
-		CrossLinkBlock: big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		S3Block:        big.NewInt(0),
+		CrossLinkEpoch: big.NewInt(0),
+		EIP155Epoch:    big.NewInt(0),
+		S3Epoch:        big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -60,64 +60,45 @@ type TrustedCheckpoint struct {
 type ChainConfig struct {
 	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
 
-	CrossLinkBlock *big.Int `json:"homesteadBlock,omitempty"`
+	CrossLinkEpoch *big.Int `json:"homesteadBlock,omitempty"`
 
-	EIP155Block *big.Int `json:"eip155Block,omitempty"` // EIP155 HF block (include EIP158 too)
-	S3Block     *big.Int `json:"s3Block,omitempty"`     // S3 block is the first block containing S3 mainnet and all ethereum update up to Constantinople
-}
-
-// EthashConfig is the consensus engine configs for proof-of-work based sealing.
-type EthashConfig struct{}
-
-// String implements the stringer interface, returning the consensus engine details.
-func (c *EthashConfig) String() string {
-	return "ethash"
-}
-
-// CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
-type CliqueConfig struct {
-	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
-	Epoch  uint64 `json:"epoch"`  // Epoch length to reset votes and checkpoint
-}
-
-// String implements the stringer interface, returning the consensus engine details.
-func (c *CliqueConfig) String() string {
-	return "clique"
+	EIP155Epoch *big.Int `json:"eip155Block,omitempty"` // EIP155 hard fork epoch (include EIP158 too)
+	S3Epoch     *big.Int `json:"s3Block,omitempty"`     // S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
 	return fmt.Sprintf("{ChainID: %v EIP155: %v CrossLink: %v}",
 		c.ChainID,
-		c.CrossLinkBlock,
-		c.EIP155Block,
+		c.CrossLinkEpoch,
+		c.EIP155Epoch,
 	)
 }
 
-// IsEIP155 returns whether num is either equal to the EIP155 fork block or greater.
-func (c *ChainConfig) IsEIP155(num *big.Int) bool {
-	return isForked(c.EIP155Block, num)
+// IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
+func (c *ChainConfig) IsEIP155(epoch *big.Int) bool {
+	return isForked(c.EIP155Epoch, epoch)
 }
 
-// IsCrossLink returns whether num is either equal to the CrossLink fork block or greater.
-func (c *ChainConfig) IsCrossLink(num *big.Int) bool {
-	return isForked(c.CrossLinkBlock, num)
+// IsCrossLink returns whether epoch is either equal to the CrossLink fork epoch or greater.
+func (c *ChainConfig) IsCrossLink(epoch *big.Int) bool {
+	return isForked(c.CrossLinkEpoch, epoch)
 }
 
-// IsS3 returns whether num is either equal to the S3 fork block or greater.
-func (c *ChainConfig) IsS3(num *big.Int) bool {
-	return isForked(c.CrossLinkBlock, num)
+// IsS3 returns whether epoch is either equal to the S3 fork epoch or greater.
+func (c *ChainConfig) IsS3(epoch *big.Int) bool {
+	return isForked(c.CrossLinkEpoch, epoch)
 }
 
 // GasTable returns the gas table corresponding to the current phase (homestead or homestead reprice).
 //
 // The returned GasTable's fields shouldn't, under any circumstances, be changed.
-func (c *ChainConfig) GasTable(num *big.Int) GasTable {
-	if num == nil {
+func (c *ChainConfig) GasTable(epoch *big.Int) GasTable {
+	if epoch == nil {
 		return GasTableR3
 	}
 	switch {
-	case c.IsS3(num):
+	case c.IsS3(epoch):
 		return GasTableS3
 	default:
 		return GasTableR3
@@ -143,30 +124,31 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *Confi
 }
 
 func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *ConfigCompatError {
-	if isForkIncompatible(c.EIP155Block, newcfg.EIP155Block, head) {
-		return newCompatError("EIP155 fork block", c.EIP155Block, newcfg.EIP155Block)
-	}
-	if isForkIncompatible(c.CrossLinkBlock, newcfg.CrossLinkBlock, head) {
-		return newCompatError("CrossLink fork block", c.CrossLinkBlock, newcfg.CrossLinkBlock)
-	}
-	if isForkIncompatible(c.S3Block, newcfg.S3Block, head) {
-		return newCompatError("S3 fork block", c.S3Block, newcfg.S3Block)
-	}
+	// TODO: check compatibility and reversion based on epochs.
+	//if isForkIncompatible(c.EIP155Epoch, newcfg.EIP155Epoch, head) {
+	//	return newCompatError("EIP155 fork block", c.EIP155Epoch, newcfg.EIP155Epoch)
+	//}
+	//if isForkIncompatible(c.CrossLinkEpoch, newcfg.CrossLinkEpoch, head) {
+	//	return newCompatError("CrossLink fork block", c.CrossLinkEpoch, newcfg.CrossLinkEpoch)
+	//}
+	//if isForkIncompatible(c.S3Epoch, newcfg.S3Epoch, head) {
+	//	return newCompatError("S3 fork block", c.S3Epoch, newcfg.S3Epoch)
+	//}
 	return nil
 }
 
 // isForkIncompatible returns true if a fork scheduled at s1 cannot be rescheduled to
-// block s2 because head is already past the fork.
-func isForkIncompatible(s1, s2, head *big.Int) bool {
-	return (isForked(s1, head) || isForked(s2, head)) && !configNumEqual(s1, s2)
+// epoch s2 because head is already past the fork.
+func isForkIncompatible(s1, s2, epoch *big.Int) bool {
+	return (isForked(s1, epoch) || isForked(s2, epoch)) && !configNumEqual(s1, s2)
 }
 
-// isForked returns whether a fork scheduled at block s is active at the given head block.
-func isForked(s, head *big.Int) bool {
-	if s == nil || head == nil {
+// isForked returns whether a fork scheduled at epoch s is active at the given head epoch.
+func isForked(s, epoch *big.Int) bool {
+	if s == nil || epoch == nil {
 		return false
 	}
-	return s.Cmp(head) <= 0
+	return s.Cmp(epoch) <= 0
 }
 
 func configNumEqual(x, y *big.Int) bool {
@@ -221,15 +203,15 @@ type Rules struct {
 }
 
 // Rules ensures c's ChainID is not nil.
-func (c *ChainConfig) Rules(num *big.Int) Rules {
+func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 	chainID := c.ChainID
 	if chainID == nil {
 		chainID = new(big.Int)
 	}
 	return Rules{
 		ChainID:     new(big.Int).Set(chainID),
-		IsCrossLink: c.IsCrossLink(num),
-		IsEIP155:    c.IsEIP155(num),
-		IsS3:        c.IsS3(num),
+		IsCrossLink: c.IsCrossLink(epoch),
+		IsEIP155:    c.IsEIP155(epoch),
+		IsS3:        c.IsS3(epoch),
 	}
 }

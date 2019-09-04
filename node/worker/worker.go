@@ -53,7 +53,7 @@ type Worker struct {
 // Throttling happens based on the amount, frequency, etc.
 func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, tx *types.Transaction) (common.Address, shardingconfig.TxThrottleFlag) {
 	var sender common.Address
-	msg, err := tx.AsMessage(types.MakeSigner(w.config, w.chain.CurrentBlock().Number()))
+	msg, err := tx.AsMessage(types.MakeSigner(w.config, w.chain.CurrentBlock().Epoch()))
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("txId", tx.Hash().Hex()).Msg("Error when parsing tx into message")
 	} else {

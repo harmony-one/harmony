@@ -403,7 +403,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 		)
 	}
 
-	firstCrossLinkBlock := core.ShardingSchedule.FirstCrossLinkBlock()
+	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch.Uint64())
 
 	for i, crossLink := range *crossLinks {
 		lastLink := &types.CrossLink{}

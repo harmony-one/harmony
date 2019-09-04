@@ -188,7 +188,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	}
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
-	homestead := st.evm.ChainConfig().IsS3(st.evm.BlockNumber) // s3 includes homestead
+	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas

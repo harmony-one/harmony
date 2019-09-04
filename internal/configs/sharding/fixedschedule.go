@@ -35,12 +35,13 @@ func (s fixedSchedule) IsLastBlock(blockNum uint64) bool {
 	return blockNum%blocks == blocks-1
 }
 
-func (s fixedSchedule) VdfDifficulty() int {
-	return mainnetVdfDifficulty
+func (s fixedSchedule) EpochLastBlock(epochNum uint64) uint64 {
+	blocks := s.BlocksPerEpoch()
+	return blocks*(epochNum+1) - 1
 }
 
-func (s fixedSchedule) FirstCrossLinkBlock() uint64 {
-	return mainnetFirstCrossLinkBlock
+func (s fixedSchedule) VdfDifficulty() int {
+	return mainnetVdfDifficulty
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

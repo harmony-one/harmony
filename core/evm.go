@@ -51,10 +51,10 @@ func NewEVMContext(msg Message, header *types.Header, chain ChainContext, author
 		Origin:      msg.From(),
 		Coinbase:    beneficiary,
 		BlockNumber: new(big.Int).Set(header.Number),
+		EpochNumber: new(big.Int).Set(header.Epoch),
 		Time:        new(big.Int).Set(header.Time),
-		//Difficulty:  new(big.Int).Set(header.Difficulty),
-		GasLimit: header.GasLimit,
-		GasPrice: new(big.Int).Set(msg.GasPrice()),
+		GasLimit:    header.GasLimit,
+		GasPrice:    new(big.Int).Set(msg.GasPrice()),
 	}
 }
 

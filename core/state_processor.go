@@ -122,7 +122,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	if txType == types.InvalidTx {
 		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
 	}
-	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
+	msg, err := tx.AsMessage(types.MakeSigner(config, header.Epoch))
 	// skip signer err for additiononly tx
 	if err != nil {
 		return nil, nil, 0, err
@@ -141,10 +141,10 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	}
 	// Update the state with pending changes
 	var root []byte
-	if config.IsS3(header.Number) {
+	if config.IsS3(header.Epoch) {
 		statedb.Finalise(true)
 	} else {
-		root = statedb.IntermediateRoot(config.IsS3(header.Number)).Bytes()
+		root = statedb.IntermediateRoot(config.IsS3(header.Epoch)).Bytes()
 	}
 	*usedGas += gas
 
@@ -188,7 +188,7 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *type
 			db.CreateAccount(*cx.To)
 		}
 		db.AddBalance(*cx.To, cx.Amount)
-		db.IntermediateRoot(config.IsS3(header.Number)).Bytes()
+		db.IntermediateRoot(config.IsS3(header.Epoch)).Bytes()
 	}
 	return nil
 }

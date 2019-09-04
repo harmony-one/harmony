@@ -168,9 +168,9 @@ func benchmarkEVMCreate(bench *testing.B, code string) {
 		BlockNumber: new(big.Int).SetUint64(1),
 		ChainConfig: &params.ChainConfig{
 			ChainID:        big.NewInt(1),
-			CrossLinkBlock: new(big.Int),
-			EIP155Block:    new(big.Int),
-			S3Block:        new(big.Int),
+			CrossLinkEpoch: new(big.Int),
+			EIP155Epoch:    new(big.Int),
+			S3Epoch:        new(big.Int),
 		},
 		EVMConfig: vm.Config{},
 	}

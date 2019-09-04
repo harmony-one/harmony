@@ -115,7 +115,7 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	return &EVMInterpreter{
 		evm:      evm,
 		cfg:      cfg,
-		gasTable: evm.ChainConfig().GasTable(evm.BlockNumber),
+		gasTable: evm.ChainConfig().GasTable(evm.EpochNumber),
 	}
 }
 

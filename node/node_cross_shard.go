@@ -35,7 +35,7 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 		node.pendingCrossLinks = []*types.Header{}
 		node.pendingClMutex.Unlock()
 
-		firstCrossLinkBlock := core.ShardingSchedule.FirstCrossLinkBlock()
+		firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch.Uint64())
 		for _, header := range headers {
 			if header.Number.Uint64() >= firstCrossLinkBlock {
 				// Only process cross link starting from FirstCrossLinkBlock
@@ -221,7 +221,7 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 
 	shardCrossLinks := make([]types.CrossLinks, numShards)
 
-	firstCrossLinkBlock := core.ShardingSchedule.FirstCrossLinkBlock()
+	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch.Uint64())
 
 	for i := 0; i < int(numShards); i++ {
 		curShardID := uint32(i)
