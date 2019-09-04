@@ -405,12 +405,12 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 		)
 	}
 
-	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch.Uint64())
+	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
 
 	for i, crossLink := range *crossLinks {
 		lastLink := &types.CrossLink{}
 		if i == 0 {
-			if crossLink.BlockNum().Uint64() > firstCrossLinkBlock {
+			if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
 				lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
 				if err != nil {
 					return ctxerror.New("[CrossLinkVerification] no last cross link found 1",
@@ -421,7 +421,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 			}
 		} else {
 			if (*crossLinks)[i-1].Header().ShardID != crossLink.Header().ShardID {
-				if crossLink.BlockNum().Uint64() > firstCrossLinkBlock {
+				if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
 					lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
 					if err != nil {
 						return ctxerror.New("[CrossLinkVerification] no last cross link found 2",
@@ -435,7 +435,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 			}
 		}
 
-		if crossLink.BlockNum().Uint64() > firstCrossLinkBlock { // TODO: verify genesis block
+		if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 { // TODO: verify genesis block
 			err = node.VerifyCrosslinkHeader(lastLink.Header(), crossLink.Header())
 			if err != nil {
 				return ctxerror.New("cannot ValidateNewBlock",

@@ -244,11 +244,11 @@ func IsEpochBlock(block *types.Block) bool {
 }
 
 // EpochFirstBlock returns the block number of the first block of an epoch.
-func EpochFirstBlock(epoch uint64) uint64 {
-	if epoch == 0 {
-		return 0
+func EpochFirstBlock(epoch *big.Int) *big.Int {
+	if epoch.Cmp(big.NewInt(0)) == 0 {
+		return big.NewInt(0)
 	}
-	return ShardingSchedule.EpochLastBlock(epoch-1) + 1
+	return big.NewInt(int64(ShardingSchedule.EpochLastBlock(epoch.Uint64()-1) + 1))
 }
 
 // IsEpochLastBlock returns whether this block is the last block of an epoch.

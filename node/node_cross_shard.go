@@ -3,7 +3,6 @@ package node
 import (
 	"encoding/binary"
 	"errors"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -37,9 +36,9 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 		node.pendingCrossLinks = []*block.Header{}
 		node.pendingClMutex.Unlock()
 
-		firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch.Uint64())
+		firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
 		for _, header := range headers {
-			if header.Number.Uint64() >= firstCrossLinkBlock {
+			if header.Number.Cmp(firstCrossLinkBlock) >= 0 {
 				// Only process cross link starting from FirstCrossLinkBlock
 				utils.Logger().Debug().Msgf("[ProcessHeaderMessage] Add Pending CrossLink, shardID %d, blockNum %d", header.ShardID, header.Number)
 				crossLinkHeadersToProcess = append(crossLinkHeadersToProcess, header)
@@ -61,7 +60,7 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 				continue
 			}
 
-			if header.Number.Uint64() > firstCrossLinkBlock { // Directly trust the first cross-link
+			if header.Number.Cmp(firstCrossLinkBlock) > 0 { // Directly trust the first cross-link
 				// Sanity check on the previous link with the new link
 				previousLink, err := node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64()-1, false)
 				if err != nil {
@@ -223,13 +222,13 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 
 	shardCrossLinks := make([]types.CrossLinks, numShards)
 
-	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch.Uint64())
+	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
 
 	for i := 0; i < int(numShards); i++ {
 		curShardID := uint32(i)
 		lastLink, err := node.Blockchain().ReadShardLastCrossLink(curShardID)
 
-		lastLinkblockNum := big.NewInt(int64(firstCrossLinkBlock))
+		lastLinkblockNum := firstCrossLinkBlock
 		blockNumoffset := 0
 		if err == nil && lastLink != nil {
 			blockNumoffset = 1
@@ -242,7 +241,7 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 				break
 			}
 
-			if link.BlockNum().Uint64() > firstCrossLinkBlock {
+			if link.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
 				if lastLink == nil {
 					utils.Logger().Error().
 						Err(err).

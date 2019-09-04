@@ -2,9 +2,10 @@ package worker
 
 import (
 	"fmt"
-	"github.com/harmony-one/harmony/shard"
 	"math/big"
 	"time"
+
+	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/rlp"
 
