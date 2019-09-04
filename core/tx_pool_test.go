@@ -30,6 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -52,7 +54,7 @@ type testBlockChain struct {
 }
 
 func (bc *testBlockChain) CurrentBlock() *types.Block {
-	return types.NewBlock(&types.Header{
+	return types.NewBlock(&block.Header{
 		GasLimit: bc.gasLimit,
 	}, nil, nil, nil, nil)
 }

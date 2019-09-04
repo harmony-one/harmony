@@ -10,6 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 )
 
@@ -96,7 +98,7 @@ func (c *Client) getBlock(ctx context.Context, method string, args ...interface{
 		return nil, ethereum.NotFound
 	}
 	// Decode header and transactions.
-	var head *types.Header
+	var head *block.Header
 	var body rpcBlock
 	if err := json.Unmarshal(raw, &head); err != nil {
 		return nil, err
@@ -119,7 +121,7 @@ func (c *Client) getBlock(ctx context.Context, method string, args ...interface{
 		}
 		txs[i] = tx.tx
 	}
-	return types.NewBlockWithHeader(head).WithBody(txs, []*types.Header{}, nil), nil
+	return types.NewBlockWithHeader(head).WithBody(txs, []*block.Header{}, nil), nil
 }
 
 func toBlockNumArg(number *big.Int) string {

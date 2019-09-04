@@ -3,7 +3,7 @@ package structs
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -22,7 +22,7 @@ type StakeInfoReturnValue struct {
 // StakeInfo stores the staking information for a staker.
 type StakeInfo struct {
 	Account         common.Address
-	BlsPublicKey    types.BlsPublicKey
+	BlsPublicKey    shard.BlsPublicKey
 	BlockNum        *big.Int
 	LockPeriodCount *big.Int // The number of locking period the token will be locked.
 	Amount          *big.Int

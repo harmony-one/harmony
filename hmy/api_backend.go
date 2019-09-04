@@ -12,8 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -55,7 +57,7 @@ func (b *APIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber)
 }
 
 // StateAndHeaderByNumber ...
-func (b *APIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *types.Header, error) {
+func (b *APIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *block.Header, error) {
 	// Pending state is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
 		return nil, nil, errors.New("not implemented")
@@ -70,7 +72,7 @@ func (b *APIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.Blo
 }
 
 // HeaderByNumber ...
-func (b *APIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
+func (b *APIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error) {
 	// Pending block is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
 		return nil, errors.New("not implemented")
@@ -139,7 +141,7 @@ func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*t
 }
 
 // HeaderByHash ...
-func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error) {
+func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*block.Header, error) {
 	// TODO(ricl): implement
 	return nil, nil
 }
@@ -211,7 +213,7 @@ func (b *APIBackend) NetVersion() uint64 {
 }
 
 // GetEVM returns a new EVM entity
-func (b *APIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *types.Header) (*vm.EVM, func() error, error) {
+func (b *APIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *block.Header) (*vm.EVM, func() error, error) {
 	// TODO(ricl): The code is borrowed from [go-ethereum](https://github.com/ethereum/go-ethereum/blob/40cdcf8c47ff094775aca08fd5d94051f9cf1dbb/les/api_backend.go#L114)
 	// [question](https://ethereum.stackexchange.com/q/72977/54923)
 	// Might need to reconsider the SetBalance behavior

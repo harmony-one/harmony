@@ -30,6 +30,7 @@ require (
 	github.com/karalabe/hid v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/libp2p/go-libp2p v0.3.1
+	github.com/libp2p/go-libp2p-core v0.2.2
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.1.0
 	github.com/libp2p/go-libp2p-host v0.1.0

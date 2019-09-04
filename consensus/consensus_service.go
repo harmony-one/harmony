@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -456,7 +457,7 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 }
 
 // retrieve corresponding blsPublicKey from Coinbase Address
-func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *types.Header) (*bls.PublicKey, error) {
+func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*bls.PublicKey, error) {
 	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch)
 	if err != nil {
 		return nil, ctxerror.New("cannot read shard state",

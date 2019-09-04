@@ -29,6 +29,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
@@ -76,7 +78,7 @@ type subscription struct {
 	logsCrit  ethereum.FilterQuery
 	logs      chan []*types.Log
 	hashes    chan []common.Hash
-	headers   chan *types.Header
+	headers   chan *block.Header
 	installed chan struct{} // closed when the filter is installed
 	err       chan error    // closed when the filter is uninstalled
 }
@@ -87,7 +89,7 @@ type EventSystem struct {
 	mux       *event.TypeMux
 	backend   Backend
 	lightMode bool
-	lastHead  *types.Header
+	lastHead  *block.Header
 
 	// Subscriptions
 	txsSub        event.Subscription         // Subscription for new transaction event
@@ -236,7 +238,7 @@ func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs
 		created:   time.Now(),
 		logs:      logs,
 		hashes:    make(chan []common.Hash),
-		headers:   make(chan *types.Header),
+		headers:   make(chan *block.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
 	}
@@ -253,7 +255,7 @@ func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 		created:   time.Now(),
 		logs:      logs,
 		hashes:    make(chan []common.Hash),
-		headers:   make(chan *types.Header),
+		headers:   make(chan *block.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
 	}
@@ -270,7 +272,7 @@ func (es *EventSystem) subscribePendingLogs(crit ethereum.FilterQuery, logs chan
 		created:   time.Now(),
 		logs:      logs,
 		hashes:    make(chan []common.Hash),
-		headers:   make(chan *types.Header),
+		headers:   make(chan *block.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
 	}
@@ -279,7 +281,7 @@ func (es *EventSystem) subscribePendingLogs(crit ethereum.FilterQuery, logs chan
 
 // SubscribeNewHeads creates a subscription that writes the header of a block that is
 // imported in the chain.
-func (es *EventSystem) SubscribeNewHeads(headers chan *types.Header) *Subscription {
+func (es *EventSystem) SubscribeNewHeads(headers chan *block.Header) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       BlocksSubscription,
@@ -302,7 +304,7 @@ func (es *EventSystem) SubscribePendingTxs(hashes chan []common.Hash) *Subscript
 		created:   time.Now(),
 		logs:      make(chan []*types.Log),
 		hashes:    hashes,
-		headers:   make(chan *types.Header),
+		headers:   make(chan *block.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
 	}
@@ -355,7 +357,7 @@ func (es *EventSystem) broadcast(filters filterIndex, ev interface{}) {
 			f.headers <- e.Block.Header()
 		}
 		if es.lightMode && len(filters[LogsSubscription]) > 0 {
-			es.lightFilterNewHead(e.Block.Header(), func(header *types.Header, remove bool) {
+			es.lightFilterNewHead(e.Block.Header(), func(header *block.Header, remove bool) {
 				for _, f := range filters[LogsSubscription] {
 					if matchedLogs := es.lightFilterLogs(header, f.logsCrit.Addresses, f.logsCrit.Topics, remove); len(matchedLogs) > 0 {
 						f.logs <- matchedLogs
@@ -366,7 +368,7 @@ func (es *EventSystem) broadcast(filters filterIndex, ev interface{}) {
 	}
 }
 
-func (es *EventSystem) lightFilterNewHead(newHeader *types.Header, callBack func(*types.Header, bool)) {
+func (es *EventSystem) lightFilterNewHead(newHeader *block.Header, callBack func(*block.Header, bool)) {
 	oldh := es.lastHead
 	es.lastHead = newHeader
 	if oldh == nil {
@@ -374,7 +376,7 @@ func (es *EventSystem) lightFilterNewHead(newHeader *types.Header, callBack func
 	}
 	newh := newHeader
 	// find common ancestor, create list of rolled back and new block hashes
-	var oldHeaders, newHeaders []*types.Header
+	var oldHeaders, newHeaders []*block.Header
 	for oldh.Hash() != newh.Hash() {
 		if oldh.Number.Uint64() >= newh.Number.Uint64() {
 			oldHeaders = append(oldHeaders, oldh)
@@ -400,7 +402,7 @@ func (es *EventSystem) lightFilterNewHead(newHeader *types.Header, callBack func
 }
 
 // filter logs of a single header in light client mode
-func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.Address, topics [][]common.Hash, remove bool) []*types.Log {
+func (es *EventSystem) lightFilterLogs(header *block.Header, addresses []common.Address, topics [][]common.Hash, remove bool) []*types.Log {
 	if bloomFilter(header.Bloom, addresses, topics) {
 		// Get the logs of the block
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)

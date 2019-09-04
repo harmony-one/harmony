@@ -1,4 +1,4 @@
-package types
+package shard
 
 import (
 	"bytes"
@@ -16,15 +16,15 @@ import (
 // EpochShardState is the shard state of an epoch
 type EpochShardState struct {
 	Epoch      uint64
-	ShardState ShardState
+	ShardState State
 }
 
-// ShardState is the collection of all committees
-type ShardState []Committee
+// State is the collection of all committees
+type State []Committee
 
 // FindCommitteeByID returns the committee configuration for the given shard,
 // or nil if the given shard is not found.
-func (ss ShardState) FindCommitteeByID(shardID uint32) *Committee {
+func (ss State) FindCommitteeByID(shardID uint32) *Committee {
 	for _, committee := range ss {
 		if committee.ShardID == shardID {
 			return &committee
@@ -34,16 +34,16 @@ func (ss ShardState) FindCommitteeByID(shardID uint32) *Committee {
 }
 
 // DeepCopy returns a deep copy of the receiver.
-func (ss ShardState) DeepCopy() ShardState {
-	var r ShardState
+func (ss State) DeepCopy() State {
+	var r State
 	for _, c := range ss {
 		r = append(r, c.DeepCopy())
 	}
 	return r
 }
 
-// CompareShardState compares two ShardState instances.
-func CompareShardState(s1, s2 ShardState) int {
+// CompareShardState compares two State instances.
+func CompareShardState(s1, s2 State) int {
 	commonLen := len(s1)
 	if commonLen > len(s2) {
 		commonLen = len(s2)
@@ -180,8 +180,8 @@ func GetHashFromNodeList(nodeList []NodeID) []byte {
 	return d.Sum(nil)
 }
 
-// Hash is the root hash of ShardState
-func (ss ShardState) Hash() (h common.Hash) {
+// Hash is the root hash of State
+func (ss State) Hash() (h common.Hash) {
 	// TODO ek – this sorting really doesn't belong here; it should instead
 	//  be made an explicit invariant to be maintained and, if needed, checked.
 	copy := ss.DeepCopy()

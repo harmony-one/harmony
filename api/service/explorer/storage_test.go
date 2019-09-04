@@ -9,7 +9,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
+
+	block2 "github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,7 +58,7 @@ func TestDump(t *testing.T) {
 	tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), 0, big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
 	txs := []*types.Transaction{tx1, tx2, tx3}
 
-	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil, nil, nil)
+	block := types.NewBlock(&block2.Header{Number: big.NewInt(314)}, txs, nil, nil, nil)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
 	ins.Dump(block, uint64(1))
 	db := ins.GetDB()
@@ -82,14 +86,14 @@ func TestDumpCommittee(t *testing.T) {
 	assert.Nil(t, err, "should be nil")
 	err = blsPubKey2.DeserializeHexStr("02c8ff0b88f313717bc3a627d2f8bb172ba3ad3bb9ba3ecb8eed4b7c878653d3d4faf769876c528b73f343967f74a917")
 	assert.Nil(t, err, "should be nil")
-	BlsPublicKey1 := new(types.BlsPublicKey)
-	BlsPublicKey2 := new(types.BlsPublicKey)
+	BlsPublicKey1 := new(shard.BlsPublicKey)
+	BlsPublicKey2 := new(shard.BlsPublicKey)
 	BlsPublicKey1.FromLibBLSPublicKey(blsPubKey1)
 	BlsPublicKey2.FromLibBLSPublicKey(blsPubKey2)
-	nodeID1 := types.NodeID{EcdsaAddress: common.HexToAddress("52789f18a342da8023cc401e5d2b14a6b710fba9"), BlsPublicKey: *BlsPublicKey1}
-	nodeID2 := types.NodeID{EcdsaAddress: common.HexToAddress("7c41e0668b551f4f902cfaec05b5bdca68b124ce"), BlsPublicKey: *BlsPublicKey2}
-	nodeIDList := []types.NodeID{nodeID1, nodeID2}
-	committee := types.Committee{ShardID: uint32(0), NodeList: nodeIDList}
+	nodeID1 := shard.NodeID{EcdsaAddress: common.HexToAddress("52789f18a342da8023cc401e5d2b14a6b710fba9"), BlsPublicKey: *BlsPublicKey1}
+	nodeID2 := shard.NodeID{EcdsaAddress: common.HexToAddress("7c41e0668b551f4f902cfaec05b5bdca68b124ce"), BlsPublicKey: *BlsPublicKey2}
+	nodeIDList := []shard.NodeID{nodeID1, nodeID2}
+	committee := shard.Committee{ShardID: uint32(0), NodeList: nodeIDList}
 	shardID := uint32(0)
 	epoch := uint64(0)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
@@ -112,7 +116,7 @@ func TestUpdateAddressStorage(t *testing.T) {
 	tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), 0, big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
 	txs := []*types.Transaction{tx1, tx2, tx3}
 
-	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil, nil, nil)
+	block := types.NewBlock(&block2.Header{Number: big.NewInt(314)}, txs, nil, nil, nil)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
 	ins.Dump(block, uint64(1))
 	db := ins.GetDB()

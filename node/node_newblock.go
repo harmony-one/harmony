@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants of lower bound limit of a new block.
@@ -125,7 +126,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
 }
 
-func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) types.ShardState {
+func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) shard.State {
 	if block == nil || !core.IsEpochLastBlock(block) {
 		return nil
 	}
@@ -176,7 +177,7 @@ func (node *Node) proposeLocalShardState(block *types.Block) {
 		return
 	}
 	masterShardState := node.nextShardState.master.ShardState
-	var localShardState types.ShardState
+	var localShardState shard.State
 	committee := masterShardState.FindCommitteeByID(block.ShardID())
 	if committee != nil {
 		logger.Info().Msg("found local shard info; proposing it")

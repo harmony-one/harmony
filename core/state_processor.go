@@ -21,6 +21,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -101,7 +103,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 }
 
 // return true if it is valid
-func getTransactionType(header *types.Header, tx *types.Transaction) types.TransactionType {
+func getTransactionType(header *block.Header, tx *types.Transaction) types.TransactionType {
 	if tx.ShardID() == tx.ToShardID() && header.ShardID == tx.ShardID() {
 		return types.SameShardTx
 	}
@@ -117,7 +119,7 @@ func getTransactionType(header *types.Header, tx *types.Transaction) types.Trans
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
+func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
 	txType := getTransactionType(header, tx)
 	if txType == types.InvalidTx {
 		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
@@ -172,7 +174,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 }
 
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt
-func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *types.Header, cxp *types.CXReceiptsProof) error {
+func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *block.Header, cxp *types.CXReceiptsProof) error {
 	if cxp == nil {
 		return nil
 	}

@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 )
 
@@ -154,7 +156,7 @@ func (api *PublicFilterAPI) NewPendingTransactions(ctx context.Context) (*rpc.Su
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newblockfilter
 func (api *PublicFilterAPI) NewBlockFilter() rpc.ID {
 	var (
-		headers   = make(chan *types.Header)
+		headers   = make(chan *block.Header)
 		headerSub = api.events.SubscribeNewHeads(headers)
 	)
 
@@ -193,7 +195,7 @@ func (api *PublicFilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, er
 	rpcSub := notifier.CreateSubscription()
 
 	go func() {
-		headers := make(chan *types.Header)
+		headers := make(chan *block.Header)
 		headersSub := api.events.SubscribeNewHeads(headers)
 
 		for {
