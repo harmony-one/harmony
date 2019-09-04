@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -90,29 +89,10 @@ func GenShardingStructure(shardNum, shardID uint32, httpPattern, wsPattern strin
 func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[string]interface{}, error) {
 	// Get header and number of shards.
 	header := s.b.CurrentBlock().Header()
-	numShard := core.ShardingSchedule.InstanceForEpoch(header.Epoch).NumShards()
+	numShard := core.ShardingSchedule.InstanceForEpoch(header.Epoch()).NumShards()
+
 	// Return shareding structure for each case.
-	if core.ShardingSchedule.GetNetworkID() == shardingconfig.MainNet {
-		s.b.CurrentBlock().Header()
-		return GenShardingStructure(numShard, s.b.GetShardID(), MainNetHTTPPattern, MainNetWSPattern), nil
-	} else if core.ShardingSchedule.GetNetworkID() == shardingconfig.TestNet {
-		return GenShardingStructure(numShard, s.b.GetShardID(), TestNetHTTPPattern, TestNetWSPattern), nil
-	} else {
-		return []map[string]interface{}{
-			map[string]interface{}{
-				"current": s.b.GetShardID() == 0,
-				"shardID": 0,
-				"http":    "http://127.0.0.1:9500",
-				"ws":      "ws://127.0.0.1:9800",
-			},
-			map[string]interface{}{
-				"current": s.b.GetShardID() == 1,
-				"shardID": 1,
-				"http":    "http://127.0.0.1:9501",
-				"ws":      "ws://127.0.0.1:9801",
-			},
-		}, nil
-	}
+	return core.ShardingSchedule.GetShardingStructure(int(numShard), int(s.b.GetShardID())), nil
 }
 
 // GetCode returns the code stored at the given address in the state for the given block number.

@@ -32,6 +32,11 @@ const (
 	localnetMaxTxPoolSizeLimit             = 8000
 	localnetMaxNumTxsPerBlockLimit         = 1000
 	localnetRecentTxDuration               = time.Hour
+
+	// LocalNetHTTPPattern is the http pattern for mainnet.
+	LocalNetHTTPPattern = "http://s%d.t.hmny.io:9500"
+	// LocalNetWSPattern is the websocket pattern for mainnet.
+	LocalNetWSPattern = "ws://s%d.t.hmny.io:9800"
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -124,6 +129,11 @@ func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 
 func (ls localnetSchedule) GetNetworkID() NetworkID {
 	return LocalNet
+}
+
+// GetShardingStructure is the sharding structure for localnet.
+func (ls localnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+	return genShardingStructure(numShard, shardID, LocalNetHTTPPattern, LocalNetWSPattern)
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}

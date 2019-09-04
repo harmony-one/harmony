@@ -3,6 +3,7 @@
 package shardingconfig
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -56,6 +57,9 @@ type Schedule interface {
 
 	// GetNetworkID() return networkID type.
 	GetNetworkID() NetworkID
+
+	// GetShardingStructure returns sharding structure.
+	GetShardingStructure(int, int) []map[string]interface{}
 }
 
 // Instance is one sharding configuration instance.
@@ -123,4 +127,18 @@ type TxsThrottleConfig struct {
 
 	// Max total number of transactions allowed to be processed per block
 	MaxNumTxsPerBlockLimit int
+}
+
+// genShardingStructure return sharding structure, given shard number and its patterns.
+func genShardingStructure(shardNum, shardID int, httpPattern, wsPattern string) []map[string]interface{} {
+	res := []map[string]interface{}{}
+	for i := 0; i < shardNum; i++ {
+		res = append(res, map[string]interface{}{
+			"current": int(shardID) == i,
+			"shardID": i,
+			"http":    fmt.Sprintf(httpPattern, i),
+			"ws":      fmt.Sprintf(wsPattern, i),
+		})
+	}
+	return res
 }
