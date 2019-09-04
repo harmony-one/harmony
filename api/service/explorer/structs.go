@@ -5,7 +5,10 @@ import (
 	"math/big"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -13,16 +16,22 @@ import (
  * All the code here is work of progress for the sprint.
  */
 
+// Tx types ...
+const (
+	Received = "RECEIVED"
+	Sent     = "SENT"
+)
+
 // Data ...
 type Data struct {
 	Blocks []*Block `json:"blocks"`
 	// Block   Block        `json:"block"`
-	Address Address `json:"address"`
+	Account Account `json:"account"`
 	TX      Transaction
 }
 
-// Address ...
-type Address struct {
+// Account ...
+type Account struct {
 	ID      string         `json:"id"`
 	Balance *big.Int       `json:"balance"`
 	TXs     []*Transaction `json:"txs"`
@@ -48,6 +57,7 @@ type Transaction struct {
 	Value     *big.Int `json:"value"`
 	Bytes     string   `json:"bytes"`
 	Data      string   `json:"data"`
+	Type      string   `json:"type"`
 }
 
 // Block ...
@@ -86,21 +96,6 @@ type Shard struct {
 // NewBlock ...
 func NewBlock(block *types.Block, height int) *Block {
 	// TODO(ricl): use block.Header().CommitBitmap and GetPubKeyFromMask
-	signers := []string{}
-	/*state, err := block.Header().GetShardState()
-	if err == nil {
-		for _, committee := range state {
-			if committee.ShardID == block.ShardID() {
-				for i, validator := range committee.NodeList {
-					oneAddress, err := common.AddressToBech32(validator.EcdsaAddress)
-					if err != nil && block.Header().LastCommitBitmap[i] != 0x0 {
-						continue
-					}
-					signers = append(signers, oneAddress)
-				}
-			}
-		}
-	}*/
 	return &Block{
 		Height:     strconv.Itoa(height),
 		ID:         block.Hash().Hex(),
@@ -108,7 +103,7 @@ func NewBlock(block *types.Block, height int) *Block {
 		Timestamp:  strconv.Itoa(int(block.Time().Int64() * 1000)),
 		MerkleRoot: block.Root().Hex(),
 		Bytes:      strconv.Itoa(int(block.Size())),
-		Signers:    signers,
+		Signers:    []string{},
 		Epoch:      block.Epoch().Uint64(),
 		ExtraData:  string(block.Extra()),
 	}
@@ -116,6 +111,7 @@ func NewBlock(block *types.Block, height int) *Block {
 
 // GetTransaction ...
 func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transaction {
+	utils.Logger().Info().Msgf("Tx id %s", tx.Hash().Hex())
 	if tx.To() == nil {
 		return nil
 	}
@@ -123,13 +119,15 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transacti
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
 	}
+	utils.Logger().Info().Msg("OK done")
 	return &Transaction{
 		ID:        tx.Hash().Hex(),
 		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
-		From:      msg.From().Hex(), // TODO ek – use bech32
-		To:        msg.To().Hex(),   // TODO ek – use bech32
+		From:      common2.MustAddressToBech32(common.HexToAddress(msg.From().Hex())),
+		To:        common2.MustAddressToBech32(common.HexToAddress(msg.To().Hex())),
 		Value:     msg.Value(),
 		Bytes:     strconv.Itoa(int(tx.Size())),
 		Data:      hex.EncodeToString(tx.Data()),
+		Type:      "",
 	}
 }

@@ -30,6 +30,8 @@ import (
 // Constants for explorer service.
 const (
 	explorerPortDifference = 4000
+	txViewNone             = "NONE"
+	txViewAll              = "ALL"
 )
 
 // HTTPError is an HTTP error.
@@ -107,9 +109,9 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/tx").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerTransaction).Methods("GET")
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 
-	// Set up router for address.
-	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset)).HandlerFunc(s.GetExplorerAddress).Methods("GET")
-	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
+	// Set up router for account.
+	s.router.Path("/account").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset)).HandlerFunc(s.GetExplorerAccount).Methods("GET")
+	s.router.Path("/account").HandlerFunc(s.GetExplorerAccount)
 
 	// Set up router for node count.
 	s.router.Path("/nodes").HandlerFunc(s.GetExplorerNodeCount) // TODO(ricl): this is going to be replaced by /node-count
@@ -120,8 +122,8 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/shard").HandlerFunc(s.GetExplorerShard)
 
 	// Set up router for committee.
-	s.router.Path("/committee").Queries("shard_id", "{[0-9]*?}", "epoch", "{[0-9]*?}").HandlerFunc(s.GetCommittee).Methods("GET")
-	s.router.Path("/committee").HandlerFunc(s.GetCommittee).Methods("GET")
+	s.router.Path("/committee").Queries("shard_id", "{[0-9]*?}", "epoch", "{[0-9]*?}").HandlerFunc(s.GetExplorerCommittee).Methods("GET")
+	s.router.Path("/committee").HandlerFunc(s.GetExplorerCommittee).Methods("GET")
 
 	// Do serving now.
 	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
@@ -174,12 +176,15 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	if from == "" {
+		utils.Logger().Warn().Msg("Missing from parameter")
+		w.WriteHeader(400)
 		return
 	}
 	db := s.storage.GetDB()
 	fromInt, err := strconv.Atoi(from)
 	if err != nil {
-		utils.Logger().Warn().Err(err).Str("from", from).Msg("invalid from parameter")
+		utils.Logger().Warn().Err(err).Msg("invalid from parameter")
+		w.WriteHeader(400)
 		return
 	}
 	var toInt int
@@ -195,7 +200,8 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		toInt, err = strconv.Atoi(to)
 	}
 	if err != nil {
-		utils.Logger().Warn().Err(err).Str("to", to).Msg("invalid to parameter")
+		utils.Logger().Warn().Err(err).Msg("invalid to parameter")
+		w.WriteHeader(400)
 		return
 	}
 
@@ -296,24 +302,28 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 		}
 	}()
 	if id == "" {
+		utils.Logger().Warn().Msg("invalid id parameter")
+		w.WriteHeader(400)
 		return
 	}
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(GetTXKey(id)))
 	if err != nil {
 		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read TX")
+		w.WriteHeader(500)
 		return
 	}
 	tx := new(Transaction)
 	if rlp.DecodeBytes(bytes, tx) != nil {
 		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
+		w.WriteHeader(500)
 		return
 	}
 	data.TX = *tx
 }
 
-// GetCommittee servers /comittee end-point.
-func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
+// GetExplorerCommittee servers /comittee end-point.
+func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	shardIDRead := r.FormValue("shard_id")
 	epochRead := r.FormValue("epoch")
@@ -392,43 +402,72 @@ func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetExplorerAddress serves /address end-point.
-func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
+// GetExplorerAccount serves /account end-point.
+func (s *Service) GetExplorerAccount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := r.FormValue("id")
-	key := GetAddressKey(id)
-
-	utils.Logger().Info().Str("address", id).Msg("Querying address")
+	key := GetAccountKey(id)
+	txViewParam := r.FormValue("tx_view")
+	txView := txViewNone
+	if txViewParam != "" {
+		txView = txViewParam
+	}
+	utils.Logger().Info().Str("account", id).Msg("Querying account")
 	data := &Data{}
 	defer func() {
-		if err := json.NewEncoder(w).Encode(data.Address); err != nil {
+		if err := json.NewEncoder(w).Encode(data.Account); err != nil {
 			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
-				"cannot JSON-encode address")
+				"cannot JSON-encode account")
 		}
 	}()
 	if id == "" {
+		utils.Logger().Warn().Msg("missing account address param")
+		w.WriteHeader(400)
 		return
 	}
-	data.Address.ID = id
+
+	db := s.storage.GetDB()
+	bytes, err := db.Get([]byte(key))
+	if err != nil {
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read account from db")
+		w.WriteHeader(500)
+		return
+	}
+	if err = rlp.DecodeBytes(bytes, &data.Account); err != nil {
+		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
+		w.WriteHeader(500)
+		return
+	}
+
+	data.Account.ID = id
 	// Try to populate the banace by directly calling get balance.
 	// Check the balance from blockchain rather than local DB dump
 	if s.GetAccountBalance != nil {
 		address := common2.ParseAddr(id)
 		balance, err := s.GetAccountBalance(address)
 		if err == nil {
-			data.Address.Balance = balance
+			data.Account.Balance = balance
 		}
 	}
-
-	db := s.storage.GetDB()
-	bytes, err := db.Get([]byte(key))
-	if err != nil {
-		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
-		return
-	}
-	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
-		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
-		return
+	switch txView {
+	case txViewNone:
+		data.Account.TXs = nil
+	case Received:
+		receivedTXs := make([]*Transaction, 0)
+		for _, tx := range data.Account.TXs {
+			if tx.Type == Received {
+				receivedTXs = append(receivedTXs, tx)
+			}
+		}
+		data.Account.TXs = receivedTXs
+	case Sent:
+		sentTXs := make([]*Transaction, 0)
+		for _, tx := range data.Account.TXs {
+			if tx.Type == Sent {
+				sentTXs = append(sentTXs, tx)
+			}
+		}
+		data.Account.TXs = sentTXs
 	}
 }
 
@@ -437,6 +476,7 @@ func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(len(s.GetNodeIDs())); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode node count")
+		w.WriteHeader(500)
 	}
 }
 
@@ -451,6 +491,7 @@ func (s *Service) GetExplorerShard(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewEncoder(w).Encode(Shard{Nodes: nodes}); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode shard info")
+		w.WriteHeader(500)
 	}
 }
 

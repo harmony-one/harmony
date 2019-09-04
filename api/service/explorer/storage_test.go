@@ -18,9 +18,9 @@ func TestGetBlockInfoKey(t *testing.T) {
 	assert.Equal(t, GetBlockInfoKey(3), "bi_3", "error")
 }
 
-// Test for GetAddressKey
-func TestGetAddressKey(t *testing.T) {
-	assert.Equal(t, GetAddressKey("abcd"), "ad_abcd", "error")
+// Test for GetAccountKey
+func TestGetAccountKey(t *testing.T) {
+	assert.Equal(t, GetAccountKey("abcd"), "ad_abcd", "error")
 }
 
 // Test for GetBlockKey

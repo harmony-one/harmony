@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // Test for GetBlockInfoKey
@@ -22,6 +23,6 @@ func TestGetTransaction(t *testing.T) {
 
 	tx := GetTransaction(tx1, block)
 	assert.Equal(t, tx.ID, tx1.Hash().Hex(), "should be equal tx1.Hash()")
-	assert.Equal(t, tx.To, tx1.To().Hex(), "should be equal tx1.To()") // TODO ek – use bech32
+	assert.Equal(t, tx.To, common2.MustAddressToBech32(common.HexToAddress(tx1.To().Hex())), "should be equal tx1.To()")
 	assert.Equal(t, tx.Bytes, strconv.Itoa(int(tx1.Size())), "should be equal tx1.Size()")
 }
