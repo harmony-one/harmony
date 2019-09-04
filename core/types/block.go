@@ -465,8 +465,8 @@ func (b *Block) AddVdf(vdf []byte) {
 }
 
 // AddShardState add shardState into block header
-func (b *Block) AddShardState(shardState shard.ShardState) error {
-	// Make a copy because ShardState.Hash() internally sorts entries.
+func (b *Block) AddShardState(shardState shard.State) error {
+	// Make a copy because State.Hash() internally sorts entries.
 	// Store the sorted copy.
 	shardState = append(shardState[:0:0], shardState...)
 	b.header.ShardStateHash = shardState.Hash()

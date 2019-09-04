@@ -47,14 +47,14 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 		if c == nil {
 			return errors.New("cannot find local shard in genesis")
 		}
-		shardState = shard.ShardState{*c}
+		shardState = shard.State{*c}
 	}
 	gi.node.SetupGenesisBlock(db, shardID, shardState)
 	return nil
 }
 
 // SetupGenesisBlock sets up a genesis blockchain.
-func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState shard.ShardState) {
+func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState shard.State) {
 	utils.Logger().Info().Interface("shardID", shardID).Msg("setting up a brand new chain database")
 	if shardID == node.NodeConfig.ShardID {
 		node.isFirstTime = true

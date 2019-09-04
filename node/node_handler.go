@@ -474,7 +474,7 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 		// We aren't expecting to reshard, so proceed to sign
 		return nil
 	}
-	shardState := &shard.ShardState{}
+	shardState := &shard.State{}
 	err := rlp.DecodeBytes(header.ShardState, shardState)
 	if err != nil {
 		return err
@@ -834,7 +834,7 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 }
 
 /*
-func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
+func (node *Node) transitionIntoNextEpoch(shardState types.State) {
 	logger = logger.New(
 		"blsPubKey", hex.EncodeToString(node.Consensus.PubKey.Serialize()),
 		"curShard", node.Blockchain().ShardID(),
@@ -886,7 +886,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.ShardState) {
 */
 
 func findRoleInShardState(
-	key *bls.PublicKey, state shard.ShardState,
+	key *bls.PublicKey, state shard.State,
 ) (shardID uint32, isLeader bool) {
 	keyBytes := key.Serialize()
 	for idx, shard := range state {

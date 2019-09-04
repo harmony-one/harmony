@@ -31,7 +31,7 @@ type ShardingState struct {
 	epoch      uint64 // current epoch
 	rnd        uint64 // random seed for resharding
 	numShards  int    // TODO ek – equal to len(shardState); remove this
-	shardState shard.ShardState
+	shardState shard.State
 }
 
 // sortedCommitteeBySize will sort shards by size
@@ -175,7 +175,7 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingSt
 func CalculateNewShardState(
 	bc *BlockChain, epoch *big.Int,
 	stakeInfo *map[common.Address]*structs.StakeInfo,
-) (shard.ShardState, error) {
+) (shard.State, error) {
 	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
 		return GetInitShardState(), nil
 	}
@@ -230,12 +230,12 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 var ShardingSchedule shardingconfig.Schedule = shardingconfig.MainnetSchedule
 
 // GetInitShardState returns the initial shard state at genesis.
-func GetInitShardState() shard.ShardState {
+func GetInitShardState() shard.State {
 	return GetShardState(big.NewInt(GenesisEpoch))
 }
 
 // GetShardState returns the shard state based on epoch number
-func GetShardState(epoch *big.Int) shard.ShardState {
+func GetShardState(epoch *big.Int) shard.State {
 	utils.Logger().Info().Int64("epoch", epoch.Int64()).Msg("Get Shard State of Epoch.")
 	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
@@ -244,7 +244,7 @@ func GetShardState(epoch *big.Int) shard.ShardState {
 	hmyAccounts := shardingConfig.HmyAccounts()
 	fnAccounts := shardingConfig.FnAccounts()
 
-	shardState := shard.ShardState{}
+	shardState := shard.State{}
 	for i := 0; i < shardNum; i++ {
 		com := shard.Committee{ShardID: uint32(i)}
 		for j := 0; j < shardHarmonyNodes; j++ {

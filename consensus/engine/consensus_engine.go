@@ -35,7 +35,7 @@ type ChainReader interface {
 	GetBlock(hash common.Hash, number uint64) *types.Block
 
 	// ReadShardState retrieves sharding state given the epoch number.
-	ReadShardState(epoch *big.Int) (shard.ShardState, error)
+	ReadShardState(epoch *big.Int) (shard.State, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.

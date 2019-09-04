@@ -80,8 +80,8 @@ func (h *Header) Logger(logger *zerolog.Logger) *zerolog.Logger {
 }
 
 // GetShardState returns the deserialized shard state object.
-func (h *Header) GetShardState() (shard.ShardState, error) {
-	shardState := shard.ShardState{}
+func (h *Header) GetShardState() (shard.State, error) {
+	shardState := shard.State{}
 	err := rlp.DecodeBytes(h.ShardState, &shardState)
 	if err != nil {
 		return nil, err

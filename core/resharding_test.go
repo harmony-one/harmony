@@ -39,9 +39,9 @@ func init() {
 	copy(blsPubKey10[:], []byte("random key 10"))
 }
 
-func fakeGetInitShardState(numberOfShards, numOfNodes int) shard.ShardState {
+func fakeGetInitShardState(numberOfShards, numOfNodes int) shard.State {
 	rand.Seed(int64(42))
-	shardState := shard.ShardState{}
+	shardState := shard.State{}
 	for i := 0; i < numberOfShards; i++ {
 		sid := uint32(i)
 		com := shard.Committee{ShardID: sid}

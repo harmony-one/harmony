@@ -1807,10 +1807,10 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 }
 
 // ReadShardState retrieves sharding state given the epoch number.
-func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.ShardState, error) {
+func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.State, error) {
 	cacheKey := string(epoch.Bytes())
 	if cached, ok := bc.shardStateCache.Get(cacheKey); ok {
-		shardState := cached.(shard.ShardState)
+		shardState := cached.(shard.State)
 		return shardState, nil
 	}
 	shardState, err := rawdb.ReadShardState(bc.db, epoch)
@@ -1823,7 +1823,7 @@ func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.ShardState, error) {
 
 // WriteShardState saves the given sharding state under the given epoch number.
 func (bc *BlockChain) WriteShardState(
-	epoch *big.Int, shardState shard.ShardState,
+	epoch *big.Int, shardState shard.State,
 ) error {
 	shardState = shardState.DeepCopy()
 	err := rawdb.WriteShardState(bc.db, epoch, shardState)
@@ -1839,7 +1839,7 @@ func (bc *BlockChain) WriteShardState(
 func (bc *BlockChain) WriteShardStateBytes(
 	epoch *big.Int, shardState []byte,
 ) error {
-	decodeShardState := shard.ShardState{}
+	decodeShardState := shard.State{}
 	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
 		return err
 	}
@@ -1899,7 +1899,7 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 func (bc *BlockChain) GetShardState(
 	epoch *big.Int,
 	stakeInfo *map[common.Address]*structs.StakeInfo,
-) (shard.ShardState, error) {
+) (shard.State, error) {
 	shardState, err := bc.ReadShardState(epoch)
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err

@@ -58,7 +58,7 @@ type Genesis struct {
 	Coinbase       common.Address      `json:"coinbase"`
 	Alloc          GenesisAlloc        `json:"alloc"          gencodec:"required"`
 	ShardStateHash common.Hash         `json:"shardStateHash" gencodec:"required"`
-	ShardState     shard.ShardState    `json:"shardState"     gencodec:"required"`
+	ShardState     shard.State         `json:"shardState"     gencodec:"required"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.

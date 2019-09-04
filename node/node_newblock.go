@@ -195,7 +195,7 @@ func (node *Node) proposeLocalShardState(block *types.Block) {
 		return
 	}
 	masterShardState := node.nextShardState.master.ShardState
-	var localShardState shard.ShardState
+	var localShardState shard.State
 	committee := masterShardState.FindCommitteeByID(block.ShardID())
 	if committee != nil {
 		logger.Info().Msg("found local shard info; proposing it")

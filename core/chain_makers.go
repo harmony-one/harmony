@@ -265,4 +265,4 @@ func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *block.Header       
 func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *block.Header          { return nil }
 func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Header { return nil }
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
-func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (shard.ShardState, error) { return nil, nil }
+func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (shard.State, error)      { return nil, nil }

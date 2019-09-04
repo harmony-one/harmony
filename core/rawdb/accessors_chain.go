@@ -414,7 +414,7 @@ func FindCommonAncestor(db DatabaseReader, a, b *block.Header) *block.Header {
 // ReadShardState retrieves sharding state.
 func ReadShardState(
 	db DatabaseReader, epoch *big.Int,
-) (shardState shard.ShardState, err error) {
+) (shardState shard.State, err error) {
 	var data []byte
 	data, err = db.Get(shardStateKey(epoch))
 	if err != nil {
@@ -432,7 +432,7 @@ func ReadShardState(
 
 // WriteShardState stores sharding state into database.
 func WriteShardState(
-	db DatabaseWriter, epoch *big.Int, shardState shard.ShardState,
+	db DatabaseWriter, epoch *big.Int, shardState shard.State,
 ) (err error) {
 	data, err := rlp.EncodeToBytes(shardState)
 	if err != nil {
