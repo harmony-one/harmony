@@ -39,9 +39,9 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 
 		firstCrossLinkBlock := core.ShardingSchedule.FirstCrossLinkBlock()
 		for _, header := range headers {
-			if header.Number.Uint64() >= firstCrossLinkBlock {
+			if header.Number().Uint64() >= firstCrossLinkBlock {
 				// Only process cross link starting from FirstCrossLinkBlock
-				utils.Logger().Debug().Msgf("[ProcessHeaderMessage] Add Pending CrossLink, shardID %d, blockNum %d", header.ShardID, header.Number)
+				utils.Logger().Debug().Msgf("[ProcessHeaderMessage] Add Pending CrossLink, shardID %d, blockNum %d", header.ShardID(), header.Number())
 				crossLinkHeadersToProcess = append(crossLinkHeadersToProcess, header)
 			}
 		}
@@ -54,22 +54,22 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 			if len(headersToQuque) > crossLinkBatchSize {
 				break
 			}
-			exist, err := node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64(), false)
+			exist, err := node.Blockchain().ReadCrossLink(header.ShardID(), header.Number().Uint64(), false)
 			if err == nil && exist != nil {
 				utils.Logger().Debug().
-					Msgf("[ProcessingHeader] Cross Link already exists, pass. Block num: %d, shardID %d", header.Number, header.ShardID)
+					Msgf("[ProcessingHeader] Cross Link already exists, pass. Block num: %d, shardID %d", header.Number(), header.ShardID())
 				continue
 			}
 
-			if header.Number.Uint64() > firstCrossLinkBlock { // Directly trust the first cross-link
+			if header.Number().Uint64() > firstCrossLinkBlock { // Directly trust the first cross-link
 				// Sanity check on the previous link with the new link
-				previousLink, err := node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64()-1, false)
+				previousLink, err := node.Blockchain().ReadCrossLink(header.ShardID(), header.Number().Uint64()-1, false)
 				if err != nil {
-					previousLink, err = node.Blockchain().ReadCrossLink(header.ShardID, header.Number.Uint64()-1, true)
+					previousLink, err = node.Blockchain().ReadCrossLink(header.ShardID(), header.Number().Uint64()-1, true)
 					if err != nil {
 						headersToQuque = append(headersToQuque, header)
 						utils.Logger().Error().Err(err).
-							Msgf("[ProcessingHeader] ReadCrossLink cannot read previousLink with number %d, shardID %d", header.Number.Uint64()-1, header.ShardID)
+							Msgf("[ProcessingHeader] ReadCrossLink cannot read previousLink with number %d, shardID %d", header.Number().Uint64()-1, header.ShardID())
 						continue
 					}
 				}
@@ -78,14 +78,14 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 				if err != nil {
 					utils.Logger().Error().
 						Err(err).
-						Msgf("[ProcessingHeader] Failed to verify new cross link header for shardID %d, blockNum %d", header.ShardID, header.Number)
+						Msgf("[ProcessingHeader] Failed to verify new cross link header for shardID %d, blockNum %d", header.ShardID(), header.Number())
 					continue
 				}
 			}
 
 			crossLink := types.NewCrossLink(header)
 			utils.Logger().Debug().
-				Msgf("[ProcessingHeader] committing for shardID %d, blockNum %d", header.ShardID, header.Number.Uint64())
+				Msgf("[ProcessingHeader] committing for shardID %d, blockNum %d", header.ShardID(), header.Number().Uint64())
 			node.Blockchain().WriteCrossLinks(types.CrossLinks{crossLink}, true)
 		}
 
@@ -122,7 +122,7 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	if len(cxps) > 0 {
 		incomingReceiptHash = types.DeriveSha(cxps)
 	}
-	if incomingReceiptHash != block.Header().IncomingReceiptHash {
+	if incomingReceiptHash != block.Header().IncomingReceiptHash() {
 		return ctxerror.New("[verifyIncomingReceipts] Invalid IncomingReceiptHash in block header")
 	}
 
@@ -148,7 +148,7 @@ func (node *Node) compareCrosslinkWithReceipts(cxp *types.CXReceiptsProof) error
 			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get crosslink", "blockNum", blockNum, "shardID", shardID).WithCause(err)
 		}
 		hash = crossLink.ChainHeader.Hash()
-		outgoingReceiptHash = crossLink.ChainHeader.OutgoingReceiptHash
+		outgoingReceiptHash = crossLink.ChainHeader.OutgoingReceiptHash()
 	}
 	// verify the source block hash is from a finalized block
 	if hash == cxp.MerkleProof.BlockHash && outgoingReceiptHash == cxp.MerkleProof.CXReceiptHash {
@@ -161,16 +161,17 @@ func (node *Node) compareCrosslinkWithReceipts(cxp *types.CXReceiptsProof) error
 func (node *Node) VerifyCrosslinkHeader(prevHeader, header *block.Header) error {
 
 	// TODO: add fork choice rule
-	if prevHeader.Hash() != header.ParentHash {
-		return ctxerror.New("[CrossLink] Invalid cross link header - parent hash mismatch", "shardID", header.ShardID, "blockNum", header.Number)
+	parentHash := header.ParentHash()
+	if prevHeader.Hash() != parentHash {
+		return ctxerror.New("[CrossLink] Invalid cross link header - parent hash mismatch", "shardID", header.ShardID(), "blockNum", header.Number())
 	}
 
 	// Verify signature of the new cross link header
-	shardState, err := node.Blockchain().ReadShardState(prevHeader.Epoch)
-	committee := shardState.FindCommitteeByID(prevHeader.ShardID)
+	shardState, err := node.Blockchain().ReadShardState(prevHeader.Epoch())
+	committee := shardState.FindCommitteeByID(prevHeader.ShardID())
 
 	if err != nil || committee == nil {
-		return ctxerror.New("[CrossLink] Failed to read shard state for cross link header", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		return ctxerror.New("[CrossLink] Failed to read shard state for cross link header", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 	}
 	var committerKeys []*bls.PublicKey
 
@@ -185,29 +186,30 @@ func (node *Node) VerifyCrosslinkHeader(prevHeader, header *block.Header) error 
 		committerKeys = append(committerKeys, committerKey)
 	}
 	if !parseKeysSuccess {
-		return ctxerror.New("[CrossLink] cannot convert BLS public key", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		return ctxerror.New("[CrossLink] cannot convert BLS public key", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 	}
 
-	if header.Number.Uint64() > 1 { // First block doesn't have last sig
+	if header.Number().Uint64() > 1 { // First block doesn't have last sig
 		mask, err := bls_cosi.NewMask(committerKeys, nil)
 		if err != nil {
-			return ctxerror.New("cannot create group sig mask", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+			return ctxerror.New("cannot create group sig mask", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 		}
-		if err := mask.SetMask(header.LastCommitBitmap); err != nil {
-			return ctxerror.New("cannot set group sig mask bits", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
+			return ctxerror.New("cannot set group sig mask bits", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 		}
 
 		aggSig := bls.Sign{}
-		err = aggSig.Deserialize(header.LastCommitSignature[:])
+		sig := header.LastCommitSignature()
+		err = aggSig.Deserialize(sig[:])
 		if err != nil {
 			return ctxerror.New("unable to deserialize multi-signature from payload").WithCause(err)
 		}
 
 		blockNumBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(blockNumBytes, header.Number.Uint64()-1)
-		commitPayload := append(blockNumBytes, header.ParentHash[:]...)
+		binary.LittleEndian.PutUint64(blockNumBytes, header.Number().Uint64()-1)
+		commitPayload := append(blockNumBytes, parentHash[:]...)
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-			return ctxerror.New("Failed to verify the signature for cross link header ", "shardID", header.ShardID, "blockNum", header.Number)
+			return ctxerror.New("Failed to verify the signature for cross link header ", "shardID", header.ShardID(), "blockNum", header.Number())
 		}
 	}
 	return nil
@@ -219,7 +221,7 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 		Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 		Msg("Proposing cross links ...")
 	curBlock := node.Blockchain().CurrentBlock()
-	numShards := core.ShardingSchedule.InstanceForEpoch(curBlock.Header().Epoch).NumShards()
+	numShards := core.ShardingSchedule.InstanceForEpoch(curBlock.Header().Epoch()).NumShards()
 
 	shardCrossLinks := make([]types.CrossLinks, numShards)
 

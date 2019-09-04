@@ -59,18 +59,18 @@ func (b *BlockGen) SetCoinbase(addr common.Address) {
 		}
 		panic("coinbase can only be set once")
 	}
-	b.header.Coinbase = addr
-	b.gasPool = new(GasPool).AddGas(b.header.GasLimit)
+	b.header.SetCoinbase(addr)
+	b.gasPool = new(GasPool).AddGas(b.header.GasLimit())
 }
 
 // SetExtra sets the extra data field of the generated block.
 func (b *BlockGen) SetExtra(data []byte) {
-	b.header.Extra = data
+	b.header.SetExtra(data)
 }
 
 // SetShardID sets the shardID field of the generated block.
 func (b *BlockGen) SetShardID(shardID uint32) {
-	b.header.ShardID = shardID
+	b.header.SetShardID(shardID)
 }
 
 // AddTx adds a transaction to the generated block. If no coinbase has
@@ -98,7 +98,11 @@ func (b *BlockGen) AddTxWithChain(bc *BlockChain, tx *types.Transaction) {
 		b.SetCoinbase(common.Address{})
 	}
 	b.statedb.Prepare(tx.Hash(), common.Hash{}, len(b.txs))
-	receipt, _, _, err := ApplyTransaction(b.config, bc, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vm.Config{})
+	coinbase := b.header.Coinbase()
+	gasUsed := b.header.GasUsed()
+	receipt, _, _, err := ApplyTransaction(b.config, bc, &coinbase, b.gasPool, b.statedb, b.header, tx, &gasUsed, vm.Config{})
+	b.header.SetGasUsed(gasUsed)
+	b.header.SetCoinbase(coinbase)
 	if err != nil {
 		panic(err)
 	}
@@ -108,7 +112,7 @@ func (b *BlockGen) AddTxWithChain(bc *BlockChain, tx *types.Transaction) {
 
 // Number returns the block number of the block being generated.
 func (b *BlockGen) Number() *big.Int {
-	return new(big.Int).Set(b.header.Number)
+	return b.header.Number()
 }
 
 // AddUncheckedReceipt forcefully adds a receipts to the block without a
@@ -184,7 +188,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			}
 
 			// Write state changes to db
-			root, err := statedb.Commit(config.IsEIP158(b.header.Number))
+			root, err := statedb.Commit(config.IsEIP158(b.header.Number()))
 			if err != nil {
 				panic(fmt.Sprintf("state write error: %v", err))
 			}
@@ -216,20 +220,14 @@ func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *
 		time = new(big.Int).Add(parent.Time(), big.NewInt(10)) // block time is fixed at 10 seconds
 	}
 
-	return &block.Header{
-		Root:       state.IntermediateRoot(chain.Config().IsEIP158(parent.Number())),
-		ParentHash: parent.Hash(),
-		Coinbase:   parent.Coinbase(),
-		//Difficulty: engine.CalcDifficulty(chain, time.Uint64(), &types.Header{
-		//	Number:     parent.Number(),
-		//	Time:       new(big.Int).Sub(time, big.NewInt(10)),
-		//	Difficulty: parent.Difficulty(),
-		//	UncleHash:  parent.UncleHash(),
-		//}),
-		GasLimit: CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit()),
-		Number:   new(big.Int).Add(parent.Number(), common.Big1),
-		Time:     time,
-	}
+	return block.NewHeaderWith().
+		Root(state.IntermediateRoot(chain.Config().IsEIP158(parent.Number()))).
+		ParentHash(parent.Hash()).
+		Coinbase(parent.Coinbase()).
+		GasLimit(CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit())).
+		Number(new(big.Int).Add(parent.Number(), common.Big1)).
+		Time(time).
+		Header()
 }
 
 // makeHeaderChain creates a deterministic chain of headers rooted at parent.

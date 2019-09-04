@@ -555,7 +555,7 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		return false
 	}
 	ss.syncMux.Lock()
-	if err := worker.UpdateCurrent(block.Header().Coinbase); err != nil {
+	if err := worker.UpdateCurrent(block.Header().Coinbase()); err != nil {
 		utils.Logger().Warn().Err(err).Msg("[SYNC] (*Worker).UpdateCurrent failed")
 	}
 	ss.syncMux.Unlock()

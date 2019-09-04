@@ -458,35 +458,35 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 
 // retrieve corresponding blsPublicKey from Coinbase Address
 func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*bls.PublicKey, error) {
-	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch)
+	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch())
 	if err != nil {
 		return nil, ctxerror.New("cannot read shard state",
-			"epoch", header.Epoch,
-			"coinbaseAddr", header.Coinbase,
+			"epoch", header.Epoch(),
+			"coinbaseAddr", header.Coinbase(),
 		).WithCause(err)
 	}
 
-	committee := shardState.FindCommitteeByID(header.ShardID)
+	committee := shardState.FindCommitteeByID(header.ShardID())
 	if committee == nil {
 		return nil, ctxerror.New("cannot find shard in the shard state",
-			"blockNum", header.Number,
-			"shardID", header.ShardID,
-			"coinbaseAddr", header.Coinbase,
+			"blockNum", header.Number(),
+			"shardID", header.ShardID(),
+			"coinbaseAddr", header.Coinbase(),
 		)
 	}
 	committerKey := new(bls.PublicKey)
 	for _, member := range committee.NodeList {
-		if member.EcdsaAddress == header.Coinbase {
+		if member.EcdsaAddress == header.Coinbase() {
 			err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 			if err != nil {
 				return nil, ctxerror.New("cannot convert BLS public key",
 					"blsPublicKey", member.BlsPublicKey,
-					"coinbaseAddr", header.Coinbase).WithCause(err)
+					"coinbaseAddr", header.Coinbase()).WithCause(err)
 			}
 			return committerKey, nil
 		}
 	}
-	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase)
+	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase())
 }
 
 // UpdateConsensusInformation will update shard information (epoch, publicKeys, blockNum, viewID)
@@ -505,8 +505,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	header := consensus.ChainReader.CurrentHeader()
 
-	epoch := header.Epoch
-	curPubKeys := core.GetPublicKeys(epoch, header.ShardID)
+	epoch := header.Epoch()
+	curPubKeys := core.GetPublicKeys(epoch, header.ShardID())
 	consensus.numPrevPubKeys = len(curPubKeys)
 
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
@@ -514,9 +514,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if core.IsEpochLastBlockByHeader(header) {
 		// increase epoch by one if it's the last block
 		consensus.SetEpochNum(epoch.Uint64() + 1)
-		consensus.getLogger().Info().Uint64("headerNum", header.Number.Uint64()).Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
+		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
 		nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		pubKeys = core.GetPublicKeys(nextEpoch, header.ShardID)
+		pubKeys = core.GetPublicKeys(nextEpoch, header.ShardID())
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
 		pubKeys = curPubKeys
@@ -534,7 +534,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.UpdatePublicKeys(pubKeys)
 
 	// take care of possible leader change during the epoch
-	if !core.IsEpochLastBlockByHeader(header) && header.Number.Uint64() != 0 {
+	if !core.IsEpochLastBlockByHeader(header) && header.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).Msg("[SYNC] Unable to get leaderPubKey from coinbase")

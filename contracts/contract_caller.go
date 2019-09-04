@@ -33,7 +33,7 @@ func NewContractCaller(bc *core.BlockChain, config *params.ChainConfig) *Contrac
 // CallContract calls a contracts with the specified transaction.
 func (cc *ContractCaller) CallContract(tx *types.Transaction) ([]byte, error) {
 	currBlock := cc.blockchain.CurrentBlock()
-	msg, err := tx.AsMessage(types.MakeSigner(cc.config, currBlock.Header().Number))
+	msg, err := tx.AsMessage(types.MakeSigner(cc.config, currBlock.Header().Number()))
 	if err != nil {
 		utils.GetLogInstance().Error("[ABI] Failed to convert transaction to message", "error", err)
 		return []byte{}, err

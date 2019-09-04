@@ -67,7 +67,7 @@ func (b *APIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.Blo
 	if header == nil || err != nil {
 		return nil, nil, err
 	}
-	stateDb, err := b.hmy.blockchain.StateAt(header.Root)
+	stateDb, err := b.hmy.blockchain.StateAt(header.Root())
 	return stateDb, header, err
 }
 

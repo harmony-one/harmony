@@ -297,7 +297,7 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 
 	utils.Logger().Info().Msgf("[BroadcastCrossLinkHeader] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, newBlock.NumberU64(), len(headers))
 	for _, header := range headers {
-		utils.Logger().Debug().Msgf("[BroadcastCrossLinkHeader] Broadcasting %d", header.Number.Uint64())
+		utils.Logger().Debug().Msgf("[BroadcastCrossLinkHeader] Broadcasting %d", header.Number().Uint64())
 	}
 	node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(headers)))
 }
@@ -305,7 +305,7 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
 // destination shards
 func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
-	epoch := newBlock.Header().Epoch
+	epoch := newBlock.Header().Epoch()
 	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
 	myShardID := node.Consensus.ShardID
@@ -386,22 +386,22 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 
 // VerifyBlockCrossLinks verifies the cross links of the block
 func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
-	if len(block.Header().CrossLinks) == 0 {
+	if len(block.Header().CrossLinks()) == 0 {
 		return nil
 	}
 	crossLinks := &types.CrossLinks{}
-	err := rlp.DecodeBytes(block.Header().CrossLinks, crossLinks)
+	err := rlp.DecodeBytes(block.Header().CrossLinks(), crossLinks)
 	if err != nil {
 		return ctxerror.New("[CrossLinkVerification] failed to decode cross links",
 			"blockHash", block.Hash(),
-			"crossLinks", len(block.Header().CrossLinks),
+			"crossLinks", len(block.Header().CrossLinks()),
 		).WithCause(err)
 	}
 
 	if !crossLinks.IsSorted() {
 		return ctxerror.New("[CrossLinkVerification] cross links are not sorted",
 			"blockHash", block.Hash(),
-			"crossLinks", len(block.Header().CrossLinks),
+			"crossLinks", len(block.Header().CrossLinks()),
 		)
 	}
 
@@ -420,7 +420,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 				}
 			}
 		} else {
-			if (*crossLinks)[i-1].Header().ShardID != crossLink.Header().ShardID {
+			if (*crossLinks)[i-1].Header().ShardID() != crossLink.Header().ShardID() {
 				if crossLink.BlockNum().Uint64() > firstCrossLinkBlock {
 					lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
 					if err != nil {
@@ -457,7 +457,7 @@ var BigMaxUint64 = new(big.Int).SetBytes([]byte{
 func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) error {
 	// Common case first – blocks without resharding proposal
 	header := block.Header()
-	if header.ShardStateHash == (common.Hash{}) {
+	if header.ShardStateHash() == (common.Hash{}) {
 		// No new shard state was proposed
 		if block.ShardID() == 0 {
 			if core.IsEpochLastBlock(block) {
@@ -475,7 +475,7 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 		return nil
 	}
 	shardState := &shard.State{}
-	err := rlp.DecodeBytes(header.ShardState, shardState)
+	err := rlp.DecodeBytes(header.ShardState(), shardState)
 	if err != nil {
 		return err
 	}
@@ -483,7 +483,7 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 	if block.ShardID() == 0 {
 		// Beacon validators independently recalculate the master state and
 		// compare it against the proposed copy.
-		nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
+		nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
 		// TODO ek – this may be called from regular shards,
 		//  for vetting beacon chain blocks received during block syncing.
 		//  DRand may or or may not get in the way.  Test this out.
@@ -650,7 +650,7 @@ func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
 	}
 	epochShardStateMessage := proto_node.ConstructEpochShardStateMessage(
 		shard.EpochShardState{
-			Epoch:      newBlock.Header().Epoch.Uint64() + 1,
+			Epoch:      newBlock.Header().Epoch().Uint64() + 1,
 			ShardState: shardState,
 		},
 	)
@@ -666,7 +666,7 @@ func (node *Node) AddNewBlock(newBlock *types.Block) error {
 		utils.Logger().Error().
 			Err(err).
 			Uint64("blockNum", newBlock.NumberU64()).
-			Bytes("parentHash", newBlock.Header().ParentHash.Bytes()[:]).
+			Bytes("parentHash", newBlock.Header().ParentHash().Bytes()[:]).
 			Bytes("hash", newBlock.Header().Hash().Bytes()[:]).
 			Msg("Error Adding new block to blockchain")
 	} else {
