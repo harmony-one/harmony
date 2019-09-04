@@ -9,6 +9,7 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
+	// TODO: populate with real genesis hash (sharded)
 	MainnetGenesisHash = common.HexToHash("0x")
 	TestnetGenesisHash = common.HexToHash("0x")
 )
@@ -31,9 +32,13 @@ var (
 	}
 
 	// AllProtocolChanges ...
+	// This configuration is intentionally not using keyed fields to force anyone
+	// adding flags to the config to also have to set these fields.
 	AllProtocolChanges = &ChainConfig{big.NewInt(100), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
 
 	// TestChainConfig ...
+	// This configuration is intentionally not using keyed fields to force anyone
+	// adding flags to the config to also have to set these fields.
 	TestChainConfig = &ChainConfig{big.NewInt(99), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
 
 	// TestRules ...

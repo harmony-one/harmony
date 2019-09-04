@@ -41,9 +41,9 @@ func Unlock(account accounts.Account) {
 }
 
 // SignTx signs transaction using account key
-func SignTx(account accounts.Account, tx *types.Transaction) (*types.Transaction, error) {
+func SignTx(account accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
 	if hmyKeystore != nil {
-		return hmyKeystore.SignTx(account, tx, big.NewInt(1)) // TODO: use chainID from config
+		return hmyKeystore.SignTx(account, tx, chainID)
 	}
 	return tx, fmt.Errorf("un-initialized keystore")
 }
