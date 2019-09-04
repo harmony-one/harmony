@@ -506,8 +506,8 @@ func (ss *StateSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) 
 	maxFirstID, maxCount := GetHowManyMaxConsensus(candidateBlocks)
 	hash := candidateBlocks[maxFirstID].Hash()
 	utils.Logger().Debug().
-		Bytes("parentHash", parentHash[:]).
-		Bytes("hash", hash[:]).
+		Hex("parentHash", parentHash[:]).
+		Hex("hash", hash[:]).
 		Int("maxCount", maxCount).
 		Msg("[SYNC] Find block with matching parenthash")
 	return candidateBlocks[maxFirstID]
@@ -662,7 +662,7 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		err := peerConfig.registerToBroadcast(ss.selfPeerHash[:], ss.selfip, ss.selfport)
 		if err != nil {
 			logger.Debug().
-				Bytes("selfPeerHash", ss.selfPeerHash[:]).
+				Hex("selfPeerHash", ss.selfPeerHash[:]).
 				Msg("[SYNC] register failed to peer")
 			return
 		}

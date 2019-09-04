@@ -338,7 +338,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			// Verify the multi-sig for prepare phase
 			if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 				consensus.getLogger().Warn().
-					Bytes("blockHash", blockHash).
+					Hex("blockHash", blockHash).
 					Msg("[onViewChange] failed to verify multi signature for m1 prepared payload")
 				return
 			}
@@ -430,7 +430,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 		consensus.getLogger().Warn().
 			Int("payloadSize", len(consensus.m1Payload)).
-			Bytes("M1Payload", consensus.m1Payload).
+			Hex("M1Payload", consensus.m1Payload).
 			Msg("[onViewChange] Sent NewView Message")
 		consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_NEWVIEW, []p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
@@ -491,7 +491,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	if !m3Sig.VerifyHash(m3Mask.AggregatePublic, viewIDBytes) {
 		consensus.getLogger().Warn().
 			Str("m3Sig", m3Sig.SerializeToHexStr()).
-			Bytes("m3Mask", m3Mask.Bitmap).
+			Hex("m3Mask", m3Mask.Bitmap).
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Msg("[onNewView] Unable to Verify Aggregated Signature of M3 (ViewID) payload")
 		return

@@ -52,7 +52,7 @@ func ReadChainConfig(db DatabaseReader, hash common.Hash) *params.ChainConfig {
 	}
 	var config params.ChainConfig
 	if err := json.Unmarshal(data, &config); err != nil {
-		utils.Logger().Error().Err(err).Bytes("hash", hash.Bytes()).Msg("Invalid chain config JSON")
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid chain config JSON")
 		return nil
 	}
 	return &config

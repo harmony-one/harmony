@@ -385,7 +385,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 		} else {
 			consensus.getLogger().Debug().
-				Bytes("blockHash", consensus.blockHash[:]).
+				Hex("blockHash", consensus.blockHash[:]).
 				Uint64("blockNum", consensus.blockNum).
 				Msg("[OnPrepare] Sent Prepared Message!!")
 		}
@@ -481,7 +481,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if blockObj.Header().Hash() != recvMsg.BlockHash {
 		consensus.getLogger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Bytes("MsgBlockHash", recvMsg.BlockHash[:]).
+			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
 			Str("blockObjHash", blockObj.Header().Hash().Hex()).
 			Msg("[OnPrepared] BlockHash not match")
 		return
@@ -509,7 +509,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.getLogger().Debug().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Bytes("blockHash", recvMsg.BlockHash[:]).
+		Hex("blockHash", recvMsg.BlockHash[:]).
 		Msg("[OnPrepared] Prepared message and block added")
 
 	consensus.mutex.Lock()
@@ -569,7 +569,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	} else {
 		consensus.getLogger().Info().
 			Uint64("blockNum", consensus.blockNum).
-			Bytes("blockHash", consensus.blockHash[:]).
+			Hex("blockHash", consensus.blockHash[:]).
 			Msg("[OnPrepared] Sent Commit Message!!")
 	}
 
@@ -616,7 +616,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	if !consensus.PbftLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
 		consensus.getLogger().Debug().
-			Bytes("MsgBlockHash", recvMsg.BlockHash[:]).
+			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnCommit] Cannot find matching blockhash")
@@ -625,7 +625,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	if !consensus.PbftLog.HasMatchingPrepared(consensus.blockNum, recvMsg.BlockHash) {
 		consensus.getLogger().Debug().
-			Bytes("blockHash", recvMsg.BlockHash[:]).
+			Hex("blockHash", recvMsg.BlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnCommit] Cannot find matching prepared message")
 		return
@@ -746,7 +746,7 @@ func (consensus *Consensus) finalizeCommits() {
 		consensus.getLogger().Warn().Err(err).Msg("[Finalizing] Cannot send committed message")
 	} else {
 		consensus.getLogger().Info().
-			Bytes("blockHash", consensus.blockHash[:]).
+			Hex("blockHash", consensus.blockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[Finalizing] Sent Committed Message")
 	}
@@ -1073,7 +1073,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 						// Verify the randomness
 						_ = blockHash
 						consensus.getLogger().Info().
-							Bytes("rnd", rnd[:]).
+							Hex("rnd", rnd[:]).
 							Msg("[ConsensusMainLoop] Adding randomness into new block")
 						// newBlock.AddVdf([258]byte{}) // TODO(HB): add real vdf
 					} else {
