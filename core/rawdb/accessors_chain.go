@@ -350,6 +350,10 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 	WriteHeader(db, block.Header())
 	// TODO ek – maybe roll the below into WriteHeader()
 	epoch := block.Header().Epoch()
+	if epoch == nil {
+		// backward compatibility
+		return
+	}
 	epochBlockNum := block.Number()
 	writeOne := func() {
 		if err := WriteEpochBlockNumber(db, epoch, epochBlockNum); err != nil {
