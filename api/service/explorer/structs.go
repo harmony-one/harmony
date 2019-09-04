@@ -26,12 +26,12 @@ const (
 type Data struct {
 	Blocks []*Block `json:"blocks"`
 	// Block   Block        `json:"block"`
-	Account Account `json:"account"`
+	Address Address `json:"Address"`
 	TX      Transaction
 }
 
-// Account ...
-type Account struct {
+// Address ...
+type Address struct {
 	ID      string         `json:"id"`
 	Balance *big.Int       `json:"balance"`
 	TXs     []*Transaction `json:"txs"`
@@ -110,7 +110,7 @@ func NewBlock(block *types.Block, height int) *Block {
 }
 
 // GetTransaction ...
-func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transaction {
+func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transaction {
 	if tx.To() == nil {
 		return nil
 	}
@@ -120,7 +120,7 @@ func GetTransaction(tx *types.Transaction, accountBlock *types.Block) *Transacti
 	}
 	return &Transaction{
 		ID:        tx.Hash().Hex(),
-		Timestamp: strconv.Itoa(int(accountBlock.Time().Int64() * 1000)),
+		Timestamp: strconv.Itoa(int(addressBlock.Time().Int64() * 1000)),
 		From:      common2.MustAddressToBech32(common.HexToAddress(msg.From().Hex())),
 		To:        common2.MustAddressToBech32(common.HexToAddress(msg.To().Hex())),
 		Value:     msg.Value(),

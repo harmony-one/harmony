@@ -21,7 +21,7 @@ const (
 	BlockInfoPrefix = "bi"
 	BlockPrefix     = "b"
 	TXPrefix        = "tx"
-	AccountPrefix   = "ad"
+	AddressPrefix   = "ad"
 	CommitteePrefix = "cp"
 )
 
@@ -30,9 +30,9 @@ func GetBlockInfoKey(id int) string {
 	return fmt.Sprintf("%s_%d", BlockInfoPrefix, id)
 }
 
-// GetAccountKey ...
-func GetAccountKey(address string) string {
-	return fmt.Sprintf("%s_%s", AccountPrefix, address)
+// GetAddressKey ...
+func GetAddressKey(address string) string {
+	return fmt.Sprintf("%s_%s", AddressPrefix, address)
 }
 
 // GetBlockKey ...
@@ -118,7 +118,7 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 
 		explorerTransaction := GetTransaction(tx, block)
 		storage.UpdateTXStorage(batch, explorerTransaction, tx)
-		storage.UpdateAccount(batch, explorerTransaction, tx)
+		storage.UpdateAddress(batch, explorerTransaction, tx)
 	}
 	if err := batch.Write(); err != nil {
 		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
@@ -154,37 +154,37 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 	}
 }
 
-// UpdateAccount ...
-func (storage *Storage) UpdateAccount(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
+// UpdateAddress ...
+func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
-	storage.UpdateAccountStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+	storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
 	explorerTransaction.Type = Sent
-	storage.UpdateAccountStorage(batch, explorerTransaction.From, explorerTransaction, tx)
+	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
 }
 
-// UpdateAccountStorage updates specific addr account.
-func (storage *Storage) UpdateAccountStorage(batch ethdb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
-	key := GetAccountKey(addr)
+// UpdateAddressStorage updates specific addr Address.
+func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
+	key := GetAddressKey(addr)
 
-	var account Account
+	var address Address
 	if data, err := storage.db.Get([]byte(key)); err == nil {
-		err = rlp.DecodeBytes(data, &account)
+		err = rlp.DecodeBytes(data, &address)
 		if err == nil {
-			account.Balance.Add(account.Balance, tx.Value())
+			address.Balance.Add(address.Balance, tx.Value())
 		} else {
 			utils.Logger().Error().Err(err).Msg("Failed to error")
 		}
 	} else {
-		account.Balance = tx.Value()
+		address.Balance = tx.Value()
 	}
-	account.ID = addr
-	account.TXs = append(account.TXs, explorerTransaction)
-	encoded, err := rlp.EncodeToBytes(account)
+	address.ID = addr
+	address.TXs = append(address.TXs, explorerTransaction)
+	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
 		if err := batch.Put([]byte(key), encoded); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot batch account")
+			utils.Logger().Warn().Err(err).Msg("cannot batch address")
 		}
 	} else {
-		utils.Logger().Error().Err(err).Msg("cannot encode address account")
+		utils.Logger().Error().Err(err).Msg("cannot encode address")
 	}
 }

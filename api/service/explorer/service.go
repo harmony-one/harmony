@@ -104,16 +104,16 @@ func (s *Service) Run() *http.Server {
 
 	s.router = mux.NewRouter()
 	// Set up router for blocks.
-	s.router.Path("/blocks").Queries("from", "{[0-9]*?}", "to", "{[0-9]*?}").HandlerFunc(s.GetExplorerBlocks).Methods("GET")
+	s.router.Path("/blocks").Queries("from", "{[0-9]*?}", "to", "{[0-9]*?}", "page", "{[0-9]*?}", "offset", "{[0-9]*?}").HandlerFunc(s.GetExplorerBlocks).Methods("GET")
 	s.router.Path("/blocks").HandlerFunc(s.GetExplorerBlocks)
 
 	// Set up router for tx.
 	s.router.Path("/tx").Queries("id", "{[0-9A-Fa-fx]*?}").HandlerFunc(s.GetExplorerTransaction).Methods("GET")
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 
-	// Set up router for account.
-	s.router.Path("/account").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset)).HandlerFunc(s.GetExplorerAccount).Methods("GET")
-	s.router.Path("/account").HandlerFunc(s.GetExplorerAccount)
+	// Set up router for address.
+	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset, "tx_view", "{[A-Z]*?}", "page", "{[0-9]*?}", "offset", "{[0-9]*?}")).HandlerFunc(s.GetExplorerAddress).Methods("GET")
+	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
 	// Set up router for node count.
 	s.router.Path("/nodes").HandlerFunc(s.GetExplorerNodeCount) // TODO(ricl): this is going to be replaced by /node-count
@@ -167,7 +167,8 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	from := r.FormValue("from")
 	to := r.FormValue("to")
-
+	pageParam := r.FormValue("page")
+	offsetParam := r.FormValue("offset")
 	data := &Data{
 		Blocks: []*Block{},
 	}
@@ -206,15 +207,37 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(400)
 		return
 	}
+	var offset int
+	if offsetParam != "" {
+		offset, err = strconv.Atoi(offsetParam)
+		if err != nil || offset < 1 {
+			utils.Logger().Warn().Msg("invalid offset parameter")
+			w.WriteHeader(400)
+			return
+		}
+	} else {
+		offset = 10
+	}
+	var page int
+	if pageParam != "" {
+		page, err = strconv.Atoi(pageParam)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("invalid page parameter")
+			w.WriteHeader(400)
+			return
+		}
+	} else {
+		page = 0
+	}
 
-	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
+	addressBlocks := s.ReadBlocksFromDB(fromInt, toInt)
 	curEpoch := int64(-1)
 	committee := &shard.Committee{}
-	for id, accountBlock := range accountBlocks {
-		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
+	for id, addressBlock := range addressBlocks {
+		if id == 0 || id == len(addressBlocks)-1 || addressBlock == nil {
 			continue
 		}
-		block := NewBlock(accountBlock, id+fromInt-1)
+		block := NewBlock(addressBlock, id+fromInt-1)
 		if int64(block.Epoch) > curEpoch {
 			if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), block.Epoch))); err == nil {
 				committee = &shard.Committee{}
@@ -222,10 +245,10 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 					utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
 				}
 			} else {
-				state, err := accountBlock.Header().GetShardState()
+				state, err := addressBlock.Header().GetShardState()
 				if err == nil {
 					for _, shardCommittee := range state {
-						if shardCommittee.ShardID == accountBlock.ShardID() {
+						if shardCommittee.ShardID == addressBlock.ShardID() {
 							committee = &shardCommittee
 							break
 						}
@@ -240,8 +263,8 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 		}
 		mask, err := bls2.NewMask(pubkeys, nil)
-		if err == nil && accountBlocks[id+1] != nil {
-			err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap)
+		if err == nil && addressBlocks[id+1] != nil {
+			err = mask.SetMask(addressBlocks[id+1].Header().LastCommitBitmap)
 			if err == nil {
 				for _, validator := range committee.NodeList {
 					oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
@@ -257,39 +280,44 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		// Populate transactions
-		for _, tx := range accountBlock.Transactions() {
-			transaction := GetTransaction(tx, accountBlock)
+		for _, tx := range addressBlock.Transactions() {
+			transaction := GetTransaction(tx, addressBlock)
 			if transaction != nil {
 				block.TXs = append(block.TXs, transaction)
 			}
 		}
-		if accountBlocks[id-1] == nil {
+		if addressBlocks[id-1] == nil {
 			block.BlockTime = int64(0)
 			block.PrevBlock = RefBlock{
 				ID:     "",
 				Height: "",
 			}
 		} else {
-			block.BlockTime = accountBlock.Time().Int64() - accountBlocks[id-1].Time().Int64()
+			block.BlockTime = addressBlock.Time().Int64() - addressBlocks[id-1].Time().Int64()
 			block.PrevBlock = RefBlock{
-				ID:     accountBlocks[id-1].Hash().Hex(),
+				ID:     addressBlocks[id-1].Hash().Hex(),
 				Height: strconv.Itoa(id + fromInt - 2),
 			}
 		}
-		if accountBlocks[id+1] == nil {
+		if addressBlocks[id+1] == nil {
 			block.NextBlock = RefBlock{
 				ID:     "",
 				Height: "",
 			}
 		} else {
 			block.NextBlock = RefBlock{
-				ID:     accountBlocks[id+1].Hash().Hex(),
+				ID:     addressBlocks[id+1].Hash().Hex(),
 				Height: strconv.Itoa(id + fromInt),
 			}
 		}
 		data.Blocks = append(data.Blocks, block)
 	}
-	return
+
+	paginatedBlocks := make([]*Block, 0)
+	for i := 0; i < offset && i+offset*page < len(data.Blocks); i++ {
+		paginatedBlocks = append(paginatedBlocks, data.Blocks[i+offset*page])
+	}
+	data.Blocks = paginatedBlocks
 }
 
 // GetExplorerTransaction servers /tx end-point.
@@ -404,73 +432,103 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetExplorerAccount serves /account end-point.
-func (s *Service) GetExplorerAccount(w http.ResponseWriter, r *http.Request) {
+// GetExplorerAddress serves /address end-point.
+func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := r.FormValue("id")
-	key := GetAccountKey(id)
+	key := GetAddressKey(id)
 	txViewParam := r.FormValue("tx_view")
+	pageParam := r.FormValue("page")
+	offsetParam := r.FormValue("offset")
 	txView := txViewNone
 	if txViewParam != "" {
 		txView = txViewParam
 	}
-	utils.Logger().Info().Str("account", id).Msg("Querying account")
+	utils.Logger().Info().Str("Address", id).Msg("Querying address")
 	data := &Data{}
 	defer func() {
-		if err := json.NewEncoder(w).Encode(data.Account); err != nil {
+		if err := json.NewEncoder(w).Encode(data.Address); err != nil {
 			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
-				"cannot JSON-encode account")
+				"cannot JSON-encode Address")
 		}
 	}()
 	if id == "" {
-		utils.Logger().Warn().Msg("missing account address param")
+		utils.Logger().Warn().Msg("missing address id param")
 		w.WriteHeader(400)
 		return
+	}
+	var err error
+	var offset int
+	if offsetParam != "" {
+		offset, err = strconv.Atoi(offsetParam)
+		if err != nil || offset < 1 {
+			utils.Logger().Warn().Msg("invalid offset parameter")
+			w.WriteHeader(400)
+			return
+		}
+	} else {
+		offset = 10
+	}
+	var page int
+	if pageParam != "" {
+		page, err = strconv.Atoi(pageParam)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("invalid page parameter")
+			w.WriteHeader(400)
+			return
+		}
+	} else {
+		page = 0
 	}
 
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(key))
 	if err != nil {
-		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read account from db")
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
 		w.WriteHeader(500)
 		return
 	}
-	if err = rlp.DecodeBytes(bytes, &data.Account); err != nil {
+	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
 		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
 		w.WriteHeader(500)
 		return
 	}
 
-	data.Account.ID = id
+	data.Address.ID = id
 	// Try to populate the banace by directly calling get balance.
 	// Check the balance from blockchain rather than local DB dump
 	if s.GetAccountBalance != nil {
 		address := common2.ParseAddr(id)
 		balance, err := s.GetAccountBalance(address)
 		if err == nil {
-			data.Account.Balance = balance
+			data.Address.Balance = balance
 		}
 	}
 	switch txView {
 	case txViewNone:
-		data.Account.TXs = nil
+		data.Address.TXs = nil
 	case Received:
 		receivedTXs := make([]*Transaction, 0)
-		for _, tx := range data.Account.TXs {
+		for _, tx := range data.Address.TXs {
 			if tx.Type == Received {
 				receivedTXs = append(receivedTXs, tx)
 			}
 		}
-		data.Account.TXs = receivedTXs
+		data.Address.TXs = receivedTXs
 	case Sent:
 		sentTXs := make([]*Transaction, 0)
-		for _, tx := range data.Account.TXs {
+		for _, tx := range data.Address.TXs {
 			if tx.Type == Sent {
 				sentTXs = append(sentTXs, tx)
 			}
 		}
-		data.Account.TXs = sentTXs
+		data.Address.TXs = sentTXs
 	}
+	paginatedTXs := make([]*Transaction, 0)
+	for i := 0; i < offset && i+offset*page < len(data.Address.TXs); i++ {
+		paginatedTXs = append(paginatedTXs, data.Address.TXs[i+offset*page])
+	}
+	data.Address.TXs = paginatedTXs
 }
 
 // GetExplorerNodeCount serves /nodes end-point.
