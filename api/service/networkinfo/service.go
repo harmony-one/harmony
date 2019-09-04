@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	badger "github.com/ipfs/go-ds-badger"
+	coredis "github.com/libp2p/go-libp2p-core/discovery"
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
@@ -51,6 +52,8 @@ const (
 
 	// register to bootnode every ticker
 	dhtTicker = 6 * time.Hour
+
+	discoveryLimit = 32
 )
 
 // New returns role conversion service.
@@ -165,7 +168,7 @@ func (s *Service) DoService() {
 			utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Successfully announced!")
 		default:
 			var err error
-			s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous))
+			s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous), coredis.Limit(discoveryLimit))
 			if err != nil {
 				utils.Logger().Error().Err(err).Msg("FindPeers")
 				return
