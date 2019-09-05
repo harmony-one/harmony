@@ -32,11 +32,6 @@ const (
 	localnetMaxTxPoolSizeLimit             = 8000
 	localnetMaxNumTxsPerBlockLimit         = 1000
 	localnetRecentTxDuration               = time.Hour
-
-	// LocalNetHTTPPattern is the http pattern for mainnet.
-	LocalNetHTTPPattern = "http://s%d.t.hmny.io:9500"
-	// LocalNetWSPattern is the websocket pattern for mainnet.
-	LocalNetWSPattern = "ws://s%d.t.hmny.io:9800"
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
