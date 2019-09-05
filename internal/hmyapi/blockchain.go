@@ -25,14 +25,6 @@ const (
 	defaultFromAddress = "0x0000000000000000000000000000000000000000"
 )
 
-// Constants for sharding structure.
-const (
-	MainNetHTTPPattern = "http://s%d.t.hmny.io:9500"
-	MainNetWSPattern   = "ws://s%d.t.hmny.io:9800"
-	TestNetHTTPPattern = "http://s%d.b.hmny.io:9500"
-	TestNetWSPattern   = "ws://s%d.s.hmny.io:9800"
-)
-
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockChainAPI struct {
@@ -69,20 +61,6 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 		return RPCMarshalBlock(block, false, false)
 	}
 	return nil, err
-}
-
-// GenShardingStructure return sharding structure, given shard number and its patterns.
-func GenShardingStructure(shardNum, shardID uint32, httpPattern, wsPattern string) []map[string]interface{} {
-	res := []map[string]interface{}{}
-	for i := 0; i < int(shardNum); i++ {
-		res = append(res, map[string]interface{}{
-			"current": int(shardID) == i,
-			"shardID": i,
-			"http":    fmt.Sprintf(httpPattern, i),
-			"ws":      fmt.Sprintf(wsPattern, i),
-		})
-	}
-	return res
 }
 
 // GetShardingStructure returns an array of sharding structures.

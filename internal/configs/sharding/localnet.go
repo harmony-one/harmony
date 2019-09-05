@@ -1,6 +1,7 @@
 package shardingconfig
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -133,7 +134,16 @@ func (ls localnetSchedule) GetNetworkID() NetworkID {
 
 // GetShardingStructure is the sharding structure for localnet.
 func (ls localnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
-	return genShardingStructure(numShard, shardID, LocalNetHTTPPattern, LocalNetWSPattern)
+	res := []map[string]interface{}{}
+	for i := 0; i < numShard; i++ {
+		res = append(res, map[string]interface{}{
+			"current": int(shardID) == i,
+			"shardID": i,
+			"http":    fmt.Sprintf("http://127.0.0.1:%d", 9500+i),
+			"ws":      fmt.Sprintf("ws://127.0.0.1:%d", 9800+i),
+		})
+	}
+	return res
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}
