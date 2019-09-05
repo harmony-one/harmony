@@ -790,6 +790,7 @@ func (node *Node) bootstrapConsensus() {
 				utils.Logger().Info().
 					Int("previousNumPeers", lastPeerNum).
 					Int("numPeersNow", numPeersNow).
+					Int("targetNumPeers", node.Consensus.MinPeers).
 					Msg("New peers increased")
 				lastPeerNum = numPeersNow
 			}
