@@ -339,7 +339,7 @@ func (node *Node) StartServer() {
 // Currently used for stats reporting purpose
 func (node *Node) countNumTransactionsInBlockchain() int {
 	count := 0
-	for block := node.Blockchain().CurrentBlock(); block != nil; block = node.Blockchain().GetBlockByHash(block.Header().ParentHash) {
+	for block := node.Blockchain().CurrentBlock(); block != nil; block = node.Blockchain().GetBlockByHash(block.Header().ParentHash()) {
 		count += len(block.Transactions())
 	}
 	return count

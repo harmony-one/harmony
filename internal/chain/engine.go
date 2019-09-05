@@ -27,17 +27,17 @@ func (e *engineImpl) SealHash(header *block.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
 	// TODO: update with new fields
 	if err := rlp.Encode(hasher, []interface{}{
-		header.ParentHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra,
+		header.ParentHash(),
+		header.Coinbase(),
+		header.Root(),
+		header.TxHash(),
+		header.ReceiptHash(),
+		header.Bloom(),
+		header.Number(),
+		header.GasLimit(),
+		header.GasUsed(),
+		header.Time(),
+		header.Extra(),
 	}); err != nil {
 		utils.Logger().Warn().Err(err).Msg("rlp.Encode failed")
 	}
@@ -66,7 +66,7 @@ func (e *engineImpl) Prepare(chain engine.ChainReader, header *block.Header) err
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
 func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header, seal bool) error {
-	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
+	parentHeader := chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
 	if parentHeader == nil {
 		return engine.ErrUnknownAncestor
 	}
@@ -91,22 +91,22 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 
 // retrievePublicKeysFromLastBlock finds the public keys of last block's committee
 func retrievePublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
-	parentHeader := bc.GetHeaderByHash(header.ParentHash)
+	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	if parentHeader == nil {
 		return nil, ctxerror.New("cannot find parent block header in DB",
-			"parentHash", header.ParentHash)
+			"parentHash", header.ParentHash())
 	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch)
+	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
 	if err != nil {
 		return nil, ctxerror.New("cannot read shard state",
-			"epoch", parentHeader.Epoch,
+			"epoch", parentHeader.Epoch(),
 		).WithCause(err)
 	}
-	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID)
+	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID())
 	if parentCommittee == nil {
 		return nil, ctxerror.New("cannot find shard in the shard state",
-			"parentBlockNumber", parentHeader.Number,
-			"shardID", parentHeader.ShardID,
+			"parentBlockNumber", parentHeader.Number(),
+			"shardID", parentHeader.ShardID(),
 		)
 	}
 	var committerKeys []*bls.PublicKey
@@ -125,23 +125,25 @@ func retrievePublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header
 // VerifySeal implements Engine, checking whether the given block satisfies
 // the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
 func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) error {
-	if chain.CurrentHeader().Number.Uint64() <= uint64(1) {
+	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
 		return nil
 	}
 	publicKeys, err := retrievePublicKeysFromLastBlock(chain, header)
 	if err != nil {
 		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys from last block").WithCause(err)
 	}
-	payload := append(header.LastCommitSignature[:], header.LastCommitBitmap...)
+	sig := header.LastCommitSignature()
+	payload := append(sig[:], header.LastCommitBitmap()...)
 	aggSig, mask, err := ReadSignatureBitmapByPublicKeys(payload, publicKeys)
 	if err != nil {
 		return ctxerror.New("[VerifySeal] Unable to deserialize the LastCommitSignature and LastCommitBitmap in Block Header").WithCause(err)
 	}
-	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
+	parentHash := header.ParentHash()
+	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
 	parentQuorum, err := QuorumForBlock(chain, parentHeader)
 	if err != nil {
 		return errors.Wrapf(err,
-			"cannot calculate quorum for block %s", header.Number)
+			"cannot calculate quorum for block %s", header.Number())
 	}
 	if count := utils.CountOneBits(mask.Bitmap); count < parentQuorum {
 		return ctxerror.New("[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
@@ -149,11 +151,11 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 
 	blockNumHash := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumHash, header.Number.Uint64()-1)
-	lastCommitPayload := append(blockNumHash, header.ParentHash[:]...)
+	binary.LittleEndian.PutUint64(blockNumHash, header.Number().Uint64()-1)
+	lastCommitPayload := append(blockNumHash, parentHash[:]...)
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
-		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature from last block", "lastBlockNum", header.Number.Uint64()-1, "lastBlockHash", header.ParentHash)
+		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature from last block", "lastBlockNum", header.Number().Uint64()-1, "lastBlockHash", parentHash)
 	}
 	return nil
 }
@@ -166,7 +168,7 @@ func (e *engineImpl) Finalize(chain engine.ChainReader, header *block.Header, st
 	if err := AccumulateRewards(chain, state, header); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
-	header.Root = state.IntermediateRoot(chain.Config().IsS3(header.Epoch))
+	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs), nil
 }
 
@@ -174,15 +176,15 @@ func (e *engineImpl) Finalize(chain engine.ChainReader, header *block.Header, st
 func QuorumForBlock(
 	chain engine.ChainReader, h *block.Header,
 ) (quorum int, err error) {
-	ss, err := chain.ReadShardState(h.Epoch)
+	ss, err := chain.ReadShardState(h.Epoch())
 	if err != nil {
 		return 0, errors.Wrapf(err,
-			"cannot read shard state for epoch %s", h.Epoch)
+			"cannot read shard state for epoch %s", h.Epoch())
 	}
-	c := ss.FindCommitteeByID(h.ShardID)
+	c := ss.FindCommitteeByID(h.ShardID())
 	if c == nil {
 		return 0, errors.Errorf(
-			"cannot find shard %d in shard state", h.ShardID)
+			"cannot find shard %d in shard state", h.ShardID())
 	}
 	return (len(c.NodeList))*2/3 + 1, nil
 }

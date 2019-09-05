@@ -174,8 +174,8 @@ func GetHashFromNodeList(nodeList []NodeID) []byte {
 	}
 
 	d := sha3.NewLegacyKeccak256()
-	for i := range nodeList {
-		d.Write(nodeList[i].Serialize())
+	for _, nodeID := range nodeList {
+		d.Write(nodeID.Serialize())
 	}
 	return d.Sum(nil)
 }

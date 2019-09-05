@@ -130,7 +130,8 @@ func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) shard.S
 	if block == nil || !core.IsEpochLastBlock(block) {
 		return nil
 	}
-	nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
+
+	nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
 	return core.GetShardState(nextEpoch)
 }
 
@@ -150,7 +151,7 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 		// We haven't reached the end of this epoch; don't propose yet.
 		return nil
 	}
-	nextEpoch := new(big.Int).Add(block.Header().Epoch, common.Big1)
+	nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
 	shardState, err := core.CalculateNewShardState(
 		node.Blockchain(), nextEpoch, &node.CurrentStakes)
 	if err != nil {

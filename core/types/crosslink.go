@@ -28,12 +28,12 @@ func (cl CrossLink) Header() *block.Header {
 
 // ShardID returns shardID
 func (cl CrossLink) ShardID() uint32 {
-	return cl.ChainHeader.ShardID
+	return cl.ChainHeader.ShardID()
 }
 
 // BlockNum returns blockNum
 func (cl CrossLink) BlockNum() *big.Int {
-	return cl.ChainHeader.Number
+	return cl.ChainHeader.Number()
 }
 
 // Hash returns hash
@@ -43,12 +43,12 @@ func (cl CrossLink) Hash() common.Hash {
 
 // StateRoot returns hash of state root
 func (cl CrossLink) StateRoot() common.Hash {
-	return cl.ChainHeader.Root
+	return cl.ChainHeader.Root()
 }
 
 // OutgoingReceiptsRoot returns hash of cross shard receipts
 func (cl CrossLink) OutgoingReceiptsRoot() common.Hash {
-	return cl.ChainHeader.OutgoingReceiptHash
+	return cl.ChainHeader.OutgoingReceiptHash()
 }
 
 // Serialize returns bytes of cross link rlp-encoded content

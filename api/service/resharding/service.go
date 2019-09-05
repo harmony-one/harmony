@@ -61,11 +61,11 @@ func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
 func (s *Service) DoService() {
 	tick := time.NewTicker(ReshardingCheckTime)
 	// Get current shard state hash.
-	currentShardStateHash := s.beaconChain.CurrentBlock().Header().ShardStateHash
+	currentShardStateHash := s.beaconChain.CurrentBlock().Header().ShardStateHash()
 	for {
 		select {
 		case <-tick.C:
-			LatestShardStateHash := s.beaconChain.CurrentBlock().Header().ShardStateHash
+			LatestShardStateHash := s.beaconChain.CurrentBlock().Header().ShardStateHash()
 			if currentShardStateHash != LatestShardStateHash {
 				// TODO(minhdoan): Add resharding logic later after modifying the resharding func as it current doesn't calculate the role (leader/validator)
 			}

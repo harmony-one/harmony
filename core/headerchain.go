@@ -137,7 +137,7 @@ func (hc *HeaderChain) WriteHeader(header *block.Header) (status WriteStatus, er
 	// Cache some values to prevent constant recalculation
 	var (
 		hash   = header.Hash()
-		number = header.Number.Uint64()
+		number = header.Number().Uint64()
 	)
 	// TODO: implement fork choice mechanism
 	//localTd := hc.GetTd(hc.currentHeaderHash, hc.CurrentHeader().Number.Uint64())
@@ -206,18 +206,19 @@ type WhCallback func(*block.Header) error
 func (hc *HeaderChain) ValidateHeaderChain(chain []*block.Header, checkFreq int) (int, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
-		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 || chain[i].ParentHash != chain[i-1].Hash() {
+		parentHash := chain[i].ParentHash()
+		if chain[i].Number().Uint64() != chain[i-1].Number().Uint64()+1 || parentHash != chain[i-1].Hash() {
 			// Chain broke ancestry, log a message (programming error) and skip insertion
 			utils.Logger().Error().
-				Str("number", chain[i].Number.String()).
+				Str("number", chain[i].Number().String()).
 				Str("hash", chain[i].Hash().Hex()).
-				Str("parent", chain[i].ParentHash.Hex()).
-				Str("prevnumber", chain[i-1].Number.String()).
+				Str("parent", parentHash.Hex()).
+				Str("prevnumber", chain[i-1].Number().String()).
 				Str("prevhash", chain[i-1].Hash().Hex()).
 				Msg("Non contiguous header insert")
 
-			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].Number,
-				chain[i-1].Hash().Bytes()[:4], i, chain[i].Number, chain[i].Hash().Bytes()[:4], chain[i].ParentHash[:4])
+			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].Number(),
+				chain[i-1].Hash().Bytes()[:4], i, chain[i].Number(), chain[i].Hash().Bytes()[:4], parentHash[:4])
 		}
 	}
 
@@ -271,7 +272,7 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*block.Header, writeHeader WhCa
 			return i, errors.New("aborted")
 		}
 		// If the header's already known, skip it, otherwise store
-		if hc.HasHeader(header.Hash(), header.Number.Uint64()) {
+		if hc.HasHeader(header.Hash(), header.Number().Uint64()) {
 			stats.ignored++
 			continue
 		}
@@ -286,10 +287,10 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*block.Header, writeHeader WhCa
 	context := utils.Logger().With().
 		Int("count", stats.processed).
 		Str("elapsed", common.PrettyDuration(time.Since(start)).String()).
-		Str("number", last.Number.String()).
+		Str("number", last.Number().String()).
 		Str("hash", last.Hash().Hex())
 
-	if timestamp := time.Unix(last.Time.Int64(), 0); time.Since(timestamp) > time.Minute {
+	if timestamp := time.Unix(last.Time().Int64(), 0); time.Since(timestamp) > time.Minute {
 		context = context.Str("age", common.PrettyAge(timestamp).String())
 	}
 	if stats.ignored > 0 {
@@ -312,12 +313,12 @@ func (hc *HeaderChain) GetBlockHashesFromHash(hash common.Hash, max uint64) []co
 	// Iterate the headers until enough is collected or the genesis reached
 	chain := make([]common.Hash, 0, max)
 	for i := uint64(0); i < max; i++ {
-		next := header.ParentHash
-		if header = hc.GetHeader(next, header.Number.Uint64()-1); header == nil {
+		next := header.ParentHash()
+		if header = hc.GetHeader(next, header.Number().Uint64()-1); header == nil {
 			break
 		}
 		chain = append(chain, next)
-		if header.Number.Sign() == 0 {
+		if header.Number().Sign() == 0 {
 			break
 		}
 	}
@@ -336,7 +337,7 @@ func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, ma
 	if ancestor == 1 {
 		// in this case it is cheaper to just read the header
 		if header := hc.GetHeader(hash, number); header != nil {
-			return header.ParentHash, number - 1
+			return header.ParentHash(), number - 1
 		}
 		return common.Hash{}, 0
 	}
@@ -354,7 +355,7 @@ func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, ma
 		if header == nil {
 			return common.Hash{}, 0
 		}
-		hash = header.ParentHash
+		hash = header.ParentHash()
 		number--
 	}
 	return hash, number
@@ -462,19 +463,19 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
 	height := uint64(0)
 
 	if hdr := hc.CurrentHeader(); hdr != nil {
-		height = hdr.Number.Uint64()
+		height = hdr.Number().Uint64()
 	}
 	batch := hc.chainDb.NewBatch()
-	for hdr := hc.CurrentHeader(); hdr != nil && hdr.Number.Uint64() > head; hdr = hc.CurrentHeader() {
+	for hdr := hc.CurrentHeader(); hdr != nil && hdr.Number().Uint64() > head; hdr = hc.CurrentHeader() {
 		hash := hdr.Hash()
-		num := hdr.Number.Uint64()
+		num := hdr.Number().Uint64()
 		if delFn != nil {
 			delFn(batch, hash, num)
 		}
 		rawdb.DeleteHeader(batch, hash, num)
 		rawdb.DeleteTd(batch, hash, num)
 
-		hc.currentHeader.Store(hc.GetHeader(hdr.ParentHash, hdr.Number.Uint64()-1))
+		hc.currentHeader.Store(hc.GetHeader(hdr.ParentHash(), hdr.Number().Uint64()-1))
 	}
 	// Roll back the canonical chain numbering
 	for i := height; i > head; i-- {

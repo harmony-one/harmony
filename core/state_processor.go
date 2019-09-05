@@ -66,7 +66,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		incxs    = block.IncomingReceipts()
 		usedGas  = new(uint64)
 		header   = block.Header()
-		coinbase = block.Header().Coinbase
+		coinbase = block.Header().Coinbase()
 		allLogs  []*types.Log
 		gp       = new(GasPool).AddGas(block.GasLimit())
 	)
@@ -104,12 +104,12 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 
 // return true if it is valid
 func getTransactionType(header *block.Header, tx *types.Transaction) types.TransactionType {
-	if tx.ShardID() == tx.ToShardID() && header.ShardID == tx.ShardID() {
+	if tx.ShardID() == tx.ToShardID() && header.ShardID() == tx.ShardID() {
 		return types.SameShardTx
 	}
-	numShards := ShardingSchedule.InstanceForEpoch(header.Epoch).NumShards()
+	numShards := ShardingSchedule.InstanceForEpoch(header.Epoch()).NumShards()
 	// Assuming here all the shards are consecutive from 0 to n-1, n is total number of shards
-	if tx.ShardID() != tx.ToShardID() && header.ShardID == tx.ShardID() && tx.ToShardID() < numShards {
+	if tx.ShardID() != tx.ToShardID() && header.ShardID() == tx.ShardID() && tx.ToShardID() < numShards {
 		return types.SubtractionOnly
 	}
 	return types.InvalidTx
@@ -124,7 +124,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	if txType == types.InvalidTx {
 		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
 	}
-	msg, err := tx.AsMessage(types.MakeSigner(config, header.Epoch))
+	msg, err := tx.AsMessage(types.MakeSigner(config, header.Epoch()))
 	// skip signer err for additiononly tx
 	if err != nil {
 		return nil, nil, 0, err
@@ -143,10 +143,10 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	}
 	// Update the state with pending changes
 	var root []byte
-	if config.IsS3(header.Epoch) {
+	if config.IsS3(header.Epoch()) {
 		statedb.Finalise(true)
 	} else {
-		root = statedb.IntermediateRoot(config.IsS3(header.Epoch)).Bytes()
+		root = statedb.IntermediateRoot(config.IsS3(header.Epoch())).Bytes()
 	}
 	*usedGas += gas
 
@@ -190,7 +190,7 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 			db.CreateAccount(*cx.To)
 		}
 		db.AddBalance(*cx.To, cx.Amount)
-		db.IntermediateRoot(config.IsS3(header.Epoch)).Bytes()
+		db.IntermediateRoot(config.IsS3(header.Epoch())).Bytes()
 	}
 	return nil
 }

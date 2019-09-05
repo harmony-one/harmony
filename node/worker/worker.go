@@ -99,7 +99,7 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 	}
 
 	if w.current.gasPool == nil {
-		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
 
 	selected := types.Transactions{}
@@ -143,7 +143,7 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("Transaction gas limit info")
 	}
 
-	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Uint64("blockGasLimit", w.current.header.GasLimit).Uint64("blockGasUsed", w.current.header.GasUsed).Msg("Block gas limit and usage info")
+	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("Block gas limit and usage info")
 
 	return selected, unselected, invalid
 }
@@ -151,7 +151,9 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	receipt, cx, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vm.Config{})
+	gasUsed := w.current.header.GasUsed()
+	receipt, cx, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
@@ -180,7 +182,7 @@ func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Addr
 	}
 
 	if w.current.gasPool == nil {
-		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
 	for _, tx := range txs {
 		snap := w.current.state.Snapshot()
@@ -197,13 +199,13 @@ func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Addr
 // CommitReceipts commits a list of already verified incoming cross shard receipts
 func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 	if w.current.gasPool == nil {
-		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
 
 	if len(receiptsList) == 0 {
-		w.current.header.IncomingReceiptHash = types.EmptyRootHash
+		w.current.header.SetIncomingReceiptHash(types.EmptyRootHash)
 	} else {
-		w.current.header.IncomingReceiptHash = types.DeriveSha(types.CXReceiptsProofs(receiptsList))
+		w.current.header.SetIncomingReceiptHash(types.DeriveSha(types.CXReceiptsProofs(receiptsList)))
 	}
 
 	for _, cx := range receiptsList {
@@ -225,22 +227,22 @@ func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 	num := parent.Number()
 	timestamp := time.Now().Unix()
 	// New block's epoch is the same as parent's...
-	epoch := new(big.Int).Set(parent.Header().Epoch)
+	epoch := new(big.Int).Set(parent.Header().Epoch())
 
 	// TODO: Don't depend on sharding state for epoch change.
-	if len(parent.Header().ShardState) > 0 && parent.NumberU64() != 0 {
+	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
 		// ... except if parent has a resharding assignment it increases by 1.
 		epoch = epoch.Add(epoch, common.Big1)
 	}
-	header := &block.Header{
-		ParentHash: parent.Hash(),
-		Number:     num.Add(num, common.Big1),
-		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
-		Time:       big.NewInt(timestamp),
-		Epoch:      epoch,
-		ShardID:    w.chain.ShardID(),
-		Coinbase:   coinbase,
-	}
+	header := block.NewHeaderWith().
+		ParentHash(parent.Hash()).
+		Number(num.Add(num, common.Big1)).
+		GasLimit(core.CalcGasLimit(parent, w.gasFloor, w.gasCeil)).
+		Time(big.NewInt(timestamp)).
+		Epoch(epoch).
+		ShardID(w.chain.ShardID()).
+		Coinbase(coinbase).
+		Header()
 	return w.makeCurrent(parent, header)
 }
 
@@ -281,32 +283,33 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 
 // ProposeShardStateWithoutBeaconSync proposes the next shard state for next epoch.
 func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.State {
-	if !core.ShardingSchedule.IsLastBlock(w.current.header.Number.Uint64()) {
+	if !core.ShardingSchedule.IsLastBlock(w.current.header.Number().Uint64()) {
 		return nil
 	}
-	nextEpoch := new(big.Int).Add(w.current.header.Epoch, common.Big1)
+	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
 	return core.GetShardState(nextEpoch)
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
 func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks types.CrossLinks, shardState shard.State) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
-		copy(w.current.header.LastCommitSignature[:], sig[:])
-		w.current.header.LastCommitBitmap = append(signers[:0:0], signers...)
+		sig2 := w.current.header.LastCommitSignature()
+		copy(sig2[:], sig[:])
+		w.current.header.SetLastCommitSignature(sig2)
+		w.current.header.SetLastCommitBitmap(signers)
 	}
-	w.current.header.Coinbase = coinbase
-	w.current.header.ViewID = new(big.Int)
-	w.current.header.ViewID.SetUint64(viewID)
+	w.current.header.SetCoinbase(coinbase)
+	w.current.header.SetViewID(new(big.Int).SetUint64(viewID))
 
 	// Cross Links
 	if crossLinks != nil && len(crossLinks) != 0 {
 		crossLinkData, err := rlp.EncodeToBytes(crossLinks)
 		if err == nil {
 			utils.Logger().Debug().
-				Uint64("blockNum", w.current.header.Number.Uint64()).
+				Uint64("blockNum", w.current.header.Number().Uint64()).
 				Int("numCrossLinks", len(crossLinks)).
 				Msg("Successfully proposed cross links into new block")
-			w.current.header.CrossLinks = crossLinkData
+			w.current.header.SetCrossLinks(crossLinkData)
 		} else {
 			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed cross links")
 			return nil, err
@@ -315,10 +318,10 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 
 	// Shard State
 	if shardState != nil && len(shardState) != 0 {
-		w.current.header.ShardStateHash = shardState.Hash()
+		w.current.header.SetShardStateHash(shardState.Hash())
 		shardStateData, err := rlp.EncodeToBytes(shardState)
 		if err == nil {
-			w.current.header.ShardState = shardStateData
+			w.current.header.SetShardState(shardStateData)
 		} else {
 			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed shard state")
 			return nil, err
@@ -350,21 +353,21 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 	num := parent.Number()
 	timestamp := time.Now().Unix()
 	// New block's epoch is the same as parent's...
-	epoch := new(big.Int).Set(parent.Header().Epoch)
+	epoch := parent.Header().Epoch()
 
 	// TODO: Don't depend on sharding state for epoch change.
-	if len(parent.Header().ShardState) > 0 && parent.NumberU64() != 0 {
+	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
 		// ... except if parent has a resharding assignment it increases by 1.
 		epoch = epoch.Add(epoch, common.Big1)
 	}
-	header := &block.Header{
-		ParentHash: parent.Hash(),
-		Number:     num.Add(num, common.Big1),
-		GasLimit:   core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil),
-		Time:       big.NewInt(timestamp),
-		Epoch:      epoch,
-		ShardID:    worker.chain.ShardID(),
-	}
+	header := block.NewHeaderWith().
+		ParentHash(parent.Hash()).
+		Number(num.Add(num, common.Big1)).
+		GasLimit(core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil)).
+		Time(big.NewInt(timestamp)).
+		Epoch(epoch).
+		ShardID(worker.chain.ShardID()).
+		Header()
 	worker.makeCurrent(parent, header)
 
 	return worker

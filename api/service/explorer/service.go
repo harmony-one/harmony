@@ -235,7 +235,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		}
 		mask, err := bls2.NewMask(pubkeys, nil)
 		if err == nil && accountBlocks[id+1] != nil {
-			err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap)
+			err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
 			if err == nil {
 				for _, validator := range committee.NodeList {
 					oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)

@@ -259,7 +259,7 @@ func IsEpochLastBlock(block *types.Block) bool {
 // IsEpochLastBlockByHeader returns whether this block is the last block of an epoch
 // given block header
 func IsEpochLastBlockByHeader(header *block.Header) bool {
-	return ShardingSchedule.IsLastBlock(header.Number.Uint64())
+	return ShardingSchedule.IsLastBlock(header.Number().Uint64())
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -317,15 +317,15 @@ func (bc *BlockChain) loadLastState() error {
 	// Issue a status log for the user
 	currentFastBlock := bc.CurrentFastBlock()
 
-	headerTd := bc.GetTd(currentHeader.Hash(), currentHeader.Number.Uint64())
+	headerTd := bc.GetTd(currentHeader.Hash(), currentHeader.Number().Uint64())
 	blockTd := bc.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
 	fastTd := bc.GetTd(currentFastBlock.Hash(), currentFastBlock.NumberU64())
 
 	utils.Logger().Info().
-		Str("number", currentHeader.Number.String()).
+		Str("number", currentHeader.Number().String()).
 		Str("hash", currentHeader.Hash().Hex()).
 		Str("td", headerTd.String()).
-		Str("age", common.PrettyAge(time.Unix(currentHeader.Time.Int64(), 0)).String()).
+		Str("age", common.PrettyAge(time.Unix(currentHeader.Time().Int64(), 0)).String()).
 		Msg("Loaded most recent local header")
 	utils.Logger().Info().
 		Str("number", currentBlock.Number().String()).
@@ -369,8 +369,8 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	bc.shardStateCache.Purge()
 
 	// Rewind the block chain, ensuring we don't end up with a stateless head block
-	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number.Uint64() < currentBlock.NumberU64() {
-		bc.currentBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64()))
+	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number().Uint64() < currentBlock.NumberU64() {
+		bc.currentBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
 	}
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil {
 		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
@@ -379,8 +379,8 @@ func (bc *BlockChain) SetHead(head uint64) error {
 		}
 	}
 	// Rewind the fast block in a simpleton way to the target head
-	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentHeader.Number.Uint64() < currentFastBlock.NumberU64() {
-		bc.currentFastBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64()))
+	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentHeader.Number().Uint64() < currentFastBlock.NumberU64() {
+		bc.currentFastBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
 	}
 	// If either blocks reached nil, reset to the genesis state
 	if currentBlock := bc.CurrentBlock(); currentBlock == nil {
@@ -833,7 +833,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 
 		currentHeader := bc.hc.CurrentHeader()
 		if currentHeader != nil && currentHeader.Hash() == hash {
-			bc.hc.SetCurrentHeader(bc.GetHeader(currentHeader.ParentHash, currentHeader.Number.Uint64()-1))
+			bc.hc.SetCurrentHeader(bc.GetHeader(currentHeader.ParentHash(), currentHeader.Number().Uint64()-1))
 		}
 		if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentFastBlock.Hash() == hash {
 			newFastBlock := bc.GetBlock(currentFastBlock.ParentHash(), currentFastBlock.NumberU64()-1)
@@ -1040,7 +1040,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			}
 			// Find the next state trie we need to commit
 			header := bc.GetHeaderByNumber(current - triesInMemory)
-			chosen := header.Number.Uint64()
+			chosen := header.Number().Uint64()
 
 			// If we exceeded out time allowance, flush an entire trie to disk
 			if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
@@ -1054,7 +1054,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 						Msg("State in memory for too long, committing")
 				}
 				// Flush an entire trie and restart the counters
-				triedb.Commit(header.Root, true)
+				triedb.Commit(header.Root(), true)
 				lastWrite = chosen
 				bc.gcproc = 0
 			}
@@ -1074,7 +1074,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	batch := bc.db.NewBatch()
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
 
-	epoch := block.Header().Epoch
+	epoch := block.Header().Epoch()
 	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
 	for i := 0; i < shardNum; i++ {
@@ -1137,13 +1137,13 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 			header := block.Header()
 			header.Logger(utils.Logger()).Info().
 				Int("segmentIndex", idx).
-				Str("parentHash", header.ParentHash.Hex()).
+				Str("parentHash", header.ParentHash().Hex()).
 				Msg("added block to chain")
 
 				// TODO: move into WriteBlockWithState
-			if header.ShardStateHash != (common.Hash{}) {
-				epoch := new(big.Int).Add(header.Epoch, common.Big1)
-				err = bc.WriteShardStateBytes(epoch, header.ShardState)
+			if header.ShardStateHash() != (common.Hash{}) {
+				epoch := new(big.Int).Add(header.Epoch(), common.Big1)
+				err = bc.WriteShardStateBytes(epoch, header.ShardState())
 				if err != nil {
 					header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
 					return n, err
@@ -1151,9 +1151,9 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 			}
 
 			// TODO: move into WriteBlockWithState
-			if len(header.CrossLinks) > 0 {
+			if len(header.CrossLinks()) > 0 {
 				crossLinks := &types.CrossLinks{}
-				err = rlp.DecodeBytes(header.CrossLinks, crossLinks)
+				err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
 				if err != nil {
 					header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cannot parse cross links")
 					return n, err
@@ -1373,19 +1373,19 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 
 		//check non zero VRF field in header and add to local db
 		if len(block.Vrf()) > 0 {
-			vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch)
+			vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch())
 			if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
 				utils.Logger().Error().
 					Str("number", chain[i].Number().String()).
-					Str("epoch", block.Header().Epoch.String()).
+					Str("epoch", block.Header().Epoch().String()).
 					Msg("VRF block number is already in local db")
 			} else {
 				vrfBlockNumbers = append(vrfBlockNumbers, block.NumberU64())
-				err = bc.WriteEpochVrfBlockNums(block.Header().Epoch, vrfBlockNumbers)
+				err = bc.WriteEpochVrfBlockNums(block.Header().Epoch(), vrfBlockNumbers)
 				if err != nil {
 					utils.Logger().Error().
 						Str("number", chain[i].Number().String()).
-						Str("epoch", block.Header().Epoch.String()).
+						Str("epoch", block.Header().Epoch().String()).
 						Msg("failed to write VRF block number to local db")
 				}
 			}
@@ -1393,11 +1393,11 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 
 		//check non zero Vdf in header and add to local db
 		if len(block.Vdf()) > 0 {
-			err = bc.WriteEpochVdfBlockNum(block.Header().Epoch, block.Number())
+			err = bc.WriteEpochVdfBlockNum(block.Header().Epoch(), block.Number())
 			if err != nil {
 				utils.Logger().Error().
 					Str("number", chain[i].Number().String()).
-					Str("epoch", block.Header().Epoch.String()).
+					Str("epoch", block.Header().Epoch().String()).
 					Msg("failed to write VDF block number to local db")
 			}
 		}
@@ -1890,7 +1890,7 @@ func (bc *BlockChain) GetVdfByNumber(number uint64) []byte {
 		return []byte{}
 	}
 
-	return header.Vdf
+	return header.Vdf()
 }
 
 // GetVrfByNumber retrieves the randomness preimage given the block number, return 0 if not exist
@@ -1899,7 +1899,7 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 	if header == nil {
 		return []byte{}
 	}
-	return header.Vrf
+	return header.Vrf()
 }
 
 // GetShardState returns the shard state for the given epoch,
@@ -2125,14 +2125,14 @@ func (bc *BlockChain) WriteCXReceipts(shardID uint32, blockNum uint64, blockHash
 
 // CXMerkleProof calculates the cross shard transaction merkle proof of a given destination shard
 func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
-	proof := &types.CXMerkleProof{BlockNum: block.Number(), BlockHash: block.Hash(), ShardID: block.ShardID(), CXReceiptHash: block.Header().OutgoingReceiptHash, CXShardHashes: []common.Hash{}, ShardIDs: []uint32{}}
+	proof := &types.CXMerkleProof{BlockNum: block.Number(), BlockHash: block.Hash(), ShardID: block.ShardID(), CXReceiptHash: block.Header().OutgoingReceiptHash(), CXShardHashes: []common.Hash{}, ShardIDs: []uint32{}}
 	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, block.NumberU64(), block.Hash(), false)
 
 	if err != nil || cxs == nil {
 		return nil, err
 	}
 
-	epoch := block.Header().Epoch
+	epoch := block.Header().Epoch()
 	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
 
