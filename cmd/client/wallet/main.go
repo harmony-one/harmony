@@ -290,8 +290,9 @@ func createWalletNode() *node.Node {
 	// dummy host for wallet
 	// TODO: potentially, too many dummy IP may flush out good IP address from our bootnode DHT
 	// we need to understand the impact to bootnode DHT with this dummy host ip added
-	self := p2p.Peer{IP: "127.0.0.1", Port: "6999"}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "6999")
+	port := fmt.Sprintf("%d", 16999+rand.Intn(1000))
+	self := p2p.Peer{IP: "127.0.0.1", Port: port}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", port)
 	host, err := p2pimpl.NewHost(&self, priKey)
 	if err != nil {
 		panic(err)
@@ -688,8 +689,6 @@ func processTransferCommand() {
 		return
 	}
 
-	walletNode := createWalletNode()
-
 	shardIDToAccountState := FetchBalance(senderAddress)
 
 	state := shardIDToAccountState[shardID]
@@ -704,6 +703,8 @@ func processTransferCommand() {
 		fmt.Printf("Balance is not enough for the transfer, current balance is %.6f\n", float64(balance.Uint64())/denominations.Nano)
 		return
 	}
+
+	walletNode := createWalletNode()
 
 	amountBigInt := big.NewInt(int64(amount * denominations.Nano))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
