@@ -25,7 +25,7 @@ var BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One)
 func AccumulateRewards(
 	bc engine.ChainReader, state *state.DB, header *block.Header,
 ) error {
-	blockNum := header.Number.Uint64()
+	blockNum := header.Number().Uint64()
 	if blockNum == 0 {
 		// Epoch block has no parent to reward.
 		return nil
@@ -33,27 +33,27 @@ func AccumulateRewards(
 	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
 	//  while it is okay with hash.  Sounds like DB inconsistency.
 	//  Figure out why.
-	parentHeader := bc.GetHeaderByHash(header.ParentHash)
+	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	if parentHeader == nil {
 		return ctxerror.New("cannot find parent block header in DB",
-			"parentHash", header.ParentHash)
+			"parentHash", header.ParentHash())
 	}
-	if parentHeader.Number.Cmp(common.Big0) == 0 {
+	if parentHeader.Number().Cmp(common.Big0) == 0 {
 		// Parent is an epoch block,
 		// which is not signed in the usual manner therefore rewards nothing.
 		return nil
 	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch)
+	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
 	if err != nil {
 		return ctxerror.New("cannot read shard state",
-			"epoch", parentHeader.Epoch,
+			"epoch", parentHeader.Epoch(),
 		).WithCause(err)
 	}
-	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID)
+	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID())
 	if parentCommittee == nil {
 		return ctxerror.New("cannot find shard in the shard state",
-			"parentBlockNumber", parentHeader.Number,
-			"shardID", parentHeader.ShardID,
+			"parentBlockNumber", parentHeader.Number(),
+			"shardID", parentHeader.ShardID(),
 		)
 	}
 	var committerKeys []*bls.PublicKey
@@ -70,7 +70,7 @@ func AccumulateRewards(
 	if err != nil {
 		return ctxerror.New("cannot create group sig mask").WithCause(err)
 	}
-	if err := mask.SetMask(header.LastCommitBitmap); err != nil {
+	if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
 		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
 	}
 	totalAmount := big.NewInt(0)

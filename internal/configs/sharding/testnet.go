@@ -30,6 +30,11 @@ const (
 	testnetMaxTxPoolSizeLimit             = 8000
 	testnetMaxNumTxsPerBlockLimit         = 1000
 	testnetRecentTxDuration               = time.Hour
+
+	// TestNetHTTPPattern is the http pattern for testnet.
+	TestNetHTTPPattern = "http://s%d.b.hmny.io:9500"
+	// TestNetWSPattern is the websocket pattern for testnet.
+	TestNetWSPattern = "ws://s%d.b.hmny.io:9800"
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -123,6 +128,11 @@ func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 
 func (ts testnetSchedule) GetNetworkID() NetworkID {
 	return TestNet
+}
+
+// GetShardingStructure is the sharding structure for testnet.
+func (ts testnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+	return genShardingStructure(numShard, shardID, TestNetHTTPPattern, TestNetWSPattern)
 }
 
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}

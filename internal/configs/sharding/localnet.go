@@ -1,6 +1,7 @@
 package shardingconfig
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -32,6 +33,11 @@ const (
 	localnetMaxTxPoolSizeLimit             = 8000
 	localnetMaxNumTxsPerBlockLimit         = 1000
 	localnetRecentTxDuration               = time.Hour
+
+	// LocalNetHTTPPattern is the http pattern for mainnet.
+	LocalNetHTTPPattern = "http://s%d.t.hmny.io:9500"
+	// LocalNetWSPattern is the websocket pattern for mainnet.
+	LocalNetWSPattern = "ws://s%d.t.hmny.io:9800"
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -124,6 +130,20 @@ func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 
 func (ls localnetSchedule) GetNetworkID() NetworkID {
 	return LocalNet
+}
+
+// GetShardingStructure is the sharding structure for localnet.
+func (ls localnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+	res := []map[string]interface{}{}
+	for i := 0; i < numShard; i++ {
+		res = append(res, map[string]interface{}{
+			"current": int(shardID) == i,
+			"shardID": i,
+			"http":    fmt.Sprintf("http://127.0.0.1:%d", 9500+i),
+			"ws":      fmt.Sprintf("ws://127.0.0.1:%d", 9800+i),
+		})
+	}
+	return res
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}

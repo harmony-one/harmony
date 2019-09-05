@@ -92,22 +92,22 @@ type RPCBlock struct {
 func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]interface{}, error) {
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
-		"number":           (*hexutil.Big)(head.Number),
+		"number":           (*hexutil.Big)(head.Number()),
 		"hash":             b.Hash(),
-		"parentHash":       head.ParentHash,
+		"parentHash":       head.ParentHash(),
 		"nonce":            0, // Remove this because we don't have it in our header
-		"mixHash":          head.MixDigest,
-		"logsBloom":        head.Bloom,
-		"stateRoot":        head.Root,
-		"miner":            head.Coinbase,
+		"mixHash":          head.MixDigest(),
+		"logsBloom":        head.Bloom(),
+		"stateRoot":        head.Root(),
+		"miner":            head.Coinbase(),
 		"difficulty":       0, // Remove this because we don't have it in our header
-		"extraData":        hexutil.Bytes(head.Extra),
+		"extraData":        hexutil.Bytes(head.Extra()),
 		"size":             hexutil.Uint64(b.Size()),
-		"gasLimit":         hexutil.Uint64(head.GasLimit),
-		"gasUsed":          hexutil.Uint64(head.GasUsed),
-		"timestamp":        hexutil.Uint64(head.Time.Uint64()),
-		"transactionsRoot": head.TxHash,
-		"receiptsRoot":     head.ReceiptHash,
+		"gasLimit":         hexutil.Uint64(head.GasLimit()),
+		"gasUsed":          hexutil.Uint64(head.GasUsed()),
+		"timestamp":        hexutil.Uint64(head.Time().Uint64()),
+		"transactionsRoot": head.TxHash(),
+		"receiptsRoot":     head.ReceiptHash(),
 	}
 
 	if inclTx {

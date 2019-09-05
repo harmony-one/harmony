@@ -67,7 +67,7 @@ func (b *APIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.Blo
 	if header == nil || err != nil {
 		return nil, nil, err
 	}
-	stateDb, err := b.hmy.blockchain.StateAt(header.Root)
+	stateDb, err := b.hmy.blockchain.StateAt(header.Root())
 	return stateDb, header, err
 }
 
@@ -227,4 +227,9 @@ func (b *APIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.
 // RPCGasCap returns the gas cap of rpc
 func (b *APIBackend) RPCGasCap() *big.Int {
 	return b.hmy.RPCGasCap // TODO(ricl): should be hmy.config.RPCGasCap
+}
+
+// GetShardID returns the gas cap of rpc
+func (b *APIBackend) GetShardID() uint32 {
+	return b.hmy.shardID
 }

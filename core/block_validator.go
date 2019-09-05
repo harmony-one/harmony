@@ -69,8 +69,8 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	//if err := v.engine.VerifyUncles(v.bc, block); err != nil {
 	//	return err
 	//}
-	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash {
-		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash)
+	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash() {
+		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash())
 	}
 	return nil
 }
@@ -87,24 +87,24 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	// Validate the received block's bloom with the one derived from the generated receipts.
 	// For valid blocks this should always validate to true.
 	rbloom := types.CreateBloom(receipts)
-	if rbloom != header.Bloom {
-		return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.Bloom, rbloom)
+	if rbloom != header.Bloom() {
+		return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.Bloom(), rbloom)
 	}
 	// Tre receipt Trie's root (R = (Tr [[H1, R1], ... [Hn, R1]]))
 	receiptSha := types.DeriveSha(receipts)
-	if receiptSha != header.ReceiptHash {
-		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash, receiptSha)
+	if receiptSha != header.ReceiptHash() {
+		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash(), receiptSha)
 	}
 
 	cxsSha := types.DeriveMultipleShardsSha(cxReceipts)
-	if cxsSha != header.OutgoingReceiptHash {
-		return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash, cxsSha)
+	if cxsSha != header.OutgoingReceiptHash() {
+		return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash(), cxsSha)
 	}
 
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
-	if root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number)); header.Root != root {
-		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root, root)
+	if root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number())); header.Root() != root {
+		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root(), root)
 	}
 	return nil
 }
@@ -114,14 +114,14 @@ func VerifyBlockLastCommitSigs(bc *BlockChain, block *types.Block) error {
 	header := block.Header()
 	parentBlock := bc.GetBlockByNumber(block.NumberU64() - 1)
 	if parentBlock == nil {
-		return ctxerror.New("[VerifyNewBlock] Failed to get parent block", "shardID", header.ShardID, "blockNum", header.Number)
+		return ctxerror.New("[VerifyNewBlock] Failed to get parent block", "shardID", header.ShardID(), "blockNum", header.Number())
 	}
 	parentHeader := parentBlock.Header()
-	shardState, err := bc.ReadShardState(parentHeader.Epoch)
-	committee := shardState.FindCommitteeByID(parentHeader.ShardID)
+	shardState, err := bc.ReadShardState(parentHeader.Epoch())
+	committee := shardState.FindCommitteeByID(parentHeader.ShardID())
 
 	if err != nil || committee == nil {
-		return ctxerror.New("[VerifyNewBlock] Failed to read shard state for cross link header", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		return ctxerror.New("[VerifyNewBlock] Failed to read shard state for cross link header", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 	}
 	var committerKeys []*bls.PublicKey
 
@@ -136,28 +136,30 @@ func VerifyBlockLastCommitSigs(bc *BlockChain, block *types.Block) error {
 		committerKeys = append(committerKeys, committerKey)
 	}
 	if !parseKeysSuccess {
-		return ctxerror.New("[VerifyNewBlock] cannot convert BLS public key", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		return ctxerror.New("[VerifyNewBlock] cannot convert BLS public key", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 	}
 
 	mask, err := bls2.NewMask(committerKeys, nil)
 	if err != nil {
-		return ctxerror.New("[VerifyNewBlock] cannot create group sig mask", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+		return ctxerror.New("[VerifyNewBlock] cannot create group sig mask", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 	}
-	if err := mask.SetMask(header.LastCommitBitmap); err != nil {
-		return ctxerror.New("[VerifyNewBlock] cannot set group sig mask bits", "shardID", header.ShardID, "blockNum", header.Number).WithCause(err)
+	if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
+		return ctxerror.New("[VerifyNewBlock] cannot set group sig mask bits", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 	}
 
 	aggSig := bls.Sign{}
-	err = aggSig.Deserialize(header.LastCommitSignature[:])
+	lastCommitSig := header.LastCommitSignature()
+	err = aggSig.Deserialize(lastCommitSig[:])
 	if err != nil {
 		return ctxerror.New("[VerifyNewBlock] unable to deserialize multi-signature from payload").WithCause(err)
 	}
 
 	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, header.Number.Uint64()-1)
-	commitPayload := append(blockNumBytes, header.ParentHash[:]...)
+	binary.LittleEndian.PutUint64(blockNumBytes, header.Number().Uint64()-1)
+	parentHash := header.ParentHash()
+	commitPayload := append(blockNumBytes, parentHash[:]...)
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-		return ctxerror.New("[VerifyNewBlock] Failed to verify the signature for last commit sig", "shardID", header.ShardID, "blockNum", header.Number)
+		return ctxerror.New("[VerifyNewBlock] Failed to verify the signature for last commit sig", "shardID", header.ShardID(), "blockNum", header.Number())
 	}
 	return nil
 }

@@ -22,9 +22,9 @@ func TestGetBlockInfoKey(t *testing.T) {
 	assert.Equal(t, GetBlockInfoKey(3), "bi_3", "error")
 }
 
-// Test for GetAccountKey
-func TestGetAccountKey(t *testing.T) {
-	assert.Equal(t, GetAccountKey("abcd"), "ad_abcd", "error")
+// Test for GetAddressKey
+func TestGetAddressKey(t *testing.T) {
+	assert.Equal(t, GetAddressKey("abcd"), "ad_abcd", "error")
 }
 
 // Test for GetBlockKey
@@ -58,7 +58,7 @@ func TestDump(t *testing.T) {
 	tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), 0, big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
 	txs := []*types.Transaction{tx1, tx2, tx3}
 
-	block := types.NewBlock(&block2.Header{Number: big.NewInt(314)}, txs, nil, nil, nil)
+	block := types.NewBlock(block2.NewHeaderWith().Number(big.NewInt(314)).Header(), txs, nil, nil, nil)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
 	ins.Dump(block, uint64(1))
 	db := ins.GetDB()
@@ -116,7 +116,7 @@ func TestUpdateAddressStorage(t *testing.T) {
 	tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), 0, big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
 	txs := []*types.Transaction{tx1, tx2, tx3}
 
-	block := types.NewBlock(&block2.Header{Number: big.NewInt(314)}, txs, nil, nil, nil)
+	block := types.NewBlock(block2.NewHeaderWith().Number(big.NewInt(314)).Header(), txs, nil, nil, nil)
 	ins := GetStorageInstance("1.1.1.1", "3333", true)
 	ins.Dump(block, uint64(1))
 	db := ins.GetDB()

@@ -112,7 +112,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 
 	// Set up router for address.
-	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset, "tx_view", "{[A-Z]*?}", "page", "{[0-9]*?}", "offset", "{[0-9]*?}")).HandlerFunc(s.GetExplorerAddress).Methods("GET")
+	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset), "tx_view", "{[A-Z]*?}", "page", "{[0-9]*?}", "offset", "{[0-9]*?}").HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
 	// Set up router for node count.
@@ -230,14 +230,14 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		page = 0
 	}
 
-	addressBlocks := s.ReadBlocksFromDB(fromInt, toInt)
+	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
 	curEpoch := int64(-1)
 	committee := &shard.Committee{}
-	for id, addressBlock := range addressBlocks {
-		if id == 0 || id == len(addressBlocks)-1 || addressBlock == nil {
+	for id, accountBlock := range accountBlocks {
+		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
-		block := NewBlock(addressBlock, id+fromInt-1)
+		block := NewBlock(accountBlock, id+fromInt-1)
 		if int64(block.Epoch) > curEpoch {
 			if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), block.Epoch))); err == nil {
 				committee = &shard.Committee{}
@@ -245,10 +245,10 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 					utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
 				}
 			} else {
-				state, err := addressBlock.Header().GetShardState()
+				state, err := accountBlock.Header().GetShardState()
 				if err == nil {
 					for _, shardCommittee := range state {
-						if shardCommittee.ShardID == addressBlock.ShardID() {
+						if shardCommittee.ShardID == accountBlock.ShardID() {
 							committee = &shardCommittee
 							break
 						}
@@ -263,8 +263,8 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 		}
 		mask, err := bls2.NewMask(pubkeys, nil)
-		if err == nil && addressBlocks[id+1] != nil {
-			err = mask.SetMask(addressBlocks[id+1].Header().LastCommitBitmap)
+		if err == nil && accountBlocks[id+1] != nil {
+			err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
 			if err == nil {
 				for _, validator := range committee.NodeList {
 					oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
@@ -280,33 +280,33 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		// Populate transactions
-		for _, tx := range addressBlock.Transactions() {
-			transaction := GetTransaction(tx, addressBlock)
+		for _, tx := range accountBlock.Transactions() {
+			transaction := GetTransaction(tx, accountBlock)
 			if transaction != nil {
 				block.TXs = append(block.TXs, transaction)
 			}
 		}
-		if addressBlocks[id-1] == nil {
+		if accountBlocks[id-1] == nil {
 			block.BlockTime = int64(0)
 			block.PrevBlock = RefBlock{
 				ID:     "",
 				Height: "",
 			}
 		} else {
-			block.BlockTime = addressBlock.Time().Int64() - addressBlocks[id-1].Time().Int64()
+			block.BlockTime = accountBlock.Time().Int64() - accountBlocks[id-1].Time().Int64()
 			block.PrevBlock = RefBlock{
-				ID:     addressBlocks[id-1].Hash().Hex(),
+				ID:     accountBlocks[id-1].Hash().Hex(),
 				Height: strconv.Itoa(id + fromInt - 2),
 			}
 		}
-		if addressBlocks[id+1] == nil {
+		if accountBlocks[id+1] == nil {
 			block.NextBlock = RefBlock{
 				ID:     "",
 				Height: "",
 			}
 		} else {
 			block.NextBlock = RefBlock{
-				ID:     addressBlocks[id+1].Hash().Hex(),
+				ID:     accountBlocks[id+1].Hash().Hex(),
 				Height: strconv.Itoa(id + fromInt),
 			}
 		}

@@ -245,21 +245,21 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		utils.Logger().Error().Msg("failed to rlp-serialize genesis shard state")
 		os.Exit(1)
 	}
-	head := &block.Header{
-		Number:         new(big.Int).SetUint64(g.Number),
-		Epoch:          big.NewInt(0),
-		ShardID:        g.ShardID,
-		Time:           new(big.Int).SetUint64(g.Timestamp),
-		ParentHash:     g.ParentHash,
-		Extra:          g.ExtraData,
-		GasLimit:       g.GasLimit,
-		GasUsed:        g.GasUsed,
-		MixDigest:      g.Mixhash,
-		Coinbase:       g.Coinbase,
-		Root:           root,
-		ShardStateHash: g.ShardStateHash,
-		ShardState:     shardStateBytes,
-	}
+	head := block.NewHeaderWith().
+		Number(new(big.Int).SetUint64(g.Number)).
+		Epoch(big.NewInt(0)).
+		ShardID(g.ShardID).
+		Time(new(big.Int).SetUint64(g.Timestamp)).
+		ParentHash(g.ParentHash).
+		Extra(g.ExtraData).
+		GasLimit(g.GasLimit).
+		GasUsed(g.GasUsed).
+		MixDigest(g.Mixhash).
+		Coinbase(g.Coinbase).
+		Root(root).
+		ShardStateHash(g.ShardStateHash).
+		ShardState(shardStateBytes).
+		Header()
 	statedb.Commit(false)
 	statedb.Database().TrieDB().Commit(root, true)
 
@@ -280,7 +280,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	rawdb.WriteHeadBlockHash(db, block.Hash())
 	rawdb.WriteHeadHeaderHash(db, block.Hash())
 
-	err := rawdb.WriteShardStateBytes(db, block.Header().Epoch, block.Header().ShardState)
+	err := rawdb.WriteShardStateBytes(db, block.Header().Epoch(), block.Header().ShardState())
 
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to store genesis shard state")

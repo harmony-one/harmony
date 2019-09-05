@@ -60,14 +60,14 @@ func TestConstructBlocksSyncMessage(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 
 	root := statedb.IntermediateRoot(false)
-	head := &block.Header{
-		Number:  new(big.Int).SetUint64(uint64(10000)),
-		Epoch:   big.NewInt(0),
-		ShardID: 0,
-		Time:    new(big.Int).SetUint64(uint64(100000)),
-		Root:    root,
-	}
-	head.GasLimit = 10000000000
+	head := block.NewHeaderWith().
+		Number(new(big.Int).SetUint64(uint64(10000))).
+		Epoch(big.NewInt(0)).
+		ShardID(0).
+		Time(new(big.Int).SetUint64(uint64(100000))).
+		Root(root).
+		GasLimit(10000000000).
+		Header()
 
 	if _, err := statedb.Commit(false); err != nil {
 		t.Fatalf("statedb.Commit() failed: %s", err)

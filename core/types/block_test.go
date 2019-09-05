@@ -96,15 +96,16 @@ func TestBlock_SetLastCommitSig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &Block{header: &block.Header{}}
+			b := &Block{header: block.NewHeader()}
 			b.SetLastCommitSig(tt.sig, tt.signers)
-			if !bytes.Equal(tt.sig, b.header.LastCommitSignature[:]) {
+			sig := b.header.LastCommitSignature()
+			if !bytes.Equal(tt.sig, sig[:]) {
 				t.Errorf("signature mismatch: expected %+v, actual %+v",
-					tt.sig, b.header.LastCommitSignature)
+					tt.sig, sig)
 			}
-			if !bytes.Equal(tt.signers, b.header.LastCommitBitmap) {
+			if !bytes.Equal(tt.signers, b.header.LastCommitBitmap()) {
 				t.Errorf("signature mismatch: expected %+v, actual %+v",
-					tt.signers, b.header.LastCommitBitmap)
+					tt.signers, b.header.LastCommitBitmap())
 			}
 		})
 	}

@@ -60,16 +60,8 @@ func (node *Node) setupForNewNode() {
 }
 
 func (node *Node) setupForClientNode() {
-	nodeConfig, chanPeer := node.initNodeConfiguration()
-
-	// Register peer discovery service.
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, chanPeer, nil))
-	// Register new metrics service
-	if node.NodeConfig.GetMetricsFlag() {
-		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort()))
-	}
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, p2p.GroupIDBeacon, nil, nil))
 }
 
 func (node *Node) setupForExplorerNode() {

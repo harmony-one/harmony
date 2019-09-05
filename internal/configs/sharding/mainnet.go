@@ -33,6 +33,11 @@ const (
 	mainnetMaxTxPoolSizeLimit             = 8000
 	mainnetMaxNumTxsPerBlockLimit         = 1000
 	mainnetRecentTxDuration               = time.Hour
+
+	// MainNetHTTPPattern is the http pattern for mainnet.
+	MainNetHTTPPattern = "http://s%d.t.hmny.io:9500"
+	// MainNetWSPattern is the websocket pattern for mainnet.
+	MainNetWSPattern = "ws://s%d.t.hmny.io:9800"
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -147,6 +152,11 @@ func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 
 func (ms mainnetSchedule) GetNetworkID() NetworkID {
 	return MainNet
+}
+
+// GetShardingStructure is the sharding structure for mainnet.
+func (ms mainnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+	return genShardingStructure(numShard, shardID, MainNetHTTPPattern, MainNetWSPattern)
 }
 
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch)}
