@@ -770,7 +770,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 		node.AddPeers([]*p2p.Peer{peer})
 		utils.Logger().Info().
 			Str("Peer", peer.String()).
-			Int("# Peers", len(node.Consensus.PublicKeys)).
+			Int("# Peers", node.numPeers).
 			Msg("Add Peer to Node")
 	}
 
@@ -791,6 +791,9 @@ func (node *Node) bootstrapConsensus() {
 					Msg("No peers, continue")
 				continue
 			}
+			utils.Logger().Info().
+				Int("numPeersNow", numPeersNow).
+				Msg("No peers, continue")
 			if numPeersNow >= node.Consensus.MinPeers {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				node.startConsensus <- struct{}{}
