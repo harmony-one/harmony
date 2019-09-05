@@ -10,7 +10,7 @@ import (
 // NetworkID is the network type of the blockchain.
 type NetworkID byte
 
-//Consensus and other message categories
+// Constants for NetworkID.
 const (
 	MainNet NetworkID = iota
 	TestNet

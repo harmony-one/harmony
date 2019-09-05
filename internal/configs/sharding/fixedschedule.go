@@ -91,6 +91,11 @@ func (s fixedSchedule) GetNetworkID() NetworkID {
 	return DevNet
 }
 
+// GetShardingStructure is the sharding structure for fixed schedule.
+func (fixedSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+	return genShardingStructure(numShard, shardID, TestNetHTTPPattern, TestNetHTTPPattern)
+}
+
 // NewFixedSchedule returns a sharding configuration schedule that uses the
 // given config instance for all epochs.  Useful for testing.
 func NewFixedSchedule(instance Instance) Schedule {

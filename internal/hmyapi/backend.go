@@ -63,6 +63,7 @@ type Backend interface {
 	CurrentBlock() *types.Block
 	// Get balance
 	GetBalance(address common.Address) (*hexutil.Big, error)
+	GetShardID() uint32
 }
 
 // GetAPIs returns all the APIs.

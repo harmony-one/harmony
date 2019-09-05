@@ -63,6 +63,16 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 	return nil, err
 }
 
+// GetShardingStructure returns an array of sharding structures.
+func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[string]interface{}, error) {
+	// Get header and number of shards.
+	header := s.b.CurrentBlock().Header()
+	numShard := core.ShardingSchedule.InstanceForEpoch(header.Epoch()).NumShards()
+
+	// Return shareding structure for each case.
+	return core.ShardingSchedule.GetShardingStructure(int(numShard), int(s.b.GetShardID())), nil
+}
+
 // GetCode returns the code stored at the given address in the state for the given block number.
 func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
 	address := internal_common.ParseAddr(addr)

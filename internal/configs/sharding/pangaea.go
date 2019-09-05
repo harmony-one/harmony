@@ -10,6 +10,13 @@ import (
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
+const (
+	// PangaeaHTTPPattern is the http pattern for pangaea.
+	PangaeaHTTPPattern = "http://s%d.pga.hmny.io:9500"
+	// PangaeaWSPattern is the websocket pattern for pangaea.
+	PangaeaWSPattern = "ws://s%d.pga.hmny.io:9800"
+)
+
 // PangaeaSchedule is the Pangaea sharding configuration schedule.
 var PangaeaSchedule pangaeaSchedule
 
@@ -89,4 +96,9 @@ func (ps pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 
 func (pangaeaSchedule) GetNetworkID() NetworkID {
 	return Pangaea
+}
+
+// GetShardingStructure is the sharding structure for mainnet.
+func (pangaeaSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+	return genShardingStructure(numShard, shardID, PangaeaHTTPPattern, PangaeaWSPattern)
 }
