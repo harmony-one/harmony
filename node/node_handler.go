@@ -405,12 +405,12 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 		)
 	}
 
-	firstCrossLinkBlock := core.ShardingSchedule.FirstCrossLinkBlock()
+	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
 
 	for i, crossLink := range *crossLinks {
 		lastLink := &types.CrossLink{}
 		if i == 0 {
-			if crossLink.BlockNum().Uint64() > firstCrossLinkBlock {
+			if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
 				lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
 				if err != nil {
 					return ctxerror.New("[CrossLinkVerification] no last cross link found 1",
@@ -421,7 +421,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 			}
 		} else {
 			if (*crossLinks)[i-1].Header().ShardID() != crossLink.Header().ShardID() {
-				if crossLink.BlockNum().Uint64() > firstCrossLinkBlock {
+				if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
 					lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
 					if err != nil {
 						return ctxerror.New("[CrossLinkVerification] no last cross link found 2",
@@ -435,7 +435,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 			}
 		}
 
-		if crossLink.BlockNum().Uint64() > firstCrossLinkBlock { // TODO: verify genesis block
+		if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 { // TODO: verify genesis block
 			err = node.VerifyCrosslinkHeader(lastLink.Header(), crossLink.Header())
 			if err != nil {
 				return ctxerror.New("cannot ValidateNewBlock",
@@ -765,7 +765,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 		node.AddPeers([]*p2p.Peer{peer})
 		utils.Logger().Info().
 			Str("Peer", peer.String()).
-			Int("# Peers", len(node.Consensus.PublicKeys)).
+			Int("# Peers", node.numPeers).
 			Msg("Add Peer to Node")
 	}
 
@@ -775,6 +775,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 // bootstrapConsensus is the a goroutine to check number of peers and start the consensus
 func (node *Node) bootstrapConsensus() {
 	tick := time.NewTicker(5 * time.Second)
+	lastPeerNum := node.numPeers
 	for {
 		select {
 		case <-tick.C:
@@ -785,7 +786,15 @@ func (node *Node) bootstrapConsensus() {
 					Int("numPeersNow", numPeersNow).
 					Msg("No peers, continue")
 				continue
+			} else if numPeersNow > lastPeerNum {
+				utils.Logger().Info().
+					Int("previousNumPeers", lastPeerNum).
+					Int("numPeersNow", numPeersNow).
+					Int("targetNumPeers", node.Consensus.MinPeers).
+					Msg("New peers increased")
+				lastPeerNum = numPeersNow
 			}
+
 			if numPeersNow >= node.Consensus.MinPeers {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				node.startConsensus <- struct{}{}

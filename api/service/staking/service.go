@@ -222,8 +222,8 @@ func (s *Service) createRawStakingMessage() []byte {
 	)
 
 	// This is currently not called.
-	hmykey.Unlock(s.account)
-	if signedTx, err := hmykey.SignTx(s.account, tx); err == nil {
+	chainID := big.NewInt(1) // TODO: wire the correct chain ID after staking flow is revamped.
+	if signedTx, err := hmykey.SignTx(s.account, tx, chainID); err == nil {
 		ts := types.Transactions{signedTx}
 		return constructStakingMessage(ts)
 	}

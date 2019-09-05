@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
@@ -745,7 +747,11 @@ func processTransferCommand() {
 
 	fmt.Printf("Unlock account succeeded! '%v'\n", senderPass)
 
-	tx, err = ks.SignTx(account, tx, nil)
+	chainConfig := params.MainnetChainConfig
+	if walletProfile.Profile != defaultProfile {
+		chainConfig = params.TestnetChainConfig
+	}
+	tx, err = ks.SignTx(account, tx, chainConfig.ChainID)
 	if err != nil {
 		fmt.Printf("SignTx Error: %v\n", err)
 		return

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"math/big"
@@ -134,20 +133,6 @@ func Shuffle(list []shard.NodeID) {
 	})
 }
 
-// GetBlockNumberFromEpoch calculates the block number where epoch sharding information is stored
-// TODO lc - use ShardingSchedule function
-func GetBlockNumberFromEpoch(epoch uint64) uint64 {
-	number := epoch * ShardingSchedule.BlocksPerEpoch() // currently we use the first block in each epoch
-	return number
-}
-
-// GetLastBlockNumberFromEpoch calculates the last block number for the given
-// epoch.  TODO ek – this is a temp hack.
-// TODO lc - use ShardingSchedule function
-func GetLastBlockNumberFromEpoch(epoch uint64) uint64 {
-	return (epoch+1)*ShardingSchedule.BlocksPerEpoch() - 1
-}
-
 // GetEpochFromBlockNumber calculates the epoch number the block belongs to
 func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
 	return ShardingSchedule.CalcEpochNumber(blockNumber).Uint64()
@@ -164,9 +149,10 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingSt
 	}
 	shardState = shardState.DeepCopy()
 
-	blockNumber := GetBlockNumberFromEpoch(epoch.Uint64())
-	rndSeedBytes := bc.GetVdfByNumber(blockNumber)
-	rndSeed := binary.BigEndian.Uint64(rndSeedBytes[:])
+	// TODO(RJ,HB): use real randomness for resharding
+	//blockNumber := GetBlockNumberFromEpoch(epoch.Uint64())
+	//rndSeedBytes := bc.GetVdfByNumber(blockNumber)
+	rndSeed := uint64(0)
 
 	return &ShardingState{epoch: epoch.Uint64(), rnd: rndSeed, shardState: shardState, numShards: len(shardState)}, nil
 }

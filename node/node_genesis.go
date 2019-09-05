@@ -88,10 +88,6 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		node.ContractDeployerKey = contractDeployerKey
 	}
 
-	// Initialize shard state
-	// TODO: use 1 for now as mainnet, change to networkID instead
-	chainConfig.ChainID = big.NewInt(1)
-
 	gspec := core.Genesis{
 		Config:         &chainConfig,
 		Alloc:          genesisAlloc,
