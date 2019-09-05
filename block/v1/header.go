@@ -1,4 +1,4 @@
-package block
+package v1
 
 import (
 	"io"
@@ -15,7 +15,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-// Header represents a block header in the Harmony blockchain.
+// Header is the V1 block header.
 type Header struct {
 	fields headerFields
 }
@@ -408,4 +408,3 @@ func (h *Header) GetShardState() (shard.State, error) {
 	}
 	return shardState, nil
 }
-

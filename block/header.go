@@ -5,7 +5,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	v1 "github.com/harmony-one/harmony/block/v1"
 )
+
+// Header represents a block header in the Harmony blockchain.
+type Header = v1.Header
+
+// NewHeader creates a new header object
+var NewHeader = v1.NewHeader
 
 // HeaderFieldSetter is a header field setter.
 //
