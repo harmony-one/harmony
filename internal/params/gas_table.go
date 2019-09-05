@@ -1,6 +1,6 @@
 package params
 
-// GasTable organizes gas prices for different ethereum phases.
+// GasTable organizes gas prices for different harmony phases.
 type GasTable struct {
 	ExtcodeSize uint64
 	ExtcodeCopy uint64
@@ -20,11 +20,11 @@ type GasTable struct {
 	CreateBySuicide uint64
 }
 
-// Variables containing gas prices for different ethereum phases.
+// Variables containing gas prices for different harmony phases.
 var (
-	// GasTableHomestead contain the gas prices for
-	// the homestead phase.
-	GasTableHomestead = GasTable{
+	// GasTableR3 contain the gas prices for
+	// the r3 phase.
+	GasTableR3 = GasTable{
 		ExtcodeSize: 20,
 		ExtcodeCopy: 20,
 		Balance:     20,
@@ -33,36 +33,9 @@ var (
 		Suicide:     0,
 		ExpByte:     10,
 	}
-
-	// GasTableEIP150 contain the gas re-prices for
-	// the EIP150 phase.
-	GasTableEIP150 = GasTable{
-		ExtcodeSize: 700,
-		ExtcodeCopy: 700,
-		Balance:     400,
-		SLoad:       200,
-		Calls:       700,
-		Suicide:     5000,
-		ExpByte:     10,
-
-		CreateBySuicide: 25000,
-	}
-	// GasTableEIP158 contain the gas re-prices for
-	// the EIP155/EIP158 phase.
-	GasTableEIP158 = GasTable{
-		ExtcodeSize: 700,
-		ExtcodeCopy: 700,
-		Balance:     400,
-		SLoad:       200,
-		Calls:       700,
-		Suicide:     5000,
-		ExpByte:     50,
-
-		CreateBySuicide: 25000,
-	}
-	// GasTableConstantinople contain the gas re-prices for
-	// the constantinople phase.
-	GasTableConstantinople = GasTable{
+	// GasTableS3 contain the gas re-prices for
+	// the s3 phase.
+	GasTableS3 = GasTable{
 		ExtcodeSize: 700,
 		ExtcodeCopy: 700,
 		ExtcodeHash: 400,

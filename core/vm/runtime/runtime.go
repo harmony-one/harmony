@@ -37,6 +37,7 @@ type Config struct {
 	Origin      common.Address
 	Coinbase    common.Address
 	BlockNumber *big.Int
+	EpochNumber *big.Int
 	Time        *big.Int
 	GasLimit    uint64
 	GasPrice    *big.Int
@@ -53,12 +54,9 @@ func setDefaults(cfg *Config) {
 	if cfg.ChainConfig == nil {
 		cfg.ChainConfig = &params.ChainConfig{
 			ChainID:        big.NewInt(1),
-			HomesteadBlock: new(big.Int),
-			DAOForkBlock:   new(big.Int),
-			DAOForkSupport: false,
-			EIP150Block:    new(big.Int),
-			EIP155Block:    new(big.Int),
-			EIP158Block:    new(big.Int),
+			CrossLinkEpoch: new(big.Int),
+			EIP155Epoch:    new(big.Int),
+			S3Epoch:        new(big.Int),
 		}
 	}
 
@@ -79,6 +77,9 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.BlockNumber == nil {
 		cfg.BlockNumber = new(big.Int)
+	}
+	if cfg.EpochNumber == nil {
+		cfg.EpochNumber = new(big.Int)
 	}
 	if cfg.GetHashFn == nil {
 		cfg.GetHashFn = func(n uint64) common.Hash {

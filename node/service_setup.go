@@ -26,7 +26,7 @@ func (node *Node) setupForValidator() {
 	// Register consensus service.
 	node.serviceManager.RegisterService(service.Consensus, consensus.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
-	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyv2))
+	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyV2))
 	// Register client support service.
 	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.Blockchain().State, node.CallFaucetContract, node.getDeployedStakingContract, node.SelfPeer.IP, node.SelfPeer.Port))
 	// Register new metrics service
@@ -56,7 +56,6 @@ func (node *Node) setupForNewNode() {
 	if node.NodeConfig.GetMetricsFlag() {
 		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort()))
 	}
-	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
 
 func (node *Node) setupForClientNode() {
@@ -65,17 +64,10 @@ func (node *Node) setupForClientNode() {
 }
 
 func (node *Node) setupForExplorerNode() {
-	// TODO determine the role of new node, currently assume it is beacon node
-	nodeConfig, chanPeer := node.initNodeConfiguration()
-
-	// Register peer discovery service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), nil, nil))
 	// Register explorer service.
 	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.NodeConfig.GetShardID(), node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
-
-	// TODO: how to restart networkinfo and discovery service after receiving shard id info from beacon chain?
 }
 
 // ServiceManagerSetup setups service store.

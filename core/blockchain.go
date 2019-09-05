@@ -243,6 +243,15 @@ func IsEpochBlock(block *types.Block) bool {
 	return ShardingSchedule.IsLastBlock(block.NumberU64() - 1)
 }
 
+// EpochFirstBlock returns the block number of the first block of an epoch.
+// TODO: instead of using fixed epoch schedules, determine the first block by epoch changes.
+func EpochFirstBlock(epoch *big.Int) *big.Int {
+	if epoch.Cmp(big.NewInt(0)) == 0 {
+		return big.NewInt(0)
+	}
+	return big.NewInt(int64(ShardingSchedule.EpochLastBlock(epoch.Uint64()-1) + 1))
+}
+
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
 func IsEpochLastBlock(block *types.Block) bool {
 	return ShardingSchedule.IsLastBlock(block.NumberU64())
@@ -846,7 +855,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 
 // SetReceiptsData computes all the non-consensus fields of the receipts
 func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) error {
-	signer := types.MakeSigner(config, block.Number())
+	signer := types.MakeSigner(config, block.Epoch())
 
 	transactions, logIndex := block.Transactions(), uint(0)
 	if len(transactions) != len(receipts) {
@@ -1005,7 +1014,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 	rawdb.WriteBlock(bc.db, block)
 
-	root, err := state.Commit(bc.chainConfig.IsEIP158(block.Number()))
+	root, err := state.Commit(bc.chainConfig.IsS3(block.Epoch()))
 	if err != nil {
 		return NonStatTy, err
 	}

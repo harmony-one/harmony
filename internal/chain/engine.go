@@ -168,7 +168,7 @@ func (e *engineImpl) Finalize(chain engine.ChainReader, header *block.Header, st
 	if err := AccumulateRewards(chain, state, header); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
-	header.SetRoot(state.IntermediateRoot(chain.Config().IsEIP158(header.Number())))
+	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs), nil
 }
 
