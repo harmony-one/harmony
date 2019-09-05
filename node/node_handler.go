@@ -761,12 +761,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 	//node.host.AddIncomingPeer(*peer)
 	node.host.ConnectHostPeer(*peer)
 
-	if ping.Node.Role == proto_node.ClientRole {
-		utils.Logger().Info().
-			Str("Client", peer.String()).
-			Msg("Add Client Peer to Node")
-		node.ClientPeer = peer
-	} else {
+	if ping.Node.Role != proto_node.ClientRole {
 		node.AddPeers([]*p2p.Peer{peer})
 		utils.Logger().Info().
 			Str("Peer", peer.String()).
