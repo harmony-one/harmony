@@ -58,10 +58,10 @@ type TrustedCheckpoint struct {
 type ChainConfig struct {
 	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
 
-	CrossLinkEpoch *big.Int `json:"homesteadBlock,omitempty"`
+	CrossLinkEpoch *big.Int `json:"crossLinkEpoch,omitempty"`
 
-	EIP155Epoch *big.Int `json:"eip155Block,omitempty"` // EIP155 hard fork epoch (include EIP158 too)
-	S3Epoch     *big.Int `json:"s3Block,omitempty"`     // S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
+	EIP155Epoch *big.Int `json:"eip155Epoch,omitempty"` // EIP155 hard fork epoch (include EIP158 too)
+	S3Epoch     *big.Int `json:"s3Epoch,omitempty"`     // S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
 }
 
 // String implements the fmt.Stringer interface.

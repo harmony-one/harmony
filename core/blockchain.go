@@ -244,6 +244,7 @@ func IsEpochBlock(block *types.Block) bool {
 }
 
 // EpochFirstBlock returns the block number of the first block of an epoch.
+// TODO: instead of using fixed epoch schedules, determine the first block by epoch changes.
 func EpochFirstBlock(epoch *big.Int) *big.Int {
 	if epoch.Cmp(big.NewInt(0)) == 0 {
 		return big.NewInt(0)
