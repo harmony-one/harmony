@@ -34,7 +34,7 @@ const (
 	// TestNetHTTPPattern is the http pattern for testnet.
 	TestNetHTTPPattern = "http://s%d.b.hmny.io:9500"
 	// TestNetWSPattern is the websocket pattern for testnet.
-	TestNetWSPattern = "ws://s%d.s.hmny.io:9800"
+	TestNetWSPattern = "ws://s%d.b.hmny.io:9800"
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
