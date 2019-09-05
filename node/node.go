@@ -106,10 +106,9 @@ type Node struct {
 	// Shard databases
 	shardChains shardchain.Collection
 
-	ClientPeer *p2p.Peer      // The peer for the harmony tx generator client, used for leaders to return proof-of-accept
-	Client     *client.Client // The presence of a client object means this node will also act as a client
-	SelfPeer   p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
-	BCPeers    []p2p.Peer     // list of Beacon Chain Peers.  This is needed by all nodes.
+	Client   *client.Client // The presence of a client object means this node will also act as a client
+	SelfPeer p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
+	BCPeers  []p2p.Peer     // list of Beacon Chain Peers.  This is needed by all nodes.
 
 	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
