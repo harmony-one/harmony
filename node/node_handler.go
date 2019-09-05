@@ -775,6 +775,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 // bootstrapConsensus is the a goroutine to check number of peers and start the consensus
 func (node *Node) bootstrapConsensus() {
 	tick := time.NewTicker(5 * time.Second)
+	lastPeerNum := node.numPeers
 	for {
 		select {
 		case <-tick.C:
@@ -785,10 +786,14 @@ func (node *Node) bootstrapConsensus() {
 					Int("numPeersNow", numPeersNow).
 					Msg("No peers, continue")
 				continue
+			} else if numPeersNow > lastPeerNum {
+				utils.Logger().Info().
+					Int("previousNumPeers", lastPeerNum).
+					Int("numPeersNow", numPeersNow).
+					Msg("New peers increased")
+				lastPeerNum = numPeersNow
 			}
-			utils.Logger().Info().
-				Int("numPeersNow", numPeersNow).
-				Msg("No peers, continue")
+
 			if numPeersNow >= node.Consensus.MinPeers {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 				node.startConsensus <- struct{}{}
