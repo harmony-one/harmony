@@ -45,6 +45,7 @@ func TestUpdateStakingList(t *testing.T) {
 		node.Worker.CommitTransactions(selectedTxs, common.Address{})
 		block, err := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
+		// The block must first be finalized before being added to the blockchain.
 		if err != nil {
 			t.Errorf("Error when finalizing block: %v", err)
 		}

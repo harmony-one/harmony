@@ -192,9 +192,10 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	// Special case: don't change the existing config of a non-mainnet chain if no new
 	// config is supplied. These chains would get AllProtocolChanges (and a compat error)
 	// if we just continued here.
-	if genesis == nil && stored != params.MainnetGenesisHash {
-		return storedcfg, stored, nil
-	}
+	// TODO: take use of genesis hash
+	//if genesis == nil && stored != params.MainnetGenesisHash {
+	//	return storedcfg, stored, nil
+	//}
 
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
@@ -214,10 +215,11 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	switch {
 	case g != nil:
 		return g.Config
-	case ghash == params.MainnetGenesisHash:
-		return params.MainnetChainConfig
-	case ghash == params.TestnetGenesisHash:
-		return params.TestnetChainConfig
+	// TODO: take use of genesis hash
+	//case ghash == params.MainnetGenesisHash:
+	//	return params.MainnetChainConfig
+	//case ghash == params.TestnetGenesisHash:
+	//	return params.TestnetChainConfig
 	default:
 		return params.AllProtocolChanges
 	}

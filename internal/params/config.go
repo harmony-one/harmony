@@ -7,13 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// Genesis hashes to enforce below configs on.
-var (
-	// TODO: populate with real genesis hash (sharded)
-	MainnetGenesisHash = common.HexToHash("0x")
-	TestnetGenesisHash = common.HexToHash("0x")
-)
-
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
