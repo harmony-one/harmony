@@ -304,7 +304,20 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
 // destination shards
-func (node *Node) BroadcastCXReceipts(newBlock *types.Block, commitSig [96]byte, commitBitmap []byte) {
+func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte) {
+
+	//#### Read payload data from committed msg
+	if len(lastCommits) <= 96 {
+		utils.Logger().Debug().Int("lastCommitsLen", len(lastCommits)).Msg("[BroadcastCXReceipts] lastCommits Not Enough Length")
+	}
+	commitSig := make([]byte, 96)
+	commitBitmap := make([]byte, len(lastCommits)-96)
+	offset := 0
+	copy(commitSig[:], lastCommits[offset:offset+96])
+	offset += 96
+	copy(commitBitmap[:], lastCommits[offset:])
+	//#### END Read payload data from committed msg
+
 	epoch := newBlock.Header().Epoch()
 	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
@@ -328,7 +341,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block, commitSig [96]byte,
 		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] ReadCXReceipts and MerkleProof Found")
 
 		groupID := p2p.ShardID(i)
-		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, commitSig, commitBitmap)))
+		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, newBlock.Header(), commitSig, commitBitmap)))
 	}
 }
 
@@ -559,7 +572,7 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
-func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
+func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBitmap []byte) {
 	if err := node.AddNewBlock(newBlock); err != nil {
 		utils.Logger().Error().
 			Err(err).
@@ -578,7 +591,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		} else {
 			node.BroadcastCrossLinkHeader(newBlock)
 		}
-		node.BroadcastCXReceipts(newBlock) //hehe
+		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
 		utils.Logger().Info().
 			Uint64("ViewID", node.Consensus.GetViewID()).

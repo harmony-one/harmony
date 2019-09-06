@@ -17,9 +17,12 @@
 package core
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -111,12 +114,17 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 }
 
 // VerifyHeaderWithSignature verifies the header with corresponding commit sigs
-func VerifyHeaderWithSignature(bc *BlockChain, header *block.Header, commitSig [96]byte, commitBitmap []byte) error {
-	shardState, err := bc.ReadShardState(header.Epoch())
-	committee := shardState.FindCommitteeByID(header.ShardID())
+func VerifyHeaderWithSignature(header *block.Header, commitSig []byte, commitBitmap []byte) error {
+	if header == nil || len(commitSig) != 96 || len(commitBitmap) == 0 {
+		return ctxerror.New("[VerifyHeaderWithSignature] Invalid header/commitSig/commitBitmap", "header", header, "commitSigLen", len(commitSig), "commitBitmapLen", len(commitBitmap))
+	}
 
-	if err != nil || committee == nil {
-		return ctxerror.New("[VerifyHeaderWithSignature] Failed to read shard state", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+	shardState := GetShardState(header.Epoch())
+	committee := shardState.FindCommitteeByID(header.ShardID())
+	var err error
+
+	if committee == nil {
+		return ctxerror.New("[VerifyHeaderWithSignature] Failed to read shard state", "shardID", header.ShardID(), "blockNum", header.Number())
 	}
 	var committerKeys []*bls.PublicKey
 
@@ -168,7 +176,7 @@ func VerifyBlockLastCommitSigs(bc *BlockChain, header *block.Header) error {
 	lastCommitSig := header.LastCommitSignature()
 	lastCommitBitmap := header.LastCommitBitmap()
 
-	return VerifyHeaderWithSignature(bc, parentHeader, lastCommitSig, lastCommitBitmap)
+	return VerifyHeaderWithSignature(parentHeader, lastCommitSig[:], lastCommitBitmap)
 }
 
 // CalcGasLimit computes the gas limit of the next block after parent. It aims
@@ -209,7 +217,7 @@ func CalcGasLimit(parent *types.Block, gasFloor, gasCeil uint64) uint64 {
 }
 
 // IsValidCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
-func IsValidCXReceiptsProof(cxp *CXReceiptsProof, bc *BlockChain) error {
+func IsValidCXReceiptsProof(cxp *types.CXReceiptsProof) error {
 	toShardID, err := cxp.GetToShardID()
 	if err != nil {
 		return ctxerror.New("[IsValidCXReceiptsProof] invalid shardID").WithCause(err)
@@ -239,7 +247,7 @@ func IsValidCXReceiptsProof(cxp *CXReceiptsProof, bc *BlockChain) error {
 	sourceShardID := merkleProof.ShardID
 	sourceBlockNum := merkleProof.BlockNum
 
-	sha := DeriveSha(cxp.Receipts)
+	sha := types.DeriveSha(cxp.Receipts)
 
 	// (1) verify the CXReceipts trie root match
 	if sha != shardRoot {
@@ -258,5 +266,5 @@ func IsValidCXReceiptsProof(cxp *CXReceiptsProof, bc *BlockChain) error {
 	}
 
 	// (4) verify signatures of blockHeader
-	return VerifyHeaderWithSignature(bc, cxp.Header, cxp.CommitSig, cxp.CommitBitmap)
+	return VerifyHeaderWithSignature(cxp.Header, cxp.CommitSig, cxp.CommitBitmap)
 }

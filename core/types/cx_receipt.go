@@ -1,16 +1,12 @@
 package types
 
 import (
-	"bytes"
-	"encoding/binary"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
@@ -79,7 +75,7 @@ type CXReceiptsProof struct {
 	Receipts     CXReceipts
 	MerkleProof  *CXMerkleProof
 	Header       *block.Header
-	CommitSig    [96]byte
+	CommitSig    []byte
 	CommitBitmap []byte
 }
 
