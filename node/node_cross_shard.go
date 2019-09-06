@@ -99,21 +99,19 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	m := make(map[common.Hash]bool)
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
-		if err := core.IsValidCXReceiptsProof(cxp); err != nil {
-			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
-		}
+		// double spent
 		if node.Blockchain().IsSpent(cxp) {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
 		hash := cxp.MerkleProof.BlockHash
-		// ignore duplicated receipts
+		// duplicated receipts
 		if _, ok := m[hash]; ok {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
 		m[hash] = true
 
-		if err := node.compareCrosslinkWithReceipts(cxp); err != nil {
-			return err
+		if err := core.IsValidCXReceiptsProof(cxp); err != nil {
+			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
 		}
 	}
 
@@ -126,34 +124,6 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	}
 
 	return nil
-}
-
-func (node *Node) compareCrosslinkWithReceipts(cxp *types.CXReceiptsProof) error {
-	var hash, outgoingReceiptHash common.Hash
-
-	shardID := cxp.MerkleProof.ShardID
-	blockNum := cxp.MerkleProof.BlockNum.Uint64()
-	beaconChain := node.Beaconchain()
-	if shardID == 0 {
-		block := beaconChain.GetBlockByNumber(blockNum)
-		if block == nil {
-			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get beaconchain header", "blockNum", blockNum, "shardID", shardID)
-		}
-		hash = block.Hash()
-		outgoingReceiptHash = block.OutgoingReceiptHash()
-	} else {
-		crossLink, err := beaconChain.ReadCrossLink(shardID, blockNum, false)
-		if err != nil {
-			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get crosslink", "blockNum", blockNum, "shardID", shardID).WithCause(err)
-		}
-		hash = crossLink.ChainHeader.Hash()
-		outgoingReceiptHash = crossLink.ChainHeader.OutgoingReceiptHash()
-	}
-	// verify the source block hash is from a finalized block
-	if hash == cxp.MerkleProof.BlockHash && outgoingReceiptHash == cxp.MerkleProof.CXReceiptHash {
-		return nil
-	}
-	return ErrCrosslinkVerificationFail
 }
 
 // VerifyCrosslinkHeader verifies the header is valid against the prevHeader.

@@ -598,8 +598,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			Msg("BINGO !!! Reached Consensus")
 	}
 
-	// TODO chao: Write New checkpoint after clean
-	node.Blockchain().CleanCXReceiptsCheckpointsByBlock(newBlock)
+	// TODO chao: uncomment this after beacon syncing is stable
+	// node.Blockchain().UpdateCXReceiptsCheckpointsByBlock(newBlock)
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
