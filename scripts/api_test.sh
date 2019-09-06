@@ -15,6 +15,7 @@ white=`tput sgr0`
 yellow=`tput setaf 11`
 reset=`tput sgr0`
 
+
 function response_test() {
 	if [ "$1" != "" ]; then
 		echo "${green}RESPONSE RECIEVED${reset}"
@@ -113,7 +114,7 @@ while getopts "lbvp" OPTION; do
 			    --data "{\"jsonrpc\":\"2.0\",\"method\":\"hmy_sendRawTransaction\",\"params\":[\""$SIGNED_RAW_TRANSACTION"\"],\"id\":1}" | jq -r '.result')
 		echo "TRANSACTION_HASH:"
 		echo $TRANSACTION_HASH
-		sleep 20s
+		sleep 10s
 		TRANSACTION=$(curl --location --request POST "http://localhost:9500" \
 			  --header "Content-Type: application/json" \
 			  --data "{\"jsonrpc\":\"2.0\",\"method\":\"hmy_getTransactionByHash\",\"params\":[\"$TRANSACTION_HASH\"],\"id\":1}")
