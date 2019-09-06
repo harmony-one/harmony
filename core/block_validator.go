@@ -207,3 +207,56 @@ func CalcGasLimit(parent *types.Block, gasFloor, gasCeil uint64) uint64 {
 	}
 	return limit
 }
+
+// IsValidCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
+func IsValidCXReceiptsProof(cxp *CXReceiptsProof, bc *BlockChain) error {
+	toShardID, err := cxp.GetToShardID()
+	if err != nil {
+		return ctxerror.New("[IsValidCXReceiptsProof] invalid shardID").WithCause(err)
+	}
+
+	merkleProof := cxp.MerkleProof
+	shardRoot := common.Hash{}
+	foundMatchingShardID := false
+	byteBuffer := bytes.NewBuffer([]byte{})
+
+	// prepare to calculate source shard outgoing cxreceipts root hash
+	for j := 0; j < len(merkleProof.ShardIDs); j++ {
+		sKey := make([]byte, 4)
+		binary.BigEndian.PutUint32(sKey, merkleProof.ShardIDs[j])
+		byteBuffer.Write(sKey)
+		byteBuffer.Write(merkleProof.CXShardHashes[j][:])
+		if merkleProof.ShardIDs[j] == toShardID {
+			shardRoot = merkleProof.CXShardHashes[j]
+			foundMatchingShardID = true
+		}
+	}
+
+	if !foundMatchingShardID {
+		return ctxerror.New("[IsValidCXReceiptsProof] Didn't find matching shardID")
+	}
+
+	sourceShardID := merkleProof.ShardID
+	sourceBlockNum := merkleProof.BlockNum
+
+	sha := DeriveSha(cxp.Receipts)
+
+	// (1) verify the CXReceipts trie root match
+	if sha != shardRoot {
+		return ctxerror.New("[IsValidCXReceiptsProof] Trie Root of ReadCXReceipts Not Match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", sha, "got", shardRoot)
+	}
+
+	// (2) verify the outgoingCXReceiptsHash match
+	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
+	if outgoingHashFromSourceShard != merkleProof.CXReceiptHash {
+		return ctxerror.New("[IsValidCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
+	}
+
+	// (3) verify the block hash matches
+	if cxp.Header.Hash() != merkleProof.BlockHash || cxp.Header.OutgoingReceiptHash() != merkleProof.CXReceiptHash {
+		return ctxerror.New("[IsValidCXReceiptsProof] BlockHash or OutgoingReceiptHash not match in block Header", "blockHash", cxp.Header.Hash(), "merkleProofBlockHash", merkleProof.BlockHash, "headerOutReceiptHash", cxp.Header.OutgoingReceiptHash(), "merkleOutReceiptHash", merkleProof.CXReceiptHash)
+	}
+
+	// (4) verify signatures of blockHeader
+	return VerifyHeaderWithSignature(bc, cxp.Header, cxp.CommitSig, cxp.CommitBitmap)
+}

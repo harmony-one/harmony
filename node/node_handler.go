@@ -304,7 +304,7 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
 // destination shards
-func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
+func (node *Node) BroadcastCXReceipts(newBlock *types.Block, commitSig [96]byte, commitBitmap []byte) {
 	epoch := newBlock.Header().Epoch()
 	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
@@ -328,7 +328,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] ReadCXReceipts and MerkleProof Found")
 
 		groupID := p2p.ShardID(i)
-		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof)))
+		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, commitSig, commitBitmap)))
 	}
 }
 
@@ -578,7 +578,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		} else {
 			node.BroadcastCrossLinkHeader(newBlock)
 		}
-		node.BroadcastCXReceipts(newBlock)
+		node.BroadcastCXReceipts(newBlock) //hehe
 	} else {
 		utils.Logger().Info().
 			Uint64("ViewID", node.Consensus.GetViewID()).

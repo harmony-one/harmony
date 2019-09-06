@@ -99,7 +99,7 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	m := make(map[common.Hash]bool)
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
-		if err := cxp.IsValidCXReceiptsProof(); err != nil {
+		if err := core.IsValidCXReceiptsProof(cxp, node.Blockchain()); err != nil {
 			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
 		}
 		if node.Blockchain().IsSpent(cxp) {
@@ -285,7 +285,7 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 		return
 	}
 
-	if err := cxp.IsValidCXReceiptsProof(); err != nil {
+	if err := core.IsValidCXReceiptsProof(cxp, node.Blockchain()); err != nil {
 		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Invalid CXReceiptsProof")
 		return
 	}

@@ -189,9 +189,10 @@ func DeserializeEpochShardStateFromMessage(payload []byte) (*shard.EpochShardSta
 	return epochShardState, nil
 }
 
-// ConstructCXReceiptsProof constructs cross shard receipts and merkle proof
-func ConstructCXReceiptsProof(cxs types.CXReceipts, mkp *types.CXMerkleProof) []byte {
-	msg := &types.CXReceiptsProof{Receipts: cxs, MerkleProof: mkp}
+// ConstructCXReceiptsProof constructs cross shard receipts and related proof including
+// merkle proof, blockHeader and  commitSignatures
+func ConstructCXReceiptsProof(cxs types.CXReceipts, mkp *types.CXMerkleProof, header *block.Header, commitSig [96]byte, CommitBitmap []byte) []byte {
+	msg := &types.CXReceiptsProof{Receipts: cxs, MerkleProof: mkp, Header: header, CommitSig: commitSig, CommitBitmap: commitBitmap}
 
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
