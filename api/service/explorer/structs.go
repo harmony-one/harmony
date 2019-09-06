@@ -115,6 +115,8 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transacti
 		return nil
 	}
 	msg, err := tx.AsMessage(types.HomesteadSigner{})
+	utils.Logger().Info().Msgf("Tx from %s", msg.From().Hex())
+	utils.Logger().Info().Msgf("Tx from parsed %s", common2.MustAddressToBech32(common.HexToAddress(msg.From().Hex())))
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
 	}

@@ -64,10 +64,15 @@ func (node *Node) setupForClientNode() {
 }
 
 func (node *Node) setupForExplorerNode() {
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), nil, nil))
+	nodeConfig, chanPeer := node.initNodeConfiguration()
+
+	// Register peer discovery service.
+	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
+	// Register networkinfo service.
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.New(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
 	// Register explorer service.
 	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.NodeConfig.GetShardID(), node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
+	// Register explorer service.
 }
 
 // ServiceManagerSetup setups service store.

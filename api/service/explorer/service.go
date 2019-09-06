@@ -32,6 +32,7 @@ import (
 // Constants for explorer service.
 const (
 	explorerPortDifference = 4000
+	paginationOffset       = 10
 	txViewNone             = "NONE"
 	txViewAll              = "ALL"
 )
@@ -104,6 +105,7 @@ func (s *Service) Run() *http.Server {
 
 	s.router = mux.NewRouter()
 	// Set up router for blocks.
+	// Blocks are divided into pages in consequent groups of offset size.
 	s.router.Path("/blocks").Queries("from", "{[0-9]*?}", "to", "{[0-9]*?}", "page", "{[0-9]*?}", "offset", "{[0-9]*?}").HandlerFunc(s.GetExplorerBlocks).Methods("GET")
 	s.router.Path("/blocks").HandlerFunc(s.GetExplorerBlocks)
 
@@ -112,6 +114,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 
 	// Set up router for address.
+	// Address transactions are divided into pages in consequent groups of offset size.
 	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset), "tx_view", "{[A-Z]*?}", "page", "{[0-9]*?}", "offset", "{[0-9]*?}").HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
@@ -180,14 +183,14 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 
 	if from == "" {
 		utils.Logger().Warn().Msg("Missing from parameter")
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	db := s.storage.GetDB()
 	fromInt, err := strconv.Atoi(from)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("invalid from parameter")
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	var toInt int
@@ -204,7 +207,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("invalid to parameter")
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	var offset int
@@ -212,18 +215,18 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		offset, err = strconv.Atoi(offsetParam)
 		if err != nil || offset < 1 {
 			utils.Logger().Warn().Msg("invalid offset parameter")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	} else {
-		offset = 10
+		offset = paginationOffset
 	}
 	var page int
 	if pageParam != "" {
 		page, err = strconv.Atoi(pageParam)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("invalid page parameter")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	} else {
@@ -333,20 +336,20 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 	}()
 	if id == "" {
 		utils.Logger().Warn().Msg("invalid id parameter")
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(GetTXKey(id)))
 	if err != nil {
 		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read TX")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	tx := new(Transaction)
 	if rlp.DecodeBytes(bytes, tx) != nil {
 		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	data.TX = *tx
@@ -364,7 +367,7 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 		shardID, err = strconv.ParseUint(shardIDRead, 10, 32)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot read shard id")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	}
@@ -372,13 +375,13 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 		epoch, err = strconv.ParseUint(epochRead, 10, 64)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot read shard epoch")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	}
 	if s.ShardID != uint32(shardID) {
 		utils.Logger().Warn().Msg("incorrect shard id")
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	// fetch current epoch if epoch is 0
@@ -388,7 +391,7 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 		blockHeight, err := strconv.Atoi(string(bytes))
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot decode block height from DB")
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		key := GetBlockKey(blockHeight)
@@ -396,7 +399,7 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 		block := new(types.Block)
 		if rlp.DecodeBytes(data, block) != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot get block from db")
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		epoch = block.Epoch().Uint64()
@@ -404,13 +407,13 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 	bytes, err := db.Get([]byte(GetCommitteeKey(uint32(shardID), epoch)))
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot read committee")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	committee := &shard.Committee{}
 	if err := rlp.DecodeBytes(bytes, committee); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot decode committee data from DB")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	validators := &Committee{}
@@ -428,7 +431,7 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewEncoder(w).Encode(validators); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode committee")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
@@ -454,7 +457,7 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	}()
 	if id == "" {
 		utils.Logger().Warn().Msg("missing address id param")
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	var err error
@@ -463,46 +466,50 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 		offset, err = strconv.Atoi(offsetParam)
 		if err != nil || offset < 1 {
 			utils.Logger().Warn().Msg("invalid offset parameter")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	} else {
-		offset = 10
+		offset = paginationOffset
 	}
 	var page int
 	if pageParam != "" {
 		page, err = strconv.Atoi(pageParam)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("invalid page parameter")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	} else {
 		page = 0
 	}
 
-	db := s.storage.GetDB()
-	bytes, err := db.Get([]byte(key))
-	if err != nil {
-		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
-		w.WriteHeader(500)
-		return
-	}
-	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
-		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
-		w.WriteHeader(500)
-		return
-	}
-
 	data.Address.ID = id
 	// Try to populate the banace by directly calling get balance.
 	// Check the balance from blockchain rather than local DB dump
+	balanceAddr := big.NewInt(0)
 	if s.GetAccountBalance != nil {
 		address := common2.ParseAddr(id)
 		balance, err := s.GetAccountBalance(address)
 		if err == nil {
+			balanceAddr = balance
 			data.Address.Balance = balance
 		}
+	}
+
+	db := s.storage.GetDB()
+	bytes, err := db.Get([]byte(key))
+	if err != nil {
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
+		return
+	}
+	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
+		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if balanceAddr.Cmp(big.NewInt(0)) != 0 {
+		data.Address.Balance = balanceAddr
 	}
 	switch txView {
 	case txViewNone:
@@ -536,7 +543,7 @@ func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(len(s.GetNodeIDs())); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode node count")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
@@ -551,7 +558,7 @@ func (s *Service) GetExplorerShard(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewEncoder(w).Encode(Shard{Nodes: nodes}); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode shard info")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
