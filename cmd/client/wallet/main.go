@@ -942,9 +942,6 @@ func submitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 		return err
 	}
 	fmt.Printf("Transaction Id for shard %d: %s\n", int(shardID), tx.Hash().Hex())
-	// FIXME (leo): how to we know the tx was successful sent to the network
-	// this is a hacky way to wait for sometime
-	time.Sleep(3 * time.Second)
 	if *waitForColoredBalance {
 		sender := *transferSenderPtr
 		receiver := *transferReceiverPtr
