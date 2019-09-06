@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -41,20 +42,18 @@ func NewHeader() *Header {
 }
 
 type headerFields struct {
-	ParentHash          common.Hash    `json:"parentHash"       gencodec:"required"`
-	Coinbase            common.Address `json:"miner"            gencodec:"required"`
-	Root                common.Hash    `json:"stateRoot"        gencodec:"required"`
-	TxHash              common.Hash    `json:"transactionsRoot" gencodec:"required"`
-	ReceiptHash         common.Hash    `json:"receiptsRoot"     gencodec:"required"`
-	OutgoingReceiptHash common.Hash    `json:"outgoingReceiptsRoot"     gencodec:"required"`
-	IncomingReceiptHash common.Hash    `json:"incomingReceiptsRoot" gencodec:"required"`
-	Bloom               ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
-	Number              *big.Int       `json:"number"           gencodec:"required"`
-	GasLimit            uint64         `json:"gasLimit"         gencodec:"required"`
-	GasUsed             uint64         `json:"gasUsed"          gencodec:"required"`
-	Time                *big.Int       `json:"timestamp"        gencodec:"required"`
-	Extra               []byte         `json:"extraData"        gencodec:"required"`
-	MixDigest           common.Hash    `json:"mixHash"          gencodec:"required"`
+	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
+	Coinbase    common.Address `json:"miner"            gencodec:"required"`
+	Root        common.Hash    `json:"stateRoot"        gencodec:"required"`
+	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
+	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
+	Bloom       ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
+	Number      *big.Int       `json:"number"           gencodec:"required"`
+	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
+	GasUsed     uint64         `json:"gasUsed"          gencodec:"required"`
+	Time        *big.Int       `json:"timestamp"        gencodec:"required"`
+	Extra       []byte         `json:"extraData"        gencodec:"required"`
+	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
 	ViewID              *big.Int    `json:"viewID"           gencodec:"required"`
 	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
@@ -62,10 +61,7 @@ type headerFields struct {
 	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
 	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
 	ShardStateHash      common.Hash `json:"shardStateRoot"`
-	Vrf                 []byte      `json:"vrf"`
-	Vdf                 []byte      `json:"vdf"`
 	ShardState          []byte      `json:"shardState"`
-	CrossLinks          []byte      `json:"crossLink"`
 }
 
 // ParentHash is the header hash of the parent block.  For the genesis block
@@ -122,22 +118,30 @@ func (h *Header) SetReceiptHash(newReceiptHash common.Hash) {
 
 // OutgoingReceiptHash is the egress transaction receipt trie hash.
 func (h *Header) OutgoingReceiptHash() common.Hash {
-	return h.fields.OutgoingReceiptHash
+	return ethtypes.EmptyRootHash
 }
 
 // SetOutgoingReceiptHash sets the egress transaction receipt trie hash.
 func (h *Header) SetOutgoingReceiptHash(newOutgoingReceiptHash common.Hash) {
-	h.fields.OutgoingReceiptHash = newOutgoingReceiptHash
+	if newOutgoingReceiptHash != ethtypes.EmptyRootHash {
+		h.Logger(utils.Logger()).Warn().
+			Hex("outgoingReceiptHash", newOutgoingReceiptHash[:]).
+			Msg("non-empty outgoing receipt root hash provided but cannot be stored")
+	}
 }
 
 // IncomingReceiptHash is the ingress transaction receipt trie hash.
 func (h *Header) IncomingReceiptHash() common.Hash {
-	return h.fields.IncomingReceiptHash
+	return ethtypes.EmptyRootHash
 }
 
 // SetIncomingReceiptHash sets the ingress transaction receipt trie hash.
 func (h *Header) SetIncomingReceiptHash(newIncomingReceiptHash common.Hash) {
-	h.fields.IncomingReceiptHash = newIncomingReceiptHash
+	if newIncomingReceiptHash != ethtypes.EmptyRootHash {
+		h.Logger(utils.Logger()).Warn().
+			Hex("incomingReceiptHash", newIncomingReceiptHash[:]).
+			Msg("non-empty outgoing receipt root hash provided but cannot be stored")
+	}
 }
 
 // Bloom is the Bloom filter that indexes accounts and topics logged by smart
@@ -307,28 +311,36 @@ func (h *Header) SetShardStateHash(newShardStateHash common.Hash) {
 //
 // The returned slice is a copy; the caller may do anything with it.
 func (h *Header) Vrf() []byte {
-	return append(h.fields.Vrf[:0:0], h.fields.Vrf...)
+	return nil
 }
 
 // SetVrf sets the output of the VRF for the epoch.
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetVrf(newVrf []byte) {
-	h.fields.Vrf = append(newVrf[:0:0], newVrf...)
+	if len(newVrf) > 0 {
+		h.Logger(utils.Logger()).Warn().
+			Hex("vrf", newVrf).
+			Msg("non-empty VRF provided but cannot be stored")
+	}
 }
 
 // Vdf is the output of the VDF for the epoch.
 //
 // The returned slice is a copy; the caller may do anything with it.
 func (h *Header) Vdf() []byte {
-	return append(h.fields.Vdf[:0:0], h.fields.Vdf...)
+	return nil
 }
 
 // SetVdf sets the output of the VDF for the epoch.
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetVdf(newVdf []byte) {
-	h.fields.Vdf = append(newVdf[:0:0], newVdf...)
+	if len(newVdf) > 0 {
+		h.Logger(utils.Logger()).Warn().
+			Hex("vdf", newVdf).
+			Msg("non-empty VDF provided but cannot be stored")
+	}
 }
 
 // ShardState is the RLP-encoded form of shard state (list of committees) for
@@ -352,7 +364,7 @@ func (h *Header) SetShardState(newShardState []byte) {
 //
 // The returned slice is a copy; the caller may do anything with it.
 func (h *Header) CrossLinks() []byte {
-	return append(h.fields.CrossLinks[:0:0], h.fields.CrossLinks...)
+	return nil
 }
 
 // SetCrossLinks sets the RLP-encoded form of non-beacon block headers chosen to
@@ -360,7 +372,11 @@ func (h *Header) CrossLinks() []byte {
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetCrossLinks(newCrossLinks []byte) {
-	h.fields.CrossLinks = append(newCrossLinks[:0:0], newCrossLinks...)
+	if len(newCrossLinks) > 0 {
+		h.Logger(utils.Logger()).Warn().
+			Hex("crossLinks", newCrossLinks).
+			Msg("non-empty cross-chain links provided but cannot be stored")
+	}
 }
 
 // field type overrides for gencodec
