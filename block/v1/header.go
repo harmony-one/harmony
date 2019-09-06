@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/rs/zerolog"
 
@@ -48,7 +48,7 @@ type headerFields struct {
 	ReceiptHash         common.Hash    `json:"receiptsRoot"     gencodec:"required"`
 	OutgoingReceiptHash common.Hash    `json:"outgoingReceiptsRoot"     gencodec:"required"`
 	IncomingReceiptHash common.Hash    `json:"incomingReceiptsRoot" gencodec:"required"`
-	Bloom               types.Bloom    `json:"logsBloom"        gencodec:"required"`
+	Bloom               ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
 	Number              *big.Int       `json:"number"           gencodec:"required"`
 	GasLimit            uint64         `json:"gasLimit"         gencodec:"required"`
 	GasUsed             uint64         `json:"gasUsed"          gencodec:"required"`
@@ -142,12 +142,12 @@ func (h *Header) SetIncomingReceiptHash(newIncomingReceiptHash common.Hash) {
 
 // Bloom is the Bloom filter that indexes accounts and topics logged by smart
 // contract transactions (executions) in this block.
-func (h *Header) Bloom() types.Bloom {
+func (h *Header) Bloom() ethtypes.Bloom {
 	return h.fields.Bloom
 }
 
 // SetBloom sets the smart contract log Bloom filter for this block.
-func (h *Header) SetBloom(newBloom types.Bloom) {
+func (h *Header) SetBloom(newBloom ethtypes.Bloom) {
 	h.fields.Bloom = newBloom
 }
 

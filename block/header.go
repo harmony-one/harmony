@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	v1 "github.com/harmony-one/harmony/block/v1"
 )
@@ -80,7 +80,7 @@ func (s HeaderFieldSetter) IncomingReceiptHash(newIncomingReceiptHash common.Has
 }
 
 // Bloom sets the smart contract log Bloom filter for this block.
-func (s HeaderFieldSetter) Bloom(newBloom types.Bloom) HeaderFieldSetter {
+func (s HeaderFieldSetter) Bloom(newBloom ethtypes.Bloom) HeaderFieldSetter {
 	s.h.SetBloom(newBloom)
 	return s
 }
