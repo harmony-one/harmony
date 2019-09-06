@@ -538,8 +538,9 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] Current Block")
 
 	// Verify block signatures
+	// TODO chao: only when block is verified against last commit sigs, we can update the block and status
 	if block.NumberU64() > 1 {
-		err := core.VerifyBlockLastCommitSigs(bc, block)
+		err := core.VerifyBlockLastCommitSigs(bc, block.Header())
 		if err != nil {
 			utils.Logger().Error().Err(err).Msgf("[SYNC] failed verifying signatures for new block %d", block.NumberU64())
 			return false
@@ -687,7 +688,7 @@ func (ss *StateSync) RegisterNodeInfo() int {
 }
 
 // getMaxPeerHeight gets the maximum blockchain heights from peers
-func (ss *StateSync) getMaxPeerHeight() uint64 {
+func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 	maxHeight := uint64(0)
 	var wg sync.WaitGroup
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
@@ -695,7 +696,7 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			utils.Logger().Debug().Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
+			utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Warn().Err(err).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
@@ -715,14 +716,14 @@ func (ss *StateSync) getMaxPeerHeight() uint64 {
 
 // IsSameBlockchainHeight checks whether the node is out of sync from other peers
 func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) {
-	otherHeight := ss.getMaxPeerHeight()
+	otherHeight := ss.getMaxPeerHeight(false)
 	currentHeight := bc.CurrentBlock().NumberU64()
 	return otherHeight, currentHeight == otherHeight
 }
 
 // IsOutOfSync checks whether the node is out of sync from other peers
 func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
-	otherHeight := ss.getMaxPeerHeight()
+	otherHeight := ss.getMaxPeerHeight(false)
 	currentHeight := bc.CurrentBlock().NumberU64()
 	utils.Logger().Debug().
 		Uint64("OtherHeight", otherHeight).
@@ -743,11 +744,13 @@ Loop:
 	for {
 		select {
 		case <-ticker.C:
-			otherHeight := ss.getMaxPeerHeight()
+			otherHeight := ss.getMaxPeerHeight(isBeacon)
 			currentHeight := bc.CurrentBlock().NumberU64()
 			if currentHeight >= otherHeight {
-				utils.Logger().Info().Msgf("[SYNC] Node is now IN SYNC! (ShardID: %d, otherHeight: %d, currentHeight: %d)", bc.ShardID(), otherHeight, currentHeight)
+				utils.Logger().Info().Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)", isBeacon, bc.ShardID(), otherHeight, currentHeight)
 				break Loop
+			} else {
+				utils.Logger().Debug().Msgf("[SYNC] Node is Not in Sync (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)", isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			}
 			startHash := bc.CurrentBlock().Hash()
 			size := uint32(otherHeight - currentHeight)
