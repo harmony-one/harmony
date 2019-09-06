@@ -12,6 +12,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
