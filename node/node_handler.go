@@ -338,7 +338,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
 
 	if newBlock.NumberU64() > 1 {
-		err := core.VerifyBlockLastCommitSigs(node.Blockchain(), newBlock)
+		err := core.VerifyBlockLastCommitSigs(node.Blockchain(), newBlock.Header())
 		if err != nil {
 			return err
 		}
