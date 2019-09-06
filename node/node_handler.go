@@ -356,7 +356,7 @@ var BigMaxUint64 = new(big.Int).SetBytes([]byte{
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
-func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
+func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBitmap []byte) {
 	if err := node.AddNewBlock(newBlock); err != nil {
 		utils.Logger().Error().
 			Err(err).
@@ -375,15 +375,15 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 		} else {
 			node.BroadcastCrossLinkHeader(newBlock)
 		}
-		node.BroadcastCXReceipts(newBlock)
+		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
 		utils.Logger().Info().
 			Uint64("ViewID", node.Consensus.GetViewID()).
 			Msg("BINGO !!! Reached Consensus")
 	}
 
-	// TODO chao: Write New checkpoint after clean
-	node.Blockchain().CleanCXReceiptsCheckpointsByBlock(newBlock)
+	// TODO chao: uncomment this after beacon syncing is stable
+	// node.Blockchain().UpdateCXReceiptsCheckpointsByBlock(newBlock)
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce

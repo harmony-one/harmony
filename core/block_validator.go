@@ -17,9 +17,12 @@
 package core
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -111,12 +114,17 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 }
 
 // VerifyHeaderWithSignature verifies the header with corresponding commit sigs
-func VerifyHeaderWithSignature(bc *BlockChain, header *block.Header, commitSig [96]byte, commitBitmap []byte) error {
-	shardState, err := bc.ReadShardState(header.Epoch())
-	committee := shardState.FindCommitteeByID(header.ShardID())
+func VerifyHeaderWithSignature(header *block.Header, commitSig []byte, commitBitmap []byte) error {
+	if header == nil || len(commitSig) != 96 || len(commitBitmap) == 0 {
+		return ctxerror.New("[VerifyHeaderWithSignature] Invalid header/commitSig/commitBitmap", "header", header, "commitSigLen", len(commitSig), "commitBitmapLen", len(commitBitmap))
+	}
 
-	if err != nil || committee == nil {
-		return ctxerror.New("[VerifyHeaderWithSignature] Failed to read shard state", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+	shardState := GetShardState(header.Epoch())
+	committee := shardState.FindCommitteeByID(header.ShardID())
+	var err error
+
+	if committee == nil {
+		return ctxerror.New("[VerifyHeaderWithSignature] Failed to read shard state", "shardID", header.ShardID(), "blockNum", header.Number())
 	}
 	var committerKeys []*bls.PublicKey
 
@@ -168,7 +176,7 @@ func VerifyBlockLastCommitSigs(bc *BlockChain, header *block.Header) error {
 	lastCommitSig := header.LastCommitSignature()
 	lastCommitBitmap := header.LastCommitBitmap()
 
-	return VerifyHeaderWithSignature(bc, parentHeader, lastCommitSig, lastCommitBitmap)
+	return VerifyHeaderWithSignature(parentHeader, lastCommitSig[:], lastCommitBitmap)
 }
 
 // CalcGasLimit computes the gas limit of the next block after parent. It aims
@@ -206,4 +214,57 @@ func CalcGasLimit(parent *types.Block, gasFloor, gasCeil uint64) uint64 {
 		}
 	}
 	return limit
+}
+
+// IsValidCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
+func IsValidCXReceiptsProof(cxp *types.CXReceiptsProof) error {
+	toShardID, err := cxp.GetToShardID()
+	if err != nil {
+		return ctxerror.New("[IsValidCXReceiptsProof] invalid shardID").WithCause(err)
+	}
+
+	merkleProof := cxp.MerkleProof
+	shardRoot := common.Hash{}
+	foundMatchingShardID := false
+	byteBuffer := bytes.NewBuffer([]byte{})
+
+	// prepare to calculate source shard outgoing cxreceipts root hash
+	for j := 0; j < len(merkleProof.ShardIDs); j++ {
+		sKey := make([]byte, 4)
+		binary.BigEndian.PutUint32(sKey, merkleProof.ShardIDs[j])
+		byteBuffer.Write(sKey)
+		byteBuffer.Write(merkleProof.CXShardHashes[j][:])
+		if merkleProof.ShardIDs[j] == toShardID {
+			shardRoot = merkleProof.CXShardHashes[j]
+			foundMatchingShardID = true
+		}
+	}
+
+	if !foundMatchingShardID {
+		return ctxerror.New("[IsValidCXReceiptsProof] Didn't find matching shardID")
+	}
+
+	sourceShardID := merkleProof.ShardID
+	sourceBlockNum := merkleProof.BlockNum
+
+	sha := types.DeriveSha(cxp.Receipts)
+
+	// (1) verify the CXReceipts trie root match
+	if sha != shardRoot {
+		return ctxerror.New("[IsValidCXReceiptsProof] Trie Root of ReadCXReceipts Not Match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", sha, "got", shardRoot)
+	}
+
+	// (2) verify the outgoingCXReceiptsHash match
+	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
+	if outgoingHashFromSourceShard != merkleProof.CXReceiptHash {
+		return ctxerror.New("[IsValidCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
+	}
+
+	// (3) verify the block hash matches
+	if cxp.Header.Hash() != merkleProof.BlockHash || cxp.Header.OutgoingReceiptHash() != merkleProof.CXReceiptHash {
+		return ctxerror.New("[IsValidCXReceiptsProof] BlockHash or OutgoingReceiptHash not match in block Header", "blockHash", cxp.Header.Hash(), "merkleProofBlockHash", merkleProof.BlockHash, "headerOutReceiptHash", cxp.Header.OutgoingReceiptHash(), "merkleOutReceiptHash", merkleProof.CXReceiptHash)
+	}
+
+	// (4) verify signatures of blockHeader
+	return VerifyHeaderWithSignature(cxp.Header, cxp.CommitSig, cxp.CommitBitmap)
 }

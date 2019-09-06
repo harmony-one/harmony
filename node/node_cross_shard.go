@@ -23,7 +23,20 @@ import (
 
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
 // destination shards
-func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
+func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte) {
+
+	//#### Read payload data from committed msg
+	if len(lastCommits) <= 96 {
+		utils.Logger().Debug().Int("lastCommitsLen", len(lastCommits)).Msg("[BroadcastCXReceipts] lastCommits Not Enough Length")
+	}
+	commitSig := make([]byte, 96)
+	commitBitmap := make([]byte, len(lastCommits)-96)
+	offset := 0
+	copy(commitSig[:], lastCommits[offset:offset+96])
+	offset += 96
+	copy(commitBitmap[:], lastCommits[offset:])
+	//#### END Read payload data from committed msg
+
 	epoch := newBlock.Header().Epoch()
 	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
@@ -47,7 +60,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] ReadCXReceipts and MerkleProof Found")
 
 		groupID := p2p.ShardID(i)
-		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof)))
+		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, newBlock.Header(), commitSig, commitBitmap)))
 	}
 }
 
@@ -197,21 +210,19 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	m := make(map[common.Hash]bool)
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
-		if err := cxp.IsValidCXReceiptsProof(); err != nil {
-			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
-		}
+		// double spent
 		if node.Blockchain().IsSpent(cxp) {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
 		hash := cxp.MerkleProof.BlockHash
-		// ignore duplicated receipts
+		// duplicated receipts
 		if _, ok := m[hash]; ok {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
 		m[hash] = true
 
-		if err := node.compareCrosslinkWithReceipts(cxp); err != nil {
-			return err
+		if err := core.IsValidCXReceiptsProof(cxp); err != nil {
+			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
 		}
 	}
 
@@ -224,34 +235,6 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	}
 
 	return nil
-}
-
-func (node *Node) compareCrosslinkWithReceipts(cxp *types.CXReceiptsProof) error {
-	var hash, outgoingReceiptHash common.Hash
-
-	shardID := cxp.MerkleProof.ShardID
-	blockNum := cxp.MerkleProof.BlockNum.Uint64()
-	beaconChain := node.Beaconchain()
-	if shardID == 0 {
-		block := beaconChain.GetBlockByNumber(blockNum)
-		if block == nil {
-			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get beaconchain header", "blockNum", blockNum, "shardID", shardID)
-		}
-		hash = block.Hash()
-		outgoingReceiptHash = block.OutgoingReceiptHash()
-	} else {
-		crossLink, err := beaconChain.ReadCrossLink(shardID, blockNum, false)
-		if err != nil {
-			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get crosslink", "blockNum", blockNum, "shardID", shardID).WithCause(err)
-		}
-		hash = crossLink.ChainHeader.Hash()
-		outgoingReceiptHash = crossLink.ChainHeader.OutgoingReceiptHash()
-	}
-	// verify the source block hash is from a finalized block
-	if hash == cxp.MerkleProof.BlockHash && outgoingReceiptHash == cxp.MerkleProof.CXReceiptHash {
-		return nil
-	}
-	return ErrCrosslinkVerificationFail
 }
 
 // VerifyCrosslinkHeader verifies the header is valid against the prevHeader.
@@ -382,12 +365,6 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Unable to Decode message Payload")
 		return
 	}
-
-	if err := cxp.IsValidCXReceiptsProof(); err != nil {
-		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Invalid CXReceiptsProof")
-		return
-	}
-
 	utils.Logger().Debug().Interface("cxp", cxp).Msg("[ProcessReceiptMessage] Add CXReceiptsProof to pending Receipts")
 	// TODO: integrate with txpool
 	node.AddPendingReceipts(&cxp)
