@@ -365,12 +365,6 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Unable to Decode message Payload")
 		return
 	}
-
-	if err := core.IsValidCXReceiptsProof(&cxp); err != nil {
-		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Invalid CXReceiptsProof")
-		return
-	}
-
 	utils.Logger().Debug().Interface("cxp", cxp).Msg("[ProcessReceiptMessage] Add CXReceiptsProof to pending Receipts")
 	// TODO: integrate with txpool
 	node.AddPendingReceipts(&cxp)
