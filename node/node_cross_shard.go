@@ -221,6 +221,12 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 		}
 		m[hash] = true
 
+		for _, item := range cxp.Receipts {
+			if item.ToShardID != node.Blockchain().ShardID() {
+				return ctxerror.New("[verifyIncomingReceipts] Invalid ToShardID", "myShardID", node.Blockchain().ShardID(), "expectShardID", item.ToShardID)
+			}
+		}
+
 		if err := core.IsValidCXReceiptsProof(cxp); err != nil {
 			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
 		}

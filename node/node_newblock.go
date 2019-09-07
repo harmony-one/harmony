@@ -207,6 +207,7 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 
 	m := make(map[common.Hash]bool)
 
+Loop:
 	for _, cxp := range node.pendingCXReceipts {
 		if numProposed > IncomingReceiptsLimit {
 			pendingReceiptsList = append(pendingReceiptsList, cxp)
@@ -223,6 +224,12 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 			continue
 		} else {
 			m[hash] = true
+		}
+
+		for _, item := range cxp.Receipts {
+			if item.ToShardID != node.Blockchain().ShardID() {
+				continue Loop
+			}
 		}
 
 		if err := core.IsValidCXReceiptsProof(cxp); err != nil {
