@@ -17,13 +17,17 @@
 package core
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 
+	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -109,19 +113,18 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	return nil
 }
 
-// VerifyBlockLastCommitSigs verifies the last commit sigs of the block
-func VerifyBlockLastCommitSigs(bc *BlockChain, block *types.Block) error {
-	header := block.Header()
-	parentBlock := bc.GetBlockByNumber(block.NumberU64() - 1)
-	if parentBlock == nil {
-		return ctxerror.New("[VerifyNewBlock] Failed to get parent block", "shardID", header.ShardID(), "blockNum", header.Number())
+// VerifyHeaderWithSignature verifies the header with corresponding commit sigs
+func VerifyHeaderWithSignature(header *block.Header, commitSig []byte, commitBitmap []byte) error {
+	if header == nil || len(commitSig) != 96 || len(commitBitmap) == 0 {
+		return ctxerror.New("[VerifyHeaderWithSignature] Invalid header/commitSig/commitBitmap", "header", header, "commitSigLen", len(commitSig), "commitBitmapLen", len(commitBitmap))
 	}
-	parentHeader := parentBlock.Header()
-	shardState, err := bc.ReadShardState(parentHeader.Epoch())
-	committee := shardState.FindCommitteeByID(parentHeader.ShardID())
 
-	if err != nil || committee == nil {
-		return ctxerror.New("[VerifyNewBlock] Failed to read shard state for cross link header", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+	shardState := GetShardState(header.Epoch())
+	committee := shardState.FindCommitteeByID(header.ShardID())
+	var err error
+
+	if committee == nil {
+		return ctxerror.New("[VerifyHeaderWithSignature] Failed to read shard state", "shardID", header.ShardID(), "blockNum", header.Number())
 	}
 	var committerKeys []*bls.PublicKey
 
@@ -136,32 +139,44 @@ func VerifyBlockLastCommitSigs(bc *BlockChain, block *types.Block) error {
 		committerKeys = append(committerKeys, committerKey)
 	}
 	if !parseKeysSuccess {
-		return ctxerror.New("[VerifyNewBlock] cannot convert BLS public key", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+		return ctxerror.New("[VerifyBlockWithSignature] cannot convert BLS public key", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 	}
 
 	mask, err := bls2.NewMask(committerKeys, nil)
 	if err != nil {
-		return ctxerror.New("[VerifyNewBlock] cannot create group sig mask", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+		return ctxerror.New("[VerifyHeaderWithSignature] cannot create group sig mask", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 	}
-	if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
-		return ctxerror.New("[VerifyNewBlock] cannot set group sig mask bits", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+	if err := mask.SetMask(commitBitmap); err != nil {
+		return ctxerror.New("[VerifyHeaderWithSignature] cannot set group sig mask bits", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
 	}
 
 	aggSig := bls.Sign{}
-	lastCommitSig := header.LastCommitSignature()
-	err = aggSig.Deserialize(lastCommitSig[:])
+	err = aggSig.Deserialize(commitSig[:])
 	if err != nil {
 		return ctxerror.New("[VerifyNewBlock] unable to deserialize multi-signature from payload").WithCause(err)
 	}
 
 	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, header.Number().Uint64()-1)
-	parentHash := header.ParentHash()
-	commitPayload := append(blockNumBytes, parentHash[:]...)
+	binary.LittleEndian.PutUint64(blockNumBytes, header.Number().Uint64())
+	hash := header.Hash()
+	commitPayload := append(blockNumBytes, hash[:]...)
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-		return ctxerror.New("[VerifyNewBlock] Failed to verify the signature for last commit sig", "shardID", header.ShardID(), "blockNum", header.Number())
+		return ctxerror.New("[VerifyHeaderWithSignature] Failed to verify the signature for last commit sig", "shardID", header.ShardID(), "blockNum", header.Number())
 	}
 	return nil
+}
+
+// VerifyBlockLastCommitSigs verifies the last commit sigs of the block
+func VerifyBlockLastCommitSigs(bc *BlockChain, header *block.Header) error {
+	parentBlock := bc.GetBlockByNumber(header.Number().Uint64() - 1)
+	if parentBlock == nil {
+		return ctxerror.New("[VerifyBlockLastCommitSigs] Failed to get parent block", "shardID", header.ShardID(), "blockNum", header.Number())
+	}
+	parentHeader := parentBlock.Header()
+	lastCommitSig := header.LastCommitSignature()
+	lastCommitBitmap := header.LastCommitBitmap()
+
+	return VerifyHeaderWithSignature(parentHeader, lastCommitSig[:], lastCommitBitmap)
 }
 
 // CalcGasLimit computes the gas limit of the next block after parent. It aims
@@ -199,4 +214,57 @@ func CalcGasLimit(parent *types.Block, gasFloor, gasCeil uint64) uint64 {
 		}
 	}
 	return limit
+}
+
+// IsValidCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
+func IsValidCXReceiptsProof(cxp *types.CXReceiptsProof) error {
+	toShardID, err := cxp.GetToShardID()
+	if err != nil {
+		return ctxerror.New("[IsValidCXReceiptsProof] invalid shardID").WithCause(err)
+	}
+
+	merkleProof := cxp.MerkleProof
+	shardRoot := common.Hash{}
+	foundMatchingShardID := false
+	byteBuffer := bytes.NewBuffer([]byte{})
+
+	// prepare to calculate source shard outgoing cxreceipts root hash
+	for j := 0; j < len(merkleProof.ShardIDs); j++ {
+		sKey := make([]byte, 4)
+		binary.BigEndian.PutUint32(sKey, merkleProof.ShardIDs[j])
+		byteBuffer.Write(sKey)
+		byteBuffer.Write(merkleProof.CXShardHashes[j][:])
+		if merkleProof.ShardIDs[j] == toShardID {
+			shardRoot = merkleProof.CXShardHashes[j]
+			foundMatchingShardID = true
+		}
+	}
+
+	if !foundMatchingShardID {
+		return ctxerror.New("[IsValidCXReceiptsProof] Didn't find matching shardID")
+	}
+
+	sourceShardID := merkleProof.ShardID
+	sourceBlockNum := merkleProof.BlockNum
+
+	sha := types.DeriveSha(cxp.Receipts)
+
+	// (1) verify the CXReceipts trie root match
+	if sha != shardRoot {
+		return ctxerror.New("[IsValidCXReceiptsProof] Trie Root of ReadCXReceipts Not Match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", sha, "got", shardRoot)
+	}
+
+	// (2) verify the outgoingCXReceiptsHash match
+	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
+	if outgoingHashFromSourceShard != merkleProof.CXReceiptHash {
+		return ctxerror.New("[IsValidCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
+	}
+
+	// (3) verify the block hash matches
+	if cxp.Header.Hash() != merkleProof.BlockHash || cxp.Header.OutgoingReceiptHash() != merkleProof.CXReceiptHash {
+		return ctxerror.New("[IsValidCXReceiptsProof] BlockHash or OutgoingReceiptHash not match in block Header", "blockHash", cxp.Header.Hash(), "merkleProofBlockHash", merkleProof.BlockHash, "headerOutReceiptHash", cxp.Header.OutgoingReceiptHash(), "merkleOutReceiptHash", merkleProof.CXReceiptHash)
+	}
+
+	// (4) verify signatures of blockHeader
+	return VerifyHeaderWithSignature(cxp.Header, cxp.CommitSig, cxp.CommitBitmap)
 }

@@ -4,11 +4,15 @@ import (
 	"encoding/binary"
 	"errors"
 
+	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/p2p/host"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -16,6 +20,113 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
+
+// BroadcastCXReceipts broadcasts cross shard receipts to correspoding
+// destination shards
+func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte) {
+
+	//#### Read payload data from committed msg
+	if len(lastCommits) <= 96 {
+		utils.Logger().Debug().Int("lastCommitsLen", len(lastCommits)).Msg("[BroadcastCXReceipts] lastCommits Not Enough Length")
+	}
+	commitSig := make([]byte, 96)
+	commitBitmap := make([]byte, len(lastCommits)-96)
+	offset := 0
+	copy(commitSig[:], lastCommits[offset:offset+96])
+	offset += 96
+	copy(commitBitmap[:], lastCommits[offset:])
+	//#### END Read payload data from committed msg
+
+	epoch := newBlock.Header().Epoch()
+	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
+	shardNum := int(shardingConfig.NumShards())
+	myShardID := node.Consensus.ShardID
+	utils.Logger().Info().Int("shardNum", shardNum).Uint32("myShardID", myShardID).Uint64("blockNum", newBlock.NumberU64()).Msg("[BroadcastCXReceipts]")
+
+	for i := 0; i < shardNum; i++ {
+		if i == int(myShardID) {
+			continue
+		}
+		cxReceipts, err := node.Blockchain().ReadCXReceipts(uint32(i), newBlock.NumberU64(), newBlock.Hash(), false)
+		if err != nil || len(cxReceipts) == 0 {
+			utils.Logger().Warn().Err(err).Uint32("ToShardID", uint32(i)).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceipts] No ReadCXReceipts found")
+			continue
+		}
+		merkleProof, err := node.Blockchain().CXMerkleProof(uint32(i), newBlock)
+		if err != nil {
+			utils.Logger().Warn().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] Unable to get merkleProof")
+			continue
+		}
+		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] ReadCXReceipts and MerkleProof Found")
+
+		groupID := p2p.ShardID(i)
+		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, newBlock.Header(), commitSig, commitBitmap)))
+	}
+}
+
+// VerifyBlockCrossLinks verifies the cross links of the block
+func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
+	if len(block.Header().CrossLinks()) == 0 {
+		return nil
+	}
+	crossLinks := &types.CrossLinks{}
+	err := rlp.DecodeBytes(block.Header().CrossLinks(), crossLinks)
+	if err != nil {
+		return ctxerror.New("[CrossLinkVerification] failed to decode cross links",
+			"blockHash", block.Hash(),
+			"crossLinks", len(block.Header().CrossLinks()),
+		).WithCause(err)
+	}
+
+	if !crossLinks.IsSorted() {
+		return ctxerror.New("[CrossLinkVerification] cross links are not sorted",
+			"blockHash", block.Hash(),
+			"crossLinks", len(block.Header().CrossLinks()),
+		)
+	}
+
+	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
+
+	for i, crossLink := range *crossLinks {
+		lastLink := &types.CrossLink{}
+		if i == 0 {
+			if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
+				lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
+				if err != nil {
+					return ctxerror.New("[CrossLinkVerification] no last cross link found 1",
+						"blockHash", block.Hash(),
+						"crossLink", lastLink,
+					).WithCause(err)
+				}
+			}
+		} else {
+			if (*crossLinks)[i-1].Header().ShardID() != crossLink.Header().ShardID() {
+				if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
+					lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
+					if err != nil {
+						return ctxerror.New("[CrossLinkVerification] no last cross link found 2",
+							"blockHash", block.Hash(),
+							"crossLink", lastLink,
+						).WithCause(err)
+					}
+				}
+			} else {
+				lastLink = &(*crossLinks)[i-1]
+			}
+		}
+
+		if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 { // TODO: verify genesis block
+			err = node.VerifyCrosslinkHeader(lastLink.Header(), crossLink.Header())
+			if err != nil {
+				return ctxerror.New("cannot ValidateNewBlock",
+					"blockHash", block.Hash(),
+					"numTx", len(block.Transactions()),
+				).WithCause(err)
+			}
+		}
+	}
+	return nil
+}
 
 // ProcessHeaderMessage verify and process Node/Header message into crosslink when it's valid
 func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
@@ -99,21 +210,25 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	m := make(map[common.Hash]bool)
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
-		if err := cxp.IsValidCXReceiptsProof(); err != nil {
-			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
-		}
+		// double spent
 		if node.Blockchain().IsSpent(cxp) {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
 		hash := cxp.MerkleProof.BlockHash
-		// ignore duplicated receipts
+		// duplicated receipts
 		if _, ok := m[hash]; ok {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
 		m[hash] = true
 
-		if err := node.compareCrosslinkWithReceipts(cxp); err != nil {
-			return err
+		for _, item := range cxp.Receipts {
+			if item.ToShardID != node.Blockchain().ShardID() {
+				return ctxerror.New("[verifyIncomingReceipts] Invalid ToShardID", "myShardID", node.Blockchain().ShardID(), "expectShardID", item.ToShardID)
+			}
+		}
+
+		if err := core.IsValidCXReceiptsProof(cxp); err != nil {
+			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
 		}
 	}
 
@@ -126,34 +241,6 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	}
 
 	return nil
-}
-
-func (node *Node) compareCrosslinkWithReceipts(cxp *types.CXReceiptsProof) error {
-	var hash, outgoingReceiptHash common.Hash
-
-	shardID := cxp.MerkleProof.ShardID
-	blockNum := cxp.MerkleProof.BlockNum.Uint64()
-	beaconChain := node.Beaconchain()
-	if shardID == 0 {
-		block := beaconChain.GetBlockByNumber(blockNum)
-		if block == nil {
-			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get beaconchain header", "blockNum", blockNum, "shardID", shardID)
-		}
-		hash = block.Hash()
-		outgoingReceiptHash = block.OutgoingReceiptHash()
-	} else {
-		crossLink, err := beaconChain.ReadCrossLink(shardID, blockNum, false)
-		if err != nil {
-			return ctxerror.New("[compareCrosslinkWithReceipts] Cannot get crosslink", "blockNum", blockNum, "shardID", shardID).WithCause(err)
-		}
-		hash = crossLink.ChainHeader.Hash()
-		outgoingReceiptHash = crossLink.ChainHeader.OutgoingReceiptHash()
-	}
-	// verify the source block hash is from a finalized block
-	if hash == cxp.MerkleProof.BlockHash && outgoingReceiptHash == cxp.MerkleProof.CXReceiptHash {
-		return nil
-	}
-	return ErrCrosslinkVerificationFail
 }
 
 // VerifyCrosslinkHeader verifies the header is valid against the prevHeader.
@@ -284,12 +371,6 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Unable to Decode message Payload")
 		return
 	}
-
-	if err := cxp.IsValidCXReceiptsProof(); err != nil {
-		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Invalid CXReceiptsProof")
-		return
-	}
-
 	utils.Logger().Debug().Interface("cxp", cxp).Msg("[ProcessReceiptMessage] Add CXReceiptsProof to pending Receipts")
 	// TODO: integrate with txpool
 	node.AddPendingReceipts(&cxp)

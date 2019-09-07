@@ -538,8 +538,9 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] Current Block")
 
 	// Verify block signatures
+	// TODO chao: only when block is verified against last commit sigs, we can update the block and status
 	if block.NumberU64() > 1 {
-		err := core.VerifyBlockLastCommitSigs(bc, block)
+		err := core.VerifyBlockLastCommitSigs(bc, block.Header())
 		if err != nil {
 			utils.Logger().Error().Err(err).Msgf("[SYNC] failed verifying signatures for new block %d", block.NumberU64())
 			return false
@@ -695,7 +696,7 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
+			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Warn().Err(err).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")

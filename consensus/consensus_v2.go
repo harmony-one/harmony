@@ -985,7 +985,7 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.LeaderPubKey = msgs[0].SenderPubkey
 
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
-		consensus.OnConsensusDone(block)
+		consensus.OnConsensusDone(block, msgs[0].Payload)
 		consensus.ResetState()
 
 		select {
