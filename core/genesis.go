@@ -30,9 +30,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/internal/params"
 
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -48,17 +49,18 @@ var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 // Genesis specifies the header fields, state of a genesis block. It also defines hard
 // fork switch-over blocks through the chain configuration.
 type Genesis struct {
-	Config         *params.ChainConfig `json:"config"`
-	Nonce          uint64              `json:"nonce"`
-	ShardID        uint32              `json:"shardID"`
-	Timestamp      uint64              `json:"timestamp"`
-	ExtraData      []byte              `json:"extraData"`
-	GasLimit       uint64              `json:"gasLimit"       gencodec:"required"`
-	Mixhash        common.Hash         `json:"mixHash"`
-	Coinbase       common.Address      `json:"coinbase"`
-	Alloc          GenesisAlloc        `json:"alloc"          gencodec:"required"`
-	ShardStateHash common.Hash         `json:"shardStateHash" gencodec:"required"`
-	ShardState     shard.State         `json:"shardState"     gencodec:"required"`
+	Config         *params.ChainConfig  `json:"config"`
+	Factory        blockfactory.Factory `json:"-"`
+	Nonce          uint64               `json:"nonce"`
+	ShardID        uint32               `json:"shardID"`
+	Timestamp      uint64               `json:"timestamp"`
+	ExtraData      []byte               `json:"extraData"`
+	GasLimit       uint64               `json:"gasLimit"       gencodec:"required"`
+	Mixhash        common.Hash          `json:"mixHash"`
+	Coinbase       common.Address       `json:"coinbase"`
+	Alloc          GenesisAlloc         `json:"alloc"          gencodec:"required"`
+	ShardStateHash common.Hash          `json:"shardStateHash" gencodec:"required"`
+	ShardState     shard.State          `json:"shardState"     gencodec:"required"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
@@ -247,9 +249,8 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		utils.Logger().Error().Msg("failed to rlp-serialize genesis shard state")
 		os.Exit(1)
 	}
-	head := block.NewHeaderWith().
+	head := g.Factory.NewHeader(common.Big0).With().
 		Number(new(big.Int).SetUint64(g.Number)).
-		Epoch(big.NewInt(0)).
 		ShardID(g.ShardID).
 		Time(new(big.Int).SetUint64(g.Timestamp)).
 		ParentHash(g.ParentHash).
@@ -316,6 +317,7 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 func DefaultGenesisBlock() *Genesis {
 	return &Genesis{
 		Config:    params.MainnetChainConfig,
+		Factory:   blockfactory.ForMainnet,
 		Nonce:     66,
 		ExtraData: hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
 		GasLimit:  5000,

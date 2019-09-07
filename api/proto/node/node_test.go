@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 
-	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
@@ -60,9 +60,8 @@ func TestConstructBlocksSyncMessage(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 
 	root := statedb.IntermediateRoot(false)
-	head := block.NewHeaderWith().
+	head := blockfactory.NewTestHeader().With().
 		Number(new(big.Int).SetUint64(uint64(10000))).
-		Epoch(big.NewInt(0)).
 		ShardID(0).
 		Time(new(big.Int).SetUint64(uint64(100000))).
 		Root(root).
