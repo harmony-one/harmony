@@ -731,7 +731,7 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.getLogger().Info().Int("NumCommits", len(consensus.commitSigs)).Msg("[Finalizing] Finalizing Block")
 
 	beforeCatchupNum := consensus.blockNum
-	beforeCatchupViewID := consensus.viewID
+	//beforeCatchupViewID := consensus.viewID
 
 	// Construct committed message
 	msgToSend, aggSig := consensus.constructCommittedMessage()
@@ -792,11 +792,13 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
 	consensus.getLogger().Info().
-		Uint64("blockNum", beforeCatchupNum).
-		Uint64("ViewId", beforeCatchupViewID).
+		Uint64("blockNum", block.NumberU64()).
+		Uint64("ViewId", block.Header().ViewID().Uint64()).
 		Str("blockHash", block.Hash().String()).
 		Int("index", consensus.getIndexOfPubKey(consensus.PubKey)).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
+	// Print to normal log too
+	utils.GetLogInstance().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "BlockNum", block.NumberU64())
 
 	// Send signal to Node so the new block can be added and new round of consensus can be triggered
 	consensus.ReadySignal <- struct{}{}
