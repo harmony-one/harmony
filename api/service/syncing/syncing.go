@@ -696,7 +696,7 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
+			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Warn().Err(err).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
