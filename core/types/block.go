@@ -195,6 +195,7 @@ func NewBlockWithHeader(header *block.Header) *Block {
 // TODO ek – no longer necessary
 func CopyHeader(h *block.Header) *block.Header {
 	cpy := *h
+	cpy.Header = cpy.Header.Copy()
 	return &cpy
 }
 
