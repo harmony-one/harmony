@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"io"
 	"math/big"
+	"reflect"
 	"sort"
 	"sync/atomic"
 	"time"
@@ -29,9 +30,13 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/taggedrlp"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/block"
+	v0 "github.com/harmony-one/harmony/block/v0"
+	v1 "github.com/harmony-one/harmony/block/v1"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -123,10 +128,24 @@ func (b *Block) DeprecatedTd() *big.Int {
 
 // "external" block encoding. used for eth protocol, etc.
 type extblock struct {
+	Header *block.Header
+	Txs    []*Transaction
+	Uncles []*block.Header
+}
+
+// CX-ready extblock
+type extblockV1 struct {
 	Header           *block.Header
 	Txs              []*Transaction
 	Uncles           []*block.Header
 	IncomingReceipts CXReceiptsProofs
+}
+
+var extblockReg = taggedrlp.NewRegistry()
+
+func init() {
+	extblockReg.MustRegister(taggedrlp.LegacyTag, &extblock{})
+	extblockReg.MustRegister("v1", &extblockV1{})
 }
 
 // NewBlock creates a new block. The input data is copied,
@@ -186,24 +205,39 @@ func CopyHeader(h *block.Header) *block.Header {
 
 // DecodeRLP decodes the Ethereum
 func (b *Block) DecodeRLP(s *rlp.Stream) error {
-	var eb extblock
 	_, size, _ := s.Kind()
-	if err := s.Decode(&eb); err != nil {
+	eb, err := extblockReg.Decode(s)
+	if err != nil {
 		return err
 	}
-	b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
+	switch eb := eb.(type) {
+	case *extblockV1:
+		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
+	case *extblock:
+		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, nil
+	default:
+		return errors.Errorf("unknown extblock type %s", taggedrlp.TypeName(reflect.TypeOf(eb)))
+	}
 	b.size.Store(common.StorageSize(rlp.ListSize(size)))
 	return nil
 }
 
 // EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, extblock{
-		Header:           b.header,
-		Txs:              b.transactions,
-		Uncles:           b.uncles,
-		IncomingReceipts: b.incomingReceipts,
-	})
+	var eb interface{}
+	switch h := b.header.Header.(type) {
+	case *v1.Header:
+		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
+	case *v0.Header:
+		if len(b.incomingReceipts) > 0 {
+			return errors.New("incomingReceipts unsupported in v0 block")
+		}
+		eb = extblock{b.header, b.transactions, b.uncles}
+	default:
+		return errors.Errorf("unsupported block header type %s",
+			taggedrlp.TypeName(reflect.TypeOf(h)))
+	}
+	return extblockReg.Encode(w, eb)
 }
 
 // Uncles return uncles.
