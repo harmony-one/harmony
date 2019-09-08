@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/harmony-one/harmony/block/factory"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core/types"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 )

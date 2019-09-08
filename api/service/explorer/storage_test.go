@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
-	"github.com/harmony-one/harmony/block/factory"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/shard"
 

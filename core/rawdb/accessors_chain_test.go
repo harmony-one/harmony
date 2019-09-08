@@ -31,7 +31,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/block/factory"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	mock "github.com/harmony-one/harmony/core/rawdb/mock"
 	"github.com/harmony-one/harmony/core/types"
 )

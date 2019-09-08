@@ -225,4 +225,3 @@ type HeaderInterface interface {
 	// GetShardState returns the deserialized shard state object.
 	GetShardState() (shard.State, error)
 }
-

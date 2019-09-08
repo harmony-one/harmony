@@ -4,8 +4,8 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/block/v0"
-	"github.com/harmony-one/harmony/block/v1"
+	v0 "github.com/harmony-one/harmony/block/v0"
+	v1 "github.com/harmony-one/harmony/block/v1"
 	"github.com/harmony-one/harmony/internal/params"
 )
 

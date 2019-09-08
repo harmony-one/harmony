@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
-	"github.com/harmony-one/harmony/block/factory"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
