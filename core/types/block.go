@@ -121,27 +121,12 @@ func (b *Block) DeprecatedTd() *big.Int {
 	return b.td
 }
 
-// StorageBlock defines the RLP encoding of a Block stored in the
-// state database. The StorageBlock encoding contains fields that
-// would otherwise need to be recomputed.
-// [deprecated by eth/63]
-type StorageBlock Block
-
 // "external" block encoding. used for eth protocol, etc.
 type extblock struct {
 	Header           *block.Header
 	Txs              []*Transaction
 	Uncles           []*block.Header
 	IncomingReceipts CXReceiptsProofs
-}
-
-// [deprecated by eth/63]
-// "storage" block encoding. used for database.
-type storageblock struct {
-	Header *block.Header
-	Txs    []*Transaction
-	Uncles []*block.Header
-	TD     *big.Int
 }
 
 // NewBlock creates a new block. The input data is copied,
@@ -219,17 +204,6 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 		Uncles:           b.uncles,
 		IncomingReceipts: b.incomingReceipts,
 	})
-}
-
-// DecodeRLP decodes RLP
-// [deprecated by eth/63]
-func (b *StorageBlock) DecodeRLP(s *rlp.Stream) error {
-	var sb storageblock
-	if err := s.Decode(&sb); err != nil {
-		return err
-	}
-	b.header, b.uncles, b.transactions, b.td = sb.Header, sb.Uncles, sb.Txs, sb.TD
-	return nil
 }
 
 // Uncles return uncles.
