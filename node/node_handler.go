@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"math/big"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -372,14 +374,24 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		if node.NodeConfig.ShardID == 0 {
 			node.BroadcastNewBlock(newBlock)
-		} else {
+		}
+		if node.NodeConfig.ShardID != 0 && newBlock.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) >= 0 {
 			node.BroadcastCrossLinkHeader(newBlock)
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
 		utils.Logger().Info().
-			Uint64("ViewID", node.Consensus.GetViewID()).
+			Uint64("BlockNum", newBlock.NumberU64()).
 			Msg("BINGO !!! Reached Consensus")
+		// Print to normal log too
+		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "BlockNum", newBlock.NumberU64())
+
+		// 30% of the validator also need to do broadcasting
+		rand.Seed(time.Now().UTC().UnixNano())
+		rnd := rand.Intn(100)
+		if rnd < 30 {
+			node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
+		}
 	}
 
 	// TODO chao: uncomment this after beacon syncing is stable
