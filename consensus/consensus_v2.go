@@ -183,9 +183,9 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 
 	// verify validity of block header object
-	blockHeader := recvMsg.Payload
-	headerObj := block.NewHeader()
-	err = rlp.DecodeBytes(blockHeader, headerObj)
+	encodedHeader := recvMsg.Payload
+	header := new(block.Header)
+	err = rlp.DecodeBytes(encodedHeader, header)
 	if err != nil {
 		consensus.getLogger().Warn().
 			Err(err).
@@ -194,36 +194,36 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.BlockNum < consensus.blockNum || recvMsg.BlockNum != headerObj.Number().Uint64() {
+	if recvMsg.BlockNum < consensus.blockNum || recvMsg.BlockNum != header.Number().Uint64() {
 		consensus.getLogger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
-			Uint64("hdrBlockNum", headerObj.Number().Uint64()).
+			Uint64("hdrBlockNum", header.Number().Uint64()).
 			Msg("[OnAnnounce] BlockNum does not match")
 		return
 	}
 	if consensus.mode.Mode() == Normal {
-		if err = chain.Engine.VerifyHeader(consensus.ChainReader, headerObj, true); err != nil {
+		if err = chain.Engine.VerifyHeader(consensus.ChainReader, header, true); err != nil {
 			consensus.getLogger().Warn().
 				Err(err).
 				Str("inChain", consensus.ChainReader.CurrentHeader().Number().String()).
-				Str("MsgBlockNum", headerObj.Number().String()).
+				Str("MsgBlockNum", header.Number().String()).
 				Msg("[OnAnnounce] Block content is not verified successfully")
 			return
 		}
 
 		//VRF/VDF is only generated in the beach chain
-		if consensus.NeedsRandomNumberGeneration(headerObj.Epoch()) {
+		if consensus.NeedsRandomNumberGeneration(header.Epoch()) {
 			//validate the VRF with proof if a non zero VRF is found in header
-			if len(headerObj.Vrf()) > 0 {
-				if !consensus.ValidateVrfAndProof(headerObj) {
+			if len(header.Vrf()) > 0 {
+				if !consensus.ValidateVrfAndProof(header) {
 					return
 				}
 			}
 
 			//validate the VDF with proof if a non zero VDF is found in header
-			if len(headerObj.Vdf()) > 0 {
-				if !consensus.ValidateVdfAndProof(headerObj) {
+			if len(header.Vdf()) > 0 {
+				if !consensus.ValidateVdfAndProof(header) {
 					return
 				}
 			}

@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/ethereum/go-ethereum/common"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -38,7 +39,8 @@ var (
 	testUserKey, _  = crypto.GenerateKey()
 	testUserAddress = crypto.PubkeyToAddress(testUserKey.PublicKey)
 
-	chainConfig = params.TestChainConfig
+	chainConfig  = params.TestChainConfig
+	blockFactory = blockfactory.ForTest
 
 	//StakingPriKey is the keys for the deposit contract.
 	StakingPriKey, _ = crypto.GenerateKey()
@@ -52,6 +54,7 @@ var (
 	database = ethdb.NewMemDatabase()
 	gspec    = core.Genesis{
 		Config:  chainConfig,
+		Factory: blockFactory,
 		Alloc:   core.GenesisAlloc{FaucetAddress: {Balance: FaucetInitFunds}},
 		ShardID: 0,
 	}

@@ -21,7 +21,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/harmony-one/harmony/block"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 )
 
 var (
@@ -96,7 +96,7 @@ func TestBlock_SetLastCommitSig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &Block{header: block.NewHeader()}
+			b := &Block{header: blockfactory.NewTestHeader()}
 			b.SetLastCommitSig(tt.sig, tt.signers)
 			sig := b.header.LastCommitSignature()
 			if !bytes.Equal(tt.sig, sig[:]) {

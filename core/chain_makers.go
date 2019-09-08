@@ -22,6 +22,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/block"
@@ -38,6 +40,7 @@ type BlockGen struct {
 	i       int
 	parent  *types.Block
 	chain   []*types.Block
+	factory blockfactory.Factory
 	header  *block.Header
 	statedb *state.DB
 
@@ -167,11 +170,12 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	if config == nil {
 		config = params.TestChainConfig
 	}
+	factory := blockfactory.NewFactory(config)
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
 	chainreader := &fakeChainReader{config: config}
 	genblock := func(i int, parent *types.Block, statedb *state.DB) (*types.Block, types.Receipts) {
-		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, engine: engine}
-		b.header = makeHeader(chainreader, parent, statedb, b.engine)
+		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, factory: factory, engine: engine}
+		b.header = makeHeader(chainreader, parent, statedb, b.engine, factory)
 
 		//if config.DAOForkSupport && config.DAOForkBlock != nil && config.DAOForkBlock.Cmp(b.header.Number) == 0 {
 		//	misc.ApplyDAOHardFork(statedb)
@@ -212,7 +216,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	return blocks, receipts
 }
 
-func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine) *block.Header {
+func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine, factory blockfactory.Factory) *block.Header {
 	var time *big.Int
 	if parent.Time() == nil {
 		time = big.NewInt(10)
@@ -220,13 +224,12 @@ func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *
 		time = new(big.Int).Add(parent.Time(), big.NewInt(10)) // block time is fixed at 10 seconds
 	}
 
-	return block.NewHeaderWith().
+	return factory.NewHeader(parent.Epoch()).With().
 		Root(state.IntermediateRoot(chain.Config().IsS3(parent.Epoch()))).
 		ParentHash(parent.Hash()).
 		Coinbase(parent.Coinbase()).
 		GasLimit(CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit())).
 		Number(new(big.Int).Add(parent.Number(), common.Big1)).
-		Epoch(parent.Epoch()).
 		Time(time).
 		Header()
 }
