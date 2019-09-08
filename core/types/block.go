@@ -195,11 +195,6 @@ func NewBlockWithHeader(header *block.Header) *Block {
 // TODO ek – no longer necessary
 func CopyHeader(h *block.Header) *block.Header {
 	cpy := *h
-	// A field value object that lives outside of a header struct is never
-	// exposed to the outside for external modification, as its getter and
-	// setter always make a copy.  Therefore, we do not have to clone such
-	// fields, and multiple header structs can safely share the same field value
-	// objects.
 	return &cpy
 }
 
