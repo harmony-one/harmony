@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -17,12 +18,12 @@ import (
 
 // Header represents a block header in the Harmony blockchain.
 type Header struct {
-	HeaderInterface
+	blockif.Header
 }
 
 // EncodeRLP encodes the header using tagged RLP representation.
 func (h *Header) EncodeRLP(w io.Writer) error {
-	return HeaderRegistry.Encode(w, h.HeaderInterface)
+	return HeaderRegistry.Encode(w, h.Header)
 }
 
 // DecodeRLP decodes the header using tagged RLP representation.
@@ -31,13 +32,13 @@ func (h *Header) DecodeRLP(s *rlp.Stream) error {
 	if err != nil {
 		return err
 	}
-	hif, ok := decoded.(HeaderInterface)
+	hif, ok := decoded.(blockif.Header)
 	if !ok {
 		return errors.Errorf(
-			"decoded object (type %s) does not implement HeaderInterface",
+			"decoded object (type %s) does not implement Header interface",
 			taggedrlp.TypeName(reflect.TypeOf(decoded)))
 	}
-	h.HeaderInterface = hif
+	h.Header = hif
 	return nil
 }
 

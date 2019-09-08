@@ -7,13 +7,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
+	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
 )
 
 func TestHeader_EncodeRLP(t *testing.T) {
 	type fields struct {
-		HeaderInterface HeaderInterface
+		HeaderInterface blockif.Header
 	}
 	tests := []struct {
 		name    string
@@ -242,7 +243,7 @@ func TestHeader_EncodeRLP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &Header{HeaderInterface: tt.fields.HeaderInterface}
+			h := &Header{Header: tt.fields.HeaderInterface}
 			w := &bytes.Buffer{}
 			err := h.EncodeRLP(w)
 			if (err != nil) != tt.wantErr {
@@ -264,7 +265,7 @@ func TestHeader_DecodeRLP(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    HeaderInterface
+		want    blockif.Header
 		wantErr bool
 	}{
 		{
@@ -492,8 +493,8 @@ func TestHeader_DecodeRLP(t *testing.T) {
 			if err := h.DecodeRLP(tt.args.s); (err != nil) != tt.wantErr {
 				t.Errorf("DecodeRLP() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !compareHeaders(h.HeaderInterface, tt.want) {
-				t.Errorf("DecodeRLP() got  %#v", h.HeaderInterface)
+			if !compareHeaders(h.Header, tt.want) {
+				t.Errorf("DecodeRLP() got  %#v", h.Header)
 				t.Errorf("DecodeRLP() want %#v", tt.want)
 			}
 		})
@@ -509,7 +510,7 @@ func equal(x, y interface{}) bool {
 	return reflect.DeepEqual(x, y)
 }
 
-func compareHeaders(x, y HeaderInterface) bool {
+func compareHeaders(x, y blockif.Header) bool {
 	return equal(x.ParentHash(), y.ParentHash()) &&
 		equal(x.Coinbase(), y.Coinbase()) &&
 		equal(x.Root(), y.Root()) &&

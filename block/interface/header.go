@@ -1,4 +1,4 @@
-package block
+package blockif
 
 import (
 	"math/big"
@@ -10,8 +10,8 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-// HeaderInterface defines the block header interface.
-type HeaderInterface interface {
+// Header defines the block header interface.
+type Header interface {
 	// ParentHash is the header hash of the parent block.  For the genesis block
 	// which has no parent by definition, this field is zeroed out.
 	ParentHash() common.Hash

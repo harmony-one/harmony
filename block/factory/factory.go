@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/block"
+	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
 	"github.com/harmony-one/harmony/internal/params"
@@ -25,7 +26,7 @@ func NewFactory(chainConfig *params.ChainConfig) Factory {
 }
 
 func (f *factory) NewHeader(epoch *big.Int) *block.Header {
-	var impl block.HeaderInterface
+	var impl blockif.Header
 	switch {
 	case epoch.Cmp(f.chainConfig.CrossLinkEpoch) >= 0:
 		impl = v1.NewHeader()
