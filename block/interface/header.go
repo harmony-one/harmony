@@ -224,4 +224,7 @@ type Header interface {
 
 	// GetShardState returns the deserialized shard state object.
 	GetShardState() (shard.State, error)
+
+	// Copy returns a copy of the header.
+	Copy() Header
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/rs/zerolog"
 
+	blockif "github.com/harmony-one/harmony/block/interface"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -423,4 +424,10 @@ func (h *Header) GetShardState() (shard.State, error) {
 		return nil, err
 	}
 	return shardState, nil
+}
+
+// Copy returns a copy of the given header.
+func (h *Header) Copy() blockif.Header {
+	cpy := *h
+	return &cpy
 }
