@@ -65,6 +65,7 @@ func (e *engineImpl) Prepare(chain engine.ChainReader, header *block.Header) err
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
+// Note that each block header contains the bls signature of the parent block
 func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header, seal bool) error {
 	parentHeader := chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
 	if parentHeader == nil {
@@ -97,6 +98,71 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 	}()
 
 	return abort, results
+}
+
+// Similiar to VerifyHeader, but used for verifying the block header against some commit signature for
+// more flexibility on the api. Example of usage is the new block verification with cx transaction receipts proof
+// where the bls signature is given by another shard through beacon chain, not from the child block header.
+func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header *block.Header, payload []byte, commitBitmap []byte) error {
+	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
+		return nil
+	}
+	publicKeys, err := retrievePublicKeys(chain, header)
+	if err != nil {
+		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys for block").WithCause(err)
+	}
+
+	aggSig, mask, err := ReadSignatureBitmapByPublicKeys(payload, publicKeys)
+	if err != nil {
+		return ctxerror.New("[VerifySeal] Unable to deserialize the commitSignature and commitBitmap in Block Header").WithCause(err)
+	}
+	hash := header.Hash()
+	quorum, err := QuorumForBlock(chain, header)
+	if err != nil {
+		return errors.Wrapf(err,
+			"cannot calculate quorum for block %s", header.Number())
+	}
+	if count := utils.CountOneBits(mask.Bitmap); count < quorum {
+		return ctxerror.New("[VerifySeal] Not enough signature in commitSignature from Block Header",
+			"need", quorum, "got", count)
+	}
+
+	blockNumHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(blockNumHash, header.Number().Uint64()-1)
+	commitPayload := append(blockNumHash, hash[:]...)
+
+	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature for block", "blockNum", header.Number().Uint64()-1, "blockHash", hash)
+	}
+	return nil
+}
+
+// retrievePublicKeys finds the public keys of current block's committee
+func retrievePublicKeys(bc engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
+	shardState, err := bc.ReadShardState(header.Epoch())
+	if err != nil {
+		return nil, ctxerror.New("cannot read shard state",
+			"epoch", header.Epoch(),
+		).WithCause(err)
+	}
+	committee := shardState.FindCommitteeByID(header.ShardID())
+	if committee == nil {
+		return nil, ctxerror.New("cannot find shard in the shard state",
+			"blockNumber", header.Number(),
+			"shardID", header.ShardID(),
+		)
+	}
+	var committerKeys []*bls.PublicKey
+	for _, member := range committee.NodeList {
+		committerKey := new(bls.PublicKey)
+		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		if err != nil {
+			return nil, ctxerror.New("cannot convert BLS public key",
+				"blsPublicKey", member.BlsPublicKey).WithCause(err)
+		}
+		committerKeys = append(committerKeys, committerKey)
+	}
+	return committerKeys, nil
 }
 
 // retrievePublicKeysFromLastBlock finds the public keys of last block's committee
@@ -132,8 +198,9 @@ func retrievePublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header
 	return committerKeys, nil
 }
 
-// VerifySeal implements Engine, checking whether the given block satisfies
+// VerifySeal implements Engine, checking whether the given block's parent block satisfies
 // the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
+// Note that each block header contains the bls signature of the parent block
 func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) error {
 	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
 		return nil

@@ -50,6 +50,11 @@ type Engine interface {
 	// via the VerifySeal method.
 	VerifyHeader(chain ChainReader, header *block.Header, seal bool) error
 
+	// Similiar to VerifyHeader, but used for verifying the block header against some commit signature for
+	// more flexibility on the api. Example of usage is the new block verification with cx transaction receipts proof
+	// where the bls signature is given by another shard through beacon chain, not from the child block header.
+	VerifyHeaderWithSignature(chain ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte) error
+
 	// VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 	// concurrently. The method returns a quit channel to abort the operations and
 	// a results channel to retrieve the async verifications (the order is that of

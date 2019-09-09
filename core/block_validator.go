@@ -219,5 +219,5 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	}
 
 	// (4) verify blockHeader with seal
-	return v.engine.VerifyHeader(v.bc, cxp.Header, true)
+	return v.engine.VerifyHeaderWithSignature(v.bc, cxp.Header, cxp.CommitSig, cxp.CommitBitmap)
 }
