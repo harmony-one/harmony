@@ -107,8 +107,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		crossLinksToPropose, localErr := node.ProposeCrossLinkDataForBeaconchain()
 		if localErr == nil {
 			crossLinks = crossLinksToPropose
-		} else {
-			utils.Logger().Debug().Err(localErr).Msg("Failed to propose cross links")
 		}
 	}
 
