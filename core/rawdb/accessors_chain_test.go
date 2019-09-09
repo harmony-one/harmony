@@ -74,7 +74,7 @@ func TestBodyStorage(t *testing.T) {
 	db := ethdb.NewMemDatabase()
 
 	// Create a test body to move around the database and make sure it's really new
-	body := &types.Body{Uncles: []*block.Header{blockfactory.NewTestHeader().With().Extra([]byte("test header")).Header()}}
+	body := types.NewTestBody().With().Uncles([]*block.Header{blockfactory.NewTestHeader().With().Extra([]byte("test header")).Header()}).Body()
 
 	hasher := sha3.NewLegacyKeccak256()
 	rlp.Encode(hasher, body)
