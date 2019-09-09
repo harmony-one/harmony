@@ -90,6 +90,37 @@ type txdata struct {
 	Hash *common.Hash `json:"hash" rlp:"-"`
 }
 
+func copyAddr(addr *common.Address) *common.Address {
+	if addr == nil {
+		return nil
+	}
+	copy := *addr
+	return &copy
+}
+
+func copyHash(hash *common.Hash) *common.Hash {
+	if hash == nil {
+		return nil
+	}
+	copy := *hash
+	return &copy
+}
+
+func (d *txdata) CopyFrom(d2 *txdata) {
+	d.AccountNonce = d2.AccountNonce
+	d.Price = new(big.Int).Set(d2.Price)
+	d.GasLimit = d2.GasLimit
+	d.ShardID = d2.ShardID
+	d.ToShardID = d2.ToShardID
+	d.Recipient = copyAddr(d2.Recipient)
+	d.Amount = new(big.Int).Set(d2.Amount)
+	d.Payload = append(d2.Payload[:0:0], d2.Payload...)
+	d.V = new(big.Int).Set(d2.V)
+	d.R = new(big.Int).Set(d2.R)
+	d.S = new(big.Int).Set(d2.S)
+	d.Hash = copyHash(d2.Hash)
+}
+
 type txdataMarshaling struct {
 	AccountNonce hexutil.Uint64
 	Price        *hexutil.Big
@@ -354,6 +385,13 @@ func (tx *Transaction) Cost() *big.Int {
 // RawSignatureValues return raw signature values.
 func (tx *Transaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
 	return tx.data.V, tx.data.R, tx.data.S
+}
+
+// Copy returns a copy of the transaction.
+func (tx *Transaction) Copy() *Transaction {
+	var tx2 Transaction
+	tx2.data.CopyFrom(&tx.data)
+	return &tx2
 }
 
 // Transactions is a Transaction slice type for basic sorting.
