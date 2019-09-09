@@ -20,11 +20,33 @@ type CXReceipt struct {
 	Amount    *big.Int
 }
 
+// Copy makes a deep copy of the receiver.
+func (r *CXReceipt) Copy() *CXReceipt {
+	if r == nil {
+		return nil
+	}
+	cpy := *r
+	if cpy.To != nil {
+		to := *cpy.To
+		cpy.To = &to
+	}
+	cpy.Amount = new(big.Int).Set(cpy.Amount)
+	return &cpy
+}
+
 // CXReceipts is a list of CXReceipt
 type CXReceipts []*CXReceipt
 
 // Len returns the length of s.
 func (cs CXReceipts) Len() int { return len(cs) }
+
+// Copy makes a deep copy of the receiver.
+func (cs CXReceipts) Copy() (cpy CXReceipts) {
+	for _, r := range cs {
+		cpy = append(cpy, r.Copy())
+	}
+	return cpy
+}
 
 // Swap swaps the i'th and the j'th element in s.
 func (cs CXReceipts) Swap(i, j int) { cs[i], cs[j] = cs[j], cs[i] }
@@ -70,6 +92,18 @@ type CXMerkleProof struct {
 	CXShardHashes []common.Hash // ordered hash list, each hash corresponds to one destination shard's receipts root hash
 }
 
+// Copy makes a deep copy of the receiver.
+func (cxmp *CXMerkleProof) Copy() *CXMerkleProof {
+	if cxmp == nil {
+		return nil
+	}
+	cpy := *cxmp
+	cpy.BlockNum = new(big.Int).Set(cpy.BlockNum)
+	cpy.ShardIDs = append(cxmp.ShardIDs[:0:0], cpy.ShardIDs...)
+	cpy.CXShardHashes = append(cpy.CXShardHashes[:0:0], cpy.CXShardHashes...)
+	return &cpy
+}
+
 // CXReceiptsProof carrys the cross shard receipts and merkle proof
 type CXReceiptsProof struct {
 	Receipts     CXReceipts
@@ -79,11 +113,30 @@ type CXReceiptsProof struct {
 	CommitBitmap []byte
 }
 
+// Copy makes a deep copy of the receiver.
+func (cxp *CXReceiptsProof) Copy() *CXReceiptsProof {
+	return &CXReceiptsProof{
+		Receipts:     cxp.Receipts.Copy(),
+		MerkleProof:  cxp.MerkleProof.Copy(),
+		Header:       CopyHeader(cxp.Header),
+		CommitSig:    append(cxp.CommitSig[:0:0], cxp.CommitSig...),
+		CommitBitmap: append(cxp.CommitBitmap[:0:0], cxp.CommitSig...),
+	}
+}
+
 // CXReceiptsProofs is a list of CXReceiptsProof
 type CXReceiptsProofs []*CXReceiptsProof
 
 // Len returns the length of s.
 func (cs CXReceiptsProofs) Len() int { return len(cs) }
+
+// Copy makes a deep copy of the receiver.
+func (cs CXReceiptsProofs) Copy() (cpy CXReceiptsProofs) {
+	for _, cxrp := range cs {
+		cpy = append(cpy, cxrp.Copy())
+	}
+	return cpy
+}
 
 // Swap swaps the i'th and the j'th element in s.
 func (cs CXReceiptsProofs) Swap(i, j int) { cs[i], cs[j] = cs[j], cs[i] }
