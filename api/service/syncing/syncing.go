@@ -540,7 +540,7 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	// Verify block signatures
 	// TODO chao: only when block is verified against last commit sigs, we can update the block and status
 	if block.NumberU64() > 1 {
-		err := core.VerifyBlockLastCommitSigs(bc, block.Header())
+		err := bc.Engine().VerifyHeader(bc, block.Header(), true)
 		if err != nil {
 			utils.Logger().Error().Err(err).Msgf("[SYNC] failed verifying signatures for new block %d", block.NumberU64())
 			return false

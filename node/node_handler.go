@@ -302,18 +302,16 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO ek – where do we verify parent-child invariants,
 	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
 
-	if newBlock.NumberU64() > 1 {
-		err := core.VerifyBlockLastCommitSigs(node.Blockchain(), newBlock.Header())
-		if err != nil {
-			return err
-		}
+	err := node.Blockchain().Validator().ValidateHeader(newBlock, true)
+	if err != nil {
+		return ctxerror.New("cannot ValidateHeader for the new block", "blockHash", newBlock.Hash()).WithCause(err)
 	}
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
 		return ctxerror.New("wrong shard ID",
 			"my shard ID", node.Blockchain().ShardID(),
 			"new block's shard ID", newBlock.ShardID())
 	}
-	err := node.Blockchain().ValidateNewBlock(newBlock)
+	err = node.Blockchain().ValidateNewBlock(newBlock)
 	if err != nil {
 		return ctxerror.New("cannot ValidateNewBlock",
 			"blockHash", newBlock.Hash(),

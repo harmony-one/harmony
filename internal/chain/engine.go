@@ -83,9 +83,19 @@ func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header
 // a results channel to retrieve the async verifications.
 func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.Header, seals []bool) (chan<- struct{}, <-chan error) {
 	abort, results := make(chan struct{}), make(chan error, len(headers))
-	for i := 0; i < len(headers); i++ {
-		results <- nil
-	}
+
+	go func() {
+		for i, header := range headers {
+			err := e.VerifyHeader(chain, header, seals[i])
+
+			select {
+			case <-abort:
+				return
+			case results <- err:
+			}
+		}
+	}()
+
 	return abort, results
 }
 
