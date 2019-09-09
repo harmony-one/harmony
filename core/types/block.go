@@ -35,6 +35,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/block"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -103,9 +104,72 @@ type BodyInterface interface {
 // Body is a simple (mutable, non-safe) data container for storing and moving
 // a block's data contents (transactions and uncles) together.
 type Body struct {
-	Transactions     []*Transaction
-	Uncles           []*block.Header
-	IncomingReceipts CXReceiptsProofs
+	BodyInterface
+}
+
+// NewBodyForMatchingHeader returns a new block body struct whose implementation
+// matches the version of the given field.
+//
+// TODO ek – this is a stopgap, and works only while there is a 1:1 mapping
+//  between header and body versions.  Replace usage with factory.
+func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
+	var bi BodyInterface
+	switch h.Header.(type) {
+	case *v1.Header:
+		bi = new(BodyV1)
+	case *v0.Header:
+		bi = new(BodyV0)
+	default:
+		return nil, errors.Errorf("unsupported header type %s",
+			taggedrlp.TypeName(reflect.TypeOf(h)))
+	}
+	return &Body{bi}, nil
+}
+
+// NewTestBody creates a new, empty body object for epoch 0 using the test
+// factory.  Use for unit tests.
+func NewTestBody() *Body {
+	body, err := NewBodyForMatchingHeader(blockfactory.NewTestHeader())
+	if err != nil {
+		panic(err)
+	}
+	return body
+}
+
+// With returns a field setter context for the receiver.
+func (b *Body) With() BodyFieldSetter {
+	return BodyFieldSetter{b}
+}
+
+// EncodeRLP RLP-encodes the block body onto the given writer.  It uses tagged RLP
+// encoding for non-Genesis body formats.
+func (b *Body) EncodeRLP(w io.Writer) error {
+	return BodyRegistry.Encode(w, b.BodyInterface)
+}
+
+// DecodeRLP decodes a block body out of the given RLP stream into the receiver.
+// It uses tagged RLP encoding for non-Genesis body formats.
+func (b *Body) DecodeRLP(s *rlp.Stream) error {
+	decoded, err := BodyRegistry.Decode(s)
+	if err != nil {
+		return err
+	}
+	bif, ok := decoded.(BodyInterface)
+	if !ok {
+		return errors.Errorf(
+			"decoded body (type %s) does not implement BodyInterface",
+			taggedrlp.TypeName(reflect.TypeOf(decoded)))
+	}
+	b.BodyInterface = bif
+	return nil
+}
+
+// BodyRegistry is the tagged RLP registry for block body types.
+var BodyRegistry = taggedrlp.NewRegistry()
+
+func init() {
+	BodyRegistry.MustRegister(taggedrlp.LegacyTag, new(BodyV0))
+	BodyRegistry.MustRegister("v1", new(BodyV1))
 }
 
 // Block represents an entire block in the Ethereum blockchain.
@@ -221,7 +285,6 @@ func NewBlockWithHeader(header *block.Header) *Block {
 
 // CopyHeader creates a deep copy of a block header to prevent side effects from
 // modifying a header variable.
-// TODO ek – no longer necessary
 func CopyHeader(h *block.Header) *block.Header {
 	cpy := *h
 	cpy.Header = cpy.Header.Copy()
@@ -342,7 +405,18 @@ func (b *Block) Extra() []byte { return b.header.Extra() }
 func (b *Block) Header() *block.Header { return CopyHeader(b.header) }
 
 // Body returns the non-header content of the block.
-func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles, b.incomingReceipts} }
+func (b *Block) Body() *Body {
+	body, err := NewBodyForMatchingHeader(b.header)
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot create block Body struct")
+		return nil
+	}
+	return body.With().
+		Transactions(b.transactions).
+		Uncles(b.uncles).
+		IncomingReceipts(b.incomingReceipts).
+		Body()
+}
 
 // Vdf returns header Vdf.
 func (b *Block) Vdf() []byte { return b.header.Vdf() }
