@@ -75,6 +75,31 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("BlockNonce", input, n[:])
 }
 
+// BodyInterface is a simple accessor interface for block body.
+type BodyInterface interface {
+	// Transactions returns a deep copy the list of transactions in this block.
+	Transactions() []*Transaction
+
+	// SetTransactions sets the list of transactions with a deep copy of the
+	// given list.
+	SetTransactions(newTransactions []*Transaction)
+
+	// Uncles returns a deep copy of the list of uncle headers of this block.
+	Uncles() []*block.Header
+
+	// SetUncles sets the list of uncle headers with a deep copy of the given
+	// list.
+	SetUncles(newUncle []*block.Header)
+
+	// IncomingReceipts returns a deep copy of the list of incoming cross-shard
+	// transaction receipts of this block.
+	IncomingReceipts() CXReceiptsProofs
+
+	// SetIncomingReceipts sets the list of incoming cross-shard transaction
+	// receipts of this block with a dep copy of the given list.
+	SetIncomingReceipts(newIncomingReceipts CXReceiptsProofs)
+}
+
 // Body is a simple (mutable, non-safe) data container for storing and moving
 // a block's data contents (transactions and uncles) together.
 type Body struct {
