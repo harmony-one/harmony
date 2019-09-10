@@ -68,8 +68,8 @@ type ChainConfig struct {
 func (c *ChainConfig) String() string {
 	return fmt.Sprintf("{ChainID: %v EIP155: %v CrossLink: %v}",
 		c.ChainID,
-		c.CrossLinkEpoch,
 		c.EIP155Epoch,
+		c.CrossLinkEpoch,
 	)
 }
 
