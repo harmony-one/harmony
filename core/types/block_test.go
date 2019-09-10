@@ -120,12 +120,6 @@ func TestBlock_SetLastCommitSig(t *testing.T) {
 }
 
 func TestBlock_DecodeRLP(t *testing.T) {
-	type fields struct {
-		header           *block.Header
-		uncles           []*block.Header
-		transactions     Transactions
-		incomingReceipts CXReceiptsProofs
-	}
 	type args struct {
 		s *rlp.Stream
 	}
