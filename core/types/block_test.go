@@ -666,3 +666,127 @@ func TestBlock_EncodeRLP(t *testing.T) {
 		})
 	}
 }
+
+func TestBody_EncodeRLP(t *testing.T) {
+	tests := []struct {
+		name      string
+		bodyImpl  BodyInterface
+		wantBytes []byte
+		wantErr   bool
+	}{
+		{
+			"v0",
+			&BodyV0{},
+			[]byte{
+				0xc2, // BEGIN 2-byte BodyV0 struct
+				0xc0, // BEGIN 0-byte Transactions slice
+				// END Transactions slice
+				0xc0, // BEGIN 0-byte Uncles slice
+				// END Uncles slice
+				// END BodyV0 struct
+			},
+			false,
+		},
+		{
+			"v1",
+			&BodyV1{},
+			[]byte{
+				0xcf, // BEGIN 15-byte tagged RLP envelope
+				0x87, // BEGIN 7-byte tagged RLP signature
+				'H', 'm', 'n', 'y', 'T', 'g', 'd',
+				0x82, // BEGIN 2-byte type tag
+				'v', '1',
+				0xc3, // BEGIN 3-byte BodyV1 struct
+				0xc0, // BEGIN 0-byte Transactions slice
+				// END Transactions slice
+				0xc0, // BEGIN 0-byte Uncles slice
+				// END Uncles slice
+				0xc0, // BEGIN 0-byte IncomingReceipts slice
+				// END IncomingReceipts slice
+				// END BodyV1 struct
+				// END tagged RLP envelope
+			},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &Body{BodyInterface: tt.bodyImpl}
+			w := &bytes.Buffer{}
+			err := b.EncodeRLP(w)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("EncodeRLP() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if haveBytes := w.Bytes(); bytes.Compare(haveBytes, tt.wantBytes) != 0 {
+				t.Errorf("EncodeRLP() have %x", haveBytes)
+				t.Errorf("EncodeRLP() want %x", tt.wantBytes)
+			}
+		})
+	}
+}
+
+func TestBody_DecodeRLP(t *testing.T) {
+	type args struct {
+		s *rlp.Stream
+	}
+	tests := []struct {
+		name         string
+		args         args
+		wantErr      bool
+		wantBodyType reflect.Type
+	}{
+		{
+			"v0",
+			args{rlp.NewStream(bytes.NewBuffer([]byte{
+				0xc2, // BEGIN 2-byte BodyV0 struct
+				0xc0, // BEGIN 0-byte Transactions slice
+				// END Transactions slice
+				0xc0, // BEGIN 0-byte Uncles slice
+				// END Uncles slice
+				// END BodyV0 struct
+			}), 0)},
+			false,
+			reflect.TypeOf(&BodyV0{}),
+		},
+		{
+			"v1",
+			args{rlp.NewStream(bytes.NewBuffer([]byte{
+				0xcf, // BEGIN 15-byte tagged RLP envelope
+				0x87, // BEGIN 7-byte tagged RLP signature
+				'H', 'm', 'n', 'y', 'T', 'g', 'd',
+				0x82, // BEGIN 2-byte type tag
+				'v', '1',
+				0xc3, // BEGIN 3-byte BodyV1 struct
+				0xc0, // BEGIN 0-byte Transactions slice
+				// END Transactions slice
+				0xc0, // BEGIN 0-byte Uncles slice
+				// END Uncles slice
+				0xc0, // BEGIN 0-byte IncomingReceipts slice
+				// END IncomingReceipts slice
+				// END BodyV1 struct
+				// END tagged RLP envelope
+			}), 0)},
+			false,
+			reflect.TypeOf(&BodyV1{}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &Body{}
+			err := b.DecodeRLP(tt.args.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DecodeRLP() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				return
+			}
+			haveBodyType := reflect.TypeOf(b.BodyInterface)
+			if haveBodyType != tt.wantBodyType {
+				t.Errorf("DecodeRLP() got body type %s, want %s",
+					taggedrlp.TypeName(haveBodyType),
+					taggedrlp.TypeName(tt.wantBodyType))
+			}
+		})
+	}
+}
