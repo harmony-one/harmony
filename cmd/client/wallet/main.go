@@ -59,7 +59,7 @@ type AccountState struct {
 const (
 	rpcRetry          = 3
 	defaultConfigFile = ".hmy/wallet.ini"
-	defaultProfile    = "default"
+	defaultProfile    = "main"
 	keystoreDir       = ".hmy/keystore"
 )
 
@@ -144,7 +144,7 @@ func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage:")
 		fmt.Println("    wallet -p profile <action> <params>")
-		fmt.Println("    -p profile       - Specify the profile of the wallet, either testnet/devnet or others configured. Default is: testnet")
+		fmt.Println("    -p profile       - Specify the profile of the wallet, either main, local, beta, or pangaea. Default is main.")
 		fmt.Println("                       The profile is in file:", defaultConfigFile)
 		fmt.Println()
 		fmt.Println("Actions:")

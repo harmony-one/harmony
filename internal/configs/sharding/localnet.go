@@ -32,6 +32,7 @@ const (
 	localnetMaxTxPoolSizeLimit             = 8000
 	localnetMaxNumTxsPerBlockLimit         = 1000
 	localnetRecentTxDuration               = time.Hour
+	localnetEnableTxnThrottling            = true
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -118,6 +119,10 @@ func (ls localnetSchedule) RecentTxDuration() time.Duration {
 	return localnetRecentTxDuration
 }
 
+func (ls localnetSchedule) EnableTxnThrottling() bool {
+	return localnetEnableTxnThrottling
+}
+
 func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ls.MaxTxAmountLimit(),
@@ -125,6 +130,7 @@ func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxPoolSizeLimit:             ls.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ls.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               ls.RecentTxDuration(),
+		EnableTxnThrottling:            ls.EnableTxnThrottling(),
 	}
 }
 

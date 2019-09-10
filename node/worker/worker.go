@@ -72,6 +72,11 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 		return sender, shardingconfig.TxUnselect
 	}
 
+	// do not throttle transactions if disabled
+	if !txsThrottleConfig.EnableTxnThrottling {
+		return sender, shardingconfig.TxSelect
+	}
+
 	// throttle a single sender sending too many transactions in one block
 	if tx.Value().Cmp(txsThrottleConfig.MaxTxAmountLimit) > 0 {
 		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Uint64("MaxTxAmountLimit", txsThrottleConfig.MaxTxAmountLimit.Uint64()).Uint64("txAmount", tx.Value().Uint64()).Msg("Throttling tx with max amount limit")
