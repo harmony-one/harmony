@@ -52,6 +52,9 @@ type Schedule interface {
 	// How long "recent" means for transaction in time Duration unit
 	RecentTxDuration() time.Duration
 
+	// EnableTxnThrottling is the switch for transaction throttling
+	EnableTxnThrottling() bool
+
 	// configuration for throttling pending transactions
 	TxsThrottleConfig() *TxsThrottleConfig
 
@@ -127,6 +130,9 @@ type TxsThrottleConfig struct {
 
 	// Max total number of transactions allowed to be processed per block
 	MaxNumTxsPerBlockLimit int
+
+	// EnableTxnThrottling is the switch for transaction throttling
+	EnableTxnThrottling bool
 }
 
 // genShardingStructure return sharding structure, given shard number and its patterns.
