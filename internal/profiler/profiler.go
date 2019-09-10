@@ -3,6 +3,7 @@ package profiler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -48,7 +49,7 @@ func (profiler *Profiler) LogMemory() {
 		memMap, _ := profiler.proc.MemoryMaps(false)
 		loggedMemMap := ""
 		for _, mems := range *memMap {
-			loggedMemMap += mems.String() + "; "
+			loggedMemMap = fmt.Sprintf("%v; %v", loggedMemMap, mems)
 		}
 		utils.Logger().Info().
 			Str("info", info.String()).
