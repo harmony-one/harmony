@@ -99,9 +99,19 @@ func (c *ChainConfig) IsEIP155(epoch *big.Int) bool {
 	return isForked(c.EIP155Epoch, epoch)
 }
 
-// IsCrossTx returns whether cross-shard transaction is enabled in the given epoch.
+// IsCrossTx returns whether cross-shard transaction is enabled in the given
+// epoch.
+//
+// Note that this is different from comparing epoch against CrossTxEpoch.
+// Cross-shard transaction is enabled from CrossTxEpoch+1 and on, in order to
+// allow for all shards to roll into CrossTxEpoch and become able to handle
+// ingress receipts.  In other words, cross-shard transaction fields are
+// introduced at CrossTxEpoch, but these fields are not used until
+// CrossTxEpoch+1, when cross-shard transactions are actually accepted by the
+// network.
 func (c *ChainConfig) IsCrossTx(epoch *big.Int) bool {
-	return isForked(c.CrossTxEpoch, epoch)
+	crossTxEpoch := new(big.Int).Add(c.CrossTxEpoch, common.Big1)
+	return isForked(crossTxEpoch, epoch)
 }
 
 // IsCrossLink returns whether epoch is either equal to the CrossLink fork epoch or greater.

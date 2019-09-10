@@ -127,7 +127,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 	if txType != types.SameShardTx && !config.IsCrossTx(header.Epoch()) {
 		return nil, nil, 0, fmt.Errorf(
-			"cannot handle cross-shard transaction before epoch %v (now %v)",
+			"cannot handle cross-shard transaction until after epoch %v (now %v)",
 			config.CrossTxEpoch, header.Epoch())
 	}
 
