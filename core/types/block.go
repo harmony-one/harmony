@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"io"
 	"math/big"
+	"reflect"
 	"sort"
 	"sync/atomic"
 	"time"
@@ -29,9 +30,14 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/taggedrlp"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/block"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
+	v0 "github.com/harmony-one/harmony/block/v0"
+	v1 "github.com/harmony-one/harmony/block/v1"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -70,12 +76,104 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("BlockNonce", input, n[:])
 }
 
+// BodyInterface is a simple accessor interface for block body.
+type BodyInterface interface {
+	// Transactions returns a deep copy the list of transactions in this block.
+	Transactions() []*Transaction
+
+	// TransactionAt returns the transaction at the given index in this block.
+	// It returns nil if index is out of bounds.
+	TransactionAt(index int) *Transaction
+
+	// SetTransactions sets the list of transactions with a deep copy of the
+	// given list.
+	SetTransactions(newTransactions []*Transaction)
+
+	// Uncles returns a deep copy of the list of uncle headers of this block.
+	Uncles() []*block.Header
+
+	// SetUncles sets the list of uncle headers with a deep copy of the given
+	// list.
+	SetUncles(newUncle []*block.Header)
+
+	// IncomingReceipts returns a deep copy of the list of incoming cross-shard
+	// transaction receipts of this block.
+	IncomingReceipts() CXReceiptsProofs
+
+	// SetIncomingReceipts sets the list of incoming cross-shard transaction
+	// receipts of this block with a dep copy of the given list.
+	SetIncomingReceipts(newIncomingReceipts CXReceiptsProofs)
+}
+
 // Body is a simple (mutable, non-safe) data container for storing and moving
 // a block's data contents (transactions and uncles) together.
 type Body struct {
-	Transactions     []*Transaction
-	Uncles           []*block.Header
-	IncomingReceipts CXReceiptsProofs
+	BodyInterface
+}
+
+// NewBodyForMatchingHeader returns a new block body struct whose implementation
+// matches the version of the given field.
+//
+// TODO ek – this is a stopgap, and works only while there is a 1:1 mapping
+//  between header and body versions.  Replace usage with factory.
+func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
+	var bi BodyInterface
+	switch h.Header.(type) {
+	case *v1.Header:
+		bi = new(BodyV1)
+	case *v0.Header:
+		bi = new(BodyV0)
+	default:
+		return nil, errors.Errorf("unsupported header type %s",
+			taggedrlp.TypeName(reflect.TypeOf(h)))
+	}
+	return &Body{bi}, nil
+}
+
+// NewTestBody creates a new, empty body object for epoch 0 using the test
+// factory.  Use for unit tests.
+func NewTestBody() *Body {
+	body, err := NewBodyForMatchingHeader(blockfactory.NewTestHeader())
+	if err != nil {
+		panic(err)
+	}
+	return body
+}
+
+// With returns a field setter context for the receiver.
+func (b *Body) With() BodyFieldSetter {
+	return BodyFieldSetter{b}
+}
+
+// EncodeRLP RLP-encodes the block body onto the given writer.  It uses tagged RLP
+// encoding for non-Genesis body formats.
+func (b *Body) EncodeRLP(w io.Writer) error {
+	return BodyRegistry.Encode(w, b.BodyInterface)
+}
+
+// DecodeRLP decodes a block body out of the given RLP stream into the receiver.
+// It uses tagged RLP encoding for non-Genesis body formats.
+func (b *Body) DecodeRLP(s *rlp.Stream) error {
+	decoded, err := BodyRegistry.Decode(s)
+	if err != nil {
+		return err
+	}
+	bif, ok := decoded.(BodyInterface)
+	if !ok {
+		return errors.Errorf(
+			"decoded body (type %s) does not implement BodyInterface",
+			taggedrlp.TypeName(reflect.TypeOf(decoded)))
+	}
+	b.BodyInterface = bif
+	return nil
+}
+
+// BodyRegistry is the tagged RLP registry for block body types.
+var BodyRegistry = taggedrlp.NewRegistry()
+
+func init() {
+	BodyRegistry.MustRegister(taggedrlp.LegacyTag, new(BodyV0))
+	BodyRegistry.MustRegister("v1", new(BodyV1))
 }
 
 // Block represents an entire block in the Ethereum blockchain.
@@ -121,27 +219,26 @@ func (b *Block) DeprecatedTd() *big.Int {
 	return b.td
 }
 
-// StorageBlock defines the RLP encoding of a Block stored in the
-// state database. The StorageBlock encoding contains fields that
-// would otherwise need to be recomputed.
-// [deprecated by eth/63]
-type StorageBlock Block
-
 // "external" block encoding. used for eth protocol, etc.
 type extblock struct {
+	Header *block.Header
+	Txs    []*Transaction
+	Uncles []*block.Header
+}
+
+// CX-ready extblock
+type extblockV1 struct {
 	Header           *block.Header
 	Txs              []*Transaction
 	Uncles           []*block.Header
 	IncomingReceipts CXReceiptsProofs
 }
 
-// [deprecated by eth/63]
-// "storage" block encoding. used for database.
-type storageblock struct {
-	Header *block.Header
-	Txs    []*Transaction
-	Uncles []*block.Header
-	TD     *big.Int
+var extblockReg = taggedrlp.NewRegistry()
+
+func init() {
+	extblockReg.MustRegister(taggedrlp.LegacyTag, &extblock{})
+	extblockReg.MustRegister("v1", &extblockV1{})
 }
 
 // NewBlock creates a new block. The input data is copied,
@@ -192,7 +289,6 @@ func NewBlockWithHeader(header *block.Header) *Block {
 
 // CopyHeader creates a deep copy of a block header to prevent side effects from
 // modifying a header variable.
-// TODO ek – no longer necessary
 func CopyHeader(h *block.Header) *block.Header {
 	cpy := *h
 	cpy.Header = cpy.Header.Copy()
@@ -201,35 +297,39 @@ func CopyHeader(h *block.Header) *block.Header {
 
 // DecodeRLP decodes the Ethereum
 func (b *Block) DecodeRLP(s *rlp.Stream) error {
-	var eb extblock
 	_, size, _ := s.Kind()
-	if err := s.Decode(&eb); err != nil {
+	eb, err := extblockReg.Decode(s)
+	if err != nil {
 		return err
 	}
-	b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
+	switch eb := eb.(type) {
+	case *extblockV1:
+		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
+	case *extblock:
+		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, nil
+	default:
+		return errors.Errorf("unknown extblock type %s", taggedrlp.TypeName(reflect.TypeOf(eb)))
+	}
 	b.size.Store(common.StorageSize(rlp.ListSize(size)))
 	return nil
 }
 
 // EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, extblock{
-		Header:           b.header,
-		Txs:              b.transactions,
-		Uncles:           b.uncles,
-		IncomingReceipts: b.incomingReceipts,
-	})
-}
-
-// DecodeRLP decodes RLP
-// [deprecated by eth/63]
-func (b *StorageBlock) DecodeRLP(s *rlp.Stream) error {
-	var sb storageblock
-	if err := s.Decode(&sb); err != nil {
-		return err
+	var eb interface{}
+	switch h := b.header.Header.(type) {
+	case *v1.Header:
+		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
+	case *v0.Header:
+		if len(b.incomingReceipts) > 0 {
+			return errors.New("incomingReceipts unsupported in v0 block")
+		}
+		eb = extblock{b.header, b.transactions, b.uncles}
+	default:
+		return errors.Errorf("unsupported block header type %s",
+			taggedrlp.TypeName(reflect.TypeOf(h)))
 	}
-	b.header, b.uncles, b.transactions, b.td = sb.Header, sb.Uncles, sb.Txs, sb.TD
-	return nil
+	return extblockReg.Encode(w, eb)
 }
 
 // Uncles return uncles.
@@ -309,7 +409,18 @@ func (b *Block) Extra() []byte { return b.header.Extra() }
 func (b *Block) Header() *block.Header { return CopyHeader(b.header) }
 
 // Body returns the non-header content of the block.
-func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles, b.incomingReceipts} }
+func (b *Block) Body() *Body {
+	body, err := NewBodyForMatchingHeader(b.header)
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot create block Body struct")
+		return nil
+	}
+	return body.With().
+		Transactions(b.transactions).
+		Uncles(b.uncles).
+		IncomingReceipts(b.incomingReceipts).
+		Body()
+}
 
 // Vdf returns header Vdf.
 func (b *Block) Vdf() []byte { return b.header.Vdf() }
