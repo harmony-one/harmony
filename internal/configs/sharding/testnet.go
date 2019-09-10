@@ -31,9 +31,9 @@ const (
 	testnetEnableTxnThrottling            = true
 
 	// TestNetHTTPPattern is the http pattern for testnet.
-	TestNetHTTPPattern = "http://s%d.b.hmny.io:9500"
+	TestNetHTTPPattern = "https://api.s%d.b.hmny.io"
 	// TestNetWSPattern is the websocket pattern for testnet.
-	TestNetWSPattern = "ws://s%d.b.hmny.io:9800"
+	TestNetWSPattern = "wss://api.s%d.b.hmny.io"
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
