@@ -124,6 +124,11 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	if txType == types.InvalidTx {
 		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
 	}
+
+	if txType != types.SameShardTx && config.CrossLinkEpoch.Cmp(header.Epoch()) > 0 {
+		return nil, nil, 0, fmt.Errorf("Only Accept Same Shard Transaction before V0 Epoch: CrossLinkEpoch %v, currentEpoch %v", config.CrossLinkEpoch, header.Epoch())
+	}
+
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Epoch()))
 	// skip signer err for additiononly tx
 	if err != nil {
