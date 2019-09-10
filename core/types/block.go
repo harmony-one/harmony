@@ -38,6 +38,7 @@ import (
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
+	v2 "github.com/harmony-one/harmony/block/v2"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -114,12 +115,12 @@ type Body struct {
 // NewBodyForMatchingHeader returns a new block body struct whose implementation
 // matches the version of the given field.
 //
-// TODO ek – this is a stopgap, and works only while there is a 1:1 mapping
+// TODO ek – this is a stopgap, and works only while there is a N:1 mapping
 //  between header and body versions.  Replace usage with factory.
 func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
 	var bi BodyInterface
 	switch h.Header.(type) {
-	case *v1.Header:
+	case *v2.Header, *v1.Header:
 		bi = new(BodyV1)
 	case *v0.Header:
 		bi = new(BodyV0)
@@ -318,7 +319,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
 	switch h := b.header.Header.(type) {
-	case *v1.Header:
+	case *v2.Header, *v1.Header:
 		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
 	case *v0.Header:
 		if len(b.incomingReceipts) > 0 {

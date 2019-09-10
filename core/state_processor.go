@@ -125,8 +125,10 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
 	}
 
-	if txType != types.SameShardTx && config.CrossLinkEpoch.Cmp(header.Epoch()) > 0 {
-		return nil, nil, 0, fmt.Errorf("Only Accept Same Shard Transaction before V0 Epoch: CrossLinkEpoch %v, currentEpoch %v", config.CrossLinkEpoch, header.Epoch())
+	if txType != types.SameShardTx && !config.IsCrossTx(header.Epoch()) {
+		return nil, nil, 0, fmt.Errorf(
+			"cannot handle cross-shard transaction until after epoch %v (now %v)",
+			config.CrossTxEpoch, header.Epoch())
 	}
 
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Epoch()))

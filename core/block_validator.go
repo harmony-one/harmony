@@ -168,11 +168,10 @@ func VerifyHeaderWithSignature(header *block.Header, commitSig []byte, commitBit
 
 // VerifyBlockLastCommitSigs verifies the last commit sigs of the block
 func VerifyBlockLastCommitSigs(bc *BlockChain, header *block.Header) error {
-	parentBlock := bc.GetBlockByNumber(header.Number().Uint64() - 1)
-	if parentBlock == nil {
+	parentHeader := bc.GetHeaderByNumber(header.Number().Uint64() - 1)
+	if parentHeader == nil {
 		return ctxerror.New("[VerifyBlockLastCommitSigs] Failed to get parent block", "shardID", header.ShardID(), "blockNum", header.Number())
 	}
-	parentHeader := parentBlock.Header()
 	lastCommitSig := header.LastCommitSignature()
 	lastCommitBitmap := header.LastCommitBitmap()
 

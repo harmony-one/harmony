@@ -127,7 +127,7 @@ func (h *Header) SetOutgoingReceiptHash(newOutgoingReceiptHash common.Hash) {
 	if newOutgoingReceiptHash != ethtypes.EmptyRootHash {
 		h.Logger(utils.Logger()).Warn().
 			Hex("outgoingReceiptHash", newOutgoingReceiptHash[:]).
-			Msg("non-empty outgoing receipt root hash provided but cannot be stored")
+			Msg("cannot store outgoing receipt root hash in v0 header")
 	}
 }
 
@@ -141,7 +141,7 @@ func (h *Header) SetIncomingReceiptHash(newIncomingReceiptHash common.Hash) {
 	if newIncomingReceiptHash != ethtypes.EmptyRootHash {
 		h.Logger(utils.Logger()).Warn().
 			Hex("incomingReceiptHash", newIncomingReceiptHash[:]).
-			Msg("non-empty outgoing receipt root hash provided but cannot be stored")
+			Msg("cannot store incoming receipt root hash in v0 header")
 	}
 }
 
@@ -322,7 +322,7 @@ func (h *Header) SetVrf(newVrf []byte) {
 	if len(newVrf) > 0 {
 		h.Logger(utils.Logger()).Warn().
 			Hex("vrf", newVrf).
-			Msg("non-empty VRF provided but cannot be stored")
+			Msg("cannot store VRF in v0 header")
 	}
 }
 
@@ -340,7 +340,7 @@ func (h *Header) SetVdf(newVdf []byte) {
 	if len(newVdf) > 0 {
 		h.Logger(utils.Logger()).Warn().
 			Hex("vdf", newVdf).
-			Msg("non-empty VDF provided but cannot be stored")
+			Msg("annot store VDF in v0 header")
 	}
 }
 
@@ -376,7 +376,7 @@ func (h *Header) SetCrossLinks(newCrossLinks []byte) {
 	if len(newCrossLinks) > 0 {
 		h.Logger(utils.Logger()).Warn().
 			Hex("crossLinks", newCrossLinks).
-			Msg("non-empty cross-chain links provided but cannot be stored")
+			Msg("cannot store cross-chain links in V0 header")
 	}
 }
 
