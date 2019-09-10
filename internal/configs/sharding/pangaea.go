@@ -15,6 +15,8 @@ const (
 	PangaeaHTTPPattern = "http://s%d.pga.hmny.io:9500"
 	// PangaeaWSPattern is the websocket pattern for pangaea.
 	PangaeaWSPattern = "ws://s%d.pga.hmny.io:9800"
+	// transaction throttling disabled on pangaea network
+	pangaeaEnableTxnThrottling = false
 )
 
 // PangaeaSchedule is the Pangaea sharding configuration schedule.
@@ -22,11 +24,11 @@ var PangaeaSchedule pangaeaSchedule
 
 type pangaeaSchedule struct{}
 
-func (pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
+func (ps pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	return pangaeaV0
 }
 
-func (pangaeaSchedule) BlocksPerEpoch() uint64 {
+func (ps pangaeaSchedule) BlocksPerEpoch() uint64 {
 	return 10800 // 1 day with 8 seconds/block
 }
 
@@ -43,11 +45,11 @@ func (ps pangaeaSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	return blocks*(epochNum+1) - 1
 }
 
-func (pangaeaSchedule) VdfDifficulty() int {
+func (ps pangaeaSchedule) VdfDifficulty() int {
 	return testnetVdfDifficulty
 }
 
-func (pangaeaSchedule) ConsensusRatio() float64 {
+func (ps pangaeaSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
 }
 
@@ -58,30 +60,34 @@ var pangaeaV0 = MustNewInstance(
 
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
-func (pangaeaSchedule) RandomnessStartingEpoch() uint64 {
+func (ps pangaeaSchedule) RandomnessStartingEpoch() uint64 {
 	return mainnetRandomnessStartingEpoch
 }
 
-func (pangaeaSchedule) MaxTxAmountLimit() *big.Int {
+func (ps pangaeaSchedule) MaxTxAmountLimit() *big.Int {
 	amountBigInt := big.NewInt(mainnetMaxTxAmountLimit)
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
 	return amountBigInt
 }
 
-func (pangaeaSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
+func (ps pangaeaSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
 	return mainnetMaxNumRecentTxsPerAccountLimit
 }
 
-func (pangaeaSchedule) MaxTxPoolSizeLimit() int {
+func (ps pangaeaSchedule) MaxTxPoolSizeLimit() int {
 	return mainnetMaxTxPoolSizeLimit
 }
 
-func (pangaeaSchedule) MaxNumTxsPerBlockLimit() int {
+func (ps pangaeaSchedule) MaxNumTxsPerBlockLimit() int {
 	return mainnetMaxNumTxsPerBlockLimit
 }
 
-func (pangaeaSchedule) RecentTxDuration() time.Duration {
+func (ps pangaeaSchedule) RecentTxDuration() time.Duration {
 	return mainnetRecentTxDuration
+}
+
+func (ps pangaeaSchedule) EnableTxnThrottling() bool {
+	return pangaeaEnableTxnThrottling
 }
 
 func (ps pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
@@ -91,6 +97,7 @@ func (ps pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxPoolSizeLimit:             ps.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ps.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               ps.RecentTxDuration(),
+		EnableTxnThrottling:            ps.EnableTxnThrottling(),
 	}
 }
 

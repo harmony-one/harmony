@@ -77,6 +77,10 @@ func (s fixedSchedule) RecentTxDuration() time.Duration {
 	return mainnetRecentTxDuration
 }
 
+func (s fixedSchedule) EnableTxnThrottling() bool {
+	return mainnetEnableTxnThrottling
+}
+
 func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               s.MaxTxAmountLimit(),
@@ -84,6 +88,7 @@ func (s fixedSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxPoolSizeLimit:             s.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         s.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               s.RecentTxDuration(),
+		EnableTxnThrottling:            s.EnableTxnThrottling(),
 	}
 }
 
@@ -92,7 +97,7 @@ func (s fixedSchedule) GetNetworkID() NetworkID {
 }
 
 // GetShardingStructure is the sharding structure for fixed schedule.
-func (fixedSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+func (s fixedSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
 	return genShardingStructure(numShard, shardID, TestNetHTTPPattern, TestNetHTTPPattern)
 }
 

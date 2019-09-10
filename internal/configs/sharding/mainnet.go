@@ -31,6 +31,7 @@ const (
 	mainnetMaxTxPoolSizeLimit             = 8000
 	mainnetMaxNumTxsPerBlockLimit         = 1000
 	mainnetRecentTxDuration               = time.Hour
+	mainnetEnableTxnThrottling            = true
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "http://s%d.t.hmny.io:9500"
@@ -144,6 +145,10 @@ func (ms mainnetSchedule) RecentTxDuration() time.Duration {
 	return mainnetRecentTxDuration
 }
 
+func (ms mainnetSchedule) EnableTxnThrottling() bool {
+	return mainnetEnableTxnThrottling
+}
+
 func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ms.MaxTxAmountLimit(),
@@ -151,6 +156,7 @@ func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxPoolSizeLimit:             ms.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ms.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               ms.RecentTxDuration(),
+		EnableTxnThrottling:            ms.EnableTxnThrottling(),
 	}
 }
 
