@@ -182,7 +182,7 @@ pangaea)
   )
   REL=master
   network_type=pangaea
-  dns_zone=p.hmny.io
+  dns_zone=n.hmny.io
   ;;
 *)
   err 64 "${network}: invalid network"
