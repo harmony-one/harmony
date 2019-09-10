@@ -369,6 +369,9 @@ func TestHeader_EncodeRLP(t *testing.T) {
 				t.Errorf("EncodeRLP() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			if err != nil {
+				return
+			}
 			if got := w.Bytes(); bytes.Compare(got, tt.want) != 0 {
 				t.Errorf("EncodeRLP() got  %x", got)
 				t.Errorf("EncodeRLP() want %x", tt.want)
@@ -727,8 +730,12 @@ func TestHeader_DecodeRLP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := &Header{}
-			if err := h.DecodeRLP(tt.args.s); (err != nil) != tt.wantErr {
+			err := h.DecodeRLP(tt.args.s)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("DecodeRLP() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				return
 			}
 			if !compareHeaders(h.Header, tt.want) {
 				t.Errorf("DecodeRLP() got  %#v", h.Header)
