@@ -29,7 +29,7 @@ import (
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
-	v1 "github.com/harmony-one/harmony/block/v1"
+	v2 "github.com/harmony-one/harmony/block/v2"
 )
 
 var (
@@ -238,13 +238,13 @@ func TestBlock_DecodeRLP(t *testing.T) {
 			reflect.TypeOf(v0.NewHeader()),
 		},
 		{
-			"v1",
+			"v2",
 			args{s: rlp.NewStream(bytes.NewBuffer([]byte{
 				// BEGIN 689-byte tagged RLP envelope
 				0xf9, 0x02, 0xb1,
 				0x87, // 7-byte tagged RLP signature
 				'H', 'm', 'n', 'y', 'T', 'g', 'd',
-				0x82, // 2-byte v1 header tag
+				0x82, // 2-byte v1 extblock tag
 				'v', '1',
 				// BEGIN 675-byte extblockV1
 				0xf9, 0x02, 0xa3,
@@ -252,8 +252,8 @@ func TestBlock_DecodeRLP(t *testing.T) {
 				0xf9, 0x02, 0x9d,
 				0x87, // 7-byte tagged RLP signature
 				'H', 'm', 'n', 'y', 'T', 'g', 'd',
-				0x82, // 2-byte v1 header tag
-				'v', '1',
+				0x82, // 2-byte v2 header tag
+				'v', '2',
 				// BEGIN 655-byte Header
 				0xf9, 0x02, 0x8f,
 				0xa0, // 32-byte ParentHash
@@ -373,7 +373,7 @@ func TestBlock_DecodeRLP(t *testing.T) {
 				// END tagged RLP envelope
 			}), 0)},
 			false,
-			reflect.TypeOf(v1.NewHeader()),
+			reflect.TypeOf(v2.NewHeader()),
 		},
 	}
 	for _, tt := range tests {
@@ -512,14 +512,14 @@ func TestBlock_EncodeRLP(t *testing.T) {
 			false,
 		},
 		{
-			"v1",
-			&v1.Header{},
+			"v2",
+			&v2.Header{},
 			[]byte{
 				// BEGIN 689-byte tagged RLP envelope
 				0xf9, 0x02, 0xb1,
 				0x87, // 7-byte tagged RLP signature
 				'H', 'm', 'n', 'y', 'T', 'g', 'd',
-				0x82, // 2-byte v1 header tag
+				0x82, // 2-byte v1 extblock tag
 				'v', '1',
 				// BEGIN 675-byte extblockV1
 				0xf9, 0x02, 0xa3,
@@ -527,8 +527,8 @@ func TestBlock_EncodeRLP(t *testing.T) {
 				0xf9, 0x02, 0x9d,
 				0x87, // 7-byte tagged RLP signature
 				'H', 'm', 'n', 'y', 'T', 'g', 'd',
-				0x82, // 2-byte v1 header tag
-				'v', '1',
+				0x82, // 2-byte v2 header tag
+				'v', '2',
 				// BEGIN 655-byte Header
 				0xf9, 0x02, 0x8f,
 				0xa0, // 32-byte ParentHash

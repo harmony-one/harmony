@@ -1,4 +1,4 @@
-package v1
+package v2
 
 import (
 	"io"
@@ -16,7 +16,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-// Header is the V1 block header.
+// Header is the V2 block header.
 type Header struct {
 	fields headerFields
 }

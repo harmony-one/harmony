@@ -9,7 +9,7 @@ import (
 
 	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
-	v1 "github.com/harmony-one/harmony/block/v1"
+	v2 "github.com/harmony-one/harmony/block/v2"
 )
 
 func TestHeader_EncodeRLP(t *testing.T) {
@@ -122,15 +122,15 @@ func TestHeader_EncodeRLP(t *testing.T) {
 			false,
 		},
 		{
-			"v1",
-			fields{v1.NewHeader()},
+			"v2",
+			fields{v2.NewHeader()},
 			[]byte{
 				// BEGIN 669-byte tagged RLP envelope
 				0xf9, 0x02, 0x9d,
 				0x87, // 7-byte tagged RLP signature
 				'H', 'm', 'n', 'y', 'T', 'g', 'd',
-				0x82, // 2-byte v1 header tag
-				'v', '1',
+				0x82, // 2-byte v2 header tag
+				'v', '2',
 				// BEGIN 655-byte Header
 				0xf9, 0x02, 0x8f,
 				0xa0, // 32-byte ParentHash
@@ -368,14 +368,14 @@ func TestHeader_DecodeRLP(t *testing.T) {
 			false,
 		},
 		{
-			"v1",
+			"v2",
 			args{rlp.NewStream(bytes.NewBuffer([]byte{
 				// BEGIN 669-byte tagged RLP envelope
 				0xf9, 0x02, 0x9d,
 				0x87, // 7-byte tagged RLP signature
 				'H', 'm', 'n', 'y', 'T', 'g', 'd',
-				0x82, // 2-byte v1 header tag
-				'v', '1',
+				0x82, // 2-byte v2 header tag
+				'v', '2',
 				// BEGIN 655-byte Header
 				0xf9, 0x02, 0x8f,
 				0xa0, // 32-byte ParentHash
@@ -483,7 +483,7 @@ func TestHeader_DecodeRLP(t *testing.T) {
 				// END Header
 				// END tagged RLP envelope
 			}), 0)},
-			v1.NewHeader(),
+			v2.NewHeader(),
 			false,
 		},
 	}

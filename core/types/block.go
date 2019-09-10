@@ -37,7 +37,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	v0 "github.com/harmony-one/harmony/block/v0"
-	v1 "github.com/harmony-one/harmony/block/v1"
+	v2 "github.com/harmony-one/harmony/block/v2"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -119,7 +119,7 @@ type Body struct {
 func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
 	var bi BodyInterface
 	switch h.Header.(type) {
-	case *v1.Header:
+	case *v2.Header:
 		bi = new(BodyV1)
 	case *v0.Header:
 		bi = new(BodyV0)
@@ -318,7 +318,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
 	switch h := b.header.Header.(type) {
-	case *v1.Header:
+	case *v2.Header:
 		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
 	case *v0.Header:
 		if len(b.incomingReceipts) > 0 {
