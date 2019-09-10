@@ -33,6 +33,7 @@ func (f *factory) NewHeader(epoch *big.Int) *block.Header {
 	default:
 		impl = v0.NewHeader()
 	}
+	impl.SetEpoch(epoch)
 	return &block.Header{impl}
 }
 
