@@ -92,12 +92,16 @@ func (consensus *Consensus) announce(block *types.Block) {
 	// prepare message and broadcast to validators
 	encodedBlock, err := rlp.EncodeToBytes(block)
 	if err != nil {
-		consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
+		consensus.getLogger().Debug().
+			Err(err).
+			Msg("[Announce] Failed encoding block")
 		return
 	}
 	encodedBlockHeader, err := rlp.EncodeToBytes(block.Header())
 	if err != nil {
-		consensus.getLogger().Debug().Msg("[Announce] Failed encoding block header")
+		consensus.getLogger().Debug().
+			Err(err).
+			Msg("[Announce] Failed encoding block header")
 		return
 	}
 
