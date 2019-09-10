@@ -268,13 +268,13 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	// if cannot find latest crosslink header, broadcast latest 3 block headers
 	if err != nil {
 		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLinkHeader] ReadShardLastCrossLink Failed")
-		block := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 2)
-		if block != nil {
-			headers = append(headers, block.Header())
+		header := node.Blockchain().GetHeaderByNumber(newBlock.NumberU64() - 2)
+		if header != nil {
+			headers = append(headers, header)
 		}
-		block = node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 1)
-		if block != nil {
-			headers = append(headers, block.Header())
+		header = node.Blockchain().GetHeaderByNumber(newBlock.NumberU64() - 1)
+		if header != nil {
+			headers = append(headers, header)
 		}
 		headers = append(headers, newBlock.Header())
 	} else {
@@ -283,9 +283,9 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 			if blockNum > latestBlockNum+crossLinkBatchSize {
 				break
 			}
-			block := node.Blockchain().GetBlockByNumber(blockNum)
-			if block != nil {
-				headers = append(headers, block.Header())
+			header := node.Blockchain().GetHeaderByNumber(blockNum)
+			if header != nil {
+				headers = append(headers, header)
 			}
 		}
 	}

@@ -296,7 +296,12 @@ func (node *Node) SendNewBlockToUnsync() {
 				delete(node.peerRegistrationRecord, peerID)
 				continue
 			}
-			response := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
+			response, err := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
+			// close the connection if cannot push new block to unsync node
+			if err != nil {
+				node.peerRegistrationRecord[peerID].client.Close()
+				delete(node.peerRegistrationRecord, peerID)
+			}
 			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.peerRegistrationRecord[peerID].client.Close()
 				delete(node.peerRegistrationRecord, peerID)
@@ -320,11 +325,11 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		size := uint64(request.Size)
 		var startHashHeader common.Hash
 		copy(startHashHeader[:], request.BlockHash[:])
-		startBlock := node.Blockchain().GetBlockByHash(startHashHeader)
-		if startBlock == nil {
+		startHeader := node.Blockchain().GetHeaderByHash(startHashHeader)
+		if startHeader == nil {
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request cannot find startHash %s", startHashHeader.Hex())
 		}
-		startHeight := startBlock.NumberU64()
+		startHeight := startHeader.Number().Uint64()
 		endHeight := node.Blockchain().CurrentBlock().NumberU64()
 		if startHeight >= endHeight {
 			utils.Logger().
@@ -339,11 +344,11 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 		for blockNum := startHeight; blockNum <= startHeight+size; blockNum++ {
-			block := node.Blockchain().GetBlockByNumber(blockNum)
-			if block == nil {
+			header := node.Blockchain().GetHeaderByNumber(blockNum)
+			if header == nil {
 				break
 			}
-			blockHash := block.Hash()
+			blockHash := header.Hash()
 			response.Payload = append(response.Payload, blockHash[:])
 		}
 

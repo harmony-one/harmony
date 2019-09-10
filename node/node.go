@@ -433,7 +433,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	}
 
 	utils.Logger().Info().
-		Interface("genesis block header", node.Blockchain().GetBlockByNumber(0).Header()).
+		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
 
 	// start the goroutine to receive client message

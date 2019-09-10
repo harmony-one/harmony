@@ -1,4 +1,4 @@
-package v1
+package v2
 
 import (
 	"io"
@@ -13,11 +13,10 @@ import (
 
 	blockif "github.com/harmony-one/harmony/block/interface"
 	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
-// Header is the V1 block header.
+// Header is the V2 block header.
 type Header struct {
 	fields headerFields
 }
@@ -67,6 +66,7 @@ type headerFields struct {
 	Vrf                 []byte      `json:"vrf"`
 	Vdf                 []byte      `json:"vdf"`
 	ShardState          []byte      `json:"shardState"`
+	CrossLinks          []byte      `json:"crossLink"`
 }
 
 // ParentHash is the header hash of the parent block.  For the genesis block
@@ -353,7 +353,7 @@ func (h *Header) SetShardState(newShardState []byte) {
 //
 // The returned slice is a copy; the caller may do anything with it.
 func (h *Header) CrossLinks() []byte {
-	return nil
+	return append(h.fields.CrossLinks[:0:0], h.fields.CrossLinks...)
 }
 
 // SetCrossLinks sets the RLP-encoded form of non-beacon block headers chosen to
@@ -361,11 +361,7 @@ func (h *Header) CrossLinks() []byte {
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetCrossLinks(newCrossLinks []byte) {
-	if len(newCrossLinks) > 0 {
-		h.Logger(utils.Logger()).Warn().
-			Hex("crossLinks", newCrossLinks).
-			Msg("cannot store cross-chain links in V1 header")
-	}
+	h.fields.CrossLinks = append(newCrossLinks[:0:0], newCrossLinks...)
 }
 
 // field type overrides for gencodec

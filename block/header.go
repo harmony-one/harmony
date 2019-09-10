@@ -13,6 +13,7 @@ import (
 	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
+	v2 "github.com/harmony-one/harmony/block/v2"
 	"github.com/harmony-one/harmony/crypto/hash"
 )
 
@@ -81,4 +82,6 @@ func init() {
 	HeaderRegistry.MustAddFactory(func() interface{} { return v0.NewHeader() })
 	HeaderRegistry.MustRegister("v1", v1.NewHeader())
 	HeaderRegistry.MustAddFactory(func() interface{} { return v1.NewHeader() })
+	HeaderRegistry.MustRegister("v2", v2.NewHeader())
+	HeaderRegistry.MustAddFactory(func() interface{} { return v2.NewHeader() })
 }
