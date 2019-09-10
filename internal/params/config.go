@@ -111,7 +111,7 @@ func (c *ChainConfig) IsCrossLink(epoch *big.Int) bool {
 
 // IsS3 returns whether epoch is either equal to the S3 fork epoch or greater.
 func (c *ChainConfig) IsS3(epoch *big.Int) bool {
-	return isForked(c.CrossLinkEpoch, epoch)
+	return isForked(c.S3Epoch, epoch)
 }
 
 // GasTable returns the gas table corresponding to the current phase (homestead or homestead reprice).
