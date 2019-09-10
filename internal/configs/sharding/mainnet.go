@@ -34,9 +34,9 @@ const (
 	mainnetEnableTxnThrottling            = true
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
-	MainNetHTTPPattern = "http://s%d.t.hmny.io:9500"
+	MainNetHTTPPattern = "https://api.s%d.t.hmny.io"
 	// MainNetWSPattern is the websocket pattern for mainnet.
-	MainNetWSPattern = "ws://s%d.t.hmny.io:9800"
+	MainNetWSPattern = "wss://api.s%d.t.hmny.io"
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
