@@ -29,7 +29,7 @@ func (ps pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (ps pangaeaSchedule) BlocksPerEpoch() uint64 {
-	return 10800 // 1 day with 8 seconds/block
+	return 2700 // 6 hours with 8 seconds/block
 }
 
 func (ps pangaeaSchedule) CalcEpochNumber(blockNum uint64) *big.Int {

@@ -173,7 +173,7 @@ beta)
   )
   REL=testnet
   network_type=testnet
-  dns_zone=
+  dns_zone=b.hmny.io
   ;;
 pangaea)
   bootnodes=(
@@ -182,7 +182,7 @@ pangaea)
   )
   REL=master
   network_type=pangaea
-  dns_zone=pga.hmny.io
+  dns_zone=p.hmny.io
   ;;
 *)
   err 64 "${network}: invalid network"
