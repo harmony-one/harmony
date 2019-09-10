@@ -89,7 +89,7 @@ func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderRespo
 }
 
 // PushNewBlock will send the lastest verified block to registered nodes
-func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, timeout bool) *pb.DownloaderResponse {
+func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, timeout bool) (*pb.DownloaderResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -107,7 +107,7 @@ func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, time
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] unable to send new block to unsync node")
 	}
-	return response
+	return response, err
 }
 
 // GetBlockChainHeight gets the blockheight from peer

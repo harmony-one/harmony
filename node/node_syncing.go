@@ -296,7 +296,12 @@ func (node *Node) SendNewBlockToUnsync() {
 				delete(node.peerRegistrationRecord, peerID)
 				continue
 			}
-			response := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
+			response, err := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
+			// close the connection if cannot push new block to unsync node
+			if err != nil {
+				node.peerRegistrationRecord[peerID].client.Close()
+				delete(node.peerRegistrationRecord, peerID)
+			}
 			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
 				node.peerRegistrationRecord[peerID].client.Close()
 				delete(node.peerRegistrationRecord, peerID)
