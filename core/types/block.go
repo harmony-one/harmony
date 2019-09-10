@@ -81,6 +81,10 @@ type BodyInterface interface {
 	// Transactions returns a deep copy the list of transactions in this block.
 	Transactions() []*Transaction
 
+	// TransactionAt returns the transaction at the given index in this block.
+	// It returns nil if index is out of bounds.
+	TransactionAt(index int) *Transaction
+
 	// SetTransactions sets the list of transactions with a deep copy of the
 	// given list.
 	SetTransactions(newTransactions []*Transaction)

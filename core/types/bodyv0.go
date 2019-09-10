@@ -30,6 +30,15 @@ func (b *BodyV0) Transactions() (txs []*Transaction) {
 	return txs
 }
 
+// TransactionAt returns the transaction at the given index in this block.
+// It returns nil if index is out of bounds.
+func (b *BodyV0) TransactionAt(index int) *Transaction {
+	if index < 0 || index >= len(b.f.Transactions) {
+		return nil
+	}
+	return b.f.Transactions[index].Copy()
+}
+
 // SetTransactions sets the list of transactions with a deep copy of the given
 // list.
 func (b *BodyV0) SetTransactions(newTransactions []*Transaction) {
