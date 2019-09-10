@@ -364,8 +364,8 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// currentNode.DRand = dRand
 
 	// This needs to be executed after consensus and drand are setup
-	if err := currentNode.InitShardState(); err != nil {
-		ctxerror.Crit(utils.GetLogger(), err, "InitShardState failed",
+	if err := currentNode.GetInitShardState(); err != nil {
+		ctxerror.Crit(utils.GetLogger(), err, "GetInitShardState failed",
 			"shardID", *shardID)
 	}
 

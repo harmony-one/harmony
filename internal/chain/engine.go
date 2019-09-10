@@ -11,6 +11,7 @@ import (
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -139,12 +140,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 
 // retrievePublicKeys finds the public keys of current block's committee
 func retrievePublicKeys(bc engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
-	shardState, err := bc.ReadShardState(header.Epoch())
-	if err != nil {
-		return nil, ctxerror.New("cannot read shard state",
-			"epoch", header.Epoch(),
-		).WithCause(err)
-	}
+	shardState := core.GetShardState(header.Epoch())
 	committee := shardState.FindCommitteeByID(header.ShardID())
 	if committee == nil {
 		return nil, ctxerror.New("cannot find shard in the shard state",
@@ -172,12 +168,7 @@ func retrievePublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header
 		return nil, ctxerror.New("cannot find parent block header in DB",
 			"parentHash", header.ParentHash())
 	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
-	if err != nil {
-		return nil, ctxerror.New("cannot read shard state",
-			"epoch", parentHeader.Epoch(),
-		).WithCause(err)
-	}
+	parentShardState := core.GetShardState(parentHeader.Epoch())
 	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID())
 	if parentCommittee == nil {
 		return nil, ctxerror.New("cannot find shard in the shard state",
