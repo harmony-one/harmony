@@ -71,6 +71,14 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 		return nil, common.Hash{}, 0, 0
 	}
 	body := ReadBody(db, blockHash, blockNumber)
+	if body == nil {
+		utils.Logger().Error().
+			Uint64("number", blockNumber).
+			Str("hash", blockHash.Hex()).
+			Uint64("index", txIndex).
+			Msg("block Body referenced missing")
+		return nil, common.Hash{}, 0, 0
+	}
 	tx := body.TransactionAt(int(txIndex))
 	if tx == nil {
 		utils.Logger().Error().
