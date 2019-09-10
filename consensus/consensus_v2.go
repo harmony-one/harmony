@@ -33,7 +33,7 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	msg := &msg_pb.Message{}
 	err := protobuf.Unmarshal(payload, msg)
 	if err != nil {
-		utils.Logger().Error().Err(err).Interface("consensus", consensus).Msg("Failed to unmarshal message payload.")
+		consensus.getLogger().Error().Err(err).Msg("Failed to unmarshal message payload.")
 		return
 	}
 
@@ -1161,7 +1161,6 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 				consensus.getLogger().Debug().
 					Int("numTxs", len(newBlock.Transactions())).
-					Interface("consensus", consensus).
 					Time("startTime", startTime).
 					Int("publicKeys", len(consensus.PublicKeys)).
 					Msg("[ConsensusMainLoop] STARTING CONSENSUS")
