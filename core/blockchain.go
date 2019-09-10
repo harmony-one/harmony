@@ -774,7 +774,7 @@ func (bc *BlockChain) Stop() {
 
 		for _, offset := range []uint64{0, 1, triesInMemory - 1} {
 			if number := bc.CurrentBlock().NumberU64(); number > offset {
-				recent := bc.GetBlockByNumber(number - offset)
+				recent := bc.GetHeaderByNumber(number - offset)
 
 				utils.Logger().Info().
 					Str("block", recent.Number().String()).
@@ -2080,8 +2080,8 @@ func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 		return false
 	}
 
-	previousBlock := bc.GetBlockByNumber(block.NumberU64() - 1)
-	return block.Coinbase() == previousBlock.Coinbase()
+	previousHeader := bc.GetHeaderByNumber(block.NumberU64() - 1)
+	return block.Coinbase() == previousHeader.Coinbase()
 }
 
 // ChainDB ...
