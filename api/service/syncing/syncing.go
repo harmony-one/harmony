@@ -523,19 +523,21 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 	return nil
 }
 
-func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) bool {
+func (ss *StateSync) updateChainAndStatus(chain []*types.Block, bc *core.BlockChain, worker *worker.Worker) error {
 	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] Current Block")
 
-	_, err := bc.InsertChain([]*types.Block{block}) // insert chain will verify the block header
+	_, err := bc.InsertChain(chain) // insert chain will verify the block header
 	if err != nil {
-		utils.Logger().Error().Err(err).Msgf("[SYNC] Error adding new block to blockchain %d %d", block.NumberU64(), block.ShardID())
+		utils.Logger().Error().Err(err).Msgf("[SYNC] Error adding new blocks to blockchain %d %d",
+			bc.CurrentBlock().NumberU64(), bc.CurrentBlock().ShardID())
 
 		utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] Rolling back current block!")
 		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
-		return false
+		return err
 	}
 	ss.syncMux.Lock()
-	if err := worker.UpdateCurrent(block.Header().Coinbase()); err != nil {
+	coinbase := chain[len(chain)-1].Coinbase() // set coinbase to the last block on the chain
+	if err := worker.UpdateCurrent(coinbase); err != nil {
 		utils.Logger().Warn().Err(err).Msg("[SYNC] (*Worker).UpdateCurrent failed")
 	}
 	ss.syncMux.Unlock()
@@ -543,11 +545,23 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		Uint64("blockHeight", bc.CurrentBlock().NumberU64()).
 		Str("blockHex", bc.CurrentBlock().Hash().Hex()).
 		Msg("[SYNC] new block added to blockchain")
-	return true
+	return nil
 }
 
 // generateNewState will construct most recent state from downloaded blocks
-func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker) {
+func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker) error {
+	defer func() {
+		ss.syncMux.Lock()
+		ss.commonBlocks = make(map[int]*types.Block)
+		ss.syncConfig.ForEachPeer(func(peer *SyncPeerConfig) (brk bool) {
+			peer.newBlocks = []*types.Block{}
+			return
+		})
+		ss.syncMux.Unlock()
+	}()
+
+	chain := []*types.Block{}
+
 	// update blocks created before node start sync
 	parentHash := bc.CurrentBlock().Hash()
 	for {
@@ -555,15 +569,9 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		ok := ss.updateBlockAndStatus(block, bc, worker)
-		if !ok {
-			break
-		}
+		chain = append(chain, block)
 		parentHash = block.Hash()
 	}
-	ss.syncMux.Lock()
-	ss.commonBlocks = make(map[int]*types.Block)
-	ss.syncMux.Unlock()
 
 	// update blocks after node start sync
 	parentHash = bc.CurrentBlock().Hash()
@@ -572,20 +580,9 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		ok := ss.updateBlockAndStatus(block, bc, worker)
-		if !ok {
-			break
-		}
+		chain = append(chain, block)
 		parentHash = block.Hash()
 	}
-	// TODO ek – Do we need to hold syncMux now that syncConfig has its onw
-	//  mutex?
-	ss.syncMux.Lock()
-	ss.syncConfig.ForEachPeer(func(peer *SyncPeerConfig) (brk bool) {
-		peer.newBlocks = []*types.Block{}
-		return
-	})
-	ss.syncMux.Unlock()
 
 	// update last mile blocks if any
 	parentHash = bc.CurrentBlock().Hash()
@@ -594,17 +591,16 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		ok := ss.updateBlockAndStatus(block, bc, worker)
-		if !ok {
-			break
-		}
+		chain = append(chain, block)
 		parentHash = block.Hash()
 	}
+
+	return ss.updateChainAndStatus(chain, bc, worker)
 }
 
 // ProcessStateSync processes state sync from the blocks received but not yet processed so far
 // TODO: return error
-func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc *core.BlockChain, worker *worker.Worker) {
+func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc *core.BlockChain, worker *worker.Worker) error {
 	// Gets consensus hashes.
 	ss.GetConsensusHashes(startHash, size)
 	ss.generateStateSyncTaskQueue(bc)
@@ -612,7 +608,7 @@ func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc *core.Bl
 	if ss.stateSyncTaskQueue.Len() > 0 {
 		ss.downloadBlocks(bc)
 	}
-	ss.generateNewState(bc, worker)
+	return ss.generateNewState(bc, worker)
 }
 
 func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte, ip, port string) error {
@@ -710,16 +706,22 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool) {
+func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool) error {
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
 	// remove SyncLoopFrequency
 	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
+	count := 0
+	var err error
 Loop:
 	for {
 		select {
 		case <-ticker.C:
+			if count > TimesToFail {
+				break
+			}
+
 			otherHeight := ss.getMaxPeerHeight(isBeacon)
 			currentHeight := bc.CurrentBlock().NumberU64()
 			if currentHeight >= otherHeight {
@@ -733,11 +735,17 @@ Loop:
 			if size > BatchSize {
 				size = BatchSize
 			}
-			ss.ProcessStateSync(startHash[:], size, bc, worker)
-			ss.purgeOldBlocksFromCache()
+			err = ss.ProcessStateSync(startHash[:], size, bc, worker)
+			defer ss.purgeOldBlocksFromCache()
+			if err == nil {
+				break
+			} else {
+				count++
+			}
 		}
 	}
 	ss.purgeAllBlocksFromCache()
+	return err
 }
 
 // GetSyncingPort returns the syncing port.

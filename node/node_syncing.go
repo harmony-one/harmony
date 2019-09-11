@@ -213,6 +213,7 @@ SyncingLoop:
 					Msg("cannot retrieve syncing peers")
 				continue SyncingLoop
 			}
+
 			if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
 				utils.Logger().Warn().
 					Err(err).
@@ -222,26 +223,19 @@ SyncingLoop:
 			}
 			utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 		}
+
 		if node.stateSync.IsOutOfSync(bc) {
-			node.stateMutex.Lock()
-			node.State = NodeNotInSync
-			node.stateMutex.Unlock()
-			if willJoinConsensus {
-				node.Consensus.BlocksNotSynchronized()
+			node.NodeNotInSync(willJoinConsensus)
+			err := node.stateSync.SyncLoop(bc, worker, false)
+			if err == nil {
+				node.NodeReadyForConsensus(willJoinConsensus)
 			}
-
-			node.stateSync.SyncLoop(bc, worker, false)
+		} else {
+			node.State = NodeReadyForConsensus
 		}
-
-		node.stateMutex.Lock()
-		node.State = NodeReadyForConsensus
-		node.stateMutex.Unlock()
-		if willJoinConsensus {
-			node.Consensus.BlocksSynchronized()
-		}
-
-		time.Sleep(SyncFrequency * time.Second)
 	}
+
+	time.Sleep(SyncFrequency * time.Second)
 }
 
 // SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node

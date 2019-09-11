@@ -570,6 +570,26 @@ func (node *Node) AccountManager() *accounts.Manager {
 	return node.accountManager
 }
 
+// NodeReadyForConsensus sets node state to NodeReadyForConsensus
+func (node *Node) NodeReadyForConsensus(willJoinConsensus bool) {
+	node.stateMutex.Lock()
+	node.State = NodeReadyForConsensus
+	node.stateMutex.Unlock()
+	if willJoinConsensus {
+		node.Consensus.BlocksSynchronized()
+	}
+}
+
+// NodeNotInSync sets node state to NodeNotInSync
+func (node *Node) NodeNotInSync(willJoinConsensus bool) {
+	node.stateMutex.Lock()
+	node.State = NodeNotInSync
+	node.stateMutex.Unlock()
+	if willJoinConsensus {
+		node.Consensus.BlocksNotSynchronized()
+	}
+}
+
 // DeletePeerSyncConfig closes the peer connection and removes the peer from the registeration record
 func (node *Node) DeletePeerSyncConfig(peerID string) {
 	node.peerRegistrationRecord[peerID].client.Close()
