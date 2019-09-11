@@ -38,7 +38,12 @@ func (s *PrivateAccountAPI) SendTransaction(ctx context.Context, args SendTxArgs
 	}
 	signed, err := s.signTransaction(ctx, &args, passwd)
 	if err != nil {
-		utils.GetLogger().Warn("Failed transaction send attempt", "from", args.From, "to", args.To, "value", args.Value.ToInt(), "err", err)
+		utils.Logger().Warn().
+			Str("from", args.From.Hex()).
+			Str("to", args.To.Hex()).
+			Uint64("value", args.Value.ToInt().Uint64()).
+			AnErr("err", err).
+			Msg("Failed transaction send attempt")
 		return common.Hash{}, err
 	}
 	return SubmitTransaction(ctx, s.b, signed)
