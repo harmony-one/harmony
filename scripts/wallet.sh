@@ -29,7 +29,7 @@ Commands:
         --to             - The receiver account's address
         --amount         - The amount of token to transfer
         --shardID        - The shard Id for the transfer
-        --toShardID      - The destination shard Id for the transfer"
+        --toShardID      - The destination shard Id for the transfer
         --inputData      - Base64-encoded input data to embed in the transaction
         --pass           - Passphrase of sender's private key
         --waitThenBal    - Wait after the transfer with colored balances output
@@ -48,7 +48,7 @@ Commands:
         --key            - Raw private key.
     14. getBlsPublic   - Show Bls public key given raw private bls key.
         --key            - Raw private key.
-		--file           - encrypted bls file.
+        --file           - encrypted bls file.
 EOT
 }
 
