@@ -98,9 +98,11 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash(), receiptSha)
 	}
 
-	cxsSha := types.DeriveMultipleShardsSha(cxReceipts)
-	if cxsSha != header.OutgoingReceiptHash() {
-		return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash(), cxsSha)
+	if v.config.IsCrossTx(block.Epoch()) {
+		cxsSha := types.DeriveMultipleShardsSha(cxReceipts)
+		if cxsSha != header.OutgoingReceiptHash() {
+			return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash(), cxsSha)
+		}
 	}
 
 	// Validate the state root against the received state root and throw
@@ -171,6 +173,10 @@ func CalcGasLimit(parent *types.Block, gasFloor, gasCeil uint64) uint64 {
 
 // ValidateCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
 func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) error {
+	if !v.config.IsCrossTx(cxp.Header.Epoch()) {
+		return ctxerror.New("[ValidateCXReceiptsProof] cross shard receipt received before cx fork")
+	}
+
 	toShardID, err := cxp.GetToShardID()
 	if err != nil {
 		return ctxerror.New("[ValidateCXReceiptsProof] invalid shardID").WithCause(err)
