@@ -14,7 +14,7 @@ const (
 	// PangaeaHTTPPattern is the http pattern for pangaea.
 	PangaeaHTTPPattern = "https://api.s%d.pga.hmny.io"
 	// PangaeaWSPattern is the websocket pattern for pangaea.
-	PangaeaWSPattern = "wss://api.s%d.pga.hmny.io"
+	PangaeaWSPattern = "wss://ws.s%d.pga.hmny.io"
 	// transaction throttling disabled on pangaea network
 	pangaeaEnableTxnThrottling = false
 )

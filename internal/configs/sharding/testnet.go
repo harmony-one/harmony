@@ -33,7 +33,7 @@ const (
 	// TestNetHTTPPattern is the http pattern for testnet.
 	TestNetHTTPPattern = "https://api.s%d.b.hmny.io"
 	// TestNetWSPattern is the websocket pattern for testnet.
-	TestNetWSPattern = "wss://api.s%d.b.hmny.io"
+	TestNetWSPattern = "wss://ws.s%d.b.hmny.io"
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
