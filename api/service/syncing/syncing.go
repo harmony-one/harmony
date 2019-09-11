@@ -25,13 +25,12 @@ import (
 
 // Constants for syncing.
 const (
-	SleepTimeAfterNonConsensusBlockHashes        = time.Second * 30
-	TimesToFail                                  = 5 // Downloadblocks service retry limit
-	RegistrationNumber                           = 3
-	SyncingPortDifference                        = 3000
-	inSyncThreshold                              = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
-	BatchSize                             uint32 = 1000 //maximum size for one query of block hashes
-	SyncLoopFrequency                            = 1    // unit in second
+	TimesToFail                  = 5 // Downloadblocks service retry limit
+	RegistrationNumber           = 3
+	SyncingPortDifference        = 3000
+	inSyncThreshold              = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
+	BatchSize             uint32 = 1000 //maximum size for one query of block hashes
+	SyncLoopFrequency            = 1    // unit in second
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -99,9 +98,9 @@ func CreateStateSync(ip string, port string, peerHash [20]byte) *StateSync {
 type StateSync struct {
 	selfip             string
 	selfport           string
-	selfPeerHash       [20]byte // hash of ip and address combination
-	commonBlocks       map[int]*types.Block
-	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
+	selfPeerHash       [20]byte             // hash of ip and address combination
+	commonBlocks       map[int]*types.Block // common blocks stores blocks downloaded during state syncing
+	lastMileBlocks     []*types.Block       // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
 	stateSyncTaskQueue *queue.Queue
 	syncMux            sync.Mutex
@@ -308,8 +307,8 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	}
 }
 
-// GetBlockHashesConsensusAndCleanUp chesk if all consensus hashes are equal.
-func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() bool {
+// GetBlockHashesConsensusAndCleanUp checks if all consensus hashes are equal.
+func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 	// Sort all peers by the blockHashes.
@@ -321,55 +320,39 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() bool {
 		Int("maxFirstID", maxFirstID).
 		Int("maxCount", maxCount).
 		Msg("[SYNC] block consensus hashes")
-	if float64(maxCount) >= core.ShardingSchedule.ConsensusRatio()*float64(len(sc.peers)) {
-		sc.cleanUpPeers(maxFirstID)
-		return true
-	}
-	return false
+	sc.cleanUpPeers(maxFirstID)
 }
 
 // GetConsensusHashes gets all hashes needed to download.
-func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
-	count := 0
-	for {
-		var wg sync.WaitGroup
-		ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				response := peerConfig.client.GetBlockHashes(startHash, size, ss.selfip, ss.selfport)
-				if response == nil {
-					utils.Logger().Warn().
-						Str("peer IP", peerConfig.ip).
-						Str("peer Port", peerConfig.port).
-						Msg("[SYNC] GetConsensusHashes Nil Response")
-					return
-				}
-				if len(response.Payload) > int(size+1) {
-					utils.Logger().Warn().
-						Uint32("requestSize", size).
-						Int("respondSize", len(response.Payload)).
-						Msg("[SYNC] GetConsensusHashes: receive more blockHahses than request!")
-					peerConfig.blockHashes = response.Payload[:size+1]
-				} else {
-					peerConfig.blockHashes = response.Payload
-				}
-			}()
-			return
-		})
-		wg.Wait()
-		if ss.syncConfig.GetBlockHashesConsensusAndCleanUp() {
-			break
-		}
-		if count > TimesToFail {
-			utils.Logger().Info().Msg("[SYNC] GetConsensusHashes: reached retry limit")
-			return false
-		}
-		count++
-		time.Sleep(SleepTimeAfterNonConsensusBlockHashes)
-	}
+func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) {
+	var wg sync.WaitGroup
+	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			response := peerConfig.client.GetBlockHashes(startHash, size, ss.selfip, ss.selfport)
+			if response == nil {
+				utils.Logger().Warn().
+					Str("peer IP", peerConfig.ip).
+					Str("peer Port", peerConfig.port).
+					Msg("[SYNC] GetConsensusHashes Nil Response")
+				return
+			}
+			if len(response.Payload) > int(size+1) {
+				utils.Logger().Warn().
+					Uint32("requestSize", size).
+					Int("respondSize", len(response.Payload)).
+					Msg("[SYNC] GetConsensusHashes: receive more blockHahses than request!")
+				peerConfig.blockHashes = response.Payload[:size+1]
+			} else {
+				peerConfig.blockHashes = response.Payload
+			}
+		}()
+		return
+	})
+	wg.Wait()
+	ss.syncConfig.GetBlockHashesConsensusAndCleanUp()
 	utils.Logger().Info().Msg("[SYNC] Finished getting consensus block hashes")
-	return true
 }
 
 func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
@@ -537,17 +520,7 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) bool {
 	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] Current Block")
 
-	// Verify block signatures
-	// TODO chao: only when block is verified against last commit sigs, we can update the block and status
-	if block.NumberU64() > 1 {
-		err := bc.Engine().VerifyHeader(bc, block.Header(), true)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msgf("[SYNC] failed verifying signatures for new block %d", block.NumberU64())
-			return false
-		}
-	}
-
-	_, err := bc.InsertChain([]*types.Block{block})
+	_, err := bc.InsertChain([]*types.Block{block}) // insert chain will verify the block header
 	if err != nil {
 		utils.Logger().Error().Err(err).Msgf("[SYNC] Error adding new block to blockchain %d %d", block.NumberU64(), block.ShardID())
 
@@ -627,10 +600,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 // TODO: return error
 func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc *core.BlockChain, worker *worker.Worker) {
 	// Gets consensus hashes.
-	if !ss.GetConsensusHashes(startHash, size) {
-		utils.Logger().Debug().Msg("[SYNC] ProcessStateSync unable to reach consensus on ss.GetConsensusHashes")
-		return
-	}
+	ss.GetConsensusHashes(startHash, size)
 	ss.generateStateSyncTaskQueue(bc)
 	// Download blocks.
 	if ss.stateSyncTaskQueue.Len() > 0 {
@@ -734,7 +704,7 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool, isBeacon bool) {
+func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool) {
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}

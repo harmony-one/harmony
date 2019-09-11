@@ -182,7 +182,7 @@ func (node *Node) DoBeaconSyncing() {
 				}
 			}
 			node.beaconSync.AddLastMileBlock(beaconBlock)
-			node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, false, true)
+			node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true)
 		}
 	}
 }
@@ -226,7 +226,7 @@ SyncingLoop:
 				if willJoinConsensus {
 					node.Consensus.BlocksNotSynchronized()
 				}
-				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
+				node.stateSync.SyncLoop(bc, worker, false)
 				if willJoinConsensus {
 					node.stateMutex.Lock()
 					node.State = NodeReadyForConsensus
