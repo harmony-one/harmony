@@ -13,7 +13,7 @@ const (
 	blocksPerShard     = 16384  // 2^14
 
 	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
-	mainnetConsensusRatio = float64(0.66)
+	mainnetConsensusRatio = float64(0.1)
 
 	// TODO: remove it after randomness feature turned on mainnet
 	mainnetRandomnessStartingEpoch = 100000
