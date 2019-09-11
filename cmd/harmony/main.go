@@ -322,8 +322,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 	// TODO: add staking support
 	// currentNode.StakingAccount = myAccount
-	utils.GetLogInstance().Info("node account set",
-		"address", common.MustAddressToBech32(currentNode.StakingAccount.Address))
+	utils.Logger().Info().
+		Str("address", common.MustAddressToBech32(currentNode.StakingAccount.Address)).
+		Msg("node account set")
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
@@ -373,7 +374,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	height := currentNode.Blockchain().CurrentBlock().NumberU64()
 
 	currentConsensus.SetViewID(height)
-	utils.GetLogInstance().Info("Init Blockchain", "height", height)
+	utils.Logger().Info().
+		Uint64("height", height).
+		Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
@@ -435,7 +438,10 @@ func main() {
 	}
 
 	if *shardID >= 0 {
-		utils.GetLogInstance().Info("ShardID Override", "original", initialAccount.ShardID, "override", *shardID)
+		utils.Logger().Info().
+			Uint32("original", initialAccount.ShardID).
+			Int("override", *shardID).
+			Msg("ShardID Override")
 		initialAccount.ShardID = uint32(*shardID)
 	}
 
@@ -451,15 +457,16 @@ func main() {
 	if *isExplorer {
 		startMsg = "==== New Explorer Node ===="
 	}
-	utils.GetLogInstance().Info(startMsg,
-		"BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize()),
-		"ShardID", nodeConfig.ShardID,
-		"ShardGroupID", nodeConfig.GetShardGroupID(),
-		"BeaconGroupID", nodeConfig.GetBeaconGroupID(),
-		"ClientGroupID", nodeConfig.GetClientGroupID(),
-		"Role", currentNode.NodeConfig.Role(),
-		"multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s",
-			*ip, *port, nodeConfig.Host.GetID().Pretty()))
+
+	utils.Logger().Info().
+		Str("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
+		Uint32("ShardID", nodeConfig.ShardID).
+		Str("ShardGroupID", nodeConfig.GetShardGroupID().String()).
+		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).
+		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
+		Str("Role", currentNode.NodeConfig.Role().String()).
+		Str("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty())).
+		Msg(startMsg)
 
 	if *enableMemProfiling {
 		memprofiling.GetMemProfiling().Start()

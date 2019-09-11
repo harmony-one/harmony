@@ -23,9 +23,15 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 			return common.Hash{}, err
 		}
 		addr := crypto.CreateAddress(from, tx.Nonce())
-		utils.GetLogger().Info("Submitted contract creation", "fullhash", tx.Hash().Hex(), "contract", common2.MustAddressToBech32(addr))
+		utils.Logger().Info().
+			Str("fullhash", tx.Hash().Hex()).
+			Str("contract", common2.MustAddressToBech32(addr)).
+			Msg("Submitted contract creation")
 	} else {
-		utils.GetLogger().Info("Submitted transaction", "fullhash", tx.Hash().Hex(), "recipient", tx.To())
+		utils.Logger().Info().
+			Str("fullhash", tx.Hash().Hex()).
+			Str("recipient", tx.To().Hex()).
+			Msg("Submitted transaction")
 	}
 	return tx.Hash(), nil
 }

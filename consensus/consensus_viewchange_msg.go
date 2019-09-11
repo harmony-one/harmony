@@ -42,8 +42,8 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 		vcMsg.Payload = append(msgToSign[:0:0], msgToSign...)
 	}
 
-	consensus.getLogger().Debug().
-		Bytes("m1Payload", vcMsg.Payload).
+	utils.Logger().Debug().
+		Hex("m1Payload", vcMsg.Payload).
 		Str("pubKey", consensus.PubKey.SerializeToHexStr()).
 		Msg("[constructViewChangeMessage]")
 
@@ -89,7 +89,7 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	vcMsg.Payload = consensus.m1Payload
 
 	sig2arr := consensus.GetNilSigsArray()
-	consensus.getLogger().Debug().Int("len", len(sig2arr)).Msg("[constructNewViewMessage] M2 (NIL) type signatures")
+	utils.Logger().Debug().Int("len", len(sig2arr)).Msg("[constructNewViewMessage] M2 (NIL) type signatures")
 	if len(sig2arr) > 0 {
 		m2Sig := bls_cosi.AggregateSig(sig2arr)
 		vcMsg.M2Aggsigs = m2Sig.Serialize()
@@ -97,7 +97,7 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	}
 
 	sig3arr := consensus.GetViewIDSigsArray()
-	consensus.getLogger().Debug().Int("len", len(sig3arr)).Msg("[constructNewViewMessage] M3 (ViewID) type signatures")
+	utils.Logger().Debug().Int("len", len(sig3arr)).Msg("[constructNewViewMessage] M3 (ViewID) type signatures")
 	// even we check here for safty, m3 type signatures must >= 2f+1
 	if len(sig3arr) > 0 {
 		m3Sig := bls_cosi.AggregateSig(sig3arr)
