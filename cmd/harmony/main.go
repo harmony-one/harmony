@@ -77,7 +77,7 @@ var (
 	dnsZone          = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
 	dnsFlag          = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
 	//Leader needs to have a minimal number of peers to start consensus
-	minPeers = flag.Int("min_peers", 100, "Minimal number of Peers in shard")
+	minPeers = flag.Int("min_peers", 32, "Minimal number of Peers in shard")
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
 	// isGenesis indicates this node is a genesis node
