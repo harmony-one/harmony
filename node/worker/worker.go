@@ -234,14 +234,8 @@ func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 	parent := w.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
-	// New block's epoch is the same as parent's...
-	epoch := new(big.Int).Set(parent.Header().Epoch())
 
-	// TODO: Don't depend on sharding state for epoch change.
-	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
-		// ... except if parent has a resharding assignment it increases by 1.
-		epoch = epoch.Add(epoch, common.Big1)
-	}
+	epoch := w.GetNewEpoch()
 	header := w.factory.NewHeader(epoch).With().
 		ParentHash(parent.Hash()).
 		Number(num.Add(num, common.Big1)).
@@ -271,6 +265,19 @@ func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 // GetCurrentState gets the current state.
 func (w *Worker) GetCurrentState() *state.DB {
 	return w.current.state
+}
+
+// GetCurrentEpoch gets the current epoch.
+func (w *Worker) GetNewEpoch() *big.Int {
+	parent := w.chain.CurrentBlock()
+	epoch := new(big.Int).Set(parent.Header().Epoch())
+
+	// TODO: Don't depend on sharding state for epoch change.
+	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
+		// ... except if parent has a resharding assignment it increases by 1.
+		epoch = epoch.Add(epoch, common.Big1)
+	}
+	return epoch
 }
 
 // GetCurrentReceipts get the receipts generated starting from the last state.
@@ -360,14 +367,8 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
-	// New block's epoch is the same as parent's...
-	epoch := parent.Header().Epoch()
 
-	// TODO: Don't depend on sharding state for epoch change.
-	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
-		// ... except if parent has a resharding assignment it increases by 1.
-		epoch = epoch.Add(epoch, common.Big1)
-	}
+	epoch := worker.GetNewEpoch()
 	header := worker.factory.NewHeader(epoch).With().
 		ParentHash(parent.Hash()).
 		Number(num.Add(num, common.Big1)).
