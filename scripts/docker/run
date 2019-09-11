@@ -31,6 +31,6 @@ if [ -z "$NODE_ACCOUNT_ID" ]; then
   exit 2
 fi
 
-harmony -log_folder log -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -account_index $NODE_ACCOUNT_ID
+harmony -log_folder log -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -account_index $NODE_ACCOUNT_ID
 
 # vim: ai ts=2 sw=2 et sts=2 ft=sh
