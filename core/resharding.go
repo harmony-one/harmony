@@ -221,6 +221,8 @@ func GetInitShardState() shard.State {
 }
 
 // GetShardState returns the shard state based on epoch number
+// This api for getting shard state is what should be used to get shard state regardless of
+// current chain dependency (ex. getting shard state from block header received during cross-shard transaction)
 func GetShardState(epoch *big.Int) shard.State {
 	utils.Logger().Info().Int64("epoch", epoch.Int64()).Msg("Get Shard State of Epoch.")
 	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)

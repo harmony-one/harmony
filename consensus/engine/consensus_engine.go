@@ -35,6 +35,8 @@ type ChainReader interface {
 	GetBlock(hash common.Hash, number uint64) *types.Block
 
 	// ReadShardState retrieves sharding state given the epoch number.
+	// This api reads the shard state cached or saved on the chaindb.
+	// Thus, only should be used to read the shard state of the current chain.
 	ReadShardState(epoch *big.Int) (shard.State, error)
 }
 
@@ -50,10 +52,11 @@ type Engine interface {
 	// via the VerifySeal method.
 	VerifyHeader(chain ChainReader, header *block.Header, seal bool) error
 
-	// Similiar to VerifyHeader, but used for verifying the block header against some commit signature for
-	// more flexibility on the api. Example of usage is the new block verification with cx transaction receipts proof
-	// where the bls signature is given by another shard through beacon chain, not from the child block header.
-	VerifyHeaderWithSignature(chain ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte) error
+	// Similiar to VerifyHeader, which is only for verifying the block headers of one's own chain, this verification
+	// is used for verifying "incoming" block header against commit signature and bitmap sent from the other chain cross-shard via libp2p.
+	// i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
+	// for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.
+	VerifyHeaderWithSignature(header *block.Header, commitSig []byte, commitBitmap []byte) error
 
 	// VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 	// concurrently. The method returns a quit channel to abort the operations and

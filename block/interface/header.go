@@ -223,6 +223,7 @@ type Header interface {
 	Logger(logger *zerolog.Logger) *zerolog.Logger
 
 	// GetShardState returns the deserialized shard state object.
+	// Note that header encoded shard state only exists in the first block of the epoch
 	GetShardState() (shard.State, error)
 
 	// Copy returns a copy of the header.
