@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/internal/chain"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,7 +28,8 @@ var (
 	testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
 	testBankFunds   = big.NewInt(8000000000000000000)
 
-	chainConfig = params.TestChainConfig
+	chainConfig  = params.TestChainConfig
+	blockFactory = blockfactory.NewFactory(chainConfig)
 )
 
 func TestGetFreeToken(test *testing.T) {
@@ -56,6 +58,7 @@ func TestFetchAccountState(test *testing.T) {
 		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
+			Factory: blockFactory,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 10,
 		}
@@ -93,6 +96,7 @@ func TestGetStakingContractInfo(test *testing.T) {
 		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
+			Factory: blockFactory,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 10,
 		}

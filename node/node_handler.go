@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"math/big"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -266,13 +268,13 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	// if cannot find latest crosslink header, broadcast latest 3 block headers
 	if err != nil {
 		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLinkHeader] ReadShardLastCrossLink Failed")
-		block := node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 2)
-		if block != nil {
-			headers = append(headers, block.Header())
+		header := node.Blockchain().GetHeaderByNumber(newBlock.NumberU64() - 2)
+		if header != nil {
+			headers = append(headers, header)
 		}
-		block = node.Blockchain().GetBlockByNumber(newBlock.NumberU64() - 1)
-		if block != nil {
-			headers = append(headers, block.Header())
+		header = node.Blockchain().GetHeaderByNumber(newBlock.NumberU64() - 1)
+		if header != nil {
+			headers = append(headers, header)
 		}
 		headers = append(headers, newBlock.Header())
 	} else {
@@ -281,9 +283,9 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 			if blockNum > latestBlockNum+crossLinkBatchSize {
 				break
 			}
-			block := node.Blockchain().GetBlockByNumber(blockNum)
-			if block != nil {
-				headers = append(headers, block.Header())
+			header := node.Blockchain().GetHeaderByNumber(blockNum)
+			if header != nil {
+				headers = append(headers, header)
 			}
 		}
 	}
@@ -300,18 +302,16 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO ek – where do we verify parent-child invariants,
 	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
 
-	if newBlock.NumberU64() > 1 {
-		err := core.VerifyBlockLastCommitSigs(node.Blockchain(), newBlock.Header())
-		if err != nil {
-			return err
-		}
+	err := node.Blockchain().Validator().ValidateHeader(newBlock, true)
+	if err != nil {
+		return ctxerror.New("cannot ValidateHeader for the new block", "blockHash", newBlock.Hash()).WithCause(err)
 	}
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
 		return ctxerror.New("wrong shard ID",
 			"my shard ID", node.Blockchain().ShardID(),
 			"new block's shard ID", newBlock.ShardID())
 	}
-	err := node.Blockchain().ValidateNewBlock(newBlock)
+	err = node.Blockchain().ValidateNewBlock(newBlock)
 	if err != nil {
 		return ctxerror.New("cannot ValidateNewBlock",
 			"blockHash", newBlock.Hash(),
@@ -356,7 +356,7 @@ var BigMaxUint64 = new(big.Int).SetBytes([]byte{
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
-func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
+func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBitmap []byte) {
 	if err := node.AddNewBlock(newBlock); err != nil {
 		utils.Logger().Error().
 			Err(err).
@@ -372,18 +372,28 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) {
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		if node.NodeConfig.ShardID == 0 {
 			node.BroadcastNewBlock(newBlock)
-		} else {
+		}
+		if node.NodeConfig.ShardID != 0 && newBlock.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) >= 0 {
 			node.BroadcastCrossLinkHeader(newBlock)
 		}
-		node.BroadcastCXReceipts(newBlock)
+		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
 		utils.Logger().Info().
-			Uint64("ViewID", node.Consensus.GetViewID()).
+			Uint64("BlockNum", newBlock.NumberU64()).
 			Msg("BINGO !!! Reached Consensus")
+		// Print to normal log too
+		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "BlockNum", newBlock.NumberU64())
+
+		// 15% of the validator also need to do broadcasting
+		rand.Seed(time.Now().UTC().UnixNano())
+		rnd := rand.Intn(100)
+		if rnd < 15 {
+			node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
+		}
 	}
 
-	// TODO chao: Write New checkpoint after clean
-	node.Blockchain().CleanCXReceiptsCheckpointsByBlock(newBlock)
+	// TODO chao: uncomment this after beacon syncing is stable
+	// node.Blockchain().UpdateCXReceiptsCheckpointsByBlock(newBlock)
 
 	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
@@ -447,8 +457,8 @@ func (node *Node) AddNewBlock(newBlock *types.Block) error {
 		utils.Logger().Error().
 			Err(err).
 			Uint64("blockNum", newBlock.NumberU64()).
-			Bytes("parentHash", newBlock.Header().ParentHash().Bytes()[:]).
-			Bytes("hash", newBlock.Header().Hash().Bytes()[:]).
+			Str("parentHash", newBlock.Header().ParentHash().Hex()).
+			Str("hash", newBlock.Header().Hash().Hex()).
 			Msg("Error Adding new block to blockchain")
 	} else {
 		utils.Logger().Info().

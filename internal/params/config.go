@@ -11,15 +11,17 @@ var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:        big.NewInt(1),
-		CrossLinkEpoch: big.NewInt(21),
-		EIP155Epoch:    big.NewInt(20),
-		S3Epoch:        big.NewInt(20),
+		CrossTxEpoch:   big.NewInt(28),
+		CrossLinkEpoch: big.NewInt(10000000), // Temporarily made very large until a exact number is decided.
+		EIP155Epoch:    big.NewInt(28),
+		S3Epoch:        big.NewInt(28),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
 		ChainID:        big.NewInt(2),
-		CrossLinkEpoch: big.NewInt(0),
+		CrossTxEpoch:   big.NewInt(1),
+		CrossLinkEpoch: big.NewInt(2),
 		EIP155Epoch:    big.NewInt(0),
 		S3Epoch:        big.NewInt(0),
 	}
@@ -27,12 +29,24 @@ var (
 	// AllProtocolChanges ...
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllProtocolChanges = &ChainConfig{big.NewInt(100), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
+	AllProtocolChanges = &ChainConfig{
+		big.NewInt(100), // ChainID
+		big.NewInt(0),   // CrossTxEpoch
+		big.NewInt(0),   // CrossLinkEpoch
+		big.NewInt(0),   // EIP155Epoch
+		big.NewInt(0),   // S3Epoch
+	}
 
 	// TestChainConfig ...
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	TestChainConfig = &ChainConfig{big.NewInt(99), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
+	TestChainConfig = &ChainConfig{
+		big.NewInt(99), // ChainID
+		big.NewInt(0),  // CrossTxEpoch
+		big.NewInt(0),  // CrossLinkEpoch
+		big.NewInt(0),  // EIP155Epoch
+		big.NewInt(0),  // S3Epoch
+	}
 
 	// TestRules ...
 	TestRules = TestChainConfig.Rules(new(big.Int))
@@ -58,6 +72,12 @@ type TrustedCheckpoint struct {
 type ChainConfig struct {
 	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
 
+	// CrossTxEpoch is the epoch where cross-shard transaction starts being
+	// processed.
+	CrossTxEpoch *big.Int `json:"crossTxEpoch,omitempty"`
+
+	// CrossLinkEpoch is the epoch where beaconchain starts containing
+	// cross-shard links.
 	CrossLinkEpoch *big.Int `json:"crossLinkEpoch,omitempty"`
 
 	EIP155Epoch *big.Int `json:"eip155Epoch,omitempty"` // EIP155 hard fork epoch (include EIP158 too)
@@ -66,16 +86,32 @@ type ChainConfig struct {
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EIP155: %v CrossLink: %v}",
+	return fmt.Sprintf("{ChainID: %v EIP155: %v CrossTx: %v CrossLink: %v}",
 		c.ChainID,
-		c.CrossLinkEpoch,
 		c.EIP155Epoch,
+		c.CrossTxEpoch,
+		c.CrossLinkEpoch,
 	)
 }
 
 // IsEIP155 returns whether epoch is either equal to the EIP155 fork epoch or greater.
 func (c *ChainConfig) IsEIP155(epoch *big.Int) bool {
 	return isForked(c.EIP155Epoch, epoch)
+}
+
+// IsCrossTx returns whether cross-shard transaction is enabled in the given
+// epoch.
+//
+// Note that this is different from comparing epoch against CrossTxEpoch.
+// Cross-shard transaction is enabled from CrossTxEpoch+1 and on, in order to
+// allow for all shards to roll into CrossTxEpoch and become able to handle
+// ingress receipts.  In other words, cross-shard transaction fields are
+// introduced at CrossTxEpoch, but these fields are not used until
+// CrossTxEpoch+1, when cross-shard transactions are actually accepted by the
+// network.
+func (c *ChainConfig) IsCrossTx(epoch *big.Int) bool {
+	crossTxEpoch := new(big.Int).Add(c.CrossTxEpoch, common.Big1)
+	return isForked(crossTxEpoch, epoch)
 }
 
 // IsCrossLink returns whether epoch is either equal to the CrossLink fork epoch or greater.
@@ -85,7 +121,7 @@ func (c *ChainConfig) IsCrossLink(epoch *big.Int) bool {
 
 // IsS3 returns whether epoch is either equal to the S3 fork epoch or greater.
 func (c *ChainConfig) IsS3(epoch *big.Int) bool {
-	return isForked(c.CrossLinkEpoch, epoch)
+	return isForked(c.S3Epoch, epoch)
 }
 
 // GasTable returns the gas table corresponding to the current phase (homestead or homestead reprice).

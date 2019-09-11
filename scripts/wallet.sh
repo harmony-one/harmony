@@ -2,30 +2,15 @@
 
 BUCKET=pub.harmony.one
 OS=$(uname -s)
-REL=mainnet
 
-case "$OS" in
-    Darwin)
-        FOLDER=release/darwin-x86_64/${REL}/
-        BIN=( wallet libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
-        ;;
-    Linux)
-        FOLDER=release/linux-x86_64/${REL}/
-        BIN=( wallet libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
-        ;;
-    *)
-        echo "${OS} not supported."
-        exit 2
-        ;;
-esac
-
+# formatted with 4 spaces indentation for consistency with wallet binary
 usage () {
    cat << EOT
 Usage: $0 [option] command
 
 Options:
-   -d          download all the binaries/config files (do it when updated)
-   -p profile  use the profile for the given network (default [main], beta, pangaea)
+   -d          download all the binaries/config files (must come after network flag)
+   -p profile  use the profile for the given network (main, local, beta, pangaea; default: main)
    -t          equivalent to -p pangaea (deprecated)
    -h          print this help
 
@@ -44,7 +29,10 @@ Commands:
         --to             - The receiver account's address
         --amount         - The amount of token to transfer
         --shardID        - The shard Id for the transfer
+        --toShardID      - The destination shard Id for the transfer
         --inputData      - Base64-encoded input data to embed in the transaction
+        --pass           - Passphrase of sender's private key
+        --waitThenBal    - Wait after the transfer with colored balances output
     8. export        - Export account key to a new file
         --account        - Specify the account to export. Empty will export every key.
     9. exportPriKey  - Export account private key
@@ -60,31 +48,64 @@ Commands:
         --key            - Raw private key.
     14. getBlsPublic   - Show Bls public key given raw private bls key.
         --key            - Raw private key.
-		--file           - encrypted bls file.
+        --file           - encrypted bls file.
 EOT
+}
+
+set_download () {
+   case "${network}" in
+   main)
+      REL=mainnet
+      ;;
+   beta)
+      REL=testnet
+      ;;
+   pangaea)
+      REL=master
+      ;;
+   *)
+      err 64 "${network}: invalid network"
+      ;;
+   esac
+
+   case "$OS" in
+   Darwin)
+      FOLDER=release/darwin-x86_64/${REL}/
+      BIN=( wallet libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib )
+      ;;
+   Linux)
+      FOLDER=release/linux-x86_64/${REL}/
+      BIN=( wallet libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so )
+      ;;
+   *)
+      echo "${OS} not supported."
+      exit 2
+      ;;
+   esac
 }
 
 do_download () {
 # clean up old files
-    for bin in "${BIN[@]}"; do
-        rm -f ${bin}
-    done
+   for bin in "${BIN[@]}"; do
+      rm -f ${bin}
+   done
 
 # download all the binaries
-    for bin in "${BIN[@]}"; do
-        curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o ${bin}
-    done
+   for bin in "${BIN[@]}"; do
+      curl http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o ${bin}
+   done
 
-    mkdir -p .hmy/keystore
-    chmod +x wallet
+   mkdir -p .hmy/keystore
+   chmod +x wallet
 }
 
 unset network
-network=default
+network=main
 
 while getopts "dp:th" opt; do
     case ${opt} in
         d)
+            set_download
             do_download
             exit 0
             ;;

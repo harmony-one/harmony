@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	chain2 "github.com/harmony-one/harmony/internal/chain"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -22,7 +23,8 @@ var (
 	testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
 	testBankFunds   = big.NewInt(8000000000000000000)
 
-	chainConfig = params.TestChainConfig
+	chainConfig  = params.TestChainConfig
+	blockFactory = blockfactory.ForTest
 )
 
 func TestNewWorker(t *testing.T) {
@@ -31,6 +33,7 @@ func TestNewWorker(t *testing.T) {
 		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
+			Factory: blockFactory,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 10,
 		}
@@ -54,6 +57,7 @@ func TestCommitTransactions(t *testing.T) {
 		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
+			Factory: blockFactory,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 0,
 		}

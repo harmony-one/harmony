@@ -78,7 +78,7 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 	(*dRand.vrfs)[dRand.SelfAddress] = append(rand[:], proof...)
 
 	utils.Logger().Info().
-		Bytes("msg", msgToSend).
+		Hex("msg", msgToSend).
 		Str("leader.PubKey", dRand.leader.ConsensusPubKey.SerializeToHexStr()).
 		Msg("[DRG] sent init")
 	dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(dRand.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
@@ -167,8 +167,8 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 		utils.Logger().Error().
 			Err(err).
 			Str("validatorAddress", validatorAddress).
-			Bytes("expectedRand", expectedRand[:]).
-			Bytes("receivedRand", rand[:]).
+			Hex("expectedRand", expectedRand[:]).
+			Hex("receivedRand", rand[:]).
 			Msg("[DRAND] Failed to verify the VRF")
 		return
 	}

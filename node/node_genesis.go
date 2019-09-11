@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -90,6 +91,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 
 	gspec := core.Genesis{
 		Config:         &chainConfig,
+		Factory:        blockfactory.NewFactory(&chainConfig),
 		Alloc:          genesisAlloc,
 		ShardID:        shardID,
 		GasLimit:       params.GenesisGasLimit,

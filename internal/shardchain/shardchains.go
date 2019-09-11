@@ -81,8 +81,9 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		return nil, ctxerror.New("cannot open chain database").WithCause(err)
 	}
 	if rawdb.ReadCanonicalHash(db, 0) == (common.Hash{}) {
-		utils.GetLogger().Info("initializing a new chain database",
-			"shardID", shardID)
+		utils.Logger().Info().
+			Uint32("shardID", shardID).
+			Msg("initializing a new chain database")
 		if err := sc.dbInit.InitChainDB(db, shardID); err != nil {
 			return nil, ctxerror.New("cannot initialize a new chain database").
 				WithCause(err)
@@ -119,11 +120,15 @@ func (sc *CollectionImpl) CloseShardChain(shardID uint32) error {
 	if !ok {
 		return ctxerror.New("shard chain not found", "shardID", shardID)
 	}
-	utils.GetLogger().Info("closing shard chain", "shardID", shardID)
+	utils.Logger().Info().
+		Uint32("shardID", shardID).
+		Msg("closing shard chain")
 	delete(sc.pool, shardID)
 	bc.Stop()
 	bc.ChainDb().Close()
-	utils.GetLogger().Info("closed shard chain", "shardID", shardID)
+	utils.Logger().Info().
+		Uint32("shardID", shardID).
+		Msg("closed shard chain")
 	return nil
 }
 
@@ -135,10 +140,14 @@ func (sc *CollectionImpl) Close() error {
 	sc.pool = newPool
 	sc.mtx.Unlock()
 	for shardID, bc := range oldPool {
-		utils.GetLogger().Info("closing shard chain", "shardID", shardID)
+		utils.Logger().Info().
+			Uint32("shardID", shardID).
+			Msg("closing shard chain")
 		bc.Stop()
 		bc.ChainDb().Close()
-		utils.GetLogger().Info("closed shard chain", "shardID", shardID)
+		utils.Logger().Info().
+			Uint32("shardID", shardID).
+			Msg("closed shard chain")
 	}
 	return nil
 }

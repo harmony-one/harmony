@@ -5,11 +5,13 @@ import (
 	"math/big"
 	"time"
 
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/block"
@@ -40,6 +42,7 @@ type environment struct {
 // and gathering the sealing result.
 type Worker struct {
 	config  *params.ChainConfig
+	factory blockfactory.Factory
 	chain   *core.BlockChain
 	current *environment // An environment for current running cycle.
 
@@ -67,6 +70,11 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 	if len(selected) > txsThrottleConfig.MaxNumTxsPerBlockLimit {
 		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Int("MaxNumTxsPerBlockLimit", txsThrottleConfig.MaxNumTxsPerBlockLimit).Msg("Throttling tx with max num txs per block limit")
 		return sender, shardingconfig.TxUnselect
+	}
+
+	// do not throttle transactions if disabled
+	if !txsThrottleConfig.EnableTxnThrottling {
+		return sender, shardingconfig.TxSelect
 	}
 
 	// throttle a single sender sending too many transactions in one block
@@ -234,12 +242,11 @@ func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 		// ... except if parent has a resharding assignment it increases by 1.
 		epoch = epoch.Add(epoch, common.Big1)
 	}
-	header := block.NewHeaderWith().
+	header := w.factory.NewHeader(epoch).With().
 		ParentHash(parent.Hash()).
 		Number(num.Add(num, common.Big1)).
 		GasLimit(core.CalcGasLimit(parent, w.gasFloor, w.gasCeil)).
 		Time(big.NewInt(timestamp)).
-		Epoch(epoch).
 		ShardID(w.chain.ShardID()).
 		Coinbase(coinbase).
 		Header()
@@ -341,9 +348,10 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 // New create a new worker object.
 func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine, shardID uint32) *Worker {
 	worker := &Worker{
-		config: config,
-		chain:  chain,
-		engine: engine,
+		config:  config,
+		factory: blockfactory.NewFactory(config),
+		chain:   chain,
+		engine:  engine,
 	}
 	worker.gasFloor = 500000000000000000
 	worker.gasCeil = 1000000000000000000
@@ -360,12 +368,11 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 		// ... except if parent has a resharding assignment it increases by 1.
 		epoch = epoch.Add(epoch, common.Big1)
 	}
-	header := block.NewHeaderWith().
+	header := worker.factory.NewHeader(epoch).With().
 		ParentHash(parent.Hash()).
 		Number(num.Add(num, common.Big1)).
 		GasLimit(core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil)).
 		Time(big.NewInt(timestamp)).
-		Epoch(epoch).
 		ShardID(worker.chain.ShardID()).
 		Header()
 	worker.makeCurrent(parent, header)

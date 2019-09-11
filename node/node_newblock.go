@@ -14,9 +14,10 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-// Constants of lower bound limit of a new block.
+// Constants of proposing a new block
 const (
-	PeriodicBlock = 200 * time.Millisecond
+	PeriodicBlock         = 200 * time.Millisecond
+	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
 )
 
 // WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
@@ -106,8 +107,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		crossLinksToPropose, localErr := node.ProposeCrossLinkDataForBeaconchain()
 		if localErr == nil {
 			crossLinks = crossLinksToPropose
-		} else {
-			utils.Logger().Debug().Err(localErr).Msg("Failed to propose cross links")
 		}
 	}
 
@@ -194,8 +193,10 @@ func (node *Node) proposeLocalShardState(block *types.Block) {
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
+	numProposed := 0
 	validReceiptsList := []*types.CXReceiptsProof{}
 	pendingReceiptsList := []*types.CXReceiptsProof{}
+
 	node.pendingCXMutex.Lock()
 
 	sort.Slice(node.pendingCXReceipts, func(i, j int) bool {
@@ -204,7 +205,12 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 
 	m := make(map[common.Hash]bool)
 
+Loop:
 	for _, cxp := range node.pendingCXReceipts {
+		if numProposed > IncomingReceiptsLimit {
+			pendingReceiptsList = append(pendingReceiptsList, cxp)
+			continue
+		}
 		// check double spent
 		if node.Blockchain().IsSpent(cxp) {
 			utils.Logger().Debug().Interface("cxp", cxp).Msg("[proposeReceiptsProof] CXReceipt is spent")
@@ -218,18 +224,25 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 			m[hash] = true
 		}
 
-		if err := node.compareCrosslinkWithReceipts(cxp); err != nil {
-			utils.Logger().Debug().Err(err).Interface("cxp", cxp).Msg("[proposeReceiptsProof] CrossLink Verify Fail")
-			if err != ErrCrosslinkVerificationFail {
-				pendingReceiptsList = append(pendingReceiptsList, cxp)
+		for _, item := range cxp.Receipts {
+			if item.ToShardID != node.Blockchain().ShardID() {
+				continue Loop
 			}
-		} else {
-			utils.Logger().Debug().Interface("cxp", cxp).Msg("[proposeReceiptsProof] CXReceipts Added")
-			validReceiptsList = append(validReceiptsList, cxp)
 		}
+
+		if err := node.Blockchain().Validator().ValidateCXReceiptsProof(cxp); err != nil {
+			utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			continue
+		}
+
+		utils.Logger().Debug().Interface("cxp", cxp).Msg("[proposeReceiptsProof] CXReceipts Added")
+		validReceiptsList = append(validReceiptsList, cxp)
+		numProposed = numProposed + len(cxp.Receipts)
 	}
+
 	node.pendingCXReceipts = pendingReceiptsList
 	node.pendingCXMutex.Unlock()
-	utils.Logger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d, pendingReceipts %d", len(validReceiptsList), len(pendingReceiptsList))
+
+	utils.Logger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d", len(validReceiptsList))
 	return validReceiptsList
 }

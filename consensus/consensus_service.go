@@ -412,13 +412,12 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 	timeElapsed := endTime.Sub(startTime)
 	numOfTxs := len(block.Transactions())
 	tps := float64(numOfTxs) / timeElapsed.Seconds()
-	utils.Logger().Info().
+	consensus.getLogger().Info().
 		Int("numOfTXs", numOfTxs).
 		Time("startTime", startTime).
 		Time("endTime", endTime).
 		Dur("timeElapsed", endTime.Sub(startTime)).
 		Float64("TPS", tps).
-		Interface("consensus", consensus).
 		Msg("TPS Report")
 
 	// Post metrics

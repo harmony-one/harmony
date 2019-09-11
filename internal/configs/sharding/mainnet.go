@@ -24,18 +24,19 @@ const (
 	mainnetV0_4Epoch = 10
 	mainnetV1Epoch   = 12
 	mainnetV1_1Epoch = 19
-	mainnetV1_2Epoch = 21
+	mainnetV1_2Epoch = 25
 
 	mainnetMaxTxAmountLimit               = 1e3 // unit is interface{} One
 	mainnetMaxNumRecentTxsPerAccountLimit = 1e2
 	mainnetMaxTxPoolSizeLimit             = 8000
 	mainnetMaxNumTxsPerBlockLimit         = 1000
 	mainnetRecentTxDuration               = time.Hour
+	mainnetEnableTxnThrottling            = true
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
-	MainNetHTTPPattern = "http://s%d.t.hmny.io:9500"
+	MainNetHTTPPattern = "https://api.s%d.t.hmny.io"
 	// MainNetWSPattern is the websocket pattern for mainnet.
-	MainNetWSPattern = "ws://s%d.t.hmny.io:9800"
+	MainNetWSPattern = "wss://ws.s%d.t.hmny.io"
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -46,7 +47,7 @@ type mainnetSchedule struct{}
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(big.NewInt(mainnetV1_2Epoch)) >= 0:
-		// twenty-first resharding epoch around 08/30/2019 11:35pm PDT
+		// twenty-fifth resharding epoch around 09/06/2019 5:31am PDT
 		return mainnetV1_2
 	case epoch.Cmp(big.NewInt(mainnetV1_1Epoch)) >= 0:
 		// nineteenth resharding epoch around 08/27/2019 9:07pm PDT
@@ -144,6 +145,10 @@ func (ms mainnetSchedule) RecentTxDuration() time.Duration {
 	return mainnetRecentTxDuration
 }
 
+func (ms mainnetSchedule) EnableTxnThrottling() bool {
+	return mainnetEnableTxnThrottling
+}
+
 func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ms.MaxTxAmountLimit(),
@@ -151,6 +156,7 @@ func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxPoolSizeLimit:             ms.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ms.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               ms.RecentTxDuration(),
+		EnableTxnThrottling:            ms.EnableTxnThrottling(),
 	}
 }
 

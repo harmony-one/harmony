@@ -1,14 +1,12 @@
 package types
 
 import (
-	"bytes"
-	"encoding/binary"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
@@ -22,11 +20,33 @@ type CXReceipt struct {
 	Amount    *big.Int
 }
 
+// Copy makes a deep copy of the receiver.
+func (r *CXReceipt) Copy() *CXReceipt {
+	if r == nil {
+		return nil
+	}
+	cpy := *r
+	if cpy.To != nil {
+		to := *cpy.To
+		cpy.To = &to
+	}
+	cpy.Amount = new(big.Int).Set(cpy.Amount)
+	return &cpy
+}
+
 // CXReceipts is a list of CXReceipt
 type CXReceipts []*CXReceipt
 
 // Len returns the length of s.
 func (cs CXReceipts) Len() int { return len(cs) }
+
+// Copy makes a deep copy of the receiver.
+func (cs CXReceipts) Copy() (cpy CXReceipts) {
+	for _, r := range cs {
+		cpy = append(cpy, r.Copy())
+	}
+	return cpy
+}
 
 // Swap swaps the i'th and the j'th element in s.
 func (cs CXReceipts) Swap(i, j int) { cs[i], cs[j] = cs[j], cs[i] }
@@ -62,11 +82,6 @@ func (cs CXReceipts) MaxToShardID() uint32 {
 	return maxShardID
 }
 
-// NewCrossShardReceipt creates a cross shard receipt
-func NewCrossShardReceipt(txHash common.Hash, from common.Address, to *common.Address, shardID uint32, toShardID uint32, amount *big.Int) *CXReceipt {
-	return &CXReceipt{TxHash: txHash, From: from, To: to, ShardID: shardID, ToShardID: toShardID, Amount: amount}
-}
-
 // CXMerkleProof represents the merkle proof of a collection of ordered cross shard transactions
 type CXMerkleProof struct {
 	BlockNum      *big.Int      // blockNumber of source shard
@@ -77,10 +92,36 @@ type CXMerkleProof struct {
 	CXShardHashes []common.Hash // ordered hash list, each hash corresponds to one destination shard's receipts root hash
 }
 
+// Copy makes a deep copy of the receiver.
+func (cxmp *CXMerkleProof) Copy() *CXMerkleProof {
+	if cxmp == nil {
+		return nil
+	}
+	cpy := *cxmp
+	cpy.BlockNum = new(big.Int).Set(cpy.BlockNum)
+	cpy.ShardIDs = append(cxmp.ShardIDs[:0:0], cpy.ShardIDs...)
+	cpy.CXShardHashes = append(cpy.CXShardHashes[:0:0], cpy.CXShardHashes...)
+	return &cpy
+}
+
 // CXReceiptsProof carrys the cross shard receipts and merkle proof
 type CXReceiptsProof struct {
-	Receipts    CXReceipts
-	MerkleProof *CXMerkleProof
+	Receipts     CXReceipts
+	MerkleProof  *CXMerkleProof
+	Header       *block.Header
+	CommitSig    []byte
+	CommitBitmap []byte
+}
+
+// Copy makes a deep copy of the receiver.
+func (cxp *CXReceiptsProof) Copy() *CXReceiptsProof {
+	return &CXReceiptsProof{
+		Receipts:     cxp.Receipts.Copy(),
+		MerkleProof:  cxp.MerkleProof.Copy(),
+		Header:       CopyHeader(cxp.Header),
+		CommitSig:    append(cxp.CommitSig[:0:0], cxp.CommitSig...),
+		CommitBitmap: append(cxp.CommitBitmap[:0:0], cxp.CommitSig...),
+	}
 }
 
 // CXReceiptsProofs is a list of CXReceiptsProof
@@ -88,6 +129,14 @@ type CXReceiptsProofs []*CXReceiptsProof
 
 // Len returns the length of s.
 func (cs CXReceiptsProofs) Len() int { return len(cs) }
+
+// Copy makes a deep copy of the receiver.
+func (cs CXReceiptsProofs) Copy() (cpy CXReceiptsProofs) {
+	for _, cxrp := range cs {
+		cpy = append(cpy, cxrp.Copy())
+	}
+	return cpy
+}
 
 // Swap swaps the i'th and the j'th element in s.
 func (cs CXReceiptsProofs) Swap(i, j int) { cs[i], cs[j] = cs[j], cs[i] }
@@ -129,52 +178,4 @@ func (cxp *CXReceiptsProof) GetToShardID() (uint32, error) {
 		}
 	}
 	return shardID, nil
-}
-
-// IsValidCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
-func (cxp *CXReceiptsProof) IsValidCXReceiptsProof() error {
-	toShardID, err := cxp.GetToShardID()
-	if err != nil {
-		return ctxerror.New("[IsValidCXReceiptsProof] invalid shardID").WithCause(err)
-	}
-
-	merkleProof := cxp.MerkleProof
-	shardRoot := common.Hash{}
-	foundMatchingShardID := false
-	byteBuffer := bytes.NewBuffer([]byte{})
-
-	// prepare to calculate source shard outgoing cxreceipts root hash
-	for j := 0; j < len(merkleProof.ShardIDs); j++ {
-		sKey := make([]byte, 4)
-		binary.BigEndian.PutUint32(sKey, merkleProof.ShardIDs[j])
-		byteBuffer.Write(sKey)
-		byteBuffer.Write(merkleProof.CXShardHashes[j][:])
-		if merkleProof.ShardIDs[j] == toShardID {
-			shardRoot = merkleProof.CXShardHashes[j]
-			foundMatchingShardID = true
-		}
-	}
-
-	if !foundMatchingShardID {
-		return ctxerror.New("[IsValidCXReceiptsProof] Didn't find matching shardID")
-	}
-
-	sourceShardID := merkleProof.ShardID
-	sourceBlockNum := merkleProof.BlockNum
-	sourceOutgoingCXReceiptsHash := merkleProof.CXReceiptHash
-
-	sha := DeriveSha(cxp.Receipts)
-
-	// (1) verify the CXReceipts trie root match
-	if sha != shardRoot {
-		return ctxerror.New("[IsValidCXReceiptsProof] Trie Root of ReadCXReceipts Not Match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", sha, "got", shardRoot)
-	}
-
-	// (2) verify the outgoingCXReceiptsHash match
-	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
-	if outgoingHashFromSourceShard != sourceOutgoingCXReceiptsHash {
-		return ctxerror.New("[IsValidCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", sourceOutgoingCXReceiptsHash)
-	}
-
-	return nil
 }

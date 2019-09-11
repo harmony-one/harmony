@@ -28,11 +28,12 @@ const (
 	testnetMaxTxPoolSizeLimit             = 8000
 	testnetMaxNumTxsPerBlockLimit         = 1000
 	testnetRecentTxDuration               = time.Hour
+	testnetEnableTxnThrottling            = true
 
 	// TestNetHTTPPattern is the http pattern for testnet.
-	TestNetHTTPPattern = "http://s%d.b.hmny.io:9500"
+	TestNetHTTPPattern = "https://api.s%d.b.hmny.io"
 	// TestNetWSPattern is the websocket pattern for testnet.
-	TestNetWSPattern = "ws://s%d.b.hmny.io:9800"
+	TestNetWSPattern = "wss://ws.s%d.b.hmny.io"
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -120,6 +121,10 @@ func (ts testnetSchedule) RecentTxDuration() time.Duration {
 	return testnetRecentTxDuration
 }
 
+func (ts testnetSchedule) EnableTxnThrottling() bool {
+	return testnetEnableTxnThrottling
+}
+
 func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ts.MaxTxAmountLimit(),
@@ -127,6 +132,7 @@ func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxPoolSizeLimit:             ts.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ts.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               ts.RecentTxDuration(),
+		EnableTxnThrottling:            ts.EnableTxnThrottling(),
 	}
 }
 

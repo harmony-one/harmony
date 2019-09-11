@@ -507,8 +507,8 @@ func (ss *StateSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) 
 	maxFirstID, maxCount := GetHowManyMaxConsensus(candidateBlocks)
 	hash := candidateBlocks[maxFirstID].Hash()
 	utils.Logger().Debug().
-		Bytes("parentHash", parentHash[:]).
-		Bytes("hash", hash[:]).
+		Hex("parentHash", parentHash[:]).
+		Hex("hash", hash[:]).
 		Int("maxCount", maxCount).
 		Msg("[SYNC] Find block with matching parenthash")
 	return candidateBlocks[maxFirstID]
@@ -540,7 +540,7 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	// Verify block signatures
 	// TODO chao: only when block is verified against last commit sigs, we can update the block and status
 	if block.NumberU64() > 1 {
-		err := core.VerifyBlockLastCommitSigs(bc, block.Header())
+		err := bc.Engine().VerifyHeader(bc, block.Header(), true)
 		if err != nil {
 			utils.Logger().Error().Err(err).Msgf("[SYNC] failed verifying signatures for new block %d", block.NumberU64())
 			return false
@@ -675,7 +675,7 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		err := peerConfig.registerToBroadcast(ss.selfPeerHash[:], ss.selfip, ss.selfport)
 		if err != nil {
 			logger.Debug().
-				Bytes("selfPeerHash", ss.selfPeerHash[:]).
+				Hex("selfPeerHash", ss.selfPeerHash[:]).
 				Msg("[SYNC] register failed to peer")
 			return
 		}
@@ -696,7 +696,7 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
+			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Warn().Err(err).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")

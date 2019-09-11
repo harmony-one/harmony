@@ -156,11 +156,13 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 
 // UpdateAddress ...
 func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
+	explorerTransaction.Type = Received
 	storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+	explorerTransaction.Type = Sent
 	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
 }
 
-// UpdateAddressStorage updates specific addr address.
+// UpdateAddressStorage updates specific addr Address.
 func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	key := GetAddressKey(addr)
 
@@ -183,6 +185,6 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, exp
 			utils.Logger().Warn().Err(err).Msg("cannot batch address")
 		}
 	} else {
-		utils.Logger().Error().Err(err).Msg("cannot encode address account")
+		utils.Logger().Error().Err(err).Msg("cannot encode address")
 	}
 }

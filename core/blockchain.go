@@ -281,7 +281,7 @@ func (bc *BlockChain) loadLastState() error {
 	currentBlock := bc.GetBlockByHash(head)
 	if currentBlock == nil {
 		// Corrupt or empty database, init from scratch
-		utils.Logger().Warn().Bytes("hash", head.Bytes()).Msg("Head block missing, resetting chain")
+		utils.Logger().Warn().Str("hash", head.Hex()).Msg("Head block missing, resetting chain")
 		return bc.Reset()
 	}
 	// Make sure the state associated with the block is available
@@ -774,7 +774,7 @@ func (bc *BlockChain) Stop() {
 
 		for _, offset := range []uint64{0, 1, triesInMemory - 1} {
 			if number := bc.CurrentBlock().NumberU64(); number > offset {
-				recent := bc.GetBlockByNumber(number - offset)
+				recent := bc.GetHeaderByNumber(number - offset)
 
 				utils.Logger().Info().
 					Str("block", recent.Number().String()).
@@ -1225,7 +1225,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		headers[i] = block.Header()
 		seals[i] = true
 	}
-	abort, results := bc.engine.VerifyHeaders(bc, headers, seals)
+	abort, results := bc.Engine().VerifyHeaders(bc, headers, seals)
 	defer close(abort)
 
 	// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
@@ -2080,8 +2080,8 @@ func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 		return false
 	}
 
-	previousBlock := bc.GetBlockByNumber(block.NumberU64() - 1)
-	return block.Coinbase() == previousBlock.Coinbase()
+	previousHeader := bc.GetHeaderByNumber(block.NumberU64() - 1)
+	return block.Coinbase() == previousHeader.Coinbase()
 }
 
 // ChainDB ...
@@ -2166,39 +2166,38 @@ func (bc *BlockChain) NextCXReceiptsCheckpoint(currentNum uint64, shardID uint32
 
 	// the new checkpoint will not exceed currentNum+1
 	for num := lastCheckpoint; num <= currentNum+1; num++ {
+		newCheckpoint = num
 		by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, num)
 		if by == rawdb.NAByte {
 			// TODO chao: check if there is IncompingReceiptsHash in crosslink header
 			// if the rootHash is non-empty, it means incomingReceipts are not delivered
 			// otherwise, it means there is no cross-shard transactions for this block
-			newCheckpoint = num
 			continue
 		}
 		if by == rawdb.SpentByte {
-			newCheckpoint = num
 			continue
 		}
 		// the first unspent blockHash found, break the loop
-		newCheckpoint = num
 		break
 	}
 	return newCheckpoint
 }
 
-// cleanCXReceiptsCheckpoints will update the checkpoint and clean spent receipts upto checkpoint
-func (bc *BlockChain) cleanCXReceiptsCheckpoints(shardID uint32, currentNum uint64) {
+// updateCXReceiptsCheckpoints will update the checkpoint and clean spent receipts upto checkpoint
+func (bc *BlockChain) updateCXReceiptsCheckpoints(shardID uint32, currentNum uint64) {
 	lastCheckpoint, err := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
 	if err != nil {
-		utils.Logger().Warn().Msg("[cleanCXReceiptsCheckpoints] Cannot get lastCheckpoint")
+		utils.Logger().Warn().Msg("[updateCXReceiptsCheckpoints] Cannot get lastCheckpoint")
 	}
 	newCheckpoint := bc.NextCXReceiptsCheckpoint(currentNum, shardID)
 	if lastCheckpoint == newCheckpoint {
 		return
 	}
-	utils.Logger().Debug().Uint64("lastCheckpoint", lastCheckpoint).Uint64("newCheckpont", newCheckpoint).Msg("[CleanCXReceiptsCheckpoints]")
+	utils.Logger().Debug().Uint64("lastCheckpoint", lastCheckpoint).Uint64("newCheckpont", newCheckpoint).Msg("[updateCXReceiptsCheckpoints]")
 	for num := lastCheckpoint; num < newCheckpoint; num++ {
 		rawdb.DeleteCXReceiptsProofSpent(bc.db, shardID, num)
 	}
+	rawdb.WriteCXReceiptsProofUnspentCheckpoint(bc.db, shardID, newCheckpoint)
 }
 
 // WriteCXReceiptsProofSpent mark the CXReceiptsProof list with given unspent status
@@ -2220,8 +2219,8 @@ func (bc *BlockChain) IsSpent(cxp *types.CXReceiptsProof) bool {
 	return false
 }
 
-// CleanCXReceiptsCheckpointsByBlock cleans checkpoints based on incomingReceipts of the given block
-func (bc *BlockChain) CleanCXReceiptsCheckpointsByBlock(block *types.Block) {
+// UpdateCXReceiptsCheckpointsByBlock cleans checkpoints and update latest checkpoint based on incomingReceipts of the given block
+func (bc *BlockChain) UpdateCXReceiptsCheckpointsByBlock(block *types.Block) {
 	m := make(map[uint32]uint64)
 	for _, cxp := range block.IncomingReceipts() {
 		shardID := cxp.MerkleProof.ShardID
@@ -2235,6 +2234,6 @@ func (bc *BlockChain) CleanCXReceiptsCheckpointsByBlock(block *types.Block) {
 
 	for k, v := range m {
 		utils.Logger().Debug().Uint32("shardID", k).Uint64("blockNum", v).Msg("[CleanCXReceiptsCheckpoints] Cleaning CXReceiptsProof upto")
-		bc.cleanCXReceiptsCheckpoints(k, v)
+		bc.updateCXReceiptsCheckpoints(k, v)
 	}
 }

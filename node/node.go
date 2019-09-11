@@ -246,7 +246,7 @@ func (node *Node) reducePendingTransactions() {
 	// If length of pendingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
 	if curLen > txPoolLimit+txPoolLimit {
 		node.pendingTransactions = append(types.Transactions(nil), node.pendingTransactions[curLen-txPoolLimit:]...)
-		utils.GetLogger().Info("mem stat reduce pending transaction")
+		utils.Logger().Info().Msg("mem stat reduce pending transaction")
 	}
 }
 
@@ -433,7 +433,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	}
 
 	utils.Logger().Info().
-		Interface("genesis block header", node.Blockchain().GetBlockByNumber(0).Header()).
+		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
 
 	// start the goroutine to receive client message
@@ -457,10 +457,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	return &node
 }
 
-// InitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
-func (node *Node) InitShardState() (err error) {
+// GetInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
+func (node *Node) GetInitShardState() (err error) {
 	if node.Consensus == nil {
-		return ctxerror.New("[InitShardState] consenus is nil; Cannot figure out shardID")
+		return ctxerror.New("[GetInitShardState] consenus is nil; Cannot figure out shardID")
 	}
 	shardID := node.Consensus.ShardID
 
@@ -472,11 +472,11 @@ func (node *Node) InitShardState() (err error) {
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
-		Msg("[InitShardState] Try To Get PublicKeys from database")
+		Msg("[GetInitShardState] Try To Get PublicKeys from database")
 	pubKeys := core.GetPublicKeys(epoch, shardID)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
-			"[InitShardState] PublicKeys is Empty, Cannot update public keys",
+			"[GetInitShardState] PublicKeys is Empty, Cannot update public keys",
 			"shardID", shardID,
 			"blockNum", blockNum)
 	}
@@ -486,7 +486,7 @@ func (node *Node) InitShardState() (err error) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
-				Msg("[InitShardState] Successfully updated public keys")
+				Msg("[GetInitShardState] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
 			node.Consensus.SetMode(consensus.Normal)
 			return nil
