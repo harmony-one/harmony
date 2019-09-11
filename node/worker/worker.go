@@ -267,7 +267,7 @@ func (w *Worker) GetCurrentState() *state.DB {
 	return w.current.state
 }
 
-// GetCurrentEpoch gets the current epoch.
+// GetNewEpoch gets the current epoch.
 func (w *Worker) GetNewEpoch() *big.Int {
 	parent := w.chain.CurrentBlock()
 	epoch := new(big.Int).Set(parent.Header().Epoch())
