@@ -112,6 +112,9 @@ func (node *Node) AddNewBlockForExplorer() {
 			}
 			utils.Logger().Debug().Uint64("blockHeight", blocks[0].NumberU64()).Msg("Adding new block for explorer node")
 			if err := node.AddNewBlock(blocks[0]); err == nil {
+				if core.IsEpochLastBlock(blocks[0]) {
+					node.Consensus.UpdateConsensusInformation()
+				}
 				// Clean up the blocks to avoid OOM.
 				node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
 				// Do dump all blocks from state syncing for explorer one time
