@@ -64,6 +64,33 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte)
 	}
 }
 
+// BroadcastMissingCXReceipts broadcasts missing cross shard receipts per request
+func (node *Node) BroadcastMissingCXReceipts() {
+	sendNextTime := []common.Hash{}
+	it := node.CxPool.Pool().Iterator()
+	for blockHash := range it.C {
+		blk := node.Blockchain().GetBlockByHash(blockHash.(common.Hash))
+		if blk == nil {
+			continue
+		}
+		blockNum := blk.NumberU64()
+		nextBlk := node.Blockchain().GetBlockByNumber(blockNum + 1)
+		if nextBlk == nil {
+			sendNextTime = append(sendNextTime, blockHash.(common.Hash))
+			continue
+		}
+		sig := nextBlk.Header().LastCommitSignature()
+		bitmap := nextBlk.Header().LastCommitBitmap()
+		lastCommits := append(sig[:], bitmap...)
+		go node.BroadcastCXReceipts(blk, lastCommits)
+	}
+	node.CxPool.Clear()
+	// this should not happen or maybe happen for impatient user
+	for _, blockHash := range sendNextTime {
+		node.CxPool.Add(blockHash)
+	}
+}
+
 // VerifyBlockCrossLinks verifies the cross links of the block
 func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 	if len(block.Header().CrossLinks()) == 0 {

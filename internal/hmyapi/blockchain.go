@@ -112,6 +112,12 @@ func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
 	return hexutil.Uint64(header.Number().Uint64())
 }
 
+// ResendTx retrieves blockHash by TxID and add blockHash to CxPool for resending
+func (s *PublicBlockChainAPI) ResendTx(ctx context.Context, txID common.Hash) (bool, error) {
+	_, success := s.b.AddBlockHashToCxPool(ctx, txID)
+	return success, nil
+}
+
 // Call executes the given transaction on the state for the given block number.
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {

@@ -232,3 +232,14 @@ func (b *APIBackend) RPCGasCap() *big.Int {
 func (b *APIBackend) GetShardID() uint32 {
 	return b.hmy.shardID
 }
+
+// AddBlockHashToCxPool retrieve blockHash from txID and add blockHash to CxPool for resending
+func (b *APIBackend) AddBlockHashToCxPool(ctx context.Context, txID common.Hash) (uint64, bool) {
+	blockHash, blockNum := b.hmy.BlockChain().ReadTxLookupEntry(txID)
+	blk := b.hmy.BlockChain().GetBlockByHash(blockHash)
+	if blk == nil {
+		return 0, false
+	}
+	success := b.hmy.CxPool().Add(blockHash)
+	return blockNum, success
+}
