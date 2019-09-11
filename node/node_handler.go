@@ -457,8 +457,8 @@ func (node *Node) AddNewBlock(newBlock *types.Block) error {
 		utils.Logger().Error().
 			Err(err).
 			Uint64("blockNum", newBlock.NumberU64()).
-			Bytes("parentHash", newBlock.Header().ParentHash().Bytes()[:]).
-			Bytes("hash", newBlock.Header().Hash().Bytes()[:]).
+			Str("parentHash", newBlock.Header().ParentHash().Hex()).
+			Str("hash", newBlock.Header().Hash().Hex()).
 			Msg("Error Adding new block to blockchain")
 	} else {
 		utils.Logger().Info().

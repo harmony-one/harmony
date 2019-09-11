@@ -11,10 +11,10 @@ var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:        big.NewInt(1),
-		CrossTxEpoch:   big.NewInt(29),
+		CrossTxEpoch:   big.NewInt(28),
 		CrossLinkEpoch: big.NewInt(10000000), // Temporarily made very large until a exact number is decided.
-		EIP155Epoch:    big.NewInt(30),
-		S3Epoch:        big.NewInt(30),
+		EIP155Epoch:    big.NewInt(28),
+		S3Epoch:        big.NewInt(28),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.

@@ -3,6 +3,7 @@ package profiler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -46,7 +47,15 @@ func (profiler *Profiler) LogMemory() {
 		// log mem usage
 		info, _ := profiler.proc.MemoryInfo()
 		memMap, _ := profiler.proc.MemoryMaps(false)
-		utils.GetLogInstance().Info("Mem Report", "info", info, "map", memMap, "shardID", profiler.shardID)
+		loggedMemMap := ""
+		for _, mems := range *memMap {
+			loggedMemMap = fmt.Sprintf("%v; %v", loggedMemMap, mems)
+		}
+		utils.Logger().Info().
+			Str("info", info.String()).
+			Str("map", loggedMemMap).
+			Uint32("shardID", profiler.shardID).
+			Msg("Mem Report")
 
 		time.Sleep(3 * time.Second)
 	}
@@ -58,7 +67,11 @@ func (profiler *Profiler) LogCPU() {
 		// log cpu usage
 		percent, _ := profiler.proc.CPUPercent()
 		times, _ := profiler.proc.Times()
-		utils.GetLogInstance().Info("CPU Report", "percent", percent, "times", times, "shardID", profiler.shardID)
+		utils.Logger().Info().
+			Float64("percent", percent).
+			Str("times", times.String()).
+			Uint32("shardID", profiler.shardID).
+			Msg("CPU Report")
 
 		time.Sleep(3 * time.Second)
 	}

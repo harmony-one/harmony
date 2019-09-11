@@ -472,6 +472,9 @@ func WriteLastCommits(
 	if err = db.Put(lastCommitsKey, data); err != nil {
 		return ctxerror.New("cannot write last commits").WithCause(err)
 	}
+	utils.Logger().Info().
+		Int("numShards", len(data)).
+		Msg("wrote last commits")
 	return nil
 }
 

@@ -48,7 +48,7 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 		}
 		address := crypto.PubkeyToAddress(key.PublicKey)
 
-		utils.Logger().Info().Int64("amount", amount).Bytes("address", address[:]).Msg("Enter")
+		utils.Logger().Info().Int64("amount", amount).Hex("address", address[:]).Msg("Enter")
 		if err := s.CreateTransactionForEnterMethod(amount, priKey); err != nil {
 			return nil, ErrEnterMethod
 		}
