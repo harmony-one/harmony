@@ -227,7 +227,7 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 			}
 		}
 
-		if err := core.IsValidCXReceiptsProof(cxp); err != nil {
+		if err := node.Blockchain().Validator().ValidateCXReceiptsProof(cxp); err != nil {
 			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
 		}
 	}

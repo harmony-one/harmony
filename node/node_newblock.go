@@ -230,7 +230,7 @@ Loop:
 			}
 		}
 
-		if err := core.IsValidCXReceiptsProof(cxp); err != nil {
+		if err := node.Blockchain().Validator().ValidateCXReceiptsProof(cxp); err != nil {
 			utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
 			continue
 		}

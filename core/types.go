@@ -33,6 +33,18 @@ type Validator interface {
 	// ValidateState validates the given statedb and optionally the receipts and
 	// gas used.
 	ValidateState(block, parent *types.Block, state *state.DB, receipts types.Receipts, cxs types.CXReceipts, usedGas uint64) error
+
+	// ValidateHeader checks whether a header conforms to the consensus rules of a
+	// given engine. Verifying the seal may be done optionally here, or explicitly
+	// via the VerifySeal method.
+	ValidateHeader(block *types.Block, seal bool) error
+
+	// ValidateHeaders verifies a batch of blocks' headers concurrently. The method returns a quit channel
+	// to abort the operations and a results channel to retrieve the async verifications
+	ValidateHeaders(chain []*types.Block) (chan<- struct{}, <-chan error)
+
+	// ValidateCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
+	ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) error
 }
 
 // Processor is an interface for processing blocks using a given initial state.
