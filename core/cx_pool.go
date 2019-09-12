@@ -18,6 +18,9 @@ type CxEntry struct {
 }
 
 // CxPool is to hold a pool of block outgoing receipts to be resend in next round broadcast
+// When a user/client doesn't find the destination shard get the money from cross shard tx
+// it can send RPC call along with txID to allow the any validator to
+// add the corresponding block's receipts to be resent
 type CxPool struct {
 	pool    mapset.Set
 	maxSize int
