@@ -323,6 +323,112 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	data.Blocks = paginatedBlocks
 }
 
+// GetExplorerBlocksRPC serves end-point /blocks
+func (s *Service) GetExplorerBlocksRPC(from, to, page, offset int) []*Block {
+	if offset == 0 {
+		offset = paginationOffset
+	}
+	db := s.storage.GetDB()
+	if to == 0 {
+		bytes, err := db.Get([]byte(BlockHeightKey))
+		if err == nil {
+			to, err = strconv.Atoi(string(bytes))
+			if err != nil {
+				utils.Logger().Info().Msg("failed to fetch block height")
+			}
+		}
+	}
+	blocks := make([]*Block, 0)
+	accountBlocks := s.ReadBlocksFromDB(from, to)
+	curEpoch := int64(-1)
+	committee := &shard.Committee{}
+	for id, accountBlock := range accountBlocks {
+		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
+			continue
+		}
+		block := NewBlock(accountBlock, id+from-1)
+		if int64(block.Epoch) > curEpoch {
+			if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), block.Epoch))); err == nil {
+				committee = &shard.Committee{}
+				if err = rlp.DecodeBytes(bytes, committee); err != nil {
+					utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
+				}
+			} else {
+				state, err := accountBlock.Header().GetShardState()
+				if err == nil {
+					for _, shardCommittee := range state {
+						if shardCommittee.ShardID == accountBlock.ShardID() {
+							committee = &shardCommittee
+							break
+						}
+					}
+				}
+			}
+			curEpoch = int64(block.Epoch)
+		}
+		pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
+		for i, validator := range committee.NodeList {
+			pubkeys[i] = new(bls.PublicKey)
+			validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
+		}
+		mask, err := bls2.NewMask(pubkeys, nil)
+		if err == nil && accountBlocks[id+1] != nil {
+			err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
+			if err == nil {
+				for _, validator := range committee.NodeList {
+					oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+					if err != nil {
+						continue
+					}
+					blsPublicKey := new(bls.PublicKey)
+					validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
+					if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
+						block.Signers = append(block.Signers, oneAddress)
+					}
+				}
+			}
+		}
+		// Populate transactions
+		for _, tx := range accountBlock.Transactions() {
+			transaction := GetTransaction(tx, accountBlock)
+			if transaction != nil {
+				block.TXs = append(block.TXs, transaction)
+			}
+		}
+		if accountBlocks[id-1] == nil {
+			block.BlockTime = int64(0)
+			block.PrevBlock = RefBlock{
+				ID:     "",
+				Height: "",
+			}
+		} else {
+			block.BlockTime = accountBlock.Time().Int64() - accountBlocks[id-1].Time().Int64()
+			block.PrevBlock = RefBlock{
+				ID:     accountBlocks[id-1].Hash().Hex(),
+				Height: strconv.Itoa(id + from - 2),
+			}
+		}
+		if accountBlocks[id+1] == nil {
+			block.NextBlock = RefBlock{
+				ID:     "",
+				Height: "",
+			}
+		} else {
+			block.NextBlock = RefBlock{
+				ID:     accountBlocks[id+1].Hash().Hex(),
+				Height: strconv.Itoa(id + from),
+			}
+		}
+		blocks = append(blocks, block)
+	}
+
+	paginatedBlocks := make([]*Block, 0)
+	for i := 0; i < offset && i+offset*page < len(blocks); i++ {
+		paginatedBlocks = append(paginatedBlocks, blocks[i+offset*page])
+	}
+	return paginatedBlocks
+}
+
 // GetExplorerTransaction servers /tx end-point.
 func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -353,6 +459,26 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	data.TX = *tx
+}
+
+// GetExplorerTransactionRPC servers /tx end-point.
+func (s *Service) GetExplorerTransactionRPC(id string) (*Transaction, error) {
+	if id == "" {
+		utils.Logger().Warn().Msg("invalid id parameter")
+		return nil, nil
+	}
+	db := s.storage.GetDB()
+	bytes, err := db.Get([]byte(GetTXKey(id)))
+	if err != nil {
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read TX")
+		return nil, err
+	}
+	tx := new(Transaction)
+	if rlp.DecodeBytes(bytes, tx) != nil {
+		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
+		return nil, err
+	}
+	return tx, nil
 }
 
 // GetExplorerCommittee servers /comittee end-point.
@@ -433,6 +559,56 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode committee")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+}
+
+// GetExplorerCommitteeRPC servers /comittee end-point.
+func (s *Service) GetExplorerCommitteeRPC(shardID uint32, epoch uint64) (*Committee, error) {
+	if s.ShardID != uint32(shardID) {
+		utils.Logger().Warn().Msg("incorrect shard id")
+		return nil, nil
+	}
+	// fetch current epoch if epoch is 0
+	db := s.storage.GetDB()
+	if epoch == 0 {
+		bytes, err := db.Get([]byte(BlockHeightKey))
+		blockHeight, err := strconv.Atoi(string(bytes))
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot decode block height from DB")
+			return nil, err
+		}
+		key := GetBlockKey(blockHeight)
+		data, err := db.Get([]byte(key))
+		block := new(types.Block)
+		if rlp.DecodeBytes(data, block) != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot get block from db")
+			return nil, err
+		}
+		epoch = block.Epoch().Uint64()
+	}
+	bytes, err := db.Get([]byte(GetCommitteeKey(uint32(shardID), epoch)))
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot read committee")
+		return nil, err
+	}
+	committee := &shard.Committee{}
+	if err := rlp.DecodeBytes(bytes, committee); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot decode committee data from DB")
+		return nil, err
+	}
+	validators := &Committee{}
+	for _, validator := range committee.NodeList {
+		validatorBalance := big.NewInt(0)
+		validatorBalance, err := s.GetAccountBalance(validator.EcdsaAddress)
+		if err != nil {
+			continue
+		}
+		oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+		if err != nil {
+			continue
+		}
+		validators.Validators = append(validators.Validators, &Validator{Address: oneAddress, Balance: validatorBalance})
+	}
+	return validators, nil
 }
 
 // GetExplorerAddress serves /address end-point.
@@ -538,6 +714,75 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	data.Address.TXs = paginatedTXs
 }
 
+// GetExplorerAddressRPC serves /address end-point.
+func (s *Service) GetExplorerAddressRPC(id, txView string, page, offset int) (*Address, error) {
+	if offset == 0 {
+		offset = paginationOffset
+	}
+	if txView == "" {
+		txView = txViewNone
+	}
+	utils.Logger().Info().Str("Address", id).Msg("Querying address")
+	if id == "" {
+		utils.Logger().Warn().Msg("missing address id param")
+		return nil, nil
+	}
+	address := &Address{}
+	address.ID = id
+	// Try to populate the banace by directly calling get balance.
+	// Check the balance from blockchain rather than local DB dump
+	balanceAddr := big.NewInt(0)
+	if s.GetAccountBalance != nil {
+		addr := common2.ParseAddr(id)
+		balance, err := s.GetAccountBalance(addr)
+		if err == nil {
+			balanceAddr = balance
+			address.Balance = balance
+		}
+	}
+
+	key := GetAddressKey(id)
+	db := s.storage.GetDB()
+	bytes, err := db.Get([]byte(key))
+	if err != nil {
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
+		return nil, err
+	}
+	if err = rlp.DecodeBytes(bytes, &address); err != nil {
+		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
+		return nil, err
+	}
+	if balanceAddr.Cmp(big.NewInt(0)) != 0 {
+		address.Balance = balanceAddr
+	}
+	switch txView {
+	case txViewNone:
+		address.TXs = nil
+	case Received:
+		receivedTXs := make([]*Transaction, 0)
+		for _, tx := range address.TXs {
+			if tx.Type == Received {
+				receivedTXs = append(receivedTXs, tx)
+			}
+		}
+		address.TXs = receivedTXs
+	case Sent:
+		sentTXs := make([]*Transaction, 0)
+		for _, tx := range address.TXs {
+			if tx.Type == Sent {
+				sentTXs = append(sentTXs, tx)
+			}
+		}
+		address.TXs = sentTXs
+	}
+	paginatedTXs := make([]*Transaction, 0)
+	for i := 0; i < offset && i+offset*page < len(address.TXs); i++ {
+		paginatedTXs = append(paginatedTXs, address.TXs[i+offset*page])
+	}
+	address.TXs = paginatedTXs
+	return address, nil
+}
+
 // GetExplorerNodeCount serves /nodes end-point.
 func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -545,6 +790,11 @@ func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
 		utils.Logger().Warn().Msg("cannot JSON-encode node count")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+}
+
+// GetExplorerNodeCountRPC serves /nodes end-point.
+func (s *Service) GetExplorerNodeCountRPC() int {
+	return len(s.GetNodeIDs())
 }
 
 // GetExplorerShard serves /shard end-point
@@ -560,6 +810,17 @@ func (s *Service) GetExplorerShard(w http.ResponseWriter, r *http.Request) {
 		utils.Logger().Warn().Msg("cannot JSON-encode shard info")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+}
+
+// GetExplorerShardRPC serves /shard end-point
+func (s *Service) GetExplorerShardRPC() *Shard {
+	var nodes []Node
+	for _, nodeID := range s.GetNodeIDs() {
+		nodes = append(nodes, Node{
+			ID: libp2p_peer.IDB58Encode(nodeID),
+		})
+	}
+	return &Shard{Nodes: nodes}
 }
 
 // NotifyService notify service
