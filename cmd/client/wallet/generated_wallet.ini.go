@@ -53,24 +53,24 @@ rpc = l1.b.hmny.io:14555
 rpc = s1.b.hmny.io:14555
 
 [pangaea]
-bootnode = /ip4/54.86.126.90/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-bootnode = /ip4/52.40.84.2/tcp/9867/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
+bootnode = /ip4/54.86.126.90/tcp/9889/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+bootnode = /ip4/52.40.84.2/tcp/9889/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
 shards = 4
 
 [pangaea.shard0.rpc]
-rpc = l0.n.hmny.io:14555
-rpc = s0.n.hmny.io:14555
+rpc = l0.p.hmny.io:14555
+rpc = s0.p.hmny.io:14555
 
 [pangaea.shard1.rpc]
-rpc = l1.n.hmny.io:14555
-rpc = s1.n.hmny.io:14555
+rpc = l1.p.hmny.io:14555
+rpc = s1.p.hmny.io:14555
 
 [pangaea.shard2.rpc]
-rpc = l2.n.hmny.io:14555
-rpc = s2.n.hmny.io:14555
+rpc = l2.p.hmny.io:14555
+rpc = s2.p.hmny.io:14555
 
 [pangaea.shard3.rpc]
-rpc = l3.n.hmny.io:14555
-rpc = s3.n.hmny.io:14555
+rpc = l3.p.hmny.io:14555
+rpc = s3.p.hmny.io:14555
 `
 )
