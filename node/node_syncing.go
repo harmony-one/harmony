@@ -251,15 +251,20 @@ func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
 
+	joinConsensus := false
 	// Check if the current node is explorer node.
-	isExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
+	switch node.NodeConfig.Role() {
+	case nodeconfig.Validator:
+		joinConsensus = true
+	}
 
 	// Send new block to unsync node if the current node is not explorer node.
-	if !isExplorerNode {
+	// TODO: leo this pushing logic has to be removed
+	if joinConsensus {
 		go node.SendNewBlockToUnsync()
 	}
 
-	go node.DoSyncing(node.Blockchain(), node.Worker, !isExplorerNode)
+	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
 }
 
 // InitSyncingServer starts downloader server.
@@ -402,7 +407,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			return response, nil
 		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Warn("[SYNC] maximum registration limit exceeds", "ip", ip, "port", port)
+			utils.GetLogInstance().Debug("[SYNC] maximum registration limit exceeds", "ip", ip, "port", port)
 			return response, nil
 		} else {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
