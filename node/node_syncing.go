@@ -23,10 +23,11 @@ import (
 
 // Constants related to doing syncing.
 const (
-	lastMileThreshold = 4
-	inSyncThreshold   = 1  // unit in number of block
-	SyncFrequency     = 10 // unit in second
-	MinConnectedPeers = 10 // minimum number of peers connected to in node syncing
+	lastMileThreshold   = 4
+	inSyncThreshold     = 1  // unit in number of block
+	SyncFrequency       = 10 // unit in second
+	BeaconSyncFrequency = 5  // unit in second
+	MinConnectedPeers   = 10 // minimum number of peers connected to in node syncing
 )
 
 // getNeighborPeers is a helper function to return list of peers
@@ -160,9 +161,19 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 
 // DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
 func (node *Node) DoBeaconSyncing() {
+	go func(node *Node) {
+		for {
+			select {
+			case beaconBlock := <-node.BeaconBlockChannel:
+				node.beaconSync.AddLastMileBlock(beaconBlock)
+			}
+		}
+	}(node)
+
+	ticker := time.NewTicker(BeaconSyncFrequency * time.Second)
 	for {
 		select {
-		case beaconBlock := <-node.BeaconBlockChannel:
+		case <-ticker.C:
 			if node.beaconSync == nil {
 				utils.Logger().Info().Msg("initializing beacon sync")
 				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
@@ -181,7 +192,6 @@ func (node *Node) DoBeaconSyncing() {
 					continue
 				}
 			}
-			node.beaconSync.AddLastMileBlock(beaconBlock)
 			node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, false, true)
 		}
 	}

@@ -32,6 +32,7 @@ const (
 	inSyncThreshold                              = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
 	BatchSize                             uint32 = 1000 //maximum size for one query of block hashes
 	SyncLoopFrequency                            = 1    // unit in second
+	LastMileBlocksSize                           = 10
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -130,9 +131,13 @@ func (ss *StateSync) purgeOldBlocksFromCache() {
 }
 
 // AddLastMileBlock add the lastest a few block into queue for syncing
+// only keep the latest blocks with size capped by LastMileBlocksSize
 func (ss *StateSync) AddLastMileBlock(block *types.Block) {
 	ss.syncMux.Lock()
 	defer ss.syncMux.Unlock()
+	if len(ss.lastMileBlocks) >= LastMileBlocksSize {
+		ss.lastMileBlocks = ss.lastMileBlocks[1:]
+	}
 	ss.lastMileBlocks = append(ss.lastMileBlocks, block)
 }
 
