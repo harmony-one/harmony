@@ -120,6 +120,8 @@ type Node struct {
 
 	TxPool *core.TxPool // TODO migrate to TxPool from pendingTransactions list below
 
+	CxPool *core.CxPool // pool for missing cross shard receipts resend
+
 	pendingTransactions types.Transactions // All the transactions received but not yet processed for Consensus
 	pendingTxMutex      sync.Mutex
 	recentTxsStats      types.RecentTxsStats
@@ -391,6 +393,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.BeaconBlockChannel = make(chan *types.Block)
 		node.recentTxsStats = make(types.RecentTxsStats)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
+		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine, node.Consensus.ShardID)
 		if node.Blockchain().ShardID() != 0 {
 			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine, node.Consensus.ShardID)

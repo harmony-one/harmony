@@ -21,6 +21,7 @@ type Harmony struct {
 
 	blockchain     *core.BlockChain
 	txPool         *core.TxPool
+	cxPool         *core.CxPool
 	accountManager *accounts.Manager
 	eventMux       *event.TypeMux
 	// DB interfaces
@@ -51,13 +52,14 @@ type NodeAPI interface {
 
 // New creates a new Harmony object (including the
 // initialisation of the common Harmony object)
-func New(nodeAPI NodeAPI, txPool *core.TxPool, eventMux *event.TypeMux, shardID uint32) (*Harmony, error) {
+func New(nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool, eventMux *event.TypeMux, shardID uint32) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	hmy := &Harmony{
 		shutdownChan:   make(chan bool),
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		blockchain:     nodeAPI.Blockchain(),
 		txPool:         txPool,
+		cxPool:         cxPool,
 		accountManager: nodeAPI.AccountManager(),
 		eventMux:       eventMux,
 		chainDb:        chainDb,
@@ -74,6 +76,9 @@ func New(nodeAPI NodeAPI, txPool *core.TxPool, eventMux *event.TypeMux, shardID 
 
 // TxPool ...
 func (s *Harmony) TxPool() *core.TxPool { return s.txPool }
+
+// CxPool is used to store the blockHashes, where the corresponding block contains the cross shard receipts to be sent
+func (s *Harmony) CxPool() *core.CxPool { return s.cxPool }
 
 // BlockChain ...
 func (s *Harmony) BlockChain() *core.BlockChain { return s.blockchain }

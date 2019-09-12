@@ -112,6 +112,16 @@ func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
 	return hexutil.Uint64(header.Number().Uint64())
 }
 
+// ResendCx requests that the egress receipt for the given cross-shard
+// transaction be sent to the destination shard for credit.  This is used for
+// unblocking a half-complete cross-shard transaction whose fund has been
+// withdrawn already from the source shard but not credited yet in the
+// destination account due to transient failures.
+func (s *PublicBlockChainAPI) ResendCx(ctx context.Context, txID common.Hash) (bool, error) {
+	_, success := s.b.ResendCx(ctx, txID)
+	return success, nil
+}
+
 // Call executes the given transaction on the state for the given block number.
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {

@@ -2238,3 +2238,10 @@ func (bc *BlockChain) UpdateCXReceiptsCheckpointsByBlock(block *types.Block) {
 		bc.updateCXReceiptsCheckpoints(k, v)
 	}
 }
+
+// ReadTxLookupEntry returns where the given transaction resides in the chain,
+// as a (block hash, block number, index in transaction list) triple.
+// returns 0, 0 if not found
+func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64) {
+	return rawdb.ReadTxLookupEntry(bc.db, txID)
+}

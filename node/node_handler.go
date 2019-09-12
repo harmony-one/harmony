@@ -392,6 +392,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		}
 	}
 
+	node.BroadcastMissingCXReceipts()
+
 	// TODO chao: uncomment this after beacon syncing is stable
 	// node.Blockchain().UpdateCXReceiptsCheckpointsByBlock(newBlock)
 
