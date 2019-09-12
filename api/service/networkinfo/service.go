@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	badger "github.com/ipfs/go-ds-badger"
@@ -60,7 +61,7 @@ const (
 func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes utils.AddrList) *Service {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(context.Background(), connectionTimeout)
-	dataStore, err := badger.NewDatastore(fmt.Sprintf(".dht-%s-%s", h.GetSelfPeer().IP, h.GetSelfPeer().Port), nil)
+	dataStore, err := badger.NewDatastore(fmt.Sprintf("%s/.dht-%s-%s", nodeconfig.GetTempDir(), h.GetSelfPeer().IP, h.GetSelfPeer().Port), nil)
 	if err != nil {
 		panic(err)
 	}
