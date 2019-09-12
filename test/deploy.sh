@@ -149,25 +149,21 @@ sleep 2
 i=0
 while IFS='' read -r line || [[ -n "$line" ]]; do
   IFS=' ' read ip port mode account blspub <<< $line
-  if [ "${mode}" == "explorer" ]
-    then
-      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}")
-    else
-      if [ ! -e .hmy/${blspub}.key ]; then
-         echo "missing blskey .hmy/${blspub}.key"
-         echo "skipping this node"
-         continue
-      fi
-
-      args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}" -blskey_file ".hmy/${blspub}.key")
+  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}")
+  if [[ -z "$ip" || -z "$port" ]]; then
+     echo "skip empty node"
+     continue
   fi
 
-  case "${mode}" in
-  leader*|validator*) args=("${args[@]}");;
-  esac
+  if [ ! -e .hmy/${blspub}.key ]; then
+    args=("${args[@]}" -blskey_file "BLSKEY")
+  else
+    args=("${args[@]}" -blskey_file ".hmy/${blspub}.key")
+  fi
+
   case "${mode}" in leader*) args=("${args[@]}" -is_leader);; esac
   case "${mode}" in *archival|archival) args=("${args[@]}" -is_archival);; esac
-  case "${mode}" in explorer*) args=("${args[@]}" -is_explorer=true -shard_id=0);; esac
+  case "${mode}" in explorer*) args=("${args[@]}" -node_type=explorer -shard_id=0);; esac
   case "${mode}" in
   client) ;;
   *) $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &;;

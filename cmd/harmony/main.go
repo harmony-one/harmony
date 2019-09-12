@@ -10,6 +10,7 @@ import (
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -84,8 +85,8 @@ var (
 	isArchival = flag.Bool("is_archival", true, "false makes node faster by turning caching off")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
-	// isExplorer indicates this node is a node to serve explorer
-	isExplorer = flag.Bool("is_explorer", false, "true means this node is a node to serve explorer")
+	// nodeType indicates the type of the node: validator, explorer
+	nodeType = flag.String("node_type", "validator", "node type: validator, explorer")
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet, localnet")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
@@ -168,9 +169,11 @@ func initSetup() {
 
 func passphraseForBls() {
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
-	if *isExplorer {
+	// However, explorer or non-validator nodes need no blskey
+	if *nodeType != "validator" {
 		return
 	}
+
 	if *blsKeyFile == "" || *blsPass == "" {
 		fmt.Println("Internal nodes need to have pass to decrypt blskey")
 		os.Exit(101)
@@ -231,7 +234,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	var err error
 
 	nodeConfig := nodeconfig.GetShardConfig(initialAccount.ShardID)
-	if !*isExplorer {
+	if *nodeType == "validator" {
 		// Set up consensus keys.
 		setupConsensusKey(nodeConfig)
 	} else {
@@ -334,17 +337,17 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	currentNode.NodeConfig.SetBeaconGroupID(p2p.NewGroupIDByShardID(0))
 
-	if *isExplorer {
+	switch *nodeType {
+	case "explorer":
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
 		currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
 		currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
-	} else {
+	case "validator":
+		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 		if nodeConfig.ShardID == 0 {
-			currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 		} else {
-			currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
@@ -395,6 +398,15 @@ func main() {
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
+	switch *nodeType {
+	case "validator":
+	case "explorer":
+		break
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
+		os.Exit(1)
+	}
+
 	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
 	if *versionFlag {
 		printVersion()
@@ -431,7 +443,7 @@ func main() {
 		memprofiling.MaybeCallGCPeriodically()
 	}
 
-	if !*isExplorer {
+	if *nodeType == "validator" {
 		setupInitialAccount()
 	}
 
@@ -451,10 +463,7 @@ func main() {
 		go currentNode.SupportBeaconSyncing()
 	}
 
-	startMsg := "==== New Harmony Node ===="
-	if *isExplorer {
-		startMsg = "==== New Explorer Node ===="
-	}
+	startMsg := fmt.Sprintf("==== New %s Node ====", strings.Title(*nodeType))
 
 	utils.Logger().Info().
 		Str("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
