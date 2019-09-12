@@ -47,57 +47,29 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte)
 		if i == int(myShardID) {
 			continue
 		}
-		cxReceipts, err := node.Blockchain().ReadCXReceipts(uint32(i), newBlock.NumberU64(), newBlock.Hash(), false)
-		if err != nil || len(cxReceipts) == 0 {
-			utils.Logger().Warn().Err(err).Uint32("ToShardID", uint32(i)).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceipts] No ReadCXReceipts found")
-			continue
-		}
-		merkleProof, err := node.Blockchain().CXMerkleProof(uint32(i), newBlock)
-		if err != nil {
-			utils.Logger().Warn().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] Unable to get merkleProof")
-			continue
-		}
-		utils.Logger().Info().Uint32("ToShardID", uint32(i)).Msg("[BroadcastCXReceipts] ReadCXReceipts and MerkleProof Found")
-
-		groupID := p2p.ShardID(i)
-		go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, newBlock.Header(), commitSig, commitBitmap)))
+		go node.BroadcastCXReceiptsWithShardID(newBlock, commitSig, commitBitmap, uint32(i))
 	}
 }
 
 // BroadcastCXReceiptsWithShardID broadcasts cross shard receipts to given ToShardID
-func (node *Node) BroadcastCXReceiptsWithShardID(newBlock *types.Block, lastCommits []byte, toShardID uint32) {
-	//#### Read payload data from committed msg
-	if len(lastCommits) <= 96 {
-		utils.Logger().Debug().Int("lastCommitsLen", len(lastCommits)).Msg("[BroadcastCXReceipts] lastCommits Not Enough Length")
-	}
-	commitSig := make([]byte, 96)
-	commitBitmap := make([]byte, len(lastCommits)-96)
-	offset := 0
-	copy(commitSig[:], lastCommits[offset:offset+96])
-	offset += 96
-	copy(commitBitmap[:], lastCommits[offset:])
-	//#### END Read payload data from committed msg
-
-	epoch := newBlock.Header().Epoch()
-	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
-	shardNum := int(shardingConfig.NumShards())
+func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig []byte, commitBitmap []byte, toShardID uint32) {
 	myShardID := node.Consensus.ShardID
-	utils.Logger().Info().Int("shardNum", shardNum).Uint32("myShardID", myShardID).Uint64("blockNum", newBlock.NumberU64()).Msg("[BroadcastCXReceipts]")
+	utils.Logger().Info().Uint32("toShardID", toShardID).Uint32("myShardID", myShardID).Uint64("blockNum", block.NumberU64()).Msg("[BroadcastCXReceiptsWithShardID]")
 
-	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, newBlock.NumberU64(), newBlock.Hash(), false)
+	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash(), false)
 	if err != nil || len(cxReceipts) == 0 {
-		utils.Logger().Warn().Err(err).Uint32("ToShardID", toShardID).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceipts] No ReadCXReceipts found")
+		utils.Logger().Warn().Err(err).Uint32("ToShardID", toShardID).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceiptsWithShardID] No ReadCXReceipts found")
 		return
 	}
-	merkleProof, err := node.Blockchain().CXMerkleProof(toShardID, newBlock)
+	merkleProof, err := node.Blockchain().CXMerkleProof(toShardID, block)
 	if err != nil {
-		utils.Logger().Warn().Uint32("ToShardID", toShardID).Msg("[BroadcastCXReceipts] Unable to get merkleProof")
+		utils.Logger().Warn().Uint32("ToShardID", toShardID).Msg("[BroadcastCXReceiptsWithShardID] Unable to get merkleProof")
 		return
 	}
-	utils.Logger().Info().Uint32("ToShardID", toShardID).Msg("[BroadcastCXReceipts] ReadCXReceipts and MerkleProof Found")
+	utils.Logger().Info().Uint32("ToShardID", toShardID).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof Found")
 
 	groupID := p2p.ShardID(toShardID)
-	go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, newBlock.Header(), commitSig, commitBitmap)))
+	go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, block.Header(), commitSig, commitBitmap)))
 }
 
 // BroadcastMissingCXReceipts broadcasts missing cross shard receipts per request
@@ -119,8 +91,7 @@ func (node *Node) BroadcastMissingCXReceipts() {
 		}
 		sig := nextHeader.LastCommitSignature()
 		bitmap := nextHeader.LastCommitBitmap()
-		lastCommits := append(sig[:], bitmap...)
-		go node.BroadcastCXReceiptsWithShardID(blk, lastCommits, toShardID)
+		go node.BroadcastCXReceiptsWithShardID(blk, sig[:], bitmap, toShardID)
 	}
 	node.CxPool.Clear()
 	// this should not happen or maybe happen for impatient user
