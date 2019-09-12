@@ -233,13 +233,23 @@ func (b *APIBackend) GetShardID() uint32 {
 	return b.hmy.shardID
 }
 
-// AddBlockHashToCxPool retrieve blockHash from txID and add blockHash to CxPool for resending
-func (b *APIBackend) AddBlockHashToCxPool(ctx context.Context, txID common.Hash) (uint64, bool) {
-	blockHash, blockNum := b.hmy.BlockChain().ReadTxLookupEntry(txID)
+// ResendCx retrieve blockHash from txID and add blockHash to CxPool for resending
+func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bool) {
+	blockHash, blockNum, index := b.hmy.BlockChain().ReadTxLookupEntry(txID)
 	blk := b.hmy.BlockChain().GetBlockByHash(blockHash)
 	if blk == nil {
 		return 0, false
 	}
-	success := b.hmy.CxPool().Add(blockHash)
+	txs := blk.Transactions()
+	// a valid index is from 0 to len-1
+	if int(index) > len(txs)-1 {
+		return 0, false
+	}
+	tx := txs[int(index)]
+	if tx.ShardID() == tx.ToShardID() || blk.Header().ShardID() != tx.ShardID() {
+		return 0, false
+	}
+	entry := core.CxEntry{blockHash, tx.ToShardID()}
+	success := b.hmy.CxPool().Add(entry)
 	return blockNum, success
 }

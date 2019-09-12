@@ -7,14 +7,23 @@ import (
 )
 
 const (
+	// CxPoolSize is the maximum size of the pool
 	CxPoolSize = 50
 )
 
+// CxEntry represents the egress receipt's blockHash and ToShardID
+type CxEntry struct {
+	BlockHash common.Hash
+	ToShardID uint32
+}
+
+// CxPool is to hold a pool of block outgoing receipts to be resend in next round broadcast
 type CxPool struct {
 	pool    mapset.Set
 	maxSize int
 }
 
+// NewCxPool creates a new CxPool
 func NewCxPool(limit int) *CxPool {
 	pool := mapset.NewSet()
 	cxPool := CxPool{pool: pool, maxSize: limit}
@@ -32,11 +41,11 @@ func (cxPool *CxPool) Size() int {
 }
 
 // Add add element into the pool if not exceed limit
-func (cxPool *CxPool) Add(hash common.Hash) bool {
+func (cxPool *CxPool) Add(entry CxEntry) bool {
 	if cxPool.Size() > cxPool.maxSize {
 		return false
 	}
-	cxPool.pool.Add(hash)
+	cxPool.pool.Add(entry)
 	return true
 }
 

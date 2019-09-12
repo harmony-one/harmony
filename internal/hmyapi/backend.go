@@ -66,7 +66,7 @@ type Backend interface {
 	GetShardID() uint32
 
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
-	AddBlockHashToCxPool(ctx context.Context, txID common.Hash) (uint64, bool)
+	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 }
 
 // GetAPIs returns all the APIs.

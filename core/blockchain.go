@@ -2238,8 +2238,9 @@ func (bc *BlockChain) UpdateCXReceiptsCheckpointsByBlock(block *types.Block) {
 	}
 }
 
-// ReadTxLookupEntry returns the corresponding blockHash and blockNum where transaction locates
-func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64) {
-	blockHash, blockNum, _ := rawdb.ReadTxLookupEntry(bc.db, txID)
-	return blockHash, blockNum
+// ReadTxLookupEntry returns where the given transaction resides in the chain,
+// as a (block hash, block number, index in transaction list) triple.
+// returns 0, 0 if not found
+func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64) {
+	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }
