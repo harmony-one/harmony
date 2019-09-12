@@ -163,11 +163,11 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   fi
 
   case "${mode}" in
-  leader*|validator*) args=("${args[@]}" -is_genesis);;
+  leader*|validator*) args=("${args[@]}");;
   esac
   case "${mode}" in leader*) args=("${args[@]}" -is_leader);; esac
   case "${mode}" in *archival|archival) args=("${args[@]}" -is_archival);; esac
-  case "${mode}" in explorer*) args=("${args[@]}" -is_genesis=false -is_explorer=true -shard_id=0);; esac
+  case "${mode}" in explorer*) args=("${args[@]}" -is_explorer=true -shard_id=0);; esac
   case "${mode}" in
   client) ;;
   *) $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &;;
