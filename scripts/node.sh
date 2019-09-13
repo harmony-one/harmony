@@ -107,6 +107,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -N network     join the given network (main, beta, pangaea; default: main)
    -t             equivalent to -N pangaea (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
+   -i shardid     specify the shard id (valid only with explorer node; default: 1)
 
 example:
 
@@ -134,11 +135,12 @@ download_only=false
 metrics=false
 network=main
 node_type=validator
+shard_id=1
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT: opt
+while getopts :1chk:sSp:dDmN:tT:i: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -156,6 +158,7 @@ do
    N) network="${OPTARG}";;
    t) network=pangaea;;
    T) node_type="${OPTARG}";;
+   i) shard_id="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -497,6 +500,7 @@ do
    explorer)
       args+=(
       -node_type="${node_type}"
+      -shard_id="${shard_id}"
       )
       ;;
    esac
