@@ -22,6 +22,8 @@ type RPCTransaction struct {
 	To               *common.Address `json:"to"`
 	TransactionIndex hexutil.Uint    `json:"transactionIndex"`
 	Value            *hexutil.Big    `json:"value"`
+	FromShardID      uint32          `json:"fromShardID"`
+	ToShardID        uint32          `json:"toShardID"`
 	V                *hexutil.Big    `json:"v"`
 	R                *hexutil.Big    `json:"r"`
 	S                *hexutil.Big    `json:"s"`
@@ -38,17 +40,19 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	v, r, s := tx.RawSignatureValues()
 
 	result := &RPCTransaction{
-		From:     from,
-		Gas:      hexutil.Uint64(tx.Gas()),
-		GasPrice: (*hexutil.Big)(tx.GasPrice()),
-		Hash:     tx.Hash(),
-		Input:    hexutil.Bytes(tx.Data()),
-		Nonce:    hexutil.Uint64(tx.Nonce()),
-		To:       tx.To(),
-		Value:    (*hexutil.Big)(tx.Value()),
-		V:        (*hexutil.Big)(v),
-		R:        (*hexutil.Big)(r),
-		S:        (*hexutil.Big)(s),
+		From:        from,
+		Gas:         hexutil.Uint64(tx.Gas()),
+		GasPrice:    (*hexutil.Big)(tx.GasPrice()),
+		Hash:        tx.Hash(),
+		Input:       hexutil.Bytes(tx.Data()),
+		Nonce:       hexutil.Uint64(tx.Nonce()),
+		To:          tx.To(),
+		Value:       (*hexutil.Big)(tx.Value()),
+		FromShardID: tx.ShardID(),
+		ToShardID:   tx.ToShardID(),
+		V:           (*hexutil.Big)(v),
+		R:           (*hexutil.Big)(r),
+		S:           (*hexutil.Big)(s),
 	}
 	if blockHash != (common.Hash{}) {
 		result.BlockHash = blockHash
