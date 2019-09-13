@@ -569,3 +569,8 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 func (node *Node) AccountManager() *accounts.Manager {
 	return node.accountManager
 }
+
+// ServiceManager ...
+func (node *Node) ServiceManager() *service.Manager {
+	return node.serviceManager
+}

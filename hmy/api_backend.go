@@ -246,6 +246,7 @@ func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bo
 		return 0, false
 	}
 	tx := txs[int(index)]
+	// check whether it is a valid cross shard tx
 	if tx.ShardID() == tx.ToShardID() || blk.Header().ShardID() != tx.ShardID() {
 		return 0, false
 	}

@@ -12,13 +12,14 @@ SRC[wallet_stress_test]="cmd/client/wallet_stress_test/main.go cmd/client/wallet
 BINDIR=bin
 BUCKET=unique-bucket-bin
 PUBBUCKET=pub.harmony.one
-REL=s3
+REL=
 GOOS=linux
 GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
 RACE=
 VERBOSE=
 DEBUG=false
+NETWORK=main
 
 unset -v progdir
 case "${0}" in
@@ -35,6 +36,9 @@ if [ "$(uname -s)" == "Darwin" ]; then
    GOOS=darwin
    LIB[libbls384_256.dylib]=${BLS_DIR}/lib/libbls384_256.dylib
    LIB[libmcl.dylib]=${MCL_DIR}/lib/libmcl.dylib
+   LIB[libgmp.10.dylib]=/usr/local/opt/gmp/lib/libgmp.10.dylib
+   LIB[libgmpxx.4.dylib]=/usr/local/opt/gmp/lib/libgmpxx.4.dylib
+   LIB[libcrypto.1.0.0.dylib]=/usr/local/opt/openssl/lib/libcrypto.1.0.0.dylib
 else
    MD5=md5sum
    LIB[libbls384_256.so]=${BLS_DIR}/lib/libbls384_256.so
@@ -62,6 +66,7 @@ ACTION:
    build       build binaries only (default action)
    upload      upload binaries to s3
    pubwallet   upload wallet to public bucket (bucket: $PUBBUCKET)
+   release     upload binaries to release bucket
 
    harmony|txgen|bootnode|wallet
                only build the specified binary
@@ -133,6 +138,45 @@ function upload
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
 }
 
+function release
+{
+   AWSCLI=aws
+
+   if [ -n "$PROFILE" ]; then
+      AWSCLI+=" --profile $PROFILE"
+   fi
+
+   OS=$(uname -s)
+
+   case "$OS" in
+      "Linux")
+         FOLDER=release/linux-x86_64/$REL ;;
+      "Darwin")
+         FOLDER=release/darwin-x86_64/$REL ;;
+      *)
+         echo "Unsupported OS: $OS"
+         return ;;
+   esac
+
+   for bin in "${!SRC[@]}"; do
+      if [ -e $BINDIR/$bin ]; then
+         $AWSCLI s3 cp $BINDIR/$bin s3://${PUBBUCKET}/$FOLDER/$bin --acl public-read
+      else
+         echo "!! MISSGING $bin !!"
+      fi
+   done
+
+   for lib in "${!LIB[@]}"; do
+      if [ -e ${LIB[$lib]} ]; then
+         $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$FOLDER/$lib --acl public-read
+      else
+         echo "!! MISSING ${LIB[$lib]} !!"
+      fi
+   done
+
+   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${PUBBUCKET}/$FOLDER/md5sum.txt --acl public-read
+}
+
 function upload_wallet
 {
    AWSCLI=aws
@@ -168,7 +212,7 @@ function upload_wallet
 }
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:rv" option; do
+while getopts "hp:a:o:b:f:rvN:" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;
@@ -179,6 +223,7 @@ while getopts "hp:a:o:b:f:rv" option; do
       r) RACE=-race ;;
       v) VERBOSE='-v -x' ;;
       d) DEBUG=true ;;
+      N) NETWORK=$OPTARG ;;
    esac
 done
 
@@ -188,9 +233,26 @@ shift $(($OPTIND-1))
 
 ACTION=${1:-build}
 
+case "${NETWORK}" in
+main)
+  REL=mainnet
+  ;;
+beta)
+  REL=testnet
+  ;;
+pangaea)
+  REL=pangaea
+  ;;
+*)
+  echo "${NETWORK}: invalid network"
+  exit
+  ;;
+esac
+
 case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
+   "release") release ;;
    "pubwallet") upload_wallet ;;
    "harmony"|"wallet"|"txgen"|"bootnode") build_only $ACTION ;;
    *) usage ;;

@@ -42,7 +42,7 @@ var (
 	commit  string
 )
 
-// InitLDBDatabase initializes a LDBDatabase. isGenesis=true will return the beacon chain database for normal shard nodes
+// InitLDBDatabase initializes a LDBDatabase. will return the beacon chain database for normal shard nodes
 func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethdb.LDBDatabase, error) {
 	var dbFileName string
 	if isBeacon {
@@ -80,14 +80,12 @@ var (
 	minPeers = flag.Int("min_peers", 32, "Minimal number of Peers in shard")
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
-	// isGenesis indicates this node is a genesis node
-	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", true, "false makes node faster by turning caching off")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
-	// isExplorer indicates this node is a node to serve explorer
-	isExplorer = flag.Bool("is_explorer", false, "true means this node is a node to serve explorer")
+	// nodeType indicates the type of the node: validator, explorer
+	nodeType = flag.String("node_type", "validator", "node type: validator, explorer")
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet, localnet")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
@@ -170,9 +168,11 @@ func initSetup() {
 
 func passphraseForBls() {
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
-	if *isExplorer {
+	// However, explorer or non-validator nodes need no blskey
+	if *nodeType != "validator" {
 		return
 	}
+
 	if *blsKeyFile == "" || *blsPass == "" {
 		fmt.Println("Internal nodes need to have pass to decrypt blskey")
 		os.Exit(101)
@@ -233,7 +233,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	var err error
 
 	nodeConfig := nodeconfig.GetShardConfig(initialAccount.ShardID)
-	if !*isExplorer {
+	if *nodeType == "validator" {
 		// Set up consensus keys.
 		setupConsensusKey(nodeConfig)
 	} else {
@@ -336,17 +336,17 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	currentNode.NodeConfig.SetBeaconGroupID(p2p.NewGroupIDByShardID(0))
 
-	if *isExplorer {
+	switch *nodeType {
+	case "explorer":
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
 		currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
 		currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
-	} else {
+	case "validator":
+		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 		if nodeConfig.ShardID == 0 {
-			currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
 			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
 		} else {
-			currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
 		}
@@ -397,6 +397,15 @@ func main() {
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
+	switch *nodeType {
+	case "validator":
+	case "explorer":
+		break
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
+		os.Exit(1)
+	}
+
 	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
 	if *versionFlag {
 		printVersion()
@@ -433,7 +442,7 @@ func main() {
 		memprofiling.MaybeCallGCPeriodically()
 	}
 
-	if !*isExplorer {
+	if *nodeType == "validator" {
 		setupInitialAccount()
 	}
 
@@ -454,7 +463,7 @@ func main() {
 	}
 
 	startMsg := "==== New Harmony Node ===="
-	if *isExplorer {
+	if *nodeType == "explorer" {
 		startMsg = "==== New Explorer Node ===="
 	}
 

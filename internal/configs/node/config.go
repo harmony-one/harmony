@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -245,4 +246,9 @@ func SetVersion(ver string) {
 // GetVersion return the version of the node binary
 func GetVersion() string {
 	return version
+}
+
+// GetTempDir return temporary directory
+func GetTempDir() string {
+	return os.TempDir()
 }
