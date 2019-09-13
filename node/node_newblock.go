@@ -193,6 +193,10 @@ func (node *Node) proposeLocalShardState(block *types.Block) {
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
+	if !node.Blockchain().Config().IsCrossTx(node.Worker.GetNewEpoch()) {
+		return []*types.CXReceiptsProof{}
+	}
+
 	numProposed := 0
 	validReceiptsList := []*types.CXReceiptsProof{}
 	pendingReceiptsList := []*types.CXReceiptsProof{}
