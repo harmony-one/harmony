@@ -106,6 +106,7 @@ type StateSync struct {
 	syncConfig         *SyncConfig
 	stateSyncTaskQueue *queue.Queue
 	syncMux            sync.Mutex
+	lastMileMux        sync.Mutex
 }
 
 func (ss *StateSync) purgeAllBlocksFromCache() {
@@ -133,8 +134,8 @@ func (ss *StateSync) purgeOldBlocksFromCache() {
 // AddLastMileBlock add the lastest a few block into queue for syncing
 // only keep the latest blocks with size capped by LastMileBlocksSize
 func (ss *StateSync) AddLastMileBlock(block *types.Block) {
-	ss.syncMux.Lock()
-	defer ss.syncMux.Unlock()
+	ss.lastMileMux.Lock()
+	defer ss.lastMileMux.Unlock()
 	if len(ss.lastMileBlocks) >= LastMileBlocksSize {
 		ss.lastMileBlocks = ss.lastMileBlocks[1:]
 	}

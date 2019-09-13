@@ -170,84 +170,77 @@ func (node *Node) DoBeaconSyncing() {
 		}
 	}(node)
 
-	ticker := time.NewTicker(BeaconSyncFrequency * time.Second)
 	for {
-		select {
-		case <-ticker.C:
-			if node.beaconSync == nil {
-				utils.Logger().Info().Msg("initializing beacon sync")
-				node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
-			}
-			if node.beaconSync.GetActivePeerNumber() == 0 {
-				utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
-				peers, err := node.SyncingPeerProvider.SyncingPeers(0)
-				if err != nil {
-					utils.Logger().Warn().
-						Err(err).
-						Msg("cannot retrieve beacon syncing peers")
-					continue
-				}
-				if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
-					utils.Logger().Warn().Err(err).Msg("cannot create beacon sync config")
-					continue
-				}
-			}
-			node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, false, true)
+		if node.beaconSync == nil {
+			utils.Logger().Info().Msg("initializing beacon sync")
+			node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 		}
+		if node.beaconSync.GetActivePeerNumber() == 0 {
+			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
+			peers, err := node.SyncingPeerProvider.SyncingPeers(0)
+			if err != nil {
+				utils.Logger().Warn().
+					Err(err).
+					Msg("cannot retrieve beacon syncing peers")
+				continue
+			}
+			if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
+				utils.Logger().Warn().Err(err).Msg("cannot create beacon sync config")
+				continue
+			}
+		}
+		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, false, true)
+		time.Sleep(BeaconSyncFrequency * time.Second)
 	}
 }
 
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
-	ticker := time.NewTicker(SyncFrequency * time.Second)
 
 SyncingLoop:
 	for {
-		select {
-		case <-ticker.C:
-			if node.stateSync == nil {
-				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
-
-				utils.Logger().Debug().Msg("[SYNC] initialized state sync")
-			}
-			if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
-				shardID := bc.ShardID()
-				peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
-				if err != nil {
-					utils.Logger().Warn().
-						Err(err).
-						Uint32("shard_id", shardID).
-						Msg("cannot retrieve syncing peers")
-					continue SyncingLoop
-				}
-				if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
-					utils.Logger().Warn().
-						Err(err).
-						Interface("peers", peers).
-						Msg("[SYNC] create peers error")
-					continue SyncingLoop
-				}
-				utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
-			}
-			if node.stateSync.IsOutOfSync(bc) {
-				node.stateMutex.Lock()
-				node.State = NodeNotInSync
-				node.stateMutex.Unlock()
-				if willJoinConsensus {
-					node.Consensus.BlocksNotSynchronized()
-				}
-				node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
-				if willJoinConsensus {
-					node.stateMutex.Lock()
-					node.State = NodeReadyForConsensus
-					node.stateMutex.Unlock()
-					node.Consensus.BlocksSynchronized()
-				}
-			}
-			node.stateMutex.Lock()
-			node.State = NodeReadyForConsensus
-			node.stateMutex.Unlock()
+		if node.stateSync == nil {
+			node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+			utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 		}
+		if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
+			shardID := bc.ShardID()
+			peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
+			if err != nil {
+				utils.Logger().Warn().
+					Err(err).
+					Uint32("shard_id", shardID).
+					Msg("cannot retrieve syncing peers")
+				continue SyncingLoop
+			}
+			if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
+				utils.Logger().Warn().
+					Err(err).
+					Interface("peers", peers).
+					Msg("[SYNC] create peers error")
+				continue SyncingLoop
+			}
+			utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
+		}
+		if node.stateSync.IsOutOfSync(bc) {
+			node.stateMutex.Lock()
+			node.State = NodeNotInSync
+			node.stateMutex.Unlock()
+			if willJoinConsensus {
+				node.Consensus.BlocksNotSynchronized()
+			}
+			node.stateSync.SyncLoop(bc, worker, willJoinConsensus, false)
+			if willJoinConsensus {
+				node.stateMutex.Lock()
+				node.State = NodeReadyForConsensus
+				node.stateMutex.Unlock()
+				node.Consensus.BlocksSynchronized()
+			}
+		}
+		node.stateMutex.Lock()
+		node.State = NodeReadyForConsensus
+		node.stateMutex.Unlock()
+		time.Sleep(SyncFrequency * time.Second)
 	}
 }
 
