@@ -569,3 +569,9 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 func (node *Node) AccountManager() *accounts.Manager {
 	return node.accountManager
 }
+
+// DeletePeerSyncConfig closes the peer connection and removes the peer from the registeration record
+func (node *Node) DeletePeerSyncConfig(peerID string) {
+	node.peerRegistrationRecord[peerID].client.Close()
+	delete(node.peerRegistrationRecord, peerID)
+}

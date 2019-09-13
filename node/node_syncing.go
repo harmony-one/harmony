@@ -189,7 +189,7 @@ func (node *Node) DoBeaconSyncing() {
 				continue
 			}
 		}
-		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, false, true)
+		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true)
 		time.Sleep(BeaconSyncFrequency * time.Second)
 	}
 }
@@ -229,14 +229,17 @@ SyncingLoop:
 			if willJoinConsensus {
 				node.Consensus.BlocksNotSynchronized()
 			}
+
 			node.stateSync.SyncLoop(bc, worker, false)
 		}
+
 		node.stateMutex.Lock()
 		node.State = NodeReadyForConsensus
 		node.stateMutex.Unlock()
 		if willJoinConsensus {
 			node.Consensus.BlocksSynchronized()
 		}
+
 		time.Sleep(SyncFrequency * time.Second)
 	}
 }
@@ -297,19 +300,14 @@ func (node *Node) SendNewBlockToUnsync() {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
 				utils.Logger().Warn().Str("peerID", peerID).Msg("[SYNC] SendNewBlockToUnsync to peer timeout")
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
+				node.DeletePeerSyncConfig(peerID)
 				continue
 			}
 			response, err := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
 			// close the connection if cannot push new block to unsync node
-			if err != nil {
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-			}
-			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
+			if err != nil ||
+				(response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC) {
+				node.DeletePeerSyncConfig(peerID)
 			}
 		}
 		node.stateMutex.Unlock()
