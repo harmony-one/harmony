@@ -491,8 +491,15 @@ do
       -blskey_file "${BLSKEYFILE}"
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
-      -node_type="${node_type}"
    )
+# backward compatible with older harmony node software
+   case "${node_type}" in
+   explorer)
+      args+=(
+      -node_type="${node_type}"
+      )
+      ;;
+   esac
    case "${metrics}" in
    true)
       args+=(
