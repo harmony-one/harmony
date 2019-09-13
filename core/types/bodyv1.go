@@ -39,6 +39,21 @@ func (b *BodyV1) TransactionAt(index int) *Transaction {
 	return b.f.Transactions[index].Copy()
 }
 
+// CXReceiptAt returns the CXReceipt at given index/subindex in this block
+// It returns nil if index/subindex is out of bounds
+func (b *BodyV1) CXReceiptAt(index int, subindex int) *CXReceipt {
+	if index < 0 || index >= len(b.f.IncomingReceipts) {
+		return nil
+	}
+
+	cxs := b.f.IncomingReceipts[index].Receipts
+	if subindex < 0 || subindex >= len(cxs) {
+		return nil
+	}
+
+	return cxs[subindex].Copy()
+}
+
 // SetTransactions sets the list of transactions with a deep copy of the given
 // list.
 func (b *BodyV1) SetTransactions(newTransactions []*Transaction) {

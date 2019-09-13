@@ -29,6 +29,36 @@ type RPCTransaction struct {
 	S                *hexutil.Big    `json:"s"`
 }
 
+// RPCCXReceipt represents a CXReceipt that will serialize to the RPC representation of a CXReceipt
+type RPCCXReceipt struct {
+	BlockHash   common.Hash     `json:"blockHash"`
+	BlockNumber *hexutil.Big    `json:"blockNumber"`
+	TxHash      common.Hash     `json:"hash"`
+	From        common.Address  `json:"from"`
+	To          *common.Address `json:"to"`
+	FromShardID uint32          `json:"fromShardID"`
+	ToShardID   uint32          `json:"toShardID"`
+	Amount      *hexutil.Big    `json:"value"`
+}
+
+// newRPCCXReceipt returns a CXReceipt that will serialize to the RPC representation
+func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uint64) *RPCCXReceipt {
+	result := &RPCCXReceipt{
+		BlockHash:   blockHash,
+		TxHash:      cx.TxHash,
+		From:        cx.From,
+		To:          cx.To,
+		Amount:      (*hexutil.Big)(cx.Amount),
+		FromShardID: cx.ShardID,
+		ToShardID:   cx.ToShardID,
+	}
+	if blockHash != (common.Hash{}) {
+		result.BlockHash = blockHash
+		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
+	}
+	return result
+}
+
 // newRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
 func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, index uint64) *RPCTransaction {

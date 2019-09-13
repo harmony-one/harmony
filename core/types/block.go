@@ -86,6 +86,11 @@ type BodyInterface interface {
 	// It returns nil if index is out of bounds.
 	TransactionAt(index int) *Transaction
 
+	// CXReceiptAt returns the CXReceipt given index (from IncomingReceipts)
+	// and subindex(from CXReceiptProof in IncomingReceipts)
+	// It returns nil if index, subindex is out of bounds
+	CXReceiptAt(index int, subIndex int) *CXReceipt
+
 	// SetTransactions sets the list of transactions with a deep copy of the
 	// given list.
 	SetTransactions(newTransactions []*Transaction)
