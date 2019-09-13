@@ -106,6 +106,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -m             collect and upload node metrics to harmony prometheus + grafana
    -N network     join the given network (main, beta, pangaea; default: main)
    -t             equivalent to -N pangaea (deprecated)
+   -T nodetype    specify the node type (validator, explorer; default: validator)
 
 example:
 
@@ -132,11 +133,12 @@ do_not_download=false
 download_only=false
 metrics=false
 network=main
+node_type=validator
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:t opt
+while getopts :1chk:sSp:dDmN:tT: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -153,12 +155,19 @@ do
    m) metrics=true;;
    N) network="${OPTARG}";;
    t) network=pangaea;;
+   T) node_type="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
 shift $((${OPTIND} - 1))
 
 unset -v bootnodes REL network_type dns_zone
+
+case "${node_type}" in
+validator|explorer) ;;
+*)
+   usage ;;
+esac
 
 case "${network}" in
 main)
@@ -482,6 +491,7 @@ do
       -blskey_file "${BLSKEYFILE}"
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
+      -node_type="${node_type}"
    )
    case "${metrics}" in
    true)
