@@ -36,10 +36,9 @@ case $OS in
       ;;
 esac
 
-echo Added Env Vars:
-echo
-echo \"CGO_CFLAGS\" : \"$CGO_CFLAGS\",
-echo \"CGO_LDFLAGS\" : \"$CGO_LDFLAGS\",
-echo \"LD_LIBRARY_PATH\" : \"$LD_LIBRARY_PATH\",
-echo \"DYLD_FALLBACK_LIBRARY_PATH\" : \"$DYLD_FALLBACK_LIBRARY_PATH\"
-echo
+if [ $1 == '-v' ]; then
+   printf "{ \"CGO_CFLAGS\" : \"$CGO_CFLAGS\",
+            \"CGO_LDFLAGS\" : \"$CGO_LDFLAGS\",
+            \"LD_LIBRARY_PATH\" : \"$LD_LIBRARY_PATH\",
+            \"DYLD_FALLBACK_LIBRARY_PATH\" : \"$DYLD_FALLBACK_LIBRARY_PATH\"}"
+fi
