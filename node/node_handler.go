@@ -390,6 +390,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		}
 	}
 
+	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
 
 	// TODO chao: uncomment this after beacon syncing is stable
