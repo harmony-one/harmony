@@ -215,7 +215,7 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 
 // GetCXReceiptByHash returns the transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash common.Hash) *RPCCXReceipt {
-	if cx, blockHash, blockNumber, _, _ := rawdb.ReadCXReceipt(s.b.ChainDb(), hash); cx != nil {
+	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.b.ChainDb(), hash); cx != nil {
 		return newRPCCXReceipt(cx, blockHash, blockNumber)
 	}
 	return nil

@@ -94,7 +94,6 @@ type TxLookupEntry struct {
 	BlockHash  common.Hash
 	BlockIndex uint64
 	Index      uint64
-	SubIndex   uint64 // used for lookup CXReceipt from CXReceiptsProof
 }
 
 // encodeBlockNumber encodes a block number as big endian uint64

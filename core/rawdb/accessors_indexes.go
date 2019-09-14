@@ -124,32 +124,33 @@ func WriteBloomBits(db DatabaseWriter, bit uint, section uint64, head common.Has
 	}
 }
 
-// ReadCxLookupEntry retrieves the positional metadata associated with a transaction
-// hash to allow retrieving the transaction or receipt by hash.
+// ReadCxLookupEntry retrieves the positional metadata associated with a transaction hash
+// to allow retrieving cross shard receipt by hash in destination shard
+// not the original transaction in source shard
 // return nil if not found
-func ReadCxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64, uint64, uint64) {
+func ReadCxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64, uint64) {
 	data, _ := db.Get(cxLookupKey(hash))
 	if len(data) == 0 {
-		return common.Hash{}, 0, 0, 0
+		return common.Hash{}, 0, 0
 	}
 	var entry TxLookupEntry
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
 		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid transaction lookup entry RLP")
-		return common.Hash{}, 0, 0, 0
+		return common.Hash{}, 0, 0
 	}
-	return entry.BlockHash, entry.BlockIndex, entry.Index, entry.SubIndex
+	return entry.BlockHash, entry.BlockIndex, entry.Index
 }
 
 // WriteCxLookupEntries stores a positional metadata for every transaction from
 // a block, enabling hash based transaction and receipt lookups.
 func WriteCxLookupEntries(db DatabaseWriter, block *types.Block) {
-	for i, cxp := range block.IncomingReceipts() {
+	previousSum := 0
+	for _, cxp := range block.IncomingReceipts() {
 		for j, cx := range cxp.Receipts {
 			entry := TxLookupEntry{
 				BlockHash:  block.Hash(),
 				BlockIndex: block.NumberU64(),
-				Index:      uint64(i),
-				SubIndex:   uint64(j),
+				Index:      uint64(j + previousSum),
 			}
 			data, err := rlp.EncodeToBytes(entry)
 			if err != nil {
@@ -159,6 +160,7 @@ func WriteCxLookupEntries(db DatabaseWriter, block *types.Block) {
 				utils.Logger().Error().Err(err).Msg("Failed to store transaction lookup entry")
 			}
 		}
+		previousSum += len(cxp.Receipts)
 	}
 }
 
@@ -169,10 +171,10 @@ func DeleteCxLookupEntry(db DatabaseDeleter, hash common.Hash) {
 
 // ReadCXReceipt retrieves a specific transaction from the database, along with
 // its added positional metadata.
-func ReadCXReceipt(db DatabaseReader, hash common.Hash) (*types.CXReceipt, common.Hash, uint64, uint64, uint64) {
-	blockHash, blockNumber, cxIndex, cxSubIndex := ReadCxLookupEntry(db, hash)
+func ReadCXReceipt(db DatabaseReader, hash common.Hash) (*types.CXReceipt, common.Hash, uint64, uint64) {
+	blockHash, blockNumber, cxIndex := ReadCxLookupEntry(db, hash)
 	if blockHash == (common.Hash{}) {
-		return nil, common.Hash{}, 0, 0, 0
+		return nil, common.Hash{}, 0, 0
 	}
 	body := ReadBody(db, blockHash, blockNumber)
 	if body == nil {
@@ -180,19 +182,17 @@ func ReadCXReceipt(db DatabaseReader, hash common.Hash) (*types.CXReceipt, commo
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
 			Uint64("index", cxIndex).
-			Uint64("subIndex", cxSubIndex).
 			Msg("block Body referenced missing")
-		return nil, common.Hash{}, 0, 0, 0
+		return nil, common.Hash{}, 0, 0
 	}
-	cx := body.CXReceiptAt(int(cxIndex), int(cxSubIndex))
+	cx := body.CXReceiptAt(int(cxIndex))
 	if cx == nil {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
 			Uint64("index", cxIndex).
-			Uint64("subIndex", cxSubIndex).
 			Msg("CXReceipt referenced missing")
-		return nil, common.Hash{}, 0, 0, 0
+		return nil, common.Hash{}, 0, 0
 	}
-	return cx, blockHash, blockNumber, cxIndex, cxSubIndex
+	return cx, blockHash, blockNumber, cxIndex
 }

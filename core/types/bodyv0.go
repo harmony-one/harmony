@@ -39,10 +39,10 @@ func (b *BodyV0) TransactionAt(index int) *Transaction {
 	return b.f.Transactions[index].Copy()
 }
 
-// CXReceiptAt returns the CXReceipt at given index-subindex in this block
-// It returns nil if index/subindex is out of bounds
+// CXReceiptAt returns the CXReceipt at given index in this block
+// It returns nil if index is out of bounds
 // V0 will just return nil because we don't support CXReceipt
-func (b *BodyV0) CXReceiptAt(index int, subindex int) *CXReceipt {
+func (b *BodyV0) CXReceiptAt(index int) *CXReceipt {
 	return nil
 }
 
