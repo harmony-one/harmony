@@ -177,6 +177,7 @@ func (node *Node) DoBeaconSyncing() {
 		}
 		if node.beaconSync.GetActivePeerNumber() == 0 {
 			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
+			// 0 means shardID=0 here
 			peers, err := node.SyncingPeerProvider.SyncingPeers(0)
 			if err != nil {
 				utils.Logger().Warn().
