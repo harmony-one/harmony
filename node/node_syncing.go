@@ -184,7 +184,7 @@ func (node *Node) DoBeaconSyncing() {
 					Msg("cannot retrieve beacon syncing peers")
 				continue
 			}
-			if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
+			if err := node.beaconSync.InitSyncConfig(peers, true); err != nil {
 				utils.Logger().Warn().Err(err).Msg("cannot create beacon sync config")
 				continue
 			}
@@ -213,7 +213,7 @@ SyncingLoop:
 					Msg("cannot retrieve syncing peers")
 				continue SyncingLoop
 			}
-			if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
+			if err := node.stateSync.InitSyncConfig(peers, false); err != nil {
 				utils.Logger().Warn().
 					Err(err).
 					Interface("peers", peers).
