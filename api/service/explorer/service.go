@@ -172,6 +172,13 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	to := r.FormValue("to")
 	pageParam := r.FormValue("page")
 	offsetParam := r.FormValue("offset")
+
+	withSignersParam := r.FormValue("with_signers")
+	withSigners := false
+	if withSignersParam == "true" {
+		withSigners = true
+	}
+
 	data := &Data{
 		Blocks: []*Block{},
 	}
@@ -236,19 +243,21 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
 	curEpoch := int64(-1)
 	committee := &shard.Committee{}
+	if withSigners {
+		if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), 0))); err == nil {
+			if err = rlp.DecodeBytes(bytes, committee); err != nil {
+				utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
+			}
+		}
+	}
 	for id, accountBlock := range accountBlocks {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
 		block := NewBlock(accountBlock, id+fromInt-1)
-		if int64(block.Epoch) > curEpoch {
-			if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), block.Epoch))); err == nil {
-				committee = &shard.Committee{}
-				if err = rlp.DecodeBytes(bytes, committee); err != nil {
-					utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
-				}
-			} else {
-				state, err := accountBlock.Header().GetShardState()
+		if withSigners && int64(block.Epoch) > curEpoch {
+			if accountBlocks[id-1] != nil {
+				state, err := accountBlocks[id-1].Header().GetShardState()
 				if err == nil {
 					for _, shardCommittee := range state {
 						if shardCommittee.ShardID == accountBlock.ShardID() {
@@ -256,28 +265,32 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 							break
 						}
 					}
+				} else {
+					utils.Logger().Warn().Err(err).Msg("error parsing shard state")
 				}
 			}
 			curEpoch = int64(block.Epoch)
 		}
-		pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-		for i, validator := range committee.NodeList {
-			pubkeys[i] = new(bls.PublicKey)
-			validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
-		}
-		mask, err := bls2.NewMask(pubkeys, nil)
-		if err == nil && accountBlocks[id+1] != nil {
-			err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
-			if err == nil {
-				for _, validator := range committee.NodeList {
-					oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
-					if err != nil {
-						continue
-					}
-					blsPublicKey := new(bls.PublicKey)
-					validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
-					if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
-						block.Signers = append(block.Signers, oneAddress)
+		if withSigners {
+			pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
+			for i, validator := range committee.NodeList {
+				pubkeys[i] = new(bls.PublicKey)
+				validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
+			}
+			mask, err := bls2.NewMask(pubkeys, nil)
+			if err == nil && accountBlocks[id+1] != nil {
+				err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
+				if err == nil {
+					for _, validator := range committee.NodeList {
+						oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+						if err != nil {
+							continue
+						}
+						blsPublicKey := new(bls.PublicKey)
+						validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
+						if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
+							block.Signers = append(block.Signers, oneAddress)
+						}
 					}
 				}
 			}
@@ -316,11 +329,11 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		data.Blocks = append(data.Blocks, block)
 	}
 
-	paginatedBlocks := make([]*Block, 0)
-	for i := 0; i < offset && i+offset*page < len(data.Blocks); i++ {
-		paginatedBlocks = append(paginatedBlocks, data.Blocks[i+offset*page])
+	if offset*page+offset > len(data.Blocks) {
+		data.Blocks = data.Blocks[offset*page:]
+	} else {
+		data.Blocks = data.Blocks[offset*page : offset*page+offset]
 	}
-	data.Blocks = paginatedBlocks
 }
 
 // GetExplorerTransaction servers /tx end-point.
