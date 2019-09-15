@@ -72,7 +72,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
-		node.AddNewBlockForExplorer()
+		node.AddNewBlockForExplorer(block)
 		node.commitBlockForExplorer(block)
 	} else if msg.Type == msg_pb.MessageType_PREPARED {
 
@@ -91,7 +91,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		msgs := node.Consensus.PbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_COMMITTED, blockObj.NumberU64(), blockObj.Hash())
 		// If found, then add the new block into blockchain db.
 		if len(msgs) > 0 {
-			node.AddNewBlockForExplorer()
+			node.AddNewBlockForExplorer(blockObj)
 			node.commitBlockForExplorer(blockObj)
 		}
 	}
