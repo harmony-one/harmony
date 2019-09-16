@@ -1109,6 +1109,9 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		rawdb.WriteTxLookupEntries(batch, block)
 		rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages())
 
+		// write the positional metadata for CXReceipts lookups
+		rawdb.WriteCxLookupEntries(batch, block)
+
 		status = CanonStatTy
 	} else {
 		status = SideStatTy
