@@ -187,6 +187,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	if withSignersParam == "true" {
 		withSigners = true
 	}
+
 	data := &Data{
 		Blocks: []*Block{},
 	}

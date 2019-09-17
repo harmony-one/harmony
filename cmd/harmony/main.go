@@ -457,8 +457,8 @@ func main() {
 	nodeConfig := createGlobalConfig()
 	currentNode := setupConsensusAndNode(nodeConfig)
 
-	if nodeConfig.ShardID != 0 {
-		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID1", nodeConfig.ShardID)
+	if nodeConfig.ShardID != 0 && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID", nodeConfig.ShardID)
 		go currentNode.SupportBeaconSyncing()
 	}
 
