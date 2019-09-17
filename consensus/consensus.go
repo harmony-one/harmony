@@ -7,28 +7,26 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/core"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/bls/ffi/go/bls"
 
-	"github.com/harmony-one/harmony/common/denominations"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/contracts/structs"
-	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 )
 
-// BlockReward is the block reward, to be split evenly among block signers.
-var BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
+const (
+	vdFAndProofSize = 516 // size of VDF and Proof
+	vdfAndSeedSize  = 548 // size of VDF/Proof and Seed
+)
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
@@ -129,7 +127,7 @@ type Consensus struct {
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
-	OnConsensusDone func(*types.Block)
+	OnConsensusDone func(*types.Block, []byte)
 	// The verifier func passed from Node object
 	BlockVerifier func(*types.Block) error
 
@@ -141,9 +139,9 @@ type Consensus struct {
 
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
-	// Channel for DRG protocol to send the final randomness to consensus. The first 32 bytes are the randomness and the last 32 bytes are the hash of the block where the corresponding pRnd was generated
-	RndChannel  chan [64]byte
-	pendingRnds [][64]byte // A list of pending randomness
+	// Channel for DRG protocol to send VDF. The first 516 bytes are the VDF/Proof and the last 32 bytes are the seed for deriving VDF
+	RndChannel  chan [vdfAndSeedSize]byte
+	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 
 	uniqueIDInstance *utils.UniqueValidatorID
 
@@ -221,6 +219,11 @@ func (consensus *Consensus) PreviousQuorum() int {
 	return consensus.numPrevPubKeys*2/3 + 1
 }
 
+// VdfSeedSize returns the number of VRFs for VDF computation
+func (consensus *Consensus) VdfSeedSize() int {
+	return len(consensus.PublicKeys) * 2 / 3
+}
+
 // RewardThreshold returns the threshold to stop accepting commit messages
 // when leader receives enough signatures for block reward
 func (consensus *Consensus) RewardThreshold() int {
@@ -289,107 +292,20 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.ReadySignal = make(chan struct{})
 	consensus.lastBlockReward = big.NewInt(0)
 
+	// channel for receiving newly generated VDF
+	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
+
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 
 	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.PbftLog)
 	return &consensus, nil
 }
 
-// accumulateRewards credits the coinbase of the given block with the mining
-// reward. The total reward consists of the static block reward and rewards for
-// included uncles. The coinbase of each uncle block is also rewarded.
-// Returns node block reward or error.
-func accumulateRewards(
-	bc consensus_engine.ChainReader, state *state.DB, header *types.Header, nodeAddress common.Address,
-) (*big.Int, error) {
-	blockNum := header.Number.Uint64()
-	if blockNum == 0 {
-		// Epoch block has no parent to reward.
-		return nil, nil
-	}
-	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
-	//  while it is okay with hash.  Sounds like DB inconsistency.
-	//  Figure out why.
-	parentHeader := bc.GetHeaderByHash(header.ParentHash)
-	if parentHeader == nil {
-		return nil, ctxerror.New("cannot find parent block header in DB",
-			"parentHash", header.ParentHash)
-	}
-	if parentHeader.Number.Cmp(common.Big0) == 0 {
-		// Parent is an epoch block,
-		// which is not signed in the usual manner therefore rewards nothing.
-		return nil, nil
-	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch)
-	if err != nil {
-		return nil, ctxerror.New("cannot read shard state",
-			"epoch", parentHeader.Epoch,
-		).WithCause(err)
-	}
-	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID)
-	if parentCommittee == nil {
-		return nil, ctxerror.New("cannot find shard in the shard state",
-			"parentBlockNumber", parentHeader.Number,
-			"shardID", parentHeader.ShardID,
-		)
-	}
-	var committerKeys []*bls.PublicKey
-	for _, member := range parentCommittee.NodeList {
-		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", member.BlsPublicKey).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	mask, err := bls_cosi.NewMask(committerKeys, nil)
-	if err != nil {
-		return nil, ctxerror.New("cannot create group sig mask").WithCause(err)
-	}
-	if err := mask.SetMask(header.LastCommitBitmap); err != nil {
-		return nil, ctxerror.New("cannot set group sig mask bits").WithCause(err)
-	}
-	totalAmount := big.NewInt(0)
-	var accounts []common.Address
-	signers := []string{}
-	for idx, member := range parentCommittee.NodeList {
-		if signed, err := mask.IndexEnabled(idx); err != nil {
-			return nil, ctxerror.New("cannot check for committer bit",
-				"committerIndex", idx,
-			).WithCause(err)
-		} else if signed {
-			accounts = append(accounts, member.EcdsaAddress)
-		}
-	}
-	numAccounts := big.NewInt(int64(len(accounts)))
-	last := new(big.Int)
-	nodeReward := big.NewInt(0)
-	for i, account := range accounts {
-		cur := new(big.Int)
-		cur.Mul(BlockReward, big.NewInt(int64(i+1))).Div(cur, numAccounts)
-		diff := new(big.Int).Sub(cur, last)
-		signers = append(signers, common2.MustAddressToBech32(account))
-		if account == nodeAddress {
-			nodeReward = diff
-		}
-		state.AddBalance(account, diff)
-		totalAmount = new(big.Int).Add(totalAmount, diff)
-		last = cur
-	}
-	header.Logger(utils.Logger()).Debug().
-		Str("NumAccounts", numAccounts.String()).
-		Str("TotalAmount", totalAmount.String()).
-		Strs("Signers", signers).
-		Msg("[Block Reward] Successfully paid out block reward")
-	return nodeReward, nil
-}
-
 // GenesisStakeInfoFinder is a stake info finder implementation using only
 // genesis accounts.
 // When used for block reward, it rewards only foundational nodes.
 type GenesisStakeInfoFinder struct {
-	byNodeKey map[types.BlsPublicKey][]*structs.StakeInfo
+	byNodeKey map[shard.BlsPublicKey][]*structs.StakeInfo
 	byAccount map[common.Address][]*structs.StakeInfo
 }
 
@@ -399,7 +315,7 @@ type GenesisStakeInfoFinder struct {
 func (f *GenesisStakeInfoFinder) FindStakeInfoByNodeKey(
 	key *bls.PublicKey,
 ) []*structs.StakeInfo {
-	var pk types.BlsPublicKey
+	var pk shard.BlsPublicKey
 	if err := pk.FromLibBLSPublicKey(key); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot convert BLS public key")
 		return nil
@@ -422,13 +338,13 @@ func (f *GenesisStakeInfoFinder) FindStakeInfoByAccount(
 // genesis nodes.
 func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
 	f := &GenesisStakeInfoFinder{
-		byNodeKey: make(map[types.BlsPublicKey][]*structs.StakeInfo),
+		byNodeKey: make(map[shard.BlsPublicKey][]*structs.StakeInfo),
 		byAccount: make(map[common.Address][]*structs.StakeInfo),
 	}
 	for idx, account := range genesis.HarmonyAccounts {
 		pub := &bls.PublicKey{}
 		pub.DeserializeHexStr(account.BlsPublicKey)
-		var blsPublicKey types.BlsPublicKey
+		var blsPublicKey shard.BlsPublicKey
 		if err := blsPublicKey.FromLibBLSPublicKey(pub); err != nil {
 			return nil, ctxerror.New("cannot convert BLS public key",
 				"accountIndex", idx,

@@ -6,7 +6,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -33,7 +33,7 @@ func NewContractCaller(bc *core.BlockChain, config *params.ChainConfig) *Contrac
 // CallContract calls a contracts with the specified transaction.
 func (cc *ContractCaller) CallContract(tx *types.Transaction) ([]byte, error) {
 	currBlock := cc.blockchain.CurrentBlock()
-	msg, err := tx.AsMessage(types.MakeSigner(cc.config, currBlock.Header().Number))
+	msg, err := tx.AsMessage(types.MakeSigner(cc.config, currBlock.Header().Epoch()))
 	if err != nil {
 		utils.GetLogInstance().Error("[ABI] Failed to convert transaction to message", "error", err)
 		return []byte{}, err

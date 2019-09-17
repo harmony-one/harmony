@@ -1,6 +1,7 @@
 package shardingconfig
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -21,13 +22,17 @@ const (
 	localnetEpochBlock1 = 10
 	twoOne              = 5
 
+	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
+
+	localnetRandomnessStartingEpoch = 0
 
 	localnetMaxTxAmountLimit               = 1e3 // unit is in One
 	localnetMaxNumRecentTxsPerAccountLimit = 1e2
 	localnetMaxTxPoolSizeLimit             = 8000
 	localnetMaxNumTxsPerBlockLimit         = 1000
 	localnetRecentTxDuration               = time.Hour
+	localnetEnableTxnThrottling            = true
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -67,9 +72,29 @@ func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
+func (ls localnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
+	blocks := ls.BlocksPerEpoch()
+	switch {
+	case epochNum == 0:
+		return localnetEpochBlock1 - 1
+	default:
+		return localnetEpochBlock1 - 1 + blocks*epochNum
+	}
+}
+
+func (ls localnetSchedule) VdfDifficulty() int {
+	return localnetVdfDifficulty
+}
+
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ls localnetSchedule) ConsensusRatio() float64 {
 	return localnetConsensusRatio
+}
+
+// TODO: remove it after randomness feature turned on mainnet
+//RandonnessStartingEpoch returns starting epoch of randonness generation
+func (ls localnetSchedule) RandomnessStartingEpoch() uint64 {
+	return localnetRandomnessStartingEpoch
 }
 
 func (ls localnetSchedule) MaxTxAmountLimit() *big.Int {
@@ -94,6 +119,10 @@ func (ls localnetSchedule) RecentTxDuration() time.Duration {
 	return localnetRecentTxDuration
 }
 
+func (ls localnetSchedule) EnableTxnThrottling() bool {
+	return localnetEnableTxnThrottling
+}
+
 func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ls.MaxTxAmountLimit(),
@@ -101,11 +130,30 @@ func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxPoolSizeLimit:             ls.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ls.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               ls.RecentTxDuration(),
+		EnableTxnThrottling:            ls.EnableTxnThrottling(),
 	}
+}
+
+func (ls localnetSchedule) GetNetworkID() NetworkID {
+	return LocalNet
+}
+
+// GetShardingStructure is the sharding structure for localnet.
+func (ls localnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+	res := []map[string]interface{}{}
+	for i := 0; i < numShard; i++ {
+		res = append(res, map[string]interface{}{
+			"current": int(shardID) == i,
+			"shardID": i,
+			"http":    fmt.Sprintf("http://127.0.0.1:%d", 9500+i),
+			"ws":      fmt.Sprintf("ws://127.0.0.1:%d", 9800+i),
+		})
+	}
+	return res
 }
 
 var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}
 
 var localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, localnetReshardingEpoch)
-var localnetV1 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, localnetReshardingEpoch)
-var localnetV2 = MustNewInstance(2, 10, 4, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, localnetReshardingEpoch)
+var localnetV1 = MustNewInstance(2, 8, 5, genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, localnetReshardingEpoch)
+var localnetV2 = MustNewInstance(2, 9, 6, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, localnetReshardingEpoch)

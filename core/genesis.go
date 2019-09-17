@@ -29,13 +29,16 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	blockfactory "github.com/harmony-one/harmony/block/factory"
+	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // no go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
@@ -46,17 +49,18 @@ var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 // Genesis specifies the header fields, state of a genesis block. It also defines hard
 // fork switch-over blocks through the chain configuration.
 type Genesis struct {
-	Config         *params.ChainConfig `json:"config"`
-	Nonce          uint64              `json:"nonce"`
-	ShardID        uint32              `json:"shardID"`
-	Timestamp      uint64              `json:"timestamp"`
-	ExtraData      []byte              `json:"extraData"`
-	GasLimit       uint64              `json:"gasLimit"       gencodec:"required"`
-	Mixhash        common.Hash         `json:"mixHash"`
-	Coinbase       common.Address      `json:"coinbase"`
-	Alloc          GenesisAlloc        `json:"alloc"          gencodec:"required"`
-	ShardStateHash common.Hash         `json:"shardStateHash" gencodec:"required"`
-	ShardState     types.ShardState    `json:"shardState"     gencodec:"required"`
+	Config         *params.ChainConfig  `json:"config"`
+	Factory        blockfactory.Factory `json:"-"`
+	Nonce          uint64               `json:"nonce"`
+	ShardID        uint32               `json:"shardID"`
+	Timestamp      uint64               `json:"timestamp"`
+	ExtraData      []byte               `json:"extraData"`
+	GasLimit       uint64               `json:"gasLimit"       gencodec:"required"`
+	Mixhash        common.Hash          `json:"mixHash"`
+	Coinbase       common.Address       `json:"coinbase"`
+	Alloc          GenesisAlloc         `json:"alloc"          gencodec:"required"`
+	ShardStateHash common.Hash          `json:"shardStateHash" gencodec:"required"`
+	ShardState     shard.State          `json:"shardState"     gencodec:"required"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
@@ -155,7 +159,7 @@ func (e *GenesisMismatchError) Error() string {
 // The returned chain configuration is never nil.
 func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
 	if genesis != nil && genesis.Config == nil {
-		return params.AllEthashProtocolChanges, common.Hash{}, errGenesisNoConfig
+		return params.AllProtocolChanges, common.Hash{}, errGenesisNoConfig
 	}
 
 	// Just commit the new block if there is no stored genesis block.
@@ -190,9 +194,10 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	// Special case: don't change the existing config of a non-mainnet chain if no new
 	// config is supplied. These chains would get AllProtocolChanges (and a compat error)
 	// if we just continued here.
-	if genesis == nil && stored != params.MainnetGenesisHash {
-		return storedcfg, stored, nil
-	}
+	// TODO: take use of genesis hash
+	//if genesis == nil && stored != params.MainnetGenesisHash {
+	//	return storedcfg, stored, nil
+	//}
 
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
@@ -212,12 +217,13 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	switch {
 	case g != nil:
 		return g.Config
-	case ghash == params.MainnetGenesisHash:
-		return params.MainnetChainConfig
-	case ghash == params.TestnetGenesisHash:
-		return params.TestnetChainConfig
+	// TODO: take use of genesis hash
+	//case ghash == params.MainnetGenesisHash:
+	//	return params.MainnetChainConfig
+	//case ghash == params.TestnetGenesisHash:
+	//	return params.TestnetChainConfig
 	default:
-		return params.AllEthashProtocolChanges
+		return params.AllProtocolChanges
 	}
 }
 
@@ -243,25 +249,24 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		utils.Logger().Error().Msg("failed to rlp-serialize genesis shard state")
 		os.Exit(1)
 	}
-	head := &types.Header{
-		Number:         new(big.Int).SetUint64(g.Number),
-		Epoch:          big.NewInt(0),
-		ShardID:        g.ShardID,
-		Time:           new(big.Int).SetUint64(g.Timestamp),
-		ParentHash:     g.ParentHash,
-		Extra:          g.ExtraData,
-		GasLimit:       g.GasLimit,
-		GasUsed:        g.GasUsed,
-		MixDigest:      g.Mixhash,
-		Coinbase:       g.Coinbase,
-		Root:           root,
-		ShardStateHash: g.ShardStateHash,
-		ShardState:     shardStateBytes,
-	}
+	head := g.Factory.NewHeader(common.Big0).With().
+		Number(new(big.Int).SetUint64(g.Number)).
+		ShardID(g.ShardID).
+		Time(new(big.Int).SetUint64(g.Timestamp)).
+		ParentHash(g.ParentHash).
+		Extra(g.ExtraData).
+		GasLimit(g.GasLimit).
+		GasUsed(g.GasUsed).
+		MixDigest(g.Mixhash).
+		Coinbase(g.Coinbase).
+		Root(root).
+		ShardStateHash(g.ShardStateHash).
+		ShardState(shardStateBytes).
+		Header()
 	statedb.Commit(false)
 	statedb.Database().TrieDB().Commit(root, true)
 
-	return types.NewBlock(head, nil, nil)
+	return types.NewBlock(head, nil, nil, nil, nil)
 }
 
 // Commit writes the block and state of a genesis specification to the database.
@@ -278,7 +283,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 	rawdb.WriteHeadBlockHash(db, block.Hash())
 	rawdb.WriteHeadHeaderHash(db, block.Hash())
 
-	err := rawdb.WriteShardStateBytes(db, block.Header().Epoch, block.Header().ShardState)
+	err := rawdb.WriteShardStateBytes(db, block.Header().Epoch(), block.Header().ShardState())
 
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to store genesis shard state")
@@ -286,7 +291,7 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 
 	config := g.Config
 	if config == nil {
-		config = params.AllEthashProtocolChanges
+		config = params.AllProtocolChanges
 	}
 	rawdb.WriteChainConfig(db, block.Hash(), config)
 	return block, nil
@@ -312,36 +317,11 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 func DefaultGenesisBlock() *Genesis {
 	return &Genesis{
 		Config:    params.MainnetChainConfig,
+		Factory:   blockfactory.ForMainnet,
 		Nonce:     66,
 		ExtraData: hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
 		GasLimit:  5000,
 		Alloc:     decodePrealloc("empty"),
-	}
-}
-
-// DeveloperGenesisBlock returns the 'geth --dev' genesis block. Note, this must
-// be seeded with the
-func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
-	// Override the default period to the user requested one
-	config := *params.AllCliqueProtocolChanges
-	config.Clique.Period = period
-
-	// Assemble and return the genesis with the precompiles and faucet pre-funded
-	return &Genesis{
-		Config:    &config,
-		ExtraData: append(append(make([]byte, 32), faucet[:]...), make([]byte, 65)...),
-		GasLimit:  6283185,
-		Alloc: map[common.Address]GenesisAccount{
-			common.BytesToAddress([]byte{1}): {Balance: big.NewInt(1)}, // ECRecover
-			common.BytesToAddress([]byte{2}): {Balance: big.NewInt(1)}, // SHA256
-			common.BytesToAddress([]byte{3}): {Balance: big.NewInt(1)}, // RIPEMD
-			common.BytesToAddress([]byte{4}): {Balance: big.NewInt(1)}, // Identity
-			common.BytesToAddress([]byte{5}): {Balance: big.NewInt(1)}, // ModExp
-			common.BytesToAddress([]byte{6}): {Balance: big.NewInt(1)}, // ECAdd
-			common.BytesToAddress([]byte{7}): {Balance: big.NewInt(1)}, // ECScalarMul
-			common.BytesToAddress([]byte{8}): {Balance: big.NewInt(1)}, // ECPairing
-			//faucet: {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(9))},
-		},
 	}
 }
 

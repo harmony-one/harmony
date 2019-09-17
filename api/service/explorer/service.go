@@ -16,18 +16,25 @@ import (
 	"github.com/gorilla/mux"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/bech32"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants for explorer service.
 const (
 	explorerPortDifference = 4000
+	paginationOffset       = 10
+	txViewNone             = "NONE"
+	txViewAll              = "ALL"
 )
 
 // HTTPError is an HTTP error.
@@ -98,7 +105,8 @@ func (s *Service) Run() *http.Server {
 
 	s.router = mux.NewRouter()
 	// Set up router for blocks.
-	s.router.Path("/blocks").Queries("from", "{[0-9]*?}", "to", "{[0-9]*?}").HandlerFunc(s.GetExplorerBlocks).Methods("GET")
+	// Blocks are divided into pages in consequent groups of offset size.
+	s.router.Path("/blocks").Queries("from", "{[0-9]*?}", "to", "{[0-9]*?}", "page", "{[0-9]*?}", "offset", "{[0-9]*?}").HandlerFunc(s.GetExplorerBlocks).Methods("GET")
 	s.router.Path("/blocks").HandlerFunc(s.GetExplorerBlocks)
 
 	// Set up router for tx.
@@ -106,7 +114,8 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/tx").HandlerFunc(s.GetExplorerTransaction)
 
 	// Set up router for address.
-	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset)).HandlerFunc(s.GetExplorerAddress).Methods("GET")
+	// Address transactions are divided into pages in consequent groups of offset size.
+	s.router.Path("/address").Queries("id", fmt.Sprintf("{([0-9A-Fa-fx]*?)|(t?one1[%s]{38})}", bech32.Charset), "tx_view", "{[A-Z]*?}", "page", "{[0-9]*?}", "offset", "{[0-9]*?}").HandlerFunc(s.GetExplorerAddress).Methods("GET")
 	s.router.Path("/address").HandlerFunc(s.GetExplorerAddress)
 
 	// Set up router for node count.
@@ -118,8 +127,8 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/shard").HandlerFunc(s.GetExplorerShard)
 
 	// Set up router for committee.
-	s.router.Path("/committee").Queries("shard_id", "{[0-9]*?}", "epoch", "{[0-9]*?}").HandlerFunc(s.GetCommittee).Methods("GET")
-	s.router.Path("/committee").HandlerFunc(s.GetCommittee).Methods("GET")
+	s.router.Path("/committee").Queries("shard_id", "{[0-9]*?}", "epoch", "{[0-9]*?}").HandlerFunc(s.GetExplorerCommittee).Methods("GET")
+	s.router.Path("/committee").HandlerFunc(s.GetExplorerCommittee).Methods("GET")
 
 	// Do serving now.
 	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
@@ -161,7 +170,8 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	from := r.FormValue("from")
 	to := r.FormValue("to")
-
+	pageParam := r.FormValue("page")
+	offsetParam := r.FormValue("offset")
 	data := &Data{
 		Blocks: []*Block{},
 	}
@@ -172,12 +182,15 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	if from == "" {
+		utils.Logger().Warn().Msg("Missing from parameter")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	db := s.storage.GetDB()
 	fromInt, err := strconv.Atoi(from)
 	if err != nil {
-		utils.Logger().Warn().Err(err).Str("from", from).Msg("invalid from parameter")
+		utils.Logger().Warn().Err(err).Msg("invalid from parameter")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	var toInt int
@@ -193,16 +206,82 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		toInt, err = strconv.Atoi(to)
 	}
 	if err != nil {
-		utils.Logger().Warn().Err(err).Str("to", to).Msg("invalid to parameter")
+		utils.Logger().Warn().Err(err).Msg("invalid to parameter")
+		w.WriteHeader(http.StatusBadRequest)
 		return
+	}
+	var offset int
+	if offsetParam != "" {
+		offset, err = strconv.Atoi(offsetParam)
+		if err != nil || offset < 1 {
+			utils.Logger().Warn().Msg("invalid offset parameter")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	} else {
+		offset = paginationOffset
+	}
+	var page int
+	if pageParam != "" {
+		page, err = strconv.Atoi(pageParam)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("invalid page parameter")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	} else {
+		page = 0
 	}
 
 	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
+	curEpoch := int64(-1)
+	committee := &shard.Committee{}
 	for id, accountBlock := range accountBlocks {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
 		block := NewBlock(accountBlock, id+fromInt-1)
+		if int64(block.Epoch) > curEpoch {
+			if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), block.Epoch))); err == nil {
+				committee = &shard.Committee{}
+				if err = rlp.DecodeBytes(bytes, committee); err != nil {
+					utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
+				}
+			} else {
+				state, err := accountBlock.Header().GetShardState()
+				if err == nil {
+					for _, shardCommittee := range state {
+						if shardCommittee.ShardID == accountBlock.ShardID() {
+							committee = &shardCommittee
+							break
+						}
+					}
+				}
+			}
+			curEpoch = int64(block.Epoch)
+		}
+		pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
+		for i, validator := range committee.NodeList {
+			pubkeys[i] = new(bls.PublicKey)
+			validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
+		}
+		mask, err := bls2.NewMask(pubkeys, nil)
+		if err == nil && accountBlocks[id+1] != nil {
+			err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
+			if err == nil {
+				for _, validator := range committee.NodeList {
+					oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+					if err != nil {
+						continue
+					}
+					blsPublicKey := new(bls.PublicKey)
+					validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
+					if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
+						block.Signers = append(block.Signers, oneAddress)
+					}
+				}
+			}
+		}
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
 			transaction := GetTransaction(tx, accountBlock)
@@ -236,7 +315,12 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		}
 		data.Blocks = append(data.Blocks, block)
 	}
-	return
+
+	paginatedBlocks := make([]*Block, 0)
+	for i := 0; i < offset && i+offset*page < len(data.Blocks); i++ {
+		paginatedBlocks = append(paginatedBlocks, data.Blocks[i+offset*page])
+	}
+	data.Blocks = paginatedBlocks
 }
 
 // GetExplorerTransaction servers /tx end-point.
@@ -251,24 +335,28 @@ func (s *Service) GetExplorerTransaction(w http.ResponseWriter, r *http.Request)
 		}
 	}()
 	if id == "" {
+		utils.Logger().Warn().Msg("invalid id parameter")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	db := s.storage.GetDB()
 	bytes, err := db.Get([]byte(GetTXKey(id)))
 	if err != nil {
 		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read TX")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	tx := new(Transaction)
 	if rlp.DecodeBytes(bytes, tx) != nil {
 		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	data.TX = *tx
 }
 
-// GetCommittee servers /comittee end-point.
-func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
+// GetExplorerCommittee servers /comittee end-point.
+func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	shardIDRead := r.FormValue("shard_id")
 	epochRead := r.FormValue("epoch")
@@ -279,7 +367,7 @@ func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
 		shardID, err = strconv.ParseUint(shardIDRead, 10, 32)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot read shard id")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	}
@@ -287,13 +375,13 @@ func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
 		epoch, err = strconv.ParseUint(epochRead, 10, 64)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot read shard epoch")
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	}
 	if s.ShardID != uint32(shardID) {
 		utils.Logger().Warn().Msg("incorrect shard id")
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	// fetch current epoch if epoch is 0
@@ -303,7 +391,7 @@ func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
 		blockHeight, err := strconv.Atoi(string(bytes))
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot decode block height from DB")
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		key := GetBlockKey(blockHeight)
@@ -311,7 +399,7 @@ func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
 		block := new(types.Block)
 		if rlp.DecodeBytes(data, block) != nil {
 			utils.Logger().Warn().Err(err).Msg("cannot get block from db")
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		epoch = block.Epoch().Uint64()
@@ -319,13 +407,13 @@ func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
 	bytes, err := db.Get([]byte(GetCommitteeKey(uint32(shardID), epoch)))
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot read committee")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	committee := &types.Committee{}
+	committee := &shard.Committee{}
 	if err := rlp.DecodeBytes(bytes, committee); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot decode committee data from DB")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	validators := &Committee{}
@@ -343,7 +431,7 @@ func (s *Service) GetCommittee(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewEncoder(w).Encode(validators); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode committee")
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
@@ -352,25 +440,59 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := r.FormValue("id")
 	key := GetAddressKey(id)
-
-	utils.Logger().Info().Str("address", id).Msg("Querying address")
+	txViewParam := r.FormValue("tx_view")
+	pageParam := r.FormValue("page")
+	offsetParam := r.FormValue("offset")
+	txView := txViewNone
+	if txViewParam != "" {
+		txView = txViewParam
+	}
+	utils.Logger().Info().Str("Address", id).Msg("Querying address")
 	data := &Data{}
 	defer func() {
 		if err := json.NewEncoder(w).Encode(data.Address); err != nil {
 			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
-				"cannot JSON-encode address")
+				"cannot JSON-encode Address")
 		}
 	}()
 	if id == "" {
+		utils.Logger().Warn().Msg("missing address id param")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	var err error
+	var offset int
+	if offsetParam != "" {
+		offset, err = strconv.Atoi(offsetParam)
+		if err != nil || offset < 1 {
+			utils.Logger().Warn().Msg("invalid offset parameter")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	} else {
+		offset = paginationOffset
+	}
+	var page int
+	if pageParam != "" {
+		page, err = strconv.Atoi(pageParam)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("invalid page parameter")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	} else {
+		page = 0
+	}
+
 	data.Address.ID = id
 	// Try to populate the banace by directly calling get balance.
 	// Check the balance from blockchain rather than local DB dump
+	balanceAddr := big.NewInt(0)
 	if s.GetAccountBalance != nil {
 		address := common2.ParseAddr(id)
 		balance, err := s.GetAccountBalance(address)
 		if err == nil {
+			balanceAddr = balance
 			data.Address.Balance = balance
 		}
 	}
@@ -383,8 +505,37 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	}
 	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
 		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	if balanceAddr.Cmp(big.NewInt(0)) != 0 {
+		data.Address.Balance = balanceAddr
+	}
+	switch txView {
+	case txViewNone:
+		data.Address.TXs = nil
+	case Received:
+		receivedTXs := make([]*Transaction, 0)
+		for _, tx := range data.Address.TXs {
+			if tx.Type == Received {
+				receivedTXs = append(receivedTXs, tx)
+			}
+		}
+		data.Address.TXs = receivedTXs
+	case Sent:
+		sentTXs := make([]*Transaction, 0)
+		for _, tx := range data.Address.TXs {
+			if tx.Type == Sent {
+				sentTXs = append(sentTXs, tx)
+			}
+		}
+		data.Address.TXs = sentTXs
+	}
+	paginatedTXs := make([]*Transaction, 0)
+	for i := 0; i < offset && i+offset*page < len(data.Address.TXs); i++ {
+		paginatedTXs = append(paginatedTXs, data.Address.TXs[i+offset*page])
+	}
+	data.Address.TXs = paginatedTXs
 }
 
 // GetExplorerNodeCount serves /nodes end-point.
@@ -392,6 +543,7 @@ func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(len(s.GetNodeIDs())); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode node count")
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
@@ -406,6 +558,7 @@ func (s *Service) GetExplorerShard(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewEncoder(w).Encode(Shard{Nodes: nodes}); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode shard info")
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 

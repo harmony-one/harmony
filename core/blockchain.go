@@ -33,11 +33,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/harmony/internal/params"
 	lru "github.com/hashicorp/golang-lru"
 
+	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -46,6 +47,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 var (
@@ -57,16 +59,17 @@ var (
 )
 
 const (
-	bodyCacheLimit      = 256
-	blockCacheLimit     = 256
-	receiptsCacheLimit  = 32
-	maxFutureBlocks     = 256
-	maxTimeFutureBlocks = 30
-	badBlockLimit       = 10
-	triesInMemory       = 128
-	shardCacheLimit     = 2
-	commitsCacheLimit   = 10
-	epochCacheLimit     = 10
+	bodyCacheLimit       = 256
+	blockCacheLimit      = 256
+	receiptsCacheLimit   = 32
+	maxFutureBlocks      = 256
+	maxTimeFutureBlocks  = 30
+	badBlockLimit        = 10
+	triesInMemory        = 128
+	shardCacheLimit      = 2
+	commitsCacheLimit    = 10
+	epochCacheLimit      = 10
+	randomnessCacheLimit = 10
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -128,6 +131,7 @@ type BlockChain struct {
 	shardStateCache  *lru.Cache
 	lastCommitsCache *lru.Cache
 	epochCache       *lru.Cache // Cache epoch number → first block number
+	randomnessCache  *lru.Cache // Cache for vrf/vdf
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -163,6 +167,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	shardCache, _ := lru.New(shardCacheLimit)
 	commitsCache, _ := lru.New(commitsCacheLimit)
 	epochCache, _ := lru.New(epochCacheLimit)
+	randomnessCache, _ := lru.New(randomnessCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:      chainConfig,
@@ -180,6 +185,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		shardStateCache:  shardCache,
 		lastCommitsCache: commitsCache,
 		epochCache:       epochCache,
+		randomnessCache:  randomnessCache,
 		engine:           engine,
 		vmConfig:         vmConfig,
 		badBlocks:        badBlocks,
@@ -213,13 +219,13 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	}
 
 	// Process block using the parent state as reference point.
-	receipts, _, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+	receipts, cxReceipts, _, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
 
-	err = bc.Validator().ValidateState(block, bc.CurrentBlock(), state, receipts, usedGas)
+	err = bc.Validator().ValidateState(block, bc.CurrentBlock(), state, receipts, cxReceipts, usedGas)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
@@ -237,6 +243,15 @@ func IsEpochBlock(block *types.Block) bool {
 	return ShardingSchedule.IsLastBlock(block.NumberU64() - 1)
 }
 
+// EpochFirstBlock returns the block number of the first block of an epoch.
+// TODO: instead of using fixed epoch schedules, determine the first block by epoch changes.
+func EpochFirstBlock(epoch *big.Int) *big.Int {
+	if epoch.Cmp(big.NewInt(0)) == 0 {
+		return big.NewInt(0)
+	}
+	return big.NewInt(int64(ShardingSchedule.EpochLastBlock(epoch.Uint64()-1) + 1))
+}
+
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
 func IsEpochLastBlock(block *types.Block) bool {
 	return ShardingSchedule.IsLastBlock(block.NumberU64())
@@ -244,8 +259,8 @@ func IsEpochLastBlock(block *types.Block) bool {
 
 // IsEpochLastBlockByHeader returns whether this block is the last block of an epoch
 // given block header
-func IsEpochLastBlockByHeader(header *types.Header) bool {
-	return ShardingSchedule.IsLastBlock(header.Number.Uint64())
+func IsEpochLastBlockByHeader(header *block.Header) bool {
+	return ShardingSchedule.IsLastBlock(header.Number().Uint64())
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -303,15 +318,15 @@ func (bc *BlockChain) loadLastState() error {
 	// Issue a status log for the user
 	currentFastBlock := bc.CurrentFastBlock()
 
-	headerTd := bc.GetTd(currentHeader.Hash(), currentHeader.Number.Uint64())
+	headerTd := bc.GetTd(currentHeader.Hash(), currentHeader.Number().Uint64())
 	blockTd := bc.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
 	fastTd := bc.GetTd(currentFastBlock.Hash(), currentFastBlock.NumberU64())
 
 	utils.Logger().Info().
-		Str("number", currentHeader.Number.String()).
+		Str("number", currentHeader.Number().String()).
 		Str("hash", currentHeader.Hash().Hex()).
 		Str("td", headerTd.String()).
-		Str("age", common.PrettyAge(time.Unix(currentHeader.Time.Int64(), 0)).String()).
+		Str("age", common.PrettyAge(time.Unix(currentHeader.Time().Int64(), 0)).String()).
 		Msg("Loaded most recent local header")
 	utils.Logger().Info().
 		Str("number", currentBlock.Number().String()).
@@ -355,8 +370,8 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	bc.shardStateCache.Purge()
 
 	// Rewind the block chain, ensuring we don't end up with a stateless head block
-	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number.Uint64() < currentBlock.NumberU64() {
-		bc.currentBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64()))
+	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number().Uint64() < currentBlock.NumberU64() {
+		bc.currentBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
 	}
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil {
 		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
@@ -365,8 +380,8 @@ func (bc *BlockChain) SetHead(head uint64) error {
 		}
 	}
 	// Rewind the fast block in a simpleton way to the target head
-	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentHeader.Number.Uint64() < currentFastBlock.NumberU64() {
-		bc.currentFastBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64()))
+	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentHeader.Number().Uint64() < currentFastBlock.NumberU64() {
+		bc.currentFastBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
 	}
 	// If either blocks reached nil, reset to the genesis state
 	if currentBlock := bc.CurrentBlock(); currentBlock == nil {
@@ -408,8 +423,9 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 }
 
 // ShardID returns the shard Id of the blockchain.
+// TODO: use a better solution before resharding shuffle nodes to different shards
 func (bc *BlockChain) ShardID() uint32 {
-	return uint32(bc.chainConfig.ChainID.Int64())
+	return bc.CurrentBlock().ShardID()
 }
 
 // GasLimit returns the gas limit of the current HEAD block.
@@ -720,11 +736,11 @@ func (bc *BlockChain) GetBlocksFromHash(hash common.Hash, n int) (blocks []*type
 
 // GetUnclesInChain retrieves all the uncles from a given block backwards until
 // a specific distance is reached.
-func (bc *BlockChain) GetUnclesInChain(block *types.Block, length int) []*types.Header {
-	uncles := []*types.Header{}
-	for i := 0; block != nil && i < length; i++ {
-		uncles = append(uncles, block.Uncles()...)
-		block = bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
+func (bc *BlockChain) GetUnclesInChain(b *types.Block, length int) []*block.Header {
+	uncles := []*block.Header{}
+	for i := 0; b != nil && i < length; i++ {
+		uncles = append(uncles, b.Uncles()...)
+		b = bc.GetBlock(b.ParentHash(), b.NumberU64()-1)
 	}
 	return uncles
 }
@@ -758,7 +774,7 @@ func (bc *BlockChain) Stop() {
 
 		for _, offset := range []uint64{0, 1, triesInMemory - 1} {
 			if number := bc.CurrentBlock().NumberU64(); number > offset {
-				recent := bc.GetBlockByNumber(number - offset)
+				recent := bc.GetHeaderByNumber(number - offset)
 
 				utils.Logger().Info().
 					Str("block", recent.Number().String()).
@@ -818,7 +834,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 
 		currentHeader := bc.hc.CurrentHeader()
 		if currentHeader != nil && currentHeader.Hash() == hash {
-			bc.hc.SetCurrentHeader(bc.GetHeader(currentHeader.ParentHash, currentHeader.Number.Uint64()-1))
+			bc.hc.SetCurrentHeader(bc.GetHeader(currentHeader.ParentHash(), currentHeader.Number().Uint64()-1))
 		}
 		if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentFastBlock.Hash() == hash {
 			newFastBlock := bc.GetBlock(currentFastBlock.ParentHash(), currentFastBlock.NumberU64()-1)
@@ -839,7 +855,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 
 // SetReceiptsData computes all the non-consensus fields of the receipts
 func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) error {
-	signer := types.MakeSigner(config, block.Number())
+	signer := types.MakeSigner(config, block.Epoch())
 
 	transactions, logIndex := block.Transactions(), uint(0)
 	if len(transactions) != len(receipts) {
@@ -986,7 +1002,7 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, state *state.DB) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, state *state.DB) (status WriteStatus, err error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -998,7 +1014,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 	rawdb.WriteBlock(bc.db, block)
 
-	root, err := state.Commit(bc.chainConfig.IsEIP158(block.Number()))
+	root, err := state.Commit(bc.chainConfig.IsS3(block.Epoch()))
 	if err != nil {
 		return NonStatTy, err
 	}
@@ -1025,7 +1041,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			}
 			// Find the next state trie we need to commit
 			header := bc.GetHeaderByNumber(current - triesInMemory)
-			chosen := header.Number.Uint64()
+			chosen := header.Number().Uint64()
 
 			// If we exceeded out time allowance, flush an entire trie to disk
 			if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
@@ -1039,7 +1055,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 						Msg("State in memory for too long, committing")
 				}
 				// Flush an entire trie and restart the counters
-				triedb.Commit(header.Root, true)
+				triedb.Commit(header.Root(), true)
 				lastWrite = chosen
 				bc.gcproc = 0
 			}
@@ -1059,10 +1075,28 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	batch := bc.db.NewBatch()
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
 
+	epoch := block.Header().Epoch()
+	if bc.chainConfig.IsCrossTx(block.Epoch()) {
+		shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+		shardNum := int(shardingConfig.NumShards())
+		for i := 0; i < shardNum; i++ {
+			if i == int(block.ShardID()) {
+				continue
+			}
+			shardReceipts := GetToShardReceipts(cxReceipts, uint32(i))
+			err := rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts, false)
+			if err != nil {
+				utils.Logger().Debug().Err(err).Interface("shardReceipts", shardReceipts).Int("toShardID", i).Msg("WriteCXReceipts cannot write into database")
+			}
+		}
+		// Mark incomingReceipts in the block as spent
+		bc.WriteCXReceiptsProofSpent(block.IncomingReceipts())
+	}
+
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
 	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
-	// TODO: figure out reorg issue
+	// TODO: Remove reorg code, it's not used in our code
 	reorg := true
 	if reorg {
 		// Reorganise the chain if the parent is not the head block
@@ -1100,24 +1134,47 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	n, events, logs, err := bc.insertChain(chain)
 	bc.PostChainEvents(events, logs)
-	// TODO ek – make this a post-chain event
 	if err == nil {
 		for idx, block := range chain {
 			header := block.Header()
 			header.Logger(utils.Logger()).Info().
 				Int("segmentIndex", idx).
-				Str("parentHash", header.ParentHash.Hex()).
+				Str("parentHash", header.ParentHash().Hex()).
 				Msg("added block to chain")
 
-			if header.ShardStateHash != (common.Hash{}) {
-				epoch := new(big.Int).Add(header.Epoch, common.Big1)
-				err = bc.WriteShardStateBytes(epoch, header.ShardState)
+				// TODO: move into WriteBlockWithState
+			if header.ShardStateHash() != (common.Hash{}) {
+				epoch := new(big.Int).Add(header.Epoch(), common.Big1)
+				err = bc.WriteShardStateBytes(epoch, header.ShardState())
 				if err != nil {
 					header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
+					return n, err
+				}
+			}
+
+			// TODO: move into WriteBlockWithState
+			if len(header.CrossLinks()) > 0 {
+				crossLinks := &types.CrossLinks{}
+				err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
+				if err != nil {
+					header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cannot parse cross links")
+					return n, err
+				}
+				if !crossLinks.IsSorted() {
+					header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cross links are not sorted")
+					return n, errors.New("proposed cross links are not sorted")
+				}
+				for _, crossLink := range *crossLinks {
+					if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}, false); err == nil {
+						utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum().Uint64()).Uint32("shardID", crossLink.ShardID()).Msg("[InsertChain] Cross Link Added to Beaconchain")
+					}
+					bc.DeleteCrossLinks(types.CrossLinks{crossLink}, true)
+					bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
 				}
 			}
 		}
 	}
+
 	return n, err
 }
 
@@ -1162,14 +1219,14 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		coalescedLogs []*types.Log
 	)
 	// Start the parallel header verifier
-	headers := make([]*types.Header, len(chain))
+	headers := make([]*block.Header, len(chain))
 	seals := make([]bool, len(chain))
 
 	for i, block := range chain {
 		headers[i] = block.Header()
 		seals[i] = true
 	}
-	abort, results := bc.engine.VerifyHeaders(bc, headers, seals)
+	abort, results := bc.Engine().VerifyHeaders(bc, headers, seals)
 	defer close(abort)
 
 	// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
@@ -1268,13 +1325,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			return i, events, coalescedLogs, err
 		}
 		// Process block using the parent state as reference point.
-		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+		receipts, cxReceipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
 		}
 		// Validate the state using the default validator
-		err = bc.Validator().ValidateState(block, parent, state, receipts, usedGas)
+		err = bc.Validator().ValidateState(block, parent, state, receipts, cxReceipts, usedGas)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1282,7 +1339,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		proctime := time.Since(bstart)
 
 		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(block, receipts, state)
+		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, state)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
@@ -1315,6 +1372,37 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 
 		cache, _ := bc.stateCache.TrieDB().Size()
 		stats.report(chain, i, cache)
+
+		//check non zero VRF field in header and add to local db
+		if len(block.Vrf()) > 0 {
+			vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch())
+			if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
+				utils.Logger().Error().
+					Str("number", chain[i].Number().String()).
+					Str("epoch", block.Header().Epoch().String()).
+					Msg("VRF block number is already in local db")
+			} else {
+				vrfBlockNumbers = append(vrfBlockNumbers, block.NumberU64())
+				err = bc.WriteEpochVrfBlockNums(block.Header().Epoch(), vrfBlockNumbers)
+				if err != nil {
+					utils.Logger().Error().
+						Str("number", chain[i].Number().String()).
+						Str("epoch", block.Header().Epoch().String()).
+						Msg("failed to write VRF block number to local db")
+				}
+			}
+		}
+
+		//check non zero Vdf in header and add to local db
+		if len(block.Vdf()) > 0 {
+			err = bc.WriteEpochVdfBlockNum(block.Header().Epoch(), block.Number())
+			if err != nil {
+				utils.Logger().Error().
+					Str("number", chain[i].Number().String()).
+					Str("epoch", block.Header().Epoch().String()).
+					Msg("failed to write VDF block number to local db")
+			}
+		}
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
@@ -1593,7 +1681,7 @@ Error: %v
 // should be done or not. The reason behind the optional check is because some
 // of the header retrieval mechanisms already need to verify nonces, as well as
 // because nonces can be verified sparsely, not needing to check each.
-func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
+func (bc *BlockChain) InsertHeaderChain(chain []*block.Header, checkFreq int) (int, error) {
 	start := time.Now()
 	if i, err := bc.hc.ValidateHeaderChain(chain, checkFreq); err != nil {
 		return i, err
@@ -1606,7 +1694,7 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (i
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
-	whFunc := func(header *types.Header) error {
+	whFunc := func(header *block.Header) error {
 		bc.mu.Lock()
 		defer bc.mu.Unlock()
 
@@ -1626,7 +1714,7 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (i
 // without the real blocks. Hence, writing headers directly should only be done
 // in two scenarios: pure-header mode of operation (light clients), or properly
 // separated header/block phases (non-archive clients).
-func (bc *BlockChain) writeHeader(header *types.Header) error {
+func (bc *BlockChain) writeHeader(header *block.Header) error {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -1639,7 +1727,7 @@ func (bc *BlockChain) writeHeader(header *types.Header) error {
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
 // header is retrieved from the HeaderChain's internal cache.
-func (bc *BlockChain) CurrentHeader() *types.Header {
+func (bc *BlockChain) CurrentHeader() *block.Header {
 	return bc.hc.CurrentHeader()
 }
 
@@ -1657,13 +1745,13 @@ func (bc *BlockChain) GetTdByHash(hash common.Hash) *big.Int {
 
 // GetHeader retrieves a block header from the database by hash and number,
 // caching it if found.
-func (bc *BlockChain) GetHeader(hash common.Hash, number uint64) *types.Header {
+func (bc *BlockChain) GetHeader(hash common.Hash, number uint64) *block.Header {
 	return bc.hc.GetHeader(hash, number)
 }
 
 // GetHeaderByHash retrieves a block header from the database by hash, caching it if
 // found.
-func (bc *BlockChain) GetHeaderByHash(hash common.Hash) *types.Header {
+func (bc *BlockChain) GetHeaderByHash(hash common.Hash) *block.Header {
 	return bc.hc.GetHeaderByHash(hash)
 }
 
@@ -1693,7 +1781,7 @@ func (bc *BlockChain) GetAncestor(hash common.Hash, number, ancestor uint64, max
 
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
-func (bc *BlockChain) GetHeaderByNumber(number uint64) *types.Header {
+func (bc *BlockChain) GetHeaderByNumber(number uint64) *block.Header {
 	return bc.hc.GetHeaderByNumber(number)
 }
 
@@ -1729,10 +1817,10 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 }
 
 // ReadShardState retrieves sharding state given the epoch number.
-func (bc *BlockChain) ReadShardState(epoch *big.Int) (types.ShardState, error) {
+func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.State, error) {
 	cacheKey := string(epoch.Bytes())
 	if cached, ok := bc.shardStateCache.Get(cacheKey); ok {
-		shardState := cached.(types.ShardState)
+		shardState := cached.(shard.State)
 		return shardState, nil
 	}
 	shardState, err := rawdb.ReadShardState(bc.db, epoch)
@@ -1745,7 +1833,7 @@ func (bc *BlockChain) ReadShardState(epoch *big.Int) (types.ShardState, error) {
 
 // WriteShardState saves the given sharding state under the given epoch number.
 func (bc *BlockChain) WriteShardState(
-	epoch *big.Int, shardState types.ShardState,
+	epoch *big.Int, shardState shard.State,
 ) error {
 	shardState = shardState.DeepCopy()
 	err := rawdb.WriteShardState(bc.db, epoch, shardState)
@@ -1761,7 +1849,7 @@ func (bc *BlockChain) WriteShardState(
 func (bc *BlockChain) WriteShardStateBytes(
 	epoch *big.Int, shardState []byte,
 ) error {
-	decodeShardState := types.ShardState{}
+	decodeShardState := shard.State{}
 	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
 		return err
 	}
@@ -1798,26 +1886,22 @@ func (bc *BlockChain) WriteLastCommits(lastCommits []byte) error {
 }
 
 // GetVdfByNumber retrieves the rand seed given the block number, return 0 if not exist
-func (bc *BlockChain) GetVdfByNumber(number uint64) [32]byte {
+func (bc *BlockChain) GetVdfByNumber(number uint64) []byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return [32]byte{}
+		return []byte{}
 	}
-	result := [32]byte{}
-	//copy(result[:], header.Vdf[:32])
-	// TODO: add real vdf
-	return result
+
+	return header.Vdf()
 }
 
 // GetVrfByNumber retrieves the randomness preimage given the block number, return 0 if not exist
-func (bc *BlockChain) GetVrfByNumber(number uint64) [32]byte {
+func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 	header := bc.GetHeaderByNumber(number)
 	if header == nil {
-		return [32]byte{}
+		return []byte{}
 	}
-	//return header.Vrf
-	// TODO: add real vrf
-	return [32]byte{}
+	return header.Vrf()
 }
 
 // GetShardState returns the shard state for the given epoch,
@@ -1825,7 +1909,7 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) [32]byte {
 func (bc *BlockChain) GetShardState(
 	epoch *big.Int,
 	stakeInfo *map[common.Address]*structs.StakeInfo,
-) (types.ShardState, error) {
+) (shard.State, error) {
 	shardState, err := bc.ReadShardState(epoch)
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err
@@ -1879,6 +1963,128 @@ func (bc *BlockChain) StoreEpochBlockNumber(
 	return nil
 }
 
+// ReadEpochVrfBlockNums retrieves block numbers with valid VRF for the specified epoch
+func (bc *BlockChain) ReadEpochVrfBlockNums(epoch *big.Int) ([]uint64, error) {
+	vrfNumbers := []uint64{}
+	if cached, ok := bc.randomnessCache.Get("vrf-" + string(epoch.Bytes())); ok {
+		encodedVrfNumbers := cached.([]byte)
+		if err := rlp.DecodeBytes(encodedVrfNumbers, &vrfNumbers); err != nil {
+			return nil, err
+		}
+		return vrfNumbers, nil
+	}
+
+	encodedVrfNumbers, err := rawdb.ReadEpochVrfBlockNums(bc.db, epoch)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := rlp.DecodeBytes(encodedVrfNumbers, &vrfNumbers); err != nil {
+		return nil, err
+	}
+	return vrfNumbers, nil
+}
+
+// WriteEpochVrfBlockNums saves block numbers with valid VRF for the specified epoch
+func (bc *BlockChain) WriteEpochVrfBlockNums(epoch *big.Int, vrfNumbers []uint64) error {
+	encodedVrfNumbers, err := rlp.EncodeToBytes(vrfNumbers)
+	if err != nil {
+		return err
+	}
+
+	err = rawdb.WriteEpochVrfBlockNums(bc.db, epoch, encodedVrfNumbers)
+	if err != nil {
+		return err
+	}
+	bc.randomnessCache.Add("vrf-"+string(epoch.Bytes()), encodedVrfNumbers)
+	return nil
+}
+
+// ReadEpochVdfBlockNum retrieves block number with valid VDF for the specified epoch
+func (bc *BlockChain) ReadEpochVdfBlockNum(epoch *big.Int) (*big.Int, error) {
+	if cached, ok := bc.randomnessCache.Get("vdf-" + string(epoch.Bytes())); ok {
+		encodedVdfNumber := cached.([]byte)
+		return new(big.Int).SetBytes(encodedVdfNumber), nil
+	}
+
+	encodedVdfNumber, err := rawdb.ReadEpochVdfBlockNum(bc.db, epoch)
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(encodedVdfNumber), nil
+}
+
+// WriteEpochVdfBlockNum saves block number with valid VDF for the specified epoch
+func (bc *BlockChain) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) error {
+	err := rawdb.WriteEpochVdfBlockNum(bc.db, epoch, blockNum.Bytes())
+	if err != nil {
+		return err
+	}
+
+	bc.randomnessCache.Add("vdf-"+string(epoch.Bytes()), blockNum.Bytes())
+	return nil
+}
+
+// WriteCrossLinks saves the hashes of crosslinks by shardID and blockNum combination key
+// temp=true is to write the just received cross link that's not committed into blockchain with consensus
+func (bc *BlockChain) WriteCrossLinks(cls []types.CrossLink, temp bool) error {
+	var err error
+	for i := 0; i < len(cls); i++ {
+		cl := cls[i]
+		err = rawdb.WriteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum().Uint64(), cl.Serialize(), temp)
+	}
+	return err
+}
+
+// DeleteCrossLinks removes the hashes of crosslinks by shardID and blockNum combination key
+// temp=true is to write the just received cross link that's not committed into blockchain with consensus
+func (bc *BlockChain) DeleteCrossLinks(cls []types.CrossLink, temp bool) error {
+	var err error
+	for i := 0; i < len(cls); i++ {
+		cl := cls[i]
+		err = rawdb.DeleteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum().Uint64(), temp)
+	}
+	return err
+}
+
+// ReadCrossLink retrieves crosslink given shardID and blockNum.
+// temp=true is to retrieve the just received cross link that's not committed into blockchain with consensus
+func (bc *BlockChain) ReadCrossLink(shardID uint32, blockNum uint64, temp bool) (*types.CrossLink, error) {
+	bytes, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum, temp)
+	if err != nil {
+		return nil, err
+	}
+	crossLink, err := types.DeserializeCrossLink(bytes)
+
+	return crossLink, err
+}
+
+// WriteShardLastCrossLink saves the last crosslink of a shard
+func (bc *BlockChain) WriteShardLastCrossLink(shardID uint32, cl types.CrossLink) error {
+	return rawdb.WriteShardLastCrossLink(bc.db, cl.ShardID(), cl.Serialize())
+}
+
+// ReadShardLastCrossLink retrieves the last crosslink of a shard.
+func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error) {
+	bytes, err := rawdb.ReadShardLastCrossLink(bc.db, shardID)
+	if err != nil {
+		return nil, err
+	}
+	crossLink, err := types.DeserializeCrossLink(bytes)
+
+	return crossLink, err
+}
+
+// IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
+func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
+	if IsEpochBlock(block) {
+		return false
+	}
+
+	previousHeader := bc.GetHeaderByNumber(block.NumberU64() - 1)
+	return block.Coinbase() == previousHeader.Coinbase()
+}
+
 // ChainDB ...
 // TODO(ricl): in eth, this is not exposed. I expose it here because I need it in Harmony object.
 // In eth, chainDB is initialized within Ethereum object
@@ -1889,4 +2095,153 @@ func (bc *BlockChain) ChainDB() ethdb.Database {
 // GetVMConfig returns the block chain VM config.
 func (bc *BlockChain) GetVMConfig() *vm.Config {
 	return &bc.vmConfig
+}
+
+// GetToShardReceipts filters the cross shard receipts with given destination shardID
+func GetToShardReceipts(cxReceipts types.CXReceipts, shardID uint32) types.CXReceipts {
+	cxs := types.CXReceipts{}
+	for i := range cxReceipts {
+		cx := cxReceipts[i]
+		if cx.ToShardID == shardID {
+			cxs = append(cxs, cx)
+		}
+	}
+	return cxs
+}
+
+// ReadCXReceipts retrieves the cross shard transaction receipts of a given shard
+// temp=true is to retrieve the just received receipts that's not committed into blockchain with consensus
+func (bc *BlockChain) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, temp bool) (types.CXReceipts, error) {
+	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, blockNum, blockHash, temp)
+	if err != nil || len(cxs) == 0 {
+		return nil, err
+	}
+	return cxs, nil
+}
+
+// WriteCXReceipts saves the cross shard transaction receipts of a given shard
+// temp=true is to store the just received receipts that's not committed into blockchain with consensus
+func (bc *BlockChain) WriteCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, receipts types.CXReceipts, temp bool) error {
+	return rawdb.WriteCXReceipts(bc.db, shardID, blockNum, blockHash, receipts, temp)
+}
+
+// CXMerkleProof calculates the cross shard transaction merkle proof of a given destination shard
+func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
+	proof := &types.CXMerkleProof{BlockNum: block.Number(), BlockHash: block.Hash(), ShardID: block.ShardID(), CXReceiptHash: block.Header().OutgoingReceiptHash(), CXShardHashes: []common.Hash{}, ShardIDs: []uint32{}}
+	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, block.NumberU64(), block.Hash(), false)
+
+	if err != nil || cxs == nil {
+		return nil, err
+	}
+
+	epoch := block.Header().Epoch()
+	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+	shardNum := int(shardingConfig.NumShards())
+
+	for i := 0; i < shardNum; i++ {
+		receipts, err := bc.ReadCXReceipts(uint32(i), block.NumberU64(), block.Hash(), false)
+		if err != nil || len(receipts) == 0 {
+			continue
+		} else {
+			hash := types.DeriveSha(receipts)
+			proof.CXShardHashes = append(proof.CXShardHashes, hash)
+			proof.ShardIDs = append(proof.ShardIDs, uint32(i))
+		}
+	}
+	if len(proof.ShardIDs) == 0 {
+		return nil, nil
+	}
+	return proof, nil
+}
+
+// LatestCXReceiptsCheckpoint returns the latest checkpoint
+func (bc *BlockChain) LatestCXReceiptsCheckpoint(shardID uint32) uint64 {
+	blockNum, _ := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
+	return blockNum
+}
+
+// NextCXReceiptsCheckpoint returns the next checkpoint blockNum
+func (bc *BlockChain) NextCXReceiptsCheckpoint(currentNum uint64, shardID uint32) uint64 {
+	lastCheckpoint, _ := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
+	newCheckpoint := lastCheckpoint
+
+	// the new checkpoint will not exceed currentNum+1
+	for num := lastCheckpoint; num <= currentNum+1; num++ {
+		newCheckpoint = num
+		by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, num)
+		if by == rawdb.NAByte {
+			// TODO chao: check if there is IncompingReceiptsHash in crosslink header
+			// if the rootHash is non-empty, it means incomingReceipts are not delivered
+			// otherwise, it means there is no cross-shard transactions for this block
+			continue
+		}
+		if by == rawdb.SpentByte {
+			continue
+		}
+		// the first unspent blockHash found, break the loop
+		break
+	}
+	return newCheckpoint
+}
+
+// updateCXReceiptsCheckpoints will update the checkpoint and clean spent receipts upto checkpoint
+func (bc *BlockChain) updateCXReceiptsCheckpoints(shardID uint32, currentNum uint64) {
+	lastCheckpoint, err := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
+	if err != nil {
+		utils.Logger().Warn().Msg("[updateCXReceiptsCheckpoints] Cannot get lastCheckpoint")
+	}
+	newCheckpoint := bc.NextCXReceiptsCheckpoint(currentNum, shardID)
+	if lastCheckpoint == newCheckpoint {
+		return
+	}
+	utils.Logger().Debug().Uint64("lastCheckpoint", lastCheckpoint).Uint64("newCheckpont", newCheckpoint).Msg("[updateCXReceiptsCheckpoints]")
+	for num := lastCheckpoint; num < newCheckpoint; num++ {
+		rawdb.DeleteCXReceiptsProofSpent(bc.db, shardID, num)
+	}
+	rawdb.WriteCXReceiptsProofUnspentCheckpoint(bc.db, shardID, newCheckpoint)
+}
+
+// WriteCXReceiptsProofSpent mark the CXReceiptsProof list with given unspent status
+// true: unspent, false: spent
+func (bc *BlockChain) WriteCXReceiptsProofSpent(cxps []*types.CXReceiptsProof) {
+	for _, cxp := range cxps {
+		rawdb.WriteCXReceiptsProofSpent(bc.db, cxp)
+	}
+}
+
+// IsSpent checks whether a CXReceiptsProof is unspent
+func (bc *BlockChain) IsSpent(cxp *types.CXReceiptsProof) bool {
+	shardID := cxp.MerkleProof.ShardID
+	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, blockNum)
+	if by == rawdb.SpentByte || cxp.MerkleProof.BlockNum.Uint64() < bc.LatestCXReceiptsCheckpoint(cxp.MerkleProof.ShardID) {
+		return true
+	}
+	return false
+}
+
+// UpdateCXReceiptsCheckpointsByBlock cleans checkpoints and update latest checkpoint based on incomingReceipts of the given block
+func (bc *BlockChain) UpdateCXReceiptsCheckpointsByBlock(block *types.Block) {
+	m := make(map[uint32]uint64)
+	for _, cxp := range block.IncomingReceipts() {
+		shardID := cxp.MerkleProof.ShardID
+		blockNum := cxp.MerkleProof.BlockNum.Uint64()
+		if _, ok := m[shardID]; !ok {
+			m[shardID] = blockNum
+		} else if m[shardID] < blockNum {
+			m[shardID] = blockNum
+		}
+	}
+
+	for k, v := range m {
+		utils.Logger().Debug().Uint32("shardID", k).Uint64("blockNum", v).Msg("[CleanCXReceiptsCheckpoints] Cleaning CXReceiptsProof upto")
+		bc.updateCXReceiptsCheckpoints(k, v)
+	}
+}
+
+// ReadTxLookupEntry returns where the given transaction resides in the chain,
+// as a (block hash, block number, index in transaction list) triple.
+// returns 0, 0 if not found
+func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64) {
+	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }

@@ -1,18 +1,19 @@
 package node
 
 import (
+	"math/big"
+	"reflect"
 	"strings"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
+
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-
-	"math/big"
-	"reflect"
-	"testing"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 var (
@@ -59,14 +60,13 @@ func TestConstructBlocksSyncMessage(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 
 	root := statedb.IntermediateRoot(false)
-	head := &types.Header{
-		Number:  new(big.Int).SetUint64(uint64(10000)),
-		Epoch:   big.NewInt(0),
-		ShardID: 0,
-		Time:    new(big.Int).SetUint64(uint64(100000)),
-		Root:    root,
-	}
-	head.GasLimit = 10000000000
+	head := blockfactory.NewTestHeader().With().
+		Number(new(big.Int).SetUint64(uint64(10000))).
+		ShardID(0).
+		Time(new(big.Int).SetUint64(uint64(100000))).
+		Root(root).
+		GasLimit(10000000000).
+		Header()
 
 	if _, err := statedb.Commit(false); err != nil {
 		t.Fatalf("statedb.Commit() failed: %s", err)
@@ -75,7 +75,7 @@ func TestConstructBlocksSyncMessage(t *testing.T) {
 		t.Fatalf("statedb.Database().TrieDB().Commit() failed: %s", err)
 	}
 
-	block1 := types.NewBlock(head, nil, nil)
+	block1 := types.NewBlock(head, nil, nil, nil, nil)
 
 	blocks := []*types.Block{
 		block1,

@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/harmony-one/harmony/common/denominations"
+
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -20,7 +21,7 @@ import (
 )
 
 const (
-	defaultGasPrice    = params.GWei
+	defaultGasPrice    = denominations.Nano
 	defaultFromAddress = "0x0000000000000000000000000000000000000000"
 )
 
@@ -62,8 +63,19 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 	return nil, err
 }
 
+// GetShardingStructure returns an array of sharding structures.
+func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[string]interface{}, error) {
+	// Get header and number of shards.
+	header := s.b.CurrentBlock().Header()
+	numShard := core.ShardingSchedule.InstanceForEpoch(header.Epoch()).NumShards()
+
+	// Return shareding structure for each case.
+	return core.ShardingSchedule.GetShardingStructure(int(numShard), int(s.b.GetShardID())), nil
+}
+
 // GetCode returns the code stored at the given address in the state for the given block number.
-func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+	address := internal_common.ParseAddr(addr)
 	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return nil, err
@@ -75,7 +87,8 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Addres
 // GetStorageAt returns the storage from the state at the given address, key and
 // block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
 // numbers are also allowed.
-func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.Address, key string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+	address := internal_common.ParseAddr(addr)
 	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
 		return nil, err
@@ -89,14 +102,24 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.A
 // block numbers are also allowed.
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	// TODO: currently only get latest balance. Will add complete logic later.
-	adr := internal_common.ParseAddr(address)
-	return s.b.GetBalance(adr)
+	addr := internal_common.ParseAddr(address)
+	return s.b.GetBalance(addr)
 }
 
 // BlockNumber returns the block number of the chain head.
 func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
-	return hexutil.Uint64(header.Number.Uint64())
+	return hexutil.Uint64(header.Number().Uint64())
+}
+
+// ResendCx requests that the egress receipt for the given cross-shard
+// transaction be sent to the destination shard for credit.  This is used for
+// unblocking a half-complete cross-shard transaction whose fund has been
+// withdrawn already from the source shard but not credited yet in the
+// destination account due to transient failures.
+func (s *PublicBlockChainAPI) ResendCx(ctx context.Context, txID common.Hash) (bool, error) {
+	_, success := s.b.ResendCx(ctx, txID)
+	return success, nil
 }
 
 // Call executes the given transaction on the state for the given block number.

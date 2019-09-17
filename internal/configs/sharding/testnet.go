@@ -21,11 +21,19 @@ const (
 	testnetEpochBlock1 = 78
 	threeOne           = 111
 
+	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
+
 	testnetMaxTxAmountLimit               = 1e3 // unit is in One
 	testnetMaxNumRecentTxsPerAccountLimit = 1e2
 	testnetMaxTxPoolSizeLimit             = 8000
 	testnetMaxNumTxsPerBlockLimit         = 1000
 	testnetRecentTxDuration               = time.Hour
+	testnetEnableTxnThrottling            = true
+
+	// TestNetHTTPPattern is the http pattern for testnet.
+	TestNetHTTPPattern = "https://api.s%d.b.hmny.io"
+	// TestNetWSPattern is the websocket pattern for testnet.
+	TestNetWSPattern = "wss://ws.s%d.b.hmny.io"
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -66,9 +74,29 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
+func (ts testnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
+	blocks := ts.BlocksPerEpoch()
+	switch {
+	case epochNum == 0:
+		return testnetEpochBlock1 - 1
+	default:
+		return testnetEpochBlock1 - 1 + blocks*epochNum
+	}
+}
+
+func (ts testnetSchedule) VdfDifficulty() int {
+	return testnetVdfDifficulty
+}
+
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ts testnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
+}
+
+// TODO: remove it after randomness feature turned on mainnet
+//RandonnessStartingEpoch returns starting epoch of randonness generation
+func (ts testnetSchedule) RandomnessStartingEpoch() uint64 {
+	return mainnetRandomnessStartingEpoch
 }
 
 func (ts testnetSchedule) MaxTxAmountLimit() *big.Int {
@@ -93,6 +121,10 @@ func (ts testnetSchedule) RecentTxDuration() time.Duration {
 	return testnetRecentTxDuration
 }
 
+func (ts testnetSchedule) EnableTxnThrottling() bool {
+	return testnetEnableTxnThrottling
+}
+
 func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ts.MaxTxAmountLimit(),
@@ -100,7 +132,17 @@ func (ts testnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxPoolSizeLimit:             ts.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ts.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               ts.RecentTxDuration(),
+		EnableTxnThrottling:            ts.EnableTxnThrottling(),
 	}
+}
+
+func (ts testnetSchedule) GetNetworkID() NetworkID {
+	return TestNet
+}
+
+// GetShardingStructure is the sharding structure for testnet.
+func (ts testnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+	return genShardingStructure(numShard, shardID, TestNetHTTPPattern, TestNetWSPattern)
 }
 
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}

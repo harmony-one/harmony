@@ -24,9 +24,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
+)
+
+// Indicate whether the receipts corresponding to a blockHash is spent or not
+const (
+	SpentByte byte = iota
+	UnspentByte
+	NAByte // not exist
 )
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
@@ -143,12 +152,12 @@ func HasHeader(db DatabaseReader, hash common.Hash, number uint64) bool {
 }
 
 // ReadHeader retrieves the block header corresponding to the hash.
-func ReadHeader(db DatabaseReader, hash common.Hash, number uint64) *types.Header {
+func ReadHeader(db DatabaseReader, hash common.Hash, number uint64) *block.Header {
 	data := ReadHeaderRLP(db, hash, number)
 	if len(data) == 0 {
 		return nil
 	}
-	header := new(types.Header)
+	header := new(block.Header)
 	if err := rlp.Decode(bytes.NewReader(data), header); err != nil {
 		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid block header RLP")
 		return nil
@@ -158,11 +167,11 @@ func ReadHeader(db DatabaseReader, hash common.Hash, number uint64) *types.Heade
 
 // WriteHeader stores a block header into the database and also stores the hash-
 // to-number mapping.
-func WriteHeader(db DatabaseWriter, header *types.Header) {
+func WriteHeader(db DatabaseWriter, header *block.Header) {
 	// Write the hash -> number mapping
 	var (
 		hash    = header.Hash()
-		number  = header.Number.Uint64()
+		number  = header.Number().Uint64()
 		encoded = encodeBlockNumber(number)
 	)
 	key := headerNumberKey(hash)
@@ -332,7 +341,7 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 	if body == nil {
 		return nil
 	}
-	return types.NewBlockWithHeader(header).WithBody(body.Transactions, body.Uncles)
+	return types.NewBlockWithHeader(header).WithBody(body.Transactions(), body.Uncles(), body.IncomingReceipts())
 }
 
 // WriteBlock serializes a block into the database, header and body separately.
@@ -340,12 +349,11 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
 	WriteHeader(db, block.Header())
 	// TODO ek – maybe roll the below into WriteHeader()
-	epoch := block.Header().Epoch
+	epoch := block.Header().Epoch()
 	if epoch == nil {
 		// backward compatibility
 		return
 	}
-	epoch = new(big.Int).Set(epoch)
 	epochBlockNum := block.Number()
 	writeOne := func() {
 		if err := WriteEpochBlockNumber(db, epoch, epochBlockNum); err != nil {
@@ -359,7 +367,7 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 	}
 
 	// TODO: don't change epoch based on shard state presence
-	if len(block.Header().ShardState) > 0 && block.NumberU64() != 0 {
+	if len(block.Header().ShardState()) > 0 && block.NumberU64() != 0 {
 		// End-of-epoch block; record the next epoch after this block.
 		epoch = new(big.Int).Add(epoch, common.Big1)
 		epochBlockNum = new(big.Int).Add(epochBlockNum, common.Big1)
@@ -376,25 +384,25 @@ func DeleteBlock(db DatabaseDeleter, hash common.Hash, number uint64) {
 }
 
 // FindCommonAncestor returns the last common ancestor of two block headers
-func FindCommonAncestor(db DatabaseReader, a, b *types.Header) *types.Header {
-	for bn := b.Number.Uint64(); a.Number.Uint64() > bn; {
-		a = ReadHeader(db, a.ParentHash, a.Number.Uint64()-1)
+func FindCommonAncestor(db DatabaseReader, a, b *block.Header) *block.Header {
+	for bn := b.Number().Uint64(); a.Number().Uint64() > bn; {
+		a = ReadHeader(db, a.ParentHash(), a.Number().Uint64()-1)
 		if a == nil {
 			return nil
 		}
 	}
-	for an := a.Number.Uint64(); an < b.Number.Uint64(); {
-		b = ReadHeader(db, b.ParentHash, b.Number.Uint64()-1)
+	for an := a.Number().Uint64(); an < b.Number().Uint64(); {
+		b = ReadHeader(db, b.ParentHash(), b.Number().Uint64()-1)
 		if b == nil {
 			return nil
 		}
 	}
 	for a.Hash() != b.Hash() {
-		a = ReadHeader(db, a.ParentHash, a.Number.Uint64()-1)
+		a = ReadHeader(db, a.ParentHash(), a.Number().Uint64()-1)
 		if a == nil {
 			return nil
 		}
-		b = ReadHeader(db, b.ParentHash, b.Number.Uint64()-1)
+		b = ReadHeader(db, b.ParentHash(), b.Number().Uint64()-1)
 		if b == nil {
 			return nil
 		}
@@ -405,7 +413,7 @@ func FindCommonAncestor(db DatabaseReader, a, b *types.Header) *types.Header {
 // ReadShardState retrieves sharding state.
 func ReadShardState(
 	db DatabaseReader, epoch *big.Int,
-) (shardState types.ShardState, err error) {
+) (shardState shard.State, err error) {
 	var data []byte
 	data, err = db.Get(shardStateKey(epoch))
 	if err != nil {
@@ -423,7 +431,7 @@ func ReadShardState(
 
 // WriteShardState stores sharding state into database.
 func WriteShardState(
-	db DatabaseWriter, epoch *big.Int, shardState types.ShardState,
+	db DatabaseWriter, epoch *big.Int, shardState shard.State,
 ) (err error) {
 	data, err := rlp.EncodeToBytes(shardState)
 	if err != nil {
@@ -480,8 +488,127 @@ func ReadEpochBlockNumber(db DatabaseReader, epoch *big.Int) (*big.Int, error) {
 	return new(big.Int).SetBytes(data), nil
 }
 
-// WriteEpochBlockNumber stores the given epoch-number-to-epoch-block-number
-// in the database.
+// WriteEpochBlockNumber stores the given epoch-number-to-epoch-block-number in the database.
 func WriteEpochBlockNumber(db DatabaseWriter, epoch, blockNum *big.Int) error {
 	return db.Put(epochBlockNumberKey(epoch), blockNum.Bytes())
+}
+
+// ReadEpochVrfBlockNums retrieves the VRF block numbers for the given epoch
+func ReadEpochVrfBlockNums(db DatabaseReader, epoch *big.Int) ([]byte, error) {
+	return db.Get(epochVrfBlockNumbersKey(epoch))
+}
+
+// WriteEpochVrfBlockNums stores the VRF block numbers for the given epoch
+func WriteEpochVrfBlockNums(db DatabaseWriter, epoch *big.Int, data []byte) error {
+	return db.Put(epochVrfBlockNumbersKey(epoch), data)
+}
+
+// ReadEpochVdfBlockNum retrieves the VDF block number for the given epoch
+func ReadEpochVdfBlockNum(db DatabaseReader, epoch *big.Int) ([]byte, error) {
+	return db.Get(epochVdfBlockNumberKey(epoch))
+}
+
+// WriteEpochVdfBlockNum stores the VDF block number for the given epoch
+func WriteEpochVdfBlockNum(db DatabaseWriter, epoch *big.Int, data []byte) error {
+	return db.Put(epochVdfBlockNumberKey(epoch), data)
+}
+
+// ReadCrossLinkShardBlock retrieves the blockHash given shardID and blockNum
+func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64, temp bool) ([]byte, error) {
+	return db.Get(crosslinkKey(shardID, blockNum, temp))
+}
+
+// WriteCrossLinkShardBlock stores the blockHash given shardID and blockNum
+func WriteCrossLinkShardBlock(db DatabaseWriter, shardID uint32, blockNum uint64, data []byte, temp bool) error {
+	return db.Put(crosslinkKey(shardID, blockNum, temp), data)
+}
+
+// DeleteCrossLinkShardBlock deletes the blockHash given shardID and blockNum
+func DeleteCrossLinkShardBlock(db DatabaseDeleter, shardID uint32, blockNum uint64, temp bool) error {
+	return db.Delete(crosslinkKey(shardID, blockNum, temp))
+}
+
+// ReadShardLastCrossLink read the last cross link of a shard
+func ReadShardLastCrossLink(db DatabaseReader, shardID uint32) ([]byte, error) {
+	return db.Get(shardLastCrosslinkKey(shardID))
+}
+
+// WriteShardLastCrossLink stores the last cross link of a shard
+func WriteShardLastCrossLink(db DatabaseWriter, shardID uint32, data []byte) error {
+	return db.Put(shardLastCrosslinkKey(shardID), data)
+}
+
+// ReadCXReceipts retrieves all the transactions of receipts given destination shardID, number and blockHash
+func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash, temp bool) (types.CXReceipts, error) {
+	data, err := db.Get(cxReceiptKey(shardID, number, hash, temp))
+	if len(data) == 0 || err != nil {
+		utils.Logger().Info().Err(err).Uint64("number", number).Int("dataLen", len(data)).Msg("ReadCXReceipts")
+		return nil, err
+	}
+	cxReceipts := types.CXReceipts{}
+	if err := rlp.DecodeBytes(data, &cxReceipts); err != nil {
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid cross-shard tx receipt array RLP")
+		return nil, err
+	}
+	return cxReceipts, nil
+}
+
+// WriteCXReceipts stores all the transaction receipts given destination shardID, blockNumber and blockHash
+func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash common.Hash, receipts types.CXReceipts, temp bool) error {
+	bytes, err := rlp.EncodeToBytes(receipts)
+	if err != nil {
+		utils.Logger().Error().Msg("[WriteCXReceipts] Failed to encode cross shard tx receipts")
+	}
+	// Store the receipt slice
+	if err := db.Put(cxReceiptKey(shardID, number, hash, temp), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteCXReceipts] Failed to store cxreceipts")
+	}
+	return err
+}
+
+// DeleteCXReceipts removes all receipt data associated with a block hash.
+func DeleteCXReceipts(db DatabaseDeleter, shardID uint32, number uint64, hash common.Hash, temp bool) {
+	if err := db.Delete(cxReceiptKey(shardID, number, hash, temp)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete cross shard tx receipts")
+	}
+}
+
+// ReadCXReceiptsProofSpent check whether a CXReceiptsProof is unspent
+func ReadCXReceiptsProofSpent(db DatabaseReader, shardID uint32, number uint64) (byte, error) {
+	data, err := db.Get(cxReceiptSpentKey(shardID, number))
+	if err != nil || len(data) == 0 {
+		return NAByte, ctxerror.New("[ReadCXReceiptsProofSpent] Cannot find the key", "shardID", shardID, "number", number).WithCause(err)
+	}
+	return data[0], nil
+}
+
+// WriteCXReceiptsProofSpent write CXReceiptsProof as spent into database
+func WriteCXReceiptsProofSpent(dbw DatabaseWriter, cxp *types.CXReceiptsProof) error {
+	shardID := cxp.MerkleProof.ShardID
+	blockNum := cxp.MerkleProof.BlockNum.Uint64()
+	return dbw.Put(cxReceiptSpentKey(shardID, blockNum), []byte{SpentByte})
+}
+
+// DeleteCXReceiptsProofSpent removes unspent indicator of a given blockHash
+func DeleteCXReceiptsProofSpent(db DatabaseDeleter, shardID uint32, number uint64) {
+	if err := db.Delete(cxReceiptSpentKey(shardID, number)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete receipts unspent indicator")
+	}
+}
+
+// ReadCXReceiptsProofUnspentCheckpoint returns the last unspent blocknumber
+func ReadCXReceiptsProofUnspentCheckpoint(db DatabaseReader, shardID uint32) (uint64, error) {
+	by, err := db.Get(cxReceiptUnspentCheckpointKey(shardID))
+	if err != nil {
+		return 0, ctxerror.New("[ReadCXReceiptsProofUnspent] Cannot Unspent Checkpoint", "shardID", shardID).WithCause(err)
+	}
+	lastCheckpoint := binary.BigEndian.Uint64(by[:])
+	return lastCheckpoint, nil
+}
+
+// WriteCXReceiptsProofUnspentCheckpoint check whether a CXReceiptsProof is unspent, true means not spent
+func WriteCXReceiptsProofUnspentCheckpoint(db DatabaseWriter, shardID uint32, blockNum uint64) error {
+	by := make([]byte, 8)
+	binary.BigEndian.PutUint64(by[:], blockNum)
+	return db.Put(cxReceiptUnspentCheckpointKey(shardID), by)
 }

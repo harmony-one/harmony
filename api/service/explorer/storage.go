@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants for storage.
@@ -125,7 +126,7 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 }
 
 // DumpCommittee commits validators for shardNum and epoch.
-func (storage *Storage) DumpCommittee(shardID uint32, epoch uint64, committee types.Committee) error {
+func (storage *Storage) DumpCommittee(shardID uint32, epoch uint64, committee shard.Committee) error {
 	batch := storage.db.NewBatch()
 	// Store committees.
 	committeeData, err := rlp.EncodeToBytes(committee)
@@ -155,13 +156,15 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 
 // UpdateAddress ...
 func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
+	explorerTransaction.Type = Received
 	storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+	explorerTransaction.Type = Sent
 	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
 }
 
-// UpdateAddressStorage updates specific adr address.
-func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, explorerTransaction *Transaction, tx *types.Transaction) {
-	key := GetAddressKey(adr)
+// UpdateAddressStorage updates specific addr Address.
+func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
+	key := GetAddressKey(addr)
 
 	var address Address
 	if data, err := storage.db.Get([]byte(key)); err == nil {
@@ -174,7 +177,7 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, expl
 	} else {
 		address.Balance = tx.Value()
 	}
-	address.ID = adr
+	address.ID = addr
 	address.TXs = append(address.TXs, explorerTransaction)
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
@@ -182,6 +185,6 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, adr string, expl
 			utils.Logger().Warn().Err(err).Msg("cannot batch address")
 		}
 	} else {
-		utils.Logger().Error().Err(err).Msg("cannot encode address account")
+		utils.Logger().Error().Err(err).Msg("cannot encode address")
 	}
 }

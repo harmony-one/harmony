@@ -22,12 +22,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
 
+	blockfactory "github.com/harmony-one/harmony/block/factory"
+	"github.com/harmony-one/harmony/internal/params"
+
+	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // BlockGen creates blocks for testing.
@@ -36,13 +40,14 @@ type BlockGen struct {
 	i       int
 	parent  *types.Block
 	chain   []*types.Block
-	header  *types.Header
+	factory blockfactory.Factory
+	header  *block.Header
 	statedb *state.DB
 
 	gasPool  *GasPool
 	txs      []*types.Transaction
 	receipts []*types.Receipt
-	uncles   []*types.Header
+	uncles   []*block.Header
 
 	config *params.ChainConfig
 	engine consensus_engine.Engine
@@ -57,18 +62,18 @@ func (b *BlockGen) SetCoinbase(addr common.Address) {
 		}
 		panic("coinbase can only be set once")
 	}
-	b.header.Coinbase = addr
-	b.gasPool = new(GasPool).AddGas(b.header.GasLimit)
+	b.header.SetCoinbase(addr)
+	b.gasPool = new(GasPool).AddGas(b.header.GasLimit())
 }
 
 // SetExtra sets the extra data field of the generated block.
 func (b *BlockGen) SetExtra(data []byte) {
-	b.header.Extra = data
+	b.header.SetExtra(data)
 }
 
 // SetShardID sets the shardID field of the generated block.
 func (b *BlockGen) SetShardID(shardID uint32) {
-	b.header.ShardID = shardID
+	b.header.SetShardID(shardID)
 }
 
 // AddTx adds a transaction to the generated block. If no coinbase has
@@ -96,7 +101,11 @@ func (b *BlockGen) AddTxWithChain(bc *BlockChain, tx *types.Transaction) {
 		b.SetCoinbase(common.Address{})
 	}
 	b.statedb.Prepare(tx.Hash(), common.Hash{}, len(b.txs))
-	receipt, _, err := ApplyTransaction(b.config, bc, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vm.Config{})
+	coinbase := b.header.Coinbase()
+	gasUsed := b.header.GasUsed()
+	receipt, _, _, err := ApplyTransaction(b.config, bc, &coinbase, b.gasPool, b.statedb, b.header, tx, &gasUsed, vm.Config{})
+	b.header.SetGasUsed(gasUsed)
+	b.header.SetCoinbase(coinbase)
 	if err != nil {
 		panic(err)
 	}
@@ -106,7 +115,7 @@ func (b *BlockGen) AddTxWithChain(bc *BlockChain, tx *types.Transaction) {
 
 // Number returns the block number of the block being generated.
 func (b *BlockGen) Number() *big.Int {
-	return new(big.Int).Set(b.header.Number)
+	return b.header.Number()
 }
 
 // AddUncheckedReceipt forcefully adds a receipts to the block without a
@@ -128,7 +137,7 @@ func (b *BlockGen) TxNonce(addr common.Address) uint64 {
 }
 
 // AddUncle adds an uncle header to the generated block.
-func (b *BlockGen) AddUncle(h *types.Header) {
+func (b *BlockGen) AddUncle(h *block.Header) {
 	b.uncles = append(b.uncles, h)
 }
 
@@ -161,21 +170,13 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	if config == nil {
 		config = params.TestChainConfig
 	}
+	factory := blockfactory.NewFactory(config)
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
 	chainreader := &fakeChainReader{config: config}
 	genblock := func(i int, parent *types.Block, statedb *state.DB) (*types.Block, types.Receipts) {
-		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, engine: engine}
-		b.header = makeHeader(chainreader, parent, statedb, b.engine)
+		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, factory: factory, engine: engine}
+		b.header = makeHeader(chainreader, parent, statedb, b.engine, factory)
 
-		// Mutate the state and block according to any hard-fork specs
-		if daoBlock := config.DAOForkBlock; daoBlock != nil {
-			limit := new(big.Int).Add(daoBlock, params.DAOForkExtraRange)
-			if b.header.Number.Cmp(daoBlock) >= 0 && b.header.Number.Cmp(limit) < 0 {
-				if config.DAOForkSupport {
-					b.header.Extra = common.CopyBytes(params.DAOForkBlockExtra)
-				}
-			}
-		}
 		//if config.DAOForkSupport && config.DAOForkBlock != nil && config.DAOForkBlock.Cmp(b.header.Number) == 0 {
 		//	misc.ApplyDAOHardFork(statedb)
 		//}
@@ -185,13 +186,13 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		}
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts)
+			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil, nil)
 			if err != nil {
 				panic(err)
 			}
 
 			// Write state changes to db
-			root, err := statedb.Commit(config.IsEIP158(b.header.Number))
+			root, err := statedb.Commit(config.IsS3(b.header.Epoch()))
 			if err != nil {
 				panic(fmt.Sprintf("state write error: %v", err))
 			}
@@ -215,7 +216,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	return blocks, receipts
 }
 
-func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine) *types.Header {
+func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *state.DB, engine consensus_engine.Engine, factory blockfactory.Factory) *block.Header {
 	var time *big.Int
 	if parent.Time() == nil {
 		time = big.NewInt(10)
@@ -223,26 +224,20 @@ func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *
 		time = new(big.Int).Add(parent.Time(), big.NewInt(10)) // block time is fixed at 10 seconds
 	}
 
-	return &types.Header{
-		Root:       state.IntermediateRoot(chain.Config().IsEIP158(parent.Number())),
-		ParentHash: parent.Hash(),
-		Coinbase:   parent.Coinbase(),
-		//Difficulty: engine.CalcDifficulty(chain, time.Uint64(), &types.Header{
-		//	Number:     parent.Number(),
-		//	Time:       new(big.Int).Sub(time, big.NewInt(10)),
-		//	Difficulty: parent.Difficulty(),
-		//	UncleHash:  parent.UncleHash(),
-		//}),
-		GasLimit: CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit()),
-		Number:   new(big.Int).Add(parent.Number(), common.Big1),
-		Time:     time,
-	}
+	return factory.NewHeader(parent.Epoch()).With().
+		Root(state.IntermediateRoot(chain.Config().IsS3(parent.Epoch()))).
+		ParentHash(parent.Hash()).
+		Coinbase(parent.Coinbase()).
+		GasLimit(CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit())).
+		Number(new(big.Int).Add(parent.Number(), common.Big1)).
+		Time(time).
+		Header()
 }
 
 // makeHeaderChain creates a deterministic chain of headers rooted at parent.
-func makeHeaderChain(parent *types.Header, n int, engine consensus_engine.Engine, db ethdb.Database, seed int) []*types.Header {
+func makeHeaderChain(parent *block.Header, n int, engine consensus_engine.Engine, db ethdb.Database, seed int) []*block.Header {
 	blocks := makeBlockChain(types.NewBlockWithHeader(parent), n, engine, db, seed)
-	headers := make([]*types.Header, len(blocks))
+	headers := make([]*block.Header, len(blocks))
 	for i, block := range blocks {
 		headers[i] = block.Header()
 	}
@@ -267,9 +262,9 @@ func (cr *fakeChainReader) Config() *params.ChainConfig {
 	return cr.config
 }
 
-func (cr *fakeChainReader) CurrentHeader() *types.Header                            { return nil }
-func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *types.Header           { return nil }
-func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *types.Header          { return nil }
-func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *types.Header { return nil }
+func (cr *fakeChainReader) CurrentHeader() *block.Header                            { return nil }
+func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *block.Header           { return nil }
+func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *block.Header          { return nil }
+func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Header { return nil }
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
-func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (types.ShardState, error) { return nil, nil }
+func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (shard.State, error)      { return nil, nil }

@@ -9,15 +9,15 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/ethereum/go-ethereum/common"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	core_state "github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/params"
 	pkgworker "github.com/harmony-one/harmony/node/worker"
 )
 
@@ -39,7 +39,8 @@ var (
 	testUserKey, _  = crypto.GenerateKey()
 	testUserAddress = crypto.PubkeyToAddress(testUserKey.PublicKey)
 
-	chainConfig = params.TestChainConfig
+	chainConfig  = params.TestChainConfig
+	blockFactory = blockfactory.ForTest
 
 	//StakingPriKey is the keys for the deposit contract.
 	StakingPriKey, _ = crypto.GenerateKey()
@@ -53,6 +54,7 @@ var (
 	database = ethdb.NewMemDatabase()
 	gspec    = core.Genesis{
 		Config:  chainConfig,
+		Factory: blockFactory,
 		Alloc:   core.GenesisAlloc{FaucetAddress: {Balance: FaucetInitFunds}},
 		ShardID: 0,
 	}
@@ -105,7 +107,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 	fmt.Println("--------- Funding addresses for Faucet Contract Call ---------")
 	fmt.Println()
 
-	contractworker = pkgworker.New(params.TestChainConfig, chain, consensus.NewFaker(), 0)
+	contractworker = pkgworker.New(params.TestChainConfig, chain, chain.Engine(), 0)
 	nonce = contractworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
 	dataEnc = common.FromHex(FaucetContractBinary)
 	ftx, _ := types.SignTx(types.NewContractCreation(nonce, 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, FaucetPriKey)
@@ -129,7 +131,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	block, _ := contractworker.Commit([]byte{}, []byte{}, 0, common.Address{})
+	block, _ := contractworker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 	_, err = chain.InsertChain(types.Blocks{block})
 	if err != nil {
 		fmt.Println(err)
@@ -170,7 +172,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	block, _ := contractworker.Commit([]byte{}, []byte{}, 0, common.Address{})
+	block, _ := contractworker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 	_, err = chain.InsertChain(types.Blocks{block})
 	if err != nil {
 		fmt.Println(err)
@@ -246,7 +248,7 @@ func playStaking(chain *core.BlockChain) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	block, _ := contractworker.Commit([]byte{}, []byte{}, 0, common.Address{})
+	block, _ := contractworker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 	_, err = chain.InsertChain(types.Blocks{block})
 	if err != nil {
 		fmt.Println(err)
@@ -305,7 +307,7 @@ func playWithdrawStaking(chain *core.BlockChain) {
 		fmt.Println(err)
 	}
 
-	block, _ := contractworker.Commit([]byte{}, []byte{}, 0, common.Address{})
+	block, _ := contractworker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 	_, err = chain.InsertChain(types.Blocks{block})
 	if err != nil {
 		fmt.Println(err)
@@ -331,7 +333,7 @@ func playStakingContract(chain *core.BlockChain) {
 
 func main() {
 	genesis := gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine(), vm.Config{}, nil)
 
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain)
 
@@ -345,7 +347,7 @@ func main() {
 	//// Generate a small n-block chain and an uncle block for it
 	n := 3
 	if n > 0 {
-		blocks, _ := core.GenerateChain(chainConfig, genesis, consensus.NewFaker(), database, n, func(i int, gen *core.BlockGen) {
+		blocks, _ := core.GenerateChain(chainConfig, genesis, chain.Engine(), database, n, func(i int, gen *core.BlockGen) {
 			gen.SetCoinbase(FaucetAddress)
 			gen.SetShardID(0)
 			gen.AddTx(pendingTxs[i])

@@ -24,7 +24,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+
+	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 // Constants for transaction signing.
@@ -39,14 +41,12 @@ type sigCache struct {
 	from   common.Address
 }
 
-// MakeSigner returns a Signer based on the given chain config and block number.
-func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
+// MakeSigner returns a Signer based on the given chain config and epoch number.
+func MakeSigner(config *params.ChainConfig, epochNumber *big.Int) Signer {
 	var signer Signer
 	switch {
-	case config.IsEIP155(blockNumber):
+	case config.IsEIP155(epochNumber):
 		signer = NewEIP155Signer(config.ChainID)
-	case config.IsHomestead(blockNumber):
-		signer = HomesteadSigner{}
 	default:
 		signer = FrontierSigner{}
 	}
@@ -157,10 +157,12 @@ func (s EIP155Signer) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (s EIP155Signer) Hash(tx *Transaction) common.Hash {
-	return rlpHash([]interface{}{
+	return hash.FromRLP([]interface{}{
 		tx.data.AccountNonce,
 		tx.data.Price,
 		tx.data.GasLimit,
+		tx.data.ShardID,
+		tx.data.ToShardID,
 		tx.data.Recipient,
 		tx.data.Amount,
 		tx.data.Payload,
@@ -213,7 +215,7 @@ func (fs FrontierSigner) SignatureValues(tx *Transaction, sig []byte) (r, s, v *
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (fs FrontierSigner) Hash(tx *Transaction) common.Hash {
-	return rlpHash([]interface{}{
+	return hash.FromRLP([]interface{}{
 		tx.data.AccountNonce,
 		tx.data.Price,
 		tx.data.GasLimit,

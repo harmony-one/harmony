@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"math/big"
@@ -12,11 +11,11 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/contracts/structs"
-	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 const (
@@ -31,7 +30,7 @@ type ShardingState struct {
 	epoch      uint64 // current epoch
 	rnd        uint64 // random seed for resharding
 	numShards  int    // TODO ek – equal to len(shardState); remove this
-	shardState types.ShardState
+	shardState shard.State
 }
 
 // sortedCommitteeBySize will sort shards by size
@@ -46,7 +45,7 @@ func (ss *ShardingState) sortCommitteeBySize() {
 }
 
 // assignNewNodes add new nodes into the N/2 active committees evenly
-func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeID) {
+func (ss *ShardingState) assignNewNodes(newNodeList []shard.NodeID) {
 	ss.sortCommitteeBySize()
 	numActiveShards := ss.numShards / 2
 	Shuffle(newNodeList)
@@ -66,7 +65,7 @@ func (ss *ShardingState) assignNewNodes(newNodeList []types.NodeID) {
 // cuckooResharding uses cuckoo rule to reshard X% of active committee(shards) into inactive committee(shards)
 func (ss *ShardingState) cuckooResharding(percent float64) {
 	numActiveShards := ss.numShards / 2
-	kickedNodes := []types.NodeID{}
+	kickedNodes := []shard.NodeID{}
 	for i := range ss.shardState {
 		if i >= numActiveShards {
 			break
@@ -96,12 +95,12 @@ func (ss *ShardingState) cuckooResharding(percent float64) {
 }
 
 // Reshard will first add new nodes into shards, then use cuckoo rule to reshard to get new shard state
-func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
+func (ss *ShardingState) Reshard(newNodeList []shard.NodeID, percent float64) {
 	rand.Seed(int64(ss.rnd))
 	ss.sortCommitteeBySize()
 
 	// Take out and preserve leaders
-	leaders := []types.NodeID{}
+	leaders := []shard.NodeID{}
 	for i := 0; i < ss.numShards; i++ {
 		if len(ss.shardState[i].NodeList) > 0 {
 			leaders = append(leaders, ss.shardState[i].NodeList[0])
@@ -119,33 +118,19 @@ func (ss *ShardingState) Reshard(newNodeList []types.NodeID, percent float64) {
 		utils.Logger().Error().Msg("Not enough leaders to assign to shards")
 	}
 	for i := 0; i < ss.numShards; i++ {
-		ss.shardState[i].NodeList = append([]types.NodeID{leaders[i]}, ss.shardState[i].NodeList...)
+		ss.shardState[i].NodeList = append([]shard.NodeID{leaders[i]}, ss.shardState[i].NodeList...)
 	}
 }
 
 // Shuffle will shuffle the list with result uniquely determined by seed, assuming there is no repeat items in the list
-func Shuffle(list []types.NodeID) {
+func Shuffle(list []shard.NodeID) {
 	// Sort to make sure everyone will generate the same with the same rand seed.
 	sort.Slice(list, func(i, j int) bool {
-		return types.CompareNodeIDByBLSKey(list[i], list[j]) == -1
+		return shard.CompareNodeIDByBLSKey(list[i], list[j]) == -1
 	})
 	rand.Shuffle(len(list), func(i, j int) {
 		list[i], list[j] = list[j], list[i]
 	})
-}
-
-// GetBlockNumberFromEpoch calculates the block number where epoch sharding information is stored
-// TODO lc - use ShardingSchedule function
-func GetBlockNumberFromEpoch(epoch uint64) uint64 {
-	number := epoch * ShardingSchedule.BlocksPerEpoch() // currently we use the first block in each epoch
-	return number
-}
-
-// GetLastBlockNumberFromEpoch calculates the last block number for the given
-// epoch.  TODO ek – this is a temp hack.
-// TODO lc - use ShardingSchedule function
-func GetLastBlockNumberFromEpoch(epoch uint64) uint64 {
-	return (epoch+1)*ShardingSchedule.BlocksPerEpoch() - 1
 }
 
 // GetEpochFromBlockNumber calculates the epoch number the block belongs to
@@ -164,9 +149,10 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingSt
 	}
 	shardState = shardState.DeepCopy()
 
-	blockNumber := GetBlockNumberFromEpoch(epoch.Uint64())
-	rndSeedBytes := bc.GetVdfByNumber(blockNumber)
-	rndSeed := binary.BigEndian.Uint64(rndSeedBytes[:])
+	// TODO(RJ,HB): use real randomness for resharding
+	//blockNumber := GetBlockNumberFromEpoch(epoch.Uint64())
+	//rndSeedBytes := bc.GetVdfByNumber(blockNumber)
+	rndSeed := uint64(0)
 
 	return &ShardingState{epoch: epoch.Uint64(), rnd: rndSeed, shardState: shardState, numShards: len(shardState)}, nil
 }
@@ -175,7 +161,7 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingSt
 func CalculateNewShardState(
 	bc *BlockChain, epoch *big.Int,
 	stakeInfo *map[common.Address]*structs.StakeInfo,
-) (types.ShardState, error) {
+) (shard.State, error) {
 	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
 		return GetInitShardState(), nil
 	}
@@ -192,8 +178,8 @@ func CalculateNewShardState(
 }
 
 // UpdateShardingState remove the unstaked nodes and returns the newly staked node Ids.
-func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*structs.StakeInfo) []types.NodeID {
-	oldBlsPublicKeys := make(map[types.BlsPublicKey]bool) // map of bls public keys
+func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*structs.StakeInfo) []shard.NodeID {
+	oldBlsPublicKeys := make(map[shard.BlsPublicKey]bool) // map of bls public keys
 	for _, shard := range ss.shardState {
 		newNodeList := shard.NodeList
 		for _, nodeID := range shard.NodeList {
@@ -208,11 +194,11 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 		shard.NodeList = newNodeList
 	}
 
-	newAddresses := []types.NodeID{}
+	newAddresses := []shard.NodeID{}
 	for addr, info := range *stakeInfo {
 		_, ok := oldBlsPublicKeys[info.BlsPublicKey]
 		if !ok {
-			newAddresses = append(newAddresses, types.NodeID{
+			newAddresses = append(newAddresses, shard.NodeID{
 				EcdsaAddress: addr,
 				BlsPublicKey: info.BlsPublicKey,
 			})
@@ -230,12 +216,14 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 var ShardingSchedule shardingconfig.Schedule = shardingconfig.MainnetSchedule
 
 // GetInitShardState returns the initial shard state at genesis.
-func GetInitShardState() types.ShardState {
+func GetInitShardState() shard.State {
 	return GetShardState(big.NewInt(GenesisEpoch))
 }
 
 // GetShardState returns the shard state based on epoch number
-func GetShardState(epoch *big.Int) types.ShardState {
+// This api for getting shard state is what should be used to get shard state regardless of
+// current chain dependency (ex. getting shard state from block header received during cross-shard transaction)
+func GetShardState(epoch *big.Int) shard.State {
 	utils.Logger().Info().Int64("epoch", epoch.Int64()).Msg("Get Shard State of Epoch.")
 	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
@@ -244,18 +232,18 @@ func GetShardState(epoch *big.Int) types.ShardState {
 	hmyAccounts := shardingConfig.HmyAccounts()
 	fnAccounts := shardingConfig.FnAccounts()
 
-	shardState := types.ShardState{}
+	shardState := shard.State{}
 	for i := 0; i < shardNum; i++ {
-		com := types.Committee{ShardID: uint32(i)}
+		com := shard.Committee{ShardID: uint32(i)}
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardNum // The initial account to use for genesis nodes
 
 			pub := &bls.PublicKey{}
 			pub.DeserializeHexStr(hmyAccounts[index].BlsPublicKey)
-			pubKey := types.BlsPublicKey{}
+			pubKey := shard.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{
+			curNodeID := shard.NodeID{
 				EcdsaAddress: common2.ParseAddr(hmyAccounts[index].Address),
 				BlsPublicKey: pubKey,
 			}
@@ -269,10 +257,10 @@ func GetShardState(epoch *big.Int) types.ShardState {
 			pub := &bls.PublicKey{}
 			pub.DeserializeHexStr(fnAccounts[index].BlsPublicKey)
 
-			pubKey := types.BlsPublicKey{}
+			pubKey := shard.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := types.NodeID{
+			curNodeID := shard.NodeID{
 				EcdsaAddress: common2.ParseAddr(fnAccounts[index].Address),
 				BlsPublicKey: pubKey,
 			}

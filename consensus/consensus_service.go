@@ -1,28 +1,27 @@
 package consensus
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/internal/chain"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/rs/zerolog"
-	"golang.org/x/crypto/sha3"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -42,62 +41,21 @@ func (consensus *Consensus) WaitForNewRandomness() {
 }
 
 // GetNextRnd returns the oldest available randomness along with the hash of the block there randomness preimage is committed.
-func (consensus *Consensus) GetNextRnd() ([32]byte, [32]byte, error) {
+func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error) {
 	if len(consensus.pendingRnds) == 0 {
-		return [32]byte{}, [32]byte{}, errors.New("No available randomness")
+		return [vdFAndProofSize]byte{}, [32]byte{}, errors.New("No available randomness")
 	}
 	vdfOutput := consensus.pendingRnds[0]
+
+	vdfBytes := [vdFAndProofSize]byte{}
+	seed := [32]byte{}
+	copy(vdfBytes[:], vdfOutput[:vdFAndProofSize])
+	copy(seed[:], vdfOutput[vdFAndProofSize:])
 
 	//pop the first vdfOutput from the list
 	consensus.pendingRnds = consensus.pendingRnds[1:]
 
-	rnd := [32]byte{}
-	blockHash := [32]byte{}
-	copy(rnd[:], vdfOutput[:32])
-	copy(blockHash[:], vdfOutput[32:])
-	return rnd, blockHash, nil
-}
-
-// SealHash returns the hash of a block prior to it being sealed.
-func (consensus *Consensus) SealHash(header *types.Header) (hash common.Hash) {
-	hasher := sha3.NewLegacyKeccak256()
-	// TODO: update with new fields
-	if err := rlp.Encode(hasher, []interface{}{
-		header.ParentHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra,
-	}); err != nil {
-		utils.Logger().Warn().Err(err).Msg("rlp.Encode failed")
-	}
-	hasher.Sum(hash[:0])
-	return hash
-}
-
-// Seal is to seal final block.
-func (consensus *Consensus) Seal(chain consensus_engine.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
-	// TODO: implement final block sealing
-	return nil
-}
-
-// Author returns the author of the block header.
-func (consensus *Consensus) Author(header *types.Header) (common.Address, error) {
-	// TODO: implement this
-	return common.Address{}, nil
-}
-
-// Prepare is to prepare ...
-// TODO(RJ): fix it.
-func (consensus *Consensus) Prepare(chain consensus_engine.ChainReader, header *types.Header) error {
-	// TODO: implement prepare method
-	return nil
+	return vdfBytes, seed, nil
 }
 
 // Populates the common basic fields for all consensus message.
@@ -195,107 +153,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
 // NewFaker returns a faker consensus.
 func NewFaker() *Consensus {
 	return &Consensus{}
-}
-
-// VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
-func (consensus *Consensus) VerifyHeader(chain consensus_engine.ChainReader, header *types.Header, seal bool) error {
-	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
-	if parentHeader == nil {
-		return consensus_engine.ErrUnknownAncestor
-	}
-	if seal {
-		if err := consensus.VerifySeal(chain, header); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
-// concurrently. The method returns a quit channel to abort the operations and
-// a results channel to retrieve the async verifications.
-func (consensus *Consensus) VerifyHeaders(chain consensus_engine.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
-	abort, results := make(chan struct{}), make(chan error, len(headers))
-	for i := 0; i < len(headers); i++ {
-		results <- nil
-	}
-	return abort, results
-}
-
-// retrievePublicKeysFromLastBlock finds the public keys of last block's committee
-func retrievePublicKeysFromLastBlock(bc consensus_engine.ChainReader, header *types.Header) ([]*bls.PublicKey, error) {
-	parentHeader := bc.GetHeaderByHash(header.ParentHash)
-	if parentHeader == nil {
-		return nil, ctxerror.New("cannot find parent block header in DB",
-			"parentHash", header.ParentHash)
-	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch)
-	if err != nil {
-		return nil, ctxerror.New("cannot read shard state",
-			"epoch", parentHeader.Epoch,
-		).WithCause(err)
-	}
-	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID)
-	if parentCommittee == nil {
-		return nil, ctxerror.New("cannot find shard in the shard state",
-			"parentBlockNumber", parentHeader.Number,
-			"shardID", parentHeader.ShardID,
-		)
-	}
-	var committerKeys []*bls.PublicKey
-	for _, member := range parentCommittee.NodeList {
-		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", member.BlsPublicKey).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	return committerKeys, nil
-}
-
-// VerifySeal implements consensus.Engine, checking whether the given block satisfies
-// the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
-func (consensus *Consensus) VerifySeal(chain consensus_engine.ChainReader, header *types.Header) error {
-	if chain.CurrentHeader().Number.Uint64() <= uint64(1) {
-		return nil
-	}
-	publicKeys, err := retrievePublicKeysFromLastBlock(chain, header)
-	if err != nil {
-		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys from last block").WithCause(err)
-	}
-	payload := append(header.LastCommitSignature[:], header.LastCommitBitmap...)
-	aggSig, mask, err := readSignatureBitmapByPublicKeys(payload, publicKeys)
-	if err != nil {
-		return ctxerror.New("[VerifySeal] Unable to deserialize the LastCommitSignature and LastCommitBitmap in Block Header").WithCause(err)
-	}
-	if count := utils.CountOneBits(mask.Bitmap); count < consensus.PreviousQuorum() {
-		return ctxerror.New("[VerifySeal] Not enough signature in LastCommitSignature from Block Header", "need", consensus.Quorum(), "got", count)
-	}
-
-	blockNumHash := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumHash, header.Number.Uint64()-1)
-	lastCommitPayload := append(blockNumHash, header.ParentHash[:]...)
-
-	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
-		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature from last block", "lastBlockNum", header.Number.Uint64()-1, "lastBlockHash", header.ParentHash)
-	}
-	return nil
-}
-
-// Finalize implements consensus.Engine, accumulating the block and uncle rewards,
-// setting the final state and assembling the block.
-func (consensus *Consensus) Finalize(chain consensus_engine.ChainReader, header *types.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt) (*types.Block, error) {
-	// Accumulate any block and uncle rewards and commit the final state root
-	// Header seems complete, assemble into a block and return
-	blockReward, err := accumulateRewards(chain, state, header, consensus.SelfAddress)
-	if err != nil {
-		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
-	}
-	consensus.lastBlockReward = blockReward
-	header.Root = state.IntermediateRoot(false)
-	return types.NewBlock(header, txs, receipts), nil
 }
 
 // Sign on the hash of the message
@@ -494,7 +351,7 @@ func (consensus *Consensus) RegisterPRndChannel(pRndChannel chan []byte) {
 }
 
 // RegisterRndChannel registers the channel for receiving final randomness from DRG protocol
-func (consensus *Consensus) RegisterRndChannel(rndChannel chan [64]byte) {
+func (consensus *Consensus) RegisterRndChannel(rndChannel chan [548]byte) {
 	consensus.RndChannel = rndChannel
 }
 
@@ -547,38 +404,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(recvPayload []byte, offse
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	sigAndBitmapPayload := recvPayload[offset:]
-	return readSignatureBitmapByPublicKeys(sigAndBitmapPayload, consensus.PublicKeys)
-}
-
-// readSignatureBitmapByPublicKeys read the payload of signature and bitmap based on public keys
-func readSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []*bls.PublicKey) (*bls.Sign, *bls_cosi.Mask, error) {
-	if len(recvPayload) < 96 {
-		return nil, nil, errors.New("payload not have enough length")
-	}
-	payload := append(recvPayload[:0:0], recvPayload...)
-	//#### Read payload data
-	// 96 byte of multi-sig
-	offset := 0
-	multiSig := payload[offset : offset+96]
-	offset += 96
-	// bitmap
-	bitmap := payload[offset:]
-	//#### END Read payload data
-
-	aggSig := bls.Sign{}
-	err := aggSig.Deserialize(multiSig)
-	if err != nil {
-		return nil, nil, errors.New("unable to deserialize multi-signature from payload")
-	}
-	mask, err := bls_cosi.NewMask(publicKeys, nil)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("onNewView unable to setup mask for prepared message")
-		return nil, nil, errors.New("unable to setup mask from payload")
-	}
-	if err := mask.SetMask(bitmap); err != nil {
-		utils.Logger().Warn().Err(err).Msg("mask.SetMask failed")
-	}
-	return &aggSig, mask, nil
+	return chain.ReadSignatureBitmapByPublicKeys(sigAndBitmapPayload, consensus.PublicKeys)
 }
 
 func (consensus *Consensus) reportMetrics(block types.Block) {
@@ -586,13 +412,12 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 	timeElapsed := endTime.Sub(startTime)
 	numOfTxs := len(block.Transactions())
 	tps := float64(numOfTxs) / timeElapsed.Seconds()
-	utils.Logger().Info().
+	consensus.getLogger().Info().
 		Int("numOfTXs", numOfTxs).
 		Time("startTime", startTime).
 		Time("endTime", endTime).
 		Dur("timeElapsed", endTime.Sub(startTime)).
 		Float64("TPS", tps).
-		Interface("consensus", consensus).
 		Msg("TPS Report")
 
 	// Post metrics
@@ -631,36 +456,36 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 }
 
 // retrieve corresponding blsPublicKey from Coinbase Address
-func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *types.Header) (*bls.PublicKey, error) {
-	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch)
+func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*bls.PublicKey, error) {
+	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch())
 	if err != nil {
 		return nil, ctxerror.New("cannot read shard state",
-			"epoch", header.Epoch,
-			"coinbaseAddr", header.Coinbase,
+			"epoch", header.Epoch(),
+			"coinbaseAddr", header.Coinbase(),
 		).WithCause(err)
 	}
 
-	committee := shardState.FindCommitteeByID(header.ShardID)
+	committee := shardState.FindCommitteeByID(header.ShardID())
 	if committee == nil {
 		return nil, ctxerror.New("cannot find shard in the shard state",
-			"blockNum", header.Number,
-			"shardID", header.ShardID,
-			"coinbaseAddr", header.Coinbase,
+			"blockNum", header.Number(),
+			"shardID", header.ShardID(),
+			"coinbaseAddr", header.Coinbase(),
 		)
 	}
 	committerKey := new(bls.PublicKey)
 	for _, member := range committee.NodeList {
-		if member.EcdsaAddress == header.Coinbase {
+		if member.EcdsaAddress == header.Coinbase() {
 			err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 			if err != nil {
 				return nil, ctxerror.New("cannot convert BLS public key",
 					"blsPublicKey", member.BlsPublicKey,
-					"coinbaseAddr", header.Coinbase).WithCause(err)
+					"coinbaseAddr", header.Coinbase()).WithCause(err)
 			}
 			return committerKey, nil
 		}
 	}
-	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase)
+	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase())
 }
 
 // UpdateConsensusInformation will update shard information (epoch, publicKeys, blockNum, viewID)
@@ -679,8 +504,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	header := consensus.ChainReader.CurrentHeader()
 
-	epoch := header.Epoch
-	curPubKeys := core.GetPublicKeys(epoch, header.ShardID)
+	epoch := header.Epoch()
+	curPubKeys := core.GetPublicKeys(epoch, header.ShardID())
 	consensus.numPrevPubKeys = len(curPubKeys)
 
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
@@ -688,9 +513,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if core.IsEpochLastBlockByHeader(header) {
 		// increase epoch by one if it's the last block
 		consensus.SetEpochNum(epoch.Uint64() + 1)
-		consensus.getLogger().Info().Uint64("headerNum", header.Number.Uint64()).Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
+		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
 		nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		pubKeys = core.GetPublicKeys(nextEpoch, header.ShardID)
+		pubKeys = core.GetPublicKeys(nextEpoch, header.ShardID())
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
 		pubKeys = curPubKeys
@@ -708,7 +533,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.UpdatePublicKeys(pubKeys)
 
 	// take care of possible leader change during the epoch
-	if !core.IsEpochLastBlockByHeader(header) && header.Number.Uint64() != 0 {
+	if !core.IsEpochLastBlockByHeader(header) && header.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).Msg("[SYNC] Unable to get leaderPubKey from coinbase")
@@ -741,5 +566,14 @@ func (consensus *Consensus) IsLeader() bool {
 	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
 		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
 	}
+	return false
+}
+
+// NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
+func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
+	if consensus.ShardID == 0 && epoch.Uint64() >= core.ShardingSchedule.RandomnessStartingEpoch() {
+		return true
+	}
+
 	return false
 }

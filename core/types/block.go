@@ -21,19 +21,27 @@ import (
 	"encoding/binary"
 	"io"
 	"math/big"
+	"reflect"
 	"sort"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/taggedrlp"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"golang.org/x/crypto/sha3"
 
+	"github.com/harmony-one/harmony/block"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
+	v0 "github.com/harmony-one/harmony/block/v0"
+	v1 "github.com/harmony-one/harmony/block/v1"
+	v2 "github.com/harmony-one/harmony/block/v2"
+	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants for block.
@@ -69,95 +77,112 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("BlockNonce", input, n[:])
 }
 
-// Header represents a block header in the Harmony blockchain.
-type Header struct {
-	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
-	Coinbase    common.Address `json:"miner"            gencodec:"required"`
-	Root        common.Hash    `json:"stateRoot"        gencodec:"required"`
-	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
-	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
-	Bloom       ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
-	Number      *big.Int       `json:"number"           gencodec:"required"`
-	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
-	GasUsed     uint64         `json:"gasUsed"          gencodec:"required"`
-	Time        *big.Int       `json:"timestamp"        gencodec:"required"`
-	Extra       []byte         `json:"extraData"        gencodec:"required"`
-	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
-	// Additional Fields
-	ViewID              *big.Int    `json:"viewID"           gencodec:"required"`
-	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
-	ShardID             uint32      `json:"shardID"          gencodec:"required"`
-	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
-	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
-	ShardStateHash      common.Hash `json:"shardStateRoot"`
-	ShardState          []byte      `json:"shardState"`
-}
+// BodyInterface is a simple accessor interface for block body.
+type BodyInterface interface {
+	// Transactions returns a deep copy the list of transactions in this block.
+	Transactions() []*Transaction
 
-// field type overrides for gencodec
-type headerMarshaling struct {
-	Difficulty *hexutil.Big
-	Number     *hexutil.Big
-	GasLimit   hexutil.Uint64
-	GasUsed    hexutil.Uint64
-	Time       *hexutil.Big
-	Extra      hexutil.Bytes
-	Hash       common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
-}
+	// TransactionAt returns the transaction at the given index in this block.
+	// It returns nil if index is out of bounds.
+	TransactionAt(index int) *Transaction
 
-// Hash returns the block hash of the header, which is simply the keccak256 hash of its
-// RLP encoding.
-func (h *Header) Hash() common.Hash {
-	return rlpHash(h)
-}
+	// SetTransactions sets the list of transactions with a deep copy of the
+	// given list.
+	SetTransactions(newTransactions []*Transaction)
 
-// Size returns the approximate memory used by all internal contents. It is used
-// to approximate and limit the memory consumption of various caches.
-func (h *Header) Size() common.StorageSize {
-	// TODO: update with new fields
-	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra)+(h.Number.BitLen()+h.Time.BitLen())/8)
-}
+	// Uncles returns a deep copy of the list of uncle headers of this block.
+	Uncles() []*block.Header
 
-// Logger returns a sub-logger with block contexts added.
-func (h *Header) Logger(logger *zerolog.Logger) *zerolog.Logger {
-	nlogger := logger.
-		With().
-		Str("blockHash", h.Hash().Hex()).
-		Uint32("blockShard", h.ShardID).
-		Uint64("blockEpoch", h.Epoch.Uint64()).
-		Uint64("blockNumber", h.Number.Uint64()).
-		Logger()
-	return &nlogger
-}
+	// SetUncles sets the list of uncle headers with a deep copy of the given
+	// list.
+	SetUncles(newUncle []*block.Header)
 
-// GetShardState returns the deserialized shard state object.
-func (h *Header) GetShardState() (ShardState, error) {
-	shardState := ShardState{}
-	err := rlp.DecodeBytes(h.ShardState, &shardState)
-	if err != nil {
-		return nil, err
-	}
-	return shardState, nil
-}
+	// IncomingReceipts returns a deep copy of the list of incoming cross-shard
+	// transaction receipts of this block.
+	IncomingReceipts() CXReceiptsProofs
 
-func rlpHash(x interface{}) (h common.Hash) {
-	hw := sha3.NewLegacyKeccak256()
-	rlp.Encode(hw, x)
-	hw.Sum(h[:0])
-	return h
+	// SetIncomingReceipts sets the list of incoming cross-shard transaction
+	// receipts of this block with a dep copy of the given list.
+	SetIncomingReceipts(newIncomingReceipts CXReceiptsProofs)
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
 // a block's data contents (transactions and uncles) together.
 type Body struct {
-	Transactions []*Transaction
-	Uncles       []*Header
+	BodyInterface
+}
+
+// NewBodyForMatchingHeader returns a new block body struct whose implementation
+// matches the version of the given field.
+//
+// TODO ek – this is a stopgap, and works only while there is a N:1 mapping
+//  between header and body versions.  Replace usage with factory.
+func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
+	var bi BodyInterface
+	switch h.Header.(type) {
+	case *v2.Header, *v1.Header:
+		bi = new(BodyV1)
+	case *v0.Header:
+		bi = new(BodyV0)
+	default:
+		return nil, errors.Errorf("unsupported header type %s",
+			taggedrlp.TypeName(reflect.TypeOf(h)))
+	}
+	return &Body{bi}, nil
+}
+
+// NewTestBody creates a new, empty body object for epoch 0 using the test
+// factory.  Use for unit tests.
+func NewTestBody() *Body {
+	body, err := NewBodyForMatchingHeader(blockfactory.NewTestHeader())
+	if err != nil {
+		panic(err)
+	}
+	return body
+}
+
+// With returns a field setter context for the receiver.
+func (b *Body) With() BodyFieldSetter {
+	return BodyFieldSetter{b}
+}
+
+// EncodeRLP RLP-encodes the block body onto the given writer.  It uses tagged RLP
+// encoding for non-Genesis body formats.
+func (b *Body) EncodeRLP(w io.Writer) error {
+	return BodyRegistry.Encode(w, b.BodyInterface)
+}
+
+// DecodeRLP decodes a block body out of the given RLP stream into the receiver.
+// It uses tagged RLP encoding for non-Genesis body formats.
+func (b *Body) DecodeRLP(s *rlp.Stream) error {
+	decoded, err := BodyRegistry.Decode(s)
+	if err != nil {
+		return err
+	}
+	bif, ok := decoded.(BodyInterface)
+	if !ok {
+		return errors.Errorf(
+			"decoded body (type %s) does not implement BodyInterface",
+			taggedrlp.TypeName(reflect.TypeOf(decoded)))
+	}
+	b.BodyInterface = bif
+	return nil
+}
+
+// BodyRegistry is the tagged RLP registry for block body types.
+var BodyRegistry = taggedrlp.NewRegistry()
+
+func init() {
+	BodyRegistry.MustRegister(taggedrlp.LegacyTag, new(BodyV0))
+	BodyRegistry.MustRegister("v1", new(BodyV1))
 }
 
 // Block represents an entire block in the Ethereum blockchain.
 type Block struct {
-	header       *Header
-	uncles       []*Header
-	transactions Transactions
+	header           *block.Header
+	uncles           []*block.Header
+	transactions     Transactions
+	incomingReceipts CXReceiptsProofs
 
 	// caches
 	hash atomic.Value
@@ -176,14 +201,16 @@ type Block struct {
 
 // SetLastCommitSig sets the last block's commit group signature.
 func (b *Block) SetLastCommitSig(sig []byte, signers []byte) {
-	if len(sig) != len(b.header.LastCommitSignature) {
+	if len(sig) != len(b.header.LastCommitSignature()) {
 		utils.Logger().Warn().
 			Int("srcLen", len(sig)).
-			Int("dstLen", len(b.header.LastCommitSignature)).
+			Int("dstLen", len(b.header.LastCommitSignature())).
 			Msg("SetLastCommitSig: sig size mismatch")
 	}
-	copy(b.header.LastCommitSignature[:], sig[:])
-	b.header.LastCommitBitmap = append(signers[:0:0], signers...)
+	var sig2 [96]byte
+	copy(sig2[:], sig)
+	b.header.SetLastCommitSignature(sig2)
+	b.header.SetLastCommitBitmap(signers)
 }
 
 // DeprecatedTd is an old relic for extracting the TD of a block. It is in the
@@ -193,26 +220,26 @@ func (b *Block) DeprecatedTd() *big.Int {
 	return b.td
 }
 
-// StorageBlock defines the RLP encoding of a Block stored in the
-// state database. The StorageBlock encoding contains fields that
-// would otherwise need to be recomputed.
-// [deprecated by eth/63]
-type StorageBlock Block
-
 // "external" block encoding. used for eth protocol, etc.
 type extblock struct {
-	Header *Header
+	Header *block.Header
 	Txs    []*Transaction
-	Uncles []*Header
+	Uncles []*block.Header
 }
 
-// [deprecated by eth/63]
-// "storage" block encoding. used for database.
-type storageblock struct {
-	Header *Header
-	Txs    []*Transaction
-	Uncles []*Header
-	TD     *big.Int
+// CX-ready extblock
+type extblockV1 struct {
+	Header           *block.Header
+	Txs              []*Transaction
+	Uncles           []*block.Header
+	IncomingReceipts CXReceiptsProofs
+}
+
+var extblockReg = taggedrlp.NewRegistry()
+
+func init() {
+	extblockReg.MustRegister(taggedrlp.LegacyTag, &extblock{})
+	extblockReg.MustRegister("v1", &extblockV1{})
 }
 
 // NewBlock creates a new block. The input data is copied,
@@ -222,23 +249,33 @@ type storageblock struct {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs,
 // and receipts.
-func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt) *Block {
+func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof) *Block {
 	b := &Block{header: CopyHeader(header)}
 
 	// TODO: panic if len(txs) != len(receipts)
 	if len(txs) == 0 {
-		b.header.TxHash = EmptyRootHash
+		b.header.SetTxHash(EmptyRootHash)
 	} else {
-		b.header.TxHash = DeriveSha(Transactions(txs))
+		b.header.SetTxHash(DeriveSha(Transactions(txs)))
 		b.transactions = make(Transactions, len(txs))
 		copy(b.transactions, txs)
 	}
 
 	if len(receipts) == 0 {
-		b.header.ReceiptHash = EmptyRootHash
+		b.header.SetReceiptHash(EmptyRootHash)
 	} else {
-		b.header.ReceiptHash = DeriveSha(Receipts(receipts))
-		b.header.Bloom = CreateBloom(receipts)
+		b.header.SetReceiptHash(DeriveSha(Receipts(receipts)))
+		b.header.SetBloom(CreateBloom(receipts))
+	}
+
+	b.header.SetOutgoingReceiptHash(DeriveMultipleShardsSha(CXReceipts(outcxs)))
+
+	if len(incxs) == 0 {
+		b.header.SetIncomingReceiptHash(EmptyRootHash)
+	} else {
+		b.header.SetIncomingReceiptHash(DeriveSha(CXReceiptsProofs(incxs)))
+		b.incomingReceipts = make(CXReceiptsProofs, len(incxs))
+		copy(b.incomingReceipts, incxs)
 	}
 
 	return b
@@ -247,82 +284,68 @@ func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt) *Block {
 // NewBlockWithHeader creates a block with the given header data. The
 // header data is copied, changes to header and to the field values
 // will not affect the block.
-func NewBlockWithHeader(header *Header) *Block {
+func NewBlockWithHeader(header *block.Header) *Block {
 	return &Block{header: CopyHeader(header)}
 }
 
 // CopyHeader creates a deep copy of a block header to prevent side effects from
 // modifying a header variable.
-func CopyHeader(h *Header) *Header {
-	// TODO: update with new fields
+func CopyHeader(h *block.Header) *block.Header {
 	cpy := *h
-	if cpy.Time = new(big.Int); h.Time != nil {
-		cpy.Time.Set(h.Time)
-	}
-	if cpy.Number = new(big.Int); h.Number != nil {
-		cpy.Number.Set(h.Number)
-	}
-	if cpy.ViewID = new(big.Int); h.ViewID != nil {
-		cpy.ViewID.Set(h.ViewID)
-	}
-	if cpy.Epoch = new(big.Int); h.Epoch != nil {
-		cpy.Epoch.Set(h.Epoch)
-	}
-	if len(h.Extra) > 0 {
-		cpy.Extra = make([]byte, len(h.Extra))
-		copy(cpy.Extra, h.Extra)
-	}
-	if len(h.ShardState) > 0 {
-		cpy.ShardState = make([]byte, len(h.ShardState))
-		copy(cpy.ShardState, h.ShardState)
-	}
-	//if len(h.CrossLinks) > 0 {
-	//	cpy.CrossLinks = make([]byte, len(h.CrossLinks))
-	//	copy(cpy.CrossLinks, h.CrossLinks)
-	//}
+	cpy.Header = cpy.Header.Copy()
 	return &cpy
 }
 
 // DecodeRLP decodes the Ethereum
 func (b *Block) DecodeRLP(s *rlp.Stream) error {
-	var eb extblock
 	_, size, _ := s.Kind()
-	if err := s.Decode(&eb); err != nil {
+	eb, err := extblockReg.Decode(s)
+	if err != nil {
 		return err
 	}
-	b.header, b.uncles, b.transactions = eb.Header, eb.Uncles, eb.Txs
+	switch eb := eb.(type) {
+	case *extblockV1:
+		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
+	case *extblock:
+		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, nil
+	default:
+		return errors.Errorf("unknown extblock type %s", taggedrlp.TypeName(reflect.TypeOf(eb)))
+	}
 	b.size.Store(common.StorageSize(rlp.ListSize(size)))
 	return nil
 }
 
 // EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, extblock{
-		Header: b.header,
-		Txs:    b.transactions,
-		Uncles: b.uncles,
-	})
-}
-
-// DecodeRLP decodes RLP
-// [deprecated by eth/63]
-func (b *StorageBlock) DecodeRLP(s *rlp.Stream) error {
-	var sb storageblock
-	if err := s.Decode(&sb); err != nil {
-		return err
+	var eb interface{}
+	switch h := b.header.Header.(type) {
+	case *v2.Header, *v1.Header:
+		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
+	case *v0.Header:
+		if len(b.incomingReceipts) > 0 {
+			return errors.New("incomingReceipts unsupported in v0 block")
+		}
+		eb = extblock{b.header, b.transactions, b.uncles}
+	default:
+		return errors.Errorf("unsupported block header type %s",
+			taggedrlp.TypeName(reflect.TypeOf(h)))
 	}
-	b.header, b.uncles, b.transactions, b.td = sb.Header, sb.Uncles, sb.Txs, sb.TD
-	return nil
+	return extblockReg.Encode(w, eb)
 }
 
 // Uncles return uncles.
-func (b *Block) Uncles() []*Header {
+func (b *Block) Uncles() []*block.Header {
 	return b.uncles
 }
 
 // Transactions returns transactions.
 func (b *Block) Transactions() Transactions {
 	return b.transactions
+}
+
+// IncomingReceipts returns verified outgoing receipts
+func (b *Block) IncomingReceipts() CXReceiptsProofs {
+	return b.incomingReceipts
 }
 
 // Transaction returns Transaction.
@@ -336,55 +359,75 @@ func (b *Block) Transaction(hash common.Hash) *Transaction {
 }
 
 // Number returns header number.
-func (b *Block) Number() *big.Int { return new(big.Int).Set(b.header.Number) }
+func (b *Block) Number() *big.Int { return b.header.Number() }
 
 // GasLimit returns header gas limit.
-func (b *Block) GasLimit() uint64 { return b.header.GasLimit }
+func (b *Block) GasLimit() uint64 { return b.header.GasLimit() }
 
 // GasUsed returns header gas used.
-func (b *Block) GasUsed() uint64 { return b.header.GasUsed }
+func (b *Block) GasUsed() uint64 { return b.header.GasUsed() }
 
 // Time is header time.
-func (b *Block) Time() *big.Int { return new(big.Int).Set(b.header.Time) }
+func (b *Block) Time() *big.Int { return b.header.Time() }
 
 // NumberU64 is the header number in uint64.
-func (b *Block) NumberU64() uint64 { return b.header.Number.Uint64() }
+func (b *Block) NumberU64() uint64 { return b.header.Number().Uint64() }
 
 // MixDigest is the header mix digest.
-func (b *Block) MixDigest() common.Hash { return b.header.MixDigest }
+func (b *Block) MixDigest() common.Hash { return b.header.MixDigest() }
 
 // ShardID is the header ShardID
-func (b *Block) ShardID() uint32 { return b.header.ShardID }
+func (b *Block) ShardID() uint32 { return b.header.ShardID() }
 
 // Epoch is the header Epoch
-func (b *Block) Epoch() *big.Int { return b.header.Epoch }
+func (b *Block) Epoch() *big.Int { return b.header.Epoch() }
 
 // Bloom returns header bloom.
-func (b *Block) Bloom() ethtypes.Bloom { return b.header.Bloom }
+func (b *Block) Bloom() ethtypes.Bloom { return b.header.Bloom() }
 
 // Coinbase returns header coinbase.
-func (b *Block) Coinbase() common.Address { return b.header.Coinbase }
+func (b *Block) Coinbase() common.Address { return b.header.Coinbase() }
 
 // Root returns header root.
-func (b *Block) Root() common.Hash { return b.header.Root }
+func (b *Block) Root() common.Hash { return b.header.Root() }
 
 // ParentHash return header parent hash.
-func (b *Block) ParentHash() common.Hash { return b.header.ParentHash }
+func (b *Block) ParentHash() common.Hash { return b.header.ParentHash() }
 
 // TxHash returns header tx hash.
-func (b *Block) TxHash() common.Hash { return b.header.TxHash }
+func (b *Block) TxHash() common.Hash { return b.header.TxHash() }
 
 // ReceiptHash returns header receipt hash.
-func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
+func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash() }
+
+// OutgoingReceiptHash returns header cross shard receipt hash.
+func (b *Block) OutgoingReceiptHash() common.Hash { return b.header.OutgoingReceiptHash() }
 
 // Extra returns header extra.
-func (b *Block) Extra() []byte { return common.CopyBytes(b.header.Extra) }
+func (b *Block) Extra() []byte { return b.header.Extra() }
 
 // Header returns a copy of Header.
-func (b *Block) Header() *Header { return CopyHeader(b.header) }
+func (b *Block) Header() *block.Header { return CopyHeader(b.header) }
 
 // Body returns the non-header content of the block.
-func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles} }
+func (b *Block) Body() *Body {
+	body, err := NewBodyForMatchingHeader(b.header)
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot create block Body struct")
+		return nil
+	}
+	return body.With().
+		Transactions(b.transactions).
+		Uncles(b.uncles).
+		IncomingReceipts(b.incomingReceipts).
+		Body()
+}
+
+// Vdf returns header Vdf.
+func (b *Block) Vdf() []byte { return b.header.Vdf() }
+
+// Vrf returns header Vrf.
+func (b *Block) Vrf() []byte { return b.header.Vrf() }
 
 // Size returns the true RLP encoded storage size of the block, either by encoding
 // and returning it, or returning a previsouly cached value.
@@ -406,13 +449,13 @@ func (c *writeCounter) Write(b []byte) (int, error) {
 }
 
 // CalcUncleHash returns rlp hash of uncles.
-func CalcUncleHash(uncles []*Header) common.Hash {
-	return rlpHash(uncles)
+func CalcUncleHash(uncles []*block.Header) common.Hash {
+	return hash.FromRLP(uncles)
 }
 
 // WithSeal returns a new block with the data from b but the header replaced with
 // the sealed one.
-func (b *Block) WithSeal(header *Header) *Block {
+func (b *Block) WithSeal(header *block.Header) *Block {
 	cpy := *header
 
 	return &Block{
@@ -423,13 +466,15 @@ func (b *Block) WithSeal(header *Header) *Block {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(transactions []*Transaction, uncles []*Header) *Block {
+func (b *Block) WithBody(transactions []*Transaction, uncles []*block.Header, incomingReceipts CXReceiptsProofs) *Block {
 	block := &Block{
-		header:       CopyHeader(b.header),
-		transactions: make([]*Transaction, len(transactions)),
-		uncles:       make([]*Header, len(uncles)),
+		header:           CopyHeader(b.header),
+		transactions:     make([]*Transaction, len(transactions)),
+		uncles:           make([]*block.Header, len(uncles)),
+		incomingReceipts: make([]*CXReceiptsProof, len(incomingReceipts)),
 	}
 	copy(block.transactions, transactions)
+	copy(block.incomingReceipts, incomingReceipts)
 	for i := range uncles {
 		block.uncles[i] = CopyHeader(uncles[i])
 	}
@@ -485,30 +530,30 @@ func (s blockSorter) Less(i, j int) bool {
 
 // Number checks if block b1 is less than block b2.
 func Number(b1, b2 *Block) bool {
-	return b1.header.Number.Cmp(b2.header.Number) < 0
+	return b1.header.Number().Cmp(b2.header.Number()) < 0
 }
 
-//// AddVdf add vdf into block header
-//func (b *Block) AddVdf(vdf [258]byte) {
-//	b.header.Vdf = vdf
-//}
-//
-//// AddVrf add vrf into block header
-//func (b *Block) AddVrf(vrf [32]byte) {
-//	b.header.Vrf = vrf
-//}
+// AddVrf add vrf into block header
+func (b *Block) AddVrf(vrf []byte) {
+	b.header.SetVrf(vrf)
+}
+
+// AddVdf add vdf into block header
+func (b *Block) AddVdf(vdf []byte) {
+	b.header.SetVdf(vdf)
+}
 
 // AddShardState add shardState into block header
-func (b *Block) AddShardState(shardState ShardState) error {
-	// Make a copy because ShardState.Hash() internally sorts entries.
+func (b *Block) AddShardState(shardState shard.State) error {
+	// Make a copy because State.Hash() internally sorts entries.
 	// Store the sorted copy.
 	shardState = append(shardState[:0:0], shardState...)
-	b.header.ShardStateHash = shardState.Hash()
+	b.header.SetShardStateHash(shardState.Hash())
 	data, err := rlp.EncodeToBytes(shardState)
 	if err != nil {
 		return err
 	}
-	b.header.ShardState = data
+	b.header.SetShardState(data)
 	return nil
 }
 

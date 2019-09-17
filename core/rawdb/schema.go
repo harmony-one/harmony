@@ -60,9 +60,25 @@ var (
 	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
 
+	shardLastCrosslinkPrefix = []byte("shard-last-cross-link") // prefix for shard last crosslink
+	crosslinkPrefix          = []byte("crosslink")             // prefix for crosslink
+	tempCrosslinkPrefix      = []byte("tempCrosslink")         // prefix for tempCrosslink
+
+	cxReceiptPrefix                  = []byte("cxReceipt")                  // prefix for cross shard transaction receipt
+	tempCxReceiptPrefix              = []byte("tempCxReceipt")              // prefix for temporary cross shard transaction receipt
+	cxReceiptHashPrefix              = []byte("cxReceiptHash")              // prefix for cross shard transaction receipt hash
+	cxReceiptSpentPrefix             = []byte("cxReceiptSpent")             // prefix for indicator of unspent of cxReceiptsProof
+	cxReceiptUnspentCheckpointPrefix = []byte("cxReceiptUnspentCheckpoint") // prefix for cxReceiptsProof unspent checkpoint
+
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
 	epochBlockNumberPrefix = []byte("harmony-epoch-block-number-")
+
+	// epochVrfBlockNumbersPrefix  + epoch (big.Int.Bytes())
+	epochVrfBlockNumbersPrefix = []byte("epoch-vrf-block-numbers-")
+
+	// epochVdfBlockNumberPrefix  + epoch (big.Int.Bytes())
+	epochVdfBlockNumberPrefix = []byte("epoch-vdf-block-number-")
 
 	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
 	BloomBitsIndexPrefix = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
@@ -147,4 +163,61 @@ func shardStateKey(epoch *big.Int) []byte {
 
 func epochBlockNumberKey(epoch *big.Int) []byte {
 	return append(epochBlockNumberPrefix, epoch.Bytes()...)
+}
+
+func epochVrfBlockNumbersKey(epoch *big.Int) []byte {
+	return append(epochVrfBlockNumbersPrefix, epoch.Bytes()...)
+}
+
+func epochVdfBlockNumberKey(epoch *big.Int) []byte {
+	return append(epochVdfBlockNumberPrefix, epoch.Bytes()...)
+}
+
+func shardLastCrosslinkKey(shardID uint32) []byte {
+	sbKey := make([]byte, 4)
+	binary.BigEndian.PutUint32(sbKey, shardID)
+	key := append(crosslinkPrefix, sbKey...)
+	return key
+}
+
+func crosslinkKey(shardID uint32, blockNum uint64, temp bool) []byte {
+	prefix := crosslinkPrefix
+	if temp {
+		prefix = tempCrosslinkPrefix
+	}
+	sbKey := make([]byte, 12)
+	binary.BigEndian.PutUint32(sbKey, shardID)
+	binary.BigEndian.PutUint64(sbKey[4:], blockNum)
+	key := append(prefix, sbKey...)
+	return key
+}
+
+// cxReceiptKey = cxReceiptsPrefix + shardID + num (uint64 big endian) + hash
+func cxReceiptKey(shardID uint32, number uint64, hash common.Hash, temp bool) []byte {
+	prefix := cxReceiptPrefix
+	if temp {
+		prefix = tempCxReceiptPrefix
+	}
+	sKey := make([]byte, 4)
+	binary.BigEndian.PutUint32(sKey, shardID)
+	tmp := append(prefix, sKey...)
+	tmp1 := append(tmp, encodeBlockNumber(number)...)
+	return append(tmp1, hash.Bytes()...)
+}
+
+// cxReceiptSpentKey = cxReceiptsSpentPrefix + shardID + num (uint64 big endian)
+func cxReceiptSpentKey(shardID uint32, number uint64) []byte {
+	prefix := cxReceiptSpentPrefix
+	sKey := make([]byte, 4)
+	binary.BigEndian.PutUint32(sKey, shardID)
+	tmp := append(prefix, sKey...)
+	return append(tmp, encodeBlockNumber(number)...)
+}
+
+// cxReceiptUnspentCheckpointKey = cxReceiptsUnspentCheckpointPrefix + shardID
+func cxReceiptUnspentCheckpointKey(shardID uint32) []byte {
+	prefix := cxReceiptUnspentCheckpointPrefix
+	sKey := make([]byte, 4)
+	binary.BigEndian.PutUint32(sKey, shardID)
+	return append(prefix, sKey...)
 }

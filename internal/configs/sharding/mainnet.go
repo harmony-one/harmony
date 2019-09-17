@@ -12,7 +12,11 @@ const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14
 	blocksPerShard     = 16384  // 2^14
 
-	mainnetConsensusRatio = float64(0.66)
+	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
+	mainnetConsensusRatio = float64(0.1)
+
+	// TODO: remove it after randomness feature turned on mainnet
+	mainnetRandomnessStartingEpoch = 100000
 
 	mainnetV0_1Epoch = 1
 	mainnetV0_2Epoch = 5
@@ -27,6 +31,12 @@ const (
 	mainnetMaxTxPoolSizeLimit             = 8000
 	mainnetMaxNumTxsPerBlockLimit         = 1000
 	mainnetRecentTxDuration               = time.Hour
+	mainnetEnableTxnThrottling            = true
+
+	// MainNetHTTPPattern is the http pattern for mainnet.
+	MainNetHTTPPattern = "https://api.s%d.t.hmny.io"
+	// MainNetWSPattern is the websocket pattern for mainnet.
+	MainNetWSPattern = "wss://ws.s%d.t.hmny.io"
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
@@ -88,9 +98,29 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
+func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
+	blocks := ms.BlocksPerEpoch()
+	switch {
+	case epochNum == 0:
+		return mainnetEpochBlock1 - 1
+	default:
+		return mainnetEpochBlock1 - 1 + blocks*epochNum
+	}
+}
+
+func (ms mainnetSchedule) VdfDifficulty() int {
+	return mainnetVdfDifficulty
+}
+
 // ConsensusRatio ratio of new nodes vs consensus total nodes
 func (ms mainnetSchedule) ConsensusRatio() float64 {
 	return mainnetConsensusRatio
+}
+
+// TODO: remove it after randomness feature turned on mainnet
+//RandonnessStartingEpoch returns starting epoch of randonness generation
+func (ms mainnetSchedule) RandomnessStartingEpoch() uint64 {
+	return mainnetRandomnessStartingEpoch
 }
 
 func (ms mainnetSchedule) MaxTxAmountLimit() *big.Int {
@@ -115,6 +145,10 @@ func (ms mainnetSchedule) RecentTxDuration() time.Duration {
 	return mainnetRecentTxDuration
 }
 
+func (ms mainnetSchedule) EnableTxnThrottling() bool {
+	return mainnetEnableTxnThrottling
+}
+
 func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 	return &TxsThrottleConfig{
 		MaxTxAmountLimit:               ms.MaxTxAmountLimit(),
@@ -122,7 +156,17 @@ func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
 		MaxTxPoolSizeLimit:             ms.MaxTxPoolSizeLimit(),
 		MaxNumTxsPerBlockLimit:         ms.MaxNumTxsPerBlockLimit(),
 		RecentTxDuration:               ms.RecentTxDuration(),
+		EnableTxnThrottling:            ms.EnableTxnThrottling(),
 	}
+}
+
+func (ms mainnetSchedule) GetNetworkID() NetworkID {
+	return MainNet
+}
+
+// GetShardingStructure is the sharding structure for mainnet.
+func (ms mainnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+	return genShardingStructure(numShard, shardID, MainNetHTTPPattern, MainNetWSPattern)
 }
 
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch)}

@@ -17,12 +17,19 @@
 package core
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/internal/ctxerror"
+
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
@@ -64,8 +71,8 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	//if err := v.engine.VerifyUncles(v.bc, block); err != nil {
 	//	return err
 	//}
-	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash {
-		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash)
+	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash() {
+		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash())
 	}
 	return nil
 }
@@ -74,7 +81,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // transition, such as amount of used gas, the receipt roots and the state root
 // itself. ValidateState returns a database batch if the validation was a success
 // otherwise nil and an error is returned.
-func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *state.DB, receipts types.Receipts, usedGas uint64) error {
+func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *state.DB, receipts types.Receipts, cxReceipts types.CXReceipts, usedGas uint64) error {
 	header := block.Header()
 	if block.GasUsed() != usedGas {
 		return fmt.Errorf("invalid gas used (remote: %d local: %d)", block.GasUsed(), usedGas)
@@ -82,20 +89,49 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	// Validate the received block's bloom with the one derived from the generated receipts.
 	// For valid blocks this should always validate to true.
 	rbloom := types.CreateBloom(receipts)
-	if rbloom != header.Bloom {
-		return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.Bloom, rbloom)
+	if rbloom != header.Bloom() {
+		return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.Bloom(), rbloom)
 	}
 	// Tre receipt Trie's root (R = (Tr [[H1, R1], ... [Hn, R1]]))
 	receiptSha := types.DeriveSha(receipts)
-	if receiptSha != header.ReceiptHash {
-		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash, receiptSha)
+	if receiptSha != header.ReceiptHash() {
+		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash(), receiptSha)
 	}
+
+	if v.config.IsCrossTx(block.Epoch()) {
+		cxsSha := types.DeriveMultipleShardsSha(cxReceipts)
+		if cxsSha != header.OutgoingReceiptHash() {
+			return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash(), cxsSha)
+		}
+	}
+
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
-	if root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number)); header.Root != root {
-		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root, root)
+	if root := statedb.IntermediateRoot(v.config.IsS3(header.Epoch())); header.Root() != root {
+		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root(), root)
 	}
 	return nil
+}
+
+// ValidateHeader checks whether a header conforms to the consensus rules of a
+// given engine. Verifying the seal may be done optionally here, or explicitly
+// via the VerifySeal method.
+func (v *BlockValidator) ValidateHeader(block *types.Block, seal bool) error {
+	return v.engine.VerifyHeader(v.bc, block.Header(), true)
+}
+
+// ValidateHeaders verifies a batch of blocks' headers concurrently. The method returns a quit channel
+// to abort the operations and a results channel to retrieve the async verifications
+func (v *BlockValidator) ValidateHeaders(chain []*types.Block) (chan<- struct{}, <-chan error) {
+	// Start the parallel header verifier
+	headers := make([]*block.Header, len(chain))
+	seals := make([]bool, len(chain))
+
+	for i, block := range chain {
+		headers[i] = block.Header()
+		seals[i] = true
+	}
+	return v.engine.VerifyHeaders(v.bc, headers, seals)
 }
 
 // CalcGasLimit computes the gas limit of the next block after parent. It aims
@@ -133,4 +169,61 @@ func CalcGasLimit(parent *types.Block, gasFloor, gasCeil uint64) uint64 {
 		}
 	}
 	return limit
+}
+
+// ValidateCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
+func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) error {
+	if !v.config.IsCrossTx(cxp.Header.Epoch()) {
+		return ctxerror.New("[ValidateCXReceiptsProof] cross shard receipt received before cx fork")
+	}
+
+	toShardID, err := cxp.GetToShardID()
+	if err != nil {
+		return ctxerror.New("[ValidateCXReceiptsProof] invalid shardID").WithCause(err)
+	}
+
+	merkleProof := cxp.MerkleProof
+	shardRoot := common.Hash{}
+	foundMatchingShardID := false
+	byteBuffer := bytes.NewBuffer([]byte{})
+
+	// prepare to calculate source shard outgoing cxreceipts root hash
+	for j := 0; j < len(merkleProof.ShardIDs); j++ {
+		sKey := make([]byte, 4)
+		binary.BigEndian.PutUint32(sKey, merkleProof.ShardIDs[j])
+		byteBuffer.Write(sKey)
+		byteBuffer.Write(merkleProof.CXShardHashes[j][:])
+		if merkleProof.ShardIDs[j] == toShardID {
+			shardRoot = merkleProof.CXShardHashes[j]
+			foundMatchingShardID = true
+		}
+	}
+
+	if !foundMatchingShardID {
+		return ctxerror.New("[ValidateCXReceiptsProof] Didn't find matching shardID")
+	}
+
+	sourceShardID := merkleProof.ShardID
+	sourceBlockNum := merkleProof.BlockNum
+
+	sha := types.DeriveSha(cxp.Receipts)
+
+	// (1) verify the CXReceipts trie root match
+	if sha != shardRoot {
+		return ctxerror.New("[ValidateCXReceiptsProof] Trie Root of ReadCXReceipts Not Match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", sha, "got", shardRoot)
+	}
+
+	// (2) verify the outgoingCXReceiptsHash match
+	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
+	if outgoingHashFromSourceShard != merkleProof.CXReceiptHash {
+		return ctxerror.New("[ValidateCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
+	}
+
+	// (3) verify the block hash matches
+	if cxp.Header.Hash() != merkleProof.BlockHash || cxp.Header.OutgoingReceiptHash() != merkleProof.CXReceiptHash {
+		return ctxerror.New("[ValidateCXReceiptsProof] BlockHash or OutgoingReceiptHash not match in block Header", "blockHash", cxp.Header.Hash(), "merkleProofBlockHash", merkleProof.BlockHash, "headerOutReceiptHash", cxp.Header.OutgoingReceiptHash(), "merkleOutReceiptHash", merkleProof.CXReceiptHash)
+	}
+
+	// (4) verify blockHeader with seal
+	return v.engine.VerifyHeaderWithSignature(cxp.Header, cxp.CommitSig, cxp.CommitBitmap)
 }

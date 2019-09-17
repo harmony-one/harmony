@@ -3,6 +3,7 @@
 package shardingconfig
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -23,8 +24,18 @@ type Schedule interface {
 	// IsLastBlock check if the block is the last block in the epoch
 	IsLastBlock(blockNum uint64) bool
 
+	// EpochLastBlock returns the last block number of an epoch
+	EpochLastBlock(epochNum uint64) uint64
+
+	// VDFDifficulty returns number of iterations for VDF calculation
+	VdfDifficulty() int
+
 	// ConsensusRatio ratio of new nodes vs consensus total nodes
 	ConsensusRatio() float64
+
+	// TODO: remove it after randomness feature turned on mainnet
+	//RandomnessStartingEpoch returns starting epoch of randonness generation
+	RandomnessStartingEpoch() uint64
 
 	// Max amount limit for a valid transaction
 	MaxTxAmountLimit() *big.Int
@@ -41,8 +52,17 @@ type Schedule interface {
 	// How long "recent" means for transaction in time Duration unit
 	RecentTxDuration() time.Duration
 
+	// EnableTxnThrottling is the switch for transaction throttling
+	EnableTxnThrottling() bool
+
 	// configuration for throttling pending transactions
 	TxsThrottleConfig() *TxsThrottleConfig
+
+	// GetNetworkID() return networkID type.
+	GetNetworkID() NetworkID
+
+	// GetShardingStructure returns sharding structure.
+	GetShardingStructure(int, int) []map[string]interface{}
 }
 
 // Instance is one sharding configuration instance.
@@ -110,4 +130,21 @@ type TxsThrottleConfig struct {
 
 	// Max total number of transactions allowed to be processed per block
 	MaxNumTxsPerBlockLimit int
+
+	// EnableTxnThrottling is the switch for transaction throttling
+	EnableTxnThrottling bool
+}
+
+// genShardingStructure return sharding structure, given shard number and its patterns.
+func genShardingStructure(shardNum, shardID int, httpPattern, wsPattern string) []map[string]interface{} {
+	res := []map[string]interface{}{}
+	for i := 0; i < shardNum; i++ {
+		res = append(res, map[string]interface{}{
+			"current": int(shardID) == i,
+			"shardID": i,
+			"http":    fmt.Sprintf(httpPattern, i),
+			"ws":      fmt.Sprintf(wsPattern, i),
+		})
+	}
+	return res
 }

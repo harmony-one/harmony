@@ -15,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	color "github.com/fatih/color"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
@@ -28,6 +29,7 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
@@ -57,7 +59,7 @@ type AccountState struct {
 const (
 	rpcRetry          = 3
 	defaultConfigFile = ".hmy/wallet.ini"
-	defaultProfile    = "default"
+	defaultProfile    = "main"
 	keystoreDir       = ".hmy/keystore"
 )
 
@@ -92,9 +94,11 @@ var (
 	transferReceiverPtr   = transferCommand.String("to", "", "Specify the receiver account")
 	transferAmountPtr     = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
 	transferGasPricePtr   = transferCommand.Uint64("gasPrice", 0, "Specify the gas price amount. Unit is Nano.")
-	transferShardIDPtr    = transferCommand.Int("shardID", 0, "Specify the shard ID for the transfer")
+	transferShardIDPtr    = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
+	transferToShardIDPtr  = transferCommand.Int("toShardID", -1, "Specify the destination shard ID for the transfer")
 	transferInputDataPtr  = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
 	transferSenderPassPtr = transferCommand.String("pass", "", "Passphrase of the sender's private key")
+	waitForColoredBalance = transferCommand.Bool("waitThenBal", false, "")
 
 	freeTokenCommand    = flag.NewFlagSet("getFreeToken", flag.ExitOnError)
 	freeTokenAddressPtr = freeTokenCommand.String("address", "", "Specify the account address to receive the free token")
@@ -140,7 +144,7 @@ func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage:")
 		fmt.Println("    wallet -p profile <action> <params>")
-		fmt.Println("    -p profile       - Specify the profile of the wallet, either testnet/devnet or others configured. Default is: testnet")
+		fmt.Println("    -p profile       - Specify the profile of the wallet, either main, local, beta, or pangaea. Default is main.")
 		fmt.Println("                       The profile is in file:", defaultConfigFile)
 		fmt.Println()
 		fmt.Println("Actions:")
@@ -161,8 +165,10 @@ func main() {
 		fmt.Println("        --to             - The receiver account's address")
 		fmt.Println("        --amount         - The amount of token to transfer")
 		fmt.Println("        --shardID        - The shard Id for the transfer")
+		fmt.Println("        --toShardID      - The destination shard Id for the transfer")
 		fmt.Println("        --inputData      - Base64-encoded input data to embed in the transaction")
 		fmt.Println("        --pass           - Passphrase of sender's private key")
+		fmt.Println("        --waitThenBal    - Wait after the transfer with colored balances output")
 		fmt.Println("    8. export        - Export account key to a new file")
 		fmt.Println("        --account        - Specify the account to export. Empty will export every key.")
 		fmt.Println("    9. exportPriKey  - Export account private key")
@@ -288,8 +294,9 @@ func createWalletNode() *node.Node {
 	// dummy host for wallet
 	// TODO: potentially, too many dummy IP may flush out good IP address from our bootnode DHT
 	// we need to understand the impact to bootnode DHT with this dummy host ip added
-	self := p2p.Peer{IP: "127.0.0.1", Port: "6999"}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "6999")
+	port := fmt.Sprintf("%d", 16999+rand.Intn(1000))
+	self := p2p.Peer{IP: "127.0.0.1", Port: port}
+	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", port)
 	host, err := p2pimpl.NewHost(&self, priKey)
 	if err != nil {
 		panic(err)
@@ -486,25 +493,43 @@ func processImportCommnad() {
 	fmt.Printf("Private key imported for account: %s\n", common2.MustAddressToBech32(account.Address))
 }
 
+func showAllBalances(sender, receiver string, fromS, toS int) {
+	allAccounts := ks.Accounts()
+	for i, account := range allAccounts {
+		asBech32 := common2.MustAddressToBech32(account.Address)
+		fmt.Printf("Account %d:\n", i)
+		if asBech32 == sender {
+			color.Yellow("    Address: %s\n", asBech32)
+		} else if asBech32 == receiver {
+			color.Cyan("    Address: %s\n", asBech32)
+		} else {
+			fmt.Printf("    Address: %s\n", asBech32)
+		}
+		for shardID, balanceNonce := range FetchBalance(account.Address) {
+			if balanceNonce != nil {
+				if shardID == fromS && asBech32 == sender {
+					color.Yellow("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
+				} else if shardID == toS && asBech32 == receiver {
+					color.Cyan("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
+				} else {
+					fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
+				}
+
+			} else {
+				fmt.Printf("    Balance in Shard %d:  connection failed", shardID)
+			}
+		}
+	}
+
+}
+
 func processBalancesCommand() {
 	if err := balanceCommand.Parse(os.Args[2:]); err != nil {
 		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
 		return
 	}
-
 	if *balanceAddressPtr == "" {
-		allAccounts := ks.Accounts()
-		for i, account := range allAccounts {
-			fmt.Printf("Account %d:\n", i)
-			fmt.Printf("    Address: %s\n", common2.MustAddressToBech32(account.Address))
-			for shardID, balanceNonce := range FetchBalance(account.Address) {
-				if balanceNonce != nil {
-					fmt.Printf("    Balance in Shard %d:  %s, nonce: %v \n", shardID, convertBalanceIntoReadableFormat(balanceNonce.balance), balanceNonce.nonce)
-				} else {
-					fmt.Printf("    Balance in Shard %d:  connection failed", shardID)
-				}
-			}
-		}
+		showAllBalances("", "", -1, -1)
 	} else {
 		address := common2.ParseAddr(*balanceAddressPtr)
 		fmt.Printf("Account: %s:\n", common2.MustAddressToBech32(address))
@@ -654,6 +679,7 @@ func processTransferCommand() {
 	amount := *transferAmountPtr
 	gasPrice := *transferGasPricePtr
 	shardID := *transferShardIDPtr
+	toShardID := *transferToShardIDPtr
 	base64InputData := *transferInputDataPtr
 	senderPass := *transferSenderPassPtr
 
@@ -664,7 +690,7 @@ func processTransferCommand() {
 		return
 	}
 
-	if shardID == -1 {
+	if shardID == -1 || toShardID == -1 {
 		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
 		return
 	}
@@ -685,8 +711,6 @@ func processTransferCommand() {
 		return
 	}
 
-	walletNode := createWalletNode()
-
 	shardIDToAccountState := FetchBalance(senderAddress)
 
 	state := shardIDToAccountState[shardID]
@@ -702,6 +726,8 @@ func processTransferCommand() {
 		return
 	}
 
+	walletNode := createWalletNode()
+
 	amountBigInt := big.NewInt(int64(amount * denominations.Nano))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
 	gas, err := core.IntrinsicGas(inputData, false, true)
@@ -710,11 +736,15 @@ func processTransferCommand() {
 		return
 	}
 
+	fromShard := uint32(shardID)
+	toShard := uint32(toShardID)
+	var tx *types.Transaction
+
 	gasPriceBigInt := big.NewInt(int64(gasPrice))
 	gasPriceBigInt = gasPriceBigInt.Mul(gasPriceBigInt, big.NewInt(denominations.Nano))
 
-	tx := types.NewTransaction(
-		state.nonce, receiverAddress, uint32(shardID), amountBigInt,
+	tx = types.NewCrossShardTransaction(
+		state.nonce, &receiverAddress, fromShard, toShard, amountBigInt,
 		gas, gasPriceBigInt, inputData)
 
 	account, err := ks.Find(accounts.Account{Address: senderAddress})
@@ -737,7 +767,11 @@ func processTransferCommand() {
 
 	fmt.Printf("Unlock account succeeded! '%v'\n", senderPass)
 
-	tx, err = ks.SignTx(account, tx, nil)
+	chainConfig := params.MainnetChainConfig
+	if walletProfile.Profile != defaultProfile {
+		chainConfig = params.TestnetChainConfig
+	}
+	tx, err = ks.SignTx(account, tx, chainConfig.ChainID)
 	if err != nil {
 		fmt.Printf("SignTx Error: %v\n", err)
 		return
@@ -803,9 +837,8 @@ func FetchBalance(address common.Address) []*AccountState {
 	for shardID := 0; shardID < walletProfile.Shards; shardID++ {
 		go func(shardID int) {
 			defer wg.Done()
-			balance := big.NewInt(0)
+			balance := big.NewInt(-1)
 			var nonce uint64
-			result[uint32(shardID)] = &AccountState{balance, 0}
 
 			var wgShard sync.WaitGroup
 			wgShard.Add(len(walletProfile.RPCServer[shardID]))
@@ -845,8 +878,9 @@ func FetchBalance(address common.Address) []*AccountState {
 				}(rpcServerID)
 			}
 			wgShard.Wait()
-
-			result[shardID] = &AccountState{balance, nonce}
+			if balance.Cmp(big.NewInt(-1)) > 0 {
+				result[shardID] = &AccountState{balance, nonce}
+			}
 		}(shardID)
 	}
 	wg.Wait()
@@ -911,5 +945,13 @@ func submitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 	// FIXME (leo): how to we know the tx was successful sent to the network
 	// this is a hacky way to wait for sometime
 	time.Sleep(3 * time.Second)
+	if *waitForColoredBalance {
+		sender := *transferSenderPtr
+		receiver := *transferReceiverPtr
+		shardID := *transferShardIDPtr
+		toShardID := *transferToShardIDPtr
+		showAllBalances(sender, receiver, shardID, toShardID)
+	}
+
 	return nil
 }

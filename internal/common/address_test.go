@@ -150,6 +150,19 @@ func TestAddressToBech32(t *testing.T) {
 	}
 }
 
+func TestParseAddr(t *testing.T) {
+	adr := ethCommon.HexToAddress("0x15a128e599b74842bccba860311efa92991bffb5")
+	adr2 := ParseAddr("one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur")
+	if adr.Hex() != adr2.Hex() {
+		t.Errorf("error on ParseAddr")
+	}
+	// Parsing incorrect address
+	adr3 := ParseAddr("helloworldone1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ufdfsrfasdfadfas")
+	if adr3.Hex() != "0x0000000000000000000000000000000000000000" {
+		t.Errorf("error on ParseAddr")
+	}
+}
+
 func TestAddress_Scan(t *testing.T) {
 	type args struct {
 		src interface{}

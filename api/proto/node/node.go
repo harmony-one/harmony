@@ -11,8 +11,10 @@ import (
 	peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -26,7 +28,6 @@ const (
 	_    // used to be Control
 	PING // node send ip/pki to register with leader
 	ShardState
-	// TODO: add more types
 )
 
 // BlockchainSyncMessage is a struct for blockchain sync message.
@@ -94,6 +95,9 @@ type BlockMessageType int
 // Block sync message subtype
 const (
 	Sync BlockMessageType = iota
+
+	Header  // used for crosslink from beacon chain to shard chain
+	Receipt // cross-shard transaction receipts
 )
 
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
@@ -144,8 +148,19 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 	return byteBuffer.Bytes()
 }
 
+// ConstructCrossLinkHeadersMessage constructs cross link header message to send to beacon chain
+func ConstructCrossLinkHeadersMessage(headers []*block.Header) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(Block))
+	byteBuffer.WriteByte(byte(Header))
+
+	headersData, _ := rlp.EncodeToBytes(headers)
+	byteBuffer.Write(headersData)
+	return byteBuffer.Bytes()
+}
+
 // ConstructEpochShardStateMessage contructs epoch shard state message
-func ConstructEpochShardStateMessage(epochShardState types.EpochShardState) []byte {
+func ConstructEpochShardStateMessage(epochShardState shard.EpochShardState) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(ShardState))
 
@@ -159,8 +174,8 @@ func ConstructEpochShardStateMessage(epochShardState types.EpochShardState) []by
 }
 
 // DeserializeEpochShardStateFromMessage deserializes the shard state Message from bytes payload
-func DeserializeEpochShardStateFromMessage(payload []byte) (*types.EpochShardState, error) {
-	epochShardState := new(types.EpochShardState)
+func DeserializeEpochShardStateFromMessage(payload []byte) (*shard.EpochShardState, error) {
+	epochShardState := new(shard.EpochShardState)
 
 	r := bytes.NewBuffer(payload)
 	decoder := gob.NewDecoder(r)
@@ -172,4 +187,22 @@ func DeserializeEpochShardStateFromMessage(payload []byte) (*types.EpochShardSta
 	}
 
 	return epochShardState, nil
+}
+
+// ConstructCXReceiptsProof constructs cross shard receipts and related proof including
+// merkle proof, blockHeader and  commitSignatures
+func ConstructCXReceiptsProof(cxs types.CXReceipts, mkp *types.CXMerkleProof, header *block.Header, commitSig []byte, commitBitmap []byte) []byte {
+	msg := &types.CXReceiptsProof{Receipts: cxs, MerkleProof: mkp, Header: header, CommitSig: commitSig, CommitBitmap: commitBitmap}
+
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(Block))
+	byteBuffer.WriteByte(byte(Receipt))
+	by, err := rlp.EncodeToBytes(msg)
+
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[ConstructCXReceiptsProof] Encode CXReceiptsProof Error")
+		return []byte{}
+	}
+	byteBuffer.Write(by)
+	return byteBuffer.Bytes()
 }

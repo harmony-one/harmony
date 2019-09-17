@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	blockfactory "github.com/harmony-one/harmony/block/factory"
+	"github.com/harmony-one/harmony/internal/chain"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	client "github.com/harmony-one/harmony/api/client/service/proto"
@@ -14,10 +17,9 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 var (
@@ -26,7 +28,8 @@ var (
 	testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
 	testBankFunds   = big.NewInt(8000000000000000000)
 
-	chainConfig = params.TestChainConfig
+	chainConfig  = params.TestChainConfig
+	blockFactory = blockfactory.NewFactory(chainConfig)
 )
 
 func TestGetFreeToken(test *testing.T) {
@@ -55,6 +58,7 @@ func TestFetchAccountState(test *testing.T) {
 		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
+			Factory: blockFactory,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 10,
 		}
@@ -62,7 +66,7 @@ func TestFetchAccountState(test *testing.T) {
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine, vm.Config{}, nil)
 
 	hash := common.Hash{}
 	hash.SetBytes([]byte("hello"))
@@ -92,6 +96,7 @@ func TestGetStakingContractInfo(test *testing.T) {
 		database = ethdb.NewMemDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
+			Factory: blockFactory,
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 10,
 		}
@@ -99,7 +104,7 @@ func TestGetStakingContractInfo(test *testing.T) {
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, consensus.NewFaker(), vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine, vm.Config{}, nil)
 
 	hash := common.Hash{}
 	hash.SetBytes([]byte("hello"))

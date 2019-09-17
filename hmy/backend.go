@@ -7,10 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 // Harmony implements the Harmony full node service.
@@ -21,6 +21,7 @@ type Harmony struct {
 
 	blockchain     *core.BlockChain
 	txPool         *core.TxPool
+	cxPool         *core.CxPool
 	accountManager *accounts.Manager
 	eventMux       *event.TypeMux
 	// DB interfaces
@@ -37,6 +38,7 @@ type Harmony struct {
 	// TODO(ricl): this is never set. Will result in nil pointer bug
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap *big.Int `toml:",omitempty"`
+	shardID   uint32
 }
 
 // NodeAPI is the list of functions from node used to call rpc apis.
@@ -50,19 +52,21 @@ type NodeAPI interface {
 
 // New creates a new Harmony object (including the
 // initialisation of the common Harmony object)
-func New(nodeAPI NodeAPI, txPool *core.TxPool, eventMux *event.TypeMux) (*Harmony, error) {
+func New(nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool, eventMux *event.TypeMux, shardID uint32) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	hmy := &Harmony{
 		shutdownChan:   make(chan bool),
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		blockchain:     nodeAPI.Blockchain(),
 		txPool:         txPool,
+		cxPool:         cxPool,
 		accountManager: nodeAPI.AccountManager(),
 		eventMux:       eventMux,
 		chainDb:        chainDb,
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		nodeAPI:        nodeAPI,
 		networkID:      1, // TODO(ricl): this should be from config
+		shardID:        shardID,
 	}
 
 	hmy.APIBackend = &APIBackend{hmy}
@@ -72,6 +76,9 @@ func New(nodeAPI NodeAPI, txPool *core.TxPool, eventMux *event.TypeMux) (*Harmon
 
 // TxPool ...
 func (s *Harmony) TxPool() *core.TxPool { return s.txPool }
+
+// CxPool is used to store the blockHashes, where the corresponding block contains the cross shard receipts to be sent
+func (s *Harmony) CxPool() *core.CxPool { return s.cxPool }
 
 // BlockChain ...
 func (s *Harmony) BlockChain() *core.BlockChain { return s.blockchain }

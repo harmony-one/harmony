@@ -17,7 +17,7 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 		return common.Hash{}, err
 	}
 	if tx.To() == nil {
-		signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Number())
+		signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Epoch())
 		from, err := types.Sender(signer, tx)
 		if err != nil {
 			return common.Hash{}, err

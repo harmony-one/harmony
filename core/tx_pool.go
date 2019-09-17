@@ -30,8 +30,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/internal/params"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -360,7 +361,7 @@ func (pool *TxPool) loop() {
 
 // lockedReset is a wrapper around reset to allow calling it in a thread safe
 // manner. This method is only ever used in the tester!
-func (pool *TxPool) lockedReset(oldHead, newHead *types.Header) {
+func (pool *TxPool) lockedReset(oldHead, newHead *block.Header) {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
@@ -369,14 +370,14 @@ func (pool *TxPool) lockedReset(oldHead, newHead *types.Header) {
 
 // reset retrieves the current state of the blockchain and ensures the content
 // of the transaction pool is valid with regard to the chain state.
-func (pool *TxPool) reset(oldHead, newHead *types.Header) {
+func (pool *TxPool) reset(oldHead, newHead *block.Header) {
 	// If we're reorging an old state, reinject all dropped transactions
 	var reinject types.Transactions
 
-	if oldHead != nil && oldHead.Hash() != newHead.ParentHash {
+	if oldHead != nil && oldHead.Hash() != newHead.ParentHash() {
 		// If the reorg is too deep, avoid doing it (will happen during fast sync)
-		oldNum := oldHead.Number.Uint64()
-		newNum := newHead.Number.Uint64()
+		oldNum := oldHead.Number().Uint64()
+		newNum := newHead.Number().Uint64()
 
 		if depth := uint64(math.Abs(float64(oldNum) - float64(newNum))); depth > 64 {
 			utils.Logger().Debug().Uint64("depth", depth).Msg("Skipping deep transaction reorg")
@@ -385,14 +386,14 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 			var discarded, included types.Transactions
 
 			var (
-				rem = pool.chain.GetBlock(oldHead.Hash(), oldHead.Number.Uint64())
-				add = pool.chain.GetBlock(newHead.Hash(), newHead.Number.Uint64())
+				rem = pool.chain.GetBlock(oldHead.Hash(), oldHead.Number().Uint64())
+				add = pool.chain.GetBlock(newHead.Hash(), newHead.Number().Uint64())
 			)
 			for rem.NumberU64() > add.NumberU64() {
 				discarded = append(discarded, rem.Transactions()...)
 				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
 					utils.Logger().Error().
-						Str("block", oldHead.Number.String()).
+						Str("block", oldHead.Number().String()).
 						Str("hash", oldHead.Hash().Hex()).
 						Msg("Unrooted old chain seen by tx pool")
 					return
@@ -402,7 +403,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 				included = append(included, add.Transactions()...)
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 					utils.Logger().Error().
-						Str("block", newHead.Number.String()).
+						Str("block", newHead.Number().String()).
 						Str("hash", newHead.Hash().Hex()).
 						Msg("Unrooted new chain seen by tx pool")
 					return
@@ -412,7 +413,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 				discarded = append(discarded, rem.Transactions()...)
 				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
 					utils.Logger().Error().
-						Str("block", oldHead.Number.String()).
+						Str("block", oldHead.Number().String()).
 						Str("hash", oldHead.Hash().Hex()).
 						Msg("Unrooted old chain seen by tx pool")
 					return
@@ -420,7 +421,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 				included = append(included, add.Transactions()...)
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 					utils.Logger().Error().
-						Str("block", newHead.Number.String()).
+						Str("block", newHead.Number().String()).
 						Str("hash", newHead.Hash().Hex()).
 						Msg("Unrooted new chain seen by tx pool")
 					return
@@ -433,14 +434,14 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	if newHead == nil {
 		newHead = pool.chain.CurrentBlock().Header() // Special case during testing
 	}
-	statedb, err := pool.chain.StateAt(newHead.Root)
+	statedb, err := pool.chain.StateAt(newHead.Root())
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to reset txpool state")
 		return
 	}
 	pool.currentState = statedb
 	pool.pendingState = state.ManageState(statedb)
-	pool.currentMaxGas = newHead.GasLimit
+	pool.currentMaxGas = newHead.GasLimit()
 
 	// Inject any transactions discarded due to reorgs
 	utils.Logger().Debug().Int("count", len(reinject)).Msg("Reinjecting stale transactions")

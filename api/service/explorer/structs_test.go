@@ -8,7 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // Test for GetBlockInfoKey
@@ -18,10 +21,10 @@ func TestGetTransaction(t *testing.T) {
 	tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), 0, big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
 	txs := []*types.Transaction{tx1, tx2, tx3}
 
-	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil)
+	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, nil, nil, nil)
 
 	tx := GetTransaction(tx1, block)
 	assert.Equal(t, tx.ID, tx1.Hash().Hex(), "should be equal tx1.Hash()")
-	assert.Equal(t, tx.To, tx1.To().Hex(), "should be equal tx1.To()") // TODO ek – use bech32
+	assert.Equal(t, tx.To, common2.MustAddressToBech32(common.HexToAddress(tx1.To().Hex())), "should be equal tx1.To()")
 	assert.Equal(t, tx.Bytes, strconv.Itoa(int(tx1.Size())), "should be equal tx1.Size()")
 }
