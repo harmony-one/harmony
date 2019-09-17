@@ -290,12 +290,10 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 
 // AddPendingReceipts adds one receipt message to pending list.
 func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
-	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		node.pendingCXMutex.Lock()
-		node.pendingCXReceipts = append(node.pendingCXReceipts, receipts)
-		node.pendingCXMutex.Unlock()
-		utils.Logger().Error().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
-	}
+	node.pendingCXMutex.Lock()
+	node.pendingCXReceipts = append(node.pendingCXReceipts, receipts)
+	node.pendingCXMutex.Unlock()
+	utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
 }
 
 // Take out a subset of valid transactions from the pending transaction list
