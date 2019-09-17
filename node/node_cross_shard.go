@@ -91,7 +91,7 @@ func (node *Node) BroadcastMissingCXReceipts() {
 		}
 		sig := nextHeader.LastCommitSignature()
 		bitmap := nextHeader.LastCommitBitmap()
-		go node.BroadcastCXReceiptsWithShardID(blk, sig[:], bitmap, toShardID)
+		node.BroadcastCXReceiptsWithShardID(blk, sig[:], bitmap, toShardID)
 	}
 	node.CxPool.Clear()
 	// this should not happen or maybe happen for impatient user

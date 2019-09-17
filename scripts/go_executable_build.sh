@@ -162,7 +162,7 @@ function release
       if [ -e $BINDIR/$bin ]; then
          $AWSCLI s3 cp $BINDIR/$bin s3://${PUBBUCKET}/$FOLDER/$bin --acl public-read
       else
-         echo "!! MISSGIN $bin !!"
+         echo "!! MISSGING $bin !!"
       fi
    done
 

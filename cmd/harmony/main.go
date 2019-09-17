@@ -10,7 +10,6 @@ import (
 	"path"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -463,7 +462,10 @@ func main() {
 		go currentNode.SupportBeaconSyncing()
 	}
 
-	startMsg := fmt.Sprintf("==== New %s Node ====", strings.Title(*nodeType))
+	startMsg := "==== New Harmony Node ===="
+	if *nodeType == "explorer" {
+		startMsg = "==== New Explorer Node ===="
+	}
 
 	utils.Logger().Info().
 		Str("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
