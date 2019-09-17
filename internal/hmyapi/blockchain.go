@@ -73,6 +73,11 @@ func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[s
 	return core.ShardingSchedule.GetShardingStructure(int(numShard), int(s.b.GetShardID())), nil
 }
 
+// GetShardID returns shard ID of the requested node.
+func (s *PublicBlockChainAPI) GetShardID(ctx context.Context) (int, error) {
+	return int(s.b.GetShardID()), nil
+}
+
 // GetCode returns the code stored at the given address in the state for the given block number.
 func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
 	address := internal_common.ParseAddr(addr)
