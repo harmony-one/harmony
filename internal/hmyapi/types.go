@@ -2,6 +2,7 @@ package hmyapi
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -51,9 +52,14 @@ type HeaderInformation struct {
 	Leader      string      `json:"leader"`
 	ViewID      uint64      `json:"viewID"`
 	Epoch       uint64      `json:"epoch"`
+	Timestamp   string      `json:"timestamp"`
+	UnixTime    uint64      `json:"unixtime"`
 }
 
 func newHeaderInformation(header *block.Header) *HeaderInformation {
+	if header == nil {
+		return nil
+	}
 	result := &HeaderInformation{
 		BlockHash:   header.Hash(),
 		BlockNumber: header.Number().Uint64(),
@@ -61,6 +67,8 @@ func newHeaderInformation(header *block.Header) *HeaderInformation {
 		Leader:      common2.MustAddressToBech32(header.Coinbase()),
 		ViewID:      header.ViewID().Uint64(),
 		Epoch:       header.Epoch().Uint64(),
+		UnixTime:    header.Time().Uint64(),
+		Timestamp:   time.Unix(header.Time().Int64(), 0).UTC().String(),
 	}
 	return result
 }
