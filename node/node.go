@@ -293,7 +293,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	node.pendingCXMutex.Lock()
 	node.pendingCXReceipts = append(node.pendingCXReceipts, receipts)
 	node.pendingCXMutex.Unlock()
-	utils.Logger().Error().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
+	utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
 }
 
 // Take out a subset of valid transactions from the pending transaction list
