@@ -483,11 +483,11 @@ func main() {
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 
+	currentNode.RunServices()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
 		ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
 	}
-	currentNode.RunServices()
 
 	// Run additional node collectors
 	// Collect node metrics if metrics flag is set

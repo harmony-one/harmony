@@ -32,7 +32,7 @@ var (
 	httpEndpoint = ""
 	wsEndpoint   = ""
 
-	httpModules      = []string{"hmy", "net"}
+	httpModules      = []string{"hmy", "net", "explorer"}
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
 	httpOrigins      = []string{"*"}
