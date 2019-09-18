@@ -76,6 +76,7 @@ type ConfigType struct {
 	role     Role        // Role of the node
 	Port     string      // Port of the node.
 	IP       string      // IP of the node.
+	rpcIP    string      // IP of the node listen on RPC service
 
 	MetricsFlag     bool   // collect and upload metrics flag
 	PushgatewayIP   string // metrics pushgateway prometheus ip
@@ -236,6 +237,16 @@ func (conf *ConfigType) SetNetworkType(networkType NetworkType) {
 // GetNetworkType gets the networkType
 func (conf *ConfigType) GetNetworkType() NetworkType {
 	return conf.networkType
+}
+
+// SetRPCIP sets the IP of RPC service
+func (conf *ConfigType) SetRPCIP(ip string) {
+	conf.rpcIP = ip
+}
+
+// GetRPCIP gets the IP of the RPC srevice
+func (conf *ConfigType) GetRPCIP() string {
+	return conf.rpcIP
 }
 
 // SetVersion set the version of the node binary
