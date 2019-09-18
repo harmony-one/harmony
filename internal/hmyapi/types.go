@@ -1,6 +1,7 @@
 package hmyapi
 
 import (
+	"encoding/hex"
 	"math/big"
 	"time"
 
@@ -46,14 +47,16 @@ type RPCCXReceipt struct {
 
 // HeaderInformation represents the latest consensus information
 type HeaderInformation struct {
-	BlockHash   common.Hash `json:"blockHash"`
-	BlockNumber uint64      `json:"blockNumber"`
-	ShardID     uint32      `json:"shardID"`
-	Leader      string      `json:"leader"`
-	ViewID      uint64      `json:"viewID"`
-	Epoch       uint64      `json:"epoch"`
-	Timestamp   string      `json:"timestamp"`
-	UnixTime    uint64      `json:"unixtime"`
+	BlockHash        common.Hash `json:"blockHash"`
+	BlockNumber      uint64      `json:"blockNumber"`
+	ShardID          uint32      `json:"shardID"`
+	Leader           string      `json:"leader"`
+	ViewID           uint64      `json:"viewID"`
+	Epoch            uint64      `json:"epoch"`
+	Timestamp        string      `json:"timestamp"`
+	UnixTime         uint64      `json:"unixtime"`
+	LastCommitSig    string      `json:"lastCommitSig"`
+	LastCommitBitmap string      `json:"lastCommitBitmap"`
 }
 
 func newHeaderInformation(header *block.Header) *HeaderInformation {
@@ -61,15 +64,18 @@ func newHeaderInformation(header *block.Header) *HeaderInformation {
 		return nil
 	}
 	result := &HeaderInformation{
-		BlockHash:   header.Hash(),
-		BlockNumber: header.Number().Uint64(),
-		ShardID:     header.ShardID(),
-		Leader:      common2.MustAddressToBech32(header.Coinbase()),
-		ViewID:      header.ViewID().Uint64(),
-		Epoch:       header.Epoch().Uint64(),
-		UnixTime:    header.Time().Uint64(),
-		Timestamp:   time.Unix(header.Time().Int64(), 0).UTC().String(),
+		BlockHash:        header.Hash(),
+		BlockNumber:      header.Number().Uint64(),
+		ShardID:          header.ShardID(),
+		Leader:           common2.MustAddressToBech32(header.Coinbase()),
+		ViewID:           header.ViewID().Uint64(),
+		Epoch:            header.Epoch().Uint64(),
+		UnixTime:         header.Time().Uint64(),
+		Timestamp:        time.Unix(header.Time().Int64(), 0).UTC().String(),
+		LastCommitBitmap: hex.EncodeToString(header.LastCommitBitmap()),
 	}
+	sig := header.LastCommitSignature()
+	result.LastCommitSig = hex.EncodeToString(sig[:])
 	return result
 }
 
