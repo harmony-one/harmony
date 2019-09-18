@@ -131,6 +131,9 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
 	}
+	if tx.ChainID() != s.b.ChainConfig().ChainID {
+		return common.Hash{}, ErrIncorrectChainID
+	}
 	return SubmitTransaction(ctx, s.b, tx)
 }
 
