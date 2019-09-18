@@ -695,7 +695,6 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 		balance, err := s.GetAccountBalance(address)
 		if err == nil {
 			balanceAddr = balance
-			data.Address.Balance = balance
 		}
 	}
 

@@ -57,6 +57,8 @@ type Transaction struct {
 	Value     *big.Int `json:"value"`
 	Bytes     string   `json:"bytes"`
 	Data      string   `json:"data"`
+	FromShard uint32   `json:"fromShard"`
+	ToShard   uint32   `json:"toShard"`
 	Type      string   `json:"type"`
 }
 
@@ -126,6 +128,8 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transacti
 		Value:     msg.Value(),
 		Bytes:     strconv.Itoa(int(tx.Size())),
 		Data:      hex.EncodeToString(tx.Data()),
+		FromShard: tx.ShardID(),
+		ToShard:   tx.ToShardID(),
 		Type:      "",
 	}
 }
