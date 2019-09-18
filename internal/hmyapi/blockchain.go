@@ -230,3 +230,9 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	}
 	return res, gas, failed, err
 }
+
+// LatestHeader returns the latest header information
+func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformation {
+	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
+	return newHeaderInformation(header)
+}

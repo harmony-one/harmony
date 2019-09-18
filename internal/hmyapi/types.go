@@ -1,12 +1,16 @@
 package hmyapi
 
 import (
+	"encoding/hex"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
@@ -39,6 +43,40 @@ type RPCCXReceipt struct {
 	ShardID     uint32          `json:"shardID"`
 	ToShardID   uint32          `json:"toShardID"`
 	Amount      *hexutil.Big    `json:"value"`
+}
+
+// HeaderInformation represents the latest consensus information
+type HeaderInformation struct {
+	BlockHash        common.Hash `json:"blockHash"`
+	BlockNumber      uint64      `json:"blockNumber"`
+	ShardID          uint32      `json:"shardID"`
+	Leader           string      `json:"leader"`
+	ViewID           uint64      `json:"viewID"`
+	Epoch            uint64      `json:"epoch"`
+	Timestamp        string      `json:"timestamp"`
+	UnixTime         uint64      `json:"unixtime"`
+	LastCommitSig    string      `json:"lastCommitSig"`
+	LastCommitBitmap string      `json:"lastCommitBitmap"`
+}
+
+func newHeaderInformation(header *block.Header) *HeaderInformation {
+	if header == nil {
+		return nil
+	}
+	result := &HeaderInformation{
+		BlockHash:        header.Hash(),
+		BlockNumber:      header.Number().Uint64(),
+		ShardID:          header.ShardID(),
+		Leader:           common2.MustAddressToBech32(header.Coinbase()),
+		ViewID:           header.ViewID().Uint64(),
+		Epoch:            header.Epoch().Uint64(),
+		UnixTime:         header.Time().Uint64(),
+		Timestamp:        time.Unix(header.Time().Int64(), 0).UTC().String(),
+		LastCommitBitmap: hex.EncodeToString(header.LastCommitBitmap()),
+	}
+	sig := header.LastCommitSignature()
+	result.LastCommitSig = hex.EncodeToString(sig[:])
+	return result
 }
 
 // newRPCCXReceipt returns a CXReceipt that will serialize to the RPC representation
