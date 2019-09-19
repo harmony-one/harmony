@@ -25,12 +25,12 @@ func (id GroupID) String() string {
 
 // Const of group ID
 const (
-	GroupIDBeacon            GroupID = "harmony/0.0.1/node/beacon"
-	GroupIDBeaconClient      GroupID = "harmony/0.0.1/client/beacon"
-	GroupIDShardPrefix       GroupID = "harmony/0.0.1/node/shard/%s"
-	GroupIDShardClientPrefix GroupID = "harmony/0.0.1/client/shard/%s"
-	GroupIDGlobal            GroupID = "harmony/0.0.1/node/global"
-	GroupIDGlobalClient      GroupID = "harmony/0.0.1/node/global"
+	GroupIDBeacon            GroupID = "pangaea/0.0.1/node/beacon"
+	GroupIDBeaconClient      GroupID = "pangaea/0.0.1/client/beacon"
+	GroupIDShardPrefix       GroupID = "pangaea/0.0.1/node/shard/%s"
+	GroupIDShardClientPrefix GroupID = "pangaea/0.0.1/client/shard/%s"
+	GroupIDGlobal            GroupID = "pangaea/0.0.1/node/global"
+	GroupIDGlobalClient      GroupID = "pangaea/0.0.1/node/global"
 	GroupIDUnknown           GroupID = "B1acKh0lE"
 )
 
