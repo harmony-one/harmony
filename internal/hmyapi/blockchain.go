@@ -64,12 +64,12 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 }
 
 // GetCommittee returns committee for a particular epoch.
-func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (*RPCCommittee, error) {
+func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (map[string]interface{}, error) {
 	committee, err := s.b.GetCommittee(big.NewInt(epoch))
 	if err != nil {
 		return nil, err
 	}
-	validators := make([]*RPCValidator, 0)
+	validators := make([]map[string]interface{}, 0)
 	for _, validator := range committee.NodeList {
 		validatorBalance := new(hexutil.Big)
 		validatorBalance, err = s.b.GetBalance(validator.EcdsaAddress)
@@ -80,11 +80,15 @@ func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (*R
 		if err != nil {
 			continue
 		}
-		validators = append(validators, &RPCValidator{Address: oneAddress, Balance: validatorBalance})
+		validatorsFields := map[string]interface{}{
+			"address": oneAddress,
+			"balance": validatorBalance,
+		}
+		validators = append(validators, validatorsFields)
 	}
-	result := &RPCCommittee{
-		ShardID:    committee.ShardID,
-		Validators: validators,
+	result := map[string]interface{}{
+		"shardID":    committee.ShardID,
+		"validators": validators,
 	}
 	return result, nil
 }

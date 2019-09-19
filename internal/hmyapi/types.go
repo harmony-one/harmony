@@ -33,18 +33,6 @@ type RPCTransaction struct {
 	S                *hexutil.Big    `json:"s"`
 }
 
-// RPCValidator represents validator with address and balance
-type RPCValidator struct {
-	Address string       `json:"address"`
-	Balance *hexutil.Big `json:"balance"`
-}
-
-// RPCCommittee shpws a list of validators for a particular shard
-type RPCCommittee struct {
-	ShardID    uint32          `json:"shardID"`
-	Validators []*RPCValidator `json:"validators"`
-}
-
 // RPCCXReceipt represents a CXReceipt that will serialize to the RPC representation of a CXReceipt
 type RPCCXReceipt struct {
 	BlockHash   common.Hash     `json:"blockHash"`
