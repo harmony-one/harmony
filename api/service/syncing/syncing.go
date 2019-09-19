@@ -346,8 +346,8 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 				response := peerConfig.client.GetBlockHashes(startHash, size, ss.selfip, ss.selfport)
 				if response == nil {
 					utils.Logger().Warn().
-						Str("peer IP", peerConfig.ip).
-						Str("peer Port", peerConfig.port).
+						Str("peerIP", peerConfig.ip).
+						Str("peerPort", peerConfig.port).
 						Msg("[SYNC] GetConsensusHashes Nil Response")
 					return
 				}
@@ -697,10 +697,10 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
+			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
-				utils.Logger().Warn().Err(err).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
+				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
 				return
 			}
 			ss.syncMux.Lock()
