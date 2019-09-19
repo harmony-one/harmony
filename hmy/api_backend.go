@@ -236,13 +236,13 @@ func (b *APIBackend) GetShardID() uint32 {
 
 // GetCommittee returns committee for a particular epoch.
 func (b *APIBackend) GetCommittee(epoch *big.Int) (*shard.Committee, error) {
-	if state, err := b.hmy.BlockChain().ReadShardState(epoch); err != nil {
+	state, err := b.hmy.BlockChain().ReadShardState(epoch)
+	if err != nil {
 		return nil, err
-	} else {
-		for _, committee := range state {
-			if committee.ShardID == b.GetShardID() {
-				return &committee, nil
-			}
+	}
+	for _, committee := range state {
+		if committee.ShardID == b.GetShardID() {
+			return &committee, nil
 		}
 	}
 	return nil, nil

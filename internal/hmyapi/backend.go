@@ -65,7 +65,7 @@ type Backend interface {
 	// Get balance
 	GetBalance(address common.Address) (*hexutil.Big, error)
 	// Get committee for a particular epoch
-	GetCommittee(epoch *big.Int) (*shard.Committee, error) 
+	GetCommittee(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
 
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
