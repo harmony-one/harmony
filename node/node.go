@@ -392,9 +392,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.recentTxsStats = make(types.RecentTxsStats)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
-		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine, node.Consensus.ShardID)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 		if node.Blockchain().ShardID() != 0 {
-			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine, node.Consensus.ShardID)
+			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
 		}
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
