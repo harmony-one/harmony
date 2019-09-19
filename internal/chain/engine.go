@@ -11,7 +11,6 @@ import (
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -104,29 +103,7 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 // ReadPublicKeysFromLastBlock finds the public keys of last block's committee
 func ReadPublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
-	if parentHeader == nil {
-		return nil, ctxerror.New("cannot find parent block header in DB",
-			"parentHash", header.ParentHash())
-	}
-	parentShardState := core.GetShardState(parentHeader.Epoch())
-	parentCommittee := parentShardState.FindCommitteeByID(parentHeader.ShardID())
-	if parentCommittee == nil {
-		return nil, ctxerror.New("cannot find shard in the shard state",
-			"parentBlockNumber", parentHeader.Number(),
-			"shardID", parentHeader.ShardID(),
-		)
-	}
-	var committerKeys []*bls.PublicKey
-	for _, member := range parentCommittee.NodeList {
-		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", member.BlsPublicKey).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	return committerKeys, nil
+	return GetPublicKeys(bc, parentHeader)
 }
 
 // VerifySeal implements Engine, checking whether the given block's parent block satisfies
@@ -148,7 +125,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	parentQuorum, err := QuorumForBlock(parentHeader)
+	parentQuorum, err := QuorumForBlock(chain, parentHeader)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
@@ -181,8 +158,12 @@ func (e *engineImpl) Finalize(chain engine.ChainReader, header *block.Header, st
 }
 
 // QuorumForBlock returns the quorum for the given block header.
-func QuorumForBlock(h *block.Header) (quorum int, err error) {
-	ss := core.GetShardState(h.Epoch())
+func QuorumForBlock(chain engine.ChainReader, h *block.Header) (quorum int, err error) {
+	ss, err := chain.ReadShardState(h.Epoch())
+	if err != nil {
+		return 0, ctxerror.New("failed to read shard state of epoch",
+			"epoch", h.Epoch().Uint64())
+	}
 	c := ss.FindCommitteeByID(h.ShardID())
 	if c == nil {
 		return 0, errors.Errorf(
@@ -195,8 +176,8 @@ func QuorumForBlock(h *block.Header) (quorum int, err error) {
 // is used for verifying "incoming" block header against commit signature and bitmap sent from the other chain cross-shard via libp2p.
 // i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
 // for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.
-func (e *engineImpl) VerifyHeaderWithSignature(header *block.Header, commitSig []byte, commitBitmap []byte) error {
-	publicKeys, err := GetPublicKeys(header)
+func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte) error {
+	publicKeys, err := GetPublicKeys(chain, header)
 	if err != nil {
 		return ctxerror.New("[VerifyHeaderWithSignature] Cannot get publickeys for block header").WithCause(err)
 	}
@@ -208,7 +189,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(header *block.Header, commitSig [
 	}
 
 	hash := header.Hash()
-	quorum, err := QuorumForBlock(header)
+	quorum, err := QuorumForBlock(chain, header)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
@@ -229,8 +210,13 @@ func (e *engineImpl) VerifyHeaderWithSignature(header *block.Header, commitSig [
 }
 
 // GetPublicKeys finds the public keys of the committee that signed the block header
-func GetPublicKeys(header *block.Header) ([]*bls.PublicKey, error) {
-	shardState := core.GetShardState(header.Epoch())
+func GetPublicKeys(chain engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
+	shardState, err := chain.ReadShardState(header.Epoch())
+	if err != nil {
+		return nil, ctxerror.New("failed to read shard state of epoch",
+			"epoch", header.Epoch().Uint64())
+	}
+
 	committee := shardState.FindCommitteeByID(header.ShardID())
 	if committee == nil {
 		return nil, ctxerror.New("cannot find shard in the shard state",

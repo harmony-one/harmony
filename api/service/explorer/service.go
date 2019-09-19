@@ -641,7 +641,6 @@ func (s *ServiceAPI) GetExplorerCommittee(ctx context.Context, shardID uint32, e
 func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := r.FormValue("id")
-	key := GetAddressKey(id)
 	txViewParam := r.FormValue("tx_view")
 	pageParam := r.FormValue("page")
 	offsetParam := r.FormValue("offset")
@@ -698,17 +697,6 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	db := s.Storage.GetDB()
-	bytes, err := db.Get([]byte(key))
-	if err != nil {
-		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
-		return
-	}
-	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
-		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 	if balanceAddr.Cmp(big.NewInt(0)) != 0 {
 		data.Address.Balance = balanceAddr
 	}
@@ -766,17 +754,6 @@ func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, 
 		}
 	}
 
-	key := GetAddressKey(id)
-	db := s.Service.Storage.GetDB()
-	bytes, err := db.Get([]byte(key))
-	if err != nil {
-		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
-		return address, nil
-	}
-	if err = rlp.DecodeBytes(bytes, &address); err != nil {
-		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
-		return nil, err
-	}
 	if balanceAddr.Cmp(big.NewInt(0)) != 0 {
 		address.Balance = balanceAddr
 	}
