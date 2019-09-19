@@ -299,7 +299,7 @@ func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.State {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
-	return core.GetShardState(nextEpoch)
+	return core.CalculateShardState(nextEpoch)
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.

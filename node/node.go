@@ -458,10 +458,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	return &node
 }
 
-// GetInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
-func (node *Node) GetInitShardState() (err error) {
+// CalculateInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
+func (node *Node) CalculateInitShardState() (err error) {
 	if node.Consensus == nil {
-		return ctxerror.New("[GetInitShardState] consenus is nil; Cannot figure out shardID")
+		return ctxerror.New("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
 	}
 	shardID := node.Consensus.ShardID
 
@@ -473,11 +473,11 @@ func (node *Node) GetInitShardState() (err error) {
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
-		Msg("[GetInitShardState] Try To Get PublicKeys from database")
-	pubKeys := core.GetPublicKeys(epoch, shardID)
+		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
+	pubKeys := core.CalculatePublicKeys(epoch, shardID)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
-			"[GetInitShardState] PublicKeys is Empty, Cannot update public keys",
+			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",
 			"shardID", shardID,
 			"blockNum", blockNum)
 	}
@@ -487,7 +487,7 @@ func (node *Node) GetInitShardState() (err error) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
-				Msg("[GetInitShardState] Successfully updated public keys")
+				Msg("[CalculateInitShardState] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
 			node.Consensus.SetMode(consensus.Normal)
 			return nil
