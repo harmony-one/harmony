@@ -118,7 +118,8 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 
 		explorerTransaction := GetTransaction(tx, block)
 		storage.UpdateTXStorage(batch, explorerTransaction, tx)
-		storage.UpdateAddress(batch, explorerTransaction, tx)
+
+		//storage.UpdateAddress(batch, explorerTransaction, tx)
 	}
 	if err := batch.Write(); err != nil {
 		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
@@ -155,6 +156,7 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 }
 
 // UpdateAddress ...
+// TODO: deprecate this logic
 func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
 	storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
@@ -163,6 +165,7 @@ func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Tr
 }
 
 // UpdateAddressStorage updates specific addr Address.
+// TODO: deprecate this logic
 func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	key := GetAddressKey(addr)
 
