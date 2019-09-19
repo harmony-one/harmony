@@ -138,11 +138,7 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	// TODO: currently only get latest balance. Will add complete logic later.
 	addr := internal_common.ParseAddr(address)
-	balance, err := s.b.GetBalance(addr)
-	if err != nil {
-		return nil, err
-	}
-	return balance, nil
+	return s.b.GetBalance(addr)
 }
 
 // BlockNumber returns the block number of the chain head.
