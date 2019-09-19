@@ -74,11 +74,11 @@ func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (ma
 		validatorBalance := new(hexutil.Big)
 		validatorBalance, err = s.b.GetBalance(validator.EcdsaAddress)
 		if err != nil {
-			continue
+			return nil, err
 		}
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
-			continue
+			return nil, err
 		}
 		validatorsFields := map[string]interface{}{
 			"address": oneAddress,
@@ -138,7 +138,11 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	// TODO: currently only get latest balance. Will add complete logic later.
 	addr := internal_common.ParseAddr(address)
-	return s.b.GetBalance(addr)
+	balance, err := s.b.GetBalance(addr)
+	if err != nil {
+		return nil, err
+	}
+	return balance, nil
 }
 
 // BlockNumber returns the block number of the chain head.
