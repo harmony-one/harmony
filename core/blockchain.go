@@ -1907,7 +1907,7 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 	return header.Vrf()
 }
 
-// CalculateShardState returns the shard state for the given epoch,
+// GetShardState returns the shard state for the given epoch,
 // creating one if needed.
 func (bc *BlockChain) GetShardState(
 	epoch *big.Int,
