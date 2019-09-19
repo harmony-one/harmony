@@ -94,6 +94,8 @@ function build_only
    BUILTBY=${USER}@
    local build=$1
 
+   set -e
+
    for bin in "${!SRC[@]}"; do
       if [[ -z "$build" || "$bin" == "$build" ]]; then
          rm -f $BINDIR/$bin
