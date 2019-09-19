@@ -57,6 +57,9 @@ type Transaction struct {
 	Value     *big.Int `json:"value"`
 	Bytes     string   `json:"bytes"`
 	Data      string   `json:"data"`
+	GasFee    *big.Int `json:"gasFee"`
+	FromShard uint32   `json:"fromShard"`
+	ToShard   uint32   `json:"toShard"`
 	Type      string   `json:"type"`
 }
 
@@ -118,6 +121,8 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transacti
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
 	}
+	gasFee := big.NewInt(0)
+	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas()))
 	return &Transaction{
 		ID:        tx.Hash().Hex(),
 		Timestamp: strconv.Itoa(int(addressBlock.Time().Int64() * 1000)),
@@ -126,6 +131,9 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transacti
 		Value:     msg.Value(),
 		Bytes:     strconv.Itoa(int(tx.Size())),
 		Data:      hex.EncodeToString(tx.Data()),
+		GasFee:    gasFee,
+		FromShard: tx.ShardID(),
+		ToShard:   tx.ToShardID(),
 		Type:      "",
 	}
 }
