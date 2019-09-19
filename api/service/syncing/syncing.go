@@ -561,11 +561,6 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 		return false
 	}
-	ss.syncMux.Lock()
-	if err := worker.UpdateCurrent(block.Header().Coinbase()); err != nil {
-		utils.Logger().Warn().Err(err).Msg("[SYNC] (*Worker).UpdateCurrent failed")
-	}
-	ss.syncMux.Unlock()
 	utils.Logger().Info().
 		Uint64("blockHeight", bc.CurrentBlock().NumberU64()).
 		Str("blockHex", bc.CurrentBlock().Hash().Hex()).
@@ -740,7 +735,7 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool, isBeacon bool) {
+func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool) {
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
 // PublicHarmonyAPI provides an API to access Harmony related information.
@@ -40,4 +41,23 @@ func (s *PublicHarmonyAPI) Syncing() (interface{}, error) {
 func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) {
 	// TODO(ricl): add SuggestPrice API
 	return (*hexutil.Big)(big.NewInt(1)), nil
+}
+
+// NodeMetadata captures select metadata of the RPC answering node
+type NodeMetadata struct {
+	BLSPublicKey string `json:"blskey"`
+	Version      string `json:"version"`
+	NetworkType  string `json:"network"`
+	ChainID      string `json:"chainid"`
+}
+
+// GetNodeMetadata produces a NodeMetadata record. Note the data is from the answering RPC
+func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
+	cfg := nodeconfig.GetDefaultConfig()
+	return NodeMetadata{
+		cfg.ConsensusPubKey.SerializeToHexStr(),
+		nodeconfig.GetVersion(),
+		string(cfg.GetNetworkType()),
+		s.b.ChainConfig().ChainID.String(),
+	}
 }

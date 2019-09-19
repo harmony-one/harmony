@@ -10,6 +10,7 @@
 * [x] hmy_protocolVersion - check protocol version
 * [ ] net_version - get network id
 * [ ] net_peerCount - peer count
+* [x] hmy_getNodeMetadata - get node's version, bls key
 
 ### BlockChain info related
 * [ ] hmy_gasPrice - return min-gas-price
