@@ -34,6 +34,7 @@ func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) 
 	if err != nil {
 		return nil, err
 	}
+	profile = sec.Name() // sanitized name
 
 	if sec.HasKey("bootnode") {
 		config.Bootnodes = sec.Key("bootnode").ValueWithShadows()
@@ -44,7 +45,7 @@ func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) 
 		config.ChainID = sec.Key("chain_id").String()
 	} else {
 		// backward compatibility; use profile name to determine
-		switch strings.ToLower(strings.TrimSpace(profile)) {
+		switch profile {
 		case "main", "default":
 			config.ChainID = params.MainnetChainID.String()
 		case "pangaea":
