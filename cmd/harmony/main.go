@@ -124,6 +124,8 @@ var (
 	metricsFlag     = flag.Bool("metrics", false, "Collect and upload node metrics")
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
+
+	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
 )
 
 func initSetup() {
@@ -406,6 +408,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	nodeconfig.SetPublicRPC(*publicRPC)
 	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
 	if *versionFlag {
 		printVersion()
