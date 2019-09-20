@@ -45,6 +45,7 @@ var (
 	ForTest    = NewFactory(params.TestChainConfig)
 	ForTestnet = NewFactory(params.TestnetChainConfig)
 	ForMainnet = NewFactory(params.MainnetChainConfig)
+	ForPangaea = NewFactory(params.PangaeaChainConfig)
 )
 
 // NewTestHeader creates a new, empty header object for epoch 0 using the test

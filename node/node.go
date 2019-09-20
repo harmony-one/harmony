@@ -367,8 +367,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	}
 
 	chainConfig := *params.TestnetChainConfig
-	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+	switch node.NodeConfig.GetNetworkType() {
+	case nodeconfig.Mainnet:
 		chainConfig = *params.MainnetChainConfig
+	case nodeconfig.Pangaea:
+		chainConfig = *params.PangaeaChainConfig
 	}
 
 	collection := shardchain.NewCollection(

@@ -11,6 +11,7 @@ import (
 var (
 	MainnetChainID            = big.NewInt(1)
 	TestnetChainID            = big.NewInt(2)
+	PangaeaChainID            = big.NewInt(3)
 	TestChainID               = big.NewInt(99)  // not a real network
 	AllProtocolChangesChainID = big.NewInt(100) // not a real network
 )
@@ -34,6 +35,16 @@ var (
 		ChainID:        TestnetChainID,
 		CrossTxEpoch:   big.NewInt(1),
 		CrossLinkEpoch: big.NewInt(2),
+		EIP155Epoch:    big.NewInt(0),
+		S3Epoch:        big.NewInt(0),
+	}
+
+	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
+	// All features except for CrossLink are enabled at launch.
+	PangaeaChainConfig = &ChainConfig{
+		ChainID:        PangaeaChainID,
+		CrossTxEpoch:   big.NewInt(0),
+		CrossLinkEpoch: EpochTBD,
 		EIP155Epoch:    big.NewInt(0),
 		S3Epoch:        big.NewInt(0),
 	}

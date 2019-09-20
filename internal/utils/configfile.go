@@ -47,6 +47,8 @@ func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) 
 		switch strings.ToLower(strings.TrimSpace(profile)) {
 		case "main", "default":
 			config.ChainID = params.MainnetChainID.String()
+		case "pangaea":
+			config.ChainID = params.PangaeaChainID.String()
 		default:
 			config.ChainID = params.TestnetChainID.String()
 		}
