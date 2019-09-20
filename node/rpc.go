@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/harmony-one/harmony/hmy"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/hmyapi"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -57,12 +56,12 @@ func (node *Node) StartRPC(nodePort string) error {
 
 	port, _ := strconv.Atoi(nodePort)
 
-	httpEndpoint = fmt.Sprintf("%v:%v", nodeconfig.GetDefaultConfig().GetRPCIP(), port+rpcHTTPPortOffset)
+	httpEndpoint = fmt.Sprintf(":%v", port+rpcHTTPPortOffset)
 	if err := node.startHTTP(httpEndpoint, apis, httpModules, httpOrigins, httpVirtualHosts, httpTimeouts); err != nil {
 		return err
 	}
 
-	wsEndpoint = fmt.Sprintf("%v:%v", nodeconfig.GetDefaultConfig().GetRPCIP(), port+rpcWSPortOffset)
+	wsEndpoint = fmt.Sprintf(":%v", port+rpcWSPortOffset)
 	if err := node.startWS(wsEndpoint, apis, wsModules, wsOrigins, true); err != nil {
 		node.stopHTTP()
 		return err

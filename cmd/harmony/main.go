@@ -66,7 +66,6 @@ func printVersion() {
 
 var (
 	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
-	rcpIP            = flag.String("rpc_ip", "127.0.0.1", "listening ip of the node for rpc service")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	logMaxSize       = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
@@ -148,7 +147,6 @@ func initSetup() {
 	// Set port and ip to global config.
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
-	nodeconfig.GetDefaultConfig().SetRPCIP(*ip)
 
 	// Setup mem profiling.
 	memprofiling.GetMemProfiling().Config()
