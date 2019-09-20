@@ -6,7 +6,7 @@ export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
 
-.PHONY: all libs exe
+.PHONY: all libs exe test
 
 all: libs
 	./scripts/go_executable_build.sh
@@ -17,3 +17,6 @@ libs:
 
 exe:
 	./scripts/go_executable_build.sh
+
+test:
+	./test/debug.sh
