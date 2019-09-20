@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -12,6 +13,7 @@ func TestReadWalletProfile(t *testing.T) {
 	config := []*WalletProfile{
 		{
 			Profile:   "default",
+			ChainID:   params.MainnetChainID.String(),
 			Bootnodes: []string{"127.0.0.1:9000/abcd", "127.0.0.1:9999/daeg"},
 			Shards:    4,
 			RPCServer: [][]p2p.Peer{
@@ -59,6 +61,7 @@ func TestReadWalletProfile(t *testing.T) {
 		},
 		{
 			Profile:   "testnet",
+			ChainID:   params.TestnetChainID.String(),
 			Bootnodes: []string{"192.168.0.1:9990/abcd", "127.0.0.1:8888/daeg"},
 			Shards:    3,
 			RPCServer: [][]p2p.Peer{

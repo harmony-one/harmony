@@ -64,7 +64,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	// Initialize genesis block and blockchain
 
 	genesisAlloc := make(core.GenesisAlloc)
-	chainConfig := params.ChainConfig{}
+	chainConfig := *params.TestnetChainConfig
 
 	switch node.NodeConfig.GetNetworkType() {
 	case nodeconfig.Mainnet:
@@ -75,8 +75,10 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 			genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))
 			genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
 		}
+	case nodeconfig.Pangaea:
+		chainConfig = *params.PangaeaChainConfig
+		fallthrough // the rest is the same as testnet
 	default: // all other types share testnet config
-		chainConfig = *params.TestnetChainConfig
 		// Tests account for txgen to use
 		node.AddTestingAddresses(genesisAlloc, TestAccountNumber)
 

@@ -15,8 +15,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	color "github.com/fatih/color"
+	"github.com/fatih/color"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
@@ -29,7 +30,6 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
@@ -767,11 +767,12 @@ func processTransferCommand() {
 
 	fmt.Printf("Unlock account succeeded! '%v'\n", senderPass)
 
-	chainConfig := params.MainnetChainConfig
-	if walletProfile.Profile != defaultProfile {
-		chainConfig = params.TestnetChainConfig
+	chainID, ok := new(big.Int).SetString(walletProfile.ChainID, 0)
+	if !ok {
+		fmt.Printf("invalid chain ID %#v in config", walletProfile.ChainID)
+		return
 	}
-	tx, err = ks.SignTx(account, tx, chainConfig.ChainID)
+	tx, err = ks.SignTx(account, tx, chainID)
 	if err != nil {
 		fmt.Printf("SignTx Error: %v\n", err)
 		return
