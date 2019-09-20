@@ -7,10 +7,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// Well-known chain IDs.
+var (
+	MainnetChainID            = big.NewInt(1)
+	TestnetChainID            = big.NewInt(2)
+	TestChainID               = big.NewInt(99)  // not a real network
+	AllProtocolChangesChainID = big.NewInt(100) // not a real network
+)
+
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:        big.NewInt(1),
+		ChainID:        MainnetChainID,
 		CrossTxEpoch:   big.NewInt(28),
 		CrossLinkEpoch: big.NewInt(10000000), // Temporarily made very large until a exact number is decided.
 		EIP155Epoch:    big.NewInt(28),
@@ -19,7 +27,7 @@ var (
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:        big.NewInt(2),
+		ChainID:        TestnetChainID,
 		CrossTxEpoch:   big.NewInt(1),
 		CrossLinkEpoch: big.NewInt(2),
 		EIP155Epoch:    big.NewInt(0),
@@ -30,22 +38,22 @@ var (
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	AllProtocolChanges = &ChainConfig{
-		big.NewInt(100), // ChainID
-		big.NewInt(0),   // CrossTxEpoch
-		big.NewInt(0),   // CrossLinkEpoch
-		big.NewInt(0),   // EIP155Epoch
-		big.NewInt(0),   // S3Epoch
+		AllProtocolChangesChainID, // ChainID
+		big.NewInt(0),             // CrossTxEpoch
+		big.NewInt(0),             // CrossLinkEpoch
+		big.NewInt(0),             // EIP155Epoch
+		big.NewInt(0),             // S3Epoch
 	}
 
 	// TestChainConfig ...
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	TestChainConfig = &ChainConfig{
-		big.NewInt(99), // ChainID
-		big.NewInt(0),  // CrossTxEpoch
-		big.NewInt(0),  // CrossLinkEpoch
-		big.NewInt(0),  // EIP155Epoch
-		big.NewInt(0),  // S3Epoch
+		TestChainID,   // ChainID
+		big.NewInt(0), // CrossTxEpoch
+		big.NewInt(0), // CrossLinkEpoch
+		big.NewInt(0), // EIP155Epoch
+		big.NewInt(0), // S3Epoch
 	}
 
 	// TestRules ...
