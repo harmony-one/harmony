@@ -1076,21 +1076,22 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
 
 	epoch := block.Header().Epoch()
-	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
-	shardNum := int(shardingConfig.NumShards())
-	for i := 0; i < shardNum; i++ {
-		if i == int(block.ShardID()) {
-			continue
+	if bc.chainConfig.IsCrossTx(block.Epoch()) {
+		shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+		shardNum := int(shardingConfig.NumShards())
+		for i := 0; i < shardNum; i++ {
+			if i == int(block.ShardID()) {
+				continue
+			}
+			shardReceipts := GetToShardReceipts(cxReceipts, uint32(i))
+			err := rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts, false)
+			if err != nil {
+				utils.Logger().Debug().Err(err).Interface("shardReceipts", shardReceipts).Int("toShardID", i).Msg("WriteCXReceipts cannot write into database")
+			}
 		}
-		shardReceipts := GetToShardReceipts(cxReceipts, uint32(i))
-		err := rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts, false)
-		if err != nil {
-			utils.Logger().Debug().Err(err).Interface("shardReceipts", shardReceipts).Int("toShardID", i).Msg("WriteCXReceipts cannot write into database")
-		}
+		// Mark incomingReceipts in the block as spent
+		bc.WriteCXReceiptsProofSpent(block.IncomingReceipts())
 	}
-
-	// Mark incomingReceipts in the block as spent
-	bc.WriteCXReceiptsProofSpent(block.IncomingReceipts())
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
@@ -1107,6 +1108,9 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		// Write the positional metadata for transaction/receipt lookups and preimages
 		rawdb.WriteTxLookupEntries(batch, block)
 		rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages())
+
+		// write the positional metadata for CXReceipts lookups
+		rawdb.WriteCxLookupEntries(batch, block)
 
 		status = CanonStatTy
 	} else {
@@ -2236,4 +2240,11 @@ func (bc *BlockChain) UpdateCXReceiptsCheckpointsByBlock(block *types.Block) {
 		utils.Logger().Debug().Uint32("shardID", k).Uint64("blockNum", v).Msg("[CleanCXReceiptsCheckpoints] Cleaning CXReceiptsProof upto")
 		bc.updateCXReceiptsCheckpoints(k, v)
 	}
+}
+
+// ReadTxLookupEntry returns where the given transaction resides in the chain,
+// as a (block hash, block number, index in transaction list) triple.
+// returns 0, 0 if not found
+func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64) {
+	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }

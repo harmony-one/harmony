@@ -7,21 +7,44 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// Well-known chain IDs.
+var (
+	MainnetChainID            = big.NewInt(1)
+	TestnetChainID            = big.NewInt(2)
+	PangaeaChainID            = big.NewInt(3)
+	TestChainID               = big.NewInt(99)  // not a real network
+	AllProtocolChangesChainID = big.NewInt(100) // not a real network
+)
+
+// EpochTBD is a large, “not anytime soon” epoch.  It used as a placeholder
+// until the exact epoch is decided.
+var EpochTBD = big.NewInt(10000000)
+
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:        big.NewInt(1),
+		ChainID:        MainnetChainID,
 		CrossTxEpoch:   big.NewInt(28),
-		CrossLinkEpoch: big.NewInt(10000000), // Temporarily made very large until a exact number is decided.
+		CrossLinkEpoch: EpochTBD,
 		EIP155Epoch:    big.NewInt(28),
 		S3Epoch:        big.NewInt(28),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:        big.NewInt(2),
+		ChainID:        TestnetChainID,
 		CrossTxEpoch:   big.NewInt(1),
 		CrossLinkEpoch: big.NewInt(2),
+		EIP155Epoch:    big.NewInt(0),
+		S3Epoch:        big.NewInt(0),
+	}
+
+	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
+	// All features except for CrossLink are enabled at launch.
+	PangaeaChainConfig = &ChainConfig{
+		ChainID:        PangaeaChainID,
+		CrossTxEpoch:   big.NewInt(0),
+		CrossLinkEpoch: EpochTBD,
 		EIP155Epoch:    big.NewInt(0),
 		S3Epoch:        big.NewInt(0),
 	}
@@ -30,22 +53,22 @@ var (
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	AllProtocolChanges = &ChainConfig{
-		big.NewInt(100), // ChainID
-		big.NewInt(0),   // CrossTxEpoch
-		big.NewInt(0),   // CrossLinkEpoch
-		big.NewInt(0),   // EIP155Epoch
-		big.NewInt(0),   // S3Epoch
+		AllProtocolChangesChainID, // ChainID
+		big.NewInt(0),             // CrossTxEpoch
+		big.NewInt(0),             // CrossLinkEpoch
+		big.NewInt(0),             // EIP155Epoch
+		big.NewInt(0),             // S3Epoch
 	}
 
 	// TestChainConfig ...
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	TestChainConfig = &ChainConfig{
-		big.NewInt(99), // ChainID
-		big.NewInt(0),  // CrossTxEpoch
-		big.NewInt(0),  // CrossLinkEpoch
-		big.NewInt(0),  // EIP155Epoch
-		big.NewInt(0),  // S3Epoch
+		TestChainID,   // ChainID
+		big.NewInt(0), // CrossTxEpoch
+		big.NewInt(0), // CrossLinkEpoch
+		big.NewInt(0), // EIP155Epoch
+		big.NewInt(0), // S3Epoch
 	}
 
 	// TestRules ...

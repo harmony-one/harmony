@@ -165,9 +165,7 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 						Msg("block sync")
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
-					role := node.NodeConfig.Role()
-					if role == nodeconfig.Validator {
-
+					if node.Blockchain().ShardID() != 0 {
 						for _, block := range blocks {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
@@ -368,6 +366,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 
 	// Update last consensus time for metrics
 	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
+	// TODO: refactor the asynchronous calls to separate go routine.
 	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		if node.NodeConfig.ShardID == 0 {
@@ -391,6 +390,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 		}
 	}
+
+	// Broadcast client requested missing cross shard receipts if there is any
+	node.BroadcastMissingCXReceipts()
 
 	// TODO chao: uncomment this after beacon syncing is stable
 	// node.Blockchain().UpdateCXReceiptsCheckpointsByBlock(newBlock)
@@ -439,7 +441,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		//			ctxerror.Log15(utils.Logger().Error, e)
 		//		}
 		//	}
-		//	shardState, err := newBlockHeader.GetShardState()
+		//	shardState, err := newBlockHeader.CalculateShardState()
 		//	if err != nil {
 		//		e := ctxerror.New("cannot get shard state from header").WithCause(err)
 		//		ctxerror.Log15(utils.Logger().Error, e)
@@ -482,7 +484,7 @@ var (
 )
 
 func initGenesisCatalog() {
-	genesisShardState := core.GetInitShardState()
+	genesisShardState := core.CalculateInitShardState()
 	for _, committee := range genesisShardState {
 		for i, nodeID := range committee.NodeList {
 			genesisNode := &genesisNode{

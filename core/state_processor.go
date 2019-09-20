@@ -103,8 +103,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 }
 
 // return true if it is valid
-func getTransactionType(header *block.Header, tx *types.Transaction) types.TransactionType {
-	if tx.ShardID() == tx.ToShardID() && header.ShardID() == tx.ShardID() {
+func getTransactionType(config *params.ChainConfig, header *block.Header, tx *types.Transaction) types.TransactionType {
+	if header.ShardID() == tx.ShardID() && (!config.IsCrossTx(header.Epoch()) || tx.ShardID() == tx.ToShardID()) {
 		return types.SameShardTx
 	}
 	numShards := ShardingSchedule.InstanceForEpoch(header.Epoch()).NumShards()
@@ -120,7 +120,7 @@ func getTransactionType(header *block.Header, tx *types.Transaction) types.Trans
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
 func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
-	txType := getTransactionType(header, tx)
+	txType := getTransactionType(config, header, tx)
 	if txType == types.InvalidTx {
 		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
 	}

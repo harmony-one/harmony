@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 unset -v progname
 progname="${0##*/}"
@@ -101,10 +101,15 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -s             run setup env only (must run as root)
    -S             run the ${progname} as non-root user (default: run as root)
    -p passfile    use the given BLS passphrase file
+   -d             just download the Harmony binaries (default: off)
    -D             do not download Harmony binaries (default: download when start)
    -m             collect and upload node metrics to harmony prometheus + grafana
    -N network     join the given network (main, beta, pangaea; default: main)
    -t             equivalent to -N pangaea (deprecated)
+   -T nodetype    specify the node type (validator, explorer; default: validator)
+   -i shardid     specify the shard id (valid only with explorer node; default: 1)
+   -b             download harmony_db files from shard specified by -i <shardid> (default: off)
+   -a dbfile      specify the db file to download (default:off)
 
 example:
 
@@ -119,22 +124,31 @@ usage() {
    exit 64  # EX_USAGE
 }
 
-unset start_clean loop run_as_root blspass do_not_download metrics network
+# =======
+BUCKET=pub.harmony.one
+OS=$(uname -s)
+
+unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
 start_clean=false
 loop=true
 run_as_root=true
 do_not_download=false
+download_only=false
 metrics=false
 network=main
+node_type=validator
+shard_id=1
+download_harmony_db=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:DmN:t opt
+while getopts :1chk:sSp:dDmN:tT:i:ba: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
+   b) download_harmony_db=true;;
    c) start_clean=true;;
    1) loop=false;;
    h) print_usage; exit 0;;
@@ -142,16 +156,26 @@ do
    s) setup_env; exit 0;;
    S) run_as_root=false ;;
    p) blspass="${OPTARG}";;
+   d) download_only=true;;
    D) do_not_download=true;;
    m) metrics=true;;
    N) network="${OPTARG}";;
    t) network=pangaea;;
+   T) node_type="${OPTARG}";;
+   i) shard_id="${OPTARG}";;
+   a) db_file_to_dl="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
 shift $((${OPTIND} - 1))
 
 unset -v bootnodes REL network_type dns_zone
+
+case "${node_type}" in
+validator|explorer) ;;
+*)
+   usage ;;
+esac
 
 case "${network}" in
 main)
@@ -177,12 +201,12 @@ beta)
   ;;
 pangaea)
   bootnodes=(
-    /ip4/54.86.126.90/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/52.40.84.2/tcp/9867/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
+    /ip4/54.86.126.90/tcp/9889/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/52.40.84.2/tcp/9889/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
   )
-  REL=master
+  REL=pangaea
   network_type=pangaea
-  dns_zone=n.hmny.io
+  dns_zone=p.hmny.io
   ;;
 *)
   err 64 "${network}: invalid network"
@@ -194,6 +218,165 @@ case $# in
    usage "extra arguments at the end ($*)"
    ;;
 esac
+
+if [ "$OS" == "Darwin" ]; then
+   FOLDER=release/darwin-x86_64/$REL/
+   BIN=( harmony libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib md5sum.txt )
+fi
+if [ "$OS" == "Linux" ]; then
+   FOLDER=release/linux-x86_64/$REL/
+   BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
+fi
+
+extract_checksum() {
+   awk -v basename="${1}" '
+      {
+         s = $0;
+      }
+      # strip hash and following space; skip line if unsuccessful
+      sub(/^[0-9a-f]+ /, "", s) == 0 { next; }
+      # save hash
+      { hash = substr($0, 1, length($0) - length(s) - 1); }
+      # strip executable indicator (space or asterisk); skip line if unsuccessful
+      sub(/^[* ]/, "", s) == 0 { next; }
+      # leave basename only
+      { sub(/^.*\//, "", s); }
+      # if basename matches, print the hash and basename
+      s == basename { printf "%s  %s\n", hash, basename; }
+   '
+}
+
+verify_checksum() {
+   local dir file checksum_file checksum_for_file
+   dir="${1}"
+   file="${2}"
+   checksum_file="${3}"
+   [ -f "${dir}/${checksum_file}" ] || return 0
+   checksum_for_file="${dir}/${checksum_file}::${file}"
+   extract_checksum "${file}" < "${dir}/${checksum_file}" > "${checksum_for_file}"
+   [ -s "${dir}/${checksum_for_file}" ] || return 0
+   if ! (cd "${dir}" && exec md5sum -c --status "${checksum_for_file}")
+   then
+      msg "checksum FAILED for ${file}"
+      return 1
+   fi
+   return 0
+}
+
+download_binaries() {
+   local outdir
+   ${do_not_download} && return 0
+   outdir="${1:-.}"
+   mkdir -p "${outdir}"
+   for bin in "${BIN[@]}"; do
+      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
+      verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
+      msg "downloaded ${bin}"
+   done
+   chmod +x "${outdir}/harmony"
+   (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
+}
+
+check_free_disk() {
+   local dir
+   dir="${1:-.}"
+   local free_disk=$(df -BG $dir | tail -n 1 | awk ' { print $4 } ' | tr -d G)
+   # need at least 50G free disk space
+   local need_disk=50
+
+   if [ $free_disk -gt $need_disk ]; then
+      return 0
+   else
+      return 1
+   fi
+}
+
+_curl_check_exist() {
+   local url=$1
+   local statuscode=$(curl -I --silent --output /dev/null --write-out "%{http_code}" $url)
+   if [ $statuscode -ne 200 ]; then
+      return 1
+   else
+      return 0
+   fi
+}
+
+_curl_download() {
+   local url=$1
+   local outdir=$2
+   local filename=$3
+
+   mkdir -p "${outdir}"
+   if _curl_check_exist $url; then
+      curl --progress-bar -Sf $url -o "${outdir}/$filename" || return $?
+      return 0
+   else
+      msg "failed to find/download $url"
+      return 1
+   fi
+}
+
+download_harmony_db_file() {
+   local shard_id
+   shard_id="${1}"
+   local file_to_dl="${2}"
+   local outdir=db
+   if ! check_free_disk; then
+      err 70 "do not have enough free disk space to download db tarball"
+   fi
+
+   url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/md5sum.txt"
+   rm -f "${outdir}/md5sum.txt"
+   if ! _curl_download $url "${outdir}" md5sum.txt; then
+      err 70 "cannot download md5sum.txt"
+   fi
+
+   if [ -n "${file_to_dl}" ]; then
+      if grep -q "${file_to_dl}" "${outdir}/md5sum.txt"; then
+         url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/${file_to_dl}"
+         if _curl_download $url "${outdir}" ${file_to_dl}; then
+            verify_checksum "${outdir}" "${file_to_dl}" md5sum.txt || return $?
+            msg "downlaoded ${file_to_dl}, extracting ..."
+            tar -C "${outdir}" -xvf "${outdir}/${file_to_dl}"
+         else
+            msg "can't download ${file_to_dl}"
+         fi
+      fi
+      return
+   fi
+
+   files=$(awk '{ print $2 }' ${outdir}/md5sum.txt)
+   echo "[available harmony db files for shard ${shard_id}]"
+   grep -oE harmony_db_${shard_id}-.*.tar "${outdir}/md5sum.txt"
+   echo
+   for file in $files; do
+      if [[ $file =~ "harmony_db_${shard_id}" ]]; then
+         echo -n "Do you want to download ${file} (choose one only) [y/n]?"
+         read yesno
+         if [[ "$yesno" = "y" || "$yesno" = "Y" ]]; then
+            url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/$file"
+            if _curl_download $url "${outdir}" $file; then
+               verify_checksum "${outdir}" "${file}" md5sum.txt || return $?
+               msg "downlaoded $file, extracting ..."
+               tar -C "${outdir}" -xvf "${outdir}/${file}"
+            else
+               msg "can't download $file"
+            fi
+            break
+         fi
+      fi
+   done
+}
+
+if ${download_only}; then
+   download_binaries || err 69 "download node software failed"
+   exit 0
+fi
+
+if ${download_harmony_db}; then
+   download_harmony_db_file "${shard_id}" "${db_file_to_dl}" || err 70 "download harmony_db file failed"
+   exit 0
+fi
 
 if ${run_as_root}; then
    check_root
@@ -229,18 +412,6 @@ case "${BLSKEYFILE}" in
    ;;
 esac
 
-BUCKET=pub.harmony.one
-OS=$(uname -s)
-
-if [ "$OS" == "Darwin" ]; then
-   FOLDER=release/darwin-x86_64/$REL/
-   BIN=( harmony libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib md5sum.txt )
-fi
-if [ "$OS" == "Linux" ]; then
-   FOLDER=release/linux-x86_64/$REL/
-   BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
-fi
-
 any_new_binaries() {
    local outdir
    ${do_not_download} && return 0
@@ -254,56 +425,6 @@ any_new_binaries() {
       mv "${outdir}/md5sum.txt.new" "${outdir}/md5sum.txt"
       return 1
    fi
-}
-
-extract_checksum() {
-   awk -v basename="${1}" '
-      {
-         s = $0;
-      }
-      # strip hash and following space; skip line if unsuccessful
-      sub(/^[0-9a-f]+ /, "", s) == 0 { next; }
-      # save hash
-      { hash = substr($0, 1, length($0) - length(s) - 1); }
-      # strip executable indicator (space or asterisk); skip line if unsuccessful
-      sub(/^[* ]/, "", s) == 0 { next; }
-      # leave basename only
-      { sub(/^.*\//, "", s); }
-      # if basename matches, print the hash and basename
-      s == basename { printf "%s  %s\n", hash, basename; }
-   '
-}
-
-verify_checksum() {
-   local dir file checksum_file checksum_for_file
-   dir="${1}"
-   file="${2}"
-   checksum_file="${3}"
-   [ -f "${dir}/${checksum_file}" ] || return 0
-   checksum_for_file="${dir}/${checksum_file}::${file}"
-   extract_checksum "${file}" < "${dir}/${checksum_file}" > "${dir}/${checksum_for_file}"
-   [ -s "${dir}/${checksum_for_file}" ] || return 0
-   if ! (cd "${dir}" && exec md5sum -c --status "${checksum_for_file}")
-   then
-      msg "checksum FAILED for ${file}"
-      return 1
-   fi
-   return 0
-}
-
-
-download_binaries() {
-   local outdir
-   ${do_not_download} && return 0
-   outdir="${1:-.}"
-   mkdir -p "${outdir}"
-   for bin in "${BIN[@]}"; do
-      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
-      verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
-      msg "downloaded ${bin}"
-   done
-   chmod +x "${outdir}/harmony"
-   (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
 }
 
 if any_new_binaries
@@ -471,11 +592,19 @@ do
       -bootnodes "${BN_MA}"
       -ip "${PUB_IP}"
       -port "${NODE_PORT}"
-      -is_genesis
       -blskey_file "${BLSKEYFILE}"
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
    )
+# backward compatible with older harmony node software
+   case "${node_type}" in
+   explorer)
+      args+=(
+      -node_type="${node_type}"
+      -shard_id="${shard_id}"
+      )
+      ;;
+   esac
    case "${metrics}" in
    true)
       args+=(

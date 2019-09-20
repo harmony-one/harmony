@@ -61,7 +61,7 @@ set_download () {
       REL=testnet
       ;;
    pangaea)
-      REL=master
+      REL=pangaea
       ;;
    *)
       err 64 "${network}: invalid network"

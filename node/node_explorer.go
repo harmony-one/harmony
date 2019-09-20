@@ -72,7 +72,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
-		node.AddNewBlockForExplorer()
+		node.AddNewBlockForExplorer(block)
 		node.commitBlockForExplorer(block)
 	} else if msg.Type == msg_pb.MessageType_PREPARED {
 
@@ -91,7 +91,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		msgs := node.Consensus.PbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_COMMITTED, blockObj.NumberU64(), blockObj.Hash())
 		// If found, then add the new block into blockchain db.
 		if len(msgs) > 0 {
-			node.AddNewBlockForExplorer()
+			node.AddNewBlockForExplorer(blockObj)
 			node.commitBlockForExplorer(blockObj)
 		}
 	}
@@ -99,38 +99,29 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 }
 
 // AddNewBlockForExplorer add new block for explorer.
-func (node *Node) AddNewBlockForExplorer() {
-	utils.Logger().Debug().Msg("[Explorer] Add new block for explorer")
-	// Search for the next block in PbftLog and commit the block into blockchain for explorer node.
-	for {
-		blocks := node.Consensus.PbftLog.GetBlocksByNumber(node.Blockchain().CurrentBlock().NumberU64() + 1)
-		if len(blocks) == 0 {
-			break
-		} else {
-			if len(blocks) > 1 {
-				utils.Logger().Error().Msg("[Explorer] We should have not received more than one block with the same block height.")
-			}
-			utils.Logger().Debug().Uint64("blockHeight", blocks[0].NumberU64()).Msg("Adding new block for explorer node")
-			if err := node.AddNewBlock(blocks[0]); err == nil {
-				// Clean up the blocks to avoid OOM.
-				node.Consensus.PbftLog.DeleteBlockByNumber(blocks[0].NumberU64())
-				// Do dump all blocks from state syncing for explorer one time
-				// TODO: some blocks can be dumped before state syncing finished.
-				// And they would be dumped again here. Please fix it.
-				once.Do(func() {
-					utils.Logger().Info().Int64("starting height", int64(blocks[0].NumberU64())-1).
-						Msg("[Explorer] Populating explorer data from state synced blocks")
-					go func() {
-						for blockHeight := int64(blocks[0].NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-							explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(
-								node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
-						}
-					}()
-				})
-			} else {
-				utils.Logger().Error().Err(err).Msg("[Explorer] Error when adding new block for explorer node")
-			}
+func (node *Node) AddNewBlockForExplorer(block *types.Block) {
+	utils.Logger().Debug().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
+	if err := node.AddNewBlock(block); err == nil {
+		if core.IsEpochLastBlock(block) {
+			node.Consensus.UpdateConsensusInformation()
 		}
+		// Clean up the blocks to avoid OOM.
+		node.Consensus.PbftLog.DeleteBlockByNumber(block.NumberU64())
+		// Do dump all blocks from state syncing for explorer one time
+		// TODO: some blocks can be dumped before state syncing finished.
+		// And they would be dumped again here. Please fix it.
+		once.Do(func() {
+			utils.Logger().Info().Int64("starting height", int64(block.NumberU64())-1).
+				Msg("[Explorer] Populating explorer data from state synced blocks")
+			go func() {
+				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
+					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(
+						node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
+				}
+			}()
+		})
+	} else {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Error when adding new block for explorer node")
 	}
 }
 

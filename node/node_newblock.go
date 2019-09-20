@@ -131,7 +131,7 @@ func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) shard.S
 	}
 
 	nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
-	return core.GetShardState(nextEpoch)
+	return core.CalculateShardState(nextEpoch)
 }
 
 func (node *Node) proposeShardState(block *types.Block) error {
@@ -193,6 +193,10 @@ func (node *Node) proposeLocalShardState(block *types.Block) {
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
+	if !node.Blockchain().Config().IsCrossTx(node.Worker.GetNewEpoch()) {
+		return []*types.CXReceiptsProof{}
+	}
+
 	numProposed := 0
 	validReceiptsList := []*types.CXReceiptsProof{}
 	pendingReceiptsList := []*types.CXReceiptsProof{}

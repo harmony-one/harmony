@@ -120,6 +120,8 @@ type Node struct {
 
 	TxPool *core.TxPool // TODO migrate to TxPool from pendingTransactions list below
 
+	CxPool *core.CxPool // pool for missing cross shard receipts resend
+
 	pendingTransactions types.Transactions // All the transactions received but not yet processed for Consensus
 	pendingTxMutex      sync.Mutex
 	recentTxsStats      types.RecentTxsStats
@@ -288,12 +290,10 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 
 // AddPendingReceipts adds one receipt message to pending list.
 func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
-	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		node.pendingCXMutex.Lock()
-		node.pendingCXReceipts = append(node.pendingCXReceipts, receipts)
-		node.pendingCXMutex.Unlock()
-		utils.Logger().Error().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
-	}
+	node.pendingCXMutex.Lock()
+	node.pendingCXReceipts = append(node.pendingCXReceipts, receipts)
+	node.pendingCXMutex.Unlock()
+	utils.Logger().Error().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
 }
 
 // Take out a subset of valid transactions from the pending transaction list
@@ -367,8 +367,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	}
 
 	chainConfig := *params.TestnetChainConfig
-	if node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+	switch node.NodeConfig.GetNetworkType() {
+	case nodeconfig.Mainnet:
 		chainConfig = *params.MainnetChainConfig
+	case nodeconfig.Pangaea:
+		chainConfig = *params.PangaeaChainConfig
 	}
 
 	collection := shardchain.NewCollection(
@@ -391,9 +394,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.BeaconBlockChannel = make(chan *types.Block)
 		node.recentTxsStats = make(types.RecentTxsStats)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
-		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine, node.Consensus.ShardID)
+		node.CxPool = core.NewCxPool(core.CxPoolSize)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 		if node.Blockchain().ShardID() != 0 {
-			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine, node.Consensus.ShardID)
+			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
 		}
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
@@ -457,10 +461,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	return &node
 }
 
-// GetInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
-func (node *Node) GetInitShardState() (err error) {
+// CalculateInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
+func (node *Node) CalculateInitShardState() (err error) {
 	if node.Consensus == nil {
-		return ctxerror.New("[GetInitShardState] consenus is nil; Cannot figure out shardID")
+		return ctxerror.New("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
 	}
 	shardID := node.Consensus.ShardID
 
@@ -472,11 +476,11 @@ func (node *Node) GetInitShardState() (err error) {
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
-		Msg("[GetInitShardState] Try To Get PublicKeys from database")
-	pubKeys := core.GetPublicKeys(epoch, shardID)
+		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
+	pubKeys := core.CalculatePublicKeys(epoch, shardID)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
-			"[GetInitShardState] PublicKeys is Empty, Cannot update public keys",
+			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",
 			"shardID", shardID,
 			"blockNum", blockNum)
 	}
@@ -486,7 +490,7 @@ func (node *Node) GetInitShardState() (err error) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
-				Msg("[GetInitShardState] Successfully updated public keys")
+				Msg("[CalculateInitShardState] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
 			node.Consensus.SetMode(consensus.Normal)
 			return nil
@@ -565,4 +569,9 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 // AccountManager ...
 func (node *Node) AccountManager() *accounts.Manager {
 	return node.accountManager
+}
+
+// ServiceManager ...
+func (node *Node) ServiceManager() *service.Manager {
+	return node.serviceManager
 }

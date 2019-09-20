@@ -2,6 +2,7 @@ package main
 
 const (
 	defaultWalletIni = `[main]
+chain_id = 1
 bootnode = /ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
 bootnode = /ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
 bootnode = /ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
@@ -25,6 +26,7 @@ rpc = l3.t.hmny.io:14555
 rpc = s3.t.hmny.io:14555
 
 [local]
+chain_id = 2
 bootnode = /ip4/127.0.0.1/tcp/19876/p2p/Qmc1V6W7BwX8Ugb42Ti8RnXF1rY5PF7nnZ6bKBryCgi6cv
 shards = 2
 
@@ -39,6 +41,7 @@ rpc = 127.0.0.1:14558
 rpc = 127.0.0.1:14560
 
 [beta]
+chain_id = 2
 bootnode = /ip4/54.213.43.194/tcp/9868/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
 bootnode = /ip4/100.26.90.187/tcp/9868/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
 bootnode = /ip4/13.113.101.219/tcp/12018/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
@@ -53,24 +56,25 @@ rpc = l1.b.hmny.io:14555
 rpc = s1.b.hmny.io:14555
 
 [pangaea]
-bootnode = /ip4/54.86.126.90/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-bootnode = /ip4/52.40.84.2/tcp/9867/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
+chain_id = 3
+bootnode = /ip4/54.86.126.90/tcp/9889/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+bootnode = /ip4/52.40.84.2/tcp/9889/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
 shards = 4
 
 [pangaea.shard0.rpc]
-rpc = l0.n.hmny.io:14555
-rpc = s0.n.hmny.io:14555
+rpc = l0.p.hmny.io:14555
+rpc = s0.p.hmny.io:14555
 
 [pangaea.shard1.rpc]
-rpc = l1.n.hmny.io:14555
-rpc = s1.n.hmny.io:14555
+rpc = l1.p.hmny.io:14555
+rpc = s1.p.hmny.io:14555
 
 [pangaea.shard2.rpc]
-rpc = l2.n.hmny.io:14555
-rpc = s2.n.hmny.io:14555
+rpc = l2.p.hmny.io:14555
+rpc = s2.p.hmny.io:14555
 
 [pangaea.shard3.rpc]
-rpc = l3.n.hmny.io:14555
-rpc = s3.n.hmny.io:14555
+rpc = l3.p.hmny.io:14555
+rpc = s3.p.hmny.io:14555
 `
 )

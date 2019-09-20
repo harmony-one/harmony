@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Backend interface provides the common API services (that are provided by
@@ -63,7 +64,12 @@ type Backend interface {
 	CurrentBlock() *types.Block
 	// Get balance
 	GetBalance(address common.Address) (*hexutil.Big, error)
+	// Get committee for a particular epoch
+	GetCommittee(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
+
+	// retrieve the blockHash using txID and add blockHash to CxPool for resending
+	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 }
 
 // GetAPIs returns all the APIs.

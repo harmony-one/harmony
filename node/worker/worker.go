@@ -50,8 +50,6 @@ type Worker struct {
 
 	gasFloor uint64
 	gasCeil  uint64
-
-	shardID uint32
 }
 
 // Returns a tuple where the first value is the txs sender account address,
@@ -114,7 +112,7 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
 	for _, tx := range txs {
-		if tx.ShardID() != w.shardID {
+		if tx.ShardID() != w.chain.ShardID() {
 			invalid = append(invalid, tx)
 			continue
 		}
@@ -234,14 +232,8 @@ func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 	parent := w.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
-	// New block's epoch is the same as parent's...
-	epoch := new(big.Int).Set(parent.Header().Epoch())
 
-	// TODO: Don't depend on sharding state for epoch change.
-	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
-		// ... except if parent has a resharding assignment it increases by 1.
-		epoch = epoch.Add(epoch, common.Big1)
-	}
+	epoch := w.GetNewEpoch()
 	header := w.factory.NewHeader(epoch).With().
 		ParentHash(parent.Hash()).
 		Number(num.Add(num, common.Big1)).
@@ -273,6 +265,19 @@ func (w *Worker) GetCurrentState() *state.DB {
 	return w.current.state
 }
 
+// GetNewEpoch gets the current epoch.
+func (w *Worker) GetNewEpoch() *big.Int {
+	parent := w.chain.CurrentBlock()
+	epoch := new(big.Int).Set(parent.Header().Epoch())
+
+	// TODO: Don't depend on sharding state for epoch change.
+	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
+		// ... except if parent has a resharding assignment it increases by 1.
+		epoch = epoch.Add(epoch, common.Big1)
+	}
+	return epoch
+}
+
 // GetCurrentReceipts get the receipts generated starting from the last state.
 func (w *Worker) GetCurrentReceipts() []*types.Receipt {
 	return w.current.receipts
@@ -294,7 +299,7 @@ func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.State {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
-	return core.GetShardState(nextEpoch)
+	return core.CalculateShardState(nextEpoch)
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
@@ -346,7 +351,7 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 }
 
 // New create a new worker object.
-func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine, shardID uint32) *Worker {
+func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine) *Worker {
 	worker := &Worker{
 		config:  config,
 		factory: blockfactory.NewFactory(config),
@@ -355,19 +360,12 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 	}
 	worker.gasFloor = 500000000000000000
 	worker.gasCeil = 1000000000000000000
-	worker.shardID = shardID
 
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
-	// New block's epoch is the same as parent's...
-	epoch := parent.Header().Epoch()
 
-	// TODO: Don't depend on sharding state for epoch change.
-	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
-		// ... except if parent has a resharding assignment it increases by 1.
-		epoch = epoch.Add(epoch, common.Big1)
-	}
+	epoch := worker.GetNewEpoch()
 	header := worker.factory.NewHeader(epoch).With().
 		ParentHash(parent.Hash()).
 		Number(num.Add(num, common.Big1)).
