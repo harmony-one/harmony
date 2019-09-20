@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"strings"
 
+	"gopkg.in/ini.v1"
+
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/p2p"
-	ini "gopkg.in/ini.v1"
 )
 
 // WalletProfile contains a section and key value pair map
 type WalletProfile struct {
 	Profile   string
+	ChainID   string
 	Bootnodes []string
 	Shards    int
 	RPCServer [][]p2p.Peer
@@ -36,6 +39,17 @@ func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) 
 		config.Bootnodes = sec.Key("bootnode").ValueWithShadows()
 	} else {
 		return nil, fmt.Errorf("can't find bootnode key")
+	}
+	if sec.HasKey("chain_id") {
+		config.ChainID = sec.Key("chain_id").String()
+	} else {
+		// backward compatibility; use profile name to determine
+		switch strings.ToLower(strings.TrimSpace(profile)) {
+		case "main", "default":
+			config.ChainID = params.MainnetChainID.String()
+		default:
+			config.ChainID = params.TestnetChainID.String()
+		}
 	}
 
 	if sec.HasKey("shards") {
