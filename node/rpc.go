@@ -57,12 +57,17 @@ func (node *Node) StartRPC(nodePort string) error {
 
 	port, _ := strconv.Atoi(nodePort)
 
-	httpEndpoint = fmt.Sprintf("%v:%v", nodeconfig.GetDefaultConfig().GetRPCIP(), port+rpcHTTPPortOffset)
+	ip := ""
+	if !nodeconfig.GetPublicRPC() {
+		ip = "127.0.0.1"
+	}
+	httpEndpoint = fmt.Sprintf("%v:%v", ip, port+rpcHTTPPortOffset)
+
 	if err := node.startHTTP(httpEndpoint, apis, httpModules, httpOrigins, httpVirtualHosts, httpTimeouts); err != nil {
 		return err
 	}
 
-	wsEndpoint = fmt.Sprintf("%v:%v", nodeconfig.GetDefaultConfig().GetRPCIP(), port+rpcWSPortOffset)
+	wsEndpoint = fmt.Sprintf("%v:%v", ip, port+rpcWSPortOffset)
 	if err := node.startWS(wsEndpoint, apis, wsModules, wsOrigins, true); err != nil {
 		node.stopHTTP()
 		return err

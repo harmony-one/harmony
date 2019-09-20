@@ -63,6 +63,7 @@ const (
 )
 
 var version string
+var publicRPC bool // enable public RPC access
 
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
@@ -76,7 +77,6 @@ type ConfigType struct {
 	role     Role        // Role of the node
 	Port     string      // Port of the node.
 	IP       string      // IP of the node.
-	rpcIP    string      // IP of the node listen on RPC service
 
 	MetricsFlag     bool   // collect and upload metrics flag
 	PushgatewayIP   string // metrics pushgateway prometheus ip
@@ -239,16 +239,6 @@ func (conf *ConfigType) GetNetworkType() NetworkType {
 	return conf.networkType
 }
 
-// SetRPCIP sets the IP of RPC service
-func (conf *ConfigType) SetRPCIP(ip string) {
-	conf.rpcIP = ip
-}
-
-// GetRPCIP gets the IP of the RPC srevice
-func (conf *ConfigType) GetRPCIP() string {
-	return conf.rpcIP
-}
-
 // SetVersion set the version of the node binary
 func SetVersion(ver string) {
 	version = ver
@@ -262,4 +252,14 @@ func GetVersion() string {
 // GetTempDir return temporary directory
 func GetTempDir() string {
 	return os.TempDir()
+}
+
+// SetPublicRPC set the boolean value of public RPC access
+func SetPublicRPC(v bool) {
+	publicRPC = v
+}
+
+// GetPublicRPC get the boolean value of public RPC access
+func GetPublicRPC() bool {
+	return publicRPC
 }
