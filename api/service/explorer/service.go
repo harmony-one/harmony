@@ -700,18 +700,15 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 
 	db := s.Storage.GetDB()
 	bytes, err := db.Get([]byte(key))
-	if err != nil {
-		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
-		return
-	}
+
 	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
 		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if balanceAddr.Cmp(big.NewInt(0)) != 0 {
-		data.Address.Balance = balanceAddr
-	}
+
+	data.Address.Balance = balanceAddr
+
 	switch txView {
 	case txViewNone:
 		data.Address.TXs = nil
@@ -777,9 +774,9 @@ func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, 
 		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
 		return nil, err
 	}
-	if balanceAddr.Cmp(big.NewInt(0)) != 0 {
-		address.Balance = balanceAddr
-	}
+
+	address.Balance = balanceAddr
+
 	switch txView {
 	case txViewNone:
 		address.TXs = nil

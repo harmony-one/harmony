@@ -155,6 +155,7 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 }
 
 // UpdateAddress ...
+// TODO: deprecate this logic
 func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
 	storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
@@ -163,6 +164,7 @@ func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Tr
 }
 
 // UpdateAddressStorage updates specific addr Address.
+// TODO: deprecate this logic
 func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	key := GetAddressKey(addr)
 

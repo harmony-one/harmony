@@ -50,8 +50,6 @@ type Worker struct {
 
 	gasFloor uint64
 	gasCeil  uint64
-
-	shardID uint32
 }
 
 // Returns a tuple where the first value is the txs sender account address,
@@ -114,7 +112,7 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
 	for _, tx := range txs {
-		if tx.ShardID() != w.shardID {
+		if tx.ShardID() != w.chain.ShardID() {
 			invalid = append(invalid, tx)
 			continue
 		}
@@ -301,7 +299,7 @@ func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.State {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
-	return core.GetShardState(nextEpoch)
+	return core.CalculateShardState(nextEpoch)
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
@@ -353,7 +351,7 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 }
 
 // New create a new worker object.
-func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine, shardID uint32) *Worker {
+func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine) *Worker {
 	worker := &Worker{
 		config:  config,
 		factory: blockfactory.NewFactory(config),
@@ -362,7 +360,6 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 	}
 	worker.gasFloor = 500000000000000000
 	worker.gasCeil = 1000000000000000000
-	worker.shardID = shardID
 
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()

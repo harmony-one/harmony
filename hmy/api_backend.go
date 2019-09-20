@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
@@ -231,6 +232,20 @@ func (b *APIBackend) RPCGasCap() *big.Int {
 // GetShardID returns the gas cap of rpc
 func (b *APIBackend) GetShardID() uint32 {
 	return b.hmy.shardID
+}
+
+// GetCommittee returns committee for a particular epoch.
+func (b *APIBackend) GetCommittee(epoch *big.Int) (*shard.Committee, error) {
+	state, err := b.hmy.BlockChain().ReadShardState(epoch)
+	if err != nil {
+		return nil, err
+	}
+	for _, committee := range state {
+		if committee.ShardID == b.GetShardID() {
+			return &committee, nil
+		}
+	}
+	return nil, nil
 }
 
 // ResendCx retrieve blockHash from txID and add blockHash to CxPool for resending

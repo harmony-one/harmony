@@ -11,10 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
@@ -216,6 +215,12 @@ func processStressTestCommand() {
 
 	*/
 
+	chainID, ok := new(big.Int).SetString(walletProfile.ChainID, 0)
+	if !ok {
+		fmt.Printf("invalid chain ID %#v in config", walletProfile.ChainID)
+		return
+	}
+
 	fmt.Println("Creating wallet node")
 	walletNode := createWalletNode()
 
@@ -288,11 +293,7 @@ func processStressTestCommand() {
 
 		ks.Unlock(account, senderPass)
 
-		chainConfig := params.MainnetChainConfig
-		if walletProfile.Profile != defaultProfile {
-			chainConfig = params.TestnetChainConfig
-		}
-		tx, _ = ks.SignTx(account, tx, chainConfig.ChainID)
+		tx, _ = ks.SignTx(account, tx, chainID)
 
 		if err := submitTransaction(tx, walletNode, uint32(shardID)); err != nil {
 			fmt.Println(ctxerror.New("submitTransaction failed",

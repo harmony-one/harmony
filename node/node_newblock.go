@@ -131,7 +131,7 @@ func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) shard.S
 	}
 
 	nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
-	return core.GetShardState(nextEpoch)
+	return core.CalculateShardState(nextEpoch)
 }
 
 func (node *Node) proposeShardState(block *types.Block) error {
