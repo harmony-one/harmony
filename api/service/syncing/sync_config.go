@@ -83,6 +83,13 @@ func (h *SyncConfig) RUnlock() {
 	h.mtx.RUnlock()
 }
 
+// AddPeer adds the given sync peer.
+func (h *SyncConfig) AddPeer(peer *SyncPeerConfig) {
+	h.Lock()
+	defer h.Unlock()
+	h.Push(peer)
+}
+
 // Remove ...
 func (h *SyncConfig) Remove(i int) {
 	// TODO: move it into a util delete func.
@@ -96,7 +103,15 @@ func (h *SyncConfig) Remove(i int) {
 // ForEachPeer calls the given function with each peer.
 // It breaks the iteration iff the function returns true.
 // thread-safe
-func (h *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
+func (h *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool), write bool) {
+	if write {
+		h.Lock()
+		defer h.Unlock()
+	} else {
+		h.RLock()
+		defer h.RUnlock()
+	}
+
 	for i := 0; i < h.Len(); i++ {
 		if f(((*h).peers)[i]) {
 			break
@@ -106,41 +121,32 @@ func (h *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
 
 // CloseConnections close grpc connections for state sync clients
 func (h *SyncConfig) CloseConnections() {
-	h.Lock()
-	defer h.Unlock()
-
 	h.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		peerConfig.client.Close()
 		return
-	})
+	}, true /* write */)
 }
 
 // FindPeerByHash returns the peer with the given hash, or nil if not found.
 func (h *SyncConfig) FindPeerByHash(peerHash []byte) *SyncPeerConfig {
-	h.Lock()
-	defer h.Unlock()
-
 	var ret *SyncPeerConfig
 	h.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		if bytes.Compare(peerConfig.peerHash, peerHash) == 0 {
 			ret = peerConfig
 		}
 		return
-	})
+	}, false /* write */)
 	return ret
 }
 
 // InitForTesting used for testing.
 func (h *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]byte) {
-	h.RLock()
-	defer h.RUnlock()
-
 	h.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		configPeer.blockHashes = blockHashes
 		configPeer.client = client
 		brk = true
 		return
-	})
+	}, true /* write */)
 }
 
 // CleanUpPeers cleans up all peers whose blockHashes are not equal to
@@ -180,7 +186,6 @@ func (h *SyncConfig) GetBlockHashesConsensusAndCleanUp() bool {
 func (h *SyncConfig) GetMaxConsensusBlockFromParentHash(parentHash common.Hash) *types.Block {
 	candidateBlocks := []*types.Block{}
 
-	h.RLock()
 	h.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		for _, block := range peerConfig.newBlocks {
 			ph := block.ParentHash()
@@ -190,8 +195,7 @@ func (h *SyncConfig) GetMaxConsensusBlockFromParentHash(parentHash common.Hash) 
 			}
 		}
 		return
-	})
-	h.RUnlock()
+	}, false /* write */)
 
 	if len(candidateBlocks) == 0 {
 		return nil
@@ -224,9 +228,6 @@ func (h *SyncConfig) GetHowManyMaxConsensus() (int, int) {
 
 	i := 0
 
-	h.RLock()
-	defer h.RUnlock()
-
 	h.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		if curFirstID == -1 || CompareSyncPeerConfigByBlockHashes(h.Get(curFirstID), h.Get(i)) != 0 {
 			curCount = 1
@@ -240,30 +241,24 @@ func (h *SyncConfig) GetHowManyMaxConsensus() (int, int) {
 		}
 		i++
 		return
-	})
+	}, false /* write */)
 
 	return maxFirstID, maxCount
 }
 
 // PurgeOldBlocks sets common, old blocks, to nil for each peer for garbage collection
 func (h *SyncConfig) PurgeOldBlocks() {
-	h.Lock()
-	defer h.Unlock()
-
 	h.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		configPeer.blockHashes = nil
 		return
-	})
+	}, true /* write */)
 }
 
 // PurgeAllBlocks sets all blocks, common and new blocks to nil for each peer for garbage collection
 func (h *SyncConfig) PurgeAllBlocks() {
-	h.Lock()
-	defer h.Unlock()
-
 	h.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		configPeer.blockHashes = nil
 		configPeer.newBlocks = nil
 		return
-	})
+	}, true /* write */)
 }
