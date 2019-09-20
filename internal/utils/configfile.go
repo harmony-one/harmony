@@ -3,6 +3,7 @@ package utils
 // this module in utils handles the ini file read/write
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"gopkg.in/ini.v1"
@@ -45,6 +46,7 @@ func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) 
 		config.ChainID = sec.Key("chain_id").String()
 	} else {
 		// backward compatibility; use profile name to determine
+		// (deprecated; require chain_id after 2010-01).
 		switch profile {
 		case "main", "default":
 			config.ChainID = params.MainnetChainID.String()
@@ -53,6 +55,11 @@ func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) 
 		default:
 			config.ChainID = params.TestnetChainID.String()
 		}
+		_, _ = fmt.Fprintf(os.Stderr,
+			"NOTICE: Chain ID not found in config profile, assuming %s; "+
+				"please add \"chain_id = %s\" to section [%s] of wallet.ini "+
+				"before 2020-01\n",
+			config.ChainID, config.ChainID, profile)
 	}
 
 	if sec.HasKey("shards") {
