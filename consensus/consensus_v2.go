@@ -107,6 +107,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	// save announce message to PbftLog
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
+	// TODO(chao): don't unmarshall the message here and direclty pass the original object.
 	msg := &msg_pb.Message{}
 	_ = protobuf.Unmarshal(msgPayload, msg)
 	pbftMsg, err := ParsePbftMessage(msg)
@@ -115,6 +116,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 		return
 	}
 
+	// TODO(chao): review pbft log data structure
 	consensus.PbftLog.AddMessage(pbftMsg)
 	utils.Logger().Debug().
 		Str("MsgBlockHash", pbftMsg.BlockHash.Hex()).
@@ -183,6 +185,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 
 	// verify validity of block header object
+	// TODO: think about just sending the block hash instead of the header.
 	encodedHeader := recvMsg.Payload
 	header := new(block.Header)
 	err = rlp.DecodeBytes(encodedHeader, header)
@@ -384,6 +387,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		consensus.aggregatedPrepareSig = aggSig
 
 		//leader adds prepared message to log
+		// TODO(chao): don't unmarshall the payload again
 		msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
 		msg := &msg_pb.Message{}
 		_ = protobuf.Unmarshal(msgPayload, msg)
@@ -678,6 +682,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
+	// has to be called before verifying signature
 	quorumWasMet := len(commitSigs) >= consensus.Quorum()
 
 	// Verify the signature on commitPayload is correct

@@ -150,7 +150,9 @@ func (node *Node) GetBalanceOfAddress(address common.Address) (*big.Int, error) 
 		utils.Logger().Error().Err(err).Msg("Failed to get chain state")
 		return nil, err
 	}
-	return state.GetBalance(address), nil
+	balance := big.NewInt(0)
+	balance.SetBytes(state.GetBalance(address).Bytes())
+	return balance, nil
 }
 
 // AddFaucetContractToPendingTransactions adds the faucet contract the genesis block.

@@ -63,6 +63,36 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 	return nil, err
 }
 
+// GetCommittee returns committee for a particular epoch.
+func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (map[string]interface{}, error) {
+	committee, err := s.b.GetCommittee(big.NewInt(epoch))
+	if err != nil {
+		return nil, err
+	}
+	validators := make([]map[string]interface{}, 0)
+	for _, validator := range committee.NodeList {
+		validatorBalance := new(hexutil.Big)
+		validatorBalance, err = s.b.GetBalance(validator.EcdsaAddress)
+		if err != nil {
+			return nil, err
+		}
+		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
+		if err != nil {
+			return nil, err
+		}
+		validatorsFields := map[string]interface{}{
+			"address": oneAddress,
+			"balance": validatorBalance,
+		}
+		validators = append(validators, validatorsFields)
+	}
+	result := map[string]interface{}{
+		"shardID":    committee.ShardID,
+		"validators": validators,
+	}
+	return result, nil
+}
+
 // GetShardingStructure returns an array of sharding structures.
 func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[string]interface{}, error) {
 	// Get header and number of shards.
@@ -71,6 +101,11 @@ func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[s
 
 	// Return shareding structure for each case.
 	return core.ShardingSchedule.GetShardingStructure(int(numShard), int(s.b.GetShardID())), nil
+}
+
+// GetShardID returns shard ID of the requested node.
+func (s *PublicBlockChainAPI) GetShardID(ctx context.Context) (int, error) {
+	return int(s.b.GetShardID()), nil
 }
 
 // GetCode returns the code stored at the given address in the state for the given block number.
@@ -224,4 +259,10 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 		return nil, 0, false, fmt.Errorf("execution aborted (timeout = %v)", timeout)
 	}
 	return res, gas, failed, err
+}
+
+// LatestHeader returns the latest header information
+func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformation {
+	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
+	return newHeaderInformation(header)
 }

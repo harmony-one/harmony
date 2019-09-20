@@ -155,6 +155,7 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 }
 
 // UpdateAddress ...
+// TODO: deprecate this logic
 func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
 	storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
@@ -163,6 +164,7 @@ func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Tr
 }
 
 // UpdateAddressStorage updates specific addr Address.
+// TODO: deprecate this logic
 func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	key := GetAddressKey(addr)
 
@@ -170,7 +172,11 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, exp
 	if data, err := storage.db.Get([]byte(key)); err == nil {
 		err = rlp.DecodeBytes(data, &address)
 		if err == nil {
-			address.Balance.Add(address.Balance, tx.Value())
+			if explorerTransaction.Type == Received {
+				address.Balance.Add(address.Balance, tx.Value())
+			} else {
+				address.Balance.Sub(address.Balance, tx.Value())
+			}
 		} else {
 			utils.Logger().Error().Err(err).Msg("Failed to error")
 		}

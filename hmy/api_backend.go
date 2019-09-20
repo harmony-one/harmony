@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
@@ -233,6 +234,20 @@ func (b *APIBackend) GetShardID() uint32 {
 	return b.hmy.shardID
 }
 
+// GetCommittee returns committee for a particular epoch.
+func (b *APIBackend) GetCommittee(epoch *big.Int) (*shard.Committee, error) {
+	state, err := b.hmy.BlockChain().ReadShardState(epoch)
+	if err != nil {
+		return nil, err
+	}
+	for _, committee := range state {
+		if committee.ShardID == b.GetShardID() {
+			return &committee, nil
+		}
+	}
+	return nil, nil
+}
+
 // ResendCx retrieve blockHash from txID and add blockHash to CxPool for resending
 func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bool) {
 	blockHash, blockNum, index := b.hmy.BlockChain().ReadTxLookupEntry(txID)
@@ -246,6 +261,7 @@ func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bo
 		return 0, false
 	}
 	tx := txs[int(index)]
+	// check whether it is a valid cross shard tx
 	if tx.ShardID() == tx.ToShardID() || blk.Header().ShardID() != tx.ShardID() {
 		return 0, false
 	}

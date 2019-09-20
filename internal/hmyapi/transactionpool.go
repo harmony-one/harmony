@@ -131,6 +131,9 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
 	}
+	if tx.ChainID() != s.b.ChainConfig().ChainID {
+		return common.Hash{}, ErrIncorrectChainID
+	}
 	return SubmitTransaction(ctx, s.b, tx)
 }
 
@@ -211,4 +214,12 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 		}
 	}
 	return transactions, nil
+}
+
+// GetCXReceiptByHash returns the transaction for the given hash
+func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash common.Hash) *RPCCXReceipt {
+	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.b.ChainDb(), hash); cx != nil {
+		return newRPCCXReceipt(cx, blockHash, blockNumber)
+	}
+	return nil
 }

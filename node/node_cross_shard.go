@@ -58,7 +58,7 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 
 	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash(), false)
 	if err != nil || len(cxReceipts) == 0 {
-		utils.Logger().Warn().Err(err).Uint32("ToShardID", toShardID).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceiptsWithShardID] No ReadCXReceipts found")
+		utils.Logger().Info().Err(err).Uint32("ToShardID", toShardID).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceiptsWithShardID] No ReadCXReceipts found")
 		return
 	}
 	merkleProof, err := node.Blockchain().CXMerkleProof(toShardID, block)
@@ -91,7 +91,7 @@ func (node *Node) BroadcastMissingCXReceipts() {
 		}
 		sig := nextHeader.LastCommitSignature()
 		bitmap := nextHeader.LastCommitBitmap()
-		go node.BroadcastCXReceiptsWithShardID(blk, sig[:], bitmap, toShardID)
+		node.BroadcastCXReceiptsWithShardID(blk, sig[:], bitmap, toShardID)
 	}
 	node.CxPool.Clear()
 	// this should not happen or maybe happen for impatient user
