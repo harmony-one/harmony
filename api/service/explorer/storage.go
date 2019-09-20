@@ -118,8 +118,7 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 
 		explorerTransaction := GetTransaction(tx, block)
 		storage.UpdateTXStorage(batch, explorerTransaction, tx)
-
-		//storage.UpdateAddress(batch, explorerTransaction, tx)
+		storage.UpdateAddress(batch, explorerTransaction, tx)
 	}
 	if err := batch.Write(); err != nil {
 		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
