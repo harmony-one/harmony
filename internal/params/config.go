@@ -15,12 +15,16 @@ var (
 	AllProtocolChangesChainID = big.NewInt(100) // not a real network
 )
 
+// EpochTBD is a large, “not anytime soon” epoch.  It used as a placeholder
+// until the exact epoch is decided.
+var EpochTBD = big.NewInt(10000000)
+
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:        MainnetChainID,
 		CrossTxEpoch:   big.NewInt(28),
-		CrossLinkEpoch: big.NewInt(10000000), // Temporarily made very large until a exact number is decided.
+		CrossLinkEpoch: EpochTBD,
 		EIP155Epoch:    big.NewInt(28),
 		S3Epoch:        big.NewInt(28),
 	}
