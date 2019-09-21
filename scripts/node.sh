@@ -110,10 +110,25 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
    -b             download harmony_db files from shard specified by -i <shardid> (default: off)
    -a dbfile      specify the db file to download (default:off)
+   -U FOLDER      specify the upgrade folder to download binaries
 
-example:
+examples:
 
+# start node program w/o root account
    ${progname} -S -k mybls.key
+
+# download beacon chain (shard0) db snapshot
+   ${progname} -i 0 -b
+
+# just re-download the harmony binaries
+   ${progname} -d
+
+# start a non-validating node in shard 1
+# you need to have a dummy BLSKEY/pass file using 'touch BLSKEY; touch blspass'
+   ${progname} -S -k BLSKEY -p blspass -T explorer -i 1
+
+# upgrade harmony binaries from specified repo
+   ${progname} -1 -U upgrade
 
 ENDEND
 }
@@ -129,6 +144,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
+unset upgrade_rel
 start_clean=false
 loop=true
 run_as_root=true
@@ -143,7 +159,7 @@ ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba: opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -164,6 +180,7 @@ do
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
    a) db_file_to_dl="${OPTARG}";;
+   U) upgrade_rel="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -218,6 +235,11 @@ case $# in
    usage "extra arguments at the end ($*)"
    ;;
 esac
+
+# reset REL if upgrade_rel is set
+if [ -n "$upgrade_rel" ]; then
+   REL="${upgrade_rel}"
+fi
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/darwin-x86_64/$REL/
