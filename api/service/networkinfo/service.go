@@ -58,14 +58,15 @@ const (
 	discoveryLimit = 32
 )
 
-// New returns role conversion service.
+// New returns role conversion service.  datastorePath points to a persistent
+// database directory to use.
 func New(
 	h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer,
-	bootnodes utils.AddrList,
+	bootnodes utils.AddrList, dataStorePath string,
 ) (*Service, error) {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(context.Background(), connectionTimeout)
-	dataStore, err := badger.NewDatastore(fmt.Sprintf(".dht-%s-%s", h.GetSelfPeer().IP, h.GetSelfPeer().Port), nil)
+	dataStore, err := badger.NewDatastore(dataStorePath, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err,
 			"cannot open Badger datastore at %s", dataStorePath)
@@ -93,9 +94,9 @@ func New(
 // MustNew is a panic-on-error version of New.
 func MustNew(
 	h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer,
-	bootnodes utils.AddrList,
+	bootnodes utils.AddrList, dataStorePath string,
 ) *Service {
-	service, err := New(h, rendezvous, peerChan, bootnodes)
+	service, err := New(h, rendezvous, peerChan, bootnodes, dataStorePath)
 	if err != nil {
 		panic(err)
 	}

@@ -1,6 +1,8 @@
 package node
 
 import (
+	"fmt"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
@@ -22,7 +24,7 @@ func (node *Node) setupForValidator() {
 	// Register peer discovery service. No need to do staking for beacon chain node.
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil, node.networkInfoDHTPath()))
 	// Register consensus service.
 	node.serviceManager.RegisterService(service.Consensus, consensus.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
@@ -51,7 +53,7 @@ func (node *Node) setupForNewNode() {
 	// Register peer discovery service. "0" is the beacon shard ID
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, node.NodeConfig.GetBeaconGroupID(), chanPeer, nil))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, node.NodeConfig.GetBeaconGroupID(), chanPeer, nil, node.networkInfoDHTPath()))
 	// Register new metrics service
 	if node.NodeConfig.GetMetricsFlag() {
 		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort()))
@@ -60,7 +62,7 @@ func (node *Node) setupForNewNode() {
 
 func (node *Node) setupForClientNode() {
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, p2p.GroupIDBeacon, nil, nil))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, p2p.GroupIDBeacon, nil, nil, node.networkInfoDHTPath()))
 }
 
 func (node *Node) setupForExplorerNode() {
@@ -69,7 +71,7 @@ func (node *Node) setupForExplorerNode() {
 	// Register peer discovery service.
 	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil))
 	// Register networkinfo service.
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil, node.networkInfoDHTPath()))
 	// Register explorer service.
 	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.NodeConfig.GetShardID(), node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
 	// Register explorer service.
@@ -106,4 +108,12 @@ func (node *Node) StopServices() {
 		return
 	}
 	node.serviceManager.StopServicesByRole([]service.Type{})
+}
+
+func (node *Node) networkInfoDHTPath() string {
+	return fmt.Sprintf(".dht-%s-%s-c%s",
+		node.NodeConfig.SelfPeer.IP,
+		node.NodeConfig.SelfPeer.Port,
+		node.chainConfig.ChainID,
+	)
 }
