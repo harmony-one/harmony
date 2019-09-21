@@ -170,14 +170,9 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, exp
 
 	var address Address
 	if data, err := storage.db.Get([]byte(key)); err == nil {
-		err = rlp.DecodeBytes(data, &address)
-		if err == nil {
-			address.Balance.Add(address.Balance, tx.Value())
-		} else {
-			utils.Logger().Error().Err(err).Msg("Failed to error")
+		if err = rlp.DecodeBytes(data, &address); err != nil {
+			utils.Logger().Error().Err(err).Msg("Failed due to error")
 		}
-	} else {
-		address.Balance = tx.Value()
 	}
 	address.ID = addr
 	address.TXs = append(address.TXs, explorerTransaction)
