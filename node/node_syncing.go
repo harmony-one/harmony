@@ -327,7 +327,7 @@ func (node *Node) SendNewBlockToUnsync() {
 func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, incomingPeer string) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
 	switch request.Type {
-	case downloader_pb.DownloaderRequest_HEADER:
+	case downloader_pb.DownloaderRequest_BLOCKHASH:
 		if request.BlockHash == nil {
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request BlockHash is NIL")
 		}
@@ -362,6 +362,21 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			}
 			blockHash := header.Hash()
 			response.Payload = append(response.Payload, blockHash[:])
+		}
+
+	case downloader_pb.DownloaderRequest_BLOCKHEADER:
+		for _, bytes := range request.Hashes {
+			var hash common.Hash
+			hash.SetBytes(bytes)
+			blockHeader := node.Blockchain().GetHeaderByHash(hash)
+			if blockHeader == nil {
+				continue
+			}
+			encodedBlockHeader, err := rlp.EncodeToBytes(blockHeader)
+
+			if err == nil {
+				response.Payload = append(response.Payload, encodedBlockHeader)
+			}
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCK:
