@@ -336,7 +336,7 @@ download_harmony_db_file() {
          url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/${file_to_dl}"
          if _curl_download $url "${outdir}" ${file_to_dl}; then
             verify_checksum "${outdir}" "${file_to_dl}" md5sum.txt || return $?
-            msg "downlaoded ${file_to_dl}, extracting ..."
+            msg "downloaded ${file_to_dl}, extracting ..."
             tar -C "${outdir}" -xvf "${outdir}/${file_to_dl}"
          else
             msg "can't download ${file_to_dl}"
@@ -347,7 +347,7 @@ download_harmony_db_file() {
 
    files=$(awk '{ print $2 }' ${outdir}/md5sum.txt)
    echo "[available harmony db files for shard ${shard_id}]"
-   grep -oE harmony_db_${shard_id}-.*.tar "${outdir}/md5sum.txt"
+   grep -oE "harmony_db_${shard_id}"-.*.tar "${outdir}/md5sum.txt"
    echo
    for file in $files; do
       if [[ $file =~ "harmony_db_${shard_id}" ]]; then
@@ -357,7 +357,7 @@ download_harmony_db_file() {
             url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/$file"
             if _curl_download $url "${outdir}" $file; then
                verify_checksum "${outdir}" "${file}" md5sum.txt || return $?
-               msg "downlaoded $file, extracting ..."
+               msg "downloaded $file, extracting ..."
                tar -C "${outdir}" -xvf "${outdir}/${file}"
             else
                msg "can't download $file"

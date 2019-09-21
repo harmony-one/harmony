@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"gopkg.in/ini.v1"
+	ini "gopkg.in/ini.v1"
 
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/p2p"
