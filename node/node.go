@@ -192,6 +192,9 @@ type Node struct {
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 
+	// Chain configuration.
+	chainConfig params.ChainConfig
+
 	// map of service type to its message channel.
 	serviceMessageChan map[service.Type]chan *msg_pb.Message
 
@@ -373,6 +376,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	case nodeconfig.Pangaea:
 		chainConfig = *params.PangaeaChainConfig
 	}
+	node.chainConfig = chainConfig
 
 	collection := shardchain.NewCollection(
 		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig)
