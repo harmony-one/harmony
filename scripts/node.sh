@@ -391,7 +391,8 @@ download_harmony_db_file() {
 }
 
 if ${download_only}; then
-   download_binaries || err 69 "download node software failed"
+   download_binaries staging || err 69 "download node software failed"
+   msg "downloaded files are in staging direectory"
    exit 0
 fi
 
