@@ -10,15 +10,16 @@ service Downloader {
 // DownloaderRequest is the generic download request.
 message DownloaderRequest {
   enum RequestType {
-    HEADER = 0;
+    BLOCKHASH = 0;
     BLOCK = 1;
     NEWBLOCK = 2;
     BLOCKHEIGHT = 3;
     REGISTER = 4;
     REGISTERTIMEOUT = 5;
     UNKNOWN = 6;
+    BLOCKHEADER = 7;
   }
- 
+
   // Request type.
   RequestType type = 1;
 
