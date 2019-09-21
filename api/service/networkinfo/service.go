@@ -58,24 +58,28 @@ const (
 	discoveryLimit = 32
 )
 
-// New returns role conversion service.  datastorePath points to a persistent
-// database directory to use.
+// New returns role conversion service.  If dataStorePath is not empty, it
+// points to a persistent database directory to use.
 func New(
 	h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer,
 	bootnodes utils.AddrList, dataStorePath string,
 ) (*Service, error) {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(context.Background(), connectionTimeout)
-	dataStore, err := badger.NewDatastore(dataStorePath, nil)
-	if err != nil {
-		return nil, errors.Wrapf(err,
-			"cannot open Badger datastore at %s", dataStorePath)
+	var dhtOpts []libp2pdhtopts.Option
+	if dataStorePath != "" {
+		dataStore, err := badger.NewDatastore(dataStorePath, nil)
+		if err != nil {
+			return nil, errors.Wrapf(err,
+				"cannot open Badger datastore at %s", dataStorePath)
+		}
+		utils.Logger().Info().
+			Str("dataStorePath", dataStorePath).
+			Msg("backing DHT with Badger datastore")
+		dhtOpts = append(dhtOpts, libp2pdhtopts.Datastore(dataStore))
 	}
-	utils.Logger().Info().
-		Str("dataStorePath", dataStorePath).
-		Msg("backing DHT with Badger datastore")
 
-	dht, err := libp2pdht.New(ctx, h.GetP2PHost(), libp2pdhtopts.Datastore(dataStore))
+	dht, err := libp2pdht.New(ctx, h.GetP2PHost(), dhtOpts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot create DHT")
 	}
