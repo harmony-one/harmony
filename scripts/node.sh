@@ -572,7 +572,7 @@ kill_node() {
 }
 
 {
-   while :
+   while ${loop}
    do
       msg "re-downloading binaries in 5m"
       sleep 300
