@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -187,7 +188,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	if withSignersParam == "true" {
 		withSigners = true
 	}
-
+	order := r.FormValue("order")
 	data := &Data{
 		Blocks: []*Block{},
 	}
@@ -342,10 +343,19 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	} else {
 		data.Blocks = data.Blocks[offset*page : offset*page+offset]
 	}
+	if order == "DESC" {
+		sort.Slice(data.Blocks[:], func(i, j int) bool {
+			return data.Blocks[i].Timestamp > data.Blocks[j].Timestamp
+		})
+	} else {
+		sort.Slice(data.Blocks[:], func(i, j int) bool {
+			return data.Blocks[i].Timestamp < data.Blocks[j].Timestamp
+		})
+	}
 }
 
 // GetExplorerBlocks rpc end-point.
-func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offset int, withSigners bool) ([]*Block, error) {
+func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offset int, withSigners bool, order string) ([]*Block, error) {
 	if offset == 0 {
 		offset = paginationOffset
 	}
@@ -451,6 +461,15 @@ func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offs
 		blocks = blocks[offset*page:]
 	} else {
 		blocks = blocks[offset*page : offset*page+offset]
+	}
+	if order == "DESC" {
+		sort.Slice(blocks[:], func(i, j int) bool {
+			return blocks[i].Timestamp > blocks[j].Timestamp
+		})
+	} else {
+		sort.Slice(blocks[:], func(i, j int) bool {
+			return blocks[i].Timestamp < blocks[j].Timestamp
+		})
 	}
 	return blocks, nil
 }
@@ -645,6 +664,7 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	txViewParam := r.FormValue("tx_view")
 	pageParam := r.FormValue("page")
 	offsetParam := r.FormValue("offset")
+	order := r.FormValue("order")
 	txView := txViewNone
 	if txViewParam != "" {
 		txView = txViewParam
@@ -734,10 +754,19 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	} else {
 		data.Address.TXs = data.Address.TXs[offset*page : offset*page+offset]
 	}
+	if order == "DESC" {
+		sort.Slice(data.Address.TXs[:], func(i, j int) bool {
+			return data.Address.TXs[i].Timestamp > data.Address.TXs[j].Timestamp
+		})
+	} else {
+		sort.Slice(data.Address.TXs[:], func(i, j int) bool {
+			return data.Address.TXs[i].Timestamp < data.Address.TXs[j].Timestamp
+		})
+	}
 }
 
 // GetExplorerAddress rpc end-point.
-func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, page, offset int) (*Address, error) {
+func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, page, offset int, order string) (*Address, error) {
 	if offset == 0 {
 		offset = paginationOffset
 	}
@@ -759,7 +788,6 @@ func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, 
 		balance, err := s.Service.GetAccountBalance(addr)
 		if err == nil {
 			balanceAddr = balance
-			address.Balance = balance
 		}
 	}
 
@@ -801,6 +829,15 @@ func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, 
 		address.TXs = address.TXs[offset*page:]
 	} else {
 		address.TXs = address.TXs[offset*page : offset*page+offset]
+	}
+	if order == "DESC" {
+		sort.Slice(address.TXs[:], func(i, j int) bool {
+			return address.TXs[i].Timestamp > address.TXs[j].Timestamp
+		})
+	} else {
+		sort.Slice(address.TXs[:], func(i, j int) bool {
+			return address.TXs[i].Timestamp < address.TXs[j].Timestamp
+		})
 	}
 	return address, nil
 }
