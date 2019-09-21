@@ -71,6 +71,9 @@ func New(
 		return nil, errors.Wrapf(err,
 			"cannot open Badger datastore at %s", dataStorePath)
 	}
+	utils.Logger().Info().
+		Str("dataStorePath", dataStorePath).
+		Msg("backing DHT with Badger datastore")
 
 	dht, err := libp2pdht.New(ctx, h.GetP2PHost(), libp2pdhtopts.Datastore(dataStore))
 	if err != nil {
