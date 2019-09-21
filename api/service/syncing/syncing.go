@@ -346,8 +346,8 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 				response := peerConfig.client.GetBlockHashes(startHash, size, ss.selfip, ss.selfport)
 				if response == nil {
 					utils.Logger().Warn().
-						Str("peer IP", peerConfig.ip).
-						Str("peer Port", peerConfig.port).
+						Str("peerIP", peerConfig.ip).
+						Str("peerPort", peerConfig.port).
 						Msg("[SYNC] GetConsensusHashes Nil Response")
 					return
 				}
@@ -546,9 +546,15 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	// Verify block signatures
 	// TODO chao: only when block is verified against last commit sigs, we can update the block and status
 	if block.NumberU64() > 1 {
-		err := bc.Engine().VerifyHeader(bc, block.Header(), true)
+		// Verify signature every 100 blocks
+		verifySig := block.NumberU64()%100 == 0
+		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySig)
 		if err != nil {
 			utils.Logger().Error().Err(err).Msgf("[SYNC] failed verifying signatures for new block %d", block.NumberU64())
+			utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] Rolling back last 99 blocks!")
+			for i := 0; i < 99; i++ {
+				bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
+			}
 			return false
 		}
 	}
@@ -561,11 +567,6 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 		return false
 	}
-	ss.syncMux.Lock()
-	if err := worker.UpdateCurrent(block.Header().Coinbase()); err != nil {
-		utils.Logger().Warn().Err(err).Msg("[SYNC] (*Worker).UpdateCurrent failed")
-	}
-	ss.syncMux.Unlock()
 	utils.Logger().Info().
 		Uint64("blockHeight", bc.CurrentBlock().NumberU64()).
 		Str("blockHex", bc.CurrentBlock().Hash().Hex()).
@@ -702,10 +703,10 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
+			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
-				utils.Logger().Warn().Err(err).Str("IP", peerConfig.ip).Str("Port", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
+				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
 				return
 			}
 			ss.syncMux.Lock()
@@ -740,7 +741,7 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool, isBeacon bool) {
+func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool) {
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}

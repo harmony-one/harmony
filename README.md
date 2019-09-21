@@ -36,6 +36,8 @@ make
 
 ```
 
+Note: make sure to run ``` scripts/install_build_tools.sh ```to make sure build tools are of correct versions.
+
 ## Build
 
 If you want to bypass the Makefile:

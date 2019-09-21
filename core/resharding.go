@@ -163,7 +163,7 @@ func CalculateNewShardState(
 	stakeInfo *map[common.Address]*structs.StakeInfo,
 ) (shard.State, error) {
 	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
-		return GetInitShardState(), nil
+		return CalculateInitShardState(), nil
 	}
 	prevEpoch := new(big.Int).Sub(epoch, common.Big1)
 	ss, err := GetShardingStateFromBlockChain(bc, prevEpoch)
@@ -215,15 +215,15 @@ func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*stru
 // Depends on the type of the network.  Defaults to the mainnet schedule.
 var ShardingSchedule shardingconfig.Schedule = shardingconfig.MainnetSchedule
 
-// GetInitShardState returns the initial shard state at genesis.
-func GetInitShardState() shard.State {
-	return GetShardState(big.NewInt(GenesisEpoch))
+// CalculateInitShardState returns the initial shard state at genesis.
+func CalculateInitShardState() shard.State {
+	return CalculateShardState(big.NewInt(GenesisEpoch))
 }
 
-// GetShardState returns the shard state based on epoch number
+// CalculateShardState returns the shard state based on epoch number
 // This api for getting shard state is what should be used to get shard state regardless of
 // current chain dependency (ex. getting shard state from block header received during cross-shard transaction)
-func GetShardState(epoch *big.Int) shard.State {
+func CalculateShardState(epoch *big.Int) shard.State {
 	utils.Logger().Info().Int64("epoch", epoch.Int64()).Msg("Get Shard State of Epoch.")
 	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
@@ -271,9 +271,9 @@ func GetShardState(epoch *big.Int) shard.State {
 	return shardState
 }
 
-// GetPublicKeys returns the publickeys given epoch and shardID
-func GetPublicKeys(epoch *big.Int, shardID uint32) []*bls.PublicKey {
-	shardState := GetShardState(epoch)
+// CalculatePublicKeys returns the publickeys given epoch and shardID
+func CalculatePublicKeys(epoch *big.Int, shardID uint32) []*bls.PublicKey {
+	shardState := CalculateShardState(epoch)
 
 	// Update validator public keys
 	committee := shardState.FindCommitteeByID(shardID)

@@ -62,6 +62,7 @@ const (
 )
 
 var version string
+var publicRPC bool // enable public RPC access
 
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
@@ -245,4 +246,14 @@ func SetVersion(ver string) {
 // GetVersion return the version of the node binary
 func GetVersion() string {
 	return version
+}
+
+// SetPublicRPC set the boolean value of public RPC access
+func SetPublicRPC(v bool) {
+	publicRPC = v
+}
+
+// GetPublicRPC get the boolean value of public RPC access
+func GetPublicRPC() bool {
+	return publicRPC
 }

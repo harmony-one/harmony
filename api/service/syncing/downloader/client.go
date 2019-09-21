@@ -44,12 +44,29 @@ func (client *Client) Close() {
 func (client *Client) GetBlockHashes(startHash []byte, size uint32, ip, port string) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_HEADER, BlockHash: startHash, Size: size}
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKHASH, BlockHash: startHash, Size: size}
 	request.Ip = ip
 	request.Port = port
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] GetBlockHashes query failed")
+	}
+	return response
+}
+
+// GetBlockHeaders gets block headers in serialization byte array by calling a grpc request.
+func (client *Client) GetBlockHeaders(hashes [][]byte) *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKHEADER}
+	request.Hashes = make([][]byte, len(hashes))
+	for i := range hashes {
+		request.Hashes[i] = make([]byte, len(hashes[i]))
+		copy(request.Hashes[i], hashes[i])
+	}
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] downloader/client.go:GetBlockHeaders query failed")
 	}
 	return response
 }

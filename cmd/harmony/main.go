@@ -126,6 +126,8 @@ var (
 	metricsFlag     = flag.Bool("metrics", false, "Collect and upload node metrics")
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
+
+	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
 )
 
 func initSetup() {
@@ -367,8 +369,8 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// currentNode.DRand = dRand
 
 	// This needs to be executed after consensus and drand are setup
-	if err := currentNode.GetInitShardState(); err != nil {
-		ctxerror.Crit(utils.GetLogger(), err, "GetInitShardState failed",
+	if err := currentNode.CalculateInitShardState(); err != nil {
+		ctxerror.Crit(utils.GetLogger(), err, "CalculateInitShardState failed",
 			"shardID", *shardID)
 	}
 
@@ -408,6 +410,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	nodeconfig.SetPublicRPC(*publicRPC)
 	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
 	if *versionFlag {
 		printVersion()
@@ -459,8 +462,8 @@ func main() {
 	nodeConfig := createGlobalConfig()
 	currentNode := setupConsensusAndNode(nodeConfig)
 
-	if nodeConfig.ShardID != 0 {
-		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID1", nodeConfig.ShardID)
+	if nodeConfig.ShardID != 0 && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID", nodeConfig.ShardID)
 		go currentNode.SupportBeaconSyncing()
 	}
 
@@ -485,11 +488,11 @@ func main() {
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 
+	currentNode.RunServices()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
 		ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
 	}
-	currentNode.RunServices()
 
 	// Run additional node collectors
 	// Collect node metrics if metrics flag is set

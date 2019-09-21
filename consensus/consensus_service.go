@@ -505,7 +505,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	header := consensus.ChainReader.CurrentHeader()
 
 	epoch := header.Epoch()
-	curPubKeys := core.GetPublicKeys(epoch, header.ShardID())
+	curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID())
 	consensus.numPrevPubKeys = len(curPubKeys)
 
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
@@ -515,7 +515,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
 		nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		pubKeys = core.GetPublicKeys(nextEpoch, header.ShardID())
+		pubKeys = core.CalculatePublicKeys(nextEpoch, header.ShardID())
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
 		pubKeys = curPubKeys

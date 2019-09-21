@@ -28,7 +28,10 @@ func TestService(t *testing.T) {
 		t.Fatal("unable to new host in harmony")
 	}
 
-	s := New(host, p2p.GroupIDBeaconClient, nil, nil)
+	s, err := New(host, p2p.GroupIDBeaconClient, nil, nil, "")
+	if err != nil {
+		t.Fatalf("New() failed: %s", err)
+	}
 
 	s.StartService()
 

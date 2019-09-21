@@ -366,6 +366,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 
 	// Update last consensus time for metrics
 	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
+	// TODO: refactor the asynchronous calls to separate go routine.
 	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
 		if node.NodeConfig.ShardID == 0 {
@@ -440,7 +441,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		//			ctxerror.Log15(utils.Logger().Error, e)
 		//		}
 		//	}
-		//	shardState, err := newBlockHeader.GetShardState()
+		//	shardState, err := newBlockHeader.CalculateShardState()
 		//	if err != nil {
 		//		e := ctxerror.New("cannot get shard state from header").WithCause(err)
 		//		ctxerror.Log15(utils.Logger().Error, e)
@@ -483,7 +484,7 @@ var (
 )
 
 func initGenesisCatalog() {
-	genesisShardState := core.GetInitShardState()
+	genesisShardState := core.CalculateInitShardState()
 	for _, committee := range genesisShardState {
 		for i, nodeID := range committee.NodeList {
 			genesisNode := &genesisNode{

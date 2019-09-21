@@ -3,15 +3,19 @@ package utils
 // this module in utils handles the ini file read/write
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	"github.com/harmony-one/harmony/p2p"
 	ini "gopkg.in/ini.v1"
+
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // WalletProfile contains a section and key value pair map
 type WalletProfile struct {
 	Profile   string
+	ChainID   string
 	Bootnodes []string
 	Shards    int
 	RPCServer [][]p2p.Peer
@@ -31,11 +35,31 @@ func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) 
 	if err != nil {
 		return nil, err
 	}
+	profile = sec.Name() // sanitized name
 
 	if sec.HasKey("bootnode") {
 		config.Bootnodes = sec.Key("bootnode").ValueWithShadows()
 	} else {
 		return nil, fmt.Errorf("can't find bootnode key")
+	}
+	if sec.HasKey("chain_id") {
+		config.ChainID = sec.Key("chain_id").String()
+	} else {
+		// backward compatibility; use profile name to determine
+		// (deprecated; require chain_id after 2010-01).
+		switch profile {
+		case "main", "default":
+			config.ChainID = params.MainnetChainID.String()
+		case "pangaea":
+			config.ChainID = params.PangaeaChainID.String()
+		default:
+			config.ChainID = params.TestnetChainID.String()
+		}
+		_, _ = fmt.Fprintf(os.Stderr,
+			"NOTICE: Chain ID not found in config profile, assuming %s; "+
+				"please add \"chain_id = %s\" to section [%s] of wallet.ini "+
+				"before 2020-01\n",
+			config.ChainID, config.ChainID, profile)
 	}
 
 	if sec.HasKey("shards") {

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 unset -v progname
 progname="${0##*/}"
@@ -108,10 +108,27 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -t             equivalent to -N pangaea (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
+   -b             download harmony_db files from shard specified by -i <shardid> (default: off)
+   -a dbfile      specify the db file to download (default:off)
+   -U FOLDER      specify the upgrade folder to download binaries
 
-example:
+examples:
 
+# start node program w/o root account
    ${progname} -S -k mybls.key
+
+# download beacon chain (shard0) db snapshot
+   ${progname} -i 0 -b
+
+# just re-download the harmony binaries
+   ${progname} -d
+
+# start a non-validating node in shard 1
+# you need to have a dummy BLSKEY/pass file using 'touch BLSKEY; touch blspass'
+   ${progname} -S -k BLSKEY -p blspass -T explorer -i 1
+
+# upgrade harmony binaries from specified repo
+   ${progname} -1 -U upgrade
 
 ENDEND
 }
@@ -126,7 +143,8 @@ usage() {
 BUCKET=pub.harmony.one
 OS=$(uname -s)
 
-unset start_clean loop run_as_root blspass do_not_download metrics network
+unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
+unset upgrade_rel
 start_clean=false
 loop=true
 run_as_root=true
@@ -136,15 +154,17 @@ metrics=false
 network=main
 node_type=validator
 shard_id=1
+download_harmony_db=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i: opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
+   b) download_harmony_db=true;;
    c) start_clean=true;;
    1) loop=false;;
    h) print_usage; exit 0;;
@@ -159,6 +179,8 @@ do
    t) network=pangaea;;
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
+   a) db_file_to_dl="${OPTARG}";;
+   U) upgrade_rel="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -214,6 +236,11 @@ case $# in
    ;;
 esac
 
+# reset REL if upgrade_rel is set
+if [ -n "$upgrade_rel" ]; then
+   REL="${upgrade_rel}"
+fi
+
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/darwin-x86_64/$REL/
    BIN=( harmony libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib md5sum.txt )
@@ -248,7 +275,7 @@ verify_checksum() {
    checksum_file="${3}"
    [ -f "${dir}/${checksum_file}" ] || return 0
    checksum_for_file="${dir}/${checksum_file}::${file}"
-   extract_checksum "${file}" < "${dir}/${checksum_file}" > "${dir}/${checksum_for_file}"
+   extract_checksum "${file}" < "${dir}/${checksum_file}" > "${checksum_for_file}"
    [ -s "${dir}/${checksum_for_file}" ] || return 0
    if ! (cd "${dir}" && exec md5sum -c --status "${checksum_for_file}")
    then
@@ -272,8 +299,105 @@ download_binaries() {
    (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
 }
 
+check_free_disk() {
+   local dir
+   dir="${1:-.}"
+   local free_disk=$(df -BG $dir | tail -n 1 | awk ' { print $4 } ' | tr -d G)
+   # need at least 50G free disk space
+   local need_disk=50
+
+   if [ $free_disk -gt $need_disk ]; then
+      return 0
+   else
+      return 1
+   fi
+}
+
+_curl_check_exist() {
+   local url=$1
+   local statuscode=$(curl -I --silent --output /dev/null --write-out "%{http_code}" $url)
+   if [ $statuscode -ne 200 ]; then
+      return 1
+   else
+      return 0
+   fi
+}
+
+_curl_download() {
+   local url=$1
+   local outdir=$2
+   local filename=$3
+
+   mkdir -p "${outdir}"
+   if _curl_check_exist $url; then
+      curl --progress-bar -Sf $url -o "${outdir}/$filename" || return $?
+      return 0
+   else
+      msg "failed to find/download $url"
+      return 1
+   fi
+}
+
+download_harmony_db_file() {
+   local shard_id
+   shard_id="${1}"
+   local file_to_dl="${2}"
+   local outdir=db
+   if ! check_free_disk; then
+      err 70 "do not have enough free disk space to download db tarball"
+   fi
+
+   url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/md5sum.txt"
+   rm -f "${outdir}/md5sum.txt"
+   if ! _curl_download $url "${outdir}" md5sum.txt; then
+      err 70 "cannot download md5sum.txt"
+   fi
+
+   if [ -n "${file_to_dl}" ]; then
+      if grep -q "${file_to_dl}" "${outdir}/md5sum.txt"; then
+         url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/${file_to_dl}"
+         if _curl_download $url "${outdir}" ${file_to_dl}; then
+            verify_checksum "${outdir}" "${file_to_dl}" md5sum.txt || return $?
+            msg "downloaded ${file_to_dl}, extracting ..."
+            tar -C "${outdir}" -xvf "${outdir}/${file_to_dl}"
+         else
+            msg "can't download ${file_to_dl}"
+         fi
+      fi
+      return
+   fi
+
+   files=$(awk '{ print $2 }' ${outdir}/md5sum.txt)
+   echo "[available harmony db files for shard ${shard_id}]"
+   grep -oE "harmony_db_${shard_id}"-.*.tar "${outdir}/md5sum.txt"
+   echo
+   for file in $files; do
+      if [[ $file =~ "harmony_db_${shard_id}" ]]; then
+         echo -n "Do you want to download ${file} (choose one only) [y/n]?"
+         read yesno
+         if [[ "$yesno" = "y" || "$yesno" = "Y" ]]; then
+            url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/$file"
+            if _curl_download $url "${outdir}" $file; then
+               verify_checksum "${outdir}" "${file}" md5sum.txt || return $?
+               msg "downloaded $file, extracting ..."
+               tar -C "${outdir}" -xvf "${outdir}/${file}"
+            else
+               msg "can't download $file"
+            fi
+            break
+         fi
+      fi
+   done
+}
+
 if ${download_only}; then
-   download_binaries || err 69 "download node software failed"
+   download_binaries staging || err 69 "download node software failed"
+   msg "downloaded files are in staging direectory"
+   exit 0
+fi
+
+if ${download_harmony_db}; then
+   download_harmony_db_file "${shard_id}" "${db_file_to_dl}" || err 70 "download harmony_db file failed"
    exit 0
 fi
 
@@ -449,7 +573,7 @@ kill_node() {
 }
 
 {
-   while :
+   while ${loop}
    do
       msg "re-downloading binaries in 5m"
       sleep 300
