@@ -56,7 +56,8 @@ type Engine interface {
 	// is used for verifying "incoming" block header against commit signature and bitmap sent from the other chain cross-shard via libp2p.
 	// i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
 	// for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.
-	VerifyHeaderWithSignature(chain ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte) error
+	// (TODO) For now, when doing cross shard, we need recalcualte the shard state since we don't have shard state of other shards
+	VerifyHeaderWithSignature(chain ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte, reCalculate bool) error
 
 	// VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 	// concurrently. The method returns a quit channel to abort the operations and
