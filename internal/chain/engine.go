@@ -214,13 +214,15 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 // GetPublicKeys finds the public keys of the committee that signed the block header
 func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate bool) ([]*bls.PublicKey, error) {
 	var shardState shard.State
+	var err error
 	if reCalculate {
 		shardState = core.CalculateShardState(header.Epoch())
-	}
-	shardState, err := chain.ReadShardState(header.Epoch())
-	if err != nil {
-		return nil, ctxerror.New("failed to read shard state of epoch",
-			"epoch", header.Epoch().Uint64())
+	} else {
+		shardState, err = chain.ReadShardState(header.Epoch())
+		if err != nil {
+			return nil, ctxerror.New("failed to read shard state of epoch",
+				"epoch", header.Epoch().Uint64())
+		}
 	}
 
 	committee := shardState.FindCommitteeByID(header.ShardID())
