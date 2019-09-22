@@ -11,10 +11,12 @@ import (
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 type engineImpl struct{}
@@ -103,7 +105,7 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 // ReadPublicKeysFromLastBlock finds the public keys of last block's committee
 func ReadPublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
-	return GetPublicKeys(bc, parentHeader)
+	return GetPublicKeys(bc, parentHeader, false)
 }
 
 // VerifySeal implements Engine, checking whether the given block's parent block satisfies
@@ -176,8 +178,8 @@ func QuorumForBlock(chain engine.ChainReader, h *block.Header) (quorum int, err 
 // is used for verifying "incoming" block header against commit signature and bitmap sent from the other chain cross-shard via libp2p.
 // i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
 // for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.
-func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte) error {
-	publicKeys, err := GetPublicKeys(chain, header)
+func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte, reCalculate bool) error {
+	publicKeys, err := GetPublicKeys(chain, header, reCalculate)
 	if err != nil {
 		return ctxerror.New("[VerifyHeaderWithSignature] Cannot get publickeys for block header").WithCause(err)
 	}
@@ -210,7 +212,11 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 }
 
 // GetPublicKeys finds the public keys of the committee that signed the block header
-func GetPublicKeys(chain engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
+func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate bool) ([]*bls.PublicKey, error) {
+	var shardState shard.State
+	if reCalculate {
+		shardState = core.CalculateShardState(header.Epoch())
+	}
 	shardState, err := chain.ReadShardState(header.Epoch())
 	if err != nil {
 		return nil, ctxerror.New("failed to read shard state of epoch",
