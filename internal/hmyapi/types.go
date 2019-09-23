@@ -15,34 +15,34 @@ import (
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
 type RPCTransaction struct {
-	BlockHash        common.Hash     `json:"blockHash"`
-	BlockNumber      *hexutil.Big    `json:"blockNumber"`
-	From             string          `json:"from"`
-	Gas              hexutil.Uint64  `json:"gas"`
-	GasPrice         *hexutil.Big    `json:"gasPrice"`
-	Hash             common.Hash     `json:"hash"`
-	Input            hexutil.Bytes   `json:"input"`
-	Nonce            hexutil.Uint64  `json:"nonce"`
-	To               string          `json:"to"`
-	TransactionIndex hexutil.Uint    `json:"transactionIndex"`
-	Value            *hexutil.Big    `json:"value"`
-	ShardID          uint32          `json:"shardID"`
-	ToShardID        uint32          `json:"toShardID"`
-	V                *hexutil.Big    `json:"v"`
-	R                *hexutil.Big    `json:"r"`
-	S                *hexutil.Big    `json:"s"`
+	BlockHash        common.Hash    `json:"blockHash"`
+	BlockNumber      *hexutil.Big   `json:"blockNumber"`
+	From             string         `json:"from"`
+	Gas              hexutil.Uint64 `json:"gas"`
+	GasPrice         *hexutil.Big   `json:"gasPrice"`
+	Hash             common.Hash    `json:"hash"`
+	Input            hexutil.Bytes  `json:"input"`
+	Nonce            hexutil.Uint64 `json:"nonce"`
+	To               string         `json:"to"`
+	TransactionIndex hexutil.Uint   `json:"transactionIndex"`
+	Value            *hexutil.Big   `json:"value"`
+	ShardID          uint32         `json:"shardID"`
+	ToShardID        uint32         `json:"toShardID"`
+	V                *hexutil.Big   `json:"v"`
+	R                *hexutil.Big   `json:"r"`
+	S                *hexutil.Big   `json:"s"`
 }
 
 // RPCCXReceipt represents a CXReceipt that will serialize to the RPC representation of a CXReceipt
 type RPCCXReceipt struct {
-	BlockHash   common.Hash     `json:"blockHash"`
-	BlockNumber *hexutil.Big    `json:"blockNumber"`
-	TxHash      common.Hash     `json:"hash"`
-	From        string          `json:"from"`
-	To          string          `json:"to"`
-	ShardID     uint32          `json:"shardID"`
-	ToShardID   uint32          `json:"toShardID"`
-	Amount      *hexutil.Big    `json:"value"`
+	BlockHash   common.Hash  `json:"blockHash"`
+	BlockNumber *hexutil.Big `json:"blockNumber"`
+	TxHash      common.Hash  `json:"hash"`
+	From        string       `json:"from"`
+	To          string       `json:"to"`
+	ShardID     uint32       `json:"shardID"`
+	ToShardID   uint32       `json:"toShardID"`
+	Amount      *hexutil.Big `json:"value"`
 }
 
 // HeaderInformation represents the latest consensus information
