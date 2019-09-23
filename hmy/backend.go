@@ -48,6 +48,7 @@ type NodeAPI interface {
 	AccountManager() *accounts.Manager
 	GetBalanceOfAddress(address common.Address) (*big.Int, error)
 	GetNonceOfAddress(address common.Address) uint64
+	GetTransactionsHistory(address string) ([]common.Hash, error)
 }
 
 // New creates a new Harmony object (including the
