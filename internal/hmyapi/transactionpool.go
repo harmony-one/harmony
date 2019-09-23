@@ -2,6 +2,8 @@ package hmyapi
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -131,8 +133,8 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
 	}
-	if tx.ChainID() != s.b.ChainConfig().ChainID {
-		return common.Hash{}, ErrIncorrectChainID
+	if tx.ChainID().Cmp(s.b.ChainConfig().ChainID) != 0 {
+		return common.Hash{}, errors.New("Incorrect chain ID. The current chain id: " + s.b.ChainConfig().ChainID.String())
 	}
 	return SubmitTransaction(ctx, s.b, tx)
 }
