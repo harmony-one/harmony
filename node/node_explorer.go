@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -139,6 +140,23 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 		node.Consensus.PbftLog.DeleteBlocksLessThan(curNum - 100)
 		node.Consensus.PbftLog.DeleteMessagesLessThan(curNum - 100)
 	}
+}
+
+// GetTransactionsHistory returns list of transactions hashes of address.
+func (node *Node) GetTransactionsHistory(address string) ([]common.Hash, error) {
+	addressData := &explorer.Address{}
+	key := explorer.GetAddressKey(address)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).GetDB().Get([]byte(key))
+	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
+		return nil, err
+	}
+	hashes := make([]common.Hash, 0)
+	for _, tx := range addressData.TXs {
+		hash := common.HexToHash(tx.ID)
+		hashes = append(hashes, hash)
+	}
+	return hashes, nil
 }
 
 // CommitCommittee commits committee with shard id and epoch to explorer service.
