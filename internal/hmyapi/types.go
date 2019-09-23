@@ -17,13 +17,13 @@ import (
 type RPCTransaction struct {
 	BlockHash        common.Hash     `json:"blockHash"`
 	BlockNumber      *hexutil.Big    `json:"blockNumber"`
-	From             common.Address  `json:"from"`
+	From             string          `json:"from"`
 	Gas              hexutil.Uint64  `json:"gas"`
 	GasPrice         *hexutil.Big    `json:"gasPrice"`
 	Hash             common.Hash     `json:"hash"`
 	Input            hexutil.Bytes   `json:"input"`
 	Nonce            hexutil.Uint64  `json:"nonce"`
-	To               *common.Address `json:"to"`
+	To               string          `json:"to"`
 	TransactionIndex hexutil.Uint    `json:"transactionIndex"`
 	Value            *hexutil.Big    `json:"value"`
 	ShardID          uint32          `json:"shardID"`
@@ -38,8 +38,8 @@ type RPCCXReceipt struct {
 	BlockHash   common.Hash     `json:"blockHash"`
 	BlockNumber *hexutil.Big    `json:"blockNumber"`
 	TxHash      common.Hash     `json:"hash"`
-	From        common.Address  `json:"from"`
-	To          *common.Address `json:"to"`
+	From        string          `json:"from"`
+	To          string          `json:"to"`
 	ShardID     uint32          `json:"shardID"`
 	ToShardID   uint32          `json:"toShardID"`
 	Amount      *hexutil.Big    `json:"value"`
@@ -84,8 +84,8 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 	result := &RPCCXReceipt{
 		BlockHash: blockHash,
 		TxHash:    cx.TxHash,
-		From:      cx.From,
-		To:        cx.To,
+		From:      common2.MustAddressToBech32(cx.From),
+		To:        common2.MustAddressToBech32(*cx.To),
 		Amount:    (*hexutil.Big)(cx.Amount),
 		ShardID:   cx.ShardID,
 		ToShardID: cx.ToShardID,
@@ -108,13 +108,13 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	v, r, s := tx.RawSignatureValues()
 
 	result := &RPCTransaction{
-		From:      from,
+		From:      common2.MustAddressToBech32(from),
 		Gas:       hexutil.Uint64(tx.Gas()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
 		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
-		To:        tx.To(),
+		To:        common2.MustAddressToBech32(*tx.To()),
 		Value:     (*hexutil.Big)(tx.Value()),
 		ShardID:   tx.ShardID(),
 		ToShardID: tx.ToShardID(),
