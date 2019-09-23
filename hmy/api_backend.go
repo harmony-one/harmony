@@ -207,6 +207,12 @@ func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
 	return (*hexutil.Big)(balance), err
 }
 
+// GetTransactionsHistory returns list of transactions hashes of address.
+func (b *APIBackend) GetTransactionsHistory(address string) ([]common.Hash, error) {
+	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address)
+	return hashes, err
+}
+
 // NetVersion returns net version
 func (b *APIBackend) NetVersion() uint64 {
 	return b.hmy.NetVersion()

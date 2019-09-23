@@ -2,6 +2,8 @@ package hmyapi
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -13,6 +15,13 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 )
 
+// TxHistoryArgs is struct to make GetTransactionsHistory request
+type TxHistoryArgs struct {
+	Address string `json:"address"`
+	Offset  int    `json:"offset"`
+	Page    int    `json:"page"`
+}
+
 // PublicTransactionPoolAPI exposes methods for the RPC interface
 type PublicTransactionPoolAPI struct {
 	b         Backend
@@ -22,6 +31,28 @@ type PublicTransactionPoolAPI struct {
 // NewPublicTransactionPoolAPI creates a new RPC service with methods specific for the transaction pool.
 func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransactionPoolAPI {
 	return &PublicTransactionPoolAPI{b, nonceLock}
+}
+
+// GetTransactionsHistory returns the list of transactions hashes that involve a particular address.
+func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) ([]common.Hash, error) {
+	address := args.Address
+	if strings.HasPrefix(address, "one1") {
+		result, err := s.b.GetTransactionsHistory(address)
+		if err != nil {
+			return nil, err
+		}
+		return ReturnWithPagination(result, args), nil
+	}
+	addr := internal_common.ParseAddr(address)
+	oneAddress, err := internal_common.AddressToBech32(addr)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.b.GetTransactionsHistory(oneAddress)
+	if err != nil {
+		return nil, err
+	}
+	return ReturnWithPagination(result, args), nil
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
@@ -131,8 +162,8 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
 	}
-	if tx.ChainID() != s.b.ChainConfig().ChainID {
-		return common.Hash{}, ErrIncorrectChainID
+	if tx.ChainID().Cmp(s.b.ChainConfig().ChainID) != 0 {
+		return common.Hash{}, errors.New("Incorrect chain ID. The current chain id: " + s.b.ChainConfig().ChainID.String())
 	}
 	return SubmitTransaction(ctx, s.b, tx)
 }
