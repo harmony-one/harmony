@@ -26,6 +26,19 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 	return &PublicTransactionPoolAPI{b, nonceLock}
 }
 
+// GetTransactionsHistory returns the list of transactions hashes that involve a particular address.
+func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, address string) ([]common.Hash, error) {
+	if strings.HasPrefix(address, "one1") {
+		return s.b.GetTransactionsHistory(address)
+	}
+	addr := internal_common.ParseAddr(address)
+	oneAddress, err := internal_common.AddressToBech32(addr)
+	if err != nil {
+		return nil, err
+	}
+	return s.b.GetTransactionsHistory(oneAddress)
+}
+
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
 func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) *hexutil.Uint {
 	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
