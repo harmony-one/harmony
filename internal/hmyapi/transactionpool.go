@@ -14,6 +14,13 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 )
 
+// TxHistoryArgs is struct to make GetTransactionsHistory request
+type TxHistoryArgs struct {
+	Address string `json:"address"`
+	Offset  int    `json:"offset"`
+	Page    int    `json:"page"`
+}
+
 // PublicTransactionPoolAPI exposes methods for the RPC interface
 type PublicTransactionPoolAPI struct {
 	b         Backend
@@ -26,16 +33,25 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 }
 
 // GetTransactionsHistory returns the list of transactions hashes that involve a particular address.
-func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, address string) ([]common.Hash, error) {
+func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) ([]common.Hash, error) {
+	address := args.Address
 	if strings.HasPrefix(address, "one1") {
-		return s.b.GetTransactionsHistory(address)
+		result, err := s.b.GetTransactionsHistory(address)
+		if err != nil {
+			return nil, err
+		}
+		return ReturnWithPagination(result, args), nil
 	}
 	addr := internal_common.ParseAddr(address)
 	oneAddress, err := internal_common.AddressToBech32(addr)
 	if err != nil {
 		return nil, err
 	}
-	return s.b.GetTransactionsHistory(oneAddress)
+	result, err := s.b.GetTransactionsHistory(oneAddress)
+	if err != nil {
+		return nil, err
+	}
+	return ReturnWithPagination(result, args), nil
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.

@@ -11,6 +11,24 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
+// defaultOffset is to have default pagination.
+const (
+	defaultOffset = 100
+)
+
+// ReturnWithPagination returns result with pagination (offset, page in TxHistoryArgs).
+func ReturnWithPagination(hashes []common.Hash, args TxHistoryArgs) []common.Hash {
+	offset := defaultOffset
+	page := args.Page
+	if args.Offset > 0 {
+		offset = args.Offset
+	}
+	if offset*page+offset > len(hashes) {
+		return hashes[offset*page:]
+	}
+	return hashes[offset*page : offset*page+offset]
+}
+
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.
 func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
 	if err := b.SendTx(ctx, tx); err != nil {
