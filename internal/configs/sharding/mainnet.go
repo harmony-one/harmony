@@ -48,7 +48,7 @@ type mainnetSchedule struct{}
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(big.NewInt(mainnetV1_3Epoch)) >= 0:
-		// thirty-sixth resharding epoch around 9/18/2019 8:14:00 PDT
+		// thirty-sixth resharding epoch around 9/25/2019 5:44:00 PDT
 		return mainnetV1_3
 	case epoch.Cmp(big.NewInt(mainnetV1_2Epoch)) >= 0:
 		// twenty-fifth resharding epoch around 09/06/2019 5:31am PDT
