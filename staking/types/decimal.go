@@ -161,8 +161,7 @@ func NewDecFromStr(str string) (d Dec, err error) {
 	}
 
 	if lenDecs > Precision {
-		return d, errors.New(
-			fmt.Sprintf("too much precision, maximum %v, len decimal %v", Precision, lenDecs))
+		return d, fmt.Errorf("too much precision, maximum %v, len decimal %v", Precision, lenDecs)
 	}
 
 	// add some extra zero's to correct to the Precision factor
@@ -172,7 +171,7 @@ func NewDecFromStr(str string) (d Dec, err error) {
 
 	combined, ok := new(big.Int).SetString(combinedStr, 10) // base 10
 	if !ok {
-		return d, errors.New(fmt.Sprintf("bad string to integer conversion, combinedStr: %v", combinedStr))
+		return d, fmt.Errorf("bad string to integer conversion, combinedStr: %v", combinedStr)
 	}
 	if neg {
 		combined = new(big.Int).Neg(combined)

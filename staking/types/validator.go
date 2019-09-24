@@ -1,9 +1,10 @@
 package types
 
 import (
+	"math/big"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/common"
-	"math/big"
 )
 
 // Validator - data fields for a validator

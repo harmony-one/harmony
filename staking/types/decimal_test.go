@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/cosmos/cosmos-sdk/codec"
 )
 
 // create a decimal from a decimal string (ex. "1234.5678")
@@ -267,8 +265,6 @@ func TestTruncate(t *testing.T) {
 	}
 }
 
-var cdc = codec.New()
-
 func TestDecMarshalJSON(t *testing.T) {
 	decimal := func(i int64) Dec {
 		d := NewDec(0)
@@ -307,14 +303,6 @@ func TestDecMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestZeroDeserializationJSON(t *testing.T) {
-	d := Dec{new(big.Int)}
-	err := cdc.UnmarshalJSON([]byte(`"0"`), &d)
-	require.Nil(t, err)
-	err = cdc.UnmarshalJSON([]byte(`"{}"`), &d)
-	require.NotNil(t, err)
-}
-
 func TestSerializationText(t *testing.T) {
 	d := mustNewDecFromStr(t, "0.333")
 
@@ -327,49 +315,10 @@ func TestSerializationText(t *testing.T) {
 	require.True(t, d.Equal(d2), "original: %v, unmarshalled: %v", d, d2)
 }
 
-func TestSerializationGocodecJSON(t *testing.T) {
-	d := mustNewDecFromStr(t, "0.333")
-
-	bz, err := cdc.MarshalJSON(d)
-	require.NoError(t, err)
-
-	d2 := Dec{new(big.Int)}
-	err = cdc.UnmarshalJSON(bz, &d2)
-	require.NoError(t, err)
-	require.True(t, d.Equal(d2), "original: %v, unmarshalled: %v", d, d2)
-}
-
-func TestSerializationGocodecBinary(t *testing.T) {
-	d := mustNewDecFromStr(t, "0.333")
-
-	bz, err := cdc.MarshalBinaryLengthPrefixed(d)
-	require.NoError(t, err)
-
-	var d2 Dec
-	err = cdc.UnmarshalBinaryLengthPrefixed(bz, &d2)
-	require.NoError(t, err)
-	require.True(t, d.Equal(d2), "original: %v, unmarshalled: %v", d, d2)
-}
-
 type testDEmbedStruct struct {
 	Field1 string `json:"f1"`
 	Field2 int    `json:"f2"`
 	Field3 Dec    `json:"f3"`
-}
-
-// TODO make work for UnmarshalJSON
-func TestEmbeddedStructSerializationGocodec(t *testing.T) {
-	obj := testDEmbedStruct{"foo", 10, NewDecWithPrec(1, 3)}
-	bz, err := cdc.MarshalBinaryLengthPrefixed(obj)
-	require.Nil(t, err)
-
-	var obj2 testDEmbedStruct
-	err = cdc.UnmarshalBinaryLengthPrefixed(bz, &obj2)
-	require.Nil(t, err)
-
-	require.Equal(t, obj.Field1, obj2.Field1)
-	require.Equal(t, obj.Field2, obj2.Field2)
-	require.True(t, obj.Field3.Equal(obj2.Field3), "original: %v, unmarshalled: %v", obj, obj2)
 }
 
 func TestStringOverflow(t *testing.T) {
