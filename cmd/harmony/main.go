@@ -66,7 +66,6 @@ func printVersion() {
 
 var (
 	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
-	rcpIP            = flag.String("rpc_ip", "127.0.0.1", "listening ip of the node for rpc service")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	logMaxSize       = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
@@ -125,6 +124,8 @@ var (
 	metricsFlag     = flag.Bool("metrics", false, "Collect and upload node metrics")
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
+
+	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
 )
 
 func initSetup() {
@@ -148,7 +149,6 @@ func initSetup() {
 	// Set port and ip to global config.
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
-	nodeconfig.GetDefaultConfig().SetRPCIP(*ip)
 
 	// Setup mem profiling.
 	memprofiling.GetMemProfiling().Config()
@@ -408,6 +408,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	nodeconfig.SetPublicRPC(*publicRPC)
 	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
 	if *versionFlag {
 		printVersion()

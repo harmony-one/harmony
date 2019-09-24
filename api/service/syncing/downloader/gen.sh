@@ -1,1 +1,2 @@
-protoc -I proto/ proto/downloader.proto --go_out=plugins=grpc:proto
+SRC_DIR=$(dirname $0)
+protoc -I ${SRC_DIR}/proto/ ${SRC_DIR}/proto/downloader.proto --go_out=plugins=grpc:${SRC_DIR}/proto
