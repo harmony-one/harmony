@@ -700,10 +700,15 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 
 	db := s.Storage.GetDB()
 	bytes, err := db.Get([]byte(key))
+	if err != nil {
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("unrecognized address format")
+		data.Address.Balance = balanceAddr
+		return
+	}
 
 	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
-		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
-		w.WriteHeader(http.StatusInternalServerError)
+		utils.Logger().Warn().Str("id", id).Msg("unrecognized address format")
+		data.Address.Balance = balanceAddr
 		return
 	}
 
@@ -767,12 +772,14 @@ func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, 
 	db := s.Service.Storage.GetDB()
 	bytes, err := db.Get([]byte(key))
 	if err != nil {
-		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot read address from db")
-		return address, nil
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("unrecognized address format")
+		address.Balance = balanceAddr
+		return address, err
 	}
 	if err = rlp.DecodeBytes(bytes, &address); err != nil {
-		utils.Logger().Warn().Str("id", id).Msg("cannot convert data from DB")
-		return nil, err
+		utils.Logger().Warn().Str("id", id).Msg("unrecognized address format")
+		address.Balance = balanceAddr
+		return address, err
 	}
 
 	address.Balance = balanceAddr
