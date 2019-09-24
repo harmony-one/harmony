@@ -28,7 +28,7 @@ func TestMainnetInstanceForEpoch(t *testing.T) {
 			mainnetV1_2,
 		},
 		{
-			big.NewInt(33),
+			big.NewInt(36),
 			mainnetV1_3,
 		},
 	}
