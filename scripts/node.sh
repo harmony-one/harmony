@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+version="v1 20190924.0"
+
 unset -v progname
 progname="${0##*/}"
 
@@ -112,6 +114,8 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -a dbfile      specify the db file to download (default:off)
    -U FOLDER      specify the upgrade folder to download binaries
    -P             enable public rpc end point (default:off)
+   -v             print out the version of the node.sh
+   -V             print out the version of the Harmony binary
 
 examples:
 
@@ -161,7 +165,7 @@ ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:P opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvV opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -184,6 +188,10 @@ do
    a) db_file_to_dl="${OPTARG}";;
    U) upgrade_rel="${OPTARG}";;
    P) public_rpc=true;;
+   v) msg "version: $version"
+      exit 0 ;;
+   V) LD_LIBRARY_PATH=. ./harmony -version
+      exit 0 ;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
