@@ -24,7 +24,7 @@ require (
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
 	github.com/harmony-one/bls v0.0.5
 	github.com/harmony-one/taggedrlp v0.1.2
-	github.com/harmony-one/vdf v1.0.0
+	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
 	github.com/ipfs/go-ds-badger v0.0.5
@@ -62,7 +62,7 @@ require (
 	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3 // indirect
-	golang.org/x/tools v0.0.0-20190827205025-b29f5f60c37a
+	golang.org/x/tools v0.0.0-20190924052046-3ac2a5bbd98a
 	google.golang.org/appengine v1.4.0 // indirect
 	google.golang.org/grpc v1.21.1
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
