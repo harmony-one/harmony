@@ -50,12 +50,12 @@ require (
 	github.com/prometheus/common v0.4.1 // indirect
 	github.com/prometheus/procfs v0.0.3 // indirect
 	github.com/rjeczalik/notify v0.9.2
+	github.com/rs/cors v1.7.0 // indirect
 	github.com/rs/zerolog v1.14.3
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965
-	github.com/tendermint/tendermint v0.32.3
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
