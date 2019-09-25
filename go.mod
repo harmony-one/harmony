@@ -47,24 +47,22 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2
-	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90 // indirect
 	github.com/prometheus/common v0.4.1 // indirect
 	github.com/prometheus/procfs v0.0.3 // indirect
 	github.com/rjeczalik/notify v0.9.2
-	github.com/rs/cors v1.6.0 // indirect
+	github.com/rs/cors v1.7.0 // indirect
 	github.com/rs/zerolog v1.14.3
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/stretchr/testify v1.3.0
-	github.com/syndtr/goleveldb v1.0.0
-	github.com/tendermint/tendermint v0.31.7
+	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3 // indirect
 	golang.org/x/tools v0.0.0-20190924052046-3ac2a5bbd98a
 	google.golang.org/appengine v1.4.0 // indirect
-	google.golang.org/grpc v1.21.1
+	google.golang.org/grpc v1.22.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/ini.v1 v1.42.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
