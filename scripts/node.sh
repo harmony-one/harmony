@@ -111,6 +111,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -b             download harmony_db files from shard specified by -i <shardid> (default: off)
    -a dbfile      specify the db file to download (default:off)
    -U FOLDER      specify the upgrade folder to download binaries
+   -P             enable public rpc end point (default:off)
 
 examples:
 
@@ -144,7 +145,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel
+unset upgrade_rel public_rpc
 start_clean=false
 loop=true
 run_as_root=true
@@ -155,11 +156,12 @@ network=main
 node_type=validator
 shard_id=1
 download_harmony_db=false
+public_rpc=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U: opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:P opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -181,6 +183,7 @@ do
    i) shard_id="${OPTARG}";;
    a) db_file_to_dl="${OPTARG}";;
    U) upgrade_rel="${OPTARG}";;
+   P) public_rpc=true;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -619,6 +622,11 @@ do
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
    )
+   if ${public_rpc}; then
+      args+=(
+      -public_rpc
+      )
+   fi
 # backward compatible with older harmony node software
    case "${node_type}" in
    explorer)
