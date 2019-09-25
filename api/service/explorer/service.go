@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -641,6 +642,16 @@ func (s *ServiceAPI) GetExplorerCommittee(ctx context.Context, shardID uint32, e
 func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id := r.FormValue("id")
+	if strings.HasPrefix(id, "0x") {
+		parsedAddr := common2.ParseAddr(id)
+		oneAddr, err := common2.AddressToBech32(parsedAddr)
+		if err != nil {
+			utils.Logger().Warn().Msg("unrecognized address format")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		id = oneAddr
+	}
 	key := GetAddressKey(id)
 	txViewParam := r.FormValue("tx_view")
 	pageParam := r.FormValue("page")
@@ -701,13 +712,13 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	db := s.Storage.GetDB()
 	bytes, err := db.Get([]byte(key))
 	if err != nil {
-		utils.Logger().Warn().Err(err).Str("id", id).Msg("unrecognized address format")
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot fetch address from db")
 		data.Address.Balance = balanceAddr
 		return
 	}
 
 	if err = rlp.DecodeBytes(bytes, &data.Address); err != nil {
-		utils.Logger().Warn().Str("id", id).Msg("unrecognized address format")
+		utils.Logger().Warn().Str("id", id).Msg("cannot convert address data")
 		data.Address.Balance = balanceAddr
 		return
 	}
@@ -743,6 +754,15 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 
 // GetExplorerAddress rpc end-point.
 func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, page, offset int) (*Address, error) {
+	if strings.HasPrefix(id, "0x") {
+		parsedAddr := common2.ParseAddr(id)
+		oneAddr, err := common2.AddressToBech32(parsedAddr)
+		if err != nil {
+			utils.Logger().Warn().Msg("unrecognized address format")
+			return nil, err
+		}
+		id = oneAddr
+	}
 	if offset == 0 {
 		offset = paginationOffset
 	}
@@ -772,12 +792,12 @@ func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, 
 	db := s.Service.Storage.GetDB()
 	bytes, err := db.Get([]byte(key))
 	if err != nil {
-		utils.Logger().Warn().Err(err).Str("id", id).Msg("unrecognized address format")
+		utils.Logger().Warn().Err(err).Str("id", id).Msg("cannot fetch address from db")
 		address.Balance = balanceAddr
 		return address, err
 	}
 	if err = rlp.DecodeBytes(bytes, &address); err != nil {
-		utils.Logger().Warn().Str("id", id).Msg("unrecognized address format")
+		utils.Logger().Warn().Str("id", id).Msg("cannot convert address data")
 		address.Balance = balanceAddr
 		return address, err
 	}
