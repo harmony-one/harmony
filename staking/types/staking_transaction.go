@@ -1,9 +1,11 @@
 package types
 
 import (
+	"bytes"
 	"math/big"
 
-	"github.com/harmony-one/harmony/internal/common"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/crypto/hash"
 )
 
 // StakingTransaction struct.
@@ -19,8 +21,19 @@ type StakingTransaction struct {
 	S *big.Int `json:"s" gencodec:"required"`
 
 	// This is only used when marshaling to JSON.
-	Hash *common.Hash `json:"hash" rlp:"-"`
+	hash *common.Hash `json:"hash" rlp:"-"`
 }
 
 // StakingTransactions is a Transaction slice type for basic sorting.
 type StakingTransactions []*StakingTransaction
+
+// Hash hashes the RLP encoding of tx.
+// It uniquely identifies the transaction.
+func (tx *StakingTransaction) Hash() common.Hash {
+	emptyHash := common.Hash{}
+	if bytes.Compare(tx.hash[:], emptyHash[:]) == 0 {
+		h := hash.FromRLP(tx)
+		tx.hash = &h
+	}
+	return *tx.hash
+}
