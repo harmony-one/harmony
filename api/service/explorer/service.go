@@ -782,7 +782,7 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetExplorerAddress rpc end-point.
-func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, page, offset int) (*Address, error) {
+func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, page, offset int, order string) (*Address, error) {
 	if strings.HasPrefix(id, "0x") {
 		parsedAddr := common2.ParseAddr(id)
 		oneAddr, err := common2.AddressToBech32(parsedAddr)
