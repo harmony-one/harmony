@@ -202,9 +202,16 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 	pendingReceiptsList := []*types.CXReceiptsProof{}
 
 	node.pendingCXMutex.Lock()
+	defer node.pendingCXMutex.Unlock()
 
-	sort.Slice(node.pendingCXReceipts, func(i, j int) bool {
-		return node.pendingCXReceipts[i].MerkleProof.ShardID < node.pendingCXReceipts[j].MerkleProof.ShardID || (node.pendingCXReceipts[i].MerkleProof.ShardID == node.pendingCXReceipts[j].MerkleProof.ShardID && node.pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(node.pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
+	// not necessary to sort the list, but we just prefer to process the list ordered by shard and blocknum
+	pendingCXReceipts := []*types.CXReceiptsProof{}
+	for _, v := range node.pendingCXReceipts {
+		pendingCXReceipts = append(pendingCXReceipts, v)
+	}
+
+	sort.Slice(pendingCXReceipts, func(i, j int) bool {
+		return pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID || (pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID && pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
 	})
 
 	m := make(map[common.Hash]bool)
@@ -244,8 +251,12 @@ Loop:
 		numProposed = numProposed + len(cxp.Receipts)
 	}
 
-	node.pendingCXReceipts = pendingReceiptsList
-	node.pendingCXMutex.Unlock()
+	for _, v := range pendingReceiptsList {
+		blockNum := v.Header.Number().Uint64()
+		shardID := v.Header.ShardID()
+		key := utils.GetPendingCXKey(shardID, blockNum)
+		node.pendingCXReceipts[key] = v
+	}
 
 	utils.Logger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d", len(validReceiptsList))
 	return validReceiptsList
