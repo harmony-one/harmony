@@ -295,6 +295,12 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	node.pendingCXMutex.Lock()
 	defer node.pendingCXMutex.Unlock()
+
+	if receipts.ContainsEmptyField() {
+		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("CXReceiptsProof contains empty field")
+		return
+	}
+
 	blockNum := receipts.Header.Number().Uint64()
 	shardID := receipts.Header.ShardID()
 	key := utils.GetPendingCXKey(shardID, blockNum)
