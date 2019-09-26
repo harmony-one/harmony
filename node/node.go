@@ -99,7 +99,7 @@ type Node struct {
 	pendingCrossLinks     []*block.Header
 	pendingClMutex        sync.Mutex
 
-	pendingCXReceipts []*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
+	pendingCXReceipts map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex    sync.Mutex
 
 	// Shard databases
@@ -294,9 +294,23 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 // AddPendingReceipts adds one receipt message to pending list.
 func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	node.pendingCXMutex.Lock()
-	node.pendingCXReceipts = append(node.pendingCXReceipts, receipts)
-	node.pendingCXMutex.Unlock()
-	utils.Logger().Error().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
+	defer node.pendingCXMutex.Unlock()
+
+	if receipts.ContainsEmptyField() {
+		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("CXReceiptsProof contains empty field")
+		return
+	}
+
+	blockNum := receipts.Header.Number().Uint64()
+	shardID := receipts.Header.ShardID()
+	key := utils.GetPendingCXKey(shardID, blockNum)
+
+	if _, ok := node.pendingCXReceipts[key]; ok {
+		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Already Got Same Receipt message")
+		return
+	}
+	node.pendingCXReceipts[key] = receipts
+	utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
 }
 
 // Take out a subset of valid transactions from the pending transaction list
@@ -403,6 +417,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		if node.Blockchain().ShardID() != 0 {
 			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
 		}
+
+		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block

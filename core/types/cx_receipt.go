@@ -179,3 +179,8 @@ func (cxp *CXReceiptsProof) GetToShardID() (uint32, error) {
 	}
 	return shardID, nil
 }
+
+// ContainsEmptyField checks whether the given CXReceiptsProof contains empty field
+func (cxp *CXReceiptsProof) ContainsEmptyField() bool {
+	return cxp == nil || cxp.Receipts == nil || cxp.MerkleProof == nil || cxp.Header == nil || len(cxp.CommitSig)+len(cxp.CommitBitmap) == 0
+}
