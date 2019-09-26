@@ -99,7 +99,7 @@ type Node struct {
 	pendingCrossLinks     []*block.Header
 	pendingClMutex        sync.Mutex
 
-	pendingCXReceipts map[uint64]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
+	pendingCXReceipts map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex    sync.Mutex
 
 	// Shard databases
@@ -296,11 +296,14 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	node.pendingCXMutex.Lock()
 	defer node.pendingCXMutex.Unlock()
 	blockNum := receipts.Header.Number().Uint64()
-	if _, ok := node.pendingCXReceipts[blockNum]; ok {
+	shardID := receipts.Header.ShardID()
+	key := utils.GetPendingCXKey(shardID, blockNum)
+
+	if _, ok := node.pendingCXReceipts[key]; ok {
 		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Already Got Same Receipt message")
 		return
 	}
-	node.pendingCXReceipts[blockNum] = receipts
+	node.pendingCXReceipts[key] = receipts
 	utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
 }
 
@@ -409,7 +412,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
 		}
 
-		node.pendingCXReceipts = make(map[uint64]*types.CXReceiptsProof)
+		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block

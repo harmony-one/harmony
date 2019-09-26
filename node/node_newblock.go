@@ -253,7 +253,9 @@ Loop:
 
 	for _, v := range pendingReceiptsList {
 		blockNum := v.Header.Number().Uint64()
-		node.pendingCXReceipts[blockNum] = v
+		shardID := v.Header.ShardID()
+		key := utils.GetPendingCXKey(shardID, blockNum)
+		node.pendingCXReceipts[key] = v
 	}
 
 	utils.Logger().Debug().Msgf("[proposeReceiptsProof] number of validReceipts %d", len(validReceiptsList))

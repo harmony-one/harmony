@@ -238,3 +238,10 @@ func GetPortFromDiff(port string, diff int) string {
 	GetLogInstance().Error("error on parsing port.")
 	return ""
 }
+
+// GetPendingCXKey creates pending CXReceiptsProof key given shardID and blockNum
+// it is to avoid adding duplicated CXReceiptsProof from the same source shard
+func GetPendingCXKey(shardID uint32, blockNum uint64) string {
+	key := strconv.FormatUint(uint64(shardID), 10) + "-" + strconv.FormatUint(blockNum, 10)
+	return key
+}
