@@ -26,5 +26,8 @@ type MsgCreateValidator struct {
 	Amount            big.Int         `json:"amount" yaml:"amount"`
 }
 
-func (msg MsgCreateValidator) Type() string           { return "create_validator" }
+// Type ...
+func (msg MsgCreateValidator) Type() string { return "create_validator" }
+
+// Signer ...
 func (msg MsgCreateValidator) Signer() common.Address { return msg.Address }
