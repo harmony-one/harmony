@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -151,6 +153,9 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 		case proto_node.Transaction:
 			utils.Logger().Debug().Msg("NET: received message: Node/Transaction")
 			node.transactionMessageHandler(msgPayload)
+		case proto_node.Staking:
+			utils.Logger().Debug().Msg("NET: received message: Node/Staking")
+			node.stakingMessageHandler(msgPayload)
 		case proto_node.Block:
 			utils.Logger().Debug().Msg("NET: received message: Node/Block")
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
@@ -239,9 +244,22 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			utils.Logger().Error().
 				Err(err).
 				Msg("Failed to deserialize transaction list")
+			return
 		}
 		node.addPendingTransactions(txs)
 	}
+}
+
+func (node *Node) stakingMessageHandler(msgPayload []byte) {
+	txs := types2.StakingTransactions{}
+	err := rlp.Decode(bytes.NewReader(msgPayload[:]), &txs)
+	if err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msg("Failed to deserialize staking transaction list")
+		return
+	}
+	node.addPendingStakingTransactions(txs)
 }
 
 // BroadcastNewBlock is called by consensus leader to sync new blocks with other clients/nodes.

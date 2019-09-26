@@ -289,6 +289,7 @@ func (node *Node) VerifyCrosslinkHeader(prevHeader, header *block.Header) error 
 	}
 
 	// Verify signature of the new cross link header
+	// TODO: check whether to recalculate shard state
 	shardState, err := node.Blockchain().ReadShardState(prevHeader.Epoch())
 	committee := shardState.FindCommitteeByID(prevHeader.ShardID())
 

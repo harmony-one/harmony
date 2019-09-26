@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/params"
 
@@ -125,6 +127,9 @@ type Node struct {
 	pendingTransactions types.Transactions // All the transactions received but not yet processed for Consensus
 	pendingTxMutex      sync.Mutex
 	recentTxsStats      types.RecentTxsStats
+
+	pendingStakingTransactions types2.StakingTransactions // All the staking transactions received but not yet processed for Consensus
+	pendingStakingTxMutex      sync.Mutex
 
 	Worker       *worker.Worker
 	BeaconWorker *worker.Worker // worker for beacon chain
@@ -255,6 +260,17 @@ func (node *Node) reducePendingTransactions() {
 	}
 }
 
+func (node *Node) reducePendingStakingTransactions() {
+	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	curLen := len(node.pendingStakingTransactions)
+
+	// If length of pendingStakingTransactions is greater than TxPoolLimit then by greedy take the TxPoolLimit recent transactions.
+	if curLen > txPoolLimit+txPoolLimit {
+		node.pendingStakingTransactions = append(types2.StakingTransactions(nil), node.pendingStakingTransactions[curLen-txPoolLimit:]...)
+		utils.Logger().Info().Msg("mem stat reduce pending staking transaction")
+	}
+}
+
 func (node *Node) tryBroadcast(tx *types.Transaction) {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 
@@ -277,6 +293,15 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 	node.reducePendingTransactions()
 	node.pendingTxMutex.Unlock()
 	utils.Logger().Info().Int("length of newTxs", len(newTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more transactions")
+}
+
+// Add new staking transactions to the pending staking transaction list.
+func (node *Node) addPendingStakingTransactions(newStakingTxs types2.StakingTransactions) {
+	node.pendingStakingTxMutex.Lock()
+	node.pendingStakingTransactions = append(node.pendingStakingTransactions, newStakingTxs...)
+	node.reducePendingStakingTransactions()
+	node.pendingStakingTxMutex.Unlock()
+	utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more staking transactions")
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
@@ -315,8 +340,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Transactions {
-	node.pendingTxMutex.Lock()
+func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Transactions, types2.StakingTransactions) {
 
 	txsThrottleConfig := core.ShardingSchedule.TxsThrottleConfig()
 
@@ -332,7 +356,21 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 	}
 	node.recentTxsStats[newBlockNum] = make(types.BlockTxsCounts)
 
+	// Must update to the correct current state before processing potential txns
+	if err := node.Worker.UpdateCurrent(coinbase); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msg("Failed updating worker's state before txn selection")
+		return types.Transactions{}, types2.StakingTransactions{}
+	}
+
+	node.pendingTxMutex.Lock()
+	defer node.pendingTxMutex.Unlock()
+	node.pendingStakingTxMutex.Lock()
+	defer node.pendingStakingTxMutex.Unlock()
+
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, node.pendingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
+	selectedStaking, unselectedStaking, invalidStaking := node.Worker.SelectStakingTransactionsForNewBlock(newBlockNum, node.pendingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
 
 	node.pendingTransactions = unselected
 	node.reducePendingTransactions()
@@ -341,9 +379,16 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) types.Tran
 		Int("selected", len(selected)).
 		Int("invalidDiscarded", len(invalid)).
 		Msg("Selecting Transactions")
-	node.pendingTxMutex.Unlock()
 
-	return selected
+	node.pendingStakingTransactions = unselectedStaking
+	node.reducePendingStakingTransactions()
+	utils.Logger().Info().
+		Int("remainPending", len(node.pendingStakingTransactions)).
+		Int("selected", len(unselectedStaking)).
+		Int("invalidDiscarded", len(invalidStaking)).
+		Msg("Selecting Transactions")
+
+	return selected, selectedStaking
 }
 
 // StartServer starts a server and process the requests by a handler.
