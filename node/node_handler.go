@@ -140,13 +140,6 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 				node.DRand.ProcessMessageValidator(msgPayload)
 			}
 		}
-	case proto.Staking:
-		utils.Logger().Debug().Msg("NET: Received staking message")
-		msgPayload, _ := proto.GetStakingMessagePayload(content)
-		// Only beacon leader processes staking txn
-		if node.Consensus != nil && node.Consensus.ShardID == 0 && node.Consensus.IsLeader() {
-			node.processStakingMessage(msgPayload)
-		}
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
