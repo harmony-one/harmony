@@ -3,6 +3,8 @@ package types
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -53,15 +55,15 @@ func NewValidator(addr common.Address, pubKey bls.PublicKey, description Descrip
 }
 
 // MarshalValidator marshals the validator object
-// TODO
-func MarshalValidator(validator Validator) []byte {
-	return []byte{}
+func MarshalValidator(validator Validator) ([]byte, error) {
+	return rlp.EncodeToBytes(validator)
 }
 
 // UnmarshalValidator unmarshal binary into Validator object
-// TODO
-func UnmarshalValidator(value []byte) Validator {
-	return Validator{}
+func UnmarshalValidator(by []byte) (*Validator, error) {
+	decoded := &Validator{}
+	err := rlp.DecodeBytes(by, decoded)
+	return decoded, err
 }
 
 // NewDescription returns a new Description with the provided values.

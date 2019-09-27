@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/internal/common"
 )
 
@@ -46,15 +48,15 @@ func NewDelegation(delegatorAddr common.Address, validatorAddr common.Address,
 }
 
 // MarshalDelegation return the delegation
-// TODO
-func MarshalDelegation(delegation Delegation) []byte {
-	return []byte{}
+func MarshalDelegation(delegation Delegation) ([]byte, error) {
+	return rlp.EncodeToBytes(delegation)
 }
 
 // UnmarshalDelegation return the delegation
-// TODO
-func UnmarshalDelegation(value []byte) Delegation {
-	return Delegation{}
+func UnmarshalDelegation(by []byte) (*Delegation, error) {
+	decoded := &Delegation{}
+	err := rlp.DecodeBytes(by, decoded)
+	return decoded, err
 }
 
 // GetDelegatorAddr returns DelegatorAddr
