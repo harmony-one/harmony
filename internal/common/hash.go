@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"database/sql/driver"
 	"encoding/hex"
 	"fmt"
@@ -32,6 +33,12 @@ func BytesToHash(b []byte) Hash {
 	var h Hash
 	h.SetBytes(b)
 	return h
+}
+
+// IsEmpty gets whether the hash contains all 0 bytes
+func (h Hash) IsEmpty() bool {
+	empty := Hash{}
+	return bytes.Compare(h[:], empty[:]) == 0
 }
 
 // BigToHash sets byte representation of b to hash.

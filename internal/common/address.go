@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"database/sql/driver"
 	"encoding/hex"
 	"fmt"
@@ -47,6 +48,12 @@ func IsBech32Address(s string) bool {
 		return false
 	}
 	return true
+}
+
+// IsEmpty gets whether the address contains all 0 bytes
+func (a Address) IsEmpty() bool {
+	empty := Address{}
+	return bytes.Compare(a[:], empty[:]) == 0
 }
 
 // Bytes gets the string representation of the underlying address.

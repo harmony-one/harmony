@@ -8,7 +8,7 @@ type (
 	// Commission defines a commission parameters for a given validator.
 	Commission struct {
 		CommissionRates `json:"commission_rates" yaml:"commission_rates"`
-		UpdateHeight    big.Int `json:"update_time" yaml:"update_time"` // the block height the commission rate was last changed
+		UpdateHeight    *big.Int `json:"update_time" yaml:"update_time"` // the block height the commission rate was last changed
 	}
 
 	// CommissionRates defines the initial commission rates to be used for creating a
