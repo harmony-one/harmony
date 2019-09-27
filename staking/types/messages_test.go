@@ -1,13 +1,14 @@
 package types
 
 import (
+	"math/big"
+	"reflect"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
-	"math/big"
-	"reflect"
-	"testing"
 )
 
 var (
