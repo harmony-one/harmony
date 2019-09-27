@@ -65,7 +65,7 @@ func (d Delegation) GetDelegatorAddr() common.Address { return d.DelegatorAddres
 // GetValidatorAddr returns ValidatorAddr
 func (d Delegation) GetValidatorAddr() common.Address { return d.ValidatorAddress }
 
-// GetShares returns shares of a delegation
+// GetAmount returns amount of a delegation
 func (d Delegation) GetAmount() *big.Int { return d.Amount }
 
 // String returns a human readable string representation of a Delegation.

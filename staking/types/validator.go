@@ -110,9 +110,20 @@ func (d Description) EnsureLength() (Description, error) {
 	return d, nil
 }
 
-func (v Validator) GetAddress() common.Address     { return v.Address }
-func (v Validator) IsActive() bool                 { return v.Active }
-func (v Validator) GetName() string                { return v.Description.Name }
-func (v Validator) GetStake() *big.Int             { return v.Stake }
-func (v Validator) GetCommissionRate() Dec         { return v.Commission.Rate }
+// GetAddress returns address
+func (v Validator) GetAddress() common.Address { return v.Address }
+
+// IsActive checks whether validator is active
+func (v Validator) IsActive() bool { return v.Active }
+
+// GetName returns the name of validator in the description
+func (v Validator) GetName() string { return v.Description.Name }
+
+// GetStake returns the total staking amount
+func (v Validator) GetStake() *big.Int { return v.Stake }
+
+// GetCommissionRate returns the commission rate of the validator
+func (v Validator) GetCommissionRate() Dec { return v.Commission.Rate }
+
+// GetMinSelfDelegation returns the minimum amount the validator must stake
 func (v Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
