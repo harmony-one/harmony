@@ -6,7 +6,6 @@ package client;
 service ClientService {
   rpc FetchAccountState(FetchAccountStateRequest) returns (FetchAccountStateResponse) {}
   rpc GetFreeToken(GetFreeTokenRequest) returns (GetFreeTokenResponse) {}
-  rpc GetStakingContractInfo(StakingContractInfoRequest) returns (StakingContractInfoResponse) {}
 }
 
 // FetchAccountStateRequest is the request to fetch an account's balance and nonce.
@@ -34,20 +33,3 @@ message GetFreeTokenResponse {
   // The transaction Id that requests free token from the faucet.
   bytes txId = 1;
 }
-
-// StakingContractInfoRequest is the request to necessary info for stkaing.
-message StakingContractInfoRequest {
-  // The account address
-  bytes address = 1;
-}
-
-// StakingContractInfoResponse is the response of GetStakingContractInfo.
-message StakingContractInfoResponse {
-  // Contract address.
-  string contract_address = 1;
-  // The balance of the staking account.
-  bytes balance = 2;
-  // The nonce of the staking account.
-  uint64 nonce = 3;
-}
-
