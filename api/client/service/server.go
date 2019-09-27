@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/core/state"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"google.golang.org/grpc"
@@ -16,9 +15,8 @@ import (
 
 // Server is the Server struct for client service package.
 type Server struct {
-	stateReader                       func() (*state.DB, error)
-	callFaucetContract                func(common.Address) common.Hash
-	getDeployedStakingContractAddress func() common.Address
+	stateReader        func() (*state.DB, error)
+	callFaucetContract func(common.Address) common.Hash
 }
 
 // FetchAccountState implements the FetchAccountState interface to return account state.
@@ -39,21 +37,6 @@ func (s *Server) GetFreeToken(ctx context.Context, request *proto.GetFreeTokenRe
 	address.SetBytes(request.Address)
 	//	log.Println("Returning GetFreeTokenResponse for address: ", address.Hex())
 	return &proto.GetFreeTokenResponse{TxId: s.callFaucetContract(address).Bytes()}, nil
-}
-
-// GetStakingContractInfo implements the GetStakingContractInfo interface to return necessary info for staking.
-func (s *Server) GetStakingContractInfo(ctx context.Context, request *proto.StakingContractInfoRequest) (*proto.StakingContractInfoResponse, error) {
-	var address common.Address
-	address.SetBytes(request.Address)
-	state, err := s.stateReader()
-	if err != nil {
-		return nil, err
-	}
-	return &proto.StakingContractInfoResponse{
-		ContractAddress: common2.MustAddressToBech32(s.getDeployedStakingContractAddress()),
-		Balance:         state.GetBalance(address).Bytes(),
-		Nonce:           state.GetNonce(address),
-	}, nil
 }
 
 // Start starts the Server on given ip and port.
@@ -78,12 +61,10 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 // NewServer creates new Server which implements ClientServiceServer interface.
 func NewServer(
 	stateReader func() (*state.DB, error),
-	callFaucetContract func(common.Address) common.Hash,
-	getDeployedStakingContractAddress func() common.Address) *Server {
+	callFaucetContract func(common.Address) common.Hash) *Server {
 	s := &Server{
-		stateReader:                       stateReader,
-		callFaucetContract:                callFaucetContract,
-		getDeployedStakingContractAddress: getDeployedStakingContractAddress,
+		stateReader:        stateReader,
+		callFaucetContract: callFaucetContract,
 	}
 	return s
 }

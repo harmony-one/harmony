@@ -22,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/contracts"
-	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/drand"
@@ -150,11 +149,6 @@ type Node struct {
 
 	// Service manager.
 	serviceManager *service.Manager
-
-	//Staked Accounts and Contract
-	CurrentStakes          map[common.Address]*structs.StakeInfo //This will save the latest information about staked nodes.
-	StakingContractAddress common.Address
-	WithdrawStakeFunc      []byte
 
 	// Demo account.
 	DemoContractAddress      common.Address
