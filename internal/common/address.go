@@ -21,6 +21,10 @@ const (
 	AddressLength = 20
 )
 
+var (
+	emptyAddress = Address{}
+)
+
 // Address represents the 20 byte address of an Harmony account.
 type Address [AddressLength]byte
 
@@ -52,8 +56,7 @@ func IsBech32Address(s string) bool {
 
 // IsEmpty gets whether the address contains all 0 bytes
 func (a Address) IsEmpty() bool {
-	empty := Address{}
-	return bytes.Compare(a[:], empty[:]) == 0
+	return bytes.Compare(a[:], emptyAddress[:]) == 0
 }
 
 // Bytes gets the string representation of the underlying address.

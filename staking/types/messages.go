@@ -1,14 +1,25 @@
 package types
 
 import (
-	"bytes"
 	"encoding/json"
 	"math/big"
 
-	"github.com/harmony-one/harmony/shard"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
+)
+
+const (
+	// CreateValidator ...
+	CreateValidator = "create_validator"
+	// EditValidator ...
+	EditValidator = "edit_validator"
+	// Delegate ...
+	Delegate = "delegate"
+	// Redelegate ...
+	Redelegate = "redelegate"
+	// Undelegate ...
+	Undelegate = "undelegate"
 )
 
 // StakingMessage must fulfill these interfaces
@@ -43,7 +54,6 @@ type msgCreateValidatorJSON struct {
 // NewMsgCreateValidator creates a new validator
 func NewMsgCreateValidator(
 	description Description, commission CommissionRates, minSelfDelegation *big.Int, stakingAddress common.Address, validatingPubKey shard.BlsPublicKey, amount *big.Int) MsgCreateValidator {
-
 	return MsgCreateValidator{
 		Description:       description,
 		Commission:        commission,
@@ -55,7 +65,7 @@ func NewMsgCreateValidator(
 }
 
 // Type ...
-func (msg MsgCreateValidator) Type() string { return "create_validator" }
+func (msg MsgCreateValidator) Type() string { return CreateValidator }
 
 // Signer ...
 func (msg MsgCreateValidator) Signer() common.Address { return msg.StakingAddress }
@@ -97,8 +107,7 @@ func (msg MsgCreateValidator) ValidateBasic() error {
 	if msg.StakingAddress.Big().Uint64() == 0 {
 		return errors.New("[CreateValidator] address is empty")
 	}
-	emptyKey := shard.BlsPublicKey{}
-	if bytes.Compare(msg.ValidatingPubKey[:], emptyKey[:]) == 0 {
+	if msg.ValidatingPubKey.IsEmpty() {
 		return errors.New("[CreateValidator] invalid BLS public key")
 	}
 	if msg.Description == (Description{}) {
@@ -146,7 +155,7 @@ func NewMsgEditValidator(
 }
 
 // Type ...
-func (msg MsgEditValidator) Type() string { return "edit_validator" }
+func (msg MsgEditValidator) Type() string { return EditValidator }
 
 // Signer ...
 func (msg MsgEditValidator) Signer() common.Address { return msg.StakingAddress }
@@ -170,7 +179,7 @@ func NewMsgDelegate(
 }
 
 // Type ...
-func (msg MsgDelegate) Type() string { return "delegate" }
+func (msg MsgDelegate) Type() string { return Delegate }
 
 // Signer ...
 func (msg MsgDelegate) Signer() common.Address { return msg.DelegatorAddress }
@@ -193,6 +202,12 @@ func NewMsgRedelegate(delAddr, valSrcAddr, valDstAddr common.Address, amount *bi
 	}
 }
 
+// Type ...
+func (msg MsgRedelegate) Type() string { return Redelegate }
+
+// Signer ...
+func (msg MsgRedelegate) Signer() common.Address { return msg.DelegatorAddress }
+
 // MsgUndelegate - struct for unbonding transactions
 type MsgUndelegate struct {
 	DelegatorAddress common.Address `json:"delegator_address" yaml:"delegator_address"`
@@ -208,3 +223,9 @@ func NewMsgUndelegate(delAddr common.Address, valAddr common.Address, amount *bi
 		Amount:           amount,
 	}
 }
+
+// Type ...
+func (msg MsgUndelegate) Type() string { return Undelegate }
+
+// Signer ...
+func (msg MsgUndelegate) Signer() common.Address { return msg.DelegatorAddress }

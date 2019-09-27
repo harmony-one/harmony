@@ -20,8 +20,9 @@ const (
 )
 
 var (
-	hashT    = reflect.TypeOf(Hash{})
-	addressT = reflect.TypeOf(Address{})
+	hashT     = reflect.TypeOf(Hash{})
+	addressT  = reflect.TypeOf(Address{})
+	emptyHash = Hash{}
 )
 
 // Hash represents the 32 byte Keccak256 hash of arbitrary data.
@@ -37,8 +38,7 @@ func BytesToHash(b []byte) Hash {
 
 // IsEmpty gets whether the hash contains all 0 bytes
 func (h Hash) IsEmpty() bool {
-	empty := Hash{}
-	return bytes.Compare(h[:], empty[:]) == 0
+	return bytes.Compare(h[:], emptyHash[:]) == 0
 }
 
 // BigToHash sets byte representation of b to hash.
