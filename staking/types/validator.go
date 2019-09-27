@@ -9,7 +9,7 @@ import (
 
 // Validator - data fields for a validator
 type Validator struct {
-	StakingAddress    common.Address `json:"staking_address" yaml:"staking_address"`         // ECDSA address of the validator
+	Address           common.Address `json:"address" yaml:"address"`                         // ECDSA address of the validator
 	ValidatingPubKey  bls.PublicKey  `json:"validating_pub_key" yaml:"validating_pub_key"`   // The BLS public key of the validator for consensus
 	Description       Description    `json:"description" yaml:"description"`                 // description for the validator
 	Active            bool           `json:"active" yaml:"active"`                           // Is the validator active in the validating process or not

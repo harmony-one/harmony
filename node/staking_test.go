@@ -41,8 +41,8 @@ func TestUpdateStakingList(t *testing.T) {
 	node.BlockPeriod = 8 * time.Second
 
 	for i := 0; i < 1; i++ {
-		selectedTxs := node.getTransactionsForNewBlock(common.Address{})
-		node.Worker.CommitTransactions(selectedTxs, common.Address{})
+		selectedTxs, selectedStakingTxs := node.getTransactionsForNewBlock(common.Address{})
+		node.Worker.CommitTransactions(selectedTxs, selectedStakingTxs, common.Address{})
 		block, err := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
 		// The block must first be finalized before being added to the blockchain.

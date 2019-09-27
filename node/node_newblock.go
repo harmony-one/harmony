@@ -81,10 +81,10 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	coinbase := node.Consensus.SelfAddress
 
-	// Prepare transactions
-	selectedTxs := node.getTransactionsForNewBlock(coinbase)
+	// Prepare transactions including staking transactions
+	selectedTxs, selectedStakingTxs := node.getTransactionsForNewBlock(coinbase)
 
-	if err := node.Worker.CommitTransactions(selectedTxs, coinbase); err != nil {
+	if err := node.Worker.CommitTransactions(selectedTxs, selectedStakingTxs, coinbase); err != nil {
 		ctxerror.Log15(utils.GetLogger().Error,
 			ctxerror.New("cannot commit transactions").
 				WithCause(err))
