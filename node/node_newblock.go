@@ -252,6 +252,7 @@ Loop:
 		numProposed = numProposed + len(cxp.Receipts)
 	}
 
+	node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
 	for _, v := range pendingReceiptsList {
 		blockNum := v.Header.Number().Uint64()
 		shardID := v.Header.ShardID()

@@ -63,19 +63,27 @@ func newHeaderInformation(header *block.Header) *HeaderInformation {
 	if header == nil {
 		return nil
 	}
+
 	result := &HeaderInformation{
 		BlockHash:        header.Hash(),
 		BlockNumber:      header.Number().Uint64(),
 		ShardID:          header.ShardID(),
-		Leader:           common2.MustAddressToBech32(header.Coinbase()),
 		ViewID:           header.ViewID().Uint64(),
 		Epoch:            header.Epoch().Uint64(),
 		UnixTime:         header.Time().Uint64(),
 		Timestamp:        time.Unix(header.Time().Int64(), 0).UTC().String(),
 		LastCommitBitmap: hex.EncodeToString(header.LastCommitBitmap()),
 	}
+
 	sig := header.LastCommitSignature()
 	result.LastCommitSig = hex.EncodeToString(sig[:])
+
+	bechAddr, err := common2.AddressToBech32(header.Coinbase())
+	if err != nil {
+		bechAddr = header.Coinbase().Hex()
+	}
+
+	result.Leader = bechAddr
 	return result
 }
 
@@ -84,8 +92,6 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 	result := &RPCCXReceipt{
 		BlockHash: blockHash,
 		TxHash:    cx.TxHash,
-		From:      common2.MustAddressToBech32(cx.From),
-		To:        common2.MustAddressToBech32(*cx.To),
 		Amount:    (*hexutil.Big)(cx.Amount),
 		ShardID:   cx.ShardID,
 		ToShardID: cx.ToShardID,
@@ -94,6 +100,18 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 		result.BlockHash = blockHash
 		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
 	}
+
+	fromAddr, err := common2.AddressToBech32(cx.From)
+	if err != nil {
+		fromAddr = cx.From.Hex()
+	}
+	toAddr, err := common2.AddressToBech32(*cx.To)
+	if err != nil {
+		toAddr = (*cx.To).Hex()
+	}
+	result.From = fromAddr
+	result.To = toAddr
+
 	return result
 }
 
@@ -108,13 +126,11 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	v, r, s := tx.RawSignatureValues()
 
 	result := &RPCTransaction{
-		From:      common2.MustAddressToBech32(from),
 		Gas:       hexutil.Uint64(tx.Gas()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
 		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
-		To:        common2.MustAddressToBech32(*tx.To()),
 		Value:     (*hexutil.Big)(tx.Value()),
 		ShardID:   tx.ShardID(),
 		ToShardID: tx.ToShardID(),
@@ -127,6 +143,18 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
 		result.TransactionIndex = hexutil.Uint(index)
 	}
+
+	fromAddr, err := common2.AddressToBech32(from)
+	if err != nil {
+		fromAddr = from.Hex()
+	}
+	toAddr, err := common2.AddressToBech32(*tx.To())
+	if err != nil {
+		toAddr = (*tx.To()).Hex()
+	}
+	result.From = fromAddr
+	result.To = toAddr
+
 	return result
 }
 
