@@ -275,3 +275,8 @@ func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bo
 	success := b.hmy.CxPool().Add(entry)
 	return blockNum, success
 }
+
+// IsLeader exposes if node is currently leader
+func (b *APIBackend) IsLeader() bool {
+	return b.hmy.nodeAPI.IsCurrentlyLeader()
+}

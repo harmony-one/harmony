@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"time"
 
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/shard"
 
@@ -96,13 +98,6 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 
 // SelectTransactionsForNewBlock selects transactions for new block.
 func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Transactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
-	// Must update to the correct current state before processing potential txns
-	if err := w.UpdateCurrent(coinbase); err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("Failed updating worker's state before txn selection")
-		return types.Transactions{}, txs, types.Transactions{}
-	}
 
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
@@ -154,6 +149,12 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 	return selected, unselected, invalid
 }
 
+// SelectStakingTransactionsForNewBlock selects staking transactions for new block.
+func (w *Worker) SelectStakingTransactionsForNewBlock(newBlockNum uint64, txs types2.StakingTransactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types2.StakingTransactions, types2.StakingTransactions, types2.StakingTransactions) {
+	// TODO: implement staking transaction selection
+	return types2.StakingTransactions{}, types2.StakingTransactions{}, types2.StakingTransactions{}
+}
+
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
@@ -177,8 +178,8 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-// CommitTransactions commits transactions.
-func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Address) error {
+// CommitTransactions commits transactions including staking transactions.
+func (w *Worker) CommitTransactions(txs types.Transactions, stakingTxns types2.StakingTransactions, coinbase common.Address) error {
 	// Must update to the correct current state before processing potential txns
 	if err := w.UpdateCurrent(coinbase); err != nil {
 		utils.Logger().Error().
@@ -198,6 +199,10 @@ func (w *Worker) CommitTransactions(txs types.Transactions, coinbase common.Addr
 			return err
 
 		}
+	}
+	for _, stakingTx := range stakingTxns {
+		_ = stakingTx
+		// TODO: add logic to commit staking txns
 	}
 	return nil
 }

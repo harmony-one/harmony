@@ -31,7 +31,6 @@ const (
 	Node
 	Client
 	DRand
-	Staking
 	// TODO: add more types
 )
 
@@ -102,13 +101,6 @@ func ConstructConsensusMessage(payload []byte) []byte {
 // ConstructDRandMessage creates a message with the payload and returns as byte array.
 func ConstructDRandMessage(payload []byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(DRand)})
-	byteBuffer.Write(payload)
-	return byteBuffer.Bytes()
-}
-
-// ConstructStakingMessage creates a message with the payload and returns as byte array.
-func ConstructStakingMessage(payload []byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(Staking)})
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()
 }
