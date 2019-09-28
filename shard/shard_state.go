@@ -13,6 +13,10 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
+var (
+	emptyBlsPubKey = BlsPublicKey{}
+)
+
 // EpochShardState is the shard state of an epoch
 type EpochShardState struct {
 	Epoch      uint64
@@ -64,6 +68,11 @@ func CompareShardState(s1, s2 State) int {
 
 // BlsPublicKey defines the bls public key
 type BlsPublicKey [48]byte
+
+// IsEmpty returns whether the bls public key is empty 0 bytes
+func (pk BlsPublicKey) IsEmpty() bool {
+	return bytes.Compare(pk[:], emptyBlsPubKey[:]) == 0
+}
 
 // Hex returns the hex string of bls public key
 func (pk BlsPublicKey) Hex() string {
