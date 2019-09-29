@@ -55,6 +55,20 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 	return ReturnWithPagination(result, args), nil
 }
 
+// GetTransactionsHistoryFull returns the list of transactions with full info that involve a particular address.
+func (s *PublicTransactionPoolAPI) GetTransactionsHistoryFull(ctx context.Context, args TxHistoryArgs) ([]*RPCTransaction, error) {
+	hashes, err := s.GetTransactionsHistory(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+	result := []*RPCTransaction{}
+	for _, hash := range hashes {
+		tx := s.GetTransactionByHash(ctx, hash)
+		result = append(result, tx)
+	}
+	return result, nil
+}
+
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
 func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) *hexutil.Uint {
 	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
