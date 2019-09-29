@@ -119,13 +119,20 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transacti
 	gasFee := big.NewInt(0)
 	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas()))
 	to := ""
+	var err error
 	if msg.To() != nil {
-		to = common.MustAddressToBech32(*msg.To())
+		if to, err = common.AddressToBech32(*msg.To()); err != nil {
+			return nil			
+		}
+	}
+	from := ""
+	if from, err = common.AddressToBech32(msg.From()); err != nil {
+		return nil
 	}
 	return &Transaction{
 		ID:        tx.Hash().Hex(),
 		Timestamp: strconv.Itoa(int(addressBlock.Time().Int64() * 1000)),
-		From:      common.MustAddressToBech32(msg.From()),
+		From:      from,
 		To:        to,
 		Value:     msg.Value(),
 		Bytes:     strconv.Itoa(int(tx.Size())),
