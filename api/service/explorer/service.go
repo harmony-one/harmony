@@ -339,7 +339,9 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 		}
 		data.Blocks = append(data.Blocks, block)
 	}
-	if offset*page+offset > len(data.Blocks) {
+	if offset*page >= len(data.Blocks) {
+		data.Blocks = []*Block{}
+	} else if offset*page+offset > len(data.Blocks) {
 		data.Blocks = data.Blocks[offset*page:]
 	} else {
 		data.Blocks = data.Blocks[offset*page : offset*page+offset]
@@ -458,7 +460,9 @@ func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offs
 		}
 		blocks = append(blocks, block)
 	}
-	if offset*page+offset > len(blocks) {
+	if offset*page >= len(blocks) {
+		blocks = []*Block{}
+	} else if offset*page+offset > len(blocks) {
 		blocks = blocks[offset*page:]
 	} else {
 		blocks = blocks[offset*page : offset*page+offset]
@@ -854,7 +858,10 @@ func (s *ServiceAPI) GetExplorerAddress(ctx context.Context, id, txView string, 
 		}
 		address.TXs = sentTXs
 	}
-	if offset*page+offset > len(address.TXs) {
+
+	if offset*page >= len(address.TXs) {
+		address.TXs = []*Transaction{}
+	} else if offset*page+offset > len(address.TXs) {
 		address.TXs = address.TXs[offset*page:]
 	} else {
 		address.TXs = address.TXs[offset*page : offset*page+offset]
