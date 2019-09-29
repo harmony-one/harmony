@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // TxHistoryArgs is struct to make GetTransactionsHistory request

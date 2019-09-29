@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
@@ -153,7 +152,6 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	}
 	toAddr := ""
 
-	utils.Logger().Info().Msgf("LOLOLO %s", fromAddr)
 	if tx.To() != nil {
 		if toAddr, err = internal_common.AddressToBech32(*tx.To()); err != nil {
 			return nil
