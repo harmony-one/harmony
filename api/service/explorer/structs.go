@@ -119,7 +119,6 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transacti
 	gasFee := big.NewInt(0)
 	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas()))
 	to := ""
-	var err error
 	if msg.To() != nil {
 		if to, err = common.AddressToBech32(*msg.To()); err != nil {
 			return nil			
