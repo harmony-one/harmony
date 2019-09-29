@@ -23,6 +23,9 @@ func ReturnWithPagination(hashes []common.Hash, args TxHistoryArgs) []common.Has
 	if args.Offset > 0 {
 		offset = args.Offset
 	}
+	if offset*page >= len(hashes) {
+		return make([]common.Hash, 0)
+	}
 	if offset*page+offset > len(hashes) {
 		return hashes[offset*page:]
 	}
