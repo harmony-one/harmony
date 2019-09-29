@@ -112,10 +112,6 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 
 	// Store txs
 	for _, tx := range block.Transactions() {
-		if tx.To() == nil {
-			continue
-		}
-
 		explorerTransaction := GetTransaction(tx, block)
 		storage.UpdateTXStorage(batch, explorerTransaction, tx)
 		storage.UpdateAddress(batch, explorerTransaction, tx)
@@ -158,7 +154,9 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 // TODO: deprecate this logic
 func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
-	storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+	if explorerTransaction.To != "" {
+		storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+	}
 	explorerTransaction.Type = Sent
 	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
 }

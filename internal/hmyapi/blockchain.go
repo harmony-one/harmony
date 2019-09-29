@@ -41,6 +41,7 @@ func NewPublicBlockChainAPI(b Backend) *PublicBlockChainAPI {
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if block != nil {
+		utils.Logger().Info().Msgf("HASH block %s", block.Hash().String())
 		response, err := RPCMarshalBlock(block, true, fullTx)
 		if err == nil && blockNr == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
@@ -58,7 +59,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.GetBlock(ctx, blockHash)
 	if block != nil {
-		return RPCMarshalBlock(block, false, false)
+		return RPCMarshalBlock(block, true, fullTx)
 	}
 	return nil, err
 }

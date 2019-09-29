@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // TxHistoryArgs is struct to make GetTransactionsHistory request
@@ -93,6 +94,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context
 func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, hash common.Hash) *RPCTransaction {
 	// Try to return an already finalized transaction
 	if tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash); tx != nil {
+		utils.Logger().Info().Msgf("HASH %s", tx.Hash().String())
 		return newRPCTransaction(tx, blockHash, blockNumber, index)
 	}
 	// No finalized transaction, try to retrieve it from the pool
@@ -174,6 +176,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	if tx == nil {
 		return nil, nil
 	}
+	utils.Logger().Info().Msgf("HASH %s", tx.Hash().String())
 	receipts, err := s.b.GetReceipts(ctx, blockHash)
 	if err != nil {
 		return nil, err
@@ -188,14 +191,18 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		signer = types.NewEIP155Signer(tx.ChainID())
 	}
 	from, _ := types.Sender(signer, tx)
-
+	to := ""
+	utils.Logger().Info().Msgf("LOLOLO %s", internal_common.MustAddressToBech32(from))
+	if tx.To() != nil {
+		to = internal_common.MustAddressToBech32(*tx.To())
+	}
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
 		"blockNumber":       hexutil.Uint64(blockNumber),
 		"transactionHash":   hash,
 		"transactionIndex":  hexutil.Uint64(index),
-		"from":              from,
-		"to":                tx.To(),
+		"from":              internal_common.MustAddressToBech32(from),
+		"to":                to,
 		"shardID":           tx.ShardID(),
 		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
 		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),

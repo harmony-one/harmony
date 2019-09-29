@@ -5,10 +5,8 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -114,20 +112,21 @@ func NewBlock(block *types.Block, height int) *Block {
 
 // GetTransaction ...
 func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transaction {
-	if tx.To() == nil {
-		return nil
-	}
 	msg, err := tx.AsMessage(types.NewEIP155Signer(tx.ChainID()))
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
 	}
 	gasFee := big.NewInt(0)
 	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas()))
+	to := ""
+	if msg.To() != nil {
+		to = common.MustAddressToBech32(*msg.To())
+	}
 	return &Transaction{
 		ID:        tx.Hash().Hex(),
 		Timestamp: strconv.Itoa(int(addressBlock.Time().Int64() * 1000)),
-		From:      common2.MustAddressToBech32(common.HexToAddress(msg.From().Hex())),
-		To:        common2.MustAddressToBech32(common.HexToAddress(msg.To().Hex())),
+		From:      common.MustAddressToBech32(msg.From()),
+		To:        to,
 		Value:     msg.Value(),
 		Bytes:     strconv.Itoa(int(tx.Size())),
 		Data:      hex.EncodeToString(tx.Data()),
