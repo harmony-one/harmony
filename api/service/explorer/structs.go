@@ -121,7 +121,7 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transacti
 	to := ""
 	if msg.To() != nil {
 		if to, err = common.AddressToBech32(*msg.To()); err != nil {
-			return nil			
+			return nil
 		}
 	}
 	from := ""
