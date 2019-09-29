@@ -765,7 +765,9 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 		}
 		data.Address.TXs = sentTXs
 	}
-	if offset*page+offset > len(data.Address.TXs) {
+	if offset*page >= len(data.Address.TXs) {
+		data.Address.TXs = []*Transaction{}
+	} else if offset*page+offset > len(data.Address.TXs) {
 		data.Address.TXs = data.Address.TXs[offset*page:]
 	} else {
 		data.Address.TXs = data.Address.TXs[offset*page : offset*page+offset]
