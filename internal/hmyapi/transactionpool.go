@@ -187,18 +187,11 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	if tx.Protected() {
 		signer = types.NewEIP155Signer(tx.ChainID())
 	}
-	from, _ := types.Sender(signer, tx)
-	to := ""
-	if tx.To() != nil {
-		to = internal_common.MustAddressToBech32(*tx.To())
-	}
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
 		"blockNumber":       hexutil.Uint64(blockNumber),
 		"transactionHash":   hash,
 		"transactionIndex":  hexutil.Uint64(index),
-		"from":              internal_common.MustAddressToBech32(from),
-		"to":                to,
 		"shardID":           tx.ShardID(),
 		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
 		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
@@ -206,7 +199,18 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
 	}
-
+	from, _ := types.Sender(signer, tx)
+	fields["from"] = from
+	if tx.To() != nil {
+		fields["to"], err = internal_common.AddressToBech32(*tx.To())
+		if err != nil {
+			return nil, err
+		}
+		fields["from"], err = internal_common.AddressToBech32(from)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// Assign receipt status or post state.
 	if len(receipt.PostState) > 0 {
 		fields["root"] = hexutil.Bytes(receipt.PostState)

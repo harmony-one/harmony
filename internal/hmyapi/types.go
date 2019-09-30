@@ -3,6 +3,7 @@ package hmyapi
 import (
 	"encoding/hex"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -156,8 +157,10 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		if toAddr, err = internal_common.AddressToBech32(*tx.To()); err != nil {
 			return nil
 		}
+		result.From = fromAddr
+	} else {
+		result.From = strings.ToLower(from.Hex())
 	}
-	result.From = fromAddr
 	result.To = toAddr
 
 	return result
