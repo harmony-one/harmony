@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
+	types2 "github.com/harmony-one/harmony/staking"
 
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	chain2 "github.com/harmony-one/harmony/internal/chain"

@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
+	types2 "github.com/harmony-one/harmony/staking"
 
 	"github.com/ethereum/go-ethereum/crypto"
 

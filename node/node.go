@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
+	types2 "github.com/harmony-one/harmony/staking"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/params"
@@ -288,6 +288,12 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs types2.StakingTran
 	}
 	node.pendingStakingTxMutex.Unlock()
 	utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more staking transactions")
+}
+
+// AddPendingStakingTransaction staking transactions
+func (node *Node) AddPendingStakingTransaction(
+	newStakingTx *types2.StakingTransaction) {
+	node.addPendingStakingTransactions(types2.StakingTransactions{newStakingTx})
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.

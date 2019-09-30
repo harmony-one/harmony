@@ -54,6 +54,7 @@ require (
 	github.com/rs/zerolog v1.14.3
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
+	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc

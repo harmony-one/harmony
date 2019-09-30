@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )

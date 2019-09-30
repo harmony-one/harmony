@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
+	types2 "github.com/harmony-one/harmony/staking"
 
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/shard"
