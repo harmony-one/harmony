@@ -3,6 +3,7 @@ package hmyapi
 import (
 	"encoding/hex"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,7 +11,7 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 )
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
@@ -78,7 +79,7 @@ func newHeaderInformation(header *block.Header) *HeaderInformation {
 	sig := header.LastCommitSignature()
 	result.LastCommitSig = hex.EncodeToString(sig[:])
 
-	bechAddr, err := common2.AddressToBech32(header.Coinbase())
+	bechAddr, err := internal_common.AddressToBech32(header.Coinbase())
 	if err != nil {
 		bechAddr = header.Coinbase().Hex()
 	}
@@ -101,13 +102,15 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
 	}
 
-	fromAddr, err := common2.AddressToBech32(cx.From)
+	fromAddr, err := internal_common.AddressToBech32(cx.From)
 	if err != nil {
-		fromAddr = cx.From.Hex()
+		return nil
 	}
-	toAddr, err := common2.AddressToBech32(*cx.To)
-	if err != nil {
-		toAddr = (*cx.To).Hex()
+	toAddr := ""
+	if cx.To != nil {
+		if toAddr, err = internal_common.AddressToBech32(*cx.To); err != nil {
+			return nil
+		}
 	}
 	result.From = fromAddr
 	result.To = toAddr
@@ -144,15 +147,20 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		result.TransactionIndex = hexutil.Uint(index)
 	}
 
-	fromAddr, err := common2.AddressToBech32(from)
+	fromAddr, err := internal_common.AddressToBech32(from)
 	if err != nil {
-		fromAddr = from.Hex()
+		return nil
 	}
-	toAddr, err := common2.AddressToBech32(*tx.To())
-	if err != nil {
-		toAddr = (*tx.To()).Hex()
+	toAddr := ""
+
+	if tx.To() != nil {
+		if toAddr, err = internal_common.AddressToBech32(*tx.To()); err != nil {
+			return nil
+		}
+		result.From = fromAddr
+	} else {
+		result.From = strings.ToLower(from.Hex())
 	}
-	result.From = fromAddr
 	result.To = toAddr
 
 	return result
