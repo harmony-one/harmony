@@ -26,6 +26,7 @@ type txdata struct {
 	hash *common.Hash `json:"hash" rlp:"-"`
 }
 
+// StakingTransaction is the staking transaction
 type StakingTransaction struct {
 	data txdata
 	// caches
@@ -43,6 +44,7 @@ func NewTransaction(
 }
 
 var (
+	// ErrInvalidSig is a bad signature
 	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
 )
 
@@ -86,6 +88,7 @@ func (tx *StakingTransaction) WithSignature(signer Signer, sig []byte) (*Staking
 	return cpy, nil
 }
 
+// ChainID is what chain this staking transaction for
 func (tx *StakingTransaction) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)
 }
