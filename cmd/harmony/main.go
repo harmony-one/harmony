@@ -35,11 +35,17 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
+// Version string variables
 var (
 	version string
 	builtBy string
 	builtAt string
 	commit  string
+)
+
+// Host
+var (
+	myHost p2p.Host
 )
 
 // InitLDBDatabase initializes a LDBDatabase. isGenesis=true will return the beacon chain database for normal shard nodes
@@ -64,6 +70,7 @@ func printVersion() {
 	os.Exit(0)
 }
 
+// Flags
 var (
 	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
 	port             = flag.String("port", "9000", "port of the node.")
@@ -262,11 +269,12 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	if err != nil {
 		panic(err)
 	}
-	nodeConfig.SelfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
-	nodeConfig.Host, err = p2pimpl.NewHost(&nodeConfig.SelfPeer, nodeConfig.P2pPriKey)
+	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
+
+	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
 	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		nodeConfig.Host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
+		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
 	}
 	if err != nil {
 		panic("unable to new host in harmony")
@@ -281,7 +289,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	currentConsensus, err := consensus.New(nodeConfig.Host, nodeConfig.ShardID, nodeConfig.Leader, nodeConfig.ConsensusPriKey)
+	currentConsensus, err := consensus.New(myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey)
 	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 
 	if err != nil {
@@ -302,7 +310,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
-	currentNode := node.New(nodeConfig.Host, currentConsensus, chainDBFactory, *isArchival)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, *isArchival)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
@@ -338,21 +346,21 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
 	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
 
-	currentNode.NodeConfig.SetBeaconGroupID(p2p.NewGroupIDByShardID(0))
+	currentNode.NodeConfig.SetBeaconGroupID(nodeconfig.NewGroupIDByShardID(0))
 
 	switch *nodeType {
 	case "explorer":
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
-		currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(*shardID)))
-		currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(*shardID)))
+		currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(*shardID)))
+		currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(*shardID)))
 	case "validator":
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 		if nodeConfig.ShardID == 0 {
-			currentNode.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
-			currentNode.NodeConfig.SetClientGroupID(p2p.GroupIDBeaconClient)
+			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(0))
+			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(0))
 		} else {
-			currentNode.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
-			currentNode.NodeConfig.SetClientGroupID(p2p.NewClientGroupIDByShardID(p2p.ShardID(nodeConfig.ShardID)))
+			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
+			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 		}
 	}
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
@@ -479,7 +487,7 @@ func main() {
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).
 		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
 		Str("Role", currentNode.NodeConfig.Role().String()).
-		Str("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, nodeConfig.Host.GetID().Pretty())).
+		Str("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, myHost.GetID().Pretty())).
 		Msg(startMsg)
 
 	if *enableMemProfiling {

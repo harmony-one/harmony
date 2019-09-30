@@ -246,11 +246,11 @@ func (node *Node) Beaconchain() *core.BlockChain {
 func (node *Node) tryBroadcast(tx *types.Transaction) {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 
-	shardGroupID := p2p.NewGroupIDByShardID(p2p.ShardID(tx.ShardID()))
+	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(tx.ShardID()))
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
-		if err := node.host.SendMessageToGroups([]p2p.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
+		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
 		} else {
 			break
@@ -604,15 +604,15 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		PushgatewayIP:   node.NodeConfig.GetPushgatewayIP(),
 		PushgatewayPort: node.NodeConfig.GetPushgatewayPort(),
 		IsClient:        node.NodeConfig.IsClient(),
-		Beacon:          p2p.GroupIDBeacon,
+		Beacon:          nodeconfig.NewGroupIDByShardID(0),
 		ShardGroupID:    node.NodeConfig.GetShardGroupID(),
-		Actions:         make(map[p2p.GroupID]p2p.ActionType),
+		Actions:         make(map[nodeconfig.GroupID]nodeconfig.ActionType),
 	}
 
 	if nodeConfig.IsClient {
-		nodeConfig.Actions[p2p.GroupIDBeaconClient] = p2p.ActionStart
+		nodeConfig.Actions[nodeconfig.NewClientGroupIDByShardID(0)] = nodeconfig.ActionStart
 	} else {
-		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = p2p.ActionStart
+		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = nodeconfig.ActionStart
 	}
 
 	var err error
@@ -621,7 +621,7 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		utils.Logger().Error().Err(err).Msg("Failed to create shard receiver")
 	}
 
-	node.globalGroupReceiver, err = node.host.GroupReceiver(p2p.GroupIDBeaconClient)
+	node.globalGroupReceiver, err = node.host.GroupReceiver(nodeconfig.NewClientGroupIDByShardID(0))
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to create global receiver")
 	}

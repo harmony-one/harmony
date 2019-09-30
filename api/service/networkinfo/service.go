@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	badger "github.com/ipfs/go-ds-badger"
@@ -25,7 +26,7 @@ import (
 // Service is the network info service.
 type Service struct {
 	Host        p2p.Host
-	Rendezvous  p2p.GroupID
+	Rendezvous  nodeconfig.GroupID
 	bootnodes   utils.AddrList
 	dht         *libp2pdht.IpfsDHT
 	cancel      context.CancelFunc
@@ -61,7 +62,7 @@ const (
 // New returns role conversion service.  If dataStorePath is not empty, it
 // points to a persistent database directory to use.
 func New(
-	h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer,
+	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
 	bootnodes utils.AddrList, dataStorePath string,
 ) (*Service, error) {
 	var cancel context.CancelFunc
@@ -100,7 +101,7 @@ func New(
 
 // MustNew is a panic-on-error version of New.
 func MustNew(
-	h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer,
+	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
 	bootnodes utils.AddrList, dataStorePath string,
 ) *Service {
 	service, err := New(h, rendezvous, peerChan, bootnodes, dataStorePath)
@@ -167,7 +168,10 @@ func (s *Service) Init() error {
 	utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Announcing ourselves...")
 	s.discovery = libp2pdis.NewRoutingDiscovery(s.dht)
 	libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-	libp2pdis.Advertise(ctx, s.discovery, string(p2p.GroupIDBeaconClient))
+
+	// Everyone is beacon client, which means everyone is connected via beacon client topic
+	// 0 is beacon chain FIXME: use a constant
+	libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
 	utils.Logger().Info().Msg("Successfully announced!")
 
 	return nil
@@ -193,7 +197,8 @@ func (s *Service) DoService() {
 			return
 		case <-tick.C:
 			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-			libp2pdis.Advertise(ctx, s.discovery, string(p2p.GroupIDBeaconClient))
+			// 0 is beacon chain FIXME: use a constant
+			libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
 			utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Successfully announced!")
 		default:
 			var err error

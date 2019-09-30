@@ -6,6 +6,7 @@ package mock_p2p
 
 import (
 	gomock "github.com/golang/mock/gomock"
+	node "github.com/harmony-one/harmony/internal/configs/node"
 	p2p "github.com/harmony-one/harmony/p2p"
 	go_libp2p_host "github.com/libp2p/go-libp2p-host"
 	go_libp2p_peer "github.com/libp2p/go-libp2p-peer"
@@ -132,7 +133,7 @@ func (mr *MockHostMockRecorder) ConnectHostPeer(arg0 interface{}) *gomock.Call {
 }
 
 // SendMessageToGroups mocks base method
-func (m *MockHost) SendMessageToGroups(groups []p2p.GroupID, msg []byte) error {
+func (m *MockHost) SendMessageToGroups(groups []node.GroupID, msg []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendMessageToGroups", groups, msg)
 	ret0, _ := ret[0].(error)
@@ -146,7 +147,7 @@ func (mr *MockHostMockRecorder) SendMessageToGroups(groups, msg interface{}) *go
 }
 
 // GroupReceiver mocks base method
-func (m *MockHost) GroupReceiver(arg0 p2p.GroupID) (p2p.GroupReceiver, error) {
+func (m *MockHost) GroupReceiver(arg0 node.GroupID) (p2p.GroupReceiver, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GroupReceiver", arg0)
 	ret0, _ := ret[0].(p2p.GroupReceiver)

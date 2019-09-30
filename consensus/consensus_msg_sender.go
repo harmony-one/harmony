@@ -5,6 +5,7 @@ import (
 	"time"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -28,7 +29,7 @@ type MessageSender struct {
 // MessageRetry controls the message that can be retried
 type MessageRetry struct {
 	blockNum      uint64 // The block number this message is for
-	groups        []p2p.GroupID
+	groups        []nodeconfig.GroupID
 	p2pMsg        []byte
 	msgType       msg_pb.MessageType
 	retryCount    int
@@ -58,7 +59,7 @@ func (sender *MessageSender) Reset(blockNum uint64) {
 }
 
 // SendWithRetry sends message with retry logic.
-func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.MessageType, groups []p2p.GroupID, p2pMsg []byte) error {
+func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.MessageType, groups []nodeconfig.GroupID, p2pMsg []byte) error {
 	willRetry := sender.retryTimes != 0
 	msgRetry := MessageRetry{blockNum: blockNum, groups: groups, p2pMsg: p2pMsg, msgType: msgType, retryCount: 0, isActive: willRetry}
 	if willRetry {
@@ -71,7 +72,7 @@ func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.Messa
 }
 
 // SendWithoutRetry sends message without retry logic.
-func (sender *MessageSender) SendWithoutRetry(groups []p2p.GroupID, p2pMsg []byte) error {
+func (sender *MessageSender) SendWithoutRetry(groups []nodeconfig.GroupID, p2pMsg []byte) error {
 	return sender.host.SendMessageToGroups(groups, p2pMsg)
 }
 

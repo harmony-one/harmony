@@ -3,8 +3,8 @@ package drand
 import (
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -59,5 +59,5 @@ func (dRand *DRand) processInitMessage(message *msg_pb.Message) {
 	msgToSend := dRand.constructCommitMessage(rand, proof)
 
 	// Send the commit message back to leader
-	dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(dRand.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+	dRand.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(dRand.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 }

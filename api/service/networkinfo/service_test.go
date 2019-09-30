@@ -6,6 +6,7 @@ import (
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -28,7 +29,7 @@ func TestService(t *testing.T) {
 		t.Fatal("unable to new host in harmony")
 	}
 
-	s, err := New(host, p2p.GroupIDBeaconClient, nil, nil, "")
+	s, err := New(host, nodeconfig.GroupIDBeaconClient, nil, nil, "")
 	if err != nil {
 		t.Fatalf("New() failed: %s", err)
 	}
