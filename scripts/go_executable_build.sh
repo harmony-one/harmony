@@ -107,7 +107,7 @@ function build_only
             env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
          fi
          if [ "$(uname -s)" == "Linux" ]; then
-            $BINDIR/$bin -version
+            $BINDIR/$bin -version || $BINDIR/$bin version
          fi
          if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" -a -e $BINDIR/$bin ]; then
             $BINDIR/$bin -version || $BINDIR/$bin version

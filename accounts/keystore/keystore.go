@@ -38,7 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core/types"
-	types2 "github.com/harmony-one/harmony/staking"
+	types2 "github.com/harmony-one/harmony/staking/types"
 )
 
 // ErrLocked ...

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking"
+	types2 "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/params"

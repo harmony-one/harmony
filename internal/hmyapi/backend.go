@@ -18,7 +18,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
-	types2 "github.com/harmony-one/harmony/staking"
+	types2 "github.com/harmony-one/harmony/staking/types"
 )
 
 // Backend interface provides the common API services (that are provided by

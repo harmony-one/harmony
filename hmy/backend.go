@@ -11,7 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
-	types2 "github.com/harmony-one/harmony/staking"
+	types2 "github.com/harmony-one/harmony/staking/types"
 )
 
 // Harmony implements the Harmony full node service.

@@ -6,7 +6,7 @@ import (
 	"log"
 	"math/big"
 
-	types2 "github.com/harmony-one/harmony/staking"
+	types2 "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/crypto"
 

@@ -9,7 +9,7 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/internal/common"
-	types2 "github.com/harmony-one/harmony/staking"
+	types2 "github.com/harmony-one/harmony/staking/types"
 	"github.com/spf13/cobra"
 )
 
@@ -64,6 +64,7 @@ func versionS() string {
 }
 
 func init() {
+
 	rootCmd.AddCommand(&cobra.Command{
 		Use:               "staking-iterate",
 		Short:             "run through staking process",
