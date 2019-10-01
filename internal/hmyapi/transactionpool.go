@@ -17,10 +17,10 @@ import (
 
 // TxHistoryArgs is struct to make GetTransactionsHistory request
 type TxHistoryArgs struct {
-	Address string `json:"address"`
-	Offset  int    `json:"offset"`
-	Page    int    `json:"page"`
-	FullTx  bool   `json:"fullTx"`
+	Address   string `json:"address"`
+	PageIndex int    `json:"pageIndex"`
+	PageSize  int    `json:"pageSize"`
+	FullTx    bool   `json:"fullTx"`
 }
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
