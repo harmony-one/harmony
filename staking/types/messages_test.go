@@ -15,9 +15,9 @@ var (
 	minSelfDelegation = big.NewInt(1000)
 	stakeAmount       = big.NewInt(2000)
 	delegateAmount    = big.NewInt(500)
-	validatorAddress  = common.MustBech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy")
-	validatorAddress2 = common.MustBech32ToAddress("one1d2rngmem4x2c6zxsjjz29dlah0jzkr0k2n88wc")
-	delegatorAddress  = common.MustBech32ToAddress("one16qsd5ant9v94jrs89mruzx62h7ekcfxmduh2rx")
+	validatorAddress  = common.Address(common.MustBech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"))
+	validatorAddress2 = common.Address(common.MustBech32ToAddress("one1d2rngmem4x2c6zxsjjz29dlah0jzkr0k2n88wc"))
+	delegatorAddress  = common.Address(common.MustBech32ToAddress("one16qsd5ant9v94jrs89mruzx62h7ekcfxmduh2rx"))
 	blsPubKey         = bls.RandPrivateKey().GetPublicKey()
 )
 
@@ -73,7 +73,7 @@ func TestMsgCreateValidatorRLP(t *testing.T) {
 		t.Error("MinSelfDelegation does not match")
 	}
 
-	if decodedMsg.StakingAddress.Hex() != msgCreateValidator.StakingAddress.Hex() {
+	if decodedMsg.StakingAddress.String() != msgCreateValidator.StakingAddress.String() {
 		t.Error("StakingAddress does not match")
 	}
 
@@ -116,7 +116,7 @@ func TestMsgEditValidatorRLP(t *testing.T) {
 		t.Error("Description does not match")
 	}
 
-	if decodedMsg.StakingAddress.Hex() != msgEditValidator.StakingAddress.Hex() {
+	if decodedMsg.StakingAddress.String() != msgEditValidator.StakingAddress.String() {
 		t.Error("StakingAddress does not match")
 	}
 
@@ -144,11 +144,11 @@ func TestMsgDelegateRLP(t *testing.T) {
 		t.Error("failed to rlp decode 'create validator' message")
 	}
 
-	if decodedMsg.DelegatorAddress.Hex() != msgDelegate.DelegatorAddress.Hex() {
+	if decodedMsg.DelegatorAddress.String() != msgDelegate.DelegatorAddress.String() {
 		t.Error("DelegatorAddress does not match")
 	}
 
-	if decodedMsg.ValidatorAddress.Hex() != msgDelegate.ValidatorAddress.Hex() {
+	if decodedMsg.ValidatorAddress.String() != msgDelegate.ValidatorAddress.String() {
 		t.Error("ValidatorAddress does not match")
 	}
 
@@ -172,15 +172,15 @@ func TestMsgRedelegateRLP(t *testing.T) {
 		t.Error("failed to rlp decode 'create validator' message")
 	}
 
-	if decodedMsg.DelegatorAddress.Hex() != msgRedelegate.DelegatorAddress.Hex() {
+	if decodedMsg.DelegatorAddress.String() != msgRedelegate.DelegatorAddress.String() {
 		t.Error("DelegatorAddress does not match")
 	}
 
-	if decodedMsg.ValidatorSrcAddress.Hex() != msgRedelegate.ValidatorSrcAddress.Hex() {
+	if decodedMsg.ValidatorSrcAddress.String() != msgRedelegate.ValidatorSrcAddress.String() {
 		t.Error("ValidatorSrcAddress does not match")
 	}
 
-	if decodedMsg.ValidatorDstAddress.Hex() != msgRedelegate.ValidatorDstAddress.Hex() {
+	if decodedMsg.ValidatorDstAddress.String() != msgRedelegate.ValidatorDstAddress.String() {
 		t.Error("ValidatorDstAddress does not match")
 	}
 
@@ -204,11 +204,11 @@ func TestMsgUndelegateRLP(t *testing.T) {
 		t.Error("failed to rlp decode 'create validator' message")
 	}
 
-	if decodedMsg.DelegatorAddress.Hex() != msgUndelegate.DelegatorAddress.Hex() {
+	if decodedMsg.DelegatorAddress.String() != msgUndelegate.DelegatorAddress.String() {
 		t.Error("DelegatorAddress does not match")
 	}
 
-	if decodedMsg.ValidatorAddress.Hex() != msgUndelegate.ValidatorAddress.Hex() {
+	if decodedMsg.ValidatorAddress.String() != msgUndelegate.ValidatorAddress.String() {
 		t.Error("ValidatorAddress does not match")
 	}
 

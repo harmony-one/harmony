@@ -14,7 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
-	types2 "github.com/harmony-one/harmony/staking/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 var (
@@ -75,7 +75,7 @@ func TestCommitTransactions(t *testing.T) {
 	tx, _ := types.SignTx(types.NewTransaction(baseNonce, testBankAddress, uint32(0), big.NewInt(int64(denominations.One*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
 
 	// Commit the tx to the worker
-	err := worker.CommitTransactions(types.Transactions{tx}, types2.StakingTransactions{}, testBankAddress)
+	err := worker.CommitTransactions(types.Transactions{tx}, staking.Transactions{}, testBankAddress)
 	if err != nil {
 		t.Error(err)
 	}

@@ -21,7 +21,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
-	types2 "github.com/harmony-one/harmony/staking/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
@@ -285,7 +285,7 @@ func (b *APIBackend) IsLeader() bool {
 // SendStakingTx adds a staking transaction
 func (b *APIBackend) SendStakingTx(
 	ctx context.Context,
-	newStakingTx *types2.StakingTransaction) error {
+	newStakingTx *staking.Transaction) error {
 	b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
 	return nil
 }

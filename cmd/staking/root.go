@@ -1,26 +1,34 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"net/http"
 	"os"
 	"path"
+	"strconv"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/internal/common"
-	types2 "github.com/harmony-one/harmony/staking/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/spf13/cobra"
 )
 
 const (
 	keystoreDir = ".hmy/keystore"
+	stakingRPC  = "hmy_sendRawStakingTransaction"
 )
 
-type staker struct {
-}
+type staker struct{}
 
 var (
+	queryID       = 0
 	s             = &staker{}
 	localNetChain = big.NewInt(2)
 	dAddr         = common.ParseAddr(testAccount)
@@ -39,10 +47,27 @@ func (s *staker) preRunInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-type dm struct{}
-
-func (d dm) Type() string           { return "foo-bar" }
-func (d dm) Signer() common.Address { return common.Address(dAddr) }
+func baseRequest(method, node string, params interface{}) ([]byte, error) {
+	requestBody, _ := json.Marshal(map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      strconv.Itoa(queryID),
+		"method":  method,
+		"params":  params,
+	})
+	resp, err := http.Post(node, "application/json", bytes.NewBuffer(requestBody))
+	fmt.Printf("URL: %s, Request Body: %s\n\n", node, string(requestBody))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	queryID++
+	fmt.Printf("URL: %s, Response Body: %s\n\n", node, string(body))
+	return body, err
+}
 
 func (s *staker) run(cmd *cobra.Command, args []string) error {
 	scryptN := keystore.StandardScryptN
@@ -50,10 +75,22 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	ks := keystore.NewKeyStore(keystoreDir, scryptN, scryptP)
 	account := accounts.Account{Address: dAddr}
 	ks.Unlock(account, testAccountPassword)
-	stakingTx := types2.NewTransaction(2, 100, big.NewInt(0), dm{})
+	gasPrice := big.NewInt(0)
+	sMessage, oops := staking.NewMessage(staking.Delegate, common.Address(dAddr))
+	if oops != nil {
+		return oops
+	}
+	stakingTx := staking.NewTransaction(2, 100, gasPrice, sMessage)
 	signed, oops := ks.SignStakingTx(account, stakingTx, localNetChain)
-	fmt.Println(signed)
-	return oops
+	enc, oops1 := rlp.EncodeToBytes(signed)
+	if oops1 != nil {
+		return oops1
+	}
+	hexSignature := hexutil.Encode(enc)
+	param := []interface{}{hexSignature}
+	result, reqOops := baseRequest(stakingRPC, "http://localhost:9500", param)
+	fmt.Println(string(result))
+	return reqOops
 }
 
 func versionS() string {

@@ -22,13 +22,30 @@ const (
 	Undelegate = "undelegate"
 )
 
-// StakingMessage must fulfill these interfaces
-type StakingMessage interface {
-	// Type returns a human-readable string for the type of the staking message
-	Type() string
+var (
+	kinds = [...]string{
+		CreateValidator, EditValidator, Delegate, Redelegate, Undelegate,
+	}
+	// ErrInvalidStakingKind given when caller gives bad staking message kind
+	ErrInvalidStakingKind = errors.New("bad staking kind")
+)
 
+// Message must fulfill these interfaces
+type Message struct {
+	// Type returns a human-readable string for the type of the staking message
+	Kind string
 	// Signer returns the ECDSA address who must sign the outer transaction
-	Signer() common.Address
+	Signer common.Address
+}
+
+// NewMessage does sanity check on input
+func NewMessage(kind string, signer common.Address) (*Message, error) {
+	for _, k := range kinds {
+		if kind == k {
+			return &Message{kind, signer}, nil
+		}
+	}
+	return nil, errors.Wrapf(ErrInvalidStakingKind, "given %s", kind)
 }
 
 // MsgCreateValidator - struct for creating a new validator
@@ -53,7 +70,9 @@ type msgCreateValidatorJSON struct {
 
 // NewMsgCreateValidator creates a new validator
 func NewMsgCreateValidator(
-	description Description, commission CommissionRates, minSelfDelegation *big.Int, stakingAddress common.Address, validatingPubKey shard.BlsPublicKey, amount *big.Int) MsgCreateValidator {
+	description Description, commission CommissionRates,
+	minSelfDelegation *big.Int, stakingAddress common.Address,
+	validatingPubKey shard.BlsPublicKey, amount *big.Int) MsgCreateValidator {
 	return MsgCreateValidator{
 		Description:       description,
 		Commission:        commission,
@@ -90,14 +109,12 @@ func (msg *MsgCreateValidator) UnmarshalJSON(bz []byte) error {
 	if err := json.Unmarshal(bz, &msgCreateValJSON); err != nil {
 		return err
 	}
-
 	msg.Description = msgCreateValJSON.Description
 	msg.Commission = msgCreateValJSON.Commission
 	msg.MinSelfDelegation = msgCreateValJSON.MinSelfDelegation
 	msg.StakingAddress = msgCreateValJSON.StakingAddress
 	msg.ValidatingPubKey = msgCreateValJSON.ValidatingPubKey
 	msg.Amount = msgCreateValJSON.Amount
-
 	return nil
 }
 
@@ -126,17 +143,15 @@ func (msg MsgCreateValidator) ValidateBasic() error {
 // MsgEditValidator - struct for editing a validator
 type MsgEditValidator struct {
 	Description
-	StakingAddress common.Address `json:"staking_address" yaml:"staking_address"`
-
-	CommissionRate    Dec      `json:"commission_rate" yaml:"commission_rate"`
-	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
+	StakingAddress    common.Address `json:"staking_address" yaml:"staking_address"`
+	CommissionRate    Dec            `json:"commission_rate" yaml:"commission_rate"`
+	MinSelfDelegation *big.Int       `json:"min_self_delegation" yaml:"min_self_delegation"`
 }
 
 // MsgEditValidatorJSON - struct for editing a validator for JSON
 type MsgEditValidatorJSON struct {
 	Description
 	StakingAddress common.Address `json:"staking_address" yaml:"staking_address"`
-
 	// TODO: allow update of bls public key
 	CommissionRate    Dec      `json:"commission_rate" yaml:"commission_rate"`
 	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
@@ -144,8 +159,8 @@ type MsgEditValidatorJSON struct {
 
 // NewMsgEditValidator creates a new MsgEditValidator.
 func NewMsgEditValidator(
-	description Description, stakingAddress common.Address, commissionRate Dec, minSelfDelegation *big.Int) MsgEditValidator {
-
+	description Description, stakingAddress common.Address,
+	commissionRate Dec, minSelfDelegation *big.Int) MsgEditValidator {
 	return MsgEditValidator{
 		Description:       description,
 		StakingAddress:    stakingAddress,
@@ -170,7 +185,6 @@ type MsgDelegate struct {
 // NewMsgDelegate creates a new MsgDelegate.
 func NewMsgDelegate(
 	validatorAddress common.Address, delegatorAddress common.Address, amount *big.Int) MsgDelegate {
-
 	return MsgDelegate{
 		DelegatorAddress: delegatorAddress,
 		ValidatorAddress: validatorAddress,
@@ -193,7 +207,9 @@ type MsgRedelegate struct {
 }
 
 // NewMsgRedelegate creates a new MsgRedelegate.
-func NewMsgRedelegate(delAddr, valSrcAddr, valDstAddr common.Address, amount *big.Int) MsgRedelegate {
+func NewMsgRedelegate(
+	delAddr, valSrcAddr, valDstAddr common.Address, amount *big.Int,
+) MsgRedelegate {
 	return MsgRedelegate{
 		DelegatorAddress:    delAddr,
 		ValidatorSrcAddress: valSrcAddr,
@@ -216,7 +232,7 @@ type MsgUndelegate struct {
 }
 
 // NewMsgUndelegate creates a new MsgUndelegate.
-func NewMsgUndelegate(delAddr common.Address, valAddr common.Address, amount *big.Int) MsgUndelegate {
+func NewMsgUndelegate(delAddr, valAddr common.Address, amount *big.Int) MsgUndelegate {
 	return MsgUndelegate{
 		DelegatorAddress: delAddr,
 		ValidatorAddress: valAddr,
