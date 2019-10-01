@@ -44,6 +44,11 @@ var (
 	harmony *hmy.Harmony
 )
 
+// IsCurrentlyLeader exposes if node is currently the leader node
+func (node *Node) IsCurrentlyLeader() bool {
+	return node.Consensus.IsLeader()
+}
+
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
@@ -66,7 +71,6 @@ func (node *Node) StartRPC(nodePort string) error {
 	if err := node.startHTTP(httpEndpoint, apis, httpModules, httpOrigins, httpVirtualHosts, httpTimeouts); err != nil {
 		return err
 	}
-
 	wsEndpoint = fmt.Sprintf("%v:%v", ip, port+rpcWSPortOffset)
 	if err := node.startWS(wsEndpoint, apis, wsModules, wsOrigins, true); err != nil {
 		node.stopHTTP()

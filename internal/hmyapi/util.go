@@ -13,20 +13,23 @@ import (
 
 // defaultOffset is to have default pagination.
 const (
-	defaultOffset = 100
+	defaultPageSize = 100
 )
 
 // ReturnWithPagination returns result with pagination (offset, page in TxHistoryArgs).
 func ReturnWithPagination(hashes []common.Hash, args TxHistoryArgs) []common.Hash {
-	offset := defaultOffset
-	page := args.Page
-	if args.Offset > 0 {
-		offset = args.Offset
+	pageSize := defaultPageSize
+	pageIndex := args.PageIndex
+	if args.PageSize > 0 {
+		pageSize = args.PageSize
 	}
-	if offset*page+offset > len(hashes) {
-		return hashes[offset*page:]
+	if pageSize*pageIndex >= len(hashes) {
+		return make([]common.Hash, 0)
 	}
-	return hashes[offset*page : offset*page+offset]
+	if pageSize*pageIndex+pageSize > len(hashes) {
+		return hashes[pageSize*pageIndex:]
+	}
+	return hashes[pageSize*pageIndex : pageSize*pageIndex+pageSize]
 }
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.

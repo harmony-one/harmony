@@ -17,9 +17,10 @@ import (
 
 // TxHistoryArgs is struct to make GetTransactionsHistory request
 type TxHistoryArgs struct {
-	Address string `json:"address"`
-	Offset  int    `json:"offset"`
-	Page    int    `json:"page"`
+	Address   string `json:"address"`
+	PageIndex int    `json:"pageIndex"`
+	PageSize  int    `json:"pageSize"`
+	FullTx    bool   `json:"fullTx"`
 }
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
@@ -34,25 +35,35 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 }
 
 // GetTransactionsHistory returns the list of transactions hashes that involve a particular address.
-func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) ([]common.Hash, error) {
+func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
 	address := args.Address
+	result := []common.Hash{}
 	if strings.HasPrefix(address, "one1") {
-		result, err := s.b.GetTransactionsHistory(address)
+		hashes, err := s.b.GetTransactionsHistory(address)
 		if err != nil {
 			return nil, err
 		}
-		return ReturnWithPagination(result, args), nil
+		result = ReturnWithPagination(hashes, args)
 	}
 	addr := internal_common.ParseAddr(address)
 	oneAddress, err := internal_common.AddressToBech32(addr)
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.b.GetTransactionsHistory(oneAddress)
+	hashes, err := s.b.GetTransactionsHistory(oneAddress)
 	if err != nil {
 		return nil, err
 	}
-	return ReturnWithPagination(result, args), nil
+	result = ReturnWithPagination(hashes, args)
+	if !args.FullTx {
+		return map[string]interface{}{"transactions": result}, nil
+	}
+	txs := []*RPCTransaction{}
+	for _, hash := range result {
+		tx := s.GetTransactionByHash(ctx, hash)
+		txs = append(txs, tx)
+	}
+	return map[string]interface{}{"transactions": txs}, nil
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
@@ -187,15 +198,11 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	if tx.Protected() {
 		signer = types.NewEIP155Signer(tx.ChainID())
 	}
-	from, _ := types.Sender(signer, tx)
-
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
 		"blockNumber":       hexutil.Uint64(blockNumber),
 		"transactionHash":   hash,
 		"transactionIndex":  hexutil.Uint64(index),
-		"from":              from,
-		"to":                tx.To(),
 		"shardID":           tx.ShardID(),
 		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
 		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
@@ -203,7 +210,18 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
 	}
-
+	from, _ := types.Sender(signer, tx)
+	fields["from"] = from
+	if tx.To() != nil {
+		fields["to"], err = internal_common.AddressToBech32(*tx.To())
+		if err != nil {
+			return nil, err
+		}
+		fields["from"], err = internal_common.AddressToBech32(from)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// Assign receipt status or post state.
 	if len(receipt.PostState) > 0 {
 		fields["root"] = hexutil.Bytes(receipt.PostState)

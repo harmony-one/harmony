@@ -71,6 +71,7 @@ type Backend interface {
 	GetTransactionsHistory(address string) ([]common.Hash, error)
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
+	IsLeader() bool
 }
 
 // GetAPIs returns all the APIs.

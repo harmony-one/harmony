@@ -9,6 +9,7 @@ type (
 	Commission struct {
 		CommissionRates `json:"commission_rates" yaml:"commission_rates"`
 		UpdateHeight    *big.Int `json:"update_height" yaml:"update_height"` // the block height the commission rate was last changed
+
 	}
 
 	// CommissionRates defines the initial commission rates to be used for creating a
