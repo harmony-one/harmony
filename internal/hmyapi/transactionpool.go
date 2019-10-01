@@ -20,6 +20,7 @@ type TxHistoryArgs struct {
 	Address string `json:"address"`
 	Offset  int    `json:"offset"`
 	Page    int    `json:"page"`
+	FullTx  bool   `json:"fullTx"`
 }
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
@@ -34,39 +35,35 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 }
 
 // GetTransactionsHistory returns the list of transactions hashes that involve a particular address.
-func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) ([]common.Hash, error) {
+func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
 	address := args.Address
+	result := []common.Hash{}
 	if strings.HasPrefix(address, "one1") {
-		result, err := s.b.GetTransactionsHistory(address)
+		hashes, err := s.b.GetTransactionsHistory(address)
 		if err != nil {
 			return nil, err
 		}
-		return ReturnWithPagination(result, args), nil
+		result = ReturnWithPagination(hashes, args)
 	}
 	addr := internal_common.ParseAddr(address)
 	oneAddress, err := internal_common.AddressToBech32(addr)
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.b.GetTransactionsHistory(oneAddress)
+	hashes, err := s.b.GetTransactionsHistory(oneAddress)
 	if err != nil {
 		return nil, err
 	}
-	return ReturnWithPagination(result, args), nil
-}
-
-// GetTransactionsHistoryFull returns the list of transactions with full info that involve a particular address.
-func (s *PublicTransactionPoolAPI) GetTransactionsHistoryFull(ctx context.Context, args TxHistoryArgs) ([]*RPCTransaction, error) {
-	hashes, err := s.GetTransactionsHistory(ctx, args)
-	if err != nil {
-		return nil, err
+	result = ReturnWithPagination(hashes, args)
+	if !args.FullTx {
+		return map[string]interface{}{"transactions": result}, nil
 	}
-	result := []*RPCTransaction{}
-	for _, hash := range hashes {
+	txs := []*RPCTransaction{}
+	for _, hash := range result {
 		tx := s.GetTransactionByHash(ctx, hash)
-		result = append(result, tx)
+		txs = append(txs, tx)
 	}
-	return result, nil
+	return map[string]interface{}{"transactions": txs}, nil
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
