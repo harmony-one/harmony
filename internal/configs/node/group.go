@@ -38,15 +38,15 @@ func getNetworkPrefix(shardID ShardID) (netPre string) {
 	case Mainnet:
 		netPre = "harmony"
 	case Testnet:
-		netPre = "testnet"
+		netPre = "hmy/testnet"
 	case Pangaea:
-		netPre = "pangaea"
+		netPre = "hmy/pangaea"
 	case Devnet:
-		netPre = "devnet"
+		netPre = "hmy/devnet"
 	case Localnet:
-		netPre = "local"
+		netPre = "hmy/local"
 	default:
-		netPre = "misc"
+		netPre = "hmy/misc"
 	}
 	return
 }
