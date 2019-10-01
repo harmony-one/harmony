@@ -58,7 +58,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.GetBlock(ctx, blockHash)
 	if block != nil {
-		return RPCMarshalBlock(block, false, false)
+		return RPCMarshalBlock(block, true, fullTx)
 	}
 	return nil, err
 }
