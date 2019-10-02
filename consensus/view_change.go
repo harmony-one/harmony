@@ -223,6 +223,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 
 	// TODO: if difference is only one, new leader can still propose the same committed block to avoid another view change
+	// TODO: new leader catchup without ignore view change message
 	if consensus.blockNum > recvMsg.BlockNum {
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -252,6 +253,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	consensus.vcLock.Lock()
 	defer consensus.vcLock.Unlock()
 
+	// TODO: remove NIL type message
 	// add self m1 or m2 type message signature and bitmap
 	_, ok1 := consensus.nilSigs[consensus.PubKey.SerializeToHexStr()]
 	_, ok2 := consensus.bhpSigs[consensus.PubKey.SerializeToHexStr()]
@@ -554,6 +556,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// NewView message is verified, change state to normal consensus
+	// TODO: check magic number 32
 	if len(recvMsg.Payload) > 32 {
 		// Construct and send the commit message
 		blockNumHash := make([]byte, 8)
