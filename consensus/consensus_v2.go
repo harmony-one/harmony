@@ -235,7 +235,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 	logMsgs := consensus.PbftLog.GetMessagesByTypeSeqView(msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID)
 	if len(logMsgs) > 0 {
-		if logMsgs[0].BlockHash != recvMsg.BlockHash {
+		if logMsgs[0].BlockHash != recvMsg.BlockHash && logMsgs[0].SenderPubkey.IsEqual(recvMsg.SenderPubkey) {
 			utils.Logger().Debug().
 				Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
 				Msg("[OnAnnounce] Leader is malicious")
