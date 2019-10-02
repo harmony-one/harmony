@@ -1027,7 +1027,8 @@ func (consensus *Consensus) tryCatchup() {
 func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
 	go func() {
 		toStart := false
-		if consensus.IsLeader() {
+		isInitialLeader := consensus.IsLeader()
+		if isInitialLeader {
 			utils.Logger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Waiting for consensus start")
 
 			// send a signal to indicate it's ready to run consensus
@@ -1052,7 +1053,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		for {
 			select {
 			case <-ticker.C:
-				if toStart == false {
+				if toStart == false && isInitialLeader {
 					continue
 				}
 				for k, v := range consensus.consensusTimeout {
