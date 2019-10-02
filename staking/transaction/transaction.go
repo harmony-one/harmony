@@ -1,4 +1,4 @@
-package types
+package transaction
 
 import (
 	"errors"
@@ -9,13 +9,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/staking/message"
 )
 
 type txdata struct {
+	message.Directive
+	Stake        interface{}
 	AccountNonce uint64   `json:"nonce"      gencodec:"required"`
 	Price        *big.Int `json:"gasPrice"   gencodec:"required"`
 	GasLimit     uint64   `json:"gas"        gencodec:"required"`
-	Message      `json:"msg"        gencodec:"required"`
 	// Signature values
 	V *big.Int `json:"v" gencodec:"required"`
 	R *big.Int `json:"r" gencodec:"required"`
@@ -24,8 +26,8 @@ type txdata struct {
 	Hash *common.Hash `json:"hash" rlp:"-"`
 }
 
-// Transaction is the staking transaction
-type Transaction struct {
+// Stake is a record captuing all staking operations
+type Stake struct {
 	data txdata
 	// caches
 	hash atomic.Value
@@ -33,19 +35,26 @@ type Transaction struct {
 	from atomic.Value
 }
 
-// NewTransaction produces a new staking transaction record
-func NewTransaction(
-	nonce, gasLimit uint64,
-	gasPrice *big.Int, sM *Message) *Transaction {
-	return &Transaction{data: txdata{
-		AccountNonce: nonce,
-		Price:        big.NewInt(0).Set(gasPrice),
-		GasLimit:     gasLimit,
-		Message:      Message{sM.Kind, sM.Signer},
-		V:            big.NewInt(0),
-		R:            big.NewInt(0),
-		S:            big.NewInt(0),
+type fulfill func() (message.Directive, interface{})
+
+// NewStake produces a new staking transaction record
+func NewStake(
+	nonce, gasLimit uint64, gasPrice *big.Int, f fulfill,
+) (*Stake, error) {
+	directive, payload := f()
+	// Double check that this is legitmate directive
+	newStake := &Stake{data: txdata{
+		directive,
+		payload,
+		nonce,
+		big.NewInt(0).Set(gasPrice),
+		gasLimit,
+		big.NewInt(0),
+		big.NewInt(0),
+		big.NewInt(0),
+		nil,
 	}}
+	return newStake, nil
 }
 
 var (
@@ -53,12 +62,12 @@ var (
 	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
 )
 
-// Transactions is a Transaction slice type for basic sorting.
-type Transactions []*Transaction
+// Stakes is a stake slice type for basic sorting.
+type Stakes []*Stake
 
 // Hash hashes the RLP encoding of tx.
 // It uniquely identifies the transaction.
-func (tx *Transaction) Hash() common.Hash {
+func (tx *Stake) Hash() common.Hash {
 	if hash := tx.hash.Load(); hash != nil {
 		return hash.(common.Hash)
 	}
@@ -68,40 +77,33 @@ func (tx *Transaction) Hash() common.Hash {
 }
 
 // WithSignature returns a new transaction with the given signature.
-func (tx *Transaction) WithSignature(
-	signer Signer, sig []byte,
-) (*Transaction, error) {
+func (tx *Stake) WithSignature(signer Signer, sig []byte) (*Stake, error) {
 	r, s, v, err := signer.SignatureValues(tx, sig)
 	if err != nil {
 		return nil, err
 	}
-	cpy := &Transaction{data: tx.data}
+	cpy := &Stake{data: tx.data}
 	cpy.data.R, cpy.data.S, cpy.data.V = r, s, v
 	return cpy, nil
 }
 
 // ChainID is what chain this staking transaction for
-func (tx *Transaction) ChainID() *big.Int {
+func (tx *Stake) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)
 }
 
-// Need to have equivalent of the gen_tx_json stuff
-// func (tx *StakingTransaction) MarshalJSON() ([]byte, error) {
-// 	hash := tx.Hash()
-// 	data := tx.data
-// 	data.Hash = &hash
-// 	return data.MarshalJSON()
-// }
-
 // EncodeRLP implements rlp.Encoder
-func (tx *Transaction) EncodeRLP(w io.Writer) error {
+func (tx *Stake) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, &tx.data)
 }
 
 // DecodeRLP implements rlp.Decoder
-func (tx *Transaction) DecodeRLP(s *rlp.Stream) error {
+func (tx *Stake) DecodeRLP(s *rlp.Stream) error {
 	_, size, _ := s.Kind()
 	err := s.Decode(&tx.data)
+	if err != nil {
+		return err
+	}
 	if err == nil {
 		tx.size.Store(common.StorageSize(rlp.ListSize(size)))
 	}

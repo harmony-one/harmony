@@ -8,7 +8,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/staking/transaction"
 )
 
 // defaultOffset is to have default pagination.
@@ -61,7 +61,7 @@ func SubmitTransaction(
 
 // SubmitStakingTransaction is a helper function that submits tx to txPool and logs a message.
 func SubmitStakingTransaction(
-	ctx context.Context, b Backend, tx *staking.Transaction,
+	ctx context.Context, b Backend, tx *transaction.Stake,
 ) (common.Hash, error) {
 	if err := b.SendStakingTx(ctx, tx); err != nil {
 		return common.Hash{}, err

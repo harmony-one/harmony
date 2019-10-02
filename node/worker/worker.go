@@ -19,7 +19,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/staking/transaction"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -145,12 +145,13 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 
 // SelectStakingTransactionsForNewBlock selects staking transactions for new block.
 func (w *Worker) SelectStakingTransactionsForNewBlock(
-	newBlockNum uint64, txs staking.Transactions,
+	newBlockNum uint64, txs transaction.Stakes,
 	recentTxsStats types.RecentTxsStats,
 	txsThrottleConfig *shardingconfig.TxsThrottleConfig,
-	coinbase common.Address) (staking.Transactions, staking.Transactions, staking.Transactions) {
+	coinbase common.Address) (transaction.Stakes, transaction.Stakes, transaction.Stakes) {
 	// TODO: implement staking transaction selection
-	t := staking.Transactions{}
+
+	t := transaction.Stakes{}
 	return t, t, t
 }
 
@@ -179,7 +180,7 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 // CommitTransactions commits transactions including staking transactions.
 func (w *Worker) CommitTransactions(
-	txs types.Transactions, stakingTxns staking.Transactions, coinbase common.Address) error {
+	txs types.Transactions, stakingTxns transaction.Stakes, coinbase common.Address) error {
 	// Must update to the correct current state before processing potential txns
 	if err := w.UpdateCurrent(coinbase); err != nil {
 		utils.Logger().Error().
