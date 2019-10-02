@@ -2,8 +2,6 @@ package nodeconfig
 
 import (
 	"testing"
-
-	"github.com/harmony-one/harmony/p2p"
 )
 
 func TestNodeConfigSingleton(t *testing.T) {
@@ -13,14 +11,14 @@ func TestNodeConfigSingleton(t *testing.T) {
 	// get the singleton variable
 	c := GetShardConfig(Global)
 
-	c.SetBeaconGroupID(p2p.GroupIDBeacon)
+	c.SetBeaconGroupID(GroupIDBeacon)
 
 	d := GetShardConfig(Global)
 
 	g := d.GetBeaconGroupID()
 
-	if g != p2p.GroupIDBeacon {
-		t.Errorf("GetBeaconGroupID = %v, expected = %v", g, p2p.GroupIDBeacon)
+	if g != GroupIDBeacon {
+		t.Errorf("GetBeaconGroupID = %v, expected = %v", g, GroupIDBeacon)
 	}
 }
 

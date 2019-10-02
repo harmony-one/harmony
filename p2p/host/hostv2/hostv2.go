@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 
@@ -54,7 +55,7 @@ type HostV2 struct {
 }
 
 // SendMessageToGroups sends a message to one or more multicast groups.
-func (host *HostV2) SendMessageToGroups(groups []p2p.GroupID, msg []byte) error {
+func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
 	var error error
 	for _, group := range groups {
 		err := host.pubsub.Publish(string(group), msg)
@@ -100,7 +101,7 @@ func (r *GroupReceiverImpl) Receive(ctx context.Context) (
 
 // GroupReceiver returns a receiver of messages sent to a multicast group.
 // See the GroupReceiver interface for details.
-func (host *HostV2) GroupReceiver(group p2p.GroupID) (
+func (host *HostV2) GroupReceiver(group nodeconfig.GroupID) (
 	receiver p2p.GroupReceiver, err error,
 ) {
 	sub, err := host.pubsub.Subscribe(string(group))

@@ -12,8 +12,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/vdf"
 	"github.com/harmony-one/harmony/crypto/vrf/p256"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -81,7 +81,7 @@ func (dRand *DRand) init(epochBlock *types.Block) {
 		Hex("msg", msgToSend).
 		Str("leader.PubKey", dRand.leader.ConsensusPubKey.SerializeToHexStr()).
 		Msg("[DRG] sent init")
-	dRand.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(dRand.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+	dRand.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(dRand.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 }
 
 // ProcessMessageLeader dispatches messages for the leader to corresponding processors.

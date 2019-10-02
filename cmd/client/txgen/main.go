@@ -119,9 +119,9 @@ func setUpTXGen() *node.Node {
 	}
 	txGen.NodeConfig.SetRole(nodeconfig.ClientNode)
 	if shardID == 0 {
-		txGen.NodeConfig.SetShardGroupID(p2p.GroupIDBeacon)
+		txGen.NodeConfig.SetShardGroupID(nodeconfig.GroupIDBeacon)
 	} else {
-		txGen.NodeConfig.SetShardGroupID(p2p.NewGroupIDByShardID(p2p.ShardID(shardID)))
+		txGen.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(shardID)))
 	}
 
 	txGen.NodeConfig.SetIsClient(true)
@@ -289,10 +289,10 @@ func SendTxsToShard(clientNode *node.Node, txs types.Transactions, shardID uint3
 	msg := proto_node.ConstructTransactionListMessageAccount(txs)
 	var err error
 	if shardID == 0 {
-		err = clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{p2p.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
+		err = clientNode.GetHost().SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.GroupIDBeaconClient}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	} else {
-		clientGroup := p2p.NewClientGroupIDByShardID(p2p.ShardID(shardID))
-		err = clientNode.GetHost().SendMessageToGroups([]p2p.GroupID{clientGroup}, p2p_host.ConstructP2pMessage(byte(0), msg))
+		clientGroup := nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(shardID))
+		err = clientNode.GetHost().SendMessageToGroups([]nodeconfig.GroupID{clientGroup}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	}
 	if err != nil {
 		utils.Logger().Debug().

@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -17,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -68,8 +68,8 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 	}
 	utils.Logger().Info().Uint32("ToShardID", toShardID).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof Found")
 
-	groupID := p2p.ShardID(toShardID)
-	go node.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, block.Header(), commitSig, commitBitmap)))
+	groupID := nodeconfig.ShardID(toShardID)
+	go node.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, block.Header(), commitSig, commitBitmap)))
 }
 
 // BroadcastMissingCXReceipts broadcasts missing cross shard receipts per request
