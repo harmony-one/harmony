@@ -60,7 +60,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		pub := shard.BlsPublicKey{}
 		pub.FromLibBLSPublicKey(p)
 		return message.DirectiveNewValidator, message.NewValidator{
-			Ties: role.Ties{
+			Description: role.Description{
 				Name:            "something",
 				Identity:        "something else",
 				Website:         "some site, harmony.one",

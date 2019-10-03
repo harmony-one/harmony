@@ -39,8 +39,7 @@ func (d Directive) String() string {
 
 // NewValidator - type for creating a new validator
 type NewValidator struct {
-	// role.Validator
-	role.Ties            `json:"ties" yaml:"ties"`
+	role.Description     `json:"ties" yaml:"ties"`
 	role.CommissionRates `json:"commission" yaml:"commission"`
 	MinSelfDelegation    *big.Int           `json:"min_self_delegation" yaml:"min_self_delegation"`
 	StakingAddress       common.Address     `json:"staking_address" yaml:"staking_address"`
@@ -50,7 +49,7 @@ type NewValidator struct {
 
 // EditValidator - type for edit existing validator
 type EditValidator struct {
-	role.Ties
+	role.Description
 	StakingAddress    common.Address `json:"staking_address" yaml:"staking_address"`
 	CommissionRate    role.Dec       `json:"commission_rate" yaml:"commission_rate"`
 	MinSelfDelegation *big.Int       `json:"min_self_delegation" yaml:"min_self_delegation"`

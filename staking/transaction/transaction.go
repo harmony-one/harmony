@@ -14,7 +14,7 @@ import (
 
 type txdata struct {
 	message.Directive
-	Stake        interface{}
+	StakeMsg     interface{}
 	AccountNonce uint64   `json:"nonce"      gencodec:"required"`
 	Price        *big.Int `json:"gasPrice"   gencodec:"required"`
 	GasLimit     uint64   `json:"gas"        gencodec:"required"`
@@ -42,7 +42,7 @@ func NewStake(
 	nonce, gasLimit uint64, gasPrice *big.Int, f fulfill,
 ) (*Stake, error) {
 	directive, payload := f()
-	// Double check that this is legitmate directive
+	// TODO(Double check that this is legitmate directive)
 	newStake := &Stake{data: txdata{
 		directive,
 		payload,

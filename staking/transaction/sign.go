@@ -148,7 +148,7 @@ func (s EIP155Signer) SignatureValues(
 func (s EIP155Signer) Hash(tx *Stake) common.Hash {
 	return hash.FromRLP([]interface{}{
 		tx.data.Directive,
-		tx.data.Stake,
+		tx.data.StakeMsg,
 		tx.data.AccountNonce,
 		tx.data.Price,
 		tx.data.GasLimit,
