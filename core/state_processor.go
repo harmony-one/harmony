@@ -30,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	types2 "github.com/harmony-one/harmony/staking/types"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -200,4 +201,14 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 		db.IntermediateRoot(config.IsS3(header.Epoch())).Bytes()
 	}
 	return nil
+}
+
+// ApplyStakingTransaction attempts to apply a staking transaction to the given state database
+// and uses the input parameters for its environment. It returns the receipt
+// for the staking transaction, gas used and an error if the transaction failed,
+// indicating the block was invalid.
+// staking transaction will use the code field in the account to store the staking information
+// TODO chao: Add receipts for staking tx
+func ApplyStakingTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types2.StakingTransaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
+	return nil, nil, 0, nil
 }

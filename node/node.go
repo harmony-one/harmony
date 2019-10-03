@@ -372,7 +372,7 @@ func (node *Node) getTransactionsForNewBlock(
 	}
 
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, pendingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
-	selectedStaking, unselectedStaking, invalidStaking := node.Worker.SelectStakingTransactionsForNewBlock(newBlockNum, pendingStakingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
+	selectedStaking, unselectedStaking, invalidStaking := node.Worker.SelectStakingTransactionsForNewBlock(newBlockNum, pendingStakingTransactions, txsThrottleConfig, coinbase)
 
 	node.pendingTransactions = make(map[common.Hash]*types.Transaction)
 	for _, unselectedTx := range unselected {

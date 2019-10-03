@@ -144,14 +144,45 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 }
 
 // SelectStakingTransactionsForNewBlock selects staking transactions for new block.
+// TODO: throttle staking txs
 func (w *Worker) SelectStakingTransactionsForNewBlock(
 	newBlockNum uint64, txs staking.StakingTransactions,
-	recentTxsStats types.RecentTxsStats,
 	txsThrottleConfig *shardingconfig.TxsThrottleConfig,
 	coinbase common.Address) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
-	// TODO: implement staking transaction selection
-	t := staking.StakingTransactions{}
-	return t, t, t
+	// only beaconchain process staking transaction
+	if w.chain.ShardID() != 0 {
+		return nil, nil, nil
+	}
+
+	// staking transaction share the same gasPool with normal transactions
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
+	}
+
+	selected := types2.StakingTransactions{}
+	unselected := types2.StakingTransactions{}
+	invalid := types2.StakingTransactions{}
+	for _, tx := range txs {
+		if len(selected) > txsThrottleConfig.MaxNumTxsPerBlockLimit {
+			unselected = append(unselected, tx)
+			continue
+		}
+
+		snap := w.current.state.Snapshot()
+		_, err := w.commitStakingTransaction(tx, coinbase)
+		if err != nil {
+			w.current.state.RevertToSnapshot(snap)
+			invalid = append(invalid, tx)
+			utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Commit staking transaction error")
+		} else {
+			selected = append(selected, tx)
+			utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("StakingTransaction gas limit info")
+		}
+	}
+
+	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("[SelectStakingTransaction] Block gas limit and usage info")
+
+	return selected, unselected, invalid
 }
 
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
@@ -201,8 +232,13 @@ func (w *Worker) CommitTransactions(
 		}
 	}
 	for _, stakingTx := range stakingTxns {
-		_ = stakingTx
-		// TODO: add logic to commit staking txns
+		snap := w.current.state.Snapshot()
+		_, err := w.commitStakingTransaction(stakingTx, coinbase)
+		if err != nil {
+			w.current.state.RevertToSnapshot(snap)
+			return err
+
+		}
 	}
 	return nil
 }
@@ -381,4 +417,24 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 	worker.makeCurrent(parent, header)
 
 	return worker
+}
+
+func (w *Worker) commitStakingTransaction(tx *types2.StakingTransaction, coinbase common.Address) ([]*types.Log, error) {
+	snap := w.current.state.Snapshot()
+
+	gasUsed := w.current.header.GasUsed()
+	receipt, cx, _, err := core.ApplyStakingTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	w.current.header.SetGasUsed(gasUsed)
+	if err != nil {
+		w.current.state.RevertToSnapshot(snap)
+		return nil, err
+	}
+	if receipt == nil {
+		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
+		return nil, fmt.Errorf("Receipt is Nil")
+	}
+	// TODO: chao
+	// w.current.txs = append(w.current.txs, tx)
+	// w.current.receipts = append(w.current.receipts, receipt)
+	return receipt.Logs, nil
 }
