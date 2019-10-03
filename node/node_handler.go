@@ -9,16 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
-
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
-
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/api/proto/message"
@@ -32,6 +27,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 const (
@@ -244,7 +241,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
-	txs := types2.StakingTransactions{}
+	txs := staking.StakingTransactions{}
 	err := rlp.Decode(bytes.NewReader(msgPayload[:]), &txs)
 	if err != nil {
 		utils.Logger().Error().

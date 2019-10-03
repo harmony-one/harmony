@@ -2,7 +2,6 @@ package hmyapi
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,9 +9,12 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // TxHistoryArgs is struct to make GetTransactionsHistory request
@@ -166,6 +168,23 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	return SubmitTransaction(ctx, s.b, signed)
 }
 
+// SendRawStakingTransaction will add the signed transaction to the transaction pool.
+// The sender is responsible for signing the transaction and using the correct nonce.
+func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
+	ctx context.Context, encodedTx hexutil.Bytes,
+) (common.Hash, error) {
+	tx := new(staking.StakingTransaction)
+	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
+		return common.Hash{}, err
+	}
+	c := s.b.ChainConfig().ChainID
+	if tx.ChainID().Cmp(c) != 0 {
+		e := errors.Wrapf(core.ErrInvalidChainID, "current chain id:%s", c.String())
+		return common.Hash{}, e
+	}
+	return SubmitStakingTransaction(ctx, s.b, tx)
+}
+
 // SendRawTransaction will add the signed transaction to the transaction pool.
 // The sender is responsible for signing the transaction and using the correct nonce.
 func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error) {
@@ -173,8 +192,10 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
 	}
-	if tx.ChainID().Cmp(s.b.ChainConfig().ChainID) != 0 {
-		return common.Hash{}, errors.New("Incorrect chain ID. The current chain id: " + s.b.ChainConfig().ChainID.String())
+	c := s.b.ChainConfig().ChainID
+	if tx.ChainID().Cmp(c) != 0 {
+		e := errors.Wrapf(core.ErrInvalidChainID, "current chain id:%s", c.String())
+		return common.Hash{}, e
 	}
 	return SubmitTransaction(ctx, s.b, tx)
 }

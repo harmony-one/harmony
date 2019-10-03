@@ -6,21 +6,18 @@ import (
 	"log"
 	"math/big"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
-
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/ethereum/go-ethereum/common"
-	blockfactory "github.com/harmony-one/harmony/block/factory"
-	"github.com/harmony-one/harmony/crypto/hash"
-
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core"
 	core_state "github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/params"
 	pkgworker "github.com/harmony-one/harmony/node/worker"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -129,7 +126,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 	amount := 720000
 	tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(4), StakingAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 	txs = append(txs, tx)
-	err := contractworker.CommitTransactions(txs, types2.StakingTransactions{}, testUserAddress)
+	err := contractworker.CommitTransactions(txs, staking.StakingTransactions{}, testUserAddress)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -167,7 +164,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	callEnc = append(callEnc, paddedAddress...)
 	callfaucettx, _ := types.SignTx(types.NewTransaction(nonce+uint64(5), faucetContractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, FaucetPriKey)
 
-	err = contractworker.CommitTransactions(types.Transactions{callfaucettx}, types2.StakingTransactions{}, testUserAddress)
+	err = contractworker.CommitTransactions(types.Transactions{callfaucettx}, staking.StakingTransactions{}, testUserAddress)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -245,7 +242,7 @@ func playStaking(chain *core.BlockChain) {
 		tx, _ := types.SignTx(types.NewTransaction(0, stakeContractAddress, 0, big.NewInt(int64(stake)), params.TxGas*5, nil, callEncl), types.HomesteadSigner{}, allRandomUserKey[i])
 		stakingtxns = append(stakingtxns, tx)
 	}
-	err = contractworker.CommitTransactions(stakingtxns, types2.StakingTransactions{}, common.Address{})
+	err = contractworker.CommitTransactions(stakingtxns, staking.StakingTransactions{}, common.Address{})
 
 	if err != nil {
 		fmt.Println(err)
@@ -303,7 +300,7 @@ func playWithdrawStaking(chain *core.BlockChain) {
 		withdrawstakingtxns = append(withdrawstakingtxns, tx)
 	}
 
-	err = contractworker.CommitTransactions(withdrawstakingtxns, types2.StakingTransactions{}, common.Address{})
+	err = contractworker.CommitTransactions(withdrawstakingtxns, staking.StakingTransactions{}, common.Address{})
 	if err != nil {
 		fmt.Println("error:")
 		fmt.Println(err)

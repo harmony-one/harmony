@@ -5,10 +5,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // defaultOffset is to have default pagination.
@@ -33,7 +33,9 @@ func ReturnWithPagination(hashes []common.Hash, args TxHistoryArgs) []common.Has
 }
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.
-func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
+func SubmitTransaction(
+	ctx context.Context, b Backend, tx *types.Transaction,
+) (common.Hash, error) {
 	if err := b.SendTx(ctx, tx); err != nil {
 		return common.Hash{}, err
 	}
@@ -54,5 +56,16 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 			Str("recipient", tx.To().Hex()).
 			Msg("Submitted transaction")
 	}
+	return tx.Hash(), nil
+}
+
+// SubmitStakingTransaction is a helper function that submits tx to txPool and logs a message.
+func SubmitStakingTransaction(
+	ctx context.Context, b Backend, tx *staking.StakingTransaction,
+) (common.Hash, error) {
+	if err := b.SendStakingTx(ctx, tx); err != nil {
+		return common.Hash{}, err
+	}
+	utils.Logger().Info().Str("fullhash", tx.Hash().Hex()).Msg("Submitted Staking transaction")
 	return tx.Hash(), nil
 }

@@ -5,27 +5,21 @@ import (
 	"math/big"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
-
-	blockfactory "github.com/harmony-one/harmony/block/factory"
-	"github.com/harmony-one/harmony/shard"
-
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/harmony-one/harmony/internal/params"
-
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -150,9 +144,14 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 }
 
 // SelectStakingTransactionsForNewBlock selects staking transactions for new block.
-func (w *Worker) SelectStakingTransactionsForNewBlock(newBlockNum uint64, txs types2.StakingTransactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types2.StakingTransactions, types2.StakingTransactions, types2.StakingTransactions) {
+func (w *Worker) SelectStakingTransactionsForNewBlock(
+	newBlockNum uint64, txs staking.StakingTransactions,
+	recentTxsStats types.RecentTxsStats,
+	txsThrottleConfig *shardingconfig.TxsThrottleConfig,
+	coinbase common.Address) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
 	// TODO: implement staking transaction selection
-	return types2.StakingTransactions{}, types2.StakingTransactions{}, types2.StakingTransactions{}
+	t := staking.StakingTransactions{}
+	return t, t, t
 }
 
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
@@ -179,7 +178,8 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 }
 
 // CommitTransactions commits transactions including staking transactions.
-func (w *Worker) CommitTransactions(txs types.Transactions, stakingTxns types2.StakingTransactions, coinbase common.Address) error {
+func (w *Worker) CommitTransactions(
+	txs types.Transactions, stakingTxns staking.StakingTransactions, coinbase common.Address) error {
 	// Must update to the correct current state before processing potential txns
 	if err := w.UpdateCurrent(coinbase); err != nil {
 		utils.Logger().Error().
