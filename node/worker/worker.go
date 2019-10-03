@@ -29,6 +29,7 @@ type environment struct {
 
 	header   *block.Header
 	txs      []*types.Transaction
+	stxs     []*types2.StakingTransaction
 	receipts []*types.Receipt
 	outcxs   []*types.CXReceipt       // cross shard transaction receipts (source shard)
 	incxs    []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
@@ -433,8 +434,7 @@ func (w *Worker) commitStakingTransaction(tx *types2.StakingTransaction, coinbas
 		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
 		return nil, fmt.Errorf("Receipt is Nil")
 	}
-	// TODO: chao
-	// w.current.txs = append(w.current.txs, tx)
-	// w.current.receipts = append(w.current.receipts, receipt)
+	w.current.stxs = append(w.current.stxs, tx)
+	w.current.receipts = append(w.current.receipts, receipt)
 	return receipt.Logs, nil
 }
