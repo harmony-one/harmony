@@ -8,6 +8,7 @@ import (
 	"time"
 
 	manet "github.com/multiformats/go-multiaddr-net"
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -18,13 +19,14 @@ import (
 	coredis "github.com/libp2p/go-libp2p-core/discovery"
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
+	libp2pdhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 )
 
 // Service is the network info service.
 type Service struct {
 	Host        p2p.Host
-	Rendezvous  p2p.GroupID
+	Rendezvous  nodeconfig.GroupID
 	bootnodes   utils.AddrList
 	dht         *libp2pdht.IpfsDHT
 	cancel      context.CancelFunc
@@ -57,16 +59,31 @@ const (
 	discoveryLimit = 32
 )
 
-// New returns role conversion service.
-func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes utils.AddrList) *Service {
+// New returns role conversion service.  If dataStorePath is not empty, it
+// points to a persistent database directory to use.
+func New(
+	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
+	bootnodes utils.AddrList, dataStorePath string,
+) (*Service, error) {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(context.Background(), connectionTimeout)
-	dataStore, err := badger.NewDatastore(fmt.Sprintf("%s/.dht-%s-%s", nodeconfig.GetTempDir(), h.GetSelfPeer().IP, h.GetSelfPeer().Port), nil)
-	if err != nil {
-		panic(err)
+	var dhtOpts []libp2pdhtopts.Option
+	if dataStorePath != "" {
+		dataStore, err := badger.NewDatastore(dataStorePath, nil)
+		if err != nil {
+			return nil, errors.Wrapf(err,
+				"cannot open Badger datastore at %s", dataStorePath)
+		}
+		utils.Logger().Info().
+			Str("dataStorePath", dataStorePath).
+			Msg("backing DHT with Badger datastore")
+		dhtOpts = append(dhtOpts, libp2pdhtopts.Datastore(dataStore))
 	}
 
-	dht := libp2pdht.NewDHT(ctx, h.GetP2PHost(), dataStore)
+	dht, err := libp2pdht.New(ctx, h.GetP2PHost(), dhtOpts...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot create DHT")
+	}
 
 	return &Service{
 		Host:        h,
@@ -79,7 +96,19 @@ func New(h p2p.Host, rendezvous p2p.GroupID, peerChan chan p2p.Peer, bootnodes u
 		bootnodes:   bootnodes,
 		discovery:   nil,
 		started:     false,
+	}, nil
+}
+
+// MustNew is a panic-on-error version of New.
+func MustNew(
+	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
+	bootnodes utils.AddrList, dataStorePath string,
+) *Service {
+	service, err := New(h, rendezvous, peerChan, bootnodes, dataStorePath)
+	if err != nil {
+		panic(err)
 	}
+	return service
 }
 
 // StartService starts network info service.
@@ -139,7 +168,10 @@ func (s *Service) Init() error {
 	utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Announcing ourselves...")
 	s.discovery = libp2pdis.NewRoutingDiscovery(s.dht)
 	libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-	libp2pdis.Advertise(ctx, s.discovery, string(p2p.GroupIDBeaconClient))
+
+	// Everyone is beacon client, which means everyone is connected via beacon client topic
+	// 0 is beacon chain FIXME: use a constant
+	libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
 	utils.Logger().Info().Msg("Successfully announced!")
 
 	return nil
@@ -165,7 +197,8 @@ func (s *Service) DoService() {
 			return
 		case <-tick.C:
 			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-			libp2pdis.Advertise(ctx, s.discovery, string(p2p.GroupIDBeaconClient))
+			// 0 is beacon chain FIXME: use a constant
+			libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
 			utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Successfully announced!")
 		default:
 			var err error

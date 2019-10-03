@@ -9,14 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
-
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/api/proto/message"
@@ -30,6 +27,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 const (
@@ -138,19 +137,15 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 				node.DRand.ProcessMessageValidator(msgPayload)
 			}
 		}
-	case proto.Staking:
-		utils.Logger().Debug().Msg("NET: Received staking message")
-		msgPayload, _ := proto.GetStakingMessagePayload(content)
-		// Only beacon leader processes staking txn
-		if node.Consensus != nil && node.Consensus.ShardID == 0 && node.Consensus.IsLeader() {
-			node.processStakingMessage(msgPayload)
-		}
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
 			utils.Logger().Debug().Msg("NET: received message: Node/Transaction")
 			node.transactionMessageHandler(msgPayload)
+		case proto_node.Staking:
+			utils.Logger().Debug().Msg("NET: received message: Node/Staking")
+			node.stakingMessageHandler(msgPayload)
 		case proto_node.Block:
 			utils.Logger().Debug().Msg("NET: received message: Node/Block")
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
@@ -239,16 +234,29 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			utils.Logger().Error().
 				Err(err).
 				Msg("Failed to deserialize transaction list")
+			return
 		}
 		node.addPendingTransactions(txs)
 	}
+}
+
+func (node *Node) stakingMessageHandler(msgPayload []byte) {
+	txs := staking.StakingTransactions{}
+	err := rlp.Decode(bytes.NewReader(msgPayload[:]), &txs)
+	if err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Msg("Failed to deserialize staking transaction list")
+		return
+	}
+	node.addPendingStakingTransactions(txs)
 }
 
 // BroadcastNewBlock is called by consensus leader to sync new blocks with other clients/nodes.
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
-	groups := []p2p.GroupID{node.NodeConfig.GetClientGroupID()}
+	groups := []nodeconfig.GroupID{node.NodeConfig.GetClientGroupID()}
 	utils.Logger().Info().Msgf("broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0])
 	msg := host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
@@ -292,7 +300,7 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	for _, header := range headers {
 		utils.Logger().Debug().Msgf("[BroadcastCrossLinkHeader] Broadcasting %d", header.Number().Uint64())
 	}
-	node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(headers)))
+	node.host.SendMessageToGroups([]nodeconfig.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(headers)))
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on

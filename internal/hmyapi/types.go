@@ -3,6 +3,7 @@ package hmyapi
 import (
 	"encoding/hex"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,39 +11,39 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 )
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
 type RPCTransaction struct {
-	BlockHash        common.Hash     `json:"blockHash"`
-	BlockNumber      *hexutil.Big    `json:"blockNumber"`
-	From             common.Address  `json:"from"`
-	Gas              hexutil.Uint64  `json:"gas"`
-	GasPrice         *hexutil.Big    `json:"gasPrice"`
-	Hash             common.Hash     `json:"hash"`
-	Input            hexutil.Bytes   `json:"input"`
-	Nonce            hexutil.Uint64  `json:"nonce"`
-	To               *common.Address `json:"to"`
-	TransactionIndex hexutil.Uint    `json:"transactionIndex"`
-	Value            *hexutil.Big    `json:"value"`
-	ShardID          uint32          `json:"shardID"`
-	ToShardID        uint32          `json:"toShardID"`
-	V                *hexutil.Big    `json:"v"`
-	R                *hexutil.Big    `json:"r"`
-	S                *hexutil.Big    `json:"s"`
+	BlockHash        common.Hash    `json:"blockHash"`
+	BlockNumber      *hexutil.Big   `json:"blockNumber"`
+	From             string         `json:"from"`
+	Gas              hexutil.Uint64 `json:"gas"`
+	GasPrice         *hexutil.Big   `json:"gasPrice"`
+	Hash             common.Hash    `json:"hash"`
+	Input            hexutil.Bytes  `json:"input"`
+	Nonce            hexutil.Uint64 `json:"nonce"`
+	To               string         `json:"to"`
+	TransactionIndex hexutil.Uint   `json:"transactionIndex"`
+	Value            *hexutil.Big   `json:"value"`
+	ShardID          uint32         `json:"shardID"`
+	ToShardID        uint32         `json:"toShardID"`
+	V                *hexutil.Big   `json:"v"`
+	R                *hexutil.Big   `json:"r"`
+	S                *hexutil.Big   `json:"s"`
 }
 
 // RPCCXReceipt represents a CXReceipt that will serialize to the RPC representation of a CXReceipt
 type RPCCXReceipt struct {
-	BlockHash   common.Hash     `json:"blockHash"`
-	BlockNumber *hexutil.Big    `json:"blockNumber"`
-	TxHash      common.Hash     `json:"hash"`
-	From        common.Address  `json:"from"`
-	To          *common.Address `json:"to"`
-	ShardID     uint32          `json:"shardID"`
-	ToShardID   uint32          `json:"toShardID"`
-	Amount      *hexutil.Big    `json:"value"`
+	BlockHash   common.Hash  `json:"blockHash"`
+	BlockNumber *hexutil.Big `json:"blockNumber"`
+	TxHash      common.Hash  `json:"hash"`
+	From        string       `json:"from"`
+	To          string       `json:"to"`
+	ShardID     uint32       `json:"shardID"`
+	ToShardID   uint32       `json:"toShardID"`
+	Amount      *hexutil.Big `json:"value"`
 }
 
 // HeaderInformation represents the latest consensus information
@@ -63,19 +64,27 @@ func newHeaderInformation(header *block.Header) *HeaderInformation {
 	if header == nil {
 		return nil
 	}
+
 	result := &HeaderInformation{
 		BlockHash:        header.Hash(),
 		BlockNumber:      header.Number().Uint64(),
 		ShardID:          header.ShardID(),
-		Leader:           common2.MustAddressToBech32(header.Coinbase()),
 		ViewID:           header.ViewID().Uint64(),
 		Epoch:            header.Epoch().Uint64(),
 		UnixTime:         header.Time().Uint64(),
 		Timestamp:        time.Unix(header.Time().Int64(), 0).UTC().String(),
 		LastCommitBitmap: hex.EncodeToString(header.LastCommitBitmap()),
 	}
+
 	sig := header.LastCommitSignature()
 	result.LastCommitSig = hex.EncodeToString(sig[:])
+
+	bechAddr, err := internal_common.AddressToBech32(header.Coinbase())
+	if err != nil {
+		bechAddr = header.Coinbase().Hex()
+	}
+
+	result.Leader = bechAddr
 	return result
 }
 
@@ -84,8 +93,6 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 	result := &RPCCXReceipt{
 		BlockHash: blockHash,
 		TxHash:    cx.TxHash,
-		From:      cx.From,
-		To:        cx.To,
 		Amount:    (*hexutil.Big)(cx.Amount),
 		ShardID:   cx.ShardID,
 		ToShardID: cx.ToShardID,
@@ -94,6 +101,20 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 		result.BlockHash = blockHash
 		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
 	}
+
+	fromAddr, err := internal_common.AddressToBech32(cx.From)
+	if err != nil {
+		return nil
+	}
+	toAddr := ""
+	if cx.To != nil {
+		if toAddr, err = internal_common.AddressToBech32(*cx.To); err != nil {
+			return nil
+		}
+	}
+	result.From = fromAddr
+	result.To = toAddr
+
 	return result
 }
 
@@ -108,13 +129,11 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	v, r, s := tx.RawSignatureValues()
 
 	result := &RPCTransaction{
-		From:      from,
 		Gas:       hexutil.Uint64(tx.Gas()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
 		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
-		To:        tx.To(),
 		Value:     (*hexutil.Big)(tx.Value()),
 		ShardID:   tx.ShardID(),
 		ToShardID: tx.ToShardID(),
@@ -127,6 +146,23 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
 		result.TransactionIndex = hexutil.Uint(index)
 	}
+
+	fromAddr, err := internal_common.AddressToBech32(from)
+	if err != nil {
+		return nil
+	}
+	toAddr := ""
+
+	if tx.To() != nil {
+		if toAddr, err = internal_common.AddressToBech32(*tx.To()); err != nil {
+			return nil
+		}
+		result.From = fromAddr
+	} else {
+		result.From = strings.ToLower(from.Hex())
+	}
+	result.To = toAddr
+
 	return result
 }
 

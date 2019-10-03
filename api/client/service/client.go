@@ -52,11 +52,3 @@ func (client *Client) GetFreeToken(address common.Address) (*proto.GetFreeTokenR
 	request := &proto.GetFreeTokenRequest{Address: address.Bytes()}
 	return client.clientServiceClient.GetFreeToken(ctx, request)
 }
-
-// GetStakingContractInfo gets necessary info for staking.
-func (client *Client) GetStakingContractInfo(address common.Address) (*proto.StakingContractInfoResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	request := &proto.StakingContractInfoRequest{Address: address.Bytes()}
-	return client.clientServiceClient.GetStakingContractInfo(ctx, request)
-}

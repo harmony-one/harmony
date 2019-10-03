@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	libp2p_host "github.com/libp2p/go-libp2p-host"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
@@ -21,11 +22,11 @@ type Host interface {
 	ConnectHostPeer(Peer)
 
 	// SendMessageToGroups sends a message to one or more multicast groups.
-	SendMessageToGroups(groups []GroupID, msg []byte) error
+	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 
 	// GroupReceiver returns a receiver of messages sent to a multicast group.
 	// Each call creates a new receiver.
 	// If multiple receivers are created for the same group,
 	// a message sent to the group will be delivered to all of the receivers.
-	GroupReceiver(GroupID) (receiver GroupReceiver, err error)
+	GroupReceiver(nodeconfig.GroupID) (receiver GroupReceiver, err error)
 }

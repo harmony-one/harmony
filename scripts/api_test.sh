@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # This Script is for Testing the API functionality on both local and betanet.
 # -l to run localnet, -b to run betanet(mutually exclusive)
 # -v to see returns from each request

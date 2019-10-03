@@ -28,6 +28,7 @@ const (
 	_    // used to be Control
 	PING // node send ip/pki to register with leader
 	ShardState
+	Staking
 )
 
 // BlockchainSyncMessage is a struct for blockchain sync message.

@@ -16,7 +16,9 @@
 
 package core
 
-import "errors"
+import (
+	"github.com/pkg/errors"
+)
 
 var (
 	// ErrKnownBlock is returned when a block to import is already known locally.
@@ -35,4 +37,7 @@ var (
 
 	// ErrShardStateNotMatch is returned if the calculated shardState hash not equal that in the block header
 	ErrShardStateNotMatch = errors.New("shard state root hash not match")
+
+	// ErrInvalidChainID when ChainID of signer does not match that of running node
+	ErrInvalidChainID = errors.New("invalid chain id for signer")
 )

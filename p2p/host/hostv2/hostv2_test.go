@@ -11,7 +11,7 @@ import (
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2p_pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
-	"github.com/harmony-one/harmony/p2p"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	mock "github.com/harmony-one/harmony/p2p/host/hostv2/mock"
 )
 
@@ -19,7 +19,7 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
-		groups := []p2p.GroupID{"ABC", "DEF"}
+		groups := []nodeconfig.GroupID{"ABC", "DEF"}
 		data := []byte{1, 2, 3}
 		pubsub := mock.NewMockpubsub(mc)
 		gomock.InOrder(
@@ -34,7 +34,7 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
-		groups := []p2p.GroupID{"ABC", "DEF"}
+		groups := []nodeconfig.GroupID{"ABC", "DEF"}
 		data := []byte{1, 2, 3}
 		pubsub := mock.NewMockpubsub(mc)
 		gomock.InOrder(

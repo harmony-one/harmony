@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // Harmony implements the Harmony full node service.
@@ -43,11 +44,14 @@ type Harmony struct {
 
 // NodeAPI is the list of functions from node used to call rpc apis.
 type NodeAPI interface {
+	AddPendingStakingTransaction(*staking.StakingTransaction)
 	AddPendingTransaction(newTx *types.Transaction)
 	Blockchain() *core.BlockChain
 	AccountManager() *accounts.Manager
 	GetBalanceOfAddress(address common.Address) (*big.Int, error)
 	GetNonceOfAddress(address common.Address) uint64
+	GetTransactionsHistory(address string) ([]common.Hash, error)
+	IsCurrentlyLeader() bool
 }
 
 // New creates a new Harmony object (including the

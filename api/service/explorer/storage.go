@@ -112,10 +112,6 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 
 	// Store txs
 	for _, tx := range block.Transactions() {
-		if tx.To() == nil {
-			continue
-		}
-
 		explorerTransaction := GetTransaction(tx, block)
 		storage.UpdateTXStorage(batch, explorerTransaction, tx)
 		storage.UpdateAddress(batch, explorerTransaction, tx)
@@ -158,7 +154,9 @@ func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *
 // TODO: deprecate this logic
 func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
-	storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+	if explorerTransaction.To != "" {
+		storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+	}
 	explorerTransaction.Type = Sent
 	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
 }
@@ -170,18 +168,9 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, exp
 
 	var address Address
 	if data, err := storage.db.Get([]byte(key)); err == nil {
-		err = rlp.DecodeBytes(data, &address)
-		if err == nil {
-			if explorerTransaction.Type == Received {
-				address.Balance.Add(address.Balance, tx.Value())
-			} else {
-				address.Balance.Sub(address.Balance, tx.Value())
-			}
-		} else {
-			utils.Logger().Error().Err(err).Msg("Failed to error")
+		if err = rlp.DecodeBytes(data, &address); err != nil {
+			utils.Logger().Error().Err(err).Msg("Failed due to error")
 		}
-	} else {
-		address.Balance = tx.Value()
 	}
 	address.ID = addr
 	address.TXs = append(address.TXs, explorerTransaction)

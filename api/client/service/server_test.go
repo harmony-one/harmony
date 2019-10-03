@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"math/big"
-	"strings"
 	"testing"
 
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -11,13 +10,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	client "github.com/harmony-one/harmony/api/client/service/proto"
-	proto "github.com/harmony-one/harmony/api/client/service/proto"
-	"github.com/harmony-one/harmony/core/state"
-	common2 "github.com/harmony-one/harmony/internal/common"
-
 	"github.com/ethereum/go-ethereum/ethdb"
+	client "github.com/harmony-one/harmony/api/client/service/proto"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 )
@@ -39,7 +35,7 @@ func TestGetFreeToken(test *testing.T) {
 		return nil, nil
 	}, func(common.Address) common.Hash {
 		return hash
-	}, nil)
+	})
 
 	testBankKey, _ := crypto.GenerateKey()
 	testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
@@ -74,7 +70,7 @@ func TestFetchAccountState(test *testing.T) {
 		return chain.State()
 	}, func(common.Address) common.Hash {
 		return hash
-	}, nil)
+	})
 
 	response, err := server.FetchAccountState(nil, &client.FetchAccountStateRequest{Address: testBankAddress.Bytes()})
 
@@ -84,53 +80,6 @@ func TestFetchAccountState(test *testing.T) {
 
 	if bytes.Compare(response.Balance, testBankFunds.Bytes()) != 0 {
 		test.Errorf("Wrong balance is returned")
-	}
-
-	if response.Nonce != 0 {
-		test.Errorf("Wrong nonce is returned")
-	}
-}
-
-func TestGetStakingContractInfo(test *testing.T) {
-	var (
-		database = ethdb.NewMemDatabase()
-		gspec    = core.Genesis{
-			Config:  chainConfig,
-			Factory: blockFactory,
-			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
-			ShardID: 10,
-		}
-	)
-
-	genesis := gspec.MustCommit(database)
-	_ = genesis
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine, vm.Config{}, nil)
-
-	hash := common.Hash{}
-	hash.SetBytes([]byte("hello"))
-	deployedStakingContractAddress := common.Address{}
-	deployedStakingContractAddress.SetBytes([]byte("stakingContractAddress"))
-	server := NewServer(func() (*state.DB, error) {
-		return chain.State()
-	}, func(common.Address) common.Hash {
-		return hash
-	}, func() common.Address {
-		return deployedStakingContractAddress
-	})
-
-	response, err := server.GetStakingContractInfo(nil, &proto.StakingContractInfoRequest{Address: testBankAddress.Bytes()})
-	if err != nil {
-		test.Fatal("GetStakingContractInfo failed:", err)
-	}
-
-	if bytes.Compare(response.Balance, testBankFunds.Bytes()) != 0 {
-		test.Errorf("Wrong balance is returned")
-	}
-
-	if strings.Compare(response.ContractAddress, common2.MustAddressToBech32(deployedStakingContractAddress)) != 0 {
-		test.Errorf("Wrong ContractAddress is returned (expected %#v, got %#v)",
-			common2.MustAddressToBech32(deployedStakingContractAddress),
-			response.ContractAddress)
 	}
 
 	if response.Nonce != 0 {

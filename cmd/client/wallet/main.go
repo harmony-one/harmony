@@ -935,9 +935,9 @@ func clearKeystore() {
 // submitTransaction submits the transaction to the Harmony network
 func submitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uint32) error {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
-	clientGroup := p2p.NewClientGroupIDByShardID(p2p.ShardID(shardID))
+	clientGroup := nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(shardID))
 
-	err := walletNode.GetHost().SendMessageToGroups([]p2p.GroupID{clientGroup}, p2p_host.ConstructP2pMessage(byte(0), msg))
+	err := walletNode.GetHost().SendMessageToGroups([]nodeconfig.GroupID{clientGroup}, p2p_host.ConstructP2pMessage(byte(0), msg))
 	if err != nil {
 		fmt.Printf("Error in SubmitTransaction: %v\n", err)
 		return err

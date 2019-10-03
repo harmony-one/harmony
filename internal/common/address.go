@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"database/sql/driver"
 	"encoding/hex"
 	"fmt"
@@ -18,6 +19,10 @@ import (
 const (
 	// AddressLength is the expected length of the address
 	AddressLength = 20
+)
+
+var (
+	emptyAddress = Address{}
 )
 
 // Address represents the 20 byte address of an Harmony account.
@@ -47,6 +52,11 @@ func IsBech32Address(s string) bool {
 		return false
 	}
 	return true
+}
+
+// IsEmpty gets whether the address contains all 0 bytes
+func (a Address) IsEmpty() bool {
+	return bytes.Compare(a[:], emptyAddress[:]) == 0
 }
 
 // Bytes gets the string representation of the underlying address.

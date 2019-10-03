@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+version="v1 20190924.0"
+
 unset -v progname
 progname="${0##*/}"
 
@@ -110,10 +112,28 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
    -b             download harmony_db files from shard specified by -i <shardid> (default: off)
    -a dbfile      specify the db file to download (default:off)
+   -U FOLDER      specify the upgrade folder to download binaries
+   -P             enable public rpc end point (default:off)
+   -v             print out the version of the node.sh
+   -V             print out the version of the Harmony binary
 
-example:
+examples:
 
+# start node program w/o root account
    ${progname} -S -k mybls.key
+
+# download beacon chain (shard0) db snapshot
+   ${progname} -i 0 -b
+
+# just re-download the harmony binaries
+   ${progname} -d
+
+# start a non-validating node in shard 1
+# you need to have a dummy BLSKEY/pass file using 'touch BLSKEY; touch blspass'
+   ${progname} -S -k BLSKEY -p blspass -T explorer -i 1
+
+# upgrade harmony binaries from specified repo
+   ${progname} -1 -U upgrade
 
 ENDEND
 }
@@ -129,6 +149,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
+unset upgrade_rel public_rpc
 start_clean=false
 loop=true
 run_as_root=true
@@ -139,11 +160,12 @@ network=main
 node_type=validator
 shard_id=1
 download_harmony_db=false
+public_rpc=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba: opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvV opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -164,6 +186,12 @@ do
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
    a) db_file_to_dl="${OPTARG}";;
+   U) upgrade_rel="${OPTARG}";;
+   P) public_rpc=true;;
+   v) msg "version: $version"
+      exit 0 ;;
+   V) LD_LIBRARY_PATH=. ./harmony -version
+      exit 0 ;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -218,6 +246,11 @@ case $# in
    usage "extra arguments at the end ($*)"
    ;;
 esac
+
+# reset REL if upgrade_rel is set
+if [ -n "$upgrade_rel" ]; then
+   REL="${upgrade_rel}"
+fi
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/darwin-x86_64/$REL/
@@ -336,7 +369,7 @@ download_harmony_db_file() {
          url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/${file_to_dl}"
          if _curl_download $url "${outdir}" ${file_to_dl}; then
             verify_checksum "${outdir}" "${file_to_dl}" md5sum.txt || return $?
-            msg "downlaoded ${file_to_dl}, extracting ..."
+            msg "downloaded ${file_to_dl}, extracting ..."
             tar -C "${outdir}" -xvf "${outdir}/${file_to_dl}"
          else
             msg "can't download ${file_to_dl}"
@@ -347,7 +380,7 @@ download_harmony_db_file() {
 
    files=$(awk '{ print $2 }' ${outdir}/md5sum.txt)
    echo "[available harmony db files for shard ${shard_id}]"
-   grep -oE harmony_db_${shard_id}-.*.tar "${outdir}/md5sum.txt"
+   grep -oE "harmony_db_${shard_id}"-.*.tar "${outdir}/md5sum.txt"
    echo
    for file in $files; do
       if [[ $file =~ "harmony_db_${shard_id}" ]]; then
@@ -357,7 +390,7 @@ download_harmony_db_file() {
             url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/$file"
             if _curl_download $url "${outdir}" $file; then
                verify_checksum "${outdir}" "${file}" md5sum.txt || return $?
-               msg "downlaoded $file, extracting ..."
+               msg "downloaded $file, extracting ..."
                tar -C "${outdir}" -xvf "${outdir}/${file}"
             else
                msg "can't download $file"
@@ -369,7 +402,8 @@ download_harmony_db_file() {
 }
 
 if ${download_only}; then
-   download_binaries || err 69 "download node software failed"
+   download_binaries staging || err 69 "download node software failed"
+   msg "downloaded files are in staging direectory"
    exit 0
 fi
 
@@ -550,7 +584,7 @@ kill_node() {
 }
 
 {
-   while :
+   while ${loop}
    do
       msg "re-downloading binaries in 5m"
       sleep 300
@@ -592,10 +626,16 @@ do
       -bootnodes "${BN_MA}"
       -ip "${PUB_IP}"
       -port "${NODE_PORT}"
+      -is_genesis
       -blskey_file "${BLSKEYFILE}"
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
    )
+   if ${public_rpc}; then
+      args+=(
+      -public_rpc
+      )
+   fi
 # backward compatible with older harmony node software
    case "${node_type}" in
    explorer)

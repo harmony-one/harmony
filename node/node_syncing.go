@@ -365,8 +365,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEADER:
+		var hash common.Hash
 		for _, bytes := range request.Hashes {
-			var hash common.Hash
 			hash.SetBytes(bytes)
 			blockHeader := node.Blockchain().GetHeaderByHash(hash)
 			if blockHeader == nil {
@@ -380,8 +380,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCK:
+		var hash common.Hash
 		for _, bytes := range request.Hashes {
-			var hash common.Hash
 			hash.SetBytes(bytes)
 			block := node.Blockchain().GetBlockByHash(hash)
 			if block == nil {

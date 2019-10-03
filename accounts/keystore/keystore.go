@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // ErrLocked ...
@@ -297,6 +298,20 @@ func (ks *KeyStore) SignHashWithPassphrase(a accounts.Account, passphrase string
 	}
 	defer zeroKey(key.PrivateKey)
 	return crypto.Sign(hash, key.PrivateKey)
+}
+
+// SignStakingTx signs a staking transaction, only EIP155 based signer
+func (ks *KeyStore) SignStakingTx(
+	a accounts.Account,
+	tx *staking.StakingTransaction,
+	chainID *big.Int) (*staking.StakingTransaction, error) {
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+	unlockedKey, found := ks.unlocked[a.Address]
+	if !found {
+		return nil, ErrLocked
+	}
+	return staking.Sign(tx, staking.NewEIP155Signer(chainID), unlockedKey.PrivateKey)
 }
 
 // SignTxWithPassphrase signs the transaction if the private key matching the

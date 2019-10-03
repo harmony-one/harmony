@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
@@ -207,6 +208,12 @@ func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
 	return (*hexutil.Big)(balance), err
 }
 
+// GetTransactionsHistory returns list of transactions hashes of address.
+func (b *APIBackend) GetTransactionsHistory(address string) ([]common.Hash, error) {
+	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address)
+	return hashes, err
+}
+
 // NetVersion returns net version
 func (b *APIBackend) NetVersion() uint64 {
 	return b.hmy.NetVersion()
@@ -268,4 +275,17 @@ func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bo
 	entry := core.CxEntry{blockHash, tx.ToShardID()}
 	success := b.hmy.CxPool().Add(entry)
 	return blockNum, success
+}
+
+// IsLeader exposes if node is currently leader
+func (b *APIBackend) IsLeader() bool {
+	return b.hmy.nodeAPI.IsCurrentlyLeader()
+}
+
+// SendStakingTx adds a staking transaction
+func (b *APIBackend) SendStakingTx(
+	ctx context.Context,
+	newStakingTx *staking.StakingTransaction) error {
+	b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
+	return nil
 }

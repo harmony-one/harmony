@@ -10,8 +10,8 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
@@ -187,7 +187,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		Msg("[startViewChange]")
 
 	msgToSend := consensus.constructViewChangeMessage()
-	consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+	consensus.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	consensus.consensusTimeout[timeoutViewChange].Start()
@@ -223,6 +223,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 
 	// TODO: if difference is only one, new leader can still propose the same committed block to avoid another view change
+	// TODO: new leader catchup without ignore view change message
 	if consensus.blockNum > recvMsg.BlockNum {
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -252,6 +253,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	consensus.vcLock.Lock()
 	defer consensus.vcLock.Unlock()
 
+	// TODO: remove NIL type message
 	// add self m1 or m2 type message signature and bitmap
 	_, ok1 := consensus.nilSigs[consensus.PubKey.SerializeToHexStr()]
 	_, ok2 := consensus.bhpSigs[consensus.PubKey.SerializeToHexStr()]
@@ -432,7 +434,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Int("payloadSize", len(consensus.m1Payload)).
 			Hex("M1Payload", consensus.m1Payload).
 			Msg("[onViewChange] Sent NewView Message")
-		consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_NEWVIEW, []p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+		consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_NEWVIEW, []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
 		consensus.viewID = recvMsg.ViewID
 		consensus.ResetViewChangeState()
@@ -554,6 +556,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// NewView message is verified, change state to normal consensus
+	// TODO: check magic number 32
 	if len(recvMsg.Payload) > 32 {
 		// Construct and send the commit message
 		blockNumHash := make([]byte, 8)
@@ -562,7 +565,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		msgToSend := consensus.constructCommitMessage(commitPayload)
 
 		utils.Logger().Info().Msg("onNewView === commit")
-		consensus.host.SendMessageToGroups([]p2p.GroupID{p2p.NewGroupIDByShardID(p2p.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 		utils.Logger().Debug().
 			Str("From", consensus.phase.String()).
 			Str("To", Commit.String()).
