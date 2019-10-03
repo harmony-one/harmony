@@ -27,7 +27,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/transaction"
+	staking "github.com/harmony-one/harmony/staking/types"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
@@ -241,7 +241,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
-	txs := transaction.Stakes{}
+	txs := staking.StakingTransactions{}
 	err := rlp.Decode(bytes.NewReader(msgPayload[:]), &txs)
 	if err != nil {
 		utils.Logger().Error().

@@ -13,7 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/staking/transaction"
+	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
@@ -173,7 +173,7 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	ctx context.Context, encodedTx hexutil.Bytes,
 ) (common.Hash, error) {
-	tx := new(transaction.Stake)
+	tx := new(staking.StakingTransaction)
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
 	}

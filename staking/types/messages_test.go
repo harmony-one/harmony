@@ -1,4 +1,4 @@
-package message
+package types
 
 // var (
 // 	minSelfDelegation = big.NewInt(1000)

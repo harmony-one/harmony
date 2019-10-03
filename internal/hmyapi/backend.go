@@ -17,7 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/transaction"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // Backend interface provides the common API services (that are provided by
@@ -72,7 +72,7 @@ type Backend interface {
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
-	SendStakingTx(ctx context.Context, newStakingTx *transaction.Stake) error
+	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
 }
 
 // GetAPIs returns all the APIs.

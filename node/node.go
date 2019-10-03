@@ -31,7 +31,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/transaction"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // State is a state of a node.
@@ -125,7 +125,7 @@ type Node struct {
 	pendingTxMutex      sync.Mutex
 	recentTxsStats      types.RecentTxsStats
 
-	pendingStakingTransactions map[common.Hash]*transaction.Stake // All the staking transactions received but not yet processed for Consensus
+	pendingStakingTransactions map[common.Hash]*staking.StakingTransaction // All the staking transactions received but not yet processed for Consensus
 	pendingStakingTxMutex      sync.Mutex
 
 	Worker       *worker.Worker
@@ -273,7 +273,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 }
 
 // Add new staking transactions to the pending staking transaction list.
-func (node *Node) addPendingStakingTransactions(newStakingTxs transaction.Stakes) {
+func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
 	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
 	node.pendingStakingTxMutex.Lock()
 	for _, tx := range newStakingTxs {
@@ -290,8 +290,8 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs transaction.Stakes
 
 // AddPendingStakingTransaction staking transactions
 func (node *Node) AddPendingStakingTransaction(
-	newStakingTx *transaction.Stake) {
-	node.addPendingStakingTransactions(transaction.Stakes{newStakingTx})
+	newStakingTx *staking.StakingTransaction) {
+	node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
@@ -330,7 +330,9 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Transactions, transaction.Stakes) {
+func (node *Node) getTransactionsForNewBlock(
+	coinbase common.Address,
+) (types.Transactions, staking.StakingTransactions) {
 
 	txsThrottleConfig := core.ShardingSchedule.TxsThrottleConfig()
 
@@ -351,7 +353,7 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Tra
 		utils.Logger().Error().
 			Err(err).
 			Msg("Failed updating worker's state before txn selection")
-		return types.Transactions{}, transaction.Stakes{}
+		return types.Transactions{}, staking.StakingTransactions{}
 	}
 
 	node.pendingTxMutex.Lock()
@@ -360,7 +362,7 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Tra
 	defer node.pendingStakingTxMutex.Unlock()
 
 	pendingTransactions := types.Transactions{}
-	pendingStakingTransactions := transaction.Stakes{}
+	pendingStakingTransactions := staking.StakingTransactions{}
 
 	for _, tx := range node.pendingTransactions {
 		pendingTransactions = append(pendingTransactions, tx)
@@ -382,7 +384,7 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Tra
 		Int("invalidDiscarded", len(invalid)).
 		Msg("Selecting Transactions")
 
-	node.pendingStakingTransactions = make(map[common.Hash]*transaction.Stake)
+	node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
 	for _, unselectedStakingTx := range unselectedStaking {
 		node.pendingStakingTransactions[unselectedStakingTx.Hash()] = unselectedStakingTx
 	}
@@ -469,7 +471,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 
 		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
 		node.pendingTransactions = make(map[common.Hash]*types.Transaction)
-		node.pendingStakingTransactions = make(map[common.Hash]*transaction.Stake)
+		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
 
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block

@@ -1,4 +1,4 @@
-package transaction
+package types
 
 import (
 	"errors"
@@ -9,11 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/harmony/staking/message"
 )
 
 type txdata struct {
-	message.Directive
+	Directive
 	StakeMsg     interface{}
 	AccountNonce uint64   `json:"nonce"      gencodec:"required"`
 	Price        *big.Int `json:"gasPrice"   gencodec:"required"`
@@ -26,8 +25,8 @@ type txdata struct {
 	Hash *common.Hash `json:"hash" rlp:"-"`
 }
 
-// Stake is a record captuing all staking operations
-type Stake struct {
+// StakingTransaction is a record captuing all staking operations
+type StakingTransaction struct {
 	data txdata
 	// caches
 	hash atomic.Value
@@ -35,15 +34,15 @@ type Stake struct {
 	from atomic.Value
 }
 
-type fulfill func() (message.Directive, interface{})
+type fulfill func() (Directive, interface{})
 
-// NewStake produces a new staking transaction record
-func NewStake(
+// NewStakingTransaction produces a new staking transaction record
+func NewStakingTransaction(
 	nonce, gasLimit uint64, gasPrice *big.Int, f fulfill,
-) (*Stake, error) {
+) (*StakingTransaction, error) {
 	directive, payload := f()
 	// TODO(Double check that this is legitmate directive)
-	newStake := &Stake{data: txdata{
+	newStake := &StakingTransaction{data: txdata{
 		directive,
 		payload,
 		nonce,
@@ -62,12 +61,12 @@ var (
 	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
 )
 
-// Stakes is a stake slice type for basic sorting.
-type Stakes []*Stake
+// StakingTransactions is a stake slice type for basic sorting.
+type StakingTransactions []*StakingTransaction
 
 // Hash hashes the RLP encoding of tx.
 // It uniquely identifies the transaction.
-func (tx *Stake) Hash() common.Hash {
+func (tx *StakingTransaction) Hash() common.Hash {
 	if hash := tx.hash.Load(); hash != nil {
 		return hash.(common.Hash)
 	}
@@ -77,28 +76,28 @@ func (tx *Stake) Hash() common.Hash {
 }
 
 // WithSignature returns a new transaction with the given signature.
-func (tx *Stake) WithSignature(signer Signer, sig []byte) (*Stake, error) {
+func (tx *StakingTransaction) WithSignature(signer Signer, sig []byte) (*StakingTransaction, error) {
 	r, s, v, err := signer.SignatureValues(tx, sig)
 	if err != nil {
 		return nil, err
 	}
-	cpy := &Stake{data: tx.data}
+	cpy := &StakingTransaction{data: tx.data}
 	cpy.data.R, cpy.data.S, cpy.data.V = r, s, v
 	return cpy, nil
 }
 
 // ChainID is what chain this staking transaction for
-func (tx *Stake) ChainID() *big.Int {
+func (tx *StakingTransaction) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)
 }
 
 // EncodeRLP implements rlp.Encoder
-func (tx *Stake) EncodeRLP(w io.Writer) error {
+func (tx *StakingTransaction) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, &tx.data)
 }
 
 // DecodeRLP implements rlp.Decoder
-func (tx *Stake) DecodeRLP(s *rlp.Stream) error {
+func (tx *StakingTransaction) DecodeRLP(s *rlp.Stream) error {
 	_, size, _ := s.Kind()
 	err := s.Decode(&tx.data)
 	if err != nil {

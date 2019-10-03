@@ -18,9 +18,7 @@ import (
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/message"
-	"github.com/harmony-one/harmony/staking/role"
-	"github.com/harmony-one/harmony/staking/transaction"
+	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/spf13/cobra"
 )
 
@@ -54,23 +52,23 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	account := accounts.Account{Address: dAddr}
 	ks.Unlock(account, testAccountPassword)
 	gasPrice := big.NewInt(0)
-	stakePayloadMaker := func() (message.Directive, interface{}) {
+	stakePayloadMaker := func() (staking.Directive, interface{}) {
 		p := &bls.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
 		pub := shard.BlsPublicKey{}
 		pub.FromLibBLSPublicKey(p)
-		return message.DirectiveNewValidator, message.NewValidator{
-			Description: role.Description{
+		return staking.DirectiveNewValidator, staking.NewValidator{
+			Description: staking.Description{
 				Name:            "something",
 				Identity:        "something else",
 				Website:         "some site, harmony.one",
 				SecurityContact: "mr.smith",
 				Details:         "blah blah details",
 			},
-			CommissionRates: role.CommissionRates{
-				Rate:          role.NewDec(100),
-				MaxRate:       role.NewDec(150),
-				MaxChangeRate: role.NewDec(5),
+			CommissionRates: staking.CommissionRates{
+				Rate:          staking.NewDec(100),
+				MaxRate:       staking.NewDec(150),
+				MaxChangeRate: staking.NewDec(5),
 			},
 			MinSelfDelegation: big.NewInt(10),
 			StakingAddress:    common.Address(dAddr),
@@ -84,7 +82,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		// }
 	}
 
-	stakingTx, err := transaction.NewStake(2, 100, gasPrice, stakePayloadMaker)
+	stakingTx, err := staking.NewStakingTransaction(2, 100, gasPrice, stakePayloadMaker)
 	if err != nil {
 		return err
 	}
@@ -96,7 +94,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	if oops1 != nil {
 		return oops1
 	}
-	tx := new(transaction.Stake)
+	tx := new(staking.StakingTransaction)
 	if err := rlp.DecodeBytes(enc, tx); err != nil {
 		return err
 	}

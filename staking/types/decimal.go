@@ -1,4 +1,4 @@
-package role
+package types
 
 import (
 	"encoding/json"

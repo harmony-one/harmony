@@ -1,4 +1,4 @@
-package role
+package types
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/harmony-one/harmony/internal/common"
 )
 

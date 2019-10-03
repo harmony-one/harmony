@@ -1,11 +1,10 @@
-package message
+package types
 
 import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/role"
 	"github.com/pkg/errors"
 )
 
@@ -39,19 +38,19 @@ func (d Directive) String() string {
 
 // NewValidator - type for creating a new validator
 type NewValidator struct {
-	role.Description     `json:"ties" yaml:"ties"`
-	role.CommissionRates `json:"commission" yaml:"commission"`
-	MinSelfDelegation    *big.Int           `json:"min_self_delegation" yaml:"min_self_delegation"`
-	StakingAddress       common.Address     `json:"staking_address" yaml:"staking_address"`
-	PubKey               shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
-	Amount               *big.Int           `json:"amount" yaml:"amount"`
+	Description       `json:"ties" yaml:"ties"`
+	CommissionRates   `json:"commission" yaml:"commission"`
+	MinSelfDelegation *big.Int           `json:"min_self_delegation" yaml:"min_self_delegation"`
+	StakingAddress    common.Address     `json:"staking_address" yaml:"staking_address"`
+	PubKey            shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
+	Amount            *big.Int           `json:"amount" yaml:"amount"`
 }
 
 // EditValidator - type for edit existing validator
 type EditValidator struct {
-	role.Description
+	Description
 	StakingAddress    common.Address `json:"staking_address" yaml:"staking_address"`
-	CommissionRate    role.Dec       `json:"commission_rate" yaml:"commission_rate"`
+	CommissionRate    Dec            `json:"commission_rate" yaml:"commission_rate"`
 	MinSelfDelegation *big.Int       `json:"min_self_delegation" yaml:"min_self_delegation"`
 }
 
