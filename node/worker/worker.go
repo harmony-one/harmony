@@ -27,11 +27,12 @@ type environment struct {
 	state   *state.DB     // apply state changes here
 	gasPool *core.GasPool // available gas used to pack transactions
 
-	header   *block.Header
-	txs      []*types.Transaction
-	receipts []*types.Receipt
-	outcxs   []*types.CXReceipt       // cross shard transaction receipts (source shard)
-	incxs    []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
+	header    *block.Header
+	txs       []*types.Transaction
+	stkingTxs staking.StakingTransactions
+	receipts  []*types.Receipt
+	outcxs    []*types.CXReceipt       // cross shard transaction receipts (source shard)
+	incxs     []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -150,8 +151,10 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 	txsThrottleConfig *shardingconfig.TxsThrottleConfig,
 	coinbase common.Address) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
 	// TODO: implement staking transaction selection
-	t := staking.StakingTransactions{}
-	return t, t, t
+	selected := staking.StakingTransactions{}
+	unselected := staking.StakingTransactions{}
+	invalid := staking.StakingTransactions{}
+	return selected, unselected, invalid
 }
 
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
@@ -177,6 +180,7 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
+// TODO
 // CommitTransactions commits transactions including staking transactions.
 func (w *Worker) CommitTransactions(
 	txs types.Transactions, stakingTxns staking.StakingTransactions, coinbase common.Address) error {
@@ -348,7 +352,9 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 	s := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
-	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs)
+	block, err := w.engine.Finalize(
+		w.chain, copyHeader, s, w.current.txs, w.current.stkingTxs, w.current.receipts, w.current.outcxs, w.current.incxs,
+	)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
