@@ -116,7 +116,7 @@ func (ss *StateSync) InitSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	if ss.syncConfig != nil {
 		ss.syncConfig.CloseConnections()
 	}
-	ss.syncConfig = CreateSyncConfig()
+	ss.syncConfig = &SyncConfig{}
 
 	var wg sync.WaitGroup
 	for _, peer := range peers {
@@ -159,6 +159,8 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 	for {
 		var wg sync.WaitGroup
 
+		ss.syncConfig.Lock()
+		defer ss.syncConfig.Unlock()
 		ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 			wg.Add(1)
 			go func() {
@@ -183,7 +185,7 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 				}
 			}()
 			return
-		}, true /* write */)
+		})
 
 		wg.Wait()
 
@@ -205,6 +207,9 @@ func (ss *StateSync) GetConsensusHashes(startHash []byte, size uint32) bool {
 
 func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 	ss.stateSyncTaskQueue = queue.New(0)
+
+	ss.syncConfig.RLock()
+	defer ss.syncConfig.RUnlock()
 	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		for id, blockHash := range configPeer.blockHashes {
 			if err := ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash}); err != nil {
@@ -217,7 +222,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 		}
 		brk = true
 		return
-	}, false /* write */)
+	})
 
 	utils.Logger().Info().Int64("length", ss.stateSyncTaskQueue.Len()).Msg("[SYNC] Finished generateStateSyncTaskQueue")
 }
@@ -228,6 +233,8 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 	var wg sync.WaitGroup
 	failNumber := 0
 
+	ss.syncConfig.RLock()
+	defer ss.syncConfig.RUnlock()
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
 
@@ -284,7 +291,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 		}(ss.stateSyncTaskQueue, bc)
 
 		return
-	}, false /* write */)
+	})
 	wg.Wait()
 	utils.Logger().Info().Msg("[SYNC] Finished downloadBlocks")
 }
@@ -405,10 +412,12 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		parentHash = block.Hash()
 	}
 	// TODO ek – Do we need to hold syncMux now that syncConfig has its own mutex?
+	ss.syncConfig.Lock()
+	defer ss.syncConfig.Unlock()
 	ss.syncConfig.ForEachPeer(func(peer *SyncPeerConfig) (brk bool) {
 		peer.newBlocks = []*types.Block{}
 		return
-	}, true /* write */)
+	})
 
 	// update last mile blocks if any
 	parentHash = bc.CurrentBlock().Hash()
@@ -464,6 +473,9 @@ func (ss *StateSync) RegisterNodeInfo() int {
 	defer ss.syncConfig.RUnlock()
 
 	count := 0
+
+	ss.syncConfig.Lock()
+	defer ss.syncConfig.Unlock()
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		logger := utils.Logger().With().Str("peerPort", peerConfig.port).Str("peerIP", peerConfig.ip).Logger()
 		if count >= registrationNumber {
@@ -488,7 +500,7 @@ func (ss *StateSync) RegisterNodeInfo() int {
 		logger.Debug().Msg("[SYNC] register success")
 		count++
 		return
-	}, true /* write */)
+	})
 	return count
 }
 
@@ -499,7 +511,6 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 
 	ss.syncConfig.RLock()
 	defer ss.syncConfig.RUnlock()
-
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
 		go func() {
@@ -518,7 +529,7 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 			ss.syncMux.Unlock()
 		}()
 		return
-	}, false /* write */)
+	})
 
 	wg.Wait()
 

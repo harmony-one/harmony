@@ -42,17 +42,17 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 	return response.Payload, nil
 }
 
-// CompareSyncPeerConfigByBlockHashes compares two SyncPeerConfig by blockHashes.
-func CompareSyncPeerConfigByBlockHashes(a *SyncPeerConfig, b *SyncPeerConfig) int {
-	if len(a.blockHashes) != len(b.blockHashes) {
-		if len(a.blockHashes) < len(b.blockHashes) {
+// Compare returns comparison result between the two sync peer configs' block hashes
+func (peerConfig *SyncPeerConfig) Compare(other *SyncPeerConfig) int {
+	if len(peerConfig.blockHashes) != len(other.blockHashes) {
+		if len(peerConfig.blockHashes) < len(other.blockHashes) {
 			return -1
 		}
 		return 1
 	}
-	for id := range a.blockHashes {
-		if !reflect.DeepEqual(a.blockHashes[id], b.blockHashes[id]) {
-			return bytes.Compare(a.blockHashes[id], b.blockHashes[id])
+	for id := range peerConfig.blockHashes {
+		if !reflect.DeepEqual(peerConfig.blockHashes[id], other.blockHashes[id]) {
+			return bytes.Compare(peerConfig.blockHashes[id], other.blockHashes[id])
 		}
 	}
 	return 0
