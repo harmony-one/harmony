@@ -1135,7 +1135,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 //
 // After insertion is done, all accumulated events will be fired.
 func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
-	n, events, logs, err := bc.insertChain(chain)
+	n, events, logs, err := bc.insertChain(chain, false /* verifyHeaders */)
 	bc.PostChainEvents(events, logs)
 	if err == nil {
 		for idx, block := range chain {
@@ -1184,7 +1184,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 // insertChain will execute the actual chain insertion and event aggregation. The
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
-func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*types.Log, error) {
+func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
 		return 0, nil, nil, nil
@@ -1199,7 +1199,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 				Str("parent", chain[i].ParentHash().Hex()).
 				Str("prevnumber", chain[i-1].Number().String()).
 				Str("prevhash", chain[i-1].Hash().Hex()).
-				Msg("Non contiguous block insert")
+				Msg("insertChain: non contiguous block insert")
 
 			return 0, nil, nil, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].NumberU64(),
 				chain[i-1].Hash().Bytes()[:4], i, chain[i].NumberU64(), chain[i].Hash().Bytes()[:4], chain[i].ParentHash().Bytes()[:4])
@@ -1221,16 +1221,21 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		lastCanon     *types.Block
 		coalescedLogs []*types.Log
 	)
-	// Start the parallel header verifier
-	headers := make([]*block.Header, len(chain))
-	seals := make([]bool, len(chain))
 
-	for i, block := range chain {
-		headers[i] = block.Header()
-		seals[i] = true
+	var verifyHeadersResults <-chan error
+	if verifyHeaders {
+		// Start the parallel header verifier
+		headers := make([]*block.Header, len(chain))
+		seals := make([]bool, len(chain))
+
+		for i, block := range chain {
+			headers[i] = block.Header()
+			seals[i] = true
+		}
+		abort, results := bc.Engine().VerifyHeaders(bc, headers, seals)
+		verifyHeadersResults = results
+		defer close(abort)
 	}
-	abort, results := bc.Engine().VerifyHeaders(bc, headers, seals)
-	defer close(abort)
 
 	// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
 	//senderCacher.recoverFromBlocks(types.MakeSigner(bc.chainConfig, chain[0].Number()), chain)
@@ -1245,7 +1250,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		// Wait for the block's verification to complete
 		bstart := time.Now()
 
-		err := <-results
+		var err error
+		if verifyHeaders {
+			err = <-verifyHeadersResults
+		}
 		if err == nil {
 			err = bc.Validator().ValidateBody(block)
 		}
@@ -1302,7 +1310,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			if len(winner) > 0 {
 				// Import all the pruned blocks to make the state available
 				bc.chainmu.Unlock()
-				_, evs, logs, err := bc.insertChain(winner)
+				_, evs, logs, err := bc.insertChain(winner, true /* verifyHeaders */)
 				bc.chainmu.Lock()
 				events, coalescedLogs = evs, logs
 
