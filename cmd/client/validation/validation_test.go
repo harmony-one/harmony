@@ -3,7 +3,6 @@ package validation
 import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/cmd/client/wallet_validation"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"io/ioutil"
@@ -25,7 +24,7 @@ func TestIsValidAddress(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		valid, _ := validation.ValidateAddress("sender", test.str, common.ParseAddr(test.str))
+		valid, _ := ValidateAddress("sender", test.str, common.ParseAddr(test.str))
 
 		if valid != test.exp {
 			t.Errorf("validation.validateAddress(\"%s\") returned %v, expected %v", test.str, valid, test.exp)
@@ -47,7 +46,7 @@ func TestIsValidShard(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		valid := validation.ValidShard(test.shardID, walletProfile.Shards)
+		valid := ValidShard(test.shardID, walletProfile.Shards)
 
 		if valid != test.exp {
 			t.Errorf("validation.ValidShard(%d) returned %v, expected %v", test.shardID, valid, test.exp)

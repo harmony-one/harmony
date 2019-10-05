@@ -11,8 +11,9 @@ var (
 	base16AddressRegex = regexp.MustCompile("^0x[a-fA-F0-9]{40}")
 )
 
+// ValidateAddress - validates that an address is in a correct bech32 or base16 format
 func ValidateAddress(addressType string, address string, commonAddress common.Address) (bool, string) {
-	var valid bool = true
+	var valid = true
 	var errorMessage string
 
 	if strings.HasPrefix(address, "one") || strings.HasPrefix(address, "0x") {
@@ -20,27 +21,28 @@ func ValidateAddress(addressType string, address string, commonAddress common.Ad
 			matches := bech32AddressRegex.FindAllStringSubmatch(address, -1)
 			if len(matches) == 0 || len(commonAddress) != 20 {
 				valid = false
-				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide a valid ONE address."
+				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide an valid ONE address."
 			}
 		} else if strings.HasPrefix(address, "0x") {
 			matches := base16AddressRegex.FindAllStringSubmatch(address, -1)
 			if len(matches) == 0 || len(commonAddress) != 20 {
 				valid = false
-				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide a valid 0x address."
+				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide an valid 0x address."
 			}
 		}
 	} else {
 		valid = false
-		errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide a valid address."
+		errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide an valid address."
 	}
 
 	return valid, errorMessage
 }
 
+// ValidShard - validates that a specified shardID is valid and within bounds of the available shard count
 func ValidShard(shardID int, shardCount int) bool {
 	if shardID < 0 || shardID > (shardCount-1) {
 		return false
-	} else {
-		return true
 	}
+
+	return true
 }
