@@ -41,8 +41,8 @@ func TestIsValidShard(t *testing.T) {
 	}{
 		{0, true},
 		{1, true},
-		{2, false},
-		{3, false},
+		{-1, false},
+		{99, false},
 	}
 
 	for _, test := range tests {
