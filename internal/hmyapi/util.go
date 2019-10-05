@@ -11,7 +11,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// defaultOffset is to have default pagination.
+// defaultPageSize is to have default pagination.
 const (
 	defaultPageSize = 100
 )
