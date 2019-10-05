@@ -49,6 +49,7 @@ func (node *Node) ReceiveGlobalMessage() {
 			//utils.Logger().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				// TODO ek – limit concurrency
 				go node.messageHandler(msg[5:], sender)
 			}
 		}
@@ -68,6 +69,7 @@ func (node *Node) ReceiveGroupMessage() {
 			//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				// TODO ek – limit concurrency
 				go node.messageHandler(msg[5:], sender)
 			}
 		}
@@ -88,6 +90,7 @@ func (node *Node) ReceiveClientGroupMessage() {
 			// utils.Logger().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+				// TODO ek – limit concurrency
 				go node.messageHandler(msg[5:], sender)
 			}
 		}
