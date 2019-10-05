@@ -3,6 +3,7 @@ package validation
 import (
 	"regexp"
 	"strings"
+  
   "github.com/ethereum/go-ethereum/common"
 )
 
