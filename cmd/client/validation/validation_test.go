@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
   
-	"github.com/ethereum/go-ethereum/log"
+  "github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
