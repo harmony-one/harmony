@@ -40,6 +40,7 @@ const (
 func (node *Node) ReceiveGlobalMessage() {
 	ctx := context.Background()
 	for {
+		// TODO ek – infinite loop; add shutdown/cleanup logic
 		if node.globalGroupReceiver == nil {
 			time.Sleep(100 * time.Millisecond)
 			continue
@@ -59,6 +60,7 @@ func (node *Node) ReceiveGlobalMessage() {
 // ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
 func (node *Node) ReceiveGroupMessage() {
 	ctx := context.Background()
+	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		if node.shardGroupReceiver == nil {
 			time.Sleep(100 * time.Millisecond)
@@ -79,6 +81,7 @@ func (node *Node) ReceiveGroupMessage() {
 // ReceiveClientGroupMessage use libp2p pubsub mechanism to receive broadcast messages for client
 func (node *Node) ReceiveClientGroupMessage() {
 	ctx := context.Background()
+	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		if node.clientReceiver == nil {
 			// check less frequent on client messages
