@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -147,14 +148,58 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 // SelectStakingTransactionsForNewBlock selects staking transactions for new block.
 func (w *Worker) SelectStakingTransactionsForNewBlock(
 	newBlockNum uint64, txs staking.StakingTransactions,
-	recentTxsStats types.RecentTxsStats,
-	txsThrottleConfig *shardingconfig.TxsThrottleConfig,
 	coinbase common.Address) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
-	// TODO: implement staking transaction selection
+
+	// only beaconchain process staking transaction
+	if w.chain.ShardID() != values.BeaconChainShardID {
+		return nil, nil, nil
+	}
+
+	// staking transaction share the same gasPool with normal transactions
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
+	}
+
 	selected := staking.StakingTransactions{}
 	unselected := staking.StakingTransactions{}
 	invalid := staking.StakingTransactions{}
+	for _, tx := range txs {
+		snap := w.current.state.Snapshot()
+		_, err := w.commitStakingTransaction(tx, coinbase)
+		if err != nil {
+			w.current.state.RevertToSnapshot(snap)
+			invalid = append(invalid, tx)
+			utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Commit staking transaction error")
+		} else {
+			selected = append(selected, tx)
+			utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("StakingTransaction gas limit info")
+		}
+	}
+
+	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Uint64("blockGasLimit",
+		w.current.header.GasLimit()).Uint64("blockGasUsed",
+		w.current.header.GasUsed()).Msg("[SelectStakingTransaction] Block gas limit and usage info")
+
 	return selected, unselected, invalid
+
+}
+
+func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinbase common.Address) ([]*types.Log, error) {
+	snap := w.current.state.Snapshot()
+	gasUsed := w.current.header.GasUsed()
+	receipt, _, err :=
+		core.ApplyStakingTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	w.current.header.SetGasUsed(gasUsed)
+	if err != nil {
+		w.current.state.RevertToSnapshot(snap)
+		return nil, err
+	}
+	if receipt == nil {
+		return nil, fmt.Errorf("nil staking receipt")
+	}
+	w.current.stkingTxs = append(w.current.stkingTxs, tx)
+	w.current.receipts = append(w.current.receipts, receipt)
+	return receipt.Logs, nil
 }
 
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
@@ -180,7 +225,6 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-// TODO
 // CommitTransactions commits transactions including staking transactions.
 func (w *Worker) CommitTransactions(
 	txs types.Transactions, stakingTxns staking.StakingTransactions, coinbase common.Address) error {
