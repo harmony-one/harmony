@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
@@ -53,6 +55,10 @@ const (
 	TxPoolLimit = 20000
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
+	// RxQueueSize is the number of messages to queue before tail-dropping.
+	RxQueueSize = 16384
+	// RxWorkers is the number of concurrent message handlers.
+	RxWorkers = 32
 )
 
 func (state State) String() string {
@@ -86,6 +92,11 @@ const (
 type syncConfig struct {
 	timestamp int64
 	client    *downloader.Client
+}
+
+type incomingMessage struct {
+	content []byte
+	sender  libp2p_peer.ID
 }
 
 // Node represents a protocol-participating node in the network
@@ -144,6 +155,9 @@ type Node struct {
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
+
+	// Incoming messages to process.
+	incomingMessages chan incomingMessage
 
 	// Service manager.
 	serviceManager *service.Manager
@@ -512,6 +526,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	utils.Logger().Info().
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
+
+	node.incomingMessages = make(chan incomingMessage, RxQueueSize)
+	for i := 0; i < RxWorkers; i++ {
+		go node.handleIncomingMessages()
+	}
 
 	// start the goroutine to receive client message
 	// client messages are sent by clients, like txgen, wallet

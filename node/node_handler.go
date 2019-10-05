@@ -50,8 +50,7 @@ func (node *Node) ReceiveGlobalMessage() {
 			//utils.Logger().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				// TODO ek – limit concurrency
-				go node.messageHandler(msg[5:], sender)
+				node.enqueueIncomingMessage(msg[5:], sender)
 			}
 		}
 	}
@@ -71,8 +70,7 @@ func (node *Node) ReceiveGroupMessage() {
 			//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				// TODO ek – limit concurrency
-				go node.messageHandler(msg[5:], sender)
+				node.enqueueIncomingMessage(msg[5:], sender)
 			}
 		}
 	}
@@ -93,10 +91,27 @@ func (node *Node) ReceiveClientGroupMessage() {
 			// utils.Logger().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
 			if err == nil {
 				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				// TODO ek – limit concurrency
-				go node.messageHandler(msg[5:], sender)
+				node.enqueueIncomingMessage(msg[5:], sender)
 			}
 		}
+	}
+}
+
+func (node *Node) enqueueIncomingMessage(
+	content []byte, sender libp2p_peer.ID,
+) {
+	select {
+	case node.incomingMessages <- incomingMessage{content, sender}:
+	default:
+		utils.Logger().Warn().Msg("rx overrun")
+	}
+}
+
+func (node *Node) handleIncomingMessages() {
+	for {
+		// TODO ek – infinite loop; add shutdown/cleanup logic
+		msg := <-node.incomingMessages
+		node.messageHandler(msg.content, msg.sender)
 	}
 }
 
