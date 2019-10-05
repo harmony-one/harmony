@@ -5,10 +5,9 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
-  
-  "github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
+  "github.com/harmony-one/harmony/internal/utils"
 )
 
 func TestIsValidAddress(t *testing.T) {
