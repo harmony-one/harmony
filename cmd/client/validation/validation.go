@@ -1,9 +1,9 @@
 package validation
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"regexp"
 	"strings"
+  "github.com/ethereum/go-ethereum/common"
 )
 
 var (
@@ -21,18 +21,18 @@ func ValidateAddress(addressType string, address string, commonAddress common.Ad
 			matches := bech32AddressRegex.FindAllStringSubmatch(address, -1)
 			if len(matches) == 0 || len(commonAddress) != 20 {
 				valid = false
-				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide an valid ONE address."
+				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide a valid ONE address."
 			}
 		} else if strings.HasPrefix(address, "0x") {
 			matches := base16AddressRegex.FindAllStringSubmatch(address, -1)
 			if len(matches) == 0 || len(commonAddress) != 20 {
 				valid = false
-				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide an valid 0x address."
+				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide a valid 0x address."
 			}
 		}
 	} else {
 		valid = false
-		errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide an valid address."
+		errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide a valid address."
 	}
 
 	return valid, errorMessage
