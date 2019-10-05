@@ -9,16 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
-
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
-
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/api/proto/message"
@@ -32,6 +27,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
+	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 const (
@@ -244,7 +241,7 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
-	txs := types2.StakingTransactions{}
+	txs := staking.StakingTransactions{}
 	err := rlp.Decode(bytes.NewReader(msgPayload[:]), &txs)
 	if err != nil {
 		utils.Logger().Error().
@@ -259,7 +256,7 @@ func (node *Node) stakingMessageHandler(msgPayload []byte) {
 // NOTE: For now, just send to the client (basically not broadcasting)
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
-	groups := []p2p.GroupID{node.NodeConfig.GetClientGroupID()}
+	groups := []nodeconfig.GroupID{node.NodeConfig.GetClientGroupID()}
 	utils.Logger().Info().Msgf("broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0])
 	msg := host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
 	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
@@ -303,7 +300,7 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	for _, header := range headers {
 		utils.Logger().Debug().Msgf("[BroadcastCrossLinkHeader] Broadcasting %d", header.Number().Uint64())
 	}
-	node.host.SendMessageToGroups([]p2p.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(headers)))
+	node.host.SendMessageToGroups([]nodeconfig.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(headers)))
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on

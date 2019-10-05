@@ -5,32 +5,37 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// defaultOffset is to have default pagination.
+// defaultPageSize is to have default pagination.
 const (
-	defaultOffset = 100
+	defaultPageSize = 100
 )
 
 // ReturnWithPagination returns result with pagination (offset, page in TxHistoryArgs).
 func ReturnWithPagination(hashes []common.Hash, args TxHistoryArgs) []common.Hash {
-	offset := defaultOffset
-	page := args.Page
-	if args.Offset > 0 {
-		offset = args.Offset
+	pageSize := defaultPageSize
+	pageIndex := args.PageIndex
+	if args.PageSize > 0 {
+		pageSize = args.PageSize
 	}
-	if offset*page+offset > len(hashes) {
-		return hashes[offset*page:]
+	if pageSize*pageIndex >= len(hashes) {
+		return make([]common.Hash, 0)
 	}
-	return hashes[offset*page : offset*page+offset]
+	if pageSize*pageIndex+pageSize > len(hashes) {
+		return hashes[pageSize*pageIndex:]
+	}
+	return hashes[pageSize*pageIndex : pageSize*pageIndex+pageSize]
 }
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.
-func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
+func SubmitTransaction(
+	ctx context.Context, b Backend, tx *types.Transaction,
+) (common.Hash, error) {
 	if err := b.SendTx(ctx, tx); err != nil {
 		return common.Hash{}, err
 	}
@@ -51,5 +56,16 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 			Str("recipient", tx.To().Hex()).
 			Msg("Submitted transaction")
 	}
+	return tx.Hash(), nil
+}
+
+// SubmitStakingTransaction is a helper function that submits tx to txPool and logs a message.
+func SubmitStakingTransaction(
+	ctx context.Context, b Backend, tx *staking.StakingTransaction,
+) (common.Hash, error) {
+	if err := b.SendStakingTx(ctx, tx); err != nil {
+		return common.Hash{}, err
+	}
+	utils.Logger().Info().Str("fullhash", tx.Hash().Hex()).Msg("Submitted Staking transaction")
 	return tx.Hash(), nil
 }

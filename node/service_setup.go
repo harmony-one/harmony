@@ -14,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 )
 
 func (node *Node) setupForValidator() {
@@ -59,7 +58,7 @@ func (node *Node) setupForNewNode() {
 
 func (node *Node) setupForClientNode() {
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, p2p.GroupIDBeacon, nil, nil, node.networkInfoDHTPath()))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, nodeconfig.NewGroupIDByShardID(0), nil, nil, node.networkInfoDHTPath()))
 }
 
 func (node *Node) setupForExplorerNode() {
@@ -109,8 +108,8 @@ func (node *Node) StopServices() {
 
 func (node *Node) networkInfoDHTPath() string {
 	return fmt.Sprintf(".dht-%s-%s-c%s",
-		node.NodeConfig.SelfPeer.IP,
-		node.NodeConfig.SelfPeer.Port,
+		node.SelfPeer.IP,
+		node.SelfPeer.Port,
 		node.chainConfig.ChainID,
 	)
 }

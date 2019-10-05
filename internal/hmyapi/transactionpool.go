@@ -2,7 +2,6 @@ package hmyapi
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,16 +9,20 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // TxHistoryArgs is struct to make GetTransactionsHistory request
 type TxHistoryArgs struct {
-	Address string `json:"address"`
-	Offset  int    `json:"offset"`
-	Page    int    `json:"page"`
+	Address   string `json:"address"`
+	PageIndex int    `json:"pageIndex"`
+	PageSize  int    `json:"pageSize"`
+	FullTx    bool   `json:"fullTx"`
 }
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
@@ -34,25 +37,35 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 }
 
 // GetTransactionsHistory returns the list of transactions hashes that involve a particular address.
-func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) ([]common.Hash, error) {
+func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
 	address := args.Address
+	result := []common.Hash{}
 	if strings.HasPrefix(address, "one1") {
-		result, err := s.b.GetTransactionsHistory(address)
+		hashes, err := s.b.GetTransactionsHistory(address)
 		if err != nil {
 			return nil, err
 		}
-		return ReturnWithPagination(result, args), nil
+		result = ReturnWithPagination(hashes, args)
 	}
 	addr := internal_common.ParseAddr(address)
 	oneAddress, err := internal_common.AddressToBech32(addr)
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.b.GetTransactionsHistory(oneAddress)
+	hashes, err := s.b.GetTransactionsHistory(oneAddress)
 	if err != nil {
 		return nil, err
 	}
-	return ReturnWithPagination(result, args), nil
+	result = ReturnWithPagination(hashes, args)
+	if !args.FullTx {
+		return map[string]interface{}{"transactions": result}, nil
+	}
+	txs := []*RPCTransaction{}
+	for _, hash := range result {
+		tx := s.GetTransactionByHash(ctx, hash)
+		txs = append(txs, tx)
+	}
+	return map[string]interface{}{"transactions": txs}, nil
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
@@ -155,6 +168,23 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	return SubmitTransaction(ctx, s.b, signed)
 }
 
+// SendRawStakingTransaction will add the signed transaction to the transaction pool.
+// The sender is responsible for signing the transaction and using the correct nonce.
+func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
+	ctx context.Context, encodedTx hexutil.Bytes,
+) (common.Hash, error) {
+	tx := new(staking.StakingTransaction)
+	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
+		return common.Hash{}, err
+	}
+	c := s.b.ChainConfig().ChainID
+	if tx.ChainID().Cmp(c) != 0 {
+		e := errors.Wrapf(core.ErrInvalidChainID, "current chain id:%s", c.String())
+		return common.Hash{}, e
+	}
+	return SubmitStakingTransaction(ctx, s.b, tx)
+}
+
 // SendRawTransaction will add the signed transaction to the transaction pool.
 // The sender is responsible for signing the transaction and using the correct nonce.
 func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error) {
@@ -162,8 +192,10 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
 	}
-	if tx.ChainID().Cmp(s.b.ChainConfig().ChainID) != 0 {
-		return common.Hash{}, errors.New("Incorrect chain ID. The current chain id: " + s.b.ChainConfig().ChainID.String())
+	c := s.b.ChainConfig().ChainID
+	if tx.ChainID().Cmp(c) != 0 {
+		e := errors.Wrapf(core.ErrInvalidChainID, "current chain id:%s", c.String())
+		return common.Hash{}, e
 	}
 	return SubmitTransaction(ctx, s.b, tx)
 }
@@ -187,15 +219,11 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	if tx.Protected() {
 		signer = types.NewEIP155Signer(tx.ChainID())
 	}
-	from, _ := types.Sender(signer, tx)
-
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
 		"blockNumber":       hexutil.Uint64(blockNumber),
 		"transactionHash":   hash,
 		"transactionIndex":  hexutil.Uint64(index),
-		"from":              from,
-		"to":                tx.To(),
 		"shardID":           tx.ShardID(),
 		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
 		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
@@ -203,7 +231,19 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
 	}
-
+	from, _ := types.Sender(signer, tx)
+	fields["from"] = from
+	fields["to"] = ""
+	if tx.To() != nil {
+		fields["to"], err = internal_common.AddressToBech32(*tx.To())
+		if err != nil {
+			return nil, err
+		}
+		fields["from"], err = internal_common.AddressToBech32(from)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// Assign receipt status or post state.
 	if len(receipt.PostState) > 0 {
 		fields["root"] = hexutil.Bytes(receipt.PostState)

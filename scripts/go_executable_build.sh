@@ -8,6 +8,7 @@ SRC[txgen]=cmd/client/txgen/main.go
 SRC[bootnode]=cmd/bootnode/main.go
 SRC[wallet]="cmd/client/wallet/main.go cmd/client/wallet/generated_wallet.ini.go"
 SRC[wallet_stress_test]="cmd/client/wallet_stress_test/main.go cmd/client/wallet_stress_test/generated_wallet.ini.go"
+SRC[staking-standalone]='cmd/staking/*.go'
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
@@ -106,10 +107,10 @@ function build_only
             env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
          fi
          if [ "$(uname -s)" == "Linux" ]; then
-            $BINDIR/$bin -version
+            $BINDIR/$bin -version || $BINDIR/$bin version
          fi
          if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" -a -e $BINDIR/$bin ]; then
-            $BINDIR/$bin -version
+            $BINDIR/$bin -version || $BINDIR/$bin version
          fi
       fi
    done
@@ -256,6 +257,6 @@ case "$ACTION" in
    "upload") upload ;;
    "release") release ;;
    "pubwallet") upload_wallet ;;
-   "harmony"|"wallet"|"txgen"|"bootnode") build_only $ACTION ;;
+   "harmony"|"wallet"|"txgen"|"bootnode"|"staking-standalone") build_only $ACTION ;;
    *) usage ;;
 esac

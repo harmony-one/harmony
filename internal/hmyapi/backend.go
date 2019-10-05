@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
@@ -18,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // Backend interface provides the common API services (that are provided by
@@ -72,6 +72,7 @@ type Backend interface {
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
+	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
 }
 
 // GetAPIs returns all the APIs.

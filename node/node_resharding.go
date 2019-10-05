@@ -20,9 +20,9 @@ import (
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -141,7 +141,7 @@ func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
 		},
 	)
 	return node.host.SendMessageToGroups(
-		[]p2p.GroupID{node.NodeConfig.GetClientGroupID()},
+		[]nodeconfig.GroupID{node.NodeConfig.GetClientGroupID()},
 		host.ConstructP2pMessage(byte(0), epochShardStateMessage))
 }
 

@@ -1,12 +1,8 @@
-package p2p
+package nodeconfig
 
 import (
-	"context"
 	"fmt"
-	"io"
 	"strconv"
-
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // GroupID is a multicast group ID.
@@ -25,32 +21,50 @@ func (id GroupID) String() string {
 
 // Const of group ID
 const (
-	GroupIDBeacon            GroupID = "harmony/0.0.1/node/beacon"
-	GroupIDBeaconClient      GroupID = "harmony/0.0.1/client/beacon"
-	GroupIDShardPrefix       GroupID = "harmony/0.0.1/node/shard/%s"
-	GroupIDShardClientPrefix GroupID = "harmony/0.0.1/client/shard/%s"
-	GroupIDGlobal            GroupID = "harmony/0.0.1/node/global"
-	GroupIDGlobalClient      GroupID = "harmony/0.0.1/node/global"
-	GroupIDUnknown           GroupID = "B1acKh0lE"
+	GroupIDBeacon            GroupID = "%s/0.0.1/node/beacon"
+	GroupIDBeaconClient      GroupID = "%s/0.0.1/client/beacon"
+	GroupIDShardPrefix       GroupID = "%s/0.0.1/node/shard/%s"
+	GroupIDShardClientPrefix GroupID = "%s/0.0.1/client/shard/%s"
+	GroupIDGlobal            GroupID = "%s/0.0.1/node/global"
+	GroupIDGlobalClient      GroupID = "%s/0.0.1/node/global"
+	GroupIDUnknown           GroupID = "%s/B1acKh0lE"
 )
 
 // ShardID defines the ID of a shard
 type ShardID uint32
 
+func getNetworkPrefix(shardID ShardID) (netPre string) {
+	switch GetShardConfig(uint32(shardID)).GetNetworkType() {
+	case Mainnet:
+		netPre = "harmony"
+	case Testnet:
+		netPre = "hmy/testnet"
+	case Pangaea:
+		netPre = "hmy/pangaea"
+	case Devnet:
+		netPre = "hmy/devnet"
+	case Localnet:
+		netPre = "hmy/local"
+	default:
+		netPre = "hmy/misc"
+	}
+	return
+}
+
 // NewGroupIDByShardID returns a new groupID for a shard
 func NewGroupIDByShardID(shardID ShardID) GroupID {
 	if shardID == 0 {
-		return GroupIDBeacon
+		return GroupID(fmt.Sprintf(GroupIDBeacon.String(), getNetworkPrefix(shardID)))
 	}
-	return GroupID(fmt.Sprintf(GroupIDShardPrefix.String(), strconv.Itoa(int(shardID))))
+	return GroupID(fmt.Sprintf(GroupIDShardPrefix.String(), getNetworkPrefix(shardID), strconv.Itoa(int(shardID))))
 }
 
 // NewClientGroupIDByShardID returns a new groupID for a shard's client
 func NewClientGroupIDByShardID(shardID ShardID) GroupID {
 	if shardID == 0 {
-		return GroupIDBeaconClient
+		return GroupID(fmt.Sprintf(GroupIDBeaconClient.String(), getNetworkPrefix(shardID)))
 	}
-	return GroupID(fmt.Sprintf(GroupIDShardClientPrefix.String(), strconv.Itoa(int(shardID))))
+	return GroupID(fmt.Sprintf(GroupIDShardClientPrefix.String(), getNetworkPrefix(shardID), strconv.Itoa(int(shardID))))
 }
 
 // ActionType lists action on group
@@ -87,13 +101,4 @@ type GroupAction struct {
 
 func (g GroupAction) String() string {
 	return fmt.Sprintf("%s/%s", g.Name, g.Action)
-}
-
-// GroupReceiver is a multicast group message receiver interface.
-type GroupReceiver interface {
-	// Close closes this receiver.
-	io.Closer
-
-	// Receive a message.
-	Receive(ctx context.Context) (msg []byte, sender libp2p_peer.ID, err error)
 }

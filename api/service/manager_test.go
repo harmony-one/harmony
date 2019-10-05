@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/p2p"
 )
 
 type SupportSyncingTest struct {
@@ -102,8 +101,8 @@ func TestStopServices(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
-	if GroupIDShards[p2p.ShardID(0)] != p2p.GroupIDBeacon {
-		t.Errorf("GroupIDShards[0]: %v != GroupIDBeacon: %v", GroupIDShards[p2p.ShardID(0)], p2p.GroupIDBeacon)
+	if GroupIDShards[nodeconfig.ShardID(0)] != nodeconfig.NewGroupIDByShardID(0) {
+		t.Errorf("GroupIDShards[0]: %v != GroupIDBeacon: %v", GroupIDShards[nodeconfig.ShardID(0)], nodeconfig.NewGroupIDByShardID(0))
 	}
 	if len(GroupIDShards) != nodeconfig.MaxShards {
 		t.Errorf("len(GroupIDShards): %v != TotalShards: %v", len(GroupIDShards), nodeconfig.MaxShards)

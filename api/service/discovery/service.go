@@ -18,9 +18,9 @@ type Service struct {
 	host              p2p.Host
 	peerChan          chan p2p.Peer
 	stopChan          chan struct{}
-	actionChan        chan p2p.GroupAction
+	actionChan        chan nodeconfig.GroupAction
 	config            service.NodeConfig
-	actions           map[p2p.GroupID]p2p.ActionType
+	actions           map[nodeconfig.GroupID]nodeconfig.ActionType
 	messageChan       chan *msg_pb.Message
 	addBeaconPeerFunc func(*p2p.Peer) bool
 }
@@ -34,9 +34,9 @@ func New(h p2p.Host, config service.NodeConfig, peerChan chan p2p.Peer, addPeer 
 		host:              h,
 		peerChan:          peerChan,
 		stopChan:          make(chan struct{}),
-		actionChan:        make(chan p2p.GroupAction),
+		actionChan:        make(chan nodeconfig.GroupAction),
 		config:            config,
-		actions:           make(map[p2p.GroupID]p2p.ActionType),
+		actions:           make(map[nodeconfig.GroupID]nodeconfig.ActionType),
 		addBeaconPeerFunc: addPeer,
 	}
 }
@@ -58,7 +58,7 @@ func (s *Service) StopService() {
 // NotifyService receives notification from service manager
 func (s *Service) NotifyService(params map[string]interface{}) {
 	data := params["peer"]
-	action, ok := data.(p2p.GroupAction)
+	action, ok := data.(nodeconfig.GroupAction)
 	if !ok {
 		utils.Logger().Error().Msg("Wrong data type passed to NotifyService")
 		return
@@ -117,18 +117,14 @@ func (s *Service) contactP2pPeers() {
 }
 
 // sentPingMessage sends a ping message to a pubsub topic
-func (s *Service) sentPingMessage(g p2p.GroupID, msgBuf []byte) {
+func (s *Service) sentPingMessage(g nodeconfig.GroupID, msgBuf []byte) {
 	var err error
-	if g == p2p.GroupIDBeacon || g == p2p.GroupIDBeaconClient {
-		err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.Beacon}, msgBuf)
-	} else {
-		// The following logical will be used for 2nd stage peer discovery process
-		// do nothing when the groupID is unknown
-		if s.config.ShardGroupID == p2p.GroupIDUnknown {
-			return
-		}
-		err = s.host.SendMessageToGroups([]p2p.GroupID{s.config.ShardGroupID}, msgBuf)
+	// The following logical will be used for 2nd stage peer discovery process
+	// do nothing when the groupID is unknown
+	if s.config.ShardGroupID == nodeconfig.GroupIDUnknown {
+		return
 	}
+	err = s.host.SendMessageToGroups([]nodeconfig.GroupID{s.config.ShardGroupID}, msgBuf)
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("group", string(g)).Msg("Failed to send ping message")
 	}
