@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/cmd/client/wallet_validation"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -690,24 +691,34 @@ func processTransferCommand() {
 		return
 	}
 
-	if shardID == -1 || toShardID == -1 {
-		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
+	if !validation.ValidShard(shardID, walletProfile.Shards) {
+		fmt.Println("Please specify a valid sender shard ID for the transfer (e.g. --shardID=0)")
 		return
 	}
+
+	if !validation.ValidShard(toShardID, walletProfile.Shards) {
+		fmt.Println("Please specify a valid receiver shard ID for the transfer (e.g. --toShardID=0)")
+		return
+	}
+
 	if amount <= 0 {
 		fmt.Println("Please specify positive amount to transfer")
 		return
 	}
 
-	receiverAddress := common2.ParseAddr(receiver)
-	if len(receiverAddress) != 20 {
-		fmt.Println("The receiver address is not valid.")
+	senderAddress := common2.ParseAddr(sender)
+	valid, errorMessage := validation.ValidateAddress("sender", sender, senderAddress)
+
+	if !valid && len(errorMessage) > 0 {
+		fmt.Println(fmt.Sprintf(errorMessage, "sender", sender))
 		return
 	}
 
-	senderAddress := common2.ParseAddr(sender)
-	if len(senderAddress) != 20 {
-		fmt.Println("The sender address is not valid.")
+	receiverAddress := common2.ParseAddr(receiver)
+	valid, errorMessage = validation.ValidateAddress("receiver", receiver, receiverAddress)
+
+	if !valid && len(errorMessage) > 0 {
+		fmt.Println(fmt.Sprintf(errorMessage, "receiver", receiver))
 		return
 	}
 
