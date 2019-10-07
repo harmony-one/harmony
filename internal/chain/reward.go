@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
@@ -85,6 +84,7 @@ func AccumulateRewards(
 			accounts = append(accounts, member.EcdsaAddress)
 		}
 	}
+
 	numAccounts := big.NewInt(int64(len(accounts)))
 	last := new(big.Int)
 	for i, account := range accounts {

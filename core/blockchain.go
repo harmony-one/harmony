@@ -37,7 +37,6 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -1909,15 +1908,12 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 
 // GetShardState returns the shard state for the given epoch,
 // creating one if needed.
-func (bc *BlockChain) GetShardState(
-	epoch *big.Int,
-	stakeInfo *map[common.Address]*structs.StakeInfo,
-) (shard.State, error) {
+func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.State, error) {
 	shardState, err := bc.ReadShardState(epoch)
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err
 	}
-	shardState, err = CalculateNewShardState(bc, epoch, stakeInfo)
+	shardState, err = CalculateNewShardState(bc, epoch)
 	if err != nil {
 		return nil, err
 	}
