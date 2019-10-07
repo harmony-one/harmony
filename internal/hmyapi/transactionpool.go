@@ -233,6 +233,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	}
 	from, _ := types.Sender(signer, tx)
 	fields["from"] = from
+	fields["to"] = ""
 	if tx.To() != nil {
 		fields["to"], err = internal_common.AddressToBech32(*tx.To())
 		if err != nil {

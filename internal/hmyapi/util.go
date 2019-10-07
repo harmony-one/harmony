@@ -11,7 +11,7 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// defaultOffset is to have default pagination.
+// defaultPageSize is to have default pagination.
 const (
 	defaultPageSize = 100
 )
