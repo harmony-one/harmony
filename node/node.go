@@ -413,6 +413,21 @@ func (node *Node) getTransactionsForNewBlock(
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
+	for i := 0; i < RxWorkers; i++ {
+		go node.handleIncomingMessages()
+	}
+
+	// start the goroutine to receive client message
+	// client messages are sent by clients, like txgen, wallet
+	go node.ReceiveClientGroupMessage()
+
+	// start the goroutine to receive group message
+	go node.ReceiveGroupMessage()
+
+	// start the goroutine to receive global message, used for cross-shard TX
+	// FIXME (leo): we use beacon client topic as the global topic for now
+	go node.ReceiveGlobalMessage()
+
 	select {}
 }
 
@@ -528,20 +543,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		Msg("Genesis block hash")
 
 	node.incomingMessages = make(chan incomingMessage, RxQueueSize)
-	for i := 0; i < RxWorkers; i++ {
-		go node.handleIncomingMessages()
-	}
-
-	// start the goroutine to receive client message
-	// client messages are sent by clients, like txgen, wallet
-	go node.ReceiveClientGroupMessage()
-
-	// start the goroutine to receive group message
-	go node.ReceiveGroupMessage()
-
-	// start the goroutine to receive global message, used for cross-shard TX
-	// FIXME (leo): we use beacon client topic as the global topic for now
-	go node.ReceiveGlobalMessage()
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)

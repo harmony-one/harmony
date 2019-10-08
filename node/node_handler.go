@@ -41,10 +41,6 @@ func (node *Node) ReceiveGlobalMessage() {
 	ctx := context.Background()
 	for {
 		// TODO ek – infinite loop; add shutdown/cleanup logic
-		if node.globalGroupReceiver == nil {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
 		msg, sender, err := node.globalGroupReceiver.Receive(ctx)
 		if err != nil {
 			utils.Logger().Warn().Err(err).
@@ -65,10 +61,6 @@ func (node *Node) ReceiveGroupMessage() {
 	ctx := context.Background()
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
-		if node.shardGroupReceiver == nil {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
 		msg, sender, err := node.shardGroupReceiver.Receive(ctx)
 		if err != nil {
 			utils.Logger().Warn().Err(err).
@@ -89,11 +81,6 @@ func (node *Node) ReceiveClientGroupMessage() {
 	ctx := context.Background()
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
-		if node.clientReceiver == nil {
-			// check less frequent on client messages
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
 		msg, sender, err := node.clientReceiver.Receive(ctx)
 		if err != nil {
 			utils.Logger().Warn().Err(err).
