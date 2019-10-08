@@ -28,6 +28,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
@@ -54,6 +55,10 @@ const (
 	TxPoolLimit = 20000
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
+	// RxQueueSize is the number of messages to queue before tail-dropping.
+	RxQueueSize = 16384
+	// RxWorkers is the number of concurrent message handlers.
+	RxWorkers = 32
 )
 
 func (state State) String() string {
@@ -145,6 +150,9 @@ type Node struct {
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
+
+	// Incoming messages to process.
+	rxQueue *msgq.Queue
 
 	// Service manager.
 	serviceManager *service.Manager
@@ -401,6 +409,21 @@ func (node *Node) getTransactionsForNewBlock(
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
+	for i := 0; i < RxWorkers; i++ {
+		go node.rxQueue.HandleMessages(node)
+	}
+
+	// start the goroutine to receive client message
+	// client messages are sent by clients, like txgen, wallet
+	go node.receiveGroupMessage(node.clientReceiver)
+
+	// start the goroutine to receive group message
+	go node.receiveGroupMessage(node.shardGroupReceiver)
+
+	// start the goroutine to receive global message, used for cross-shard TX
+	// FIXME (leo): we use beacon client topic as the global topic for now
+	go node.receiveGroupMessage(node.globalGroupReceiver)
+
 	select {}
 }
 
@@ -502,16 +525,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
 
-	// start the goroutine to receive client message
-	// client messages are sent by clients, like txgen, wallet
-	go node.ReceiveClientGroupMessage()
-
-	// start the goroutine to receive group message
-	go node.ReceiveGroupMessage()
-
-	// start the goroutine to receive global message, used for cross-shard TX
-	// FIXME (leo): we use beacon client topic as the global topic for now
-	go node.ReceiveGlobalMessage()
+	node.rxQueue = msgq.New(RxQueueSize)
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)

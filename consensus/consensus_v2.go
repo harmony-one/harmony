@@ -1269,6 +1269,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 		Int("Num of VRF", len(vrfBlockNumbers)).
 		Msg("[ConsensusMainLoop] VDF computation started")
 
+	// TODO ek – limit concurrency
 	go func() {
 		vdf := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
 		outputChannel := vdf.GetOutputChannel()

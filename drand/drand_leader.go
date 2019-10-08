@@ -38,6 +38,7 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 				zeros := [32]byte{}
 				if core.IsEpochBlock(newBlock) && !bytes.Equal(pRnd[:], zeros[:]) {
 					// The epoch block should contain the randomness preimage pRnd
+					// TODO ek – limit concurrency
 					go func() {
 						vdf := vdf.New(vdfDifficulty, pRnd)
 						outputChannel := vdf.GetOutputChannel()

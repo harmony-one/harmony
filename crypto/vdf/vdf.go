@@ -37,6 +37,7 @@ func (vdf *VDF) Execute() {
 		tempResult = sha3.Sum256(tempResult[:])
 	}
 	vdf.output = tempResult
+	// TODO ek – limit concurrency
 	go func() {
 		vdf.outputChan <- vdf.output
 	}()
