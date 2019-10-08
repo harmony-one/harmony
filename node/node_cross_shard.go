@@ -243,7 +243,7 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 }
 
 func (node *Node) verifyIncomingReceipts(block *types.Block) error {
-	m := make(map[common.Hash]bool)
+	m := make(map[common.Hash]struct{})
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
 		// double spent
@@ -255,7 +255,7 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 		if _, ok := m[hash]; ok {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
-		m[hash] = true
+		m[hash] = struct{}{}
 
 		for _, item := range cxp.Receipts {
 			if item.ToShardID != node.Blockchain().ShardID() {

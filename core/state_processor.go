@@ -209,7 +209,7 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 			db.CreateAccount(*cx.To)
 		}
 		db.AddBalance(*cx.To, cx.Amount)
-		db.IntermediateRoot(config.IsS3(header.Epoch())).Bytes()
+		db.IntermediateRoot(config.IsS3(header.Epoch()))
 	}
 	return nil
 }
