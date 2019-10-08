@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"strconv"
 	"syscall"
-
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"

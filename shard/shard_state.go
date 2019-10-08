@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/core/numeric"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"golang.org/x/crypto/sha3"
@@ -105,7 +104,6 @@ func CompareBlsPublicKey(k1, k2 BlsPublicKey) int {
 type NodeID struct {
 	EcdsaAddress common.Address `json:"ecdsa_address"`
 	BlsPublicKey BlsPublicKey   `json:"bls_pubkey"`
-	VotingPower  numeric.Dec    `json:"voting-power"`
 }
 
 // CompareNodeID compares two node IDs.
