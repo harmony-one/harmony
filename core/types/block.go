@@ -30,10 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/taggedrlp"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
-
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	v0 "github.com/harmony-one/harmony/block/v0"
@@ -42,6 +38,10 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/taggedrlp"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 // Constants for block.
@@ -181,12 +181,13 @@ func init() {
 	BodyRegistry.MustRegister("v1", new(BodyV1))
 }
 
-// Block represents an entire block in the Ethereum blockchain.
+// Block represents an entire block in the Harmony blockchain.
 type Block struct {
-	header           *block.Header
-	uncles           []*block.Header
-	transactions     Transactions
-	incomingReceipts CXReceiptsProofs
+	header              *block.Header
+	uncles              []*block.Header
+	transactions        Transactions
+	stakingTransactions staking.StakingTransactions
+	incomingReceipts    CXReceiptsProofs
 
 	// caches
 	hash atomic.Value
@@ -345,6 +346,11 @@ func (b *Block) Uncles() []*block.Header {
 // Transactions returns transactions.
 func (b *Block) Transactions() Transactions {
 	return b.transactions
+}
+
+// StakingTransactions returns stakingTransactions.
+func (b *Block) StakingTransactions() staking.StakingTransactions {
+	return b.stakingTransactions
 }
 
 // IncomingReceipts returns verified outgoing receipts

@@ -4,12 +4,12 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // ChainReader defines a small collection of methods needed to access the local
@@ -77,8 +77,12 @@ type Engine interface {
 	// and assembles the final block.
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	Finalize(chain ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
-		receipts []*types.Receipt, outcxs []*types.CXReceipt, incxs []*types.CXReceiptsProof) (*types.Block, error)
+	Finalize(
+		chain ChainReader, header *block.Header, state *state.DB,
+		txs []*types.Transaction,
+		stkgTxs []*staking.StakingTransaction,
+		receipts []*types.Receipt, outcxs []*types.CXReceipt,
+		incxs []*types.CXReceiptsProof) (*types.Block, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.

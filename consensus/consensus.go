@@ -8,19 +8,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/bls/ffi/go/bls"
-
-	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/shard"
 )
 
 const (
@@ -150,9 +144,6 @@ type Consensus struct {
 	// MessageSender takes are of sending consensus message and the corresponding retry logic.
 	msgSender *MessageSender
 
-	// Staking information finder
-	stakeInfoFinder StakeInfoFinder
-
 	// Used to convey to the consensus main loop that block syncing has finished.
 	syncReadyChan chan struct{}
 	// Used to convey to the consensus main loop that node is out of sync
@@ -169,18 +160,6 @@ type Consensus struct {
 // validator delays commit message by the amount.
 func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
 	consensus.delayCommit = delay
-}
-
-// StakeInfoFinder returns the stake information finder instance this
-// consensus uses, e.g. for block reward distribution.
-func (consensus *Consensus) StakeInfoFinder() StakeInfoFinder {
-	return consensus.stakeInfoFinder
-}
-
-// SetStakeInfoFinder sets the stake information finder instance this
-// consensus uses, e.g. for block reward distribution.
-func (consensus *Consensus) SetStakeInfoFinder(stakeInfoFinder StakeInfoFinder) {
-	consensus.stakeInfoFinder = stakeInfoFinder
 }
 
 // DisableViewChangeForTestingOnly makes the receiver not propose view
@@ -235,19 +214,6 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 	return consensus.lastBlockReward
 }
 
-// StakeInfoFinder finds the staking account for the given consensus key.
-type StakeInfoFinder interface {
-	// FindStakeInfoByNodeKey returns a list of staking information matching
-	// the given node key.  Caller may modify the returned slice of StakeInfo
-	// struct pointers, but must not modify the StakeInfo structs themselves.
-	FindStakeInfoByNodeKey(key *bls.PublicKey) []*structs.StakeInfo
-
-	// FindStakeInfoByAccount returns a list of staking information matching
-	// the given account.  Caller may modify the returned slice of StakeInfo
-	// struct pointers, but must not modify the StakeInfo structs themselves.
-	FindStakeInfoByAccount(addr common.Address) []*structs.StakeInfo
-}
-
 // New creates a new Consensus object
 // TODO: put shardId into chain reader's chain config
 func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
@@ -255,19 +221,15 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.blockNumLowChan = make(chan struct{})
-
 	// pbft related
 	consensus.PbftLog = NewPbftLog()
 	consensus.phase = Announce
 	consensus.mode = PbftMode{mode: Normal}
 	// pbft timeout
 	consensus.consensusTimeout = createTimeout()
-
 	consensus.prepareSigs = map[string]*bls.Sign{}
 	consensus.commitSigs = map[string]*bls.Sign{}
-
 	consensus.CommitteePublicKeys = make(map[string]bool)
-
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if blsPriKey != nil {
@@ -283,90 +245,15 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	// as it was displayed on explorer as Height right now
 	consensus.viewID = 0
 	consensus.ShardID = ShardID
-
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.commitFinishChan = make(chan uint64)
-
 	consensus.ReadySignal = make(chan struct{})
 	consensus.lastBlockReward = big.NewInt(0)
-
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
-
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
-
 	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.PbftLog)
 	return &consensus, nil
-}
-
-// GenesisStakeInfoFinder is a stake info finder implementation using only
-// genesis accounts.
-// When used for block reward, it rewards only foundational nodes.
-type GenesisStakeInfoFinder struct {
-	byNodeKey map[shard.BlsPublicKey][]*structs.StakeInfo
-	byAccount map[common.Address][]*structs.StakeInfo
-}
-
-// FindStakeInfoByNodeKey returns the genesis account matching the given node
-// key, as a single-item StakeInfo list.
-// It returns nil if the key is not a genesis node key.
-func (f *GenesisStakeInfoFinder) FindStakeInfoByNodeKey(
-	key *bls.PublicKey,
-) []*structs.StakeInfo {
-	var pk shard.BlsPublicKey
-	if err := pk.FromLibBLSPublicKey(key); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot convert BLS public key")
-		return nil
-	}
-	l, _ := f.byNodeKey[pk]
-	return l
-}
-
-// FindStakeInfoByAccount returns the genesis account matching the given
-// address, as a single-item StakeInfo list.
-// It returns nil if the address is not a genesis account.
-func (f *GenesisStakeInfoFinder) FindStakeInfoByAccount(
-	addr common.Address,
-) []*structs.StakeInfo {
-	l, _ := f.byAccount[addr]
-	return l
-}
-
-// NewGenesisStakeInfoFinder returns a stake info finder that can look up
-// genesis nodes.
-func NewGenesisStakeInfoFinder() (*GenesisStakeInfoFinder, error) {
-	f := &GenesisStakeInfoFinder{
-		byNodeKey: make(map[shard.BlsPublicKey][]*structs.StakeInfo),
-		byAccount: make(map[common.Address][]*structs.StakeInfo),
-	}
-	for idx, account := range genesis.HarmonyAccounts {
-		pub := &bls.PublicKey{}
-		pub.DeserializeHexStr(account.BlsPublicKey)
-		var blsPublicKey shard.BlsPublicKey
-		if err := blsPublicKey.FromLibBLSPublicKey(pub); err != nil {
-			return nil, ctxerror.New("cannot convert BLS public key",
-				"accountIndex", idx,
-			).WithCause(err)
-		}
-		addressBytes, err := hexutil.Decode(account.Address)
-		if err != nil {
-			return nil, ctxerror.New("cannot decode account address",
-				"accountIndex", idx,
-			).WithCause(err)
-		}
-		var address common.Address
-		address.SetBytes(addressBytes)
-		stakeInfo := &structs.StakeInfo{
-			Account:         address,
-			BlsPublicKey:    blsPublicKey,
-			BlockNum:        common.Big0,
-			LockPeriodCount: big.NewInt(0x7fffffffffffffff),
-			Amount:          common.Big0,
-		}
-		f.byNodeKey[blsPublicKey] = append(f.byNodeKey[blsPublicKey], stakeInfo)
-		f.byAccount[address] = append(f.byAccount[address], stakeInfo)
-	}
-	return f, nil
 }

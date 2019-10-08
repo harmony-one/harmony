@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -372,7 +373,8 @@ func (node *Node) getTransactionsForNewBlock(
 	}
 
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, pendingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
-	selectedStaking, unselectedStaking, invalidStaking := node.Worker.SelectStakingTransactionsForNewBlock(newBlockNum, pendingStakingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
+	selectedStaking, unselectedStaking, invalidStaking :=
+		node.Worker.SelectStakingTransactionsForNewBlock(newBlockNum, pendingStakingTransactions, coinbase)
 
 	node.pendingTransactions = make(map[common.Hash]*types.Transaction)
 	for _, unselectedTx := range unselected {
@@ -465,14 +467,14 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
-		if node.Blockchain().ShardID() != 0 {
+
+		if node.Blockchain().ShardID() != values.BeaconChainShardID {
 			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
 		}
 
 		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
 		node.pendingTransactions = make(map[common.Hash]*types.Transaction)
 		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
-
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
@@ -486,20 +488,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 			} else {
 				node.AddContractKeyAndAddress(scFaucet)
 			}
-
-			//if node.Consensus.ShardID == 0 {
-			//	// Contracts only exist in beacon chain
-			//	if node.isFirstTime {
-			//		// Setup one time smart contracts
-			//		node.CurrentStakes = make(map[common.Address]*structs.StakeInfo)
-			//		node.AddStakingContractToPendingTransactions() //This will save the latest information about staked nodes in current staked
-			//	} else {
-			//		node.AddContractKeyAndAddress(scStaking)
-			//	}
-			//}
-
 			node.ContractCaller = contracts.NewContractCaller(node.Blockchain(), node.Blockchain().Config())
-
 			// Create test keys.  Genesis will later need this.
 			var err error
 			node.TestBankKeys, err = CreateTestBankKeys(TestAccountNumber)
