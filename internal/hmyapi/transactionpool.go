@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/values"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -179,7 +179,7 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	}
 	c := s.b.ChainConfig().ChainID
 	if tx.ChainID().Cmp(c) != 0 {
-		e := errors.Wrapf(core.ErrInvalidChainID, "current chain id:%s", c.String())
+		e := errors.Wrapf(values.ErrInvalidChainID, "current chain id:%s", c.String())
 		return common.Hash{}, e
 	}
 	return SubmitStakingTransaction(ctx, s.b, tx)
@@ -194,7 +194,7 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	}
 	c := s.b.ChainConfig().ChainID
 	if tx.ChainID().Cmp(c) != 0 {
-		e := errors.Wrapf(core.ErrInvalidChainID, "current chain id:%s", c.String())
+		e := errors.Wrapf(values.ErrInvalidChainID, "current chain id:%s", c.String())
 		return common.Hash{}, e
 	}
 	return SubmitTransaction(ctx, s.b, tx)

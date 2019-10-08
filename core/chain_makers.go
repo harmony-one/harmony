@@ -23,15 +23,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 
-	blockfactory "github.com/harmony-one/harmony/block/factory"
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/block"
+	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // BlockGen creates blocks for testing.
@@ -46,6 +46,7 @@ type BlockGen struct {
 
 	gasPool  *GasPool
 	txs      []*types.Transaction
+	stkTxs   staking.StakingTransactions
 	receipts []*types.Receipt
 	uncles   []*block.Header
 
@@ -184,9 +185,10 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if gen != nil {
 			gen(i, b)
 		}
+
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil, nil)
+			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.stkTxs, b.receipts, nil, nil)
 			if err != nil {
 				panic(err)
 			}
