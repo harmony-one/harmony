@@ -78,17 +78,17 @@ func (node *Node) handleIncomingMessages() {
 	for {
 		// TODO ek – infinite loop; add shutdown/cleanup logic
 		msg := <-node.incomingMessages
-		node.messageHandler(msg.content, msg.sender)
+		node.handleMessage(msg.content, msg.sender)
 	}
 }
 
-// messageHandler parses the message and dispatch the actions
-func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
+// handleMessage parses the message and dispatch the actions
+func (node *Node) handleMessage(content []byte, sender libp2p_peer.ID) {
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("messageHandler get message category failed")
+			Msg("handleMessage get message category failed")
 		return
 	}
 
@@ -96,7 +96,7 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("messageHandler get message type failed")
+			Msg("handleMessage get message type failed")
 		return
 	}
 
@@ -104,7 +104,7 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("messageHandler get message payload failed")
+			Msg("handleMessage get message payload failed")
 		return
 	}
 
