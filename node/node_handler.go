@@ -36,8 +36,8 @@ const (
 	crossLinkBatchSize = 7
 )
 
-// ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
-func (node *Node) ReceiveGroupMessage(receiver p2p.GroupReceiver) {
+// receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
+func (node *Node) receiveGroupMessage(receiver p2p.GroupReceiver) {
 	ctx := context.Background()
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
