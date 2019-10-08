@@ -46,12 +46,15 @@ func (node *Node) ReceiveGlobalMessage() {
 			continue
 		}
 		msg, sender, err := node.globalGroupReceiver.Receive(ctx)
+		if err != nil {
+			utils.Logger().Warn().Err(err).
+				Msg("cannot receive from global group")
+			continue
+		}
 		if sender != node.host.GetID() {
 			//utils.Logger().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
-			if err == nil {
-				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				node.enqueueIncomingMessage(msg[5:], sender)
-			}
+			// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+			node.enqueueIncomingMessage(msg[5:], sender)
 		}
 	}
 }
@@ -66,12 +69,15 @@ func (node *Node) ReceiveGroupMessage() {
 			continue
 		}
 		msg, sender, err := node.shardGroupReceiver.Receive(ctx)
+		if err != nil {
+			utils.Logger().Warn().Err(err).
+				Msg("cannot receive from shard group")
+			continue
+		}
 		if sender != node.host.GetID() {
 			//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
-			if err == nil {
-				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				node.enqueueIncomingMessage(msg[5:], sender)
-			}
+			// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+			node.enqueueIncomingMessage(msg[5:], sender)
 		}
 	}
 }
@@ -87,12 +93,15 @@ func (node *Node) ReceiveClientGroupMessage() {
 			continue
 		}
 		msg, sender, err := node.clientReceiver.Receive(ctx)
+		if err != nil {
+			utils.Logger().Warn().Err(err).
+				Msg("cannot receive from client group")
+			continue
+		}
 		if sender != node.host.GetID() {
 			// utils.Logger().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
-			if err == nil {
-				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				node.enqueueIncomingMessage(msg[5:], sender)
-			}
+			// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+			node.enqueueIncomingMessage(msg[5:], sender)
 		}
 	}
 }
