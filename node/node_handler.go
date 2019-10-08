@@ -51,11 +51,12 @@ func (node *Node) ReceiveGlobalMessage() {
 				Msg("cannot receive from global group")
 			continue
 		}
-		if sender != node.host.GetID() {
-			//utils.Logger().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
-			// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-			node.enqueueIncomingMessage(msg[5:], sender)
+		if sender == node.host.GetID() {
+			continue
 		}
+		//utils.Logger().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
+		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+		node.enqueueIncomingMessage(msg[5:], sender)
 	}
 }
 
@@ -74,11 +75,12 @@ func (node *Node) ReceiveGroupMessage() {
 				Msg("cannot receive from shard group")
 			continue
 		}
-		if sender != node.host.GetID() {
-			//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
-			// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-			node.enqueueIncomingMessage(msg[5:], sender)
+		if sender == node.host.GetID() {
+			continue
 		}
+		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
+		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+		node.enqueueIncomingMessage(msg[5:], sender)
 	}
 }
 
@@ -98,11 +100,12 @@ func (node *Node) ReceiveClientGroupMessage() {
 				Msg("cannot receive from client group")
 			continue
 		}
-		if sender != node.host.GetID() {
-			// utils.Logger().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
-			// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-			node.enqueueIncomingMessage(msg[5:], sender)
+		if sender == node.host.GetID() {
+			continue
 		}
+		// utils.Logger().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
+		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+		node.enqueueIncomingMessage(msg[5:], sender)
 	}
 }
 
