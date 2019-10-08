@@ -29,6 +29,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -52,18 +53,25 @@ func (node *Node) receiveGroupMessage(receiver p2p.GroupReceiver) {
 		}
 		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-		node.enqueueIncomingMessage(msg[5:], sender)
+		if err := node.enqueueIncomingMessage(msg[5:], sender); err != nil {
+			utils.Logger().Warn().Err(err).
+				Str("sender", sender.Pretty()).
+				Msg("cannot enqueue incoming message for processing")
+		}
 	}
 }
 
+var errRxOverrun = errors.New("rx overrun")
+
 func (node *Node) enqueueIncomingMessage(
 	content []byte, sender libp2p_peer.ID,
-) {
+) error {
 	select {
 	case node.incomingMessages <- incomingMessage{content, sender}:
 	default:
-		utils.Logger().Warn().Msg("rx overrun")
+		return errRxOverrun
 	}
+	return nil
 }
 
 func (node *Node) handleIncomingMessages() {
