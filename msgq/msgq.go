@@ -47,5 +47,11 @@ func (q *Queue) HandleMessages(h MessageHandler) {
 	}
 }
 
+// Close closes the given queue.
+func (q *Queue) Close() error {
+	close(q.ch)
+	return nil
+}
+
 // ErrRxOverrun signals that a receive queue has been overrun.
 var ErrRxOverrun = errors.New("rx overrun")
