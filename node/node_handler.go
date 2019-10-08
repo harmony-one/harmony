@@ -36,61 +36,21 @@ const (
 	crossLinkBatchSize = 7
 )
 
-// ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
-func (node *Node) ReceiveGlobalMessage() {
-	ctx := context.Background()
-	for {
-		// TODO ek – infinite loop; add shutdown/cleanup logic
-		msg, sender, err := node.globalGroupReceiver.Receive(ctx)
-		if err != nil {
-			utils.Logger().Warn().Err(err).
-				Msg("cannot receive from global group")
-			continue
-		}
-		if sender == node.host.GetID() {
-			continue
-		}
-		//utils.Logger().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
-		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-		node.enqueueIncomingMessage(msg[5:], sender)
-	}
-}
-
 // ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
-func (node *Node) ReceiveGroupMessage() {
+func (node *Node) ReceiveGroupMessage(receiver p2p.GroupReceiver) {
 	ctx := context.Background()
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
-		msg, sender, err := node.shardGroupReceiver.Receive(ctx)
+		msg, sender, err := receiver.Receive(ctx)
 		if err != nil {
 			utils.Logger().Warn().Err(err).
-				Msg("cannot receive from shard group")
+				Msg("cannot receive from group")
 			continue
 		}
 		if sender == node.host.GetID() {
 			continue
 		}
 		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
-		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-		node.enqueueIncomingMessage(msg[5:], sender)
-	}
-}
-
-// ReceiveClientGroupMessage use libp2p pubsub mechanism to receive broadcast messages for client
-func (node *Node) ReceiveClientGroupMessage() {
-	ctx := context.Background()
-	// TODO ek – infinite loop; add shutdown/cleanup logic
-	for {
-		msg, sender, err := node.clientReceiver.Receive(ctx)
-		if err != nil {
-			utils.Logger().Warn().Err(err).
-				Msg("cannot receive from client group")
-			continue
-		}
-		if sender == node.host.GetID() {
-			continue
-		}
-		// utils.Logger().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
 		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
 		node.enqueueIncomingMessage(msg[5:], sender)
 	}

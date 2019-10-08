@@ -419,14 +419,14 @@ func (node *Node) StartServer() {
 
 	// start the goroutine to receive client message
 	// client messages are sent by clients, like txgen, wallet
-	go node.ReceiveClientGroupMessage()
+	go node.ReceiveGroupMessage(node.clientReceiver)
 
 	// start the goroutine to receive group message
-	go node.ReceiveGroupMessage()
+	go node.ReceiveGroupMessage(node.shardGroupReceiver)
 
 	// start the goroutine to receive global message, used for cross-shard TX
 	// FIXME (leo): we use beacon client topic as the global topic for now
-	go node.ReceiveGlobalMessage()
+	go node.ReceiveGroupMessage(node.globalGroupReceiver)
 
 	select {}
 }
