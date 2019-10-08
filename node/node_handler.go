@@ -14,6 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/api/proto/message"
@@ -28,8 +30,6 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -53,7 +53,7 @@ func (node *Node) receiveGroupMessage(receiver p2p.GroupReceiver) {
 		}
 		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-		if err := node.enqueueIncomingMessage(msg[5:], sender); err != nil {
+		if err := node.rxQueue.AddMessage(msg[5:], sender); err != nil {
 			utils.Logger().Warn().Err(err).
 				Str("sender", sender.Pretty()).
 				Msg("cannot enqueue incoming message for processing")
@@ -61,34 +61,13 @@ func (node *Node) receiveGroupMessage(receiver p2p.GroupReceiver) {
 	}
 }
 
-var errRxOverrun = errors.New("rx overrun")
-
-func (node *Node) enqueueIncomingMessage(
-	content []byte, sender libp2p_peer.ID,
-) error {
-	select {
-	case node.incomingMessages <- incomingMessage{content, sender}:
-	default:
-		return errRxOverrun
-	}
-	return nil
-}
-
-func (node *Node) handleIncomingMessages() {
-	for {
-		// TODO ek – infinite loop; add shutdown/cleanup logic
-		msg := <-node.incomingMessages
-		node.handleMessage(msg.content, msg.sender)
-	}
-}
-
-// handleMessage parses the message and dispatch the actions
-func (node *Node) handleMessage(content []byte, sender libp2p_peer.ID) {
+// HandleMessage parses the message and dispatch the actions.
+func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("handleMessage get message category failed")
+			Msg("HandleMessage get message category failed")
 		return
 	}
 
@@ -96,7 +75,7 @@ func (node *Node) handleMessage(content []byte, sender libp2p_peer.ID) {
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("handleMessage get message type failed")
+			Msg("HandleMessage get message type failed")
 		return
 	}
 
@@ -104,7 +83,7 @@ func (node *Node) handleMessage(content []byte, sender libp2p_peer.ID) {
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("handleMessage get message payload failed")
+			Msg("HandleMessage get message payload failed")
 		return
 	}
 

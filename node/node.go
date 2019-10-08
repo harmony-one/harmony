@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
@@ -29,6 +28,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
@@ -94,11 +94,6 @@ type syncConfig struct {
 	client    *downloader.Client
 }
 
-type incomingMessage struct {
-	content []byte
-	sender  libp2p_peer.ID
-}
-
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus             *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
@@ -157,7 +152,7 @@ type Node struct {
 	host p2p.Host
 
 	// Incoming messages to process.
-	incomingMessages chan incomingMessage
+	rxQueue *msgq.Queue
 
 	// Service manager.
 	serviceManager *service.Manager
@@ -414,7 +409,7 @@ func (node *Node) getTransactionsForNewBlock(
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
 	for i := 0; i < RxWorkers; i++ {
-		go node.handleIncomingMessages()
+		go node.rxQueue.HandleMessages(node)
 	}
 
 	// start the goroutine to receive client message
@@ -542,7 +537,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
 
-	node.incomingMessages = make(chan incomingMessage, RxQueueSize)
+	node.rxQueue = msgq.New(RxQueueSize)
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
