@@ -25,7 +25,7 @@ const (
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	values.ConsensusMechanism
+	ConsensusMechanism values.ConsensusMechanism
 
 	isQuorumSatisfied func(values.QuorumPhase) bool
 	rewardThreshold   func() *big.Int
