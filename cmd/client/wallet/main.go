@@ -10,14 +10,15 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"regexp"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/fatih/color"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
@@ -520,7 +521,6 @@ func showAllBalances(sender, receiver string, fromS, toS int) {
 			}
 		}
 	}
-
 }
 
 func processBalancesCommand() {
@@ -532,6 +532,13 @@ func processBalancesCommand() {
 		showAllBalances("", "", -1, -1)
 	} else {
 		address := common2.ParseAddr(*balanceAddressPtr)
+		valid, errorMessage := validateAddress(*balanceAddressPtr, address, "")
+
+		if !valid && len(errorMessage) > 0 {
+			fmt.Println(errorMessage)
+			return
+		}
+
 		fmt.Printf("Account: %s:\n", common2.MustAddressToBech32(address))
 		for shardID, balanceNonce := range FetchBalance(address) {
 			if balanceNonce != nil {
@@ -553,6 +560,12 @@ func formatAddressCommand() {
 		fmt.Println("Please specify the --address to show formats for.")
 	} else {
 		address := common2.ParseAddr(*formatAddressPtr)
+		valid, errorMessage := validateAddress(*formatAddressPtr, address, "")
+
+		if !valid && len(errorMessage) > 0 {
+			fmt.Println(errorMessage)
+			return
+		}
 
 		fmt.Printf("account address in Bech32: %s\n", common2.MustAddressToBech32(address))
 		fmt.Printf("account address in Base16 (deprecated): %s\n", address.Hex())
@@ -665,6 +678,13 @@ func processGetFreeToken() {
 		fmt.Println("Error: --address is required")
 	} else {
 		address := common2.ParseAddr(*freeTokenAddressPtr)
+		valid, errorMessage := validateAddress(*freeTokenAddressPtr, address, "")
+
+		if !valid && len(errorMessage) > 0 {
+			fmt.Println(errorMessage)
+			return
+		}
+
 		GetFreeToken(address)
 	}
 }
@@ -690,24 +710,34 @@ func processTransferCommand() {
 		return
 	}
 
-	if shardID == -1 || toShardID == -1 {
-		fmt.Println("Please specify the shard ID for the transfer (e.g. --shardID=0)")
+	if !validShard(shardID, walletProfile.Shards) {
+		fmt.Println("Please specify a valid sender shard ID for the transfer (e.g. --shardID=0)")
 		return
 	}
+
+	if !validShard(toShardID, walletProfile.Shards) {
+		fmt.Println("Please specify a valid receiver shard ID for the transfer (e.g. --toShardID=0)")
+		return
+	}
+
 	if amount <= 0 {
 		fmt.Println("Please specify positive amount to transfer")
 		return
 	}
 
-	receiverAddress := common2.ParseAddr(receiver)
-	if len(receiverAddress) != 20 {
-		fmt.Println("The receiver address is not valid.")
+	senderAddress := common2.ParseAddr(sender)
+	valid, errorMessage := validateAddress(sender, senderAddress, "sender")
+
+	if !valid && len(errorMessage) > 0 {
+		fmt.Println(errorMessage)
 		return
 	}
 
-	senderAddress := common2.ParseAddr(sender)
-	if len(senderAddress) != 20 {
-		fmt.Println("The sender address is not valid.")
+	receiverAddress := common2.ParseAddr(receiver)
+	valid, errorMessage = validateAddress(receiver, receiverAddress, "receiver")
+
+	if !valid && len(errorMessage) > 0 {
+		fmt.Println(errorMessage)
 		return
 	}
 
@@ -955,4 +985,33 @@ func submitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 	}
 
 	return nil
+}
+
+var (
+	addressValidationRegexp = regexp.MustCompile(`(?i)^(one[a-zA-Z0-9]{39})|(0x[a-fA-F0-9]{40})`)
+)
+
+func validateAddress(address string, commonAddress common.Address, addressType string) (bool, string) {
+	var valid = true
+	var errorMessage string
+
+	if len(addressType) > 0 {
+		addressType = fmt.Sprintf("%s ", addressType)
+	}
+
+	matches := addressValidationRegexp.FindAllStringSubmatch(address, -1)
+	if len(matches) == 0 || len(commonAddress) != 20 {
+		valid = false
+		errorMessage = fmt.Sprintf("The %saddress you supplied (%s) is in an invalid format. Please provide a valid address.", addressType, address)
+	}
+
+	return valid, errorMessage
+}
+
+func validShard(shardID int, shardCount int) bool {
+	if shardID < 0 || shardID > (shardCount-1) {
+		return false
+	}
+
+	return true
 }
