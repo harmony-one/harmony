@@ -12,13 +12,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
-	"github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
@@ -166,27 +164,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 	default:
 		utils.Logger().Error().
 			Str("Unknown MsgCateogry", string(msgCategory))
-	}
-}
-
-func (node *Node) processStakingMessage(msgPayload []byte) {
-	msg := &message.Message{}
-	err := pb.Unmarshal(msgPayload, msg)
-	if err == nil {
-		stakingRequest := msg.GetStaking()
-		txs := types.Transactions{}
-		if err = rlp.DecodeBytes(stakingRequest.Transaction, &txs); err == nil {
-			utils.Logger().Info().Msg("Successfully added staking transaction to pending list.")
-			node.addPendingTransactions(txs)
-		} else {
-			utils.Logger().Error().
-				Err(err).
-				Msg("Failed to unmarshal staking transaction list")
-		}
-	} else {
-		utils.Logger().Error().
-			Err(err).
-			Msg("Failed to unmarshal staking msg payload")
 	}
 }
 

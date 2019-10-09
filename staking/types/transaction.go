@@ -113,3 +113,13 @@ func (tx *StakingTransaction) DecodeRLP(s *rlp.Stream) error {
 	}
 	return err
 }
+
+// StakingType returns the type of staking transaction
+func (tx *StakingTransaction) StakingType() Directive {
+	return tx.data.Directive
+}
+
+// StakingMessage returns the stake message of staking transaction
+func (tx *StakingTransaction) StakingMessage() interface{} {
+	return tx.data.StakeMsg
+}

@@ -18,6 +18,7 @@ package core
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -184,12 +185,56 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 // and uses the input parameters for its environment. It returns the receipt
 // for the staking transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-// staking transaction will use the code field in the account to store the staking information
+// staking transaction will use the storage field in the account to store the staking information
 // TODO chao: Add receipts for staking tx
 func ApplyStakingTransaction(
 	config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB,
 	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gasUsed uint64, oops error) {
+	txType := tx.StakingType()
+	stakeMsg := tx.StakingMessage()
+	switch txType {
+	case staking.DirectiveNewValidator:
+		newValidator := stakeMsg.(staking.NewValidator)
+		applyNewValidatorTx(newValidator)
+	case staking.DirectiveEditValidator:
+		editValidator := stakeMsg.(staking.EditValidator)
+		applyEditValidatorTx(editValidator)
+	case staking.DirectiveDelegate:
+		delegate := stakeMsg.(staking.Delegate)
+		applyDelegateTx(delegate)
+	case staking.DirectiveRedelegate:
+		redelegate := stakeMsg.(staking.Redelegate)
+		applyRedelegateTx(redelegate)
+	case staking.DirectiveUndelegate:
+		undelegate := stakeMsg.(staking.Undelegate)
+		applyUndelegateTx(undelegate)
+	default:
+
+	}
 	return nil, 0, nil
+}
+
+func applyNewValidatorTx(newValidator staking.NewValidator) {
+	amt := new(big.Int)
+	minDele := new(big.Int)
+	amt.Set(newValidator.Amount)
+	minDele.Set(newValidator.MinSelfDelegation)
+	commission := staking.Commission{CommissionRates: newValidator.CommissionRates, UpdateHeight: new(big.Int)}
+	_ = staking.Validator{Address: newValidator.StakingAddress, ValidatingPubKey: newValidator.PubKey,
+		Stake: amt, MinSelfDelegation: minDele, Description: newValidator.Description,
+		Commission: commission, UnbondingHeight: new(big.Int)}
+}
+
+func applyEditValidatorTx(editValidator staking.EditValidator) {
+}
+
+func applyDelegateTx(delegate staking.Delegate) {
+}
+
+func applyRedelegateTx(redelegate staking.Redelegate) {
+}
+
+func applyUndelegateTx(undelegate staking.Undelegate) {
 }
 
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt
