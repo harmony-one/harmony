@@ -3,12 +3,12 @@ package consensus
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/ctxerror"
-
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core/values"
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -21,7 +21,9 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := NewOneVotePerValidator(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(),
+	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -51,7 +53,9 @@ func TestConstructPreparedMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := NewOneVotePerValidator(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(),
+	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}

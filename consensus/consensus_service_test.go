@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core/values"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -20,7 +20,9 @@ func TestPopulateMessageFields(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	blsPriKey := bls.RandPrivateKey()
-	consensus, err := New(host, 0, leader, blsPriKey)
+	consensus, err := NewOneVotePerValidator(
+		host, values.BeaconChainShardID, leader, blsPriKey,
+	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -54,7 +56,9 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := NewOneVotePerValidator(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(),
+	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -79,7 +83,9 @@ func TestSetViewID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := NewOneVotePerValidator(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(),
+	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}

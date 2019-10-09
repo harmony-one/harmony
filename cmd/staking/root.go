@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -52,12 +53,12 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	account := accounts.Account{Address: dAddr}
 	ks.Unlock(account, testAccountPassword)
 	gasPrice := big.NewInt(0)
-	stakePayloadMaker := func() (staking.Directive, interface{}) {
+	stakePayloadMaker := func() (values.StakingDirective, interface{}) {
 		p := &bls.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
 		pub := shard.BlsPublicKey{}
 		pub.FromLibBLSPublicKey(p)
-		// return staking.DirectiveNewValidator, staking.NewValidator{
+		// return values.DirectiveNewValidator, staking.NewValidator{
 		// 	Description: staking.Description{
 		// 		Name:            "something",
 		// 		Identity:        "something else",
@@ -75,7 +76,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		// 	PubKey:            pub,
 		// 	Amount:            big.NewInt(100),
 		// }
-		return staking.DirectiveDelegate, staking.Delegate{
+		return values.DirectiveDelegate, staking.Delegate{
 			common.Address(dAddr),
 			common.Address(dAddr),
 			big.NewInt(10),

@@ -8,11 +8,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/hash"
 )
 
 type txdata struct {
-	Directive
+	values.StakingDirective
 	StakeMsg     interface{}
 	AccountNonce uint64   `json:"nonce"      gencodec:"required"`
 	Price        *big.Int `json:"gasPrice"   gencodec:"required"`
@@ -34,7 +35,7 @@ type StakingTransaction struct {
 	from atomic.Value
 }
 
-type fulfill func() (Directive, interface{})
+type fulfill func() (values.StakingDirective, interface{})
 
 // NewStakingTransaction produces a new staking transaction record
 func NewStakingTransaction(

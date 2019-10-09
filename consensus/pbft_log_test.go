@@ -6,6 +6,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -19,7 +20,9 @@ func constructAnnounceMessage(t *testing.T) []byte {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := NewOneVotePerValidator(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(),
+	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -39,21 +42,21 @@ func getConsensusMessage(payload []byte) (*msg_pb.Message, error) {
 	return msg, nil
 }
 
-func TestParsePbftMessage(t *testing.T) {
+func TestParsePBFTMessage(t *testing.T) {
 	payload := constructAnnounceMessage(t)
 	msg, err := getConsensusMessage(payload)
 	if err != nil {
 		t.Error("create consensus message error")
 	}
-	_, err = ParsePbftMessage(msg)
+	_, err = ParsePBFTMessage(msg)
 	if err != nil {
-		t.Error("unable to parse PbftMessage")
+		t.Error("unable to parse PBFTMessage")
 	}
 }
 
 func TestGetMessagesByTypeSeqViewHash(t *testing.T) {
-	pbftMsg := PbftMessage{MessageType: msg_pb.MessageType_ANNOUNCE, BlockNum: 2, ViewID: 3, BlockHash: [32]byte{01, 02}}
-	log := NewPbftLog()
+	pbftMsg := PBFTMessage{MessageType: msg_pb.MessageType_ANNOUNCE, BlockNum: 2, ViewID: 3, BlockHash: [32]byte{01, 02}}
+	log := NewPBFTLog()
 	log.AddMessage(&pbftMsg)
 
 	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, 2, 3, [32]byte{01, 02})
@@ -68,8 +71,8 @@ func TestGetMessagesByTypeSeqViewHash(t *testing.T) {
 }
 
 func TestHasMatchingAnnounce(t *testing.T) {
-	pbftMsg := PbftMessage{MessageType: msg_pb.MessageType_ANNOUNCE, BlockNum: 2, ViewID: 3, BlockHash: [32]byte{01, 02}}
-	log := NewPbftLog()
+	pbftMsg := PBFTMessage{MessageType: msg_pb.MessageType_ANNOUNCE, BlockNum: 2, ViewID: 3, BlockHash: [32]byte{01, 02}}
+	log := NewPBFTLog()
 	log.AddMessage(&pbftMsg)
 	found := log.HasMatchingViewAnnounce(2, 3, [32]byte{01, 02})
 	if !found {

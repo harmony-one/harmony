@@ -147,7 +147,7 @@ func (s EIP155Signer) SignatureValues(
 // It does not uniquely identify the transaction.
 func (s EIP155Signer) Hash(tx *StakingTransaction) common.Hash {
 	return hash.FromRLP([]interface{}{
-		tx.data.Directive,
+		tx.data.StakingDirective,
 		tx.data.StakeMsg,
 		tx.data.AccountNonce,
 		tx.data.Price,

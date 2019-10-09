@@ -132,7 +132,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
 	}
-	if count := utils.CountOneBits(mask.Bitmap); count < parentQuorum {
+	if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
 		return ctxerror.New("[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
 			"need", parentQuorum, "got", count)
 	}
@@ -206,7 +206,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
 	}
-	if count := utils.CountOneBits(mask.Bitmap); count < quorum {
+	if count := utils.CountOneBits(mask.Bitmap); count < int64(quorum) {
 		return ctxerror.New("[VerifyHeaderWithSignature] Not enough signature in commitSignature from Block Header",
 			"need", quorum, "got", count)
 	}

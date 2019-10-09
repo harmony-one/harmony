@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/core/values"
+	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -22,7 +22,9 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, blsKey)
+	consensus, err := consensus.NewOneVotePerValidator(
+		host, values.BeaconChainShardID, leader, blsKey,
+	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -53,7 +55,9 @@ func TestVerifyNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, blsKey)
+	consensus, err := consensus.NewOneVotePerValidator(
+		host, values.BeaconChainShardID, leader, blsKey,
+	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}

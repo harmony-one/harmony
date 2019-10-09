@@ -6,36 +6,7 @@ import (
 	"github.com/harmony-one/harmony/core/numeric"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/pkg/errors"
 )
-
-// Directive says what kind of payload follows
-type Directive byte
-
-const (
-	// DirectiveNewValidator ...
-	DirectiveNewValidator Directive = iota
-	// DirectiveEditValidator ...
-	DirectiveEditValidator
-	// DirectiveDelegate ...
-	DirectiveDelegate
-	// DirectiveRedelegate ...
-	DirectiveRedelegate
-	// DirectiveUndelegate ...
-	DirectiveUndelegate
-)
-
-var (
-	directiveKind = [...]string{
-		"NewValidator", "EditValidator", "Delegate", "Redelegate", "Undelegate",
-	}
-	// ErrInvalidStakingKind given when caller gives bad staking message kind
-	ErrInvalidStakingKind = errors.New("bad staking kind")
-)
-
-func (d Directive) String() string {
-	return directiveKind[d]
-}
 
 // NewValidator - type for creating a new validator
 type NewValidator struct {

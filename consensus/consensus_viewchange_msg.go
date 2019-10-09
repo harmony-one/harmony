@@ -29,8 +29,10 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	// next leader key already updated
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
 
-	preparedMsgs := consensus.PbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, consensus.blockNum, consensus.blockHash)
-	preparedMsg := consensus.PbftLog.FindMessageByMaxViewID(preparedMsgs)
+	preparedMsgs := consensus.PBFTLog.GetMessagesByTypeSeqHash(
+		msg_pb.MessageType_PREPARED, consensus.blockNum, consensus.blockHash,
+	)
+	preparedMsg := consensus.PBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
 	var msgToSign []byte
 	if preparedMsg == nil {

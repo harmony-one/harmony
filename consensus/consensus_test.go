@@ -3,6 +3,7 @@ package consensus
 import (
 	"testing"
 
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -16,7 +17,9 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	consensus, err := NewOneVotePerValidator(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(),
+	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}

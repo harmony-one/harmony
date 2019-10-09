@@ -565,7 +565,7 @@ func (node *Node) CalculateInitShardState() (err error) {
 
 	// Get genesis epoch shard state from chain
 	blockNum := node.Blockchain().CurrentBlock().NumberU64()
-	node.Consensus.SetMode(consensus.Listening)
+	node.Consensus.SetMode(values.PBFTListening)
 	epoch := core.ShardingSchedule.CalcEpochNumber(blockNum)
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
@@ -587,7 +587,7 @@ func (node *Node) CalculateInitShardState() (err error) {
 				Int("numPubKeys", len(pubKeys)).
 				Msg("[CalculateInitShardState] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
-			node.Consensus.SetMode(consensus.Normal)
+			node.Consensus.SetMode(values.PBFTNormal)
 			return nil
 		}
 	}

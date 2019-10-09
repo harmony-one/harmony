@@ -9,112 +9,66 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/core/values"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
-// PbftPhase  PBFT phases: pre-prepare, prepare and commit
-type PbftPhase int
-
-// Enum for PbftPhase
-const (
-	Announce PbftPhase = iota
-	Prepare
-	Commit
-)
-
-// Mode determines whether a node is in normal or viewchanging mode
-type Mode int
-
-// Enum for node Mode
-const (
-	Normal Mode = iota
-	ViewChanging
-	Syncing
-	Listening
-)
-
-// PbftMode contains mode and viewID of viewchanging
-type PbftMode struct {
-	mode   Mode
+// PBFTMode contains mode and viewID of viewchanging
+type PBFTMode struct {
+	mode   values.PBFTState
 	viewID uint64
 	mux    sync.Mutex
 }
 
 // Mode return the current node mode
-func (pm *PbftMode) Mode() Mode {
+func (pm *PBFTMode) Mode() values.PBFTState {
 	return pm.mode
 }
 
-//String print mode string
-func (mode Mode) String() string {
-	if mode == Normal {
-		return "Normal"
-	} else if mode == ViewChanging {
-		return "ViewChanging"
-	} else if mode == Syncing {
-		return "Syncing"
-	} else if mode == Listening {
-		return "Listening"
-	}
-	return "Unknown"
-}
-
-// String print phase string
-func (phase PbftPhase) String() string {
-	if phase == Announce {
-		return "Announce"
-	} else if phase == Prepare {
-		return "Prepare"
-	} else if phase == Commit {
-		return "Commit"
-	}
-	return "Unknown"
-}
-
 // SetMode set the node mode as required
-func (pm *PbftMode) SetMode(m Mode) {
+func (pm *PBFTMode) SetMode(s values.PBFTState) {
 	pm.mux.Lock()
 	defer pm.mux.Unlock()
-	pm.mode = m
+	pm.mode = s
 }
 
 // ViewID return the current viewchanging id
-func (pm *PbftMode) ViewID() uint64 {
+func (pm *PBFTMode) ViewID() uint64 {
 	return pm.viewID
 }
 
 // SetViewID sets the viewchanging id accordingly
-func (pm *PbftMode) SetViewID(viewID uint64) {
+func (pm *PBFTMode) SetViewID(viewID uint64) {
 	pm.mux.Lock()
 	defer pm.mux.Unlock()
 	pm.viewID = viewID
 }
 
 // GetViewID returns the current viewchange viewID
-func (pm *PbftMode) GetViewID() uint64 {
+func (pm *PBFTMode) GetViewID() uint64 {
 	return pm.viewID
 }
 
-// switchPhase will switch PbftPhase to nextPhase if the desirePhase equals the nextPhase
-func (consensus *Consensus) switchPhase(desirePhase PbftPhase, override bool) {
+// switchPhase will switch PBFTPhase to nextPhase if the desirePhase equals the nextPhase
+func (consensus *Consensus) switchPhase(desired values.PBFTPhase, override bool) {
 	if override {
-		consensus.phase = desirePhase
+		consensus.phase = desired
 		return
 	}
 
-	var nextPhase PbftPhase
+	var nextPhase values.PBFTPhase
 	switch consensus.phase {
-	case Announce:
-		nextPhase = Prepare
-	case Prepare:
-		nextPhase = Commit
-	case Commit:
-		nextPhase = Announce
+	case values.PBFTAnnounce:
+		nextPhase = values.PBFTPrepare
+	case values.PBFTPrepare:
+		nextPhase = values.PBFTCommit
+	case values.PBFTCommit:
+		nextPhase = values.PBFTAnnounce
 	}
-	if nextPhase == desirePhase {
+	if nextPhase == desired {
 		consensus.phase = nextPhase
 	}
 }
@@ -145,7 +99,7 @@ func (consensus *Consensus) ResetViewChangeState() {
 	utils.Logger().Debug().
 		Str("Phase", consensus.phase.String()).
 		Msg("[ResetViewChangeState] Resetting view change state")
-	consensus.mode.SetMode(Normal)
+	consensus.mode.SetMode(values.PBFTNormal)
 	bhpBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	nilBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	viewIDBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
@@ -174,7 +128,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	}
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
-	consensus.mode.SetMode(ViewChanging)
+	consensus.mode.SetMode(values.PBFTViewChanging)
 	consensus.mode.SetViewID(viewID)
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
 
@@ -187,7 +141,11 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		Msg("[startViewChange]")
 
 	msgToSend := consensus.constructViewChangeMessage()
-	consensus.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+	consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
+		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+	},
+		host.ConstructP2pMessage(byte(17), msgToSend),
+	)
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	consensus.consensusTimeout[timeoutViewChange].Start()
@@ -207,10 +165,10 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	if len(consensus.viewIDSigs) >= consensus.Quorum() {
+	need := consensus.QuorumThreshold().Int64()
+	if int64(len(consensus.viewIDSigs)) >= need {
 		utils.Logger().Debug().
-			Int("have", len(consensus.viewIDSigs)).
-			Int("need", consensus.Quorum()).
+			Int("have", len(consensus.viewIDSigs)).Int64("need", need).
 			Str("validatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
 			Msg("[onViewChange] Received Enough View Change Messages")
 		return
@@ -238,7 +196,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.mode.Mode() == ViewChanging && consensus.mode.ViewID() > recvMsg.ViewID {
+	if consensus.mode.Mode() == values.PBFTViewChanging && consensus.mode.ViewID() > recvMsg.ViewID {
 		utils.Logger().Warn().
 			Uint64("MyViewChangingID", consensus.mode.ViewID()).
 			Uint64("MsgViewChangingID", recvMsg.ViewID).
@@ -259,8 +217,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	_, ok2 := consensus.bhpSigs[consensus.PubKey.SerializeToHexStr()]
 	if !(ok1 || ok2) {
 		// add own signature for newview message
-		preparedMsgs := consensus.PbftLog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, recvMsg.BlockNum)
-		preparedMsg := consensus.PbftLog.FindMessageByMaxViewID(preparedMsgs)
+		preparedMsgs := consensus.PBFTLog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, recvMsg.BlockNum)
+		preparedMsg := consensus.PBFTLog.FindMessageByMaxViewID(preparedMsgs)
 		if preparedMsg == nil {
 			utils.Logger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
 			consensus.nilSigs[consensus.PubKey.SerializeToHexStr()] = consensus.priKey.SignHash(NIL)
@@ -329,10 +287,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				return
 			}
 			// check has 2f+1 signature in m1 type message
-			if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
-				utils.Logger().Debug().
-					Int("need", consensus.Quorum()).
-					Int("have", count).
+			need := consensus.QuorumThreshold().Int64()
+			if count := utils.CountOneBits(mask.Bitmap); count < need {
+				utils.Logger().Debug().Int64("need", need).Int64("have", count).
 					Msg("[onViewChange] M1 Payload Not Have Enough Signature")
 				return
 			}
@@ -349,14 +306,16 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			if len(consensus.m1Payload) == 0 {
 				consensus.m1Payload = append(recvMsg.Payload[:0:0], recvMsg.Payload...)
 				// create prepared message for new leader
-				preparedMsg := PbftMessage{MessageType: msg_pb.MessageType_PREPARED, ViewID: recvMsg.ViewID, BlockNum: recvMsg.BlockNum}
+				preparedMsg := PBFTMessage{
+					MessageType: msg_pb.MessageType_PREPARED, ViewID: recvMsg.ViewID, BlockNum: recvMsg.BlockNum,
+				}
 				preparedMsg.BlockHash = common.Hash{}
 				copy(preparedMsg.BlockHash[:], recvMsg.Payload[:32])
 				preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
 				copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 				preparedMsg.SenderPubkey = consensus.PubKey
 				utils.Logger().Info().Msg("[onViewChange] New Leader Prepared Message Added")
-				consensus.PbftLog.AddMessage(&preparedMsg)
+				consensus.PBFTLog.AddMessage(&preparedMsg)
 			}
 		}
 		utils.Logger().Debug().
@@ -389,12 +348,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	consensus.viewIDBitmap.SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
 	utils.Logger().Debug().
 		Int("numSigs", len(consensus.viewIDSigs)).
-		Int("needed", consensus.Quorum()).
+		Int64("needed", consensus.QuorumThreshold().Int64()).
 		Msg("[onViewChange]")
 
 	// received enough view change messages, change state to normal consensus
-	if len(consensus.viewIDSigs) >= consensus.Quorum() {
-		consensus.mode.SetMode(Normal)
+	if int64(len(consensus.viewIDSigs)) >= consensus.QuorumThreshold().Int64() {
+		consensus.mode.SetMode(values.PBFTNormal)
 		consensus.LeaderPubKey = consensus.PubKey
 		consensus.ResetState()
 		if len(consensus.m1Payload) == 0 {
@@ -404,9 +363,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		} else {
 			utils.Logger().Debug().
 				Str("From", consensus.phase.String()).
-				Str("To", Commit.String()).
+				Str("To", values.PBFTCommit.String()).
 				Msg("[OnViewChange] Switching phase")
-			consensus.switchPhase(Commit, true)
+			consensus.switchPhase(values.PBFTCommit, true)
 			copy(consensus.blockHash[:], consensus.m1Payload[:32])
 			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 32)
 			if err != nil {
@@ -482,10 +441,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 	// check total number of sigs >= 2f+1
-	if count := utils.CountOneBits(m3Mask.Bitmap); count < consensus.Quorum() {
-		utils.Logger().Debug().
-			Int("need", consensus.Quorum()).
-			Int("have", count).
+	need := consensus.QuorumThreshold().Int64()
+	if count := utils.CountOneBits(m3Mask.Bitmap); count < need {
+		utils.Logger().Debug().Int64("need", need).Int64("have", count).
 			Msg("[onNewView] Not Have Enough M3 (ViewID) Signature")
 		return
 	}
@@ -531,13 +489,13 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.prepareBitmap = mask
 
 		// create prepared message from newview
-		preparedMsg := PbftMessage{MessageType: msg_pb.MessageType_PREPARED, ViewID: recvMsg.ViewID, BlockNum: recvMsg.BlockNum}
+		preparedMsg := PBFTMessage{MessageType: msg_pb.MessageType_PREPARED, ViewID: recvMsg.ViewID, BlockNum: recvMsg.BlockNum}
 		preparedMsg.BlockHash = common.Hash{}
 		copy(preparedMsg.BlockHash[:], blockHash[:])
 		preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
 		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 		preparedMsg.SenderPubkey = senderKey
-		consensus.PbftLog.AddMessage(&preparedMsg)
+		consensus.PBFTLog.AddMessage(&preparedMsg)
 	}
 
 	// newView message verified success, override my state
@@ -568,9 +526,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 		utils.Logger().Debug().
 			Str("From", consensus.phase.String()).
-			Str("To", Commit.String()).
+			Str("To", values.PBFTCommit.String()).
 			Msg("[OnViewChange] Switching phase")
-		consensus.switchPhase(Commit, true)
+		consensus.switchPhase(values.PBFTCommit, true)
 	} else {
 		consensus.ResetState()
 		utils.Logger().Info().Msg("onNewView === announce")

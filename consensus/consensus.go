@@ -1,5 +1,5 @@
 // Package consensus implements the Cosi PBFT consensus
-package consensus // consensus
+package consensus
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/values"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -24,12 +25,18 @@ const (
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	// PbftLog stores the pbft messages and blocks during PBFT process
-	PbftLog *PbftLog
+	values.ConsensusMechanism
+
+	isQuorumSatisfied func(values.QuorumPhase) bool
+	rewardThreshold   func() *big.Int
+	QuorumThreshold   func() *big.Int
+
+	// PBFTLog stores the pbft messages and blocks during PBFT process
+	PBFTLog *PBFTLog
 	// phase: different phase of PBFT protocol: pre-prepare, prepare, commit, finish etc
-	phase PbftPhase
+	phase values.PBFTPhase
 	// mode: indicate a node is in normal or viewchanging mode
-	mode PbftMode
+	mode PBFTMode
 
 	// epoch: current epoch number
 	epoch uint64
@@ -188,25 +195,9 @@ func (consensus *Consensus) WaitForSyncing() {
 	<-consensus.blockNumLowChan
 }
 
-// Quorum returns the consensus quorum of the current committee (2f+1).
-func (consensus *Consensus) Quorum() int {
-	return len(consensus.PublicKeys)*2/3 + 1
-}
-
-// PreviousQuorum returns the quorum size of previous epoch
-func (consensus *Consensus) PreviousQuorum() int {
-	return consensus.numPrevPubKeys*2/3 + 1
-}
-
 // VdfSeedSize returns the number of VRFs for VDF computation
 func (consensus *Consensus) VdfSeedSize() int {
 	return len(consensus.PublicKeys) * 2 / 3
-}
-
-// RewardThreshold returns the threshold to stop accepting commit messages
-// when leader receives enough signatures for block reward
-func (consensus *Consensus) RewardThreshold() int {
-	return len(consensus.PublicKeys) * 9 / 10
 }
 
 // GetBlockReward returns last node block reward
@@ -214,17 +205,15 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 	return consensus.lastBlockReward
 }
 
-// New creates a new Consensus object
-// TODO: put shardId into chain reader's chain config
-func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
+func baseConsensus(host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.blockNumLowChan = make(chan struct{})
 	// pbft related
-	consensus.PbftLog = NewPbftLog()
-	consensus.phase = Announce
-	consensus.mode = PbftMode{mode: Normal}
+	consensus.PBFTLog = NewPBFTLog()
+	consensus.phase = values.PBFTAnnounce
+	consensus.mode = PBFTMode{mode: values.PBFTNormal}
 	// pbft timeout
 	consensus.consensusTimeout = createTimeout()
 	consensus.prepareSigs = map[string]*bls.Sign{}
@@ -244,7 +233,7 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	// viewID has to be initialized as the height of the blockchain during initialization
 	// as it was displayed on explorer as Height right now
 	consensus.viewID = 0
-	consensus.ShardID = ShardID
+	consensus.ShardID = shard
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
@@ -254,6 +243,59 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
-	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.PbftLog)
+	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.PBFTLog)
 	return &consensus, nil
+}
+
+// NewStakedVotePerValidator makes a staking based consensus object
+func NewStakedVotePerValidator(
+	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey,
+) (*Consensus, error) {
+	c, oops := baseConsensus(host, shard, leader, blsPriKey)
+	if oops != nil {
+		return nil, oops
+	}
+	c.ConsensusMechanism = values.SuperMajorityStake
+	c.isQuorumSatisfied = func(p values.QuorumPhase) bool {
+		return true
+	}
+	c.QuorumThreshold = func() *big.Int {
+		return big.NewInt(0)
+	}
+	c.rewardThreshold = func() *big.Int {
+		return big.NewInt(int64(len(c.PublicKeys) * 9 / 10))
+	}
+	return c, nil
+}
+
+// TODO: put shardId into chain reader's chain config
+
+// NewOneVotePerValidator is the original, pre-PoS based consensus object
+func NewOneVotePerValidator(
+	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey,
+) (*Consensus, error) {
+	c, oops := baseConsensus(host, shard, leader, blsPriKey)
+	if oops != nil {
+		return nil, oops
+	}
+	c.ConsensusMechanism = values.SuperMajorityVote
+	c.isQuorumSatisfied = func(p values.QuorumPhase) bool {
+		need := c.QuorumThreshold().Int64()
+		switch p {
+		case values.QuorumPrepare:
+			return int64(len(c.prepareSigs)) >= need
+		case values.QuorumCommit:
+			return int64(len(c.commitSigs)) >= need
+		default:
+			// Not possible
+			return false
+		}
+	}
+	c.QuorumThreshold = func() *big.Int {
+		return big.NewInt(int64(len(c.PublicKeys)*2/3 + 1))
+	}
+	c.rewardThreshold = func() *big.Int {
+		return big.NewInt(int64(len(c.PublicKeys) * 9 / 10))
+	}
+	return c, nil
 }
