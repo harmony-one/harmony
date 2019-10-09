@@ -24,7 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/hash"
 )
 
@@ -111,7 +111,7 @@ var big8 = big.NewInt(8)
 // Sender returns the sender address of the given signer.
 func (s EIP155Signer) Sender(tx *StakingTransaction) (common.Address, error) {
 	if tx.ChainID().Cmp(s.chainID) != 0 {
-		return common.Address{}, core.ErrInvalidChainID
+		return common.Address{}, values.ErrInvalidChainID
 	}
 	V := new(big.Int).Sub(tx.data.V, s.chainIDMul)
 	V.Sub(V, big8)

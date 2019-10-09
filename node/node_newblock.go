@@ -151,8 +151,7 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 	}
 	nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
 	// TODO: add logic for EPoS
-	shardState, err := core.CalculateNewShardState(
-		node.Blockchain(), nextEpoch, nil)
+	shardState, err := core.CalculateNewShardState(node.Blockchain(), nextEpoch)
 	if err != nil {
 		return err
 	}

@@ -79,6 +79,7 @@ func (m *MemProfiling) Stop() {
 // PeriodicallyScanMemSize scans memsize of the observed objects every 30 seconds.
 func (m *MemProfiling) PeriodicallyScanMemSize() {
 	go func() {
+		// TODO ek – infinite loop; add shutdown/cleanup logic
 		for {
 			select {
 			case <-time.After(memSizeScanTime):
@@ -98,6 +99,7 @@ func (m *MemProfiling) PeriodicallyScanMemSize() {
 // MaybeCallGCPeriodically runs GC manually every gcTime minutes. This is one of the options to mitigate the OOM issue.
 func MaybeCallGCPeriodically() {
 	go func() {
+		// TODO ek – infinite loop; add shutdown/cleanup logic
 		for {
 			select {
 			case <-time.After(gcTime):
@@ -108,6 +110,7 @@ func MaybeCallGCPeriodically() {
 		}
 	}()
 	go func() {
+		// TODO ek – infinite loop; add shutdown/cleanup logic
 		for {
 			select {
 			case <-time.After(memStatTime):

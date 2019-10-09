@@ -88,7 +88,6 @@ func setUpTXGen() *node.Node {
 	shardID := *shardIDFlag
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: peerPubKey}
 
-	gsif, err := consensus.NewGenesisStakeInfoFinder()
 	// Nodes containing blockchain data to mirror the shards' data in the network
 
 	myhost, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
@@ -103,7 +102,6 @@ func setUpTXGen() *node.Node {
 	chainDBFactory := &shardchain.MemDBFactory{}
 	txGen := node.New(myhost, consensusObj, chainDBFactory, false) //Changed it : no longer archival node.
 	txGen.Client = client.NewClient(txGen.GetHost(), uint32(shardID))
-	consensusObj.SetStakeInfoFinder(gsif)
 	consensusObj.ChainReader = txGen.Blockchain()
 	consensusObj.PublicKeys = nil
 	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))

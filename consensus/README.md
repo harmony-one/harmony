@@ -1,12 +1,17 @@
-Consensus package includes the Harmony BFT consensus protocol code, which uses BLS-based multi-signature to cosign the new block. The details are in Harmony's new [consensus protocol design](https://talk.harmony.one/t/bls-based-practical-bft-consensus/131).
+Consensus package includes the Harmony BFT consensus protocol code, which uses BLS-based
+multi-signature to cosign the new block. The details are
+in Harmony's new [consensus protocol design](https://talk.harmony.one/t/bls-based-practical-bft-consensus/131).
 
 ## Introduction to Harmony BFT with BLS signatures
 
-Harmony BFT consensus protocol consist of normal mode and view changing mode which is same as the PBFT(practical byzantine fault tolerance) protocol. The difference is we use the BLS aggregated signature to reduce O(N^2) communications to O(N), which is more efficient and scalable to traditional PBFT. For brevity, we will still call the whole process as PBFT.
+Harmony BFT consensus protocol consist of normal mode and view changing mode which is same
+as the PBFT(practical byzantine fault tolerance) protocol. The difference is we use the
+BLS aggregated signature to reduce O(N^2) communications to O(N), which is more efficient
+and scalable to traditional PBFT. For brevity, we will still call the whole process as PBFT.
 
 ### Normal mode
 
-To reach the consensus of the next block, there are 3 phases: announce(i.e. pre-prepare in PBFT), prepare and commit. 
+To reach the consensus of the next block, there are 3 phases: announce(i.e. pre-prepare in PBFT), prepare and commit.
 
 * Announce(leader): The leader broadcasts ANNOUNCE message along with candidate of the next block.
 * Prepare(validator): The validator will validate the block sent by leader and send PREPARE message; if the block is invalid, the validator will propose view change. If the prepare timeout, the validator will also propose view change.
@@ -42,8 +47,8 @@ type PbftLog struct {
     messages []*PbftMessage
 }
 
-// entry point and main loop; 
-// in each loop, the node will receive PBFT message from peers with timeout, 
+// entry point and main loop;
+// in each loop, the node will receive PBFT message from peers with timeout,
 // then update its state accordingly. handleMessageUpdate function handles various kinds of messages and update its state
 // it will also send new PBFT message (if not null) to its peers.
 // in the same loop, the node will also check whether it should send view changing message to new leader
@@ -75,27 +80,9 @@ func (consensus *Consensus) Start(stopChan chan struct{}, stoppedChan chan struc
         case <-stopChan:
             return
         }
-    }   
+    }
 
 }
 
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
