@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -13,27 +14,31 @@ var (
 )
 
 // ValidateAddress - validates that an address is in a correct bech32 or base16 format
-func ValidateAddress(addressType string, address string, commonAddress common.Address) (bool, string) {
+func ValidateAddress(address string, commonAddress common.Address, addressType string) (bool, string) {
 	var valid = true
 	var errorMessage string
+
+	if len(addressType) > 0 {
+		addressType = fmt.Sprintf("%s ", addressType)
+	}
 
 	if strings.HasPrefix(address, "one") || strings.HasPrefix(address, "0x") {
 		if strings.HasPrefix(address, "one") {
 			matches := bech32AddressRegex.FindAllStringSubmatch(address, -1)
 			if len(matches) == 0 || len(commonAddress) != 20 {
 				valid = false
-				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide a valid ONE address."
+				errorMessage = "The %saddress you supplied (%s) is in an invalid format. Please provide a valid ONE address."
 			}
 		} else if strings.HasPrefix(address, "0x") {
 			matches := base16AddressRegex.FindAllStringSubmatch(address, -1)
 			if len(matches) == 0 || len(commonAddress) != 20 {
 				valid = false
-				errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide a valid 0x address."
+				errorMessage = "The %saddress you supplied (%s) is in an invalid format. Please provide a valid 0x address."
 			}
 		}
 	} else {
 		valid = false
-		errorMessage = "The %s address you supplied (%s) is in an invalid format. Please provide a valid address."
+		errorMessage = "The %saddress you supplied (%s) is in an invalid format. Please provide a valid address."
 	}
 
 	return valid, errorMessage

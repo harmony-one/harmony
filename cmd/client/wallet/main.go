@@ -521,7 +521,6 @@ func showAllBalances(sender, receiver string, fromS, toS int) {
 			}
 		}
 	}
-
 }
 
 func processBalancesCommand() {
@@ -533,6 +532,13 @@ func processBalancesCommand() {
 		showAllBalances("", "", -1, -1)
 	} else {
 		address := common2.ParseAddr(*balanceAddressPtr)
+		valid, errorMessage := validation.ValidateAddress(*balanceAddressPtr, address, "")
+
+		if !valid && len(errorMessage) > 0 {
+			fmt.Println(fmt.Sprintf(errorMessage, "", *balanceAddressPtr))
+			return
+		}
+
 		fmt.Printf("Account: %s:\n", common2.MustAddressToBech32(address))
 		for shardID, balanceNonce := range FetchBalance(address) {
 			if balanceNonce != nil {
@@ -554,6 +560,12 @@ func formatAddressCommand() {
 		fmt.Println("Please specify the --address to show formats for.")
 	} else {
 		address := common2.ParseAddr(*formatAddressPtr)
+		valid, errorMessage := validation.ValidateAddress(*formatAddressPtr, address, "")
+
+		if !valid && len(errorMessage) > 0 {
+			fmt.Println(fmt.Sprintf(errorMessage, "", *formatAddressPtr))
+			return
+		}
 
 		fmt.Printf("account address in Bech32: %s\n", common2.MustAddressToBech32(address))
 		fmt.Printf("account address in Base16 (deprecated): %s\n", address.Hex())
@@ -666,6 +678,13 @@ func processGetFreeToken() {
 		fmt.Println("Error: --address is required")
 	} else {
 		address := common2.ParseAddr(*freeTokenAddressPtr)
+		valid, errorMessage := validation.ValidateAddress(*freeTokenAddressPtr, address, "")
+
+		if !valid && len(errorMessage) > 0 {
+			fmt.Println(fmt.Sprintf(errorMessage, "", *freeTokenAddressPtr))
+			return
+		}
+
 		GetFreeToken(address)
 	}
 }
@@ -707,7 +726,7 @@ func processTransferCommand() {
 	}
 
 	senderAddress := common2.ParseAddr(sender)
-	valid, errorMessage := validation.ValidateAddress("sender", sender, senderAddress)
+	valid, errorMessage := validation.ValidateAddress(sender, senderAddress, "sender")
 
 	if !valid && len(errorMessage) > 0 {
 		fmt.Println(fmt.Sprintf(errorMessage, "sender", sender))
@@ -715,7 +734,7 @@ func processTransferCommand() {
 	}
 
 	receiverAddress := common2.ParseAddr(receiver)
-	valid, errorMessage = validation.ValidateAddress("receiver", receiver, receiverAddress)
+	valid, errorMessage = validation.ValidateAddress(receiver, receiverAddress, "receiver")
 
 	if !valid && len(errorMessage) > 0 {
 		fmt.Println(fmt.Sprintf(errorMessage, "receiver", receiver))

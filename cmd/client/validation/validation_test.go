@@ -25,7 +25,7 @@ func TestIsValidAddress(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		valid, _ := ValidateAddress("sender", test.str, common.ParseAddr(test.str))
+		valid, _ := ValidateAddress(test.str, common.ParseAddr(test.str), "sender")
 
 		if valid != test.exp {
 			t.Errorf("validation.validateAddress(\"%s\") returned %v, expected %v", test.str, valid, test.exp)
