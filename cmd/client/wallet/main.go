@@ -10,20 +10,21 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/fatih/color"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/cmd/client/validation"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -125,6 +126,11 @@ var (
 var (
 	walletProfile *utils.WalletProfile
 	ks            *keystore.KeyStore
+)
+
+var (
+	bech32AddressRegex = regexp.MustCompile("^one[a-zA-Z0-9]{39}")
+	base16AddressRegex = regexp.MustCompile("^0x[a-fA-F0-9]{40}")
 )
 
 // setupLog setup log for verbose output
@@ -532,7 +538,7 @@ func processBalancesCommand() {
 		showAllBalances("", "", -1, -1)
 	} else {
 		address := common2.ParseAddr(*balanceAddressPtr)
-		valid, errorMessage := validation.ValidateAddress(*balanceAddressPtr, address, "")
+		valid, errorMessage := validateAddress(*balanceAddressPtr, address, "")
 
 		if !valid && len(errorMessage) > 0 {
 			fmt.Println(fmt.Sprintf(errorMessage, "", *balanceAddressPtr))
@@ -560,7 +566,7 @@ func formatAddressCommand() {
 		fmt.Println("Please specify the --address to show formats for.")
 	} else {
 		address := common2.ParseAddr(*formatAddressPtr)
-		valid, errorMessage := validation.ValidateAddress(*formatAddressPtr, address, "")
+		valid, errorMessage := validateAddress(*formatAddressPtr, address, "")
 
 		if !valid && len(errorMessage) > 0 {
 			fmt.Println(fmt.Sprintf(errorMessage, "", *formatAddressPtr))
@@ -678,7 +684,7 @@ func processGetFreeToken() {
 		fmt.Println("Error: --address is required")
 	} else {
 		address := common2.ParseAddr(*freeTokenAddressPtr)
-		valid, errorMessage := validation.ValidateAddress(*freeTokenAddressPtr, address, "")
+		valid, errorMessage := validateAddress(*freeTokenAddressPtr, address, "")
 
 		if !valid && len(errorMessage) > 0 {
 			fmt.Println(fmt.Sprintf(errorMessage, "", *freeTokenAddressPtr))
@@ -710,12 +716,12 @@ func processTransferCommand() {
 		return
 	}
 
-	if !validation.ValidShard(shardID, walletProfile.Shards) {
+	if !validShard(shardID, walletProfile.Shards) {
 		fmt.Println("Please specify a valid sender shard ID for the transfer (e.g. --shardID=0)")
 		return
 	}
 
-	if !validation.ValidShard(toShardID, walletProfile.Shards) {
+	if !validShard(toShardID, walletProfile.Shards) {
 		fmt.Println("Please specify a valid receiver shard ID for the transfer (e.g. --toShardID=0)")
 		return
 	}
@@ -726,7 +732,7 @@ func processTransferCommand() {
 	}
 
 	senderAddress := common2.ParseAddr(sender)
-	valid, errorMessage := validation.ValidateAddress(sender, senderAddress, "sender")
+	valid, errorMessage := validateAddress(sender, senderAddress, "sender")
 
 	if !valid && len(errorMessage) > 0 {
 		fmt.Println(fmt.Sprintf(errorMessage, "sender", sender))
@@ -734,7 +740,7 @@ func processTransferCommand() {
 	}
 
 	receiverAddress := common2.ParseAddr(receiver)
-	valid, errorMessage = validation.ValidateAddress(receiver, receiverAddress, "receiver")
+	valid, errorMessage = validateAddress(receiver, receiverAddress, "receiver")
 
 	if !valid && len(errorMessage) > 0 {
 		fmt.Println(fmt.Sprintf(errorMessage, "receiver", receiver))
@@ -985,4 +991,42 @@ func submitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 	}
 
 	return nil
+}
+
+func validateAddress(address string, commonAddress common.Address, addressType string) (bool, string) {
+	var valid = true
+	var errorMessage string
+
+	if len(addressType) > 0 {
+		addressType = fmt.Sprintf("%s ", addressType)
+	}
+
+	if strings.HasPrefix(address, "one") || strings.HasPrefix(address, "0x") {
+		if strings.HasPrefix(address, "one") {
+			matches := bech32AddressRegex.FindAllStringSubmatch(address, -1)
+			if len(matches) == 0 || len(commonAddress) != 20 {
+				valid = false
+				errorMessage = "The %saddress you supplied (%s) is in an invalid format. Please provide a valid ONE address."
+			}
+		} else if strings.HasPrefix(address, "0x") {
+			matches := base16AddressRegex.FindAllStringSubmatch(address, -1)
+			if len(matches) == 0 || len(commonAddress) != 20 {
+				valid = false
+				errorMessage = "The %saddress you supplied (%s) is in an invalid format. Please provide a valid 0x address."
+			}
+		}
+	} else {
+		valid = false
+		errorMessage = "The %saddress you supplied (%s) is in an invalid format. Please provide a valid address."
+	}
+
+	return valid, errorMessage
+}
+
+func validShard(shardID int, shardCount int) bool {
+	if shardID < 0 || shardID > (shardCount-1) {
+		return false
+	}
+
+	return true
 }
