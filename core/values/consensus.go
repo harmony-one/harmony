@@ -44,7 +44,12 @@ const (
 )
 
 var (
-	modes  = [...]string{"Normal", "ViewChanging", "Syncing", "Listening"}
+	stateNames  = map[PBFTState]string{
+		PBFTNormal:       "Normal",
+		PBFTViewChanging: "ViewChanging",
+		PBFTSyncing:      "Syncing",
+		PBFTListening:    "Listening",
+	}
 	phases = [...]string{"Announce", "Prepare", "Commit"}
 )
 
