@@ -54,7 +54,10 @@ var (
 )
 
 func (s PBFTState) String() string {
-	return modes[s]
+	if name, ok := stateNames[s]; ok {
+		return name
+	}
+	return fmt.Sprintf("PBFTState %v", byte(s))
 }
 
 // String print phase string
