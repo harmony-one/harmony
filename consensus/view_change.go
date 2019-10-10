@@ -166,7 +166,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 
 	need := consensus.QuorumThreshold().Int64()
-	if int64(len(consensus.viewIDSigs)) >= need {
+	if consensus.isQuorumSatisfied(values.QuorumViewChange) {
 		utils.Logger().Debug().
 			Int("have", len(consensus.viewIDSigs)).Int64("need", need).
 			Str("validatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
@@ -352,7 +352,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		Msg("[onViewChange]")
 
 	// received enough view change messages, change state to normal consensus
-	if int64(len(consensus.viewIDSigs)) >= consensus.QuorumThreshold().Int64() {
+	if consensus.isQuorumSatisfied(values.QuorumViewChange) {
 		consensus.mode.SetMode(values.PBFTNormal)
 		consensus.LeaderPubKey = consensus.PubKey
 		consensus.ResetState()

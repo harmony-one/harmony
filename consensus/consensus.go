@@ -286,6 +286,8 @@ func NewOneVotePerValidator(
 			return int64(len(c.prepareSigs)) >= need
 		case values.QuorumCommit:
 			return int64(len(c.commitSigs)) >= need
+		case values.QuorumViewChange:
+			return int64(len(c.viewIDSigs)) >= need
 		default:
 			// Not possible
 			return false

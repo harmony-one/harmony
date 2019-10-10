@@ -8,6 +8,8 @@ const (
 	QuorumPrepare QuorumPhase = iota
 	// QuorumCommit ..
 	QuorumCommit
+	// QuorumViewChange ..
+	QuorumViewChange
 )
 
 // ConsensusMechanism is the way we decide consensus
