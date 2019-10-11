@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/hash"
 )
 
@@ -91,6 +92,11 @@ func (tx *StakingTransaction) Gas() uint64 {
 	return tx.data.GasLimit
 }
 
+// Price returns price of StakingTransaction.
+func (tx *StakingTransaction) Price() *big.Int {
+	return tx.data.Price
+}
+
 // ChainID is what chain this staking transaction for
 func (tx *StakingTransaction) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)
@@ -114,6 +120,38 @@ func (tx *StakingTransaction) DecodeRLP(s *rlp.Stream) error {
 	return err
 }
 
+// Nonce returns nonce of staking tx
+func (tx *StakingTransaction) Nonce() uint64 {
+	return tx.data.AccountNonce
+}
+
+// StakingMsgToBytes returns the bytes of staking message
+func (tx *StakingTransaction) StakingMsgToBytes() (by []byte, err error) {
+	stakeType := tx.StakingType()
+
+	switch stakeType {
+	case DirectiveNewValidator:
+		newValidator := tx.StakingMessage().(NewValidator)
+		by, err = rlp.EncodeToBytes(newValidator)
+	case DirectiveEditValidator:
+		editValidator := tx.StakingMessage().(EditValidator)
+		by, err = rlp.EncodeToBytes(editValidator)
+	case DirectiveDelegate:
+		delegate := tx.StakingMessage().(Delegate)
+		by, err = rlp.EncodeToBytes(delegate)
+	case DirectiveRedelegate:
+		redelegate := tx.StakingMessage().(Redelegate)
+		by, err = rlp.EncodeToBytes(redelegate)
+	case DirectiveUndelegate:
+		undelegate := tx.StakingMessage().(Undelegate)
+		by, err = rlp.EncodeToBytes(undelegate)
+	default:
+		by = []byte{}
+		err = values.ErrInvalidStakingType
+	}
+	return
+}
+
 // StakingType returns the type of staking transaction
 func (tx *StakingTransaction) StakingType() Directive {
 	return tx.data.Directive
@@ -122,4 +160,14 @@ func (tx *StakingTransaction) StakingType() Directive {
 // StakingMessage returns the stake message of staking transaction
 func (tx *StakingTransaction) StakingMessage() interface{} {
 	return tx.data.StakeMsg
+}
+
+// SenderAddress returns the address of staking transaction sender
+func (tx *StakingTransaction) SenderAddress() (common.Address, error) {
+	signer := NewEIP155Signer(tx.ChainID())
+	addr, err := Sender(signer, tx)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return addr, nil
 }

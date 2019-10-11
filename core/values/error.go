@@ -76,4 +76,14 @@ var (
 	// than some meaningful limit a user might use. This is not a consensus error
 	// making the transaction invalid, rather a DOS protection.
 	ErrOversizedData = errors.New("oversized data")
+
+	// ErrSenderAddr returned if the sender of transaction is invalid or nil
+	// used in staking transaction
+	ErrSenderAddr = errors.New("invalid sender address")
+
+	// ErrInvalidStakingType returned if the staking transaction has an invalid type
+	ErrInvalidStakingType = errors.New("invalid staking message type")
+
+	// ErrNilAddress returned if we don't allow address to be empty
+	ErrNilAddress = errors.New("address is empty")
 )

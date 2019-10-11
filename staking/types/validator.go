@@ -3,12 +3,34 @@ package types
 import (
 	"math/big"
 
+	common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core/numeric"
-	"github.com/harmony-one/harmony/internal/common"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+)
+
+// Constants of the key into Storage field of Object in database
+var (
+	AddressKey          = common.HexToHash("Staking-Address")
+	BlsPubKey           = common.HexToHash("Staking-BlsPubKey")
+	StakeKey            = common.HexToHash("Staking-Amount")
+	UnboundingHeightKey = common.HexToHash("Staking-UnboundingHeight")
+	MinSelfDeleKey      = common.HexToHash("Staking-MinSelfDelegation")
+	ActiveKey           = common.HexToHash("Staking-IsActive")
+	//Commission related
+	UpdateHeightKey         = common.HexToHash("Staking-UpdateHeight")
+	CommissionRateKey       = common.HexToHash("Staking-CommissionRate")
+	CommissionMaxRateKey    = common.HexToHash("Staking-CommissionMaxRate")
+	CommissionChangeRateKey = common.HexToHash("Staking-CommissionChangeRate")
+	//Description related
+	DescriptionNameKey     = common.HexToHash("Staking-DesriptionName")
+	DescriptionIdentityKey = common.HexToHash("Staking-DesriptionIdentity")
+	DescriptionWebsiteKey  = common.HexToHash("Staking-DesriptionWebsite")
+	DescriptionContactKey  = common.HexToHash("Staking-DesriptionContact")
+	DescriptionDetailsKey  = common.HexToHash("Staking-DesriptionDetails")
 )
 
 // Define validator staking related const
@@ -23,7 +45,7 @@ const (
 // Validator - data fields for a validator
 type Validator struct {
 	// ECDSA address of the validator
-	Address common.Address `json:"address" yaml:"address"`
+	Address common2.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
 	ValidatingPubKey bls.PublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
 	// The stake put by the validator itself
@@ -106,7 +128,7 @@ func (d Description) EnsureLength() (Description, error) {
 }
 
 // GetAddress returns address
-func (v Validator) GetAddress() common.Address { return v.Address }
+func (v Validator) GetAddress() common2.Address { return v.Address }
 
 // IsActive checks whether validator is active
 func (v Validator) IsActive() bool { return v.IsCurrentlyActive }

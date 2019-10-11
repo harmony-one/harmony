@@ -18,7 +18,6 @@ package core
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -26,6 +25,7 @@ import (
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
@@ -186,55 +186,47 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 // for the staking transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
 // staking transaction will use the storage field in the account to store the staking information
-// TODO chao: Add receipts for staking tx
 func ApplyStakingTransaction(
 	config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB,
-	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gasUsed uint64, oops error) {
-	txType := tx.StakingType()
-	stakeMsg := tx.StakingMessage()
-	switch txType {
-	case staking.DirectiveNewValidator:
-		newValidator := stakeMsg.(staking.NewValidator)
-		applyNewValidatorTx(newValidator)
-	case staking.DirectiveEditValidator:
-		editValidator := stakeMsg.(staking.EditValidator)
-		applyEditValidatorTx(editValidator)
-	case staking.DirectiveDelegate:
-		delegate := stakeMsg.(staking.Delegate)
-		applyDelegateTx(delegate)
-	case staking.DirectiveRedelegate:
-		redelegate := stakeMsg.(staking.Redelegate)
-		applyRedelegateTx(redelegate)
-	case staking.DirectiveUndelegate:
-		undelegate := stakeMsg.(staking.Undelegate)
-		applyUndelegateTx(undelegate)
-	default:
+	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gas uint64, err error) {
 
+	msg, err := StakingToMessage(tx)
+	if err != nil {
+		return nil, 0, err
 	}
-	return nil, 0, nil
-}
+	stkType := tx.StakingType()
+	if _, ok := types.StakingTypeMap[stkType]; !ok {
+		return nil, 0, values.ErrInvalidStakingType
+	}
+	msg.SetType(types.StakingTypeMap[stkType])
 
-func applyNewValidatorTx(newValidator staking.NewValidator) {
-	amt := new(big.Int)
-	minDele := new(big.Int)
-	amt.Set(newValidator.Amount)
-	minDele.Set(newValidator.MinSelfDelegation)
-	commission := staking.Commission{CommissionRates: newValidator.CommissionRates, UpdateHeight: new(big.Int)}
-	_ = staking.Validator{Address: newValidator.StakingAddress, ValidatingPubKey: newValidator.PubKey,
-		Stake: amt, MinSelfDelegation: minDele, Description: newValidator.Description,
-		Commission: commission, UnbondingHeight: new(big.Int)}
-}
+	// Create a new context to be used in the EVM environment
+	context := NewEVMContext(msg, header, bc, author)
 
-func applyEditValidatorTx(editValidator staking.EditValidator) {
-}
+	// Create a new environment which holds all relevant information
+	// about the transaction and calling mechanisms.
+	vmenv := vm.NewEVM(context, statedb, config, cfg)
+	// Apply the transaction to the current state (included in the env)
+	gas, err = ApplyStakingMessage(vmenv, msg, gp)
 
-func applyDelegateTx(delegate staking.Delegate) {
-}
+	// even there is error, we charge it
+	if err != nil {
+		return nil, gas, err
+	}
 
-func applyRedelegateTx(redelegate staking.Redelegate) {
-}
+	// Update the state with pending changes
+	var root []byte
+	if config.IsS3(header.Epoch()) {
+		statedb.Finalise(true)
+	} else {
+		root = statedb.IntermediateRoot(config.IsS3(header.Epoch())).Bytes()
+	}
+	*usedGas += gas
+	receipt = types.NewReceipt(root, false, *usedGas)
+	receipt.TxHash = tx.Hash()
+	receipt.GasUsed = gas
 
-func applyUndelegateTx(undelegate staking.Undelegate) {
+	return receipt, gas, nil
 }
 
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt
@@ -243,7 +235,6 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 		return nil
 	}
 
-	// TODO: how to charge gas here?
 	for _, cx := range cxp.Receipts {
 		if cx == nil || cx.To == nil { // should not happend
 			return ctxerror.New("ApplyIncomingReceipts: Invalid incomingReceipt!", "receipt", cx)
@@ -257,4 +248,20 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 		db.IntermediateRoot(config.IsS3(header.Epoch()))
 	}
 	return nil
+}
+
+// StakingToMessage returns the staking transaction as a core.Message.
+// requires a signer to derive the sender.
+// put it here to avoid cyclic import
+func StakingToMessage(tx *staking.StakingTransaction) (types.Message, error) {
+	payload, err := tx.StakingMsgToBytes()
+	if err != nil {
+		return types.Message{}, err
+	}
+	from, err := tx.SenderAddress()
+	if err != nil {
+		return types.Message{}, err
+	}
+	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.Price(), payload)
+	return msg, nil
 }
