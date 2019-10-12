@@ -12,6 +12,12 @@ type message struct {
 	sender  peer.ID
 }
 
+// MessageAdder enqueues a received message for processing.  It returns without
+// blocking, and may return a queue overrun error.
+type MessageAdder interface {
+	AddMessage(content []byte, sender peer.ID) error
+}
+
 // MessageHandler is a message handler.
 type MessageHandler interface {
 	HandleMessage(content []byte, sender peer.ID)
