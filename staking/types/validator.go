@@ -33,7 +33,7 @@ type Validator struct {
 	// description for the validator
 	Description `json:"description" yaml:"description"`
 	// Is the validator active in the validating process or not
-	IsCurrentlyActive bool `json:"active" yaml:"active"`
+	Active bool `json:"active" yaml:"active"`
 }
 
 // Description - some possible IRL connections

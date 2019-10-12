@@ -100,7 +100,7 @@ func CompareBlsPublicKey(k1, k2 BlsPublicKey) int {
 	return bytes.Compare(k1[:], k2[:])
 }
 
-// NodeID represents node id (BLS address) and its voting power, which is set at epoch change only.
+// NodeID represents node id (BLS address)
 type NodeID struct {
 	EcdsaAddress common.Address `json:"ecdsa_address"`
 	BlsPublicKey BlsPublicKey   `json:"bls_pubkey"`
