@@ -183,11 +183,10 @@ func init() {
 
 // Block represents an entire block in the Harmony blockchain.
 type Block struct {
-	header              *block.Header
-	uncles              []*block.Header
-	transactions        Transactions
-	stakingTransactions staking.StakingTransactions
-	incomingReceipts    CXReceiptsProofs
+	header           *block.Header
+	uncles           []*block.Header
+	transactions     Transactions
+	incomingReceipts CXReceiptsProofs
 
 	// caches
 	hash atomic.Value
@@ -350,7 +349,7 @@ func (b *Block) Transactions() Transactions {
 
 // StakingTransactions returns stakingTransactions.
 func (b *Block) StakingTransactions() staking.StakingTransactions {
-	return b.stakingTransactions
+	return staking.StakingTransactions{}
 }
 
 // IncomingReceipts returns verified outgoing receipts
