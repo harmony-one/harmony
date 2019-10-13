@@ -86,6 +86,11 @@ func (tx *StakingTransaction) WithSignature(signer Signer, sig []byte) (*Staking
 	return cpy, nil
 }
 
+// Gas returns gas of StakingTransaction.
+func (tx *StakingTransaction) Gas() uint64 {
+	return tx.data.GasLimit
+}
+
 // ChainID is what chain this staking transaction for
 func (tx *StakingTransaction) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)

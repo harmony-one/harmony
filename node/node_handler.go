@@ -14,6 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/api/proto/message"
@@ -24,11 +26,11 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 )
 
 const (
@@ -36,71 +38,39 @@ const (
 	crossLinkBatchSize = 7
 )
 
-// ReceiveGlobalMessage use libp2p pubsub mechanism to receive global broadcast messages
-func (node *Node) ReceiveGlobalMessage() {
+// receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
+func (node *Node) receiveGroupMessage(
+	receiver p2p.GroupReceiver, rxQueue msgq.MessageAdder,
+) {
 	ctx := context.Background()
+	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
-		if node.globalGroupReceiver == nil {
-			time.Sleep(100 * time.Millisecond)
+		msg, sender, err := receiver.Receive(ctx)
+		if err != nil {
+			utils.Logger().Warn().Err(err).
+				Msg("cannot receive from group")
 			continue
 		}
-		msg, sender, err := node.globalGroupReceiver.Receive(ctx)
-		if sender != node.host.GetID() {
-			//utils.Logger().Info("[PUBSUB]", "received global msg", len(msg), "sender", sender)
-			if err == nil {
-				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				go node.messageHandler(msg[5:], sender)
-			}
+		if sender == node.host.GetID() {
+			continue
+		}
+		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
+		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+		if err := rxQueue.AddMessage(msg[5:], sender); err != nil {
+			utils.Logger().Warn().Err(err).
+				Str("sender", sender.Pretty()).
+				Msg("cannot enqueue incoming message for processing")
 		}
 	}
 }
 
-// ReceiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
-func (node *Node) ReceiveGroupMessage() {
-	ctx := context.Background()
-	for {
-		if node.shardGroupReceiver == nil {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-		msg, sender, err := node.shardGroupReceiver.Receive(ctx)
-		if sender != node.host.GetID() {
-			//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
-			if err == nil {
-				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				go node.messageHandler(msg[5:], sender)
-			}
-		}
-	}
-}
-
-// ReceiveClientGroupMessage use libp2p pubsub mechanism to receive broadcast messages for client
-func (node *Node) ReceiveClientGroupMessage() {
-	ctx := context.Background()
-	for {
-		if node.clientReceiver == nil {
-			// check less frequent on client messages
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-		msg, sender, err := node.clientReceiver.Receive(ctx)
-		if sender != node.host.GetID() {
-			// utils.Logger().Info("[CLIENT]", "received group msg", len(msg), "sender", sender, "error", err)
-			if err == nil {
-				// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-				go node.messageHandler(msg[5:], sender)
-			}
-		}
-	}
-}
-
-// messageHandler parses the message and dispatch the actions
-func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
+// HandleMessage parses the message and dispatch the actions.
+func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("messageHandler get message category failed")
+			Msg("HandleMessage get message category failed")
 		return
 	}
 
@@ -108,7 +78,7 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("messageHandler get message type failed")
+			Msg("HandleMessage get message type failed")
 		return
 	}
 
@@ -116,7 +86,7 @@ func (node *Node) messageHandler(content []byte, sender libp2p_peer.ID) {
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("messageHandler get message payload failed")
+			Msg("HandleMessage get message payload failed")
 		return
 	}
 

@@ -18,14 +18,22 @@ const (
 
 // Validator - data fields for a validator
 type Validator struct {
-	Address           common.Address `json:"address" yaml:"address"`                         // ECDSA address of the validator
-	ValidatingPubKey  bls.PublicKey  `json:"validating_pub_key" yaml:"validating_pub_key"`   // The BLS public key of the validator for consensus
-	Description       Description    `json:"description" yaml:"description"`                 // description for the validator
-	Active            bool           `json:"active" yaml:"active"`                           // Is the validator active in the validating process or not
-	Stake             *big.Int       `json:"stake" yaml:"stake"`                             // The stake put by the validator itself
-	UnbondingHeight   *big.Int       `json:"unbonding_height" yaml:"unbonding_height"`       // if unbonding, height at which this validator has begun unbonding
-	Commission        Commission     `json:"commission" yaml:"commission"`                   // commission parameters
-	MinSelfDelegation *big.Int       `json:"min_self_delegation" yaml:"min_self_delegation"` // validator's self declared minimum self delegation
+	// ECDSA address of the validator
+	Address common.Address `json:"address" yaml:"address"`
+	// The BLS public key of the validator for consensus
+	ValidatingPubKey bls.PublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
+	// The stake put by the validator itself
+	Stake *big.Int `json:"stake" yaml:"stake"`
+	// if unbonding, height at which this validator has begun unbonding
+	UnbondingHeight *big.Int `json:"unbonding_height" yaml:"unbonding_height"`
+	// validator's self declared minimum self delegation
+	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
+	// commission parameters
+	Commission `json:"commission" yaml:"commission"`
+	// description for the validator
+	Description `json:"description" yaml:"description"`
+	// Is the validator active in the validating process or not
+	Active bool `json:"active" yaml:"active"`
 }
 
 // Description - some possible IRL connections

@@ -9,14 +9,11 @@ import (
 	"os/exec"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/contracts/structs"
-
-	"time"
-
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -28,7 +25,7 @@ import (
 )
 
 // validateNewShardState validate whether the new shard state root matches
-func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[common.Address]*structs.StakeInfo) error {
+func (node *Node) validateNewShardState(block *types.Block) error {
 	// Common case first – blocks without resharding proposal
 	header := block.Header()
 	if header.ShardStateHash() == (common.Hash{}) {
@@ -61,8 +58,7 @@ func (node *Node) validateNewShardState(block *types.Block, stakeInfo *map[commo
 		// TODO ek – this may be called from regular shards,
 		//  for vetting beacon chain blocks received during block syncing.
 		//  DRand may or or may not get in the way.  Test this out.
-		expected, err := core.CalculateNewShardState(
-			node.Blockchain(), nextEpoch, stakeInfo)
+		expected, err := core.CalculateNewShardState(node.Blockchain(), nextEpoch)
 		if err != nil {
 			return ctxerror.New("cannot calculate expected shard state").
 				WithCause(err)

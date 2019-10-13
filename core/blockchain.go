@@ -35,19 +35,18 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/harmony-one/harmony/internal/params"
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/contracts/structs"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 var (
@@ -1250,7 +1249,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			err = bc.Validator().ValidateBody(block)
 		}
 		switch {
-		case err == ErrKnownBlock:
+		case err == values.ErrKnownBlock:
 			// Block and state both already known. However if the current block is below
 			// this number we did a rollback and we should reimport it nonetheless.
 			if bc.CurrentBlock().NumberU64() >= block.NumberU64() {
@@ -1909,15 +1908,12 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 
 // GetShardState returns the shard state for the given epoch,
 // creating one if needed.
-func (bc *BlockChain) GetShardState(
-	epoch *big.Int,
-	stakeInfo *map[common.Address]*structs.StakeInfo,
-) (shard.State, error) {
+func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.State, error) {
 	shardState, err := bc.ReadShardState(epoch)
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err
 	}
-	shardState, err = CalculateNewShardState(bc, epoch, stakeInfo)
+	shardState, err = CalculateNewShardState(bc, epoch)
 	if err != nil {
 		return nil, err
 	}

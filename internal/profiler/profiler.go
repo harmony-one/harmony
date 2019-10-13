@@ -43,6 +43,7 @@ func (profiler *Profiler) Config(shardID uint32, metricsReportURL string) {
 
 // LogMemory logs memory.
 func (profiler *Profiler) LogMemory() {
+	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		// log mem usage
 		info, _ := profiler.proc.MemoryInfo()
@@ -63,6 +64,7 @@ func (profiler *Profiler) LogMemory() {
 
 // LogCPU logs CPU metrics.
 func (profiler *Profiler) LogCPU() {
+	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		// log cpu usage
 		percent, _ := profiler.proc.CPUPercent()

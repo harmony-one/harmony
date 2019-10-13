@@ -9,8 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-
-	"github.com/harmony-one/harmony/contracts/structs"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -158,10 +156,7 @@ func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingSt
 }
 
 // CalculateNewShardState get sharding state from previous epoch and calculate sharding state for new epoch
-func CalculateNewShardState(
-	bc *BlockChain, epoch *big.Int,
-	stakeInfo *map[common.Address]*structs.StakeInfo,
-) (shard.State, error) {
+func CalculateNewShardState(bc *BlockChain, epoch *big.Int) (shard.State, error) {
 	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
 		return CalculateInitShardState(), nil
 	}
@@ -171,40 +166,8 @@ func CalculateNewShardState(
 		return nil, ctxerror.New("cannot retrieve previous sharding state").
 			WithCause(err)
 	}
-	newNodeList := ss.UpdateShardingState(stakeInfo)
 	utils.Logger().Info().Float64("percentage", CuckooRate).Msg("Cuckoo Rate")
-	ss.Reshard(newNodeList, CuckooRate)
 	return ss.shardState, nil
-}
-
-// UpdateShardingState remove the unstaked nodes and returns the newly staked node Ids.
-func (ss *ShardingState) UpdateShardingState(stakeInfo *map[common.Address]*structs.StakeInfo) []shard.NodeID {
-	oldBlsPublicKeys := make(map[shard.BlsPublicKey]bool) // map of bls public keys
-	for _, shard := range ss.shardState {
-		newNodeList := shard.NodeList
-		for _, nodeID := range shard.NodeList {
-			oldBlsPublicKeys[nodeID.BlsPublicKey] = true
-			_, ok := (*stakeInfo)[nodeID.EcdsaAddress]
-			if ok {
-				// newNodeList = append(newNodeList, nodeID)
-			} else {
-				// TODO: Remove the node if it's no longer staked
-			}
-		}
-		shard.NodeList = newNodeList
-	}
-
-	newAddresses := []shard.NodeID{}
-	for addr, info := range *stakeInfo {
-		_, ok := oldBlsPublicKeys[info.BlsPublicKey]
-		if !ok {
-			newAddresses = append(newAddresses, shard.NodeID{
-				EcdsaAddress: addr,
-				BlsPublicKey: info.BlsPublicKey,
-			})
-		}
-	}
-	return newAddresses
 }
 
 // TODO ek – shardingSchedule should really be part of a general-purpose network

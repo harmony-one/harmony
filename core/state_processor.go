@@ -21,7 +21,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
@@ -30,6 +29,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -94,7 +94,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, outcxs, incxs)
+	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.StakingTransactions(), receipts, outcxs, incxs)
 	if err != nil {
 		return nil, nil, nil, 0, ctxerror.New("cannot finalize block").WithCause(err)
 	}
@@ -180,6 +180,18 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	return receipt, cxReceipt, gas, err
 }
 
+// ApplyStakingTransaction attempts to apply a staking transaction to the given state database
+// and uses the input parameters for its environment. It returns the receipt
+// for the staking transaction, gas used and an error if the transaction failed,
+// indicating the block was invalid.
+// staking transaction will use the code field in the account to store the staking information
+// TODO chao: Add receipts for staking tx
+func ApplyStakingTransaction(
+	config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB,
+	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gasUsed uint64, oops error) {
+	return nil, 0, nil
+}
+
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt
 func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *block.Header, cxp *types.CXReceiptsProof) error {
 	if cxp == nil {
@@ -197,7 +209,7 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 			db.CreateAccount(*cx.To)
 		}
 		db.AddBalance(*cx.To, cx.Amount)
-		db.IntermediateRoot(config.IsS3(header.Epoch())).Bytes()
+		db.IntermediateRoot(config.IsS3(header.Epoch()))
 	}
 	return nil
 }

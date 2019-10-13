@@ -69,6 +69,7 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 	utils.Logger().Info().Uint32("ToShardID", toShardID).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof Found")
 
 	groupID := nodeconfig.ShardID(toShardID)
+	// TODO ek – limit concurrency
 	go node.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, block.Header(), commitSig, commitBitmap)))
 }
 
@@ -243,7 +244,7 @@ func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
 }
 
 func (node *Node) verifyIncomingReceipts(block *types.Block) error {
-	m := make(map[common.Hash]bool)
+	m := make(map[common.Hash]struct{})
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
 		// double spent
@@ -255,7 +256,7 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 		if _, ok := m[hash]; ok {
 			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
 		}
-		m[hash] = true
+		m[hash] = struct{}{}
 
 		for _, item := range cxp.Receipts {
 			if item.ToShardID != node.Blockchain().ShardID() {

@@ -3,6 +3,7 @@ package types
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/core/numeric"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -38,7 +39,7 @@ func (d Directive) String() string {
 
 // NewValidator - type for creating a new validator
 type NewValidator struct {
-	Description       `json:"ties" yaml:"ties"`
+	Description       `json:"description" yaml:"description"`
 	CommissionRates   `json:"commission" yaml:"commission"`
 	MinSelfDelegation *big.Int           `json:"min_self_delegation" yaml:"min_self_delegation"`
 	StakingAddress    common.Address     `json:"staking_address" yaml:"staking_address"`
@@ -50,7 +51,7 @@ type NewValidator struct {
 type EditValidator struct {
 	Description
 	StakingAddress    common.Address `json:"staking_address" yaml:"staking_address"`
-	CommissionRate    Dec            `json:"commission_rate" yaml:"commission_rate"`
+	CommissionRate    numeric.Dec    `json:"commission_rate" yaml:"commission_rate"`
 	MinSelfDelegation *big.Int       `json:"min_self_delegation" yaml:"min_self_delegation"`
 }
 

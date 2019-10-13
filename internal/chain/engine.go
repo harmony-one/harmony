@@ -6,9 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/pkg/errors"
-	"golang.org/x/crypto/sha3"
-
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
@@ -17,6 +14,9 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/sha3"
 )
 
 type engineImpl struct{}
@@ -149,7 +149,11 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 
 // Finalize implements Engine, accumulating the block rewards,
 // setting the final state and assembling the block.
-func (e *engineImpl) Finalize(chain engine.ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction, receipts []*types.Receipt, outcxs []*types.CXReceipt, incxs []*types.CXReceiptsProof) (*types.Block, error) {
+func (e *engineImpl) Finalize(
+	chain engine.ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
+	stkgTxs []*staking.StakingTransaction,
+	receipts []*types.Receipt, outcxs []*types.CXReceipt,
+	incxs []*types.CXReceiptsProof) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	if err := AccumulateRewards(chain, state, header); err != nil {

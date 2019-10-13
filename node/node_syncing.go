@@ -162,6 +162,7 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 // DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
 func (node *Node) DoBeaconSyncing() {
 	go func(node *Node) {
+		// TODO ek – infinite loop; add shutdown/cleanup logic
 		for {
 			select {
 			case beaconBlock := <-node.BeaconBlockChannel:
@@ -170,6 +171,7 @@ func (node *Node) DoBeaconSyncing() {
 		}
 	}(node)
 
+	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		if node.beaconSync == nil {
 			utils.Logger().Info().Msg("initializing beacon sync")
@@ -198,6 +200,7 @@ func (node *Node) DoBeaconSyncing() {
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 
+	// TODO ek – infinite loop; add shutdown/cleanup logic
 SyncingLoop:
 	for {
 		if node.stateSync == nil {
