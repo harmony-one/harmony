@@ -15,7 +15,6 @@ import (
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -188,24 +187,6 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	return validatorPeers
 }
 
-// GetPrepareSigsArray returns the signatures for prepare as a array
-func (consensus *Consensus) GetPrepareSigsArray() []*bls.Sign {
-	sigs := []*bls.Sign{}
-	for _, sig := range consensus.prepareSigs {
-		sigs = append(sigs, sig)
-	}
-	return sigs
-}
-
-// GetCommitSigsArray returns the signatures for commit as a array
-func (consensus *Consensus) GetCommitSigsArray() []*bls.Sign {
-	sigs := []*bls.Sign{}
-	for _, sig := range consensus.commitSigs {
-		sigs = append(sigs, sig)
-	}
-	return sigs
-}
-
 // GetBhpSigsArray returns the signatures for prepared message in viewchange
 func (consensus *Consensus) GetBhpSigsArray() []*bls.Sign {
 	sigs := []*bls.Sign{}
@@ -224,27 +205,15 @@ func (consensus *Consensus) GetNilSigsArray() []*bls.Sign {
 	return sigs
 }
 
-// GetViewIDSigsArray returns the signatures for viewID in viewchange
-func (consensus *Consensus) GetViewIDSigsArray() []*bls.Sign {
-	sigs := []*bls.Sign{}
-	for _, sig := range consensus.viewIDSigs {
-		sigs = append(sigs, sig)
-	}
-	return sigs
-}
-
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.getLogger().Debug().
 		Str("Phase", consensus.phase.String()).
 		Msg("[ResetState] Resetting consensus state")
-	consensus.switchPhase(values.PBFTAnnounce, true)
+	consensus.switchPhase(FBFTAnnounce, true)
 	consensus.blockHash = [32]byte{}
 	consensus.blockHeader = []byte{}
 	consensus.block = []byte{}
-	consensus.prepareSigs = map[string]*bls.Sign{}
-	consensus.commitSigs = map[string]*bls.Sign{}
-
 	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
 	consensus.prepareBitmap = prepareBitmap
@@ -333,13 +302,13 @@ func (consensus *Consensus) SetViewID(height uint64) {
 }
 
 // SetMode sets the mode of consensus
-func (consensus *Consensus) SetMode(s values.PBFTState) {
-	consensus.mode.SetMode(s)
+func (consensus *Consensus) SetMode(m Mode) {
+	consensus.current.SetMode(m)
 }
 
 // Mode returns the mode of consensus
-func (consensus *Consensus) Mode() values.PBFTState {
-	return consensus.mode.Mode()
+func (consensus *Consensus) Mode() Mode {
+	return consensus.current.Mode()
 }
 
 // RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol
@@ -353,14 +322,14 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [548]byte) {
 }
 
 // Check viewID, caller's responsibility to hold lock when change ignoreViewIDCheck
-func (consensus *Consensus) checkViewID(msg *PBFTMessage) error {
+func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 	// just ignore consensus check for the first time when node join
 	if consensus.ignoreViewIDCheck {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
-		consensus.mode.SetMode(values.PBFTNormal)
+		consensus.current.SetMode(Normal)
 		consensus.viewID = msg.ViewID
-		consensus.mode.SetViewID(msg.ViewID)
+		consensus.current.SetViewID(msg.ViewID)
 		consensus.LeaderPubKey = msg.SenderPubkey
 		consensus.ignoreViewIDCheck = false
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -451,7 +420,7 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 		Uint64("myBlock", consensus.blockNum).
 		Uint64("myViewID", consensus.viewID).
 		Interface("phase", consensus.phase).
-		Str("mode", consensus.mode.Mode().String()).
+		Str("mode", consensus.current.Mode().String()).
 		Logger()
 	return &logger
 }
@@ -499,9 +468,9 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 // (a) node not in committed: Listening mode
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
-func (consensus *Consensus) UpdateConsensusInformation() values.PBFTState {
-	var pubKeys []*bls.PublicKey
-	var hasError bool
+func (consensus *Consensus) UpdateConsensusInformation() Mode {
+	pubKeys := []*bls.PublicKey{}
+	hasError := false
 
 	header := consensus.ChainReader.CurrentHeader()
 
@@ -555,13 +524,13 @@ func (consensus *Consensus) UpdateConsensusInformation() values.PBFTState {
 		// in committee
 		if key.IsEqual(consensus.PubKey) {
 			if hasError {
-				return values.PBFTSyncing
+				return Syncing
 			}
-			return values.PBFTNormal
+			return Normal
 		}
 	}
 	// not in committee
-	return values.PBFTListening
+	return Listening
 }
 
 // IsLeader check if the node is a leader or not by comparing the public key of

@@ -71,12 +71,6 @@ Wallet:
 ./scripts/go_executable_build.sh wallet
 ```
 
-Tx Generator:
-
-```bash
-./scripts/go_executable_build.sh txgen
-```
-
 ## Usage
 
 You may build the src/harmony.go locally and run local test.

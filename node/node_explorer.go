@@ -31,7 +31,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 	}
 
 	if msg.Type == msg_pb.MessageType_COMMITTED {
-		recvMsg, err := consensus.ParsePBFTMessage(msg)
+		recvMsg, err := consensus.ParseFBFTMessage(msg)
 		if err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("[Explorer] onCommitted unable to parse msg")
@@ -48,7 +48,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		}
 
 		// check has 2f+1 signatures
-		need := node.Consensus.QuorumThreshold().Int64()
+		need := node.Consensus.Decider.QuorumThreshold()
 		if count := utils.CountOneBits(mask.Bitmap); count < need {
 			utils.Logger().Error().Int64("need", need).Int64("have", count).
 				Msg("[Explorer] not have enough signature")
@@ -66,13 +66,13 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
-		block := node.Consensus.PBFTLog.GetBlockByHash(recvMsg.BlockHash)
+		block := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 
 		if block == nil {
 			utils.Logger().Info().
 				Uint64("msgBlock", recvMsg.BlockNum).
 				Msg("[Explorer] Haven't received the block before the committed msg")
-			node.Consensus.PBFTLog.AddMessage(recvMsg)
+			node.Consensus.FBFTLog.AddMessage(recvMsg)
 			return
 		}
 
@@ -80,7 +80,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		node.commitBlockForExplorer(block)
 	} else if msg.Type == msg_pb.MessageType_PREPARED {
 
-		recvMsg, err := consensus.ParsePBFTMessage(msg)
+		recvMsg, err := consensus.ParseFBFTMessage(msg)
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("[Explorer] Unable to parse Prepared msg")
 			return
@@ -89,10 +89,10 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 
 		blockObj := &types.Block{}
 		err = rlp.DecodeBytes(block, blockObj)
-		// Add the block into PBFT log.
-		node.Consensus.PBFTLog.AddBlock(blockObj)
+		// Add the block into FBFT log.
+		node.Consensus.FBFTLog.AddBlock(blockObj)
 		// Try to search for MessageType_COMMITTED message from pbft log.
-		msgs := node.Consensus.PBFTLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_COMMITTED, blockObj.NumberU64(), blockObj.Hash())
+		msgs := node.Consensus.FBFTLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_COMMITTED, blockObj.NumberU64(), blockObj.Hash())
 		// If found, then add the new block into blockchain db.
 		if len(msgs) > 0 {
 			node.AddNewBlockForExplorer(blockObj)
@@ -110,7 +110,7 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 			node.Consensus.UpdateConsensusInformation()
 		}
 		// Clean up the blocks to avoid OOM.
-		node.Consensus.PBFTLog.DeleteBlockByNumber(block.NumberU64())
+		node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
 		// Do dump all blocks from state syncing for explorer one time
 		// TODO: some blocks can be dumped before state syncing finished.
 		// And they would be dumped again here. Please fix it.
@@ -140,8 +140,8 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {
-		node.Consensus.PBFTLog.DeleteBlocksLessThan(curNum - 100)
-		node.Consensus.PBFTLog.DeleteMessagesLessThan(curNum - 100)
+		node.Consensus.FBFTLog.DeleteBlocksLessThan(curNum - 100)
+		node.Consensus.FBFTLog.DeleteMessagesLessThan(curNum - 100)
 	}
 }
 

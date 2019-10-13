@@ -69,11 +69,12 @@ func (d Delegation) GetAmount() *big.Int { return d.Amount }
 
 // String returns a human readable string representation of a Delegation.
 func (d Delegation) String() string {
-	return fmt.Sprintf(`Delegation:
-  Delegator: %s
-  Validator: %s
-  Amount:    %s`, d.DelegatorAddress,
-		d.ValidatorAddress, d.Amount)
+	return fmt.Sprintf(`
+Delegation:
+Delegator: %s
+Validator: %s
+Amount:    %s
+`, d.DelegatorAddress, d.ValidatorAddress, d.Amount)
 }
 
 // Delegations is a collection of delegations
@@ -215,11 +216,12 @@ func (d *Redelegation) AddEntry(epoch *big.Int, amt *big.Int) {
 
 // String returns a human readable string representation of a Redelegation.
 func (d Redelegation) String() string {
-	out := fmt.Sprintf(`Redelegations between:
-  Delegator:                 %s
-  Source Validator:          %s
-  Destination Validator:     %s
-  Entries:
+	out := fmt.Sprintf(`
+Redelegations between:
+Delegator:                 %s
+Source Validator:          %s
+Destination Validator:     %s
+Entries:
 `,
 		d.DelegatorAddress, d.ValidatorSrcAddress, d.ValidatorDstAddress,
 	)

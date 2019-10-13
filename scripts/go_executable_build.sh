@@ -4,7 +4,6 @@ export GO111MODULE=on
 
 declare -A SRC
 SRC[harmony]=cmd/harmony/main.go
-SRC[txgen]=cmd/client/txgen/main.go
 SRC[bootnode]=cmd/bootnode/main.go
 SRC[wallet]="cmd/client/wallet/main.go cmd/client/wallet/generated_wallet.ini.go"
 SRC[wallet_stress_test]="cmd/client/wallet_stress_test/main.go cmd/client/wallet_stress_test/generated_wallet.ini.go"
@@ -69,8 +68,8 @@ ACTION:
    pubwallet   upload wallet to public bucket (bucket: $PUBBUCKET)
    release     upload binaries to release bucket
 
-   harmony|txgen|bootnode|wallet
-               only build the specified binary
+   harmony|bootnode|wallet
+           only build the specified binary
 
 EXAMPLES:
 
@@ -257,6 +256,6 @@ case "$ACTION" in
    "upload") upload ;;
    "release") release ;;
    "pubwallet") upload_wallet ;;
-   "harmony"|"wallet"|"txgen"|"bootnode"|"staking-standalone") build_only $ACTION ;;
+   "harmony"|"wallet"|"bootnode"|"staking-standalone") build_only $ACTION ;;
    *) usage ;;
 esac

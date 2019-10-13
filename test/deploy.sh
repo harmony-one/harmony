@@ -48,15 +48,13 @@ function usage {
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
-   -t             toggle txgen (default: $TXGEN)
-   -D duration    txgen run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
    -N network     network type (default: $NETWORK)
    -B             don't build the binary
 
-This script will build all the binaries and start harmony and txgen based on the configuration file.
+This script will build all the binaries and start harmony based on the configuration file.
 
 EXAMPLES:
 
@@ -69,8 +67,6 @@ EOU
 
 DEFAULT_DURATION_NOSYNC=60
 DEFAULT_DURATION_SYNC=200
-
-TXGEN=false
 DURATION=
 MIN=3
 SHARDS=2
@@ -81,7 +77,6 @@ NETWORK=localnet
 while getopts "htD:m:s:nBN:" option; do
    case $option in
       h) usage ;;
-      t) TXGEN=false ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
@@ -120,7 +115,6 @@ if [ "${NOBUILD}" != "true" ]; then
    pushd $ROOT
    echo "compiling ..."
    go build -o bin/harmony cmd/harmony/main.go
-   go build -o bin/txgen cmd/client/txgen/main.go
    go build -o bin/bootnode cmd/bootnode/main.go
    popd
 fi
@@ -170,19 +164,6 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   esac
   i=$((i+1))
 done < $config
-
-if [ "$TXGEN" == "true" ]; then
-   echo "launching txgen ... wait"
-   # sleep 2
-   line=$(grep client $config)
-   IFS=' ' read ip port mode account <<< $line
-   if [ "$mode" == "client" ]; then
-      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port -bootnodes "${BN_MA}" > $LOG_FILE 2>&1
-   fi
-else
-   sleep $DURATION
-fi
-
 
 cleanup
 check_result

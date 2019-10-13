@@ -430,7 +430,7 @@ func (node *Node) startRxPipeline(
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
-	// start the goroutine to receive client message
+
 	// client messages are sent by clients, like txgen, wallet
 	node.startRxPipeline(node.clientReceiver, node.clientRxQueue, ClientRxWorkers)
 
@@ -565,7 +565,7 @@ func (node *Node) CalculateInitShardState() (err error) {
 
 	// Get genesis epoch shard state from chain
 	blockNum := node.Blockchain().CurrentBlock().NumberU64()
-	node.Consensus.SetMode(values.PBFTListening)
+	node.Consensus.SetMode(consensus.Listening)
 	epoch := core.ShardingSchedule.CalcEpochNumber(blockNum)
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
@@ -587,7 +587,7 @@ func (node *Node) CalculateInitShardState() (err error) {
 				Int("numPubKeys", len(pubKeys)).
 				Msg("[CalculateInitShardState] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
-			node.Consensus.SetMode(values.PBFTNormal)
+			node.Consensus.SetMode(consensus.Normal)
 			return nil
 		}
 	}
@@ -624,7 +624,7 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 }
 
 // isBeacon = true if the node is beacon node
-// isClient = true if the node light client(txgen,wallet)
+// isClient = true if the node light client(wallet)
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 

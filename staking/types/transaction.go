@@ -8,12 +8,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/hash"
 )
 
 type txdata struct {
-	values.StakingDirective
+	Directive
 	StakeMsg     interface{}
 	AccountNonce uint64   `json:"nonce"      gencodec:"required"`
 	Price        *big.Int `json:"gasPrice"   gencodec:"required"`
@@ -35,14 +34,15 @@ type StakingTransaction struct {
 	from atomic.Value
 }
 
-type fulfill func() (values.StakingDirective, interface{})
+// StakeMsgFulfiller is signature of callback intended to produce the StakeMsg
+type StakeMsgFulfiller func() (Directive, interface{})
 
 // NewStakingTransaction produces a new staking transaction record
 func NewStakingTransaction(
-	nonce, gasLimit uint64, gasPrice *big.Int, f fulfill,
+	nonce, gasLimit uint64, gasPrice *big.Int, f StakeMsgFulfiller,
 ) (*StakingTransaction, error) {
 	directive, payload := f()
-	// TODO(Double check that this is legitmate directive)
+	// TODO(Double check that this is legitmate directive, use type switch)
 	newStake := &StakingTransaction{data: txdata{
 		directive,
 		payload,
