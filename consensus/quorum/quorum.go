@@ -132,13 +132,13 @@ func (s *cIdentities) AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign
 
 func (s *cIdentities) Reset(ps []Phase) {
 	for _, p := range ps {
-		switch p {
+		switch m := map[string]*bls.Sign{}; p {
 		case Prepare:
-			s.prepare = map[string]*bls.Sign{}
+			s.prepare = m
 		case Commit:
-			s.commit = map[string]*bls.Sign{}
+			s.commit = m
 		case ViewChange:
-			s.viewID = map[string]*bls.Sign{}
+			s.viewID = m
 		}
 	}
 }
