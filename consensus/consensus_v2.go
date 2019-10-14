@@ -709,8 +709,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	// has to be called before verifying signature
-	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Prepare)
-
+	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 	// Verify the signature on commitPayload is correct
 	var sign bls.Sign
 	err = sign.Deserialize(commitSig)
