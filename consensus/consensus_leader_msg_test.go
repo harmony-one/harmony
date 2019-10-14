@@ -3,12 +3,13 @@ package consensus
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/ctxerror"
-
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core/values"
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -21,9 +22,12 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := New(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+	)
 	if err != nil {
-		test.Fatalf("Cannot craeate consensus: %v", err)
+		test.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
 
@@ -51,7 +55,10 @@ func TestConstructPreparedMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := New(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -59,8 +66,8 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	consensus.prepareSigs[leaderPubKey.SerializeToHexStr()] = leaderPriKey.Sign(message)
-	consensus.prepareSigs[validatorPubKey.SerializeToHexStr()] = validatorPriKey.Sign(message)
+	consensus.Decider.AddSignature(quorum.Prepare, leaderPubKey, leaderPriKey.Sign(message))
+	consensus.Decider.AddSignature(quorum.Prepare, validatorPubKey, validatorPriKey.Sign(message))
 	// According to RJ these failures are benign.
 	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))

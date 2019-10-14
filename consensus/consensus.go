@@ -1,5 +1,4 @@
-// Package consensus implements the Cosi PBFT consensus
-package consensus // consensus
+package consensus
 
 import (
 	"fmt"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -24,17 +24,20 @@ const (
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	// PbftLog stores the pbft messages and blocks during PBFT process
-	PbftLog *PbftLog
-	// phase: different phase of PBFT protocol: pre-prepare, prepare, commit, finish etc
-	phase PbftPhase
-	// mode: indicate a node is in normal or viewchanging mode
-	mode PbftMode
+	Decider quorum.Decider
+
+	// FBFTLog stores the pbft messages and blocks during FBFT process
+	FBFTLog *FBFTLog
+	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
+	phase FBFTPhase
+	// current indicates what state a node is in
+	current State
 
 	// epoch: current epoch number
 	epoch uint64
 
-	// blockNum: the next blockNumber that PBFT is going to agree on, should be equal to the blockNumber of next block
+	// blockNum: the next blockNumber that FBFT is going to agree on,
+	// should be equal to the blockNumber of next block
 	blockNum uint64
 	// channel to receive consensus message
 	MsgChan chan []byte
@@ -49,17 +52,17 @@ type Consensus struct {
 	consensusTimeout map[TimeoutType]*utils.Timeout
 
 	// Commits collected from validators.
-	prepareSigs          map[string]*bls.Sign // key is the bls public key
-	commitSigs           map[string]*bls.Sign // key is the bls public key
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
 
 	// Commits collected from view change
-	bhpSigs      map[string]*bls.Sign // bhpSigs: blockHashPreparedSigs is the signature on m1 type message
-	nilSigs      map[string]*bls.Sign // nilSigs: there is no prepared message when view change, it's signature on m2 type (i.e. nil) messages
-	viewIDSigs   map[string]*bls.Sign // viewIDSigs: every validator sign on |viewID|blockHash| in view changing message
+	// bhpSigs: blockHashPreparedSigs is the signature on m1 type message
+	bhpSigs map[string]*bls.Sign
+	// nilSigs: there is no prepared message when view change,
+	// it's signature on m2 type (i.e. nil) messages
+	nilSigs      map[string]*bls.Sign
 	bhpBitmap    *bls_cosi.Mask
 	nilBitmap    *bls_cosi.Mask
 	viewIDBitmap *bls_cosi.Mask
@@ -79,8 +82,6 @@ type Consensus struct {
 	// Leader's address
 	leader p2p.Peer
 
-	// Public keys of the committee including leader and validators
-	PublicKeys          []*bls.PublicKey
 	CommitteePublicKeys map[string]bool
 
 	pubKeyLock sync.Mutex
@@ -131,9 +132,11 @@ type Consensus struct {
 	// will trigger state syncing when blockNum is low
 	blockNumLowChan chan struct{}
 
-	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
+	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
+	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
-	// Channel for DRG protocol to send VDF. The first 516 bytes are the VDF/Proof and the last 32 bytes are the seed for deriving VDF
+	// Channel for DRG protocol to send VDF. The first 516 bytes are the VDF/Proof and the last 32
+	// bytes are the seed for deriving VDF
 	RndChannel  chan [vdfAndSeedSize]byte
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 
@@ -188,25 +191,9 @@ func (consensus *Consensus) WaitForSyncing() {
 	<-consensus.blockNumLowChan
 }
 
-// Quorum returns the consensus quorum of the current committee (2f+1).
-func (consensus *Consensus) Quorum() int {
-	return len(consensus.PublicKeys)*2/3 + 1
-}
-
-// PreviousQuorum returns the quorum size of previous epoch
-func (consensus *Consensus) PreviousQuorum() int {
-	return consensus.numPrevPubKeys*2/3 + 1
-}
-
 // VdfSeedSize returns the number of VRFs for VDF computation
 func (consensus *Consensus) VdfSeedSize() int {
-	return len(consensus.PublicKeys) * 2 / 3
-}
-
-// RewardThreshold returns the threshold to stop accepting commit messages
-// when leader receives enough signatures for block reward
-func (consensus *Consensus) RewardThreshold() int {
-	return len(consensus.PublicKeys) * 9 / 10
+	return int(consensus.Decider.ParticipantsCount()) * 2 / 3
 }
 
 // GetBlockReward returns last node block reward
@@ -214,37 +201,42 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 	return consensus.lastBlockReward
 }
 
-// New creates a new Consensus object
 // TODO: put shardId into chain reader's chain config
-func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKey) (*Consensus, error) {
+
+// New create a new Consensus record
+func New(
+	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey,
+	Decider quorum.Decider,
+) (*Consensus, error) {
 	consensus := Consensus{}
+	consensus.Decider = Decider
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.blockNumLowChan = make(chan struct{})
-	// pbft related
-	consensus.PbftLog = NewPbftLog()
-	consensus.phase = Announce
-	consensus.mode = PbftMode{mode: Normal}
-	// pbft timeout
+	// FBFT related
+	consensus.FBFTLog = NewFBFTLog()
+	consensus.phase = FBFTAnnounce
+	consensus.current = State{mode: Normal}
+	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
-	consensus.prepareSigs = map[string]*bls.Sign{}
-	consensus.commitSigs = map[string]*bls.Sign{}
 	consensus.CommitteePublicKeys = make(map[string]bool)
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
 		consensus.PubKey = blsPriKey.GetPublicKey()
-		utils.Logger().Info().Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
+		utils.Logger().Info().
+			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
 	} else {
 		utils.Logger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
-	// viewID has to be initialized as the height of the blockchain during initialization
-	// as it was displayed on explorer as Height right now
+	// viewID has to be initialized as the height of
+	// the blockchain during initialization as it was
+	// displayed on explorer as Height right now
 	consensus.viewID = 0
-	consensus.ShardID = ShardID
+	consensus.ShardID = shard
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
@@ -254,6 +246,6 @@ func New(host p2p.Host, ShardID uint32, leader p2p.Peer, blsPriKey *bls.SecretKe
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
-	memprofiling.GetMemProfiling().Add("consensus.pbftLog", consensus.PbftLog)
+	memprofiling.GetMemProfiling().Add("consensus.FBFTLog", consensus.FBFTLog)
 	return &consensus, nil
 }

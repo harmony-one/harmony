@@ -22,7 +22,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -171,9 +170,9 @@ func (st *StateTransition) preCheck() error {
 		nonce := st.state.GetNonce(st.msg.From())
 
 		if nonce < st.msg.Nonce() {
-			return values.ErrNonceTooHigh
+			return ErrNonceTooHigh
 		} else if nonce > st.msg.Nonce() {
-			return values.ErrNonceTooLow
+			return ErrNonceTooLow
 		}
 	}
 	return st.buyGas()
