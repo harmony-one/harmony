@@ -495,14 +495,14 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		utils.Logger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!!")
 		return
 	}
-	// TODO come back to this
-	// if count := utils.CountOneBits(mask.Bitmap); count < consensus.Quorum() {
-	// 	utils.Logger().Debug().
-	// 		Int("Need", consensus.Quorum()).
-	// 		Int("Got", count).
-	// 		Msg("Not enough signatures in the Prepared msg")
-	// 	return
-	// }
+	prepareCount := consensus.Decider.SignatoriesCount(quorum.Prepare)
+	if count := utils.CountOneBits(mask.Bitmap); count < prepareCount {
+		utils.Logger().Debug().
+			Int64("Need", prepareCount).
+			Int64("Got", count).
+			Msg("Not enough signatures in the Prepared msg")
+		return
+	}
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
