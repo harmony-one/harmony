@@ -323,7 +323,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 
 	// check and add viewID (m3 type) message signature
-	sig := consensus.Decider.ReadSignature(quorum.ViewChange, consensus.PubKey)
+	sig := consensus.Decider.ReadSignature(quorum.ViewChange, senderKey)
 	if sig != nil {
 		utils.Logger().Debug().
 			Str("validatorPubKey", senderKey.SerializeToHexStr()).
