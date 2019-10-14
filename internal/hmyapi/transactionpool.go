@@ -11,10 +11,14 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
+)
+
+var (
+	// ErrInvalidChainID when ChainID of signer does not match that of running node
+	errInvalidChainID = errors.New("invalid chain id for signer")
 )
 
 // TxHistoryArgs is struct to make GetTransactionsHistory request
@@ -179,7 +183,7 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	}
 	c := s.b.ChainConfig().ChainID
 	if tx.ChainID().Cmp(c) != 0 {
-		e := errors.Wrapf(values.ErrInvalidChainID, "current chain id:%s", c.String())
+		e := errors.Wrapf(errInvalidChainID, "current chain id:%s", c.String())
 		return common.Hash{}, e
 	}
 	return SubmitStakingTransaction(ctx, s.b, tx)
@@ -194,7 +198,7 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	}
 	c := s.b.ChainConfig().ChainID
 	if tx.ChainID().Cmp(c) != 0 {
-		e := errors.Wrapf(values.ErrInvalidChainID, "current chain id:%s", c.String())
+		e := errors.Wrapf(errInvalidChainID, "current chain id:%s", c.String())
 		return common.Hash{}, e
 	}
 	return SubmitTransaction(ctx, s.b, tx)
