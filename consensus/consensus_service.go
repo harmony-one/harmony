@@ -13,6 +13,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -133,7 +134,8 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
 	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
 	consensus.LeaderPubKey = pubKeys[0]
-	utils.Logger().Info().Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
+	utils.Logger().Info().
+		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	consensus.ResetState()
@@ -209,6 +211,7 @@ func (consensus *Consensus) ResetState() {
 	consensus.blockHash = [32]byte{}
 	consensus.blockHeader = []byte{}
 	consensus.block = []byte{}
+	consensus.Decider.Reset([]quorum.Phase{quorum.Prepare, quorum.Commit})
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
 	commitBitmap, _ := bls_cosi.NewMask(members, nil)

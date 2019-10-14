@@ -100,6 +100,7 @@ func (consensus *Consensus) ResetViewChangeState() {
 	consensus.m1Payload = []byte{}
 	consensus.bhpSigs = map[string]*bls.Sign{}
 	consensus.nilSigs = map[string]*bls.Sign{}
+	consensus.Decider.Reset([]quorum.Phase{quorum.ViewChange})
 }
 
 func createTimeout() map[TimeoutType]*utils.Timeout {

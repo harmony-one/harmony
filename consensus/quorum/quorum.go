@@ -138,6 +138,7 @@ func (s *cIdentities) Reset(ps []Phase) {
 		case Commit:
 			s.commit = map[string]*bls.Sign{}
 		case ViewChange:
+			s.viewID = map[string]*bls.Sign{}
 		}
 	}
 }
@@ -220,7 +221,7 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
-	return v.QuorumThreshold() >= v.SignatoriesCount(p)
+	return v.SignatoriesCount(p) >= v.QuorumThreshold()
 }
 
 // QuorumThreshold ..
@@ -232,27 +233,3 @@ func (v *uniformVoteWeight) QuorumThreshold() int64 {
 func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 	return v.SignatoriesCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }
-
-// func New() {
-// 	return &{
-
-// 	}
-// }
-
-// type DecideByStake struct{}
-
-// func (s *DecideByStake) Mechanism() Mechanism {
-// 	return SuperMajorityStake
-// }
-
-// func (s *DecideByStake) IsSatisfied(sigs, constituents int) bool {
-
-// }
-
-// func (s *DecideByStake) QuorumThreshold(constituents int) int {
-
-// }
-
-// func (s *DecideByStake) RewardThreshold(constituents int) int {
-
-// }
