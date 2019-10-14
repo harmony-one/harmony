@@ -13,7 +13,7 @@ type NodeConfig struct {
 	Beacon          nodeconfig.GroupID                           // the beacon group ID
 	ShardGroupID    nodeconfig.GroupID                           // the group ID of the shard
 	Client          nodeconfig.GroupID                           // the client group ID of the shard
-	IsClient        bool                                         // whether this node is a client node, such as wallet
+	IsClient        bool                                         // whether this node is a client node, such as wallet/txgen
 	IsBeacon        bool                                         // whether this node is a beacon node or not
 	ShardID         uint32                                       // shardID of this node
 	Actions         map[nodeconfig.GroupID]nodeconfig.ActionType // actions on the groups
