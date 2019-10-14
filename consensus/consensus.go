@@ -249,35 +249,3 @@ func New(
 	memprofiling.GetMemProfiling().Add("consensus.FBFTLog", consensus.FBFTLog)
 	return &consensus, nil
 }
-
-// NewOneVotePerValidator is the original, pre-PoS based consensus object
-// func NewOneVotePerValidator(
-// 	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey,
-// ) (*Consensus, error) {
-// 	c, oops := baseConsensus(host, shard, leader, blsPriKey)
-// 	if oops != nil {
-// 		return nil, oops
-// 	}
-// 	c.ConsensusMechanism = values.SuperMajorityVote
-// 	c.isQuorumSatisfied = func(p values.QuorumPhase) bool {
-// 		need := c.QuorumThreshold().Int64()
-// 		switch p {
-// 		case values.QuorumPrepare:
-// 			return int64(len(c.prepareSigs)) >= need
-// 		case values.QuorumCommit:
-// 			return int64(len(c.commitSigs)) >= need
-// 		case values.QuorumViewChange:
-// 			return int64(len(c.viewIDSigs)) >= need
-// 		default:
-// 			// Not possible
-// 			return false
-// 		}
-// 	}
-// 	c.QuorumThreshold = func() *big.Int {
-// 		return big.NewInt(int64(len(c.PublicKeys)*2/3 + 1))
-// 	}
-// 	c.rewardThreshold = func() *big.Int {
-// 		return big.NewInt(int64(len(c.PublicKeys) * 9 / 10))
-// 	}
-// 	return c, nil
-// }

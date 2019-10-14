@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -22,8 +23,9 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.NewOneVotePerValidator(
-		host, values.BeaconChainShardID, leader, blsKey,
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := consensus.New(
+		host, values.BeaconChainShardID, leader, blsKey, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -55,8 +57,9 @@ func TestVerifyNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.NewOneVotePerValidator(
-		host, values.BeaconChainShardID, leader, blsKey,
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := consensus.New(
+		host, values.BeaconChainShardID, leader, blsKey, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

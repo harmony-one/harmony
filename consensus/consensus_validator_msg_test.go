@@ -6,6 +6,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -20,8 +21,9 @@ func TestConstructPrepareMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := NewOneVotePerValidator(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(),
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := New(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
@@ -50,8 +52,9 @@ func TestConstructCommitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := NewOneVotePerValidator(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(),
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := New(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)

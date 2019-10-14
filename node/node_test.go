@@ -10,6 +10,7 @@ import (
 
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/values"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/pki"
@@ -32,8 +33,9 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.NewOneVotePerValidator(
-		host, values.BeaconChainShardID, leader, blsKey,
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := consensus.New(
+		host, values.BeaconChainShardID, leader, blsKey, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -198,8 +200,9 @@ func TestAddPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.NewOneVotePerValidator(
-		host, values.BeaconChainShardID, leader, blsKey,
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := consensus.New(
+		host, values.BeaconChainShardID, leader, blsKey, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -247,8 +250,9 @@ func TestAddBeaconPeer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.NewOneVotePerValidator(
-		host, values.BeaconChainShardID, leader, blsKey,
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := consensus.New(
+		host, values.BeaconChainShardID, leader, blsKey, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
