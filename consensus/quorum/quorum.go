@@ -26,31 +26,85 @@ const (
 	SuperMajorityStake
 )
 
-// Tracker ..
-type Tracker interface {
+// ParticipantTracker ..
+type ParticipantTracker interface {
+	Participants() []*bls.PublicKey
+	IndexOf(*bls.PublicKey) int
+	ParticipantsCount() int64
+	NextAfter(*bls.PublicKey) (bool, *bls.PublicKey)
+	UpdateParticipants(pubKeys []*bls.PublicKey)
+	DumpParticipants() []string
+}
+
+// SignatoryTracker ..
+type SignatoryTracker interface {
+	ParticipantTracker
 	AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign)
+	// Caller assumes concurrency protection
 	SignatoriesCount(Phase) int64
 	Reset([]Phase)
 }
 
 // SignatureReader ..
 type SignatureReader interface {
-	Tracker
+	SignatoryTracker
 	ReadAllSignatures(Phase) []*bls.Sign
 	ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign
 }
 
 // These maps represent the signatories (validators), keys are BLS public keys
 // and values are BLS private key signed signatures
-type mapImpl struct {
-	prepare map[string]*bls.Sign
-	commit  map[string]*bls.Sign
+type cIdentities struct {
+	// Public keys of the committee including leader and validators
+	publicKeys []*bls.PublicKey
+	prepare    map[string]*bls.Sign
+	commit     map[string]*bls.Sign
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewID map[string]*bls.Sign
 }
 
-func (s *mapImpl) SignatoriesCount(p Phase) int64 {
+func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
+	idx := -1
+	for k, v := range s.publicKeys {
+		if v.IsEqual(pubKey) {
+			idx = k
+		}
+	}
+	return idx
+}
+
+func (s *cIdentities) NextAfter(pubKey *bls.PublicKey) (bool, *bls.PublicKey) {
+	found := false
+	idx := s.IndexOf(pubKey)
+	if idx != -1 {
+		found = true
+	}
+	idx = (idx + 1) % int(s.ParticipantsCount())
+	return found, s.publicKeys[idx]
+}
+
+func (s *cIdentities) Participants() []*bls.PublicKey {
+	return s.publicKeys
+}
+
+func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
+	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
+}
+
+func (s *cIdentities) DumpParticipants() []string {
+	keys := make([]string, len(s.publicKeys))
+	for i := 0; i < len(s.publicKeys); i++ {
+		keys[i] = s.publicKeys[i].SerializeToHexStr()
+	}
+	return keys
+}
+
+func (s *cIdentities) ParticipantsCount() int64 {
+	return int64(len(s.publicKeys))
+}
+
+func (s *cIdentities) SignatoriesCount(p Phase) int64 {
 	switch p {
 	case Prepare:
 		return int64(len(s.prepare))
@@ -64,7 +118,7 @@ func (s *mapImpl) SignatoriesCount(p Phase) int64 {
 	}
 }
 
-func (s *mapImpl) AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign) {
+func (s *cIdentities) AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign) {
 	hex := PubKey.SerializeToHexStr()
 	switch p {
 	case Prepare:
@@ -76,7 +130,7 @@ func (s *mapImpl) AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign) {
 	}
 }
 
-func (s *mapImpl) Reset(ps []Phase) {
+func (s *cIdentities) Reset(ps []Phase) {
 	for _, p := range ps {
 		switch p {
 		case Prepare:
@@ -88,7 +142,7 @@ func (s *mapImpl) Reset(ps []Phase) {
 	}
 }
 
-func (s *mapImpl) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
+func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
 	m := map[string]*bls.Sign{}
 	hex := PubKey.SerializeToHexStr()
 
@@ -108,7 +162,7 @@ func (s *mapImpl) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
 	return payload
 }
 
-func (s *mapImpl) ReadAllSignatures(p Phase) []*bls.Sign {
+func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
 	sigs := []*bls.Sign{}
 	m := map[string]*bls.Sign{}
 
@@ -128,8 +182,9 @@ func (s *mapImpl) ReadAllSignatures(p Phase) []*bls.Sign {
 }
 
 func newMapBackedSignatureReader() SignatureReader {
-	return &mapImpl{
-		map[string]*bls.Sign{}, map[string]*bls.Sign{}, map[string]*bls.Sign{},
+	return &cIdentities{
+		[]*bls.PublicKey{}, map[string]*bls.Sign{},
+		map[string]*bls.Sign{}, map[string]*bls.Sign{},
 	}
 }
 
@@ -165,17 +220,17 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
-	return true
+	return v.QuorumThreshold() >= v.SignatoriesCount(p)
 }
 
 // QuorumThreshold ..
 func (v *uniformVoteWeight) QuorumThreshold() int64 {
-	return 0
+	return v.ParticipantsCount()*2/3 + 1
 }
 
 // RewardThreshold ..
 func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
-	return true
+	return v.SignatoriesCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }
 
 // func New() {

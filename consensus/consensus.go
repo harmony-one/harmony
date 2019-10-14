@@ -36,7 +36,8 @@ type Consensus struct {
 	// epoch: current epoch number
 	epoch uint64
 
-	// blockNum: the next blockNumber that FBFT is going to agree on, should be equal to the blockNumber of next block
+	// blockNum: the next blockNumber that FBFT is going to agree on,
+	// should be equal to the blockNumber of next block
 	blockNum uint64
 	// channel to receive consensus message
 	MsgChan chan []byte
@@ -57,8 +58,11 @@ type Consensus struct {
 	commitBitmap         *bls_cosi.Mask
 
 	// Commits collected from view change
-	bhpSigs      map[string]*bls.Sign // bhpSigs: blockHashPreparedSigs is the signature on m1 type message
-	nilSigs      map[string]*bls.Sign // nilSigs: there is no prepared message when view change, it's signature on m2 type (i.e. nil) messages
+	// bhpSigs: blockHashPreparedSigs is the signature on m1 type message
+	bhpSigs map[string]*bls.Sign
+	// nilSigs: there is no prepared message when view change,
+	// it's signature on m2 type (i.e. nil) messages
+	nilSigs      map[string]*bls.Sign
 	bhpBitmap    *bls_cosi.Mask
 	nilBitmap    *bls_cosi.Mask
 	viewIDBitmap *bls_cosi.Mask
@@ -78,8 +82,6 @@ type Consensus struct {
 	// Leader's address
 	leader p2p.Peer
 
-	// Public keys of the committee including leader and validators
-	PublicKeys          []*bls.PublicKey
 	CommitteePublicKeys map[string]bool
 
 	pubKeyLock sync.Mutex
@@ -130,9 +132,11 @@ type Consensus struct {
 	// will trigger state syncing when blockNum is low
 	blockNumLowChan chan struct{}
 
-	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
+	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
+	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
-	// Channel for DRG protocol to send VDF. The first 516 bytes are the VDF/Proof and the last 32 bytes are the seed for deriving VDF
+	// Channel for DRG protocol to send VDF. The first 516 bytes are the VDF/Proof and the last 32
+	// bytes are the seed for deriving VDF
 	RndChannel  chan [vdfAndSeedSize]byte
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 
@@ -189,13 +193,15 @@ func (consensus *Consensus) WaitForSyncing() {
 
 // VdfSeedSize returns the number of VRFs for VDF computation
 func (consensus *Consensus) VdfSeedSize() int {
-	return len(consensus.PublicKeys) * 2 / 3
+	return int(consensus.Decider.ParticipantsCount()) * 2 / 3
 }
 
 // GetBlockReward returns last node block reward
 func (consensus *Consensus) GetBlockReward() *big.Int {
 	return consensus.lastBlockReward
 }
+
+// TODO: put shardId into chain reader's chain config
 
 // New create a new Consensus record
 func New(
@@ -207,11 +213,11 @@ func New(
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.blockNumLowChan = make(chan struct{})
-	// pbft related
+	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce
 	consensus.current = State{mode: Normal}
-	// pbft timeout
+	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
 	consensus.CommitteePublicKeys = make(map[string]bool)
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
@@ -219,14 +225,16 @@ func New(
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
 		consensus.PubKey = blsPriKey.GetPublicKey()
-		utils.Logger().Info().Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
+		utils.Logger().Info().
+			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
 	} else {
 		utils.Logger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
-	// viewID has to be initialized as the height of the blockchain during initialization
-	// as it was displayed on explorer as Height right now
+	// viewID has to be initialized as the height of
+	// the blockchain during initialization as it was
+	// displayed on explorer as Height right now
 	consensus.viewID = 0
 	consensus.ShardID = shard
 	consensus.MsgChan = make(chan []byte)
@@ -241,29 +249,6 @@ func New(
 	memprofiling.GetMemProfiling().Add("consensus.FBFTLog", consensus.FBFTLog)
 	return &consensus, nil
 }
-
-// // NewStakedVotePerValidator makes a staking based consensus object
-// func NewStakedVotePerValidator(
-// 	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey,
-// ) (*Consensus, error) {
-// 	c, oops := baseConsensus(host, shard, leader, blsPriKey)
-// 	if oops != nil {
-// 		return nil, oops
-// 	}
-// 	c.ConsensusMechanism = values.SuperMajorityStake
-// 	c.isQuorumSatisfied = func(p values.QuorumPhase) bool {
-// 		return true
-// 	}
-// 	c.QuorumThreshold = func() *big.Int {
-// 		return big.NewInt(0)
-// 	}
-// 	c.rewardThreshold = func() *big.Int {
-// 		return big.NewInt(int64(len(c.PublicKeys) * 9 / 10))
-// 	}
-// 	return c, nil
-// }
-
-// TODO: put shardId into chain reader's chain config
 
 // NewOneVotePerValidator is the original, pre-PoS based consensus object
 // func NewOneVotePerValidator(

@@ -315,7 +315,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M3 viewID signature")
 			return nil, err
 		}
-		m3mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+		m3mask, err := bls_cosi.NewMask(consensus.Decider.Participants(), nil)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
 			return nil, err
@@ -332,7 +332,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M2 aggregated signature")
 			return nil, err
 		}
-		m2mask, err := bls_cosi.NewMask(consensus.PublicKeys, nil)
+		m2mask, err := bls_cosi.NewMask(consensus.Decider.Participants(), nil)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
 			return nil, err

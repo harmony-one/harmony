@@ -116,34 +116,29 @@ func (consensus *Consensus) GetViewID() uint64 {
 
 // DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
 func (consensus *Consensus) DebugPrintPublicKeys() {
-	var keys []string
-	for _, k := range consensus.PublicKeys {
-		keys = append(keys, hex.EncodeToString(k.Serialize()))
-	}
+	keys := consensus.Decider.DumpParticipants()
 	utils.Logger().Debug().Strs("PublicKeys", keys).Int("count", len(keys)).Msgf("Debug Public Keys")
 }
 
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int {
+func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.pubKeyLock.Lock()
-	consensus.PublicKeys = append(pubKeys[:0:0], pubKeys...)
+	consensus.Decider.UpdateParticipants(pubKeys)
 	consensus.CommitteePublicKeys = map[string]bool{}
 	utils.Logger().Info().Msg("My Committee updated")
-	for i, pubKey := range consensus.PublicKeys {
-		utils.Logger().Info().Int("index", i).Str("BlsPubKey", pubKey.SerializeToHexStr()).Msg("Member")
-		consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()] = true
+	for i, pubKey := range consensus.Decider.DumpParticipants() {
+		utils.Logger().Info().Int("index", i).Str("BlsPubKey", pubKey).Msg("Member")
+		consensus.CommitteePublicKeys[pubKey] = true
 	}
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
 	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
 	consensus.LeaderPubKey = pubKeys[0]
-
 	utils.Logger().Info().Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	consensus.ResetState()
 	consensus.ResetViewChangeState()
-
-	return len(consensus.PublicKeys)
+	return consensus.Decider.ParticipantsCount()
 }
 
 // NewFaker returns a faker consensus.
@@ -214,8 +209,9 @@ func (consensus *Consensus) ResetState() {
 	consensus.blockHash = [32]byte{}
 	consensus.blockHeader = []byte{}
 	consensus.block = []byte{}
-	prepareBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
-	commitBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	members := consensus.Decider.Participants()
+	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
+	commitBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 	consensus.aggregatedPrepareSig = nil
@@ -373,7 +369,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 	}
 	sigAndBitmapPayload := recvPayload[offset:]
 	return chain.ReadSignatureBitmapByPublicKeys(
-		sigAndBitmapPayload, consensus.PublicKeys,
+		sigAndBitmapPayload, consensus.Decider.Participants(),
 	)
 }
 
@@ -405,7 +401,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 		"key":             hex.EncodeToString(consensus.PubKey.Serialize()),
 		"tps":             tps,
 		"txCount":         numOfTxs,
-		"nodeCount":       len(consensus.PublicKeys) + 1,
+		"nodeCount":       consensus.Decider.ParticipantsCount() + 1,
 		"latestBlockHash": hex.EncodeToString(consensus.blockHash[:]),
 		"latestTxHashes":  txHashes,
 		"blockLatency":    int(timeElapsed / time.Millisecond),

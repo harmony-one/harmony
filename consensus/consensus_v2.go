@@ -386,7 +386,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	logger = logger.With().
 		Int64("NumReceivedSoFar", consensus.Decider.SignatoriesCount(quorum.Prepare)).
-		Int("PublicKeys", len(consensus.PublicKeys)).Logger()
+		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
 	consensus.Decider.AddSignature(quorum.Prepare, validatorPubKey, &sign)
 	// Set the bitmap indicating that this validator signed.
@@ -831,7 +831,7 @@ func (consensus *Consensus) finalizeCommits() {
 		Uint64("blockNum", block.NumberU64()).
 		Uint64("ViewId", block.Header().ViewID().Uint64()).
 		Str("blockHash", block.Hash().String()).
-		Int("index", consensus.getIndexOfPubKey(consensus.PubKey)).
+		Int("index", consensus.Decider.IndexOf(consensus.PubKey)).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 	// Print to normal log too
 	utils.GetLogInstance().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "BlockNum", block.NumberU64())
@@ -1214,7 +1214,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				utils.Logger().Debug().
 					Int("numTxs", len(newBlock.Transactions())).
 					Time("startTime", startTime).
-					Int("publicKeys", len(consensus.PublicKeys)).
+					Int64("publicKeys", consensus.Decider.ParticipantsCount()).
 					Msg("[ConsensusMainLoop] STARTING CONSENSUS")
 				consensus.announce(newBlock)
 

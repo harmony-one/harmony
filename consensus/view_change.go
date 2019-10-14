@@ -75,23 +75,13 @@ func (consensus *Consensus) switchPhase(desired FBFTPhase, override bool) {
 
 // GetNextLeaderKey uniquely determine who is the leader for given viewID
 func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKey {
-	idx := consensus.getIndexOfPubKey(consensus.LeaderPubKey)
-	if idx == -1 {
+	wasFound, next := consensus.Decider.NextAfter(consensus.LeaderPubKey)
+	if !wasFound {
 		utils.Logger().Warn().
 			Str("key", consensus.LeaderPubKey.SerializeToHexStr()).
 			Msg("GetNextLeaderKey: currentLeaderKey not found")
 	}
-	idx = (idx + 1) % len(consensus.PublicKeys)
-	return consensus.PublicKeys[idx]
-}
-
-func (consensus *Consensus) getIndexOfPubKey(pubKey *bls.PublicKey) int {
-	for k, v := range consensus.PublicKeys {
-		if v.IsEqual(pubKey) {
-			return k
-		}
-	}
-	return -1
+	return next
 }
 
 // ResetViewChangeState reset the state for viewchange
@@ -100,9 +90,10 @@ func (consensus *Consensus) ResetViewChangeState() {
 		Str("Phase", consensus.phase.String()).
 		Msg("[ResetViewChangeState] Resetting view change state")
 	consensus.current.SetMode(Normal)
-	bhpBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
-	nilBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
-	viewIDBitmap, _ := bls_cosi.NewMask(consensus.PublicKeys, nil)
+	members := consensus.Decider.Participants()
+	bhpBitmap, _ := bls_cosi.NewMask(members, nil)
+	nilBitmap, _ := bls_cosi.NewMask(members, nil)
+	viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.bhpBitmap = bhpBitmap
 	consensus.nilBitmap = nilBitmap
 	consensus.viewIDBitmap = viewIDBitmap
