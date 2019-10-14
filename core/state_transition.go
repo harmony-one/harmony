@@ -291,33 +291,33 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			break
 		}
-		err = applyNewValidatorTx(stkMsg)
+		err = st.applyNewValidatorTx(stkMsg)
 
 	case types.StakeEditVal:
 		stkMsg := &staking.EditValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			break
 		}
-		err = applyEditValidatorTx(stkMsg)
+		err = st.applyEditValidatorTx(stkMsg)
 	case types.Delegate:
 		stkMsg := &staking.Delegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			break
 		}
-		err = applyDelegateTx(stkMsg)
+		err = st.applyDelegateTx(stkMsg)
 	case types.Redelegate:
 		stkMsg := &staking.Redelegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			break
 		}
-		err = applyRedelegateTx(stkMsg)
+		err = st.applyRedelegateTx(stkMsg)
 
 	case types.Undelegate:
 		stkMsg := &staking.Undelegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			break
 		}
-		err = applyUndelegateTx(stkMsg)
+		err = st.applyUndelegateTx(stkMsg)
 	default:
 		return 0, values.ErrInvalidStakingType
 	}
@@ -325,7 +325,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	return st.gasUsed(), err
 }
 
-func applyNewValidatorTx(newValidator *staking.NewValidator) error {
+func (st *StateTransition) applyNewValidatorTx(newValidator *staking.NewValidator) error {
 	amt := new(big.Int)
 	minDele := new(big.Int)
 	amt.Set(newValidator.Amount)
@@ -337,18 +337,18 @@ func applyNewValidatorTx(newValidator *staking.NewValidator) error {
 	return nil
 }
 
-func applyEditValidatorTx(editValidator *staking.EditValidator) error {
+func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValidator) error {
 	return nil
 }
 
-func applyDelegateTx(delegate *staking.Delegate) error {
+func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 	return nil
 }
 
-func applyRedelegateTx(redelegate *staking.Redelegate) error {
+func (st *StateTransition) applyRedelegateTx(redelegate *staking.Redelegate) error {
 	return nil
 }
 
-func applyUndelegateTx(undelegate *staking.Undelegate) error {
+func (st *StateTransition) applyUndelegateTx(undelegate *staking.Undelegate) error {
 	return nil
 }

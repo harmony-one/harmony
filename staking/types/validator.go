@@ -3,34 +3,12 @@ package types
 import (
 	"math/big"
 
-	common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core/numeric"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-)
-
-// Constants of the key into Storage field of Object in database
-var (
-	AddressKey          = common.HexToHash("Staking-Address")
-	BlsPubKey           = common.HexToHash("Staking-BlsPubKey")
-	StakeKey            = common.HexToHash("Staking-Amount")
-	UnboundingHeightKey = common.HexToHash("Staking-UnboundingHeight")
-	MinSelfDeleKey      = common.HexToHash("Staking-MinSelfDelegation")
-	ActiveKey           = common.HexToHash("Staking-IsActive")
-	//Commission related
-	UpdateHeightKey         = common.HexToHash("Staking-UpdateHeight")
-	CommissionRateKey       = common.HexToHash("Staking-CommissionRate")
-	CommissionMaxRateKey    = common.HexToHash("Staking-CommissionMaxRate")
-	CommissionChangeRateKey = common.HexToHash("Staking-CommissionChangeRate")
-	//Description related
-	DescriptionNameKey     = common.HexToHash("Staking-DesriptionName")
-	DescriptionIdentityKey = common.HexToHash("Staking-DesriptionIdentity")
-	DescriptionWebsiteKey  = common.HexToHash("Staking-DesriptionWebsite")
-	DescriptionContactKey  = common.HexToHash("Staking-DesriptionContact")
-	DescriptionDetailsKey  = common.HexToHash("Staking-DesriptionDetails")
 )
 
 // Define validator staking related const
@@ -54,12 +32,12 @@ type Validator struct {
 	UnbondingHeight *big.Int `json:"unbonding_height" yaml:"unbonding_height"`
 	// validator's self declared minimum self delegation
 	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
+	// Is the validator active in the validating process or not
+	IsActive bool `json:"active" yaml:"active"`
 	// commission parameters
 	Commission `json:"commission" yaml:"commission"`
 	// description for the validator
 	Description `json:"description" yaml:"description"`
-	// Is the validator active in the validating process or not
-	IsCurrentlyActive bool `json:"active" yaml:"active"`
 }
 
 // Description - some possible IRL connections
@@ -129,9 +107,6 @@ func (d Description) EnsureLength() (Description, error) {
 
 // GetAddress returns address
 func (v Validator) GetAddress() common2.Address { return v.Address }
-
-// IsActive checks whether validator is active
-func (v Validator) IsActive() bool { return v.IsCurrentlyActive }
 
 // GetName returns the name of validator in the description
 func (v Validator) GetName() string { return v.Description.Name }
