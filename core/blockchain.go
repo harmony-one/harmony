@@ -46,6 +46,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -69,6 +70,7 @@ const (
 	commitsCacheLimit    = 10
 	epochCacheLimit      = 10
 	randomnessCacheLimit = 10
+	stakingCacheLimit    = 256
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -131,6 +133,7 @@ type BlockChain struct {
 	lastCommitsCache *lru.Cache
 	epochCache       *lru.Cache // Cache epoch number → first block number
 	randomnessCache  *lru.Cache // Cache for vrf/vdf
+	stakingCache     *lru.Cache // Cache for staking validator
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -167,6 +170,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	commitsCache, _ := lru.New(commitsCacheLimit)
 	epochCache, _ := lru.New(epochCacheLimit)
 	randomnessCache, _ := lru.New(randomnessCacheLimit)
+	stakingCache, _ := lru.New(stakingCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:      chainConfig,
@@ -185,6 +189,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		lastCommitsCache: commitsCache,
 		epochCache:       epochCache,
 		randomnessCache:  randomnessCache,
+		stakingCache:     stakingCache,
 		engine:           engine,
 		vmConfig:         vmConfig,
 		badBlocks:        badBlocks,
@@ -2243,4 +2248,32 @@ func (bc *BlockChain) UpdateCXReceiptsCheckpointsByBlock(block *types.Block) {
 // returns 0, 0 if not found
 func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64) {
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
+}
+
+// ReadStakingValidator reads staking information of given validator
+func (bc *BlockChain) ReadStakingValidator(addr common.Address) (*staking.Validator, error) {
+	if cached, ok := bc.stakingCache.Get("staking-" + string(addr.Bytes())); ok {
+		by := cached.([]byte)
+		v := staking.Validator{}
+		if err := rlp.DecodeBytes(by, &v); err != nil {
+			return nil, err
+		}
+		return &v, nil
+	}
+
+	return rawdb.ReadStakingValidator(bc.db, addr)
+}
+
+// WriteStakingValidator reads staking information of given validator
+func (bc *BlockChain) WriteStakingValidator(v *staking.Validator) error {
+	err := rawdb.WriteStakingValidator(bc.db, v)
+	if err != nil {
+		return err
+	}
+	by, err := rlp.EncodeToBytes(v)
+	if err != nil {
+		return err
+	}
+	bc.stakingCache.Add("staking-"+string(v.Address.Bytes()), by)
+	return nil
 }

@@ -3,11 +3,12 @@ package types
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core/numeric"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
@@ -20,10 +21,12 @@ const (
 	MaxDetailsLength         = 280
 )
 
+var ValidatorHashKey = common.Hash(crypto.Keccak256Hash([]byte("ValidatorHash")))
+
 // Validator - data fields for a validator
 type Validator struct {
 	// ECDSA address of the validator
-	Address common2.Address `json:"address" yaml:"address"`
+	Address common.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
 	ValidatingPubKey bls.PublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
 	// The stake put by the validator itself
@@ -106,16 +109,16 @@ func (d Description) EnsureLength() (Description, error) {
 }
 
 // GetAddress returns address
-func (v Validator) GetAddress() common2.Address { return v.Address }
+func (v *Validator) GetAddress() common.Address { return v.Address }
 
 // GetName returns the name of validator in the description
-func (v Validator) GetName() string { return v.Description.Name }
+func (v *Validator) GetName() string { return v.Description.Name }
 
 // GetStake returns the total staking amount
-func (v Validator) GetStake() *big.Int { return v.Stake }
+func (v *Validator) GetStake() *big.Int { return v.Stake }
 
 // GetCommissionRate returns the commission rate of the validator
-func (v Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
+func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 
 // GetMinSelfDelegation returns the minimum amount the validator must stake
-func (v Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
+func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }

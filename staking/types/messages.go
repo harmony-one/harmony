@@ -3,9 +3,10 @@ package types
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core/numeric"
-	"github.com/harmony-one/harmony/internal/common"
 	"github.com/pkg/errors"
 )
 
