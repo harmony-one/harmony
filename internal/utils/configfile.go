@@ -19,6 +19,7 @@ type WalletProfile struct {
 	Bootnodes []string
 	Shards    int
 	RPCServer [][]p2p.Peer
+	Network   string
 }
 
 // ReadWalletProfile reads an ini file and return WalletProfile
@@ -41,6 +42,11 @@ func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) 
 		config.Bootnodes = sec.Key("bootnode").ValueWithShadows()
 	} else {
 		return nil, fmt.Errorf("can't find bootnode key")
+	}
+	if sec.HasKey("network") {
+		config.Network = sec.Key("network").String()
+	} else {
+		config.Network = "devnet"
 	}
 	if sec.HasKey("chain_id") {
 		config.ChainID = sec.Key("chain_id").String()
