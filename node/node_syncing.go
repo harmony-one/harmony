@@ -25,8 +25,8 @@ import (
 const (
 	lastMileThreshold   = 4
 	inSyncThreshold     = 1  // unit in number of block
-	SyncFrequency       = 10 // unit in second
-	BeaconSyncFrequency = 5  // unit in second
+	SyncFrequency       = 60 // unit in second
+	BeaconSyncFrequency = 60 // unit in second
 	MinConnectedPeers   = 10 // minimum number of peers connected to in node syncing
 )
 
@@ -226,6 +226,7 @@ SyncingLoop:
 			}
 			utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 		}
+		// TODO: treat fake maximum height
 		if node.stateSync.IsOutOfSync(bc) {
 			node.stateMutex.Lock()
 			node.State = NodeNotInSync
@@ -247,6 +248,7 @@ SyncingLoop:
 		node.stateMutex.Lock()
 		node.State = NodeReadyForConsensus
 		node.stateMutex.Unlock()
+		// TODO on demand syncing
 		time.Sleep(SyncFrequency * time.Second)
 	}
 }
