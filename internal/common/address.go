@@ -238,3 +238,38 @@ func ParseAddr(s string) ethCommon.Address {
 	// The result can be 0x00...00 if the passing param is not a correct address.
 	return ethCommon.HexToAddress(s)
 }
+
+// ParseAddrH is a wrapper to cast ethCommon.Address to harmony's common.Address
+func ParseAddrH(s string) Address {
+	return Address(ParseAddr(s))
+}
+
+// MustBech32ToAddressH is a wrapper for casting ethCommon.Address to harmony's common.Address
+func MustBech32ToAddressH(b32 string) Address {
+	return Address(MustBech32ToAddress(b32))
+}
+
+// Bech32ToAddressH decodes the given bech32 address.
+func Bech32ToAddressH(b32 string) (addr Address, err error) {
+	var hrp string
+	err = ParseBech32AddrH(b32, &hrp, &addr)
+	if err == nil && hrp != Bech32AddressHRP {
+		err = errors.Errorf("%#v is not a %#v address", b32, Bech32AddressHRP)
+	}
+	return
+}
+
+// ParseBech32AddrH is another wrapper
+func ParseBech32AddrH(b32 string, hrp *string, addr *Address) error {
+	h, b, err := bech32.DecodeAndConvert(b32)
+	if err != nil {
+		return errors.Wrapf(err, "cannot decode %#v as bech32 address", b32)
+	}
+	if len(b) != AddressLength {
+		return errors.Errorf("decoded bech32 %#v has invalid length %d",
+			b32, len(b))
+	}
+	*hrp = h
+	addr.SetBytes(b)
+	return nil
+}
