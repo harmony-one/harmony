@@ -387,11 +387,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 
 	// Set the consensus ID to be the current block number
-	height := currentNode.Blockchain().CurrentBlock().NumberU64()
-
-	currentConsensus.SetViewID(height)
+	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
+	currentConsensus.SetViewID(viewID)
 	utils.Logger().Info().
-		Uint64("height", height).
+		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object
