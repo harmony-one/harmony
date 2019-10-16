@@ -30,8 +30,7 @@ func TestAddNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	nodeconfig.GetDefaultConfig().SetNetworkType(nodeconfig.Devnet)
-	nodeconfig.GetShardConfig(0).SetNetworkType(nodeconfig.Devnet)
+	nodeconfig.SetNetworkType(nodeconfig.Devnet)
 	node := New(host, consensus, testDBFactory, false)
 
 	selectedTxs, selectedStakingTxs := node.getTransactionsForNewBlock(common.Address{})

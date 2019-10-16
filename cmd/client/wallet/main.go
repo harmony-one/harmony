@@ -123,6 +123,7 @@ var (
 )
 
 var (
+	networkType   string
 	walletProfile *utils.WalletProfile
 	ks            *keystore.KeyStore
 )
@@ -307,6 +308,8 @@ func createWalletNode() *node.Node {
 	w.Client = client.NewClient(w.GetHost(), uint32(shardID))
 
 	w.NodeConfig.SetRole(nodeconfig.ClientNode)
+	netType := nodeconfig.NetworkType(walletProfile.Network)
+	nodeconfig.SetNetworkType(netType)
 	w.ServiceManagerSetup()
 	w.RunServices()
 	return w

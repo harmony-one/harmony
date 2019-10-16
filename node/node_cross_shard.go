@@ -66,11 +66,11 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 		utils.Logger().Warn().Uint32("ToShardID", toShardID).Msg("[BroadcastCXReceiptsWithShardID] Unable to get merkleProof")
 		return
 	}
-	utils.Logger().Info().Uint32("ToShardID", toShardID).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof Found")
 
-	groupID := nodeconfig.ShardID(toShardID)
+	groupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(toShardID))
+	utils.Logger().Info().Uint32("ToShardID", toShardID).Str("GroupID", string(groupID)).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof Found")
 	// TODO ek – limit concurrency
-	go node.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(groupID)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, block.Header(), commitSig, commitBitmap)))
+	go node.host.SendMessageToGroups([]nodeconfig.GroupID{groupID}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, block.Header(), commitSig, commitBitmap)))
 }
 
 // BroadcastMissingCXReceipts broadcasts missing cross shard receipts per request
