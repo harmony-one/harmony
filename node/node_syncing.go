@@ -235,7 +235,9 @@ SyncingLoop:
 				node.Consensus.BlocksNotSynchronized()
 			}
 			node.stateSync.SyncLoop(bc, worker, false)
-			if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+			// update the consensus and committee information at the end of epoch including explorer node
+			// only when the syncing shard is different than node's own shard, we don't update it
+			if node.Blockchain().ShardID() == bc.ShardID() && core.ShardingSchedule.IsLastBlock(bc.CurrentBlock().NumberU64()) {
 				node.Consensus.UpdateConsensusInformation()
 			}
 			if willJoinConsensus {

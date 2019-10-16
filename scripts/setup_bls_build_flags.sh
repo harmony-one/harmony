@@ -35,10 +35,3 @@ case $OS in
       export DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
       ;;
 esac
-
-if [ "$1" == '-v' ]; then
-   echo "{ \"CGO_CFLAGS\" : \"$CGO_CFLAGS\",
-            \"CGO_LDFLAGS\" : \"$CGO_LDFLAGS\",
-            \"LD_LIBRARY_PATH\" : \"$LD_LIBRARY_PATH\",
-            \"DYLD_FALLBACK_LIBRARY_PATH\" : \"$DYLD_FALLBACK_LIBRARY_PATH\"}" | jq "."
-fi
