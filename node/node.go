@@ -430,7 +430,7 @@ func (node *Node) startRxPipeline(
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
-	// start the goroutine to receive client message
+
 	// client messages are sent by clients, like txgen, wallet
 	node.startRxPipeline(node.clientReceiver, node.clientRxQueue, ClientRxWorkers)
 
@@ -624,7 +624,7 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 }
 
 // isBeacon = true if the node is beacon node
-// isClient = true if the node light client(txgen,wallet)
+// isClient = true if the node light client(wallet)
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 

@@ -68,7 +68,7 @@ type ConfigType struct {
 	beacon   GroupID // the beacon group ID
 	group    GroupID // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
 	client   GroupID // the client group ID of the shard
-	isClient bool    // whether this node is a client node, such as wallet/txgen
+	isClient bool    // whether this node is a client node, such as wallet
 	isBeacon bool    // whether this node is beacon node doing consensus or not
 	ShardID  uint32  // ShardID of this node; TODO ek – reviisit when resharding
 	role     Role    // Role of the node

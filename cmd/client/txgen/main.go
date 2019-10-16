@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -98,23 +99,25 @@ func setUpTXGen() *node.Node {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
-	consensusObj, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil)
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensusObj, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil, decider)
 	chainDBFactory := &shardchain.MemDBFactory{}
 	txGen := node.New(myhost, consensusObj, chainDBFactory, false) //Changed it : no longer archival node.
 	txGen.Client = client.NewClient(txGen.GetHost(), uint32(shardID))
 	consensusObj.ChainReader = txGen.Blockchain()
-	consensusObj.PublicKeys = nil
 	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	startIdx := 0
 	endIdx := startIdx + genesisShardingConfig.NumNodesPerShard()
+	pubs := []*bls2.PublicKey{}
 	for _, acct := range genesis.HarmonyAccounts[startIdx:endIdx] {
 		pub := &bls2.PublicKey{}
 		if err := pub.DeserializeHexStr(acct.BlsPublicKey); err != nil {
 			fmt.Printf("Can not deserialize public key. err: %v", err)
 			os.Exit(1)
 		}
-		consensusObj.PublicKeys = append(consensusObj.PublicKeys, pub)
+		pubs = append(pubs, pub)
 	}
+	consensusObj.Decider.UpdateParticipants(pubs)
 	txGen.NodeConfig.SetRole(nodeconfig.ClientNode)
 	if shardID == 0 {
 		txGen.NodeConfig.SetShardGroupID(nodeconfig.GroupIDBeacon)

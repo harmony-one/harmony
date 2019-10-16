@@ -747,6 +747,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	}
 	// remove SyncLoopFrequency
 	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
+	defer ticker.Stop()
 Loop:
 	for {
 		select {
