@@ -5,6 +5,7 @@ import (
 
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -20,7 +21,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.ViewId = consensus.mode.ViewID()
+	vcMsg.ViewId = consensus.current.ViewID()
 	vcMsg.BlockNum = consensus.blockNum
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
@@ -29,8 +30,10 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	// next leader key already updated
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
 
-	preparedMsgs := consensus.PbftLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, consensus.blockNum, consensus.blockHash)
-	preparedMsg := consensus.PbftLog.FindMessageByMaxViewID(preparedMsgs)
+	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
+		msg_pb.MessageType_PREPARED, consensus.blockNum, consensus.blockHash,
+	)
+	preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
 	var msgToSign []byte
 	if preparedMsg == nil {
@@ -55,7 +58,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	}
 
 	viewIDBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(viewIDBytes, consensus.mode.ViewID())
+	binary.LittleEndian.PutUint64(viewIDBytes, consensus.current.ViewID())
 	sign1 := consensus.priKey.SignHash(viewIDBytes)
 	if sign1 != nil {
 		vcMsg.ViewidSig = sign1.Serialize()
@@ -65,7 +68,8 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[constructViewChangeMessage] failed to sign and marshal the viewchange message")
+		utils.Logger().Error().Err(err).
+			Msg("[constructViewChangeMessage] failed to sign and marshal the viewchange message")
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }
@@ -81,7 +85,7 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.ViewId = consensus.mode.ViewID()
+	vcMsg.ViewId = consensus.current.ViewID()
 	vcMsg.BlockNum = consensus.blockNum
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
@@ -96,7 +100,7 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 		vcMsg.M2Bitmap = consensus.nilBitmap.Bitmap
 	}
 
-	sig3arr := consensus.GetViewIDSigsArray()
+	sig3arr := consensus.Decider.ReadAllSignatures(quorum.ViewChange)
 	utils.Logger().Debug().Int("len", len(sig3arr)).Msg("[constructNewViewMessage] M3 (ViewID) type signatures")
 	// even we check here for safty, m3 type signatures must >= 2f+1
 	if len(sig3arr) > 0 {
@@ -107,7 +111,8 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[constructNewViewMessage] failed to sign and marshal the new view message")
+		utils.Logger().Error().Err(err).
+			Msg("[constructNewViewMessage] failed to sign and marshal the new view message")
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
 }

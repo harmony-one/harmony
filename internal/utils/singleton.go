@@ -36,7 +36,7 @@ var (
 )
 
 // SetLogContext used to print out loggings of node with port and ip.
-// Every instance (node, txgen, etc..) needs to set this for logging.
+// Every instance (node, etc..) needs to set this for logging.
 func SetLogContext(_port, _ip string) {
 	port = _port
 	ip = _ip

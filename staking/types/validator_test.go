@@ -5,8 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/harmony-one/harmony/core/numeric"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/numeric"
 )
 
 func CreateNewValidator() Validator {

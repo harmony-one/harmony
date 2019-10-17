@@ -25,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -181,9 +180,9 @@ func (st *StateTransition) preCheck() error {
 		nonce := st.state.GetNonce(st.msg.From())
 
 		if nonce < st.msg.Nonce() {
-			return values.ErrNonceTooHigh
+			return ErrNonceTooHigh
 		} else if nonce > st.msg.Nonce() {
-			return values.ErrNonceTooLow
+			return ErrNonceTooLow
 		}
 	}
 	return st.buyGas()
@@ -320,7 +319,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		}
 		err = st.applyUndelegateTx(stkMsg)
 	default:
-		return 0, values.ErrInvalidStakingType
+		return 0, staking.ErrInvalidStakingKind
 	}
 
 	return st.gasUsed(), err

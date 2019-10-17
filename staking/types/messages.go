@@ -1,12 +1,13 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/core/numeric"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/pkg/errors"
 )
 
@@ -27,15 +28,22 @@ const (
 )
 
 var (
-	directiveKind = [...]string{
-		"NewValidator", "EditValidator", "Delegate", "Redelegate", "Undelegate",
+	directiveNames = map[Directive]string{
+		DirectiveNewValidator:  "NewValidator",
+		DirectiveEditValidator: "EditValidator",
+		DirectiveDelegate:      "Delegate",
+		DirectiveRedelegate:    "Redelegate",
+		DirectiveUndelegate:    "Undelegate",
 	}
 	// ErrInvalidStakingKind given when caller gives bad staking message kind
 	ErrInvalidStakingKind = errors.New("bad staking kind")
 )
 
 func (d Directive) String() string {
-	return directiveKind[d]
+	if name, ok := directiveNames[d]; ok {
+		return name
+	}
+	return fmt.Sprintf("Directive %+v", byte(d))
 }
 
 // NewValidator - type for creating a new validator

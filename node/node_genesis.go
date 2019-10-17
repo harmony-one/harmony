@@ -79,7 +79,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		chainConfig = *params.PangaeaChainConfig
 		fallthrough // the rest is the same as testnet
 	default: // all other types share testnet config
-		// Tests account for txgen to use
+		// Test accounts
 		node.AddTestingAddresses(genesisAlloc, TestAccountNumber)
 
 		// Smart contract deployer account used to deploy initial smart contract
@@ -126,7 +126,7 @@ func CreateTestBankKeys(numAddresses int) (keys []*ecdsa.PrivateKey, err error) 
 }
 
 // AddTestingAddresses create the genesis block allocation that contains deterministically
-// generated testing addresses with tokens. This is mostly used for generated simulated transactions in txgen.
+// generated testing addresses with tokens.
 func (node *Node) AddTestingAddresses(gAlloc core.GenesisAlloc, numAddress int) {
 	for _, testBankKey := range node.TestBankKeys {
 		testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)

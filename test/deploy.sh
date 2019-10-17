@@ -25,21 +25,41 @@ else
 fi
 
 function check_result() {
-   find $log_folder -name leader-*.log > $log_folder/all-leaders.txt
-   find $log_folder -name zerolog-validator-*.log > $log_folder/all-validators.txt
-   find $log_folder -name archival-*.log >> $log_folder/all-validators.txt
+   err=false
 
-   echo ====== RESULTS ======
-   results=$($ROOT/test/cal_tps.sh $log_folder/all-leaders.txt $log_folder/all-validators.txt)
-   echo $results | tee -a $LOG_FILE
-   echo $results > $log_folder/tps.log
+   echo "====== WALLET BALANCES ======" > $RESULT_FILE
+   $ROOT/bin/wallet -p local balances --address $ACC1  >> $RESULT_FILE
+   $ROOT/bin/wallet -p local balances --address $ACC2  >> $RESULT_FILE
+   $ROOT/bin/wallet -p local balances --address $ACC3  >> $RESULT_FILE
+   echo "====== RESULTS ======" >> $RESULT_FILE
+
+   TEST_ACC1=$($ROOT/bin/wallet -p local balances --address $ACC1 | grep 'Shard 0' | grep -oE 'nonce:.[0-9]+' | awk ' { print $2 } ')
+   TEST_ACC2=$($ROOT/bin/wallet -p local balances --address $ACC2 | grep 'Shard 1' | grep -oE 'nonce:.[0-9]+' | awk ' { print $2 } ')
+   BAL0_ACC3=$($ROOT/bin/wallet -p local balances --address $ACC3 | grep 'Shard 0' | grep -oE '[0-9]\.[0-9]+,' | awk -F\. ' { print $1 } ')
+   BAL1_ACC3=$($ROOT/bin/wallet -p local balances --address $ACC3 | grep 'Shard 1' | grep -oE '[0-9]\.[0-9]+,' | awk -F\. ' { print $1 } ')
+
+   if [[ $TEST_ACC1 -ne $NUM_TEST || $TEST_ACC2 -ne $NUM_TEST ]]; then
+      echo -e "FAIL number of nonce. Expected Result: $NUM_TEST.\nAccount1:$TEST_ACC1\nAccount2:$TEST_ACC2\n" >> $RESULT_FILE
+      err=true
+   fi
+   if [[ $BAL0_ACC3 -ne 1 || $BAL1_ACC3 -ne 1 ]]; then
+      echo "FAIL balance of $ACC3. Expected Result: 1.\nShard0:$BAL0_ACC3\nShard1:$BAL1_ACC3\n" >> $RESULT_FILE
+      err=true
+   fi
+
+   $err || echo "PASS" >> $RESULT_FILE
 }
 
 function cleanup() {
    "${progdir}/kill_node.sh"
 }
 
-trap cleanup SIGINT SIGTERM
+function cleanup_and_result() {
+   "${ROOT}/test/kill_node.sh" 2> /dev/null
+   [ -e $RESULT_FILE ] && cat $RESULT_FILE
+}
+
+trap cleanup_and_result SIGINT SIGTERM
 
 function usage {
    local ME=$(basename $0)
@@ -48,8 +68,8 @@ function usage {
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
-   -t             toggle txgen (default: $TXGEN)
-   -D duration    txgen run duration (default: $DURATION)
+   -t             disable wallet test (default: $DOTEST)
+   -D duration    test run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
@@ -70,18 +90,22 @@ EOU
 DEFAULT_DURATION_NOSYNC=60
 DEFAULT_DURATION_SYNC=200
 
-TXGEN=false
+DOTEST=true
 DURATION=
 MIN=3
 SHARDS=2
 DRYRUN=
 SYNC=true
 NETWORK=localnet
+NUM_TEST=10
+ACC1=one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj
+ACC2=one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg
+ACC3=one1r4zyyjqrulf935a479sgqlpa78kz7zlcg2jfen
 
 while getopts "htD:m:s:nBN:" option; do
    case $option in
       h) usage ;;
-      t) TXGEN=false ;;
+      t) DOTEST=false ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
@@ -118,10 +142,9 @@ cleanup
 # Also it's recommended to use `go build` for testing the whole exe. 
 if [ "${NOBUILD}" != "true" ]; then
    pushd $ROOT
-   echo "compiling ..."
-   go build -o bin/harmony cmd/harmony/main.go
-   go build -o bin/txgen cmd/client/txgen/main.go
-   go build -o bin/bootnode cmd/bootnode/main.go
+   scripts/go_executable_build.sh harmony
+   scripts/go_executable_build.sh wallet
+   scripts/go_executable_build.sh bootnode
    popd
 fi
 
@@ -131,6 +154,7 @@ log_folder="tmp_log/log-$t"
 
 mkdir -p $log_folder
 LOG_FILE=$log_folder/r.log
+RESULT_FILE=$log_folder/result.txt
 
 echo "launching boot node ..."
 $DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
@@ -141,8 +165,6 @@ echo "bootnode launched." + " $BN_MA"
 unset -v base_args
 declare -a base_args args
 base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -network_type="$NETWORK" -blspass file:.hmy/blspass.txt -dns=false)
-NUM_NN=0
-
 sleep 2
 
 # Start nodes
@@ -171,18 +193,24 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   i=$((i+1))
 done < $config
 
-if [ "$TXGEN" == "true" ]; then
-   echo "launching txgen ... wait"
-   # sleep 2
-   line=$(grep client $config)
-   IFS=' ' read ip port mode account <<< $line
-   if [ "$mode" == "client" ]; then
-      $DRYRUN $ROOT/bin/txgen -log_folder $log_folder -duration $DURATION -ip $ip -port $port -bootnodes "${BN_MA}" > $LOG_FILE 2>&1
-   fi
-else
-   sleep $DURATION
+if [ "$DOTEST" == "true" ]; then
+   echo "waiting for some block rewards"
+   sleep 60
+   i=1
+   echo "launching wallet cross shard transfer test"
+   while [ $i -le $NUM_TEST ]; do
+      "${ROOT}/bin/wallet" -p local transfer --from $ACC1 --to $ACC3 --shardID 0 --toShardID 1 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
+      sleep 20
+      "${ROOT}/bin/wallet" -p local transfer --from $ACC2 --to $ACC3 --shardID 1 --toShardID 0 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
+      sleep 20
+      i=$((i+1))
+   done
+   echo "waiting for the result"
+   sleep 20
+   check_result
+   [ -e $RESULT_FILE ] && cat $RESULT_FILE
 fi
 
+sleep $DURATION
 
-cleanup
-check_result
+cleanup_and_result

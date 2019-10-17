@@ -40,7 +40,6 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
@@ -53,7 +52,6 @@ import (
 var (
 	// blockInsertTimer
 	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
-
 	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 )
@@ -1254,7 +1252,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			err = bc.Validator().ValidateBody(block)
 		}
 		switch {
-		case err == values.ErrKnownBlock:
+		case err == ErrKnownBlock:
 			// Block and state both already known. However if the current block is below
 			// this number we did a rollback and we should reimport it nonetheless.
 			if bc.CurrentBlock().NumberU64() >= block.NumberU64() {
@@ -2275,5 +2273,30 @@ func (bc *BlockChain) WriteStakingValidator(v *staking.Validator) error {
 		return err
 	}
 	bc.stakingCache.Add("staking-"+string(v.Address.Bytes()), by)
+	return nil
+}
+
+// CurrentValidatorAddresses returns the address of active validators for current epoch
+func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
+	return nil
+}
+
+// ValidatorCandidates returns the up to date validator candidates for next epoch
+func (bc *BlockChain) ValidatorCandidates() []common.Address {
+	return nil
+}
+
+// ValidatorInformation returns the information of validator
+func (bc *BlockChain) ValidatorInformation(addr common.Address) *staking.Validator {
+	return nil
+}
+
+// DelegatorsInformation returns up to date information of delegators of a given validator address
+func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Delegation {
+	return nil
+}
+
+// ValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
+func (bc *BlockChain) ValidatorStakingWithDelegation(addr common.Address) *big.Int {
 	return nil
 }

@@ -25,7 +25,6 @@ import (
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
@@ -196,7 +195,7 @@ func ApplyStakingTransaction(
 	}
 	stkType := tx.StakingType()
 	if _, ok := types.StakingTypeMap[stkType]; !ok {
-		return nil, 0, values.ErrInvalidStakingType
+		return nil, 0, staking.ErrInvalidStakingKind
 	}
 	msg.SetType(types.StakingTypeMap[stkType])
 

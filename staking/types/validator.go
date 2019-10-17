@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/core/numeric"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/numeric"
 )
 
 // Define validator staking related const
@@ -36,7 +36,7 @@ type Validator struct {
 	// validator's self declared minimum self delegation
 	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
 	// Is the validator active in the validating process or not
-	IsActive bool `json:"active" yaml:"active"`
+	Active bool `json:"active" yaml:"active"`
 	// commission parameters
 	Commission `json:"commission" yaml:"commission"`
 	// description for the validator

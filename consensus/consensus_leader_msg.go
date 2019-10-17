@@ -6,6 +6,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -49,7 +50,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 96 bytes aggregated signature
-	aggSig := bls_cosi.AggregateSig(consensus.GetPrepareSigsArray())
+	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
 	buffer.Write(aggSig.Serialize())
 
 	// Bitmap
@@ -82,7 +83,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	buffer := bytes.NewBuffer([]byte{})
 
 	// 96 bytes aggregated signature
-	aggSig := bls_cosi.AggregateSig(consensus.GetCommitSigsArray())
+	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Commit))
 	buffer.Write(aggSig.Serialize())
 
 	// Bitmap

@@ -8,19 +8,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/shardchain"
-
-	"github.com/harmony-one/harmony/drand"
-
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core/values"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/pki"
+	"github.com/harmony-one/harmony/drand"
+	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/stretchr/testify/assert"
 )
 
 var testDBFactory = &shardchain.MemDBFactory{}
@@ -34,7 +33,10 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, blsKey)
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := consensus.New(
+		host, values.BeaconChainShardID, leader, blsKey, decider,
+	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -198,7 +200,10 @@ func TestAddPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, blsKey)
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := consensus.New(
+		host, values.BeaconChainShardID, leader, blsKey, decider,
+	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
@@ -245,7 +250,10 @@ func TestAddBeaconPeer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := consensus.New(host, 0, leader, blsKey)
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := consensus.New(
+		host, values.BeaconChainShardID, leader, blsKey, decider,
+	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
