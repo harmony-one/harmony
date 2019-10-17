@@ -192,7 +192,7 @@ func (node *Node) DoBeaconSyncing() {
 				continue
 			}
 		}
-		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true)
+		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true, nil)
 		time.Sleep(BeaconSyncFrequency * time.Second)
 	}
 }
@@ -234,12 +234,7 @@ SyncingLoop:
 			if willJoinConsensus {
 				node.Consensus.BlocksNotSynchronized()
 			}
-			node.stateSync.SyncLoop(bc, worker, false)
-			// update the consensus and committee information at the end of epoch including explorer node
-			// only when the syncing shard is different than node's own shard, we don't update it
-			if node.Blockchain().ShardID() == bc.ShardID() && core.ShardingSchedule.IsLastBlock(bc.CurrentBlock().NumberU64()) {
-				node.Consensus.UpdateConsensusInformation()
-			}
+			node.stateSync.SyncLoop(bc, worker, false, node.Consensus)
 			if willJoinConsensus {
 				node.stateMutex.Lock()
 				node.State = NodeReadyForConsensus
