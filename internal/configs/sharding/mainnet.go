@@ -27,7 +27,7 @@ const (
 	mainnetV1_2Epoch = 25
 	mainnetV1_3Epoch = 36
 	mainnetV1_4Epoch = 46
-	mainnetV1_5Epoch = 50
+	mainnetV1_5Epoch = 54
 
 	mainnetMaxTxAmountLimit               = 1e3 // unit is interface{} One
 	mainnetMaxNumRecentTxsPerAccountLimit = 1e2
@@ -50,7 +50,7 @@ type mainnetSchedule struct{}
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(big.NewInt(mainnetV1_5Epoch)) >= 0:
-		// forty-nine resharding epoch (for shard 0) around 17/10/2019 4:05:16 PDT
+		// 54 resharding epoch (for shard 0) around 23/10/2019 ~10:05 PDT
 		return mainnetV1_5
 	case epoch.Cmp(big.NewInt(mainnetV1_4Epoch)) >= 0:
 		// forty-sixth resharding epoch around 10/10/2019 8:06pm PDT
