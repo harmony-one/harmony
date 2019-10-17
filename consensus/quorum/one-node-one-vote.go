@@ -32,3 +32,8 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 func (v *uniformVoteWeight) UpdateVotingPower(func(*bls.PublicKey) numeric.Dec) {
 	// NO-OP do not add anything here
 }
+
+func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
+	// NO-OP do not add anything here
+	return true
+}

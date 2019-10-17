@@ -3,6 +3,7 @@ package quorum
 import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/staking/effective"
 )
 
 type stakedVoteWeight struct {
@@ -33,8 +34,20 @@ func (v *stakedVoteWeight) IsRewardThresholdAchieved() bool {
 }
 
 func (v *stakedVoteWeight) UpdateVotingPower(f func(*bls.PublicKey) numeric.Dec) {
-	for validatorKey, stakedAmount := range v.validatorStakes {
-		newStake := f(validatorKey)
-		stakedAmount.Set(numeric.NewDecFromBigInt(newStake.Int).Int)
+	stakes := make([]numeric.Dec, len(v.validatorStakes))
+	for _, s := range v.validatorStakes {
+		stakes = append(stakes, s)
 	}
+	mStake := effective.Median(stakes)
+
+	for validatorKey, stakedAmount := range v.validatorStakes {
+		rStake := f(validatorKey)
+		eStake := effective.Stake(mStake, rStake)
+		stakedAmount.Set(eStake.Int)
+	}
+}
+
+func (v *stakedVoteWeight) ToggleActive(*bls.PublicKey) bool {
+
+	return true
 }

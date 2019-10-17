@@ -190,12 +190,18 @@ func newMapBackedSignatureReader() SignatureReader {
 	}
 }
 
+// Voter ..
+type Voter interface {
+	ToggleActive(*bls.PublicKey) bool
+	UpdateVotingPower(func(*bls.PublicKey) numeric.Dec)
+}
+
 // Decider ..
 type Decider interface {
 	SignatureReader
+	Voter
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	UpdateVotingPower(func(*bls.PublicKey) numeric.Dec)
 	QuorumThreshold() int64
 	IsRewardThresholdAchieved() bool
 }
