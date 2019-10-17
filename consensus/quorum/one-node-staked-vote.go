@@ -6,11 +6,18 @@ import (
 	"github.com/harmony-one/harmony/staking/effective"
 )
 
+var (
+	twoThirds = numeric.NewDec(2).QuoInt64(3)
+)
+
 type stakedVoteWeight struct {
 	SignatureReader
 	// EPOS based staking
-	validatorStakes   map[*bls.PublicKey]numeric.Dec
-	totalStakedAmount numeric.Dec
+	validatorStakes map[*bls.PublicKey]struct {
+		isActive  bool
+		effective numeric.Dec
+	}
+	totalEffectiveStakedAmount numeric.Dec
 }
 
 // Policy ..
@@ -20,12 +27,12 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
-	return false
+	return true
 }
 
 // QuorumThreshold ..
 func (v *stakedVoteWeight) QuorumThreshold() int64 {
-	return 100000
+	return v.totalEffectiveStakedAmount.Mul(twoThirds).Int64()
 }
 
 // RewardThreshold ..
@@ -36,14 +43,14 @@ func (v *stakedVoteWeight) IsRewardThresholdAchieved() bool {
 func (v *stakedVoteWeight) UpdateVotingPower(f func(*bls.PublicKey) numeric.Dec) {
 	stakes := make([]numeric.Dec, len(v.validatorStakes))
 	for _, s := range v.validatorStakes {
-		stakes = append(stakes, s)
+		stakes = append(stakes, s.effective)
 	}
 	mStake := effective.Median(stakes)
 
 	for validatorKey, stakedAmount := range v.validatorStakes {
 		rStake := f(validatorKey)
 		eStake := effective.Stake(mStake, rStake)
-		stakedAmount.Set(eStake.Int)
+		stakedAmount.effective.Set(eStake.Int)
 	}
 }
 

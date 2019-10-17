@@ -214,7 +214,10 @@ func NewDecider(p Policy) Decider {
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
 			newMapBackedSignatureReader(),
-			map[*bls.PublicKey]numeric.Dec{},
+			map[*bls.PublicKey]struct {
+				isActive  bool
+				effective numeric.Dec
+			}{},
 			numeric.ZeroDec(),
 		}
 	default:
