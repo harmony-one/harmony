@@ -192,7 +192,7 @@ func (node *Node) DoBeaconSyncing() {
 				continue
 			}
 		}
-		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true)
+		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true, nil)
 		time.Sleep(BeaconSyncFrequency * time.Second)
 	}
 }
@@ -234,10 +234,7 @@ SyncingLoop:
 			if willJoinConsensus {
 				node.Consensus.BlocksNotSynchronized()
 			}
-			node.stateSync.SyncLoop(bc, worker, false)
-			if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
-				node.Consensus.UpdateConsensusInformation()
-			}
+			node.stateSync.SyncLoop(bc, worker, false, node.Consensus)
 			if willJoinConsensus {
 				node.stateMutex.Lock()
 				node.State = NodeReadyForConsensus
