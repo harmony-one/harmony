@@ -53,7 +53,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					newBlock, err := node.proposeNewBlock()
-
 					if err == nil {
 						utils.Logger().Debug().
 							Uint64("blockNum", newBlock.NumberU64()).

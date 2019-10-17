@@ -292,11 +292,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO: verify the vrf randomness
 	// _ = newBlock.Header().Vrf
 
-	// TODO: uncomment 4 lines after we finish staking mechanism
-	//err = node.validateNewShardState(newBlock, &node.CurrentStakes)
-	//	if err != nil {
-	//		return ctxerror.New("failed to verify sharding state").WithCause(err)
-	//	}
 	return nil
 }
 

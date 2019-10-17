@@ -33,7 +33,7 @@ type environment struct {
 	stkingTxs staking.StakingTransactions
 	receipts  []*types.Receipt
 	outcxs    []*types.CXReceipt       // cross shard transaction receipts (source shard)
-	incxs     []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
+	incxs     []*types.CXReceiptsProof // cross shard receipts and its proof (destination shard)
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -195,11 +195,15 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 	return selected, unselected, invalid
 }
 
-func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinbase common.Address) ([]*types.Log, error) {
+func (w *Worker) commitStakingTransaction(
+	tx *staking.StakingTransaction, coinbase common.Address,
+) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, _, err :=
-		core.ApplyStakingTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	receipt, _, err := core.ApplyStakingTransaction(
+		w.config, w.chain, &coinbase, w.current.gasPool,
+		w.current.state, w.current.header, tx, &gasUsed, vm.Config{},
+	)
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
@@ -208,25 +212,31 @@ func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinba
 	if receipt == nil {
 		return nil, fmt.Errorf("nil staking receipt")
 	}
-
 	w.current.stkingTxs = append(w.current.stkingTxs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	return receipt.Logs, nil
 }
 
-func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
+func (w *Worker) commitTransaction(
+	tx *types.Transaction, coinbase common.Address,
+) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
 	gasUsed := w.current.header.GasUsed()
-	receipt, cx, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	receipt, cx, _, err := core.ApplyTransaction(
+		w.config, w.chain, &coinbase, w.current.gasPool, w.current.state,
+		w.current.header, tx, &gasUsed, vm.Config{},
+	)
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
-		utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Offchain ValidatorMap Read/Write Error")
+		utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).
+			Msg("Offchain ValidatorMap Read/Write Error")
 		return nil, err
 	}
 	if receipt == nil {
-		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
+		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).
+			Msg("Receipt is Nil!")
 		return nil, fmt.Errorf("Receipt is Nil")
 	}
 	w.current.txs = append(w.current.txs, tx)

@@ -71,7 +71,6 @@ func printVersion() {
 	os.Exit(0)
 }
 
-// Flags
 var (
 	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
 	port             = flag.String("port", "9000", "port of the node.")
@@ -113,35 +112,38 @@ var (
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 	blsPassphrase      string
-
 	// Sharding configuration parameters for devnet
 	devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
 	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
 	devnetHarmonySize = flag.Int("dn_hmy_size", -1, "number of Harmony-operated nodes per shard for -network_type=devnet; negative (default) means equal to -dn_shard_size")
-
 	// logConn logs incoming/outgoing connections
-	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
-
-	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
-
+	logConn        = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	keystoreDir    = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 	initialAccount = &genesis.DeployAccount{}
-
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
-
 	// dbDir is the database directory.
 	dbDir = flag.String("db_dir", "", "blockchain database directory")
-
 	// Disable view change.
 	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
-
 	// metrics flag to collct meetrics or not, pushgateway ip and port for metrics
 	metricsFlag     = flag.Bool("metrics", false, "Collect and upload node metrics")
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
-
-	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+	publicRPC       = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+	quorumPolicy    = flag.String("quorum_policy", "one-vote", "What quorum policy to use, staked-vote is alternative (default: one-vote)")
 )
+
+func stringToPolicy(s string) quorum.Policy {
+	switch s {
+	case "staked-vote":
+		return quorum.SuperMajorityStake
+	case "one-vote":
+		return quorum.SuperMajorityVote
+	default:
+		panic("unknown consensus quorum policy picked: " + s)
+	}
+}
 
 func initSetup() {
 
@@ -295,7 +297,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	decider := quorum.NewDecider(stringToPolicy(*quorumPolicy))
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
 	)
@@ -341,15 +343,12 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 
 	}
-
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
-
 	// Set up prometheus pushgateway for metrics monitoring serivce.
 	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
 	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
-
 	currentNode.NodeConfig.SetBeaconGroupID(nodeconfig.NewGroupIDByShardID(0))
 
 	switch *nodeType {
@@ -389,9 +388,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Set the consensus ID to be the current block number
 	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
 	currentConsensus.SetViewID(viewID)
-	utils.Logger().Info().
-		Uint64("viewID", viewID).
-		Msg("Init Blockchain")
+	utils.Logger().Info().Uint64("viewID", viewID).Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
