@@ -175,10 +175,6 @@ type Node struct {
 	PuzzleContractAddress   common.Address
 	PuzzleManagerPrivateKey *ecdsa.PrivateKey
 
-	// Staking Account
-	// TODO: leochen, can we use multiple account for staking?
-	StakingAccount accounts.Account
-
 	// For test only; TODO ek – remove this
 	TestBankKeys []*ecdsa.PrivateKey
 

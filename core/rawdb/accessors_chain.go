@@ -640,3 +640,30 @@ func WriteStakingValidator(db DatabaseWriter, v *staking.Validator) error {
 	}
 	return err
 }
+
+// ReadValidatorList retrieves staking validator by its address
+func ReadValidatorList(db DatabaseReader) ([]common.Address, error) {
+	data, err := db.Get([]byte("validatorList"))
+	if len(data) == 0 || err != nil {
+		utils.Logger().Info().Err(err).Msg("ReadValidatorList")
+		return nil, err
+	}
+	addrs := []common.Address{}
+	if err := rlp.DecodeBytes(data, &addrs); err != nil {
+		utils.Logger().Error().Err(err).Msg("Unable to Decode validator List from database")
+		return nil, err
+	}
+	return addrs, nil
+}
+
+// WriteValidatorList stores staking validator's information by its address
+func WriteValidatorList(db DatabaseWriter, addrs []common.Address) error {
+	bytes, err := rlp.EncodeToBytes(addrs)
+	if err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorList] Failed to encode")
+	}
+	if err := db.Put([]byte("validatorList"), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorList] Failed to store to database")
+	}
+	return err
+}

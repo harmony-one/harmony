@@ -23,6 +23,12 @@ const (
 
 var ValidatorHashKey = common.Hash(crypto.Keccak256Hash([]byte("ValidatorHash")))
 
+// ValidatorWrapper contains validator and its delegation information
+type ValidatorWrapper struct {
+	Validator   `json:"validator" yaml:"validator"`
+	Delegations []Delegation `json:"delegations" yaml:"delegations"`
+}
+
 // Validator - data fields for a validator
 type Validator struct {
 	// ECDSA address of the validator

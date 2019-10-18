@@ -336,11 +336,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 
 	}
-	// TODO: add staking support
-	// currentNode.StakingAccount = myAccount
-	utils.Logger().Info().
-		Str("address", common.MustAddressToBech32(currentNode.StakingAccount.Address)).
-		Msg("node account set")
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
