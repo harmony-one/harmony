@@ -34,14 +34,15 @@ type StakingTransaction struct {
 	from atomic.Value
 }
 
-type fulfill func() (Directive, interface{})
+// StakeMsgFulfiller is signature of callback intended to produce the StakeMsg
+type StakeMsgFulfiller func() (Directive, interface{})
 
 // NewStakingTransaction produces a new staking transaction record
 func NewStakingTransaction(
-	nonce, gasLimit uint64, gasPrice *big.Int, f fulfill,
+	nonce, gasLimit uint64, gasPrice *big.Int, f StakeMsgFulfiller,
 ) (*StakingTransaction, error) {
 	directive, payload := f()
-	// TODO(Double check that this is legitmate directive)
+	// TODO(Double check that this is legitmate directive, use type switch)
 	newStake := &StakingTransaction{data: txdata{
 		directive,
 		payload,

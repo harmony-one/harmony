@@ -19,6 +19,7 @@ import (
 
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
@@ -289,7 +290,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	currentConsensus, err := consensus.New(myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey)
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	currentConsensus, err := consensus.New(
+		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
+	)
 	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 
 	if err != nil {
@@ -383,11 +387,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 
 	// Set the consensus ID to be the current block number
-	height := currentNode.Blockchain().CurrentBlock().NumberU64()
-
-	currentConsensus.SetViewID(height)
+	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
+	currentConsensus.SetViewID(viewID)
 	utils.Logger().Info().
-		Uint64("height", height).
+		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object

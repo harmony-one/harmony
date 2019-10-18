@@ -25,8 +25,8 @@ import (
 const (
 	lastMileThreshold   = 4
 	inSyncThreshold     = 1  // unit in number of block
-	SyncFrequency       = 10 // unit in second
-	BeaconSyncFrequency = 5  // unit in second
+	SyncFrequency       = 60 // unit in second
+	BeaconSyncFrequency = 60 // unit in second
 	MinConnectedPeers   = 10 // minimum number of peers connected to in node syncing
 )
 
@@ -192,7 +192,7 @@ func (node *Node) DoBeaconSyncing() {
 				continue
 			}
 		}
-		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true)
+		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true, nil)
 		time.Sleep(BeaconSyncFrequency * time.Second)
 	}
 }
@@ -226,6 +226,7 @@ SyncingLoop:
 			}
 			utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 		}
+		// TODO: treat fake maximum height
 		if node.stateSync.IsOutOfSync(bc) {
 			node.stateMutex.Lock()
 			node.State = NodeNotInSync
@@ -233,10 +234,7 @@ SyncingLoop:
 			if willJoinConsensus {
 				node.Consensus.BlocksNotSynchronized()
 			}
-			node.stateSync.SyncLoop(bc, worker, false)
-			if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
-				node.Consensus.UpdateConsensusInformation()
-			}
+			node.stateSync.SyncLoop(bc, worker, false, node.Consensus)
 			if willJoinConsensus {
 				node.stateMutex.Lock()
 				node.State = NodeReadyForConsensus
@@ -247,6 +245,7 @@ SyncingLoop:
 		node.stateMutex.Lock()
 		node.State = NodeReadyForConsensus
 		node.stateMutex.Unlock()
+		// TODO on demand syncing
 		time.Sleep(SyncFrequency * time.Second)
 	}
 }

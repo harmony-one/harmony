@@ -3,6 +3,8 @@ package consensus
 import (
 	"testing"
 
+	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -16,7 +18,10 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	consensus, err := New(host, 0, leader, bls.RandPrivateKey())
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	consensus, err := New(
+		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}

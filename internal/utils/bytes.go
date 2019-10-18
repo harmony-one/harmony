@@ -89,7 +89,7 @@ func countOneBitsInByte(by byte) int {
 }
 
 // CountOneBits counts the number of 1 bit in byte array
-func CountOneBits(arr []byte) int {
+func CountOneBits(arr []byte) int64 {
 	if arr == nil {
 		return 0
 	}
@@ -100,5 +100,5 @@ func CountOneBits(arr []byte) int {
 	for i := range arr {
 		count += countOneBitsInByte(arr[i])
 	}
-	return count
+	return int64(count)
 }

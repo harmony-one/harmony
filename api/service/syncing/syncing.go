@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -741,18 +742,20 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool) {
+func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
 	// remove SyncLoopFrequency
 	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
+	defer ticker.Stop()
 Loop:
 	for {
 		select {
 		case <-ticker.C:
 			otherHeight := ss.getMaxPeerHeight(isBeacon)
 			currentHeight := bc.CurrentBlock().NumberU64()
+
 			if currentHeight >= otherHeight {
 				utils.Logger().Info().Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)", isBeacon, bc.ShardID(), otherHeight, currentHeight)
 				break Loop
@@ -766,6 +769,9 @@ Loop:
 			}
 			ss.ProcessStateSync(startHash[:], size, bc, worker)
 			ss.purgeOldBlocksFromCache()
+			if consensus != nil {
+				consensus.UpdateConsensusInformation()
+			}
 		}
 	}
 	ss.purgeAllBlocksFromCache()

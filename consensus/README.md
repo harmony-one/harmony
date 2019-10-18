@@ -13,38 +13,45 @@ and scalable to traditional PBFT. For brevity, we will still call the whole proc
 
 To reach the consensus of the next block, there are 3 phases: announce(i.e. pre-prepare in PBFT), prepare and commit.
 
-* Announce(leader): The leader broadcasts ANNOUNCE message along with candidate of the next block.
-* Prepare(validator): The validator will validate the block sent by leader and send PREPARE message; if the block is invalid, the validator will propose view change. If the prepare timeout, the validator will also propose view change.
-* Prepared(leader): The leader will collect 2f+1 PREPARE message including itself and broadcast PREPARED message with the aggregated signature
-* Commit(validator): The validator will check the validity of aggregated signature (# of signatures >= 2f+1) and send COMMIT message; if the commit timeout, the validator will also propose view change.
-* Committed(leader): The leader will collect 2f+1 COMMIT message including itself and broadcast COMMITTED message with the aggregated signature
-* Finalize(leader and validators): Both the leader and validators will finalize the block into blockchain together with 2f+1 aggregated signatures.
-
+- Announce(leader): The leader broadcasts ANNOUNCE message along with candidate of the next block.
+- Prepare(validator): The validator will validate the block sent by leader and send PREPARE message;
+  if the block is invalid, the validator will propose view change. If the prepare timeout, the validator will also propose view change.
+- Prepared(leader): The leader will collect 2f+1 PREPARE message including itself and broadcast PREPARED message with the aggregated signature
+- Commit(validator): The validator will check the validity of aggregated signature (# of signatures >= 2f+1) and
+  send COMMIT message; if the commit timeout, the validator will also propose view change.
+- Committed(leader): The leader will collect 2f+1 COMMIT message including itself and broadcast COMMITTED message with the aggregated signature
+- Finalize(leader and validators): Both the leader and validators will finalize the block into blockchain together with 2f+1 aggregated signatures.
 
 ### View changing mode
 
-* ViewChange(validator): whenever a validator receives invalid block/signature from the leader, it should send VIEWCHANGE message with view v+1 together with its own prepared message(>=2f+1 aggregated prepare signatures) from previous views.
-* NewView(new leader): when the new leader (uniquely determined) collect enough (2f+1) view change messages, it broadcasts the NEWVIEW message with aggregated VIEWCHANGE signatures.
-* During the view changing process, if the new leader not send NEWVIEW message on time, the validator will propose ViewChange for the next view v+2 and so on...
-
+- ViewChange(validator): whenever a validator receives invalid block/signature from the leader,
+  it should send VIEWCHANGE message with view v+1 together with its own prepared message(>=2f+1 aggregated prepare signatures) from previous views.
+- NewView(new leader): when the new leader (uniquely determined) collect enough (2f+1) view change
+  messages, it broadcasts the NEWVIEW message with aggregated VIEWCHANGE signatures.
+- During the view changing process, if the new leader not send NEWVIEW message on time, the
+  validator will propose ViewChange for the next view v+2 and so on...
 
 ## State Machine
 
-The whole process of PBFT can be described as a state machine. We don't separate the roles of leader and validators, instead we use PbftState structure to describe the role and phase of a given node who is joining the consensus process. When a node receives a new message from its peer, its state will be updated. i.e. pbft_state --(upon receive new PbftMessage)--> new_pbft_state. Thus the most nature and clear way is to describe the whole process as state machine.
+The whole process of PBFT can be described as a state machine. We don't separate the roles of leader
+and validators, instead we use PBFTState structure to describe the role and phase of a given node
+who is joining the consensus process. When a node receives a new message from its peer, its state will be updated. i.e. pbft_state --(upon
+receive new PBFTMessage)-->
+new_pbft_state. Thus the most nature and clear way is to describe the whole process as state machine.
 
-```
-// PbftState holds the state of a node in PBFT process
-type PbftState struct {
+```golang
+// PBFTState holds the state of a node in PBFT process
+type PBFTState struct {
    IsLeader bool
-   phase PbftPhase // Announce, Prepare(d), Commit(ted)
+   phase PBFTPhase // Announce, Prepare(d), Commit(ted)
    ...
 
 }
 
-// PbftLog stores the data in PBFT process, it will be used in different phases in order to determine whether a new PbftMessage is valid or not.
-type PbftLog struct {
+// PBFTLog stores the data in PBFT process, it will be used in different phases in order to determine whether a new PBFTMessage is valid or not.
+type PBFTLog struct {
     blocks []*types.Block
-    messages []*PbftMessage
+    messages []*PBFTMessage
 }
 
 // entry point and main loop;
@@ -83,6 +90,4 @@ func (consensus *Consensus) Start(stopChan chan struct{}, stoppedChan chan struc
     }
 
 }
-
-
 ```

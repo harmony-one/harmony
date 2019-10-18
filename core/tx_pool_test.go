@@ -34,7 +34,6 @@ import (
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/internal/params"
 )
 
@@ -235,27 +234,27 @@ func TestInvalidTransactions(t *testing.T) {
 	from, _ := deriveSender(tx)
 
 	pool.currentState.AddBalance(from, big.NewInt(1))
-	if err := pool.AddRemote(tx); err != values.ErrInsufficientFunds {
-		t.Error("expected", values.ErrInsufficientFunds)
+	if err := pool.AddRemote(tx); err != ErrInsufficientFunds {
+		t.Error("expected", ErrInsufficientFunds)
 	}
 
 	balance := new(big.Int).Add(tx.Value(), new(big.Int).Mul(new(big.Int).SetUint64(tx.Gas()), tx.GasPrice()))
 	pool.currentState.AddBalance(from, balance)
-	if err := pool.AddRemote(tx); err != values.ErrIntrinsicGas {
-		t.Error("expected", values.ErrIntrinsicGas, "got", err)
+	if err := pool.AddRemote(tx); err != ErrIntrinsicGas {
+		t.Error("expected", ErrIntrinsicGas, "got", err)
 	}
 
 	pool.currentState.SetNonce(from, 1)
 	pool.currentState.AddBalance(from, big.NewInt(0xffffffffffffff))
 	tx = transaction(0, 100000, key)
-	if err := pool.AddRemote(tx); err != values.ErrNonceTooLow {
-		t.Error("expected", values.ErrNonceTooLow)
+	if err := pool.AddRemote(tx); err != ErrNonceTooLow {
+		t.Error("expected", ErrNonceTooLow)
 	}
 
 	tx = transaction(1, 100000, key)
 	pool.gasPrice = big.NewInt(1000)
-	if err := pool.AddRemote(tx); err != values.ErrUnderpriced {
-		t.Error("expected", values.ErrUnderpriced, "got", err)
+	if err := pool.AddRemote(tx); err != ErrUnderpriced {
+		t.Error("expected", ErrUnderpriced, "got", err)
 	}
 	if err := pool.AddLocal(tx); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -325,8 +324,8 @@ func TestTransactionNegativeValue(t *testing.T) {
 	tx, _ := types.SignTx(types.NewTransaction(0, common.Address{}, 0, big.NewInt(-1), 100, big.NewInt(1), nil), types.HomesteadSigner{}, key)
 	from, _ := deriveSender(tx)
 	pool.currentState.AddBalance(from, big.NewInt(1))
-	if err := pool.AddRemote(tx); err != values.ErrNegativeValue {
-		t.Error("expected", values.ErrNegativeValue, "got", err)
+	if err := pool.AddRemote(tx); err != ErrNegativeValue {
+		t.Error("expected", ErrNegativeValue, "got", err)
 	}
 }
 

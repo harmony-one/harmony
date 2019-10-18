@@ -114,8 +114,9 @@ function build_only
          fi
       fi
    done
-
-   $MD5 $BINDIR/* > $BINDIR/md5sum.txt 2> /dev/null
+   pushd $BINDIR
+   $MD5 "${!SRC[@]}" > md5sum.txt
+   popd
 }
 
 function upload
