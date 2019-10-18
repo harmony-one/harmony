@@ -29,7 +29,6 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -180,54 +179,6 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	return receipt, cxReceipt, gas, err
 }
 
-// ApplyStakingTransaction attempts to apply a staking transaction to the given state database
-// and uses the input parameters for its environment. It returns the receipt
-// for the staking transaction, gas used and an error if the transaction failed,
-// indicating the block was invalid.
-// staking transaction will use the storage field in the account to store the staking information
-func ApplyStakingTransaction(
-	config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB,
-	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gas uint64, err error) {
-
-	msg, err := StakingToMessage(tx)
-	if err != nil {
-		return nil, 0, err
-	}
-	stkType := tx.StakingType()
-	if _, ok := types.StakingTypeMap[stkType]; !ok {
-		return nil, 0, staking.ErrInvalidStakingKind
-	}
-	msg.SetType(types.StakingTypeMap[stkType])
-
-	// Create a new context to be used in the EVM environment
-	context := NewEVMContext(msg, header, bc, author)
-
-	// Create a new environment which holds all relevant information
-	// about the transaction and calling mechanisms.
-	vmenv := vm.NewEVM(context, statedb, config, cfg)
-	// Apply the transaction to the current state (included in the env)
-	gas, err = ApplyStakingMessage(vmenv, msg, gp)
-
-	// even there is error, we charge it
-	if err != nil {
-		return nil, gas, err
-	}
-
-	// Update the state with pending changes
-	var root []byte
-	if config.IsS3(header.Epoch()) {
-		statedb.Finalise(true)
-	} else {
-		root = statedb.IntermediateRoot(config.IsS3(header.Epoch())).Bytes()
-	}
-	*usedGas += gas
-	receipt = types.NewReceipt(root, false, *usedGas)
-	receipt.TxHash = tx.Hash()
-	receipt.GasUsed = gas
-
-	return receipt, gas, nil
-}
-
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt
 func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *block.Header, cxp *types.CXReceiptsProof) error {
 	if cxp == nil {
@@ -247,20 +198,4 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 		db.IntermediateRoot(config.IsS3(header.Epoch()))
 	}
 	return nil
-}
-
-// StakingToMessage returns the staking transaction as a core.Message.
-// requires a signer to derive the sender.
-// put it here to avoid cyclic import
-func StakingToMessage(tx *staking.StakingTransaction) (types.Message, error) {
-	payload, err := tx.StakingMsgToBytes()
-	if err != nil {
-		return types.Message{}, err
-	}
-	from, err := tx.SenderAddress()
-	if err != nil {
-		return types.Message{}, err
-	}
-	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.Price(), payload)
-	return msg, nil
 }

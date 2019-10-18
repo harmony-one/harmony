@@ -22,13 +22,10 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 var (
@@ -135,11 +132,6 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) ([]byte, uint64, bool, error) {
 	return NewStateTransition(evm, msg, gp).TransitionDb()
-}
-
-// ApplyStakingMessage computes the new state for staking message
-func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool) (uint64, error) {
-	return NewStateTransition(evm, msg, gp).StakingTransitionDb()
 }
 
 // to returns the recipient of the message.
@@ -259,100 +251,4 @@ func (st *StateTransition) refundGas() {
 // gasUsed returns the amount of gas used up by the state transition.
 func (st *StateTransition) gasUsed() uint64 {
 	return st.initialGas - st.gas
-}
-
-// StakingTransitionDb will transition the state by applying the staking message and
-// returning the result including the used gas. It returns an error if failed.
-// It is used for staking transaction only
-func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
-	if err = st.preCheck(); err != nil {
-		return 0, err
-	}
-	msg := st.msg
-	sender := vm.AccountRef(msg.From())
-	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
-
-	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, false, homestead)
-	if err != nil {
-		return 0, err
-	}
-	if err = st.useGas(gas); err != nil {
-		return 0, err
-	}
-
-	// Increment the nonce for the next transaction
-	st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-	st.refundGas()
-
-	switch msg.Type() {
-	case types.StakeNewVal:
-		stkMsg := &staking.NewValidator{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
-		}
-		err = st.applyNewValidatorTx(stkMsg)
-
-	case types.StakeEditVal:
-		stkMsg := &staking.EditValidator{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
-		}
-		err = st.applyEditValidatorTx(stkMsg)
-	case types.Delegate:
-		stkMsg := &staking.Delegate{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
-		}
-		err = st.applyDelegateTx(stkMsg)
-	case types.Redelegate:
-		stkMsg := &staking.Redelegate{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
-		}
-		err = st.applyRedelegateTx(stkMsg)
-
-	case types.Undelegate:
-		stkMsg := &staking.Undelegate{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
-		}
-		err = st.applyUndelegateTx(stkMsg)
-	default:
-		return 0, staking.ErrInvalidStakingKind
-	}
-
-	return st.gasUsed(), err
-}
-
-func (st *StateTransition) applyNewValidatorTx(newValidator *staking.NewValidator) error {
-	// TODO UpdateHeight and UnbondingHeight
-	commission := staking.Commission{newValidator.CommissionRates, new(big.Int)}
-	v := staking.Validator{newValidator.StakingAddress, newValidator.PubKey,
-		newValidator.Amount, new(big.Int), newValidator.MinSelfDelegation, false,
-		commission, newValidator.Description}
-
-	bytes, err := rlp.EncodeToBytes(&v)
-	if err != nil {
-		return err
-	}
-	hash := crypto.Keccak256Hash(bytes)
-	st.state.SetState(v.Address, staking.ValidatorHashKey, hash)
-	return nil
-}
-
-func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValidator) error {
-	return nil
-}
-
-func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
-	return nil
-}
-
-func (st *StateTransition) applyRedelegateTx(redelegate *staking.Redelegate) error {
-	return nil
-}
-
-func (st *StateTransition) applyUndelegateTx(undelegate *staking.Undelegate) error {
-	return nil
 }
