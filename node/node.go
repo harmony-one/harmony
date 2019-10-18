@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
@@ -418,13 +419,17 @@ func (node *Node) getTransactionsForNewBlock(
 	return selected, selectedStaking
 }
 
-type messageHandler struct {
-	node *Node
+type messageHandler interface {
+	HandleMessage(content []byte, id libp2p_peer.ID)
 }
 
-func (h messageHandler) HandleItem(item interface{}) {
+type messageItemHandler struct {
+	mh messageHandler
+}
+
+func (h messageItemHandler) HandleItem(item interface{}) {
 	if msg, ok := item.(incomingMessage); ok {
-		h.node.HandleMessage(msg.content, msg.sender)
+		h.mh.HandleMessage(msg.content, msg.sender)
 	}
 }
 
@@ -433,7 +438,7 @@ func (node *Node) startRxPipeline(
 ) {
 	// consumers
 	for i := 0; i < numWorkers; i++ {
-		go queue.HandleItems(messageHandler{node})
+		go queue.HandleItems(messageItemHandler{node})
 	}
 	// provider
 	go node.receiveGroupMessage(receiver, queue)
