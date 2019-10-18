@@ -615,13 +615,13 @@ func WriteCXReceiptsProofUnspentCheckpoint(db DatabaseWriter, shardID uint32, bl
 }
 
 // ReadStakingValidator retrieves staking validator by its address
-func ReadStakingValidator(db DatabaseReader, addr common.Address) (*staking.Validator, error) {
+func ReadStakingValidator(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
 	data, err := db.Get(stakingKey(addr))
 	if len(data) == 0 || err != nil {
 		utils.Logger().Info().Err(err).Msg("ReadStakingValidator")
 		return nil, err
 	}
-	v := staking.Validator{}
+	v := staking.ValidatorWrapper{}
 	if err := rlp.DecodeBytes(data, &v); err != nil {
 		utils.Logger().Error().Err(err).Str("address", addr.Hex()).Msg("Unable to Decode staking validator from database")
 		return nil, err
@@ -630,7 +630,7 @@ func ReadStakingValidator(db DatabaseReader, addr common.Address) (*staking.Vali
 }
 
 // WriteStakingValidator stores staking validator's information by its address
-func WriteStakingValidator(db DatabaseWriter, v *staking.Validator) error {
+func WriteStakingValidator(db DatabaseWriter, v *staking.ValidatorWrapper) error {
 	bytes, err := rlp.EncodeToBytes(v)
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteStakingValidator] Failed to encode")

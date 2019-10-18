@@ -80,9 +80,8 @@ type Engine interface {
 	Finalize(
 		chain ChainReader, header *block.Header, state *state.DB,
 		txs []*types.Transaction,
-		stkgTxs []*staking.StakingTransaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
-		incxs []*types.CXReceiptsProof) (*types.Block, error)
+		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.

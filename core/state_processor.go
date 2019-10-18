@@ -94,7 +94,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.StakingTransactions(), receipts, outcxs, incxs)
+	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, outcxs, incxs, block.StakingTransactions())
 	if err != nil {
 		return nil, nil, nil, 0, ctxerror.New("cannot finalize block").WithCause(err)
 	}

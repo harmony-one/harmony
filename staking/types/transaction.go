@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"math/big"
+	"reflect"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,6 +24,26 @@ type txdata struct {
 	S *big.Int `json:"s" gencodec:"required"`
 	// This is only used when marshaling to JSON.
 	Hash *common.Hash `json:"hash" rlp:"-"`
+}
+
+func (d *txdata) CopyFrom(d2 *txdata) {
+	d.Directive = d2.Directive
+	d.AccountNonce = d2.AccountNonce
+	d.Price = new(big.Int).Set(d2.Price)
+	d.GasLimit = d2.GasLimit
+	d.StakeMsg = reflect.New(reflect.ValueOf(d2.StakeMsg).Elem().Type()).Interface()
+	d.V = new(big.Int).Set(d2.V)
+	d.R = new(big.Int).Set(d2.R)
+	d.S = new(big.Int).Set(d2.S)
+	d.Hash = copyHash(d2.Hash)
+}
+
+func copyHash(hash *common.Hash) *common.Hash {
+	if hash == nil {
+		return nil
+	}
+	copy := *hash
+	return &copy
 }
 
 // StakingTransaction is a record captuing all staking operations
@@ -74,6 +95,13 @@ func (tx *StakingTransaction) Hash() common.Hash {
 	v := hash.FromRLP(tx)
 	tx.hash.Store(v)
 	return v
+}
+
+// Copy returns a copy of the transaction.
+func (tx *StakingTransaction) Copy() *StakingTransaction {
+	var tx2 StakingTransaction
+	tx2.data.CopyFrom(&tx.data)
+	return &tx2
 }
 
 // WithSignature returns a new transaction with the given signature.

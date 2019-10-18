@@ -2252,11 +2252,11 @@ func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, 
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }
 
-// ReadStakingValidator reads staking information of given validator
-func (bc *BlockChain) ReadStakingValidator(addr common.Address) (*staking.Validator, error) {
+// ReadStakingValidator reads staking information of given validatorWrapper
+func (bc *BlockChain) ReadStakingValidator(addr common.Address) (*staking.ValidatorWrapper, error) {
 	if cached, ok := bc.stakingCache.Get("staking-" + string(addr.Bytes())); ok {
 		by := cached.([]byte)
-		v := staking.Validator{}
+		v := staking.ValidatorWrapper{}
 		if err := rlp.DecodeBytes(by, &v); err != nil {
 			return nil, err
 		}
@@ -2266,8 +2266,8 @@ func (bc *BlockChain) ReadStakingValidator(addr common.Address) (*staking.Valida
 	return rawdb.ReadStakingValidator(bc.db, addr)
 }
 
-// WriteStakingValidator reads staking information of given validator
-func (bc *BlockChain) WriteStakingValidator(v *staking.Validator) error {
+// WriteStakingValidator reads staking information of given validatorWrapper
+func (bc *BlockChain) WriteStakingValidator(v *staking.ValidatorWrapper) error {
 	err := rawdb.WriteStakingValidator(bc.db, v)
 	if err != nil {
 		return err

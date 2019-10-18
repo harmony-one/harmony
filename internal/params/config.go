@@ -26,6 +26,7 @@ var (
 		ChainID:        MainnetChainID,
 		CrossTxEpoch:   big.NewInt(28),
 		CrossLinkEpoch: EpochTBD,
+		StakingEpoch:   EpochTBD,
 		EIP155Epoch:    big.NewInt(28),
 		S3Epoch:        big.NewInt(28),
 	}
@@ -35,6 +36,7 @@ var (
 		ChainID:        TestnetChainID,
 		CrossTxEpoch:   big.NewInt(1),
 		CrossLinkEpoch: big.NewInt(2),
+		StakingEpoch:   big.NewInt(3),
 		EIP155Epoch:    big.NewInt(0),
 		S3Epoch:        big.NewInt(0),
 	}
@@ -45,6 +47,7 @@ var (
 		ChainID:        PangaeaChainID,
 		CrossTxEpoch:   big.NewInt(0),
 		CrossLinkEpoch: EpochTBD,
+		StakingEpoch:   EpochTBD,
 		EIP155Epoch:    big.NewInt(0),
 		S3Epoch:        big.NewInt(0),
 	}
@@ -56,6 +59,7 @@ var (
 		AllProtocolChangesChainID, // ChainID
 		big.NewInt(0),             // CrossTxEpoch
 		big.NewInt(0),             // CrossLinkEpoch
+		big.NewInt(0),             // StakingEpoch
 		big.NewInt(0),             // EIP155Epoch
 		big.NewInt(0),             // S3Epoch
 	}
@@ -67,6 +71,7 @@ var (
 		TestChainID,   // ChainID
 		big.NewInt(0), // CrossTxEpoch
 		big.NewInt(0), // CrossLinkEpoch
+		big.NewInt(0), // StakingEpoch
 		big.NewInt(0), // EIP155Epoch
 		big.NewInt(0), // S3Epoch
 	}
@@ -103,16 +108,20 @@ type ChainConfig struct {
 	// cross-shard links.
 	CrossLinkEpoch *big.Int `json:"crossLinkEpoch,omitempty"`
 
+	// StakingEpoch is the epoch we allow staking transactions
+	StakingEpoch *big.Int `json:"stakingEpoch,omitempty"`
+
 	EIP155Epoch *big.Int `json:"eip155Epoch,omitempty"` // EIP155 hard fork epoch (include EIP158 too)
 	S3Epoch     *big.Int `json:"s3Epoch,omitempty"`     // S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EIP155: %v CrossTx: %v CrossLink: %v}",
+	return fmt.Sprintf("{ChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v}",
 		c.ChainID,
 		c.EIP155Epoch,
 		c.CrossTxEpoch,
+		c.StakingEpoch,
 		c.CrossLinkEpoch,
 	)
 }
@@ -135,6 +144,12 @@ func (c *ChainConfig) IsEIP155(epoch *big.Int) bool {
 func (c *ChainConfig) IsCrossTx(epoch *big.Int) bool {
 	crossTxEpoch := new(big.Int).Add(c.CrossTxEpoch, common.Big1)
 	return isForked(crossTxEpoch, epoch)
+}
+
+// IsStaking determines whether it is staking epoch
+func (c *ChainConfig) IsStaking(epoch *big.Int) bool {
+	stkEpoch := new(big.Int).Add(c.StakingEpoch, common.Big1)
+	return isForked(stkEpoch, epoch)
 }
 
 // IsCrossLink returns whether epoch is either equal to the CrossLink fork epoch or greater.
