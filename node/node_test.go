@@ -8,6 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/stretchr/testify/assert"
+
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -17,9 +21,9 @@ import (
 	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
+	mock_node "github.com/harmony-one/harmony/node/mock"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	"github.com/stretchr/testify/assert"
 )
 
 var testDBFactory = &shardchain.MemDBFactory{}
@@ -295,4 +299,29 @@ func exitServer() {
 	time.Sleep(5 * time.Second)
 
 	os.Exit(0)
+}
+
+func Test_messageItemHandler_HandleItem(t *testing.T) {
+	content := []byte{0x03, 0x24, 0x3f, 0x6a, 0x88, 0x85, 0xa3, 0x08}
+	sender := peer.ID("3.141592")
+	t.Run("incomingMessage_handled", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mh := mock_node.NewMockmessageHandler(ctrl)
+		mh.EXPECT().HandleMessage(content, sender).Times(1)
+		h := messageItemHandler{mh: mh}
+		h.HandleItem(incomingMessage{content, sender})
+	})
+	t.Run("non_incomingMessage_ignored", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mh := mock_node.NewMockmessageHandler(ctrl)
+		mh.EXPECT().HandleMessage(content, sender).Times(0)
+		h := messageItemHandler{mh: mh}
+		// not called even if passed with a struct with identical members
+		h.HandleItem(struct {
+			content []byte
+			sender peer.ID
+		}{content, sender})
+	})
 }

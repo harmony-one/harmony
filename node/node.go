@@ -1,5 +1,7 @@
 package node
 
+//go:generate mockgen -source=node.go -destination=mock/node_mock.go
+
 import (
 	"crypto/ecdsa"
 	"fmt"
