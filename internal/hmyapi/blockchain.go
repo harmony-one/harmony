@@ -92,11 +92,11 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 // GetBlocks method returns blocks in range blockStart, blockEnd just like GetBlockByNumber but all at once.
 func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart rpc.BlockNumber, blockEnd rpc.BlockNumber, blockArgs BlockArgs) ([]map[string]interface{}, error) {
 	result := make([]map[string]interface{}, 0)
-	for i := blockStart; i < blockEnd; i++ {
+	for i := blockStart; i <= blockEnd; i++ {
 		block, err := s.b.BlockByNumber(ctx, i)
 		blockArgs.InclTx = true
 		if blockArgs.WithSigners {
-			blockArgs.Signers, err = s.GetBlockSigners(ctx, i)
+			blockArgs.Signers, err = s.GetBlockSigners(ctx, rpc.BlockNumber(i))
 			if err != nil {
 				return nil, err
 			}
@@ -108,16 +108,16 @@ func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart rpc.Bloc
 				for _, field := range []string{"hash", "nonce", "miner"} {
 					rpcBlock[field] = nil
 				}
-				result = append(result, rpcBlock)
 			}
+			result = append(result, rpcBlock)
 		}
 	}
 	return result, nil
 }
 
-// GetCommittee returns committee for a particular epoch.
-func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (map[string]interface{}, error) {
-	committee, err := s.b.GetCommittee(big.NewInt(epoch))
+// GetValidators returns validators list for a particular epoch.
+func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (map[string]interface{}, error) {
+	committee, err := s.b.GetValidators(big.NewInt(epoch))
 	if err != nil {
 		return nil, err
 	}
@@ -147,23 +147,35 @@ func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (ma
 
 // GetBlockSigners returns signers for a particular block.
 func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) ([]string, error) {
-	epoch := s.GetEpoch(ctx)
-	committee, err := s.b.GetCommittee(big.NewInt(int64(epoch)))
+	if uint64(blockNr) == 0 {
+		return make([]string, 0), nil
+	}
+	block, err := s.b.BlockByNumber(ctx, blockNr)
+	if err != nil {
+		return nil, err
+	}
+	blockWithSigners, err := s.b.BlockByNumber(ctx, blockNr+1)
+	if err != nil {
+		return nil, err
+	}
+	committee, err := s.b.GetValidators(block.Epoch())
+	if err != nil {
+		return nil, err
+	}
 	pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-	result := make([]string, 0)
 	for i, validator := range committee.NodeList {
 		pubkeys[i] = new(bls.PublicKey)
 		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
+	result := make([]string, 0)
 	mask, err := internal_bls.NewMask(pubkeys, nil)
 	if err != nil {
 		return result, err
 	}
-	block, err := s.b.BlockByNumber(ctx, blockNr+1)
 	if err != nil {
 		return result, err
 	}
-	err = mask.SetMask(block.Header().LastCommitBitmap())
+	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
 	if err != nil {
 		return result, err
 	}
@@ -183,8 +195,18 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 
 // IsBlockSigner returns true if validator with address signed blockNr block.
 func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.BlockNumber, address string) (bool, error) {
-	epoch := s.GetEpoch(ctx)
-	committee, err := s.b.GetCommittee(big.NewInt(int64(epoch)))
+	block, err := s.b.BlockByNumber(ctx, blockNr)
+	if err != nil {
+		return false, err
+	}
+	blockWithSigners, err := s.b.BlockByNumber(ctx, blockNr+1)
+	if err != nil {
+		return false, err
+	}
+	committee, err := s.b.GetValidators(block.Epoch())
+	if err != nil {
+		return false, err
+	}
 	pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
 	for i, validator := range committee.NodeList {
 		pubkeys[i] = new(bls.PublicKey)
@@ -194,11 +216,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 	if err != nil {
 		return false, err
 	}
-	block, err := s.b.BlockByNumber(ctx, blockNr+1)
-	if err != nil {
-		return false, err
-	}
-	err = mask.SetMask(block.Header().LastCommitBitmap())
+	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
 	if err != nil {
 		return false, err
 	}
@@ -220,7 +238,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 }
 
 // GetSignedBlocks returns how many blocks a particular validator signed for last defaultBlocksPeriod (3 hours ~ 1500 blocks).
-func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address string) uint64 {
+func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address string) hexutil.Uint64 {
 	header := s.LatestHeader(ctx)
 	totalSigned := uint64(0)
 	lastBlock := uint64(0)
@@ -233,17 +251,72 @@ func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address strin
 			totalSigned++
 		}
 	}
-	return totalSigned
+	return hexutil.Uint64(totalSigned)
 }
 
 // GetEpoch returns current epoch.
-func (s *PublicBlockChainAPI) GetEpoch(ctx context.Context) uint64 {
-	return s.LatestHeader(ctx).Epoch
+func (s *PublicBlockChainAPI) GetEpoch(ctx context.Context) hexutil.Uint64 {
+	return hexutil.Uint64(s.LatestHeader(ctx).Epoch)
 }
 
 // GetLeader returns current shard leader.
 func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 	return s.LatestHeader(ctx).Leader
+}
+
+// GetValidatorInformation returns full validator info.
+func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (map[string]interface{}, error) {
+	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
+	fields := map[string]interface{}{
+		"address":                 validator.Address.String(),
+		"stake":                   hexutil.Uint64(validator.Stake.Uint64()),
+		"name":                    validator.Description.Name,
+		"validatingPublicKey":     validator.ValidatingPubKey.SerializeToHexStr(),
+		"unbondingHeight":         hexutil.Uint64(validator.UnbondingHeight.Uint64()),
+		"minSelfDelegation":       hexutil.Uint64(validator.MinSelfDelegation.Uint64()),
+		"active":                  validator.Active,
+		"identity":                validator.Description.Identity,
+		"commissionRate":          hexutil.Uint64(validator.Commission.CommissionRates.Rate.Int.Uint64()),
+		"commissionUpdateHeight":  hexutil.Uint64(validator.Commission.UpdateHeight.Uint64()),
+		"commissionMaxRate":       hexutil.Uint64(validator.Commission.CommissionRates.MaxRate.Uint64()),
+		"commissionMaxChangeRate": hexutil.Uint64(validator.Commission.CommissionRates.MaxChangeRate.Uint64()),
+		"website":                 validator.Description.Website,
+		"securityContact":         validator.Description.SecurityContact,
+		"details":                 validator.Description.Details,
+	}
+	return fields, nil
+}
+
+// GetStake returns validator stake.
+func (s *PublicBlockChainAPI) GetStake(ctx context.Context, address string) hexutil.Uint64 {
+	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
+	return hexutil.Uint64(validator.Stake.Uint64())
+}
+
+// GetValidatorStakingAddress stacking address returns validator stacking address.
+func (s *PublicBlockChainAPI) GetValidatorStakingAddress(ctx context.Context, address string) string {
+	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
+	return validator.Address.String()
+}
+
+// GetValidatorStakingWithDelegation returns total balace stacking for validator with delegation.
+func (s *PublicBlockChainAPI) GetValidatorStakingWithDelegation(ctx context.Context, address string) hexutil.Uint64 {
+	return hexutil.Uint64(s.b.GetValidatorStakingWithDelegation(internal_common.ParseAddr(address)).Uint64())
+}
+
+// GetDelegatorsInformation returns list of delegators for a validator address.
+func (s *PublicBlockChainAPI) GetDelegatorsInformation(ctx context.Context, address string) ([]map[string]interface{}, error) {
+	delegators := s.b.GetDelegatorsInformation(internal_common.ParseAddr(address))
+	delegatorsFields := make([]map[string]interface{}, 0)
+	for _, delegator := range delegators {
+		fields := map[string]interface{}{
+			"delegator": delegator.DelegatorAddress.String(),
+			"validator": delegator.ValidatorAddress.String(),
+			"amount":    hexutil.Uint64(delegator.Amount.Uint64()),
+		}
+		delegatorsFields = append(delegatorsFields, fields)
+	}
+	return delegatorsFields, nil
 }
 
 // GetShardingStructure returns an array of sharding structures.

@@ -209,8 +209,8 @@ func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
 }
 
 // GetTransactionsHistory returns list of transactions hashes of address.
-func (b *APIBackend) GetTransactionsHistory(address string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address)
+func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
 	return hashes, err
 }
 
@@ -241,8 +241,8 @@ func (b *APIBackend) GetShardID() uint32 {
 	return b.hmy.shardID
 }
 
-// GetCommittee returns committee for a particular epoch.
-func (b *APIBackend) GetCommittee(epoch *big.Int) (*shard.Committee, error) {
+// GetValidators returns validators for a particular epoch.
+func (b *APIBackend) GetValidators(epoch *big.Int) (*shard.Committee, error) {
 	state, err := b.hmy.BlockChain().ReadShardState(epoch)
 	if err != nil {
 		return nil, err
@@ -288,4 +288,29 @@ func (b *APIBackend) SendStakingTx(
 	newStakingTx *staking.StakingTransaction) error {
 	b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
 	return nil
+}
+
+// GetCurrentValidatorAddresses returns the address of active validators for current epoch
+func (b *APIBackend) GetCurrentValidatorAddresses() []common.Address {
+	return b.hmy.BlockChain().CurrentValidatorAddresses()
+}
+
+// GetValidatorCandidates returns the up to date validator candidates for next epoch
+func (b *APIBackend) GetValidatorCandidates() []common.Address {
+	return b.hmy.BlockChain().ValidatorCandidates()
+}
+
+// GetValidatorInformation returns the information of validator
+func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Validator {
+	return b.hmy.BlockChain().ValidatorInformation(addr)
+}
+
+// GetDelegatorsInformation returns up to date information of delegators of a given validator address
+func (b *APIBackend) GetDelegatorsInformation(addr common.Address) []*staking.Delegation {
+	return b.hmy.BlockChain().DelegatorsInformation(addr)
+}
+
+// GetValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
+func (b *APIBackend) GetValidatorStakingWithDelegation(addr common.Address) *big.Int {
+	return b.hmy.BlockChain().ValidatorStakingWithDelegation(addr)
 }

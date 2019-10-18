@@ -64,8 +64,8 @@ type Backend interface {
 	CurrentBlock() *types.Block
 	// Get balance
 	GetBalance(address common.Address) (*hexutil.Big, error)
-	// Get committee for a particular epoch
-	GetCommittee(epoch *big.Int) (*shard.Committee, error)
+	// Get validators for a particular epoch
+	GetValidators(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
 	// Get transactions history for an address
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
@@ -73,6 +73,11 @@ type Backend interface {
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
+	GetCurrentValidatorAddresses() []common.Address
+	GetValidatorCandidates() []common.Address
+	GetValidatorInformation(addr common.Address) *staking.Validator
+	GetDelegatorsInformation(addr common.Address) []*staking.Delegation
+	GetValidatorStakingWithDelegation(addr common.Address) *big.Int
 }
 
 // GetAPIs returns all the APIs.
