@@ -29,10 +29,10 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/queue"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -161,9 +161,9 @@ type Node struct {
 	host p2p.Host
 
 	// Incoming messages to process.
-	clientRxQueue *msgq.Queue
-	shardRxQueue  *msgq.Queue
-	globalRxQueue *msgq.Queue
+	clientRxQueue *queue.Queue
+	shardRxQueue  *queue.Queue
+	globalRxQueue *queue.Queue
 
 	// Service manager.
 	serviceManager *service.Manager
@@ -429,7 +429,7 @@ func (h messageHandler) HandleItem(item interface{}) {
 }
 
 func (node *Node) startRxPipeline(
-	receiver p2p.GroupReceiver, queue *msgq.Queue, numWorkers int,
+	receiver p2p.GroupReceiver, queue *queue.Queue, numWorkers int,
 ) {
 	// consumers
 	for i := 0; i < numWorkers; i++ {
@@ -553,9 +553,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
 
-	node.clientRxQueue = msgq.New(ClientRxQueueSize)
-	node.shardRxQueue = msgq.New(ShardRxQueueSize)
-	node.globalRxQueue = msgq.New(GlobalRxQueueSize)
+	node.clientRxQueue = queue.New(ClientRxQueueSize)
+	node.shardRxQueue = queue.New(ShardRxQueueSize)
+	node.globalRxQueue = queue.New(GlobalRxQueueSize)
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)

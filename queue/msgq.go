@@ -1,6 +1,6 @@
-// Package msgq implements a simple, finite-sized, tail-dropping queue.  It can
+// Package queue implements a simple, finite-sized, tail-dropping queue.  It can
 // be used as a building block for a message processor pool.
-package msgq
+package queue
 
 import (
 	"github.com/pkg/errors"

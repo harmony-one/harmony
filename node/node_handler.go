@@ -26,9 +26,9 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/queue"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -45,7 +45,7 @@ type incomingMessage struct {
 
 // receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
 func (node *Node) receiveGroupMessage(
-	receiver p2p.GroupReceiver, rxQueue msgq.Enqueuer,
+	receiver p2p.GroupReceiver, rxQueue queue.Enqueuer,
 ) {
 	ctx := context.Background()
 	// TODO ek – infinite loop; add shutdown/cleanup logic
