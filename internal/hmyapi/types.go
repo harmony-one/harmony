@@ -192,12 +192,13 @@ type RPCBlock struct {
 	Transactions     []interface{}    `json:"transactions"`
 	Uncles           []common.Hash    `json:"uncles"`
 	TotalDifficulty  *big.Int         `json:"totalDifficulty"`
+	Signers          []string         `json:"signers"`
 }
 
 // RPCMarshalBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
-func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]interface{}, error) {
+func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{}, error) {
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
 		"number":           (*hexutil.Big)(head.Number()),
@@ -218,11 +219,11 @@ func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]inter
 		"receiptsRoot":     head.ReceiptHash(),
 	}
 
-	if inclTx {
+	if blockArgs.InclTx {
 		formatTx := func(tx *types.Transaction) (interface{}, error) {
 			return tx.Hash(), nil
 		}
-		if fullTx {
+		if blockArgs.FullTx {
 			formatTx = func(tx *types.Transaction) (interface{}, error) {
 				return newRPCTransactionFromBlockHash(b, tx.Hash()), nil
 			}
@@ -244,7 +245,9 @@ func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]inter
 		uncleHashes[i] = uncle.Hash()
 	}
 	fields["uncles"] = uncleHashes
-
+	if blockArgs.WithSigners {
+		fields["signers"] = blockArgs.Signers
+	}
 	return fields, nil
 }
 

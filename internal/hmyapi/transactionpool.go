@@ -23,6 +23,8 @@ type TxHistoryArgs struct {
 	PageIndex int    `json:"pageIndex"`
 	PageSize  int    `json:"pageSize"`
 	FullTx    bool   `json:"fullTx"`
+	TxType    string `json:"txType"`
+	Order     string `json:"order"`
 }
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
@@ -40,19 +42,17 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
 	address := args.Address
 	result := []common.Hash{}
-	if strings.HasPrefix(address, "one1") {
-		hashes, err := s.b.GetTransactionsHistory(address)
+	var err error
+	if strings.HasPrefix(args.Address, "one1") {
+		address = args.Address
+	} else {
+		addr := internal_common.ParseAddr(args.Address)
+		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			return nil, err
 		}
-		result = ReturnWithPagination(hashes, args)
 	}
-	addr := internal_common.ParseAddr(address)
-	oneAddress, err := internal_common.AddressToBech32(addr)
-	if err != nil {
-		return nil, err
-	}
-	hashes, err := s.b.GetTransactionsHistory(oneAddress)
+	hashes, err := s.b.GetTransactionsHistory(address, args.TxType, args.Order)
 	if err != nil {
 		return nil, err
 	}

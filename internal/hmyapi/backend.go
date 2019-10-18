@@ -68,7 +68,7 @@ type Backend interface {
 	GetCommittee(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
 	// Get transactions history for an address
-	GetTransactionsHistory(address string) ([]common.Hash, error)
+	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
