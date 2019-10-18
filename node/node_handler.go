@@ -312,6 +312,13 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		return
 	} else if core.IsEpochLastBlock(newBlock) {
 		node.Consensus.UpdateConsensusInformation()
+		validatorSnapshot := node.Blockchain().ValidatorCandidates()
+		validatorStakes := make([]*big.Int, len(validatorSnapshot))
+		for i, cand := range validatorSnapshot {
+			validatorStakes[i] = node.Blockchain().ValidatorStakingWithDelegation(cand)
+		}
+		// Here pick 400 or 1600?
+
 	}
 
 	// Update last consensus time for metrics
