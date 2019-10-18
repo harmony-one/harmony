@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	clientService "github.com/harmony-one/harmony/api/client/service"
@@ -417,12 +418,22 @@ func (node *Node) getTransactionsForNewBlock(
 	return selected, selectedStaking
 }
 
+type messageHandler struct {
+	node *Node
+}
+
+func (h messageHandler) HandleItem(item interface{}) {
+	if msg, ok := item.(incomingMessage); ok {
+		h.node.HandleMessage(msg.content, msg.sender)
+	}
+}
+
 func (node *Node) startRxPipeline(
 	receiver p2p.GroupReceiver, queue *msgq.Queue, numWorkers int,
 ) {
 	// consumers
 	for i := 0; i < numWorkers; i++ {
-		go queue.HandleMessages(node)
+		go queue.HandleItems(messageHandler{node})
 	}
 	// provider
 	go node.receiveGroupMessage(receiver, queue)

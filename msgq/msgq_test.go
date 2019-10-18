@@ -3,8 +3,6 @@ package msgq
 import (
 	"fmt"
 	"testing"
-
-	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 func TestNew(t *testing.T) {
@@ -26,7 +24,7 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestQueue_AddMessage(t *testing.T) {
+func TestQueue_EnqueueItem(t *testing.T) {
 	tests := []struct {
 		name string
 		cap  int
@@ -36,17 +34,17 @@ func TestQueue_AddMessage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := &Queue{ch: make(chan message, tt.cap)}
+			q := &Queue{ch: make(chan interface{}, tt.cap)}
 			for i := 0; i < tt.cap+10; i++ {
 				var wantErr error
 				if i >= tt.cap {
-					wantErr = ErrRxOverrun
+					wantErr = ErrOverrun
 				} else {
 					wantErr = nil
 				}
-				err := q.AddMessage([]byte{}, peer.ID(""))
+				err := q.EnqueueItem("dummy item")
 				if err != wantErr {
-					t.Fatalf("AddMessage() iter %d, error = %v, want %v",
+					t.Fatalf("EnqueueItem() iter %d, error = %v, want %v",
 						i, err, wantErr)
 				}
 			}
@@ -54,31 +52,31 @@ func TestQueue_AddMessage(t *testing.T) {
 	}
 }
 
-type testMessageHandler struct {
+type testItemHandler struct {
 	t   *testing.T
 	seq int
 }
 
-func (h *testMessageHandler) HandleMessage(content []byte, sender peer.ID) {
-	got, want := string(content), fmt.Sprint(h.seq)
+func (h *testItemHandler) HandleItem(item interface{}) {
+	got, want := item.(string), fmt.Sprint(h.seq)
 	if got != want {
-		h.t.Errorf("out-of-sequence message %v, want %v", got, want)
+		h.t.Errorf("out-of-sequence item %v, want %v", got, want)
 	}
 	h.seq++
 }
 
-func TestQueue_HandleMessages(t *testing.T) {
-	ch := make(chan message, 500)
+func TestQueue_HandleItems(t *testing.T) {
+	ch := make(chan interface{}, 500)
 	for seq := 0; seq < cap(ch); seq++ {
-		ch <- message{content: []byte(fmt.Sprint(seq))}
+		ch <- fmt.Sprint(seq)
 	}
 	close(ch)
 	q := &Queue{ch: ch}
-	q.HandleMessages(&testMessageHandler{t: t})
+	q.HandleItems(&testItemHandler{t: t})
 }
 
 func TestQueue_Close(t *testing.T) {
-	q := &Queue{ch: make(chan message, 100)}
+	q := &Queue{ch: make(chan interface{}, 100)}
 	err := q.Close()
 	if err != nil {
 		t.Errorf("Close() error = %v, want nil", err)

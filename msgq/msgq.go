@@ -1,55 +1,49 @@
-// Package msgq implements a simple, finite-sized message queue.  It can be used
-// as a building block for a message processor pool.
+// Package msgq implements a simple, finite-sized, tail-dropping queue.  It can
+// be used as a building block for a message processor pool.
 package msgq
 
 import (
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 )
 
-type message struct {
-	content []byte
-	sender  peer.ID
+// Enqueuer enqueues an item for processing.  It returns without blocking, and
+// may return a queue overrun error.
+type Enqueuer interface {
+	EnqueueItem(item interface{}) error
 }
 
-// MessageAdder enqueues a received message for processing.  It returns without
-// blocking, and may return a queue overrun error.
-type MessageAdder interface {
-	AddMessage(content []byte, sender peer.ID) error
+// Handler handles an item out of a queue.
+type Handler interface {
+	HandleItem(item interface{})
 }
 
-// MessageHandler is a message handler.
-type MessageHandler interface {
-	HandleMessage(content []byte, sender peer.ID)
-}
-
-// Queue is a finite-sized message queue.
+// Queue is a finite-sized, tail-dropping queue.
 type Queue struct {
-	ch chan message
+	ch chan interface{}
 }
 
-// New returns a new message queue of the given size.
+// New returns a new queue of the given size.
 func New(size int) *Queue {
-	return &Queue{ch: make(chan message, size)}
+	return &Queue{ch: make(chan interface{}, size)}
 }
 
-// AddMessage enqueues a received message for processing.  It returns without
-// blocking, and may return a queue overrun error.
-func (q *Queue) AddMessage(content []byte, sender peer.ID) error {
+// EnqueueItem enqueues an item for processing.  It returns without blocking,
+// and may return a queue overrun error.
+func (q *Queue) EnqueueItem(item interface{}) error {
 	select {
-	case q.ch <- message{content, sender}:
+	case q.ch <- item:
 	default:
-		return ErrRxOverrun
+		return ErrOverrun
 	}
 	return nil
 }
 
-// HandleMessages dequeues and dispatches incoming messages using the given
-// message handler, until the message queue is closed.  This function can be
-// spawned as a background goroutine, potentially multiple times for a pool.
-func (q *Queue) HandleMessages(h MessageHandler) {
-	for msg := range q.ch {
-		h.HandleMessage(msg.content, msg.sender)
+// HandleItems dequeues and dispatches items in the queue using the given
+// handler, until the queue is closed.  This function can be spawned as a
+// background goroutine, potentially multiple times for a pool.
+func (q *Queue) HandleItems(h Handler) {
+	for item := range q.ch {
+		h.HandleItem(item)
 	}
 }
 
@@ -59,5 +53,5 @@ func (q *Queue) Close() error {
 	return nil
 }
 
-// ErrRxOverrun signals that a receive queue has been overrun.
-var ErrRxOverrun = errors.New("rx overrun")
+// ErrOverrun signals that a queue has been overrun.
+var ErrOverrun = errors.New("queue overrun")
