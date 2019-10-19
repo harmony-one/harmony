@@ -213,7 +213,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // BroadcastCrossLinkHeader is called by consensus leader to send the new header as cross link to beacon chain.
 func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
-	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", node.NodeConfig.GetBeaconGroupID())
+	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", nodeconfig.NewGroupIDByShardID(0))
 	headers := []*block.Header{}
 	lastLink, err := node.Beaconchain().ReadShardLastCrossLink(newBlock.ShardID())
 	var latestBlockNum uint64
@@ -247,7 +247,7 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 	for _, header := range headers {
 		utils.Logger().Debug().Msgf("[BroadcastCrossLinkHeader] Broadcasting %d", header.Number().Uint64())
 	}
-	node.host.SendMessageToGroups([]nodeconfig.GroupID{node.NodeConfig.GetBeaconGroupID()}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(headers)))
+	node.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(0)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(headers)))
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on

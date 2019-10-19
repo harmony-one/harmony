@@ -256,7 +256,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	netType := nodeconfig.NetworkType(*networkType)
 	switch netType {
 	case nodeconfig.Mainnet, nodeconfig.Testnet, nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
-		nodeConfig.SetNetworkType(netType)
+		nodeconfig.SetNetworkType(netType)
 	default:
 		panic(fmt.Sprintf("invalid network type: %s", *networkType))
 	}
