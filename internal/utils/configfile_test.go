@@ -16,6 +16,7 @@ func TestReadWalletProfile(t *testing.T) {
 			ChainID:   params.MainnetChainID.String(),
 			Bootnodes: []string{"127.0.0.1:9000/abcd", "127.0.0.1:9999/daeg"},
 			Shards:    4,
+			Network:   "mainnet",
 			RPCServer: [][]p2p.Peer{
 				{
 					{
@@ -64,6 +65,7 @@ func TestReadWalletProfile(t *testing.T) {
 			ChainID:   params.TestnetChainID.String(),
 			Bootnodes: []string{"192.168.0.1:9990/abcd", "127.0.0.1:8888/daeg"},
 			Shards:    3,
+			Network:   "testnet",
 			RPCServer: [][]p2p.Peer{
 				{
 					{
