@@ -15,6 +15,6 @@ func CreateNewValidator() Validator {
 	d := Description{Name: "SuperHero", Identity: "YouWillNotKnow", Website: "under_construction", Details: "N/A"}
 	v := Validator{Address: common.Address{}, ValidatingPubKey: *bls.RandPrivateKey().GetPublicKey(),
 		Stake: big.NewInt(500), UnbondingHeight: big.NewInt(20), MinSelfDelegation: big.NewInt(7),
-		IsActive: false, Commission: c, Description: d}
+		Active: false, Commission: c, Description: d}
 	return v
 }
