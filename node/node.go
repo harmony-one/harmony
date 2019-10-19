@@ -156,6 +156,10 @@ type Node struct {
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 
+	// syncing frequency parameters
+	syncFreq       int
+	beaconSyncFreq int
+
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 
@@ -669,4 +673,14 @@ func (node *Node) AccountManager() *accounts.Manager {
 // ServiceManager ...
 func (node *Node) ServiceManager() *service.Manager {
 	return node.serviceManager
+}
+
+// SetSyncFreq sets the syncing frequency in the loop
+func (node *Node) SetSyncFreq(syncFreq int) {
+	node.syncFreq = syncFreq
+}
+
+// SetBeaconSyncFreq sets the syncing frequency in the loop
+func (node *Node) SetBeaconSyncFreq(syncFreq int) {
+	node.beaconSyncFreq = syncFreq
 }

@@ -23,11 +23,9 @@ import (
 
 // Constants related to doing syncing.
 const (
-	lastMileThreshold   = 4
-	inSyncThreshold     = 1  // unit in number of block
-	SyncFrequency       = 60 // unit in second
-	BeaconSyncFrequency = 60 // unit in second
-	MinConnectedPeers   = 10 // minimum number of peers connected to in node syncing
+	lastMileThreshold = 4
+	inSyncThreshold   = 1  // unit in number of block
+	MinConnectedPeers = 10 // minimum number of peers connected to in node syncing
 )
 
 // getNeighborPeers is a helper function to return list of peers
@@ -193,7 +191,7 @@ func (node *Node) DoBeaconSyncing() {
 			}
 		}
 		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true, nil)
-		time.Sleep(BeaconSyncFrequency * time.Second)
+		time.Sleep(time.Duration(node.beaconSyncFreq) * time.Second)
 	}
 }
 
@@ -246,7 +244,7 @@ SyncingLoop:
 		node.State = NodeReadyForConsensus
 		node.stateMutex.Unlock()
 		// TODO on demand syncing
-		time.Sleep(SyncFrequency * time.Second)
+		time.Sleep(time.Duration(node.syncFreq) * time.Second)
 	}
 }
 

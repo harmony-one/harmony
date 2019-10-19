@@ -98,6 +98,11 @@ var (
 	nodeType = flag.String("node_type", "validator", "node type: validator, explorer")
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet, localnet")
+	// syncFreq indicates sync frequency
+	syncFreq = flag.Int("sync_freq", 60, "unit in seconds")
+	// beaconSyncFreq indicates beaconchain sync frequency
+	beaconSyncFreq = flag.Int("beacon_sync_freq", 60, "unit in seconds")
+
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
@@ -472,6 +477,9 @@ func main() {
 
 	nodeConfig := createGlobalConfig()
 	currentNode := setupConsensusAndNode(nodeConfig)
+	//setup state syncing and beacon syncing frequency
+	currentNode.SetSyncFreq(*syncFreq)
+	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
 
 	if nodeConfig.ShardID != 0 && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID", nodeConfig.ShardID)
