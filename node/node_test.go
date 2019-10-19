@@ -321,7 +321,7 @@ func Test_messageItemHandler_HandleItem(t *testing.T) {
 		// not called even if passed with a struct with identical members
 		h.HandleItem(struct {
 			content []byte
-			sender peer.ID
+			sender  peer.ID
 		}{content, sender})
 	})
 }
