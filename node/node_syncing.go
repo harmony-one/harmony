@@ -24,7 +24,8 @@ import (
 // Constants related to doing syncing.
 const (
 	lastMileThreshold = 4
-	inSyncThreshold   = 1  // unit in number of block
+	inSyncThreshold   = 1 // unit in number of block
+	SyncFrequency     = 60
 	MinConnectedPeers = 10 // minimum number of peers connected to in node syncing
 )
 

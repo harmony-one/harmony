@@ -467,6 +467,9 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
 
+	node.syncFreq = SyncFrequency
+	node.beaconSyncFreq = SyncFrequency
+
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
