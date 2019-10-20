@@ -1,7 +1,7 @@
 package v3
 
 import (
-	"github.com/harmony-one/harmony/block/v2"
+	v2 "github.com/harmony-one/harmony/block/v2"
 )
 
 // Header v3 has the same structure as v2 header

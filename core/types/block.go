@@ -182,6 +182,7 @@ var BodyRegistry = taggedrlp.NewRegistry()
 func init() {
 	BodyRegistry.MustRegister(taggedrlp.LegacyTag, new(BodyV0))
 	BodyRegistry.MustRegister("v1", new(BodyV1))
+	BodyRegistry.MustRegister("v2", new(BodyV2))
 }
 
 // Block represents an entire block in the Harmony blockchain.
