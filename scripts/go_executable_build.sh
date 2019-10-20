@@ -33,7 +33,7 @@ esac
 declare -A LIB
 
 if [ "$(uname -s)" == "Darwin" ]; then
-   MD5='md5 -r'
+   MD5=md5sum
    GOOS=darwin
    LIB[libbls384_256.dylib]=${BLS_DIR}/lib/libbls384_256.dylib
    LIB[libmcl.dylib]=${MCL_DIR}/lib/libmcl.dylib

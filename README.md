@@ -56,6 +56,10 @@ Note : Some of our scripts require bash 4.x support, please [install bash 4.x](h
 
 You can run the script `./scripts/go_executable_build.sh` to build all the executables.
 
+Note : if you get error `md5: command not found`, please install md5sum by either using HomeBrew or MacPorts,
+- HomeBrew: `brew install md5sha1sum`
+- MacPorts: `sudo port install md5sha1sum`
+
 ### Build individual executables
 
 Harmony server / main node:
