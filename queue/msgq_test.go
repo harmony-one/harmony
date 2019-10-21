@@ -42,9 +42,9 @@ func TestQueue_EnqueueItem(t *testing.T) {
 				} else {
 					wantErr = nil
 				}
-				err := q.EnqueueItem("dummy item")
+				err := q.Enqueue("dummy item")
 				if err != wantErr {
-					t.Fatalf("EnqueueItem() iter %d, error = %v, want %v",
+					t.Fatalf("Enqueue() iter %d, error = %v, want %v",
 						i, err, wantErr)
 				}
 			}

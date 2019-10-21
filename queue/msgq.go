@@ -9,7 +9,7 @@ import (
 // Enqueuer enqueues an item for processing.  It returns without blocking, and
 // may return a queue overrun error.
 type Enqueuer interface {
-	EnqueueItem(item interface{}) error
+	Enqueue(item interface{}) error
 }
 
 // Handler handles an item out of a queue.
@@ -27,9 +27,9 @@ func New(size int) *Queue {
 	return &Queue{ch: make(chan interface{}, size)}
 }
 
-// EnqueueItem enqueues an item for processing.  It returns without blocking,
+// Enqueue enqueues an item for processing.  It returns without blocking,
 // and may return a queue overrun error.
-func (q *Queue) EnqueueItem(item interface{}) error {
+func (q *Queue) Enqueue(item interface{}) error {
 	select {
 	case q.ch <- item:
 	default:

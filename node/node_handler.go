@@ -61,7 +61,7 @@ func (node *Node) receiveGroupMessage(
 		}
 		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-		if err := rxQueue.EnqueueItem(incomingMessage{msg[5:], sender}); err != nil {
+		if err := rxQueue.Enqueue(incomingMessage{msg[5:], sender}); err != nil {
 			utils.Logger().Warn().Err(err).
 				Str("sender", sender.Pretty()).
 				Msg("cannot enqueue incoming message for processing")
