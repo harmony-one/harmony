@@ -314,7 +314,10 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	}
 }
 
-// GetBlockHashesConsensusAndCleanUp chesk if all consensus hashes are equal.
+// GetBlockHashesConsensusAndCleanUp selects the most common peer config based on their block hashes to download/sync.
+// Note that choosing the most common peer config does not guarantee that the blocks to be downloaded are the correct ones.
+// The subsequent node syncing steps of verifying the block header chain will give such confirmation later.
+// If later block header verification fails with the sync peer config chosen here, the entire sync loop gets retried with a new peer set.
 func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
@@ -590,8 +593,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		}
 		parentHash = block.Hash()
 	}
-	// TODO ek – Do we need to hold syncMux now that syncConfig has its onw
-	//  mutex?
+	// TODO ek – Do we need to hold syncMux now that syncConfig has its own mutex?
 	ss.syncMux.Lock()
 	ss.syncConfig.ForEachPeer(func(peer *SyncPeerConfig) (brk bool) {
 		peer.newBlocks = []*types.Block{}
