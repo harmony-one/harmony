@@ -151,16 +151,15 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 // setting the final state and assembling the block.
 func (e *engineImpl) Finalize(
 	chain engine.ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
-	stkgTxs []*staking.StakingTransaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
-	incxs []*types.CXReceiptsProof) (*types.Block, error) {
+	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	if err := AccumulateRewards(chain, state, header); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
-	return types.NewBlock(header, txs, receipts, outcxs, incxs), nil
+	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), nil
 }
 
 // QuorumForBlock returns the quorum for the given block header.
