@@ -156,6 +156,10 @@ type Node struct {
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 
+	// syncing frequency parameters
+	syncFreq       int
+	beaconSyncFreq int
+
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 
@@ -430,7 +434,7 @@ func (node *Node) startRxPipeline(
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
-	// start the goroutine to receive client message
+
 	// client messages are sent by clients, like txgen, wallet
 	node.startRxPipeline(node.clientReceiver, node.clientRxQueue, ClientRxWorkers)
 
@@ -462,6 +466,9 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
+
+	node.syncFreq = SyncFrequency
+	node.beaconSyncFreq = SyncFrequency
 
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
@@ -624,7 +631,7 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 }
 
 // isBeacon = true if the node is beacon node
-// isClient = true if the node light client(txgen,wallet)
+// isClient = true if the node light client(wallet)
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
@@ -669,4 +676,14 @@ func (node *Node) AccountManager() *accounts.Manager {
 // ServiceManager ...
 func (node *Node) ServiceManager() *service.Manager {
 	return node.serviceManager
+}
+
+// SetSyncFreq sets the syncing frequency in the loop
+func (node *Node) SetSyncFreq(syncFreq int) {
+	node.syncFreq = syncFreq
+}
+
+// SetBeaconSyncFreq sets the syncing frequency in the loop
+func (node *Node) SetBeaconSyncFreq(syncFreq int) {
+	node.beaconSyncFreq = syncFreq
 }

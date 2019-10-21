@@ -85,7 +85,7 @@ It should cover the basic function to pass, to fail, and error conditions.
 
 * test case # : CS1
 * description : beacon chain reach consensus
-* test procedure : start beacon chain with 50, 100, 150, 200, 250, 300 nodes, start txgen for 300 seconds, check leader log on number of consensuses
+* test procedure : start beacon chain with 50, 100, 150, 200, 250, 300 nodes, check leader log on number of consensuses
 * passing criteria
 * dependency
 * note
@@ -96,7 +96,7 @@ It should cover the basic function to pass, to fail, and error conditions.
 
 * test case # : DR1
 * description : drand generate random number
-* test procedure : start beacon chain with 50, 150, 300 nodes, start txgen for 300 seconds, check leader log on the success of generating random number
+* test procedure : start beacon chain with 50, 150, 300 nodes, check leader log on the success of generating random number
 * passing criteria : random number genreated
 * dependency
 * note
@@ -257,16 +257,6 @@ It should cover the basic function to pass, to fail, and error conditions.
 * automated?
 ---
 
-### transaction stress
-
-* test case # : STX1
-* description : txgen send transaction to shard
-* test procedure : started beacon chain with 50 nodes, start txgen to send 1,000, 10,000 tx to the shard
-* passing criteria
-* dependency
-* note
-* automated?
----
 ### long running stress
 ### storage
 

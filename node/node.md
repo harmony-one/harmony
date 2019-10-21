@@ -12,13 +12,12 @@ To support such behavior, we architecture Node logic with service manager which 
 
 Each service needs to implement minimal interace behavior like Start, Stop so that the service manager can handle those operation.
 
-```
+```golang
 // ServiceInterface is the collection of functions any service needs to implement.
 type ServiceInterface interface {
 	StartService()
 	StopService()
 }
-
 ```
 
 ### Creating a service.
@@ -31,7 +30,7 @@ Since different services may have different ways to be created you may need to h
 
 Action is the input to operate Service Manager. We can send action to action channel of service manager to start or stop a service.
 
-```
+```golang
 // Action is type of service action.
 type Action struct {
 	action      ActionType
@@ -49,17 +48,19 @@ Service Manager is very handy to transform a node role from validator to leader 
 We have enabled libp2p based gossiping using pubsub. Nodes no longer send messages to individual nodes.
 All message communication is via SendMessageToGroups function.
 
-* There would be 4 topics for sending and receiving of messages
-  * **GroupIDBeacon**       This topic serves for consensus within the beaconchain
-  * **GroupIDBeaconClient** This topic serves for receipt of staking transactions by beacon chain and broadcast of blocks (by beacon leader)
-  * **GroupIDShard** (_under construction_) This topic serves for consensus related and pingpong messages within the shard
-  * **GroupIDShardClient** (_under construction_) This topic serves to receive transactions from client and send confirmed blocks back to client (like txgen). The shard leader (only) sends back the confirmed blocks.
+- There would be 4 topics for sending and receiving of messages
 
-* Beacon chain nodes need to subscribe to _TWO_ topics
-  *  **GroupIDBeacon**
-  * **GroupIDBeaconClient**. 
+  - **GroupIDBeacon** This topic serves for consensus within the beaconchain
+  - **GroupIDBeaconClient** This topic serves for receipt of staking transactions by beacon chain and broadcast of blocks (by beacon leader)
+  - **GroupIDShard** (_under construction_) This topic serves for consensus related and pingpong messages within the shard
+  - **GroupIDShardClient** (_under construction_) This topic serves to receive transactions from client and send confirmed blocks back to client. The shard leader (only) sends back the confirmed blocks.
 
-* Every new node other than beacon chain nodes, including txgen and wallet needs to subscribe to _THREE_ topics.
-  *  **GroupIDBeaconClient**  
-  *  **GroupIDShard**
-  *  **GroupIDShardClient**  
+- Beacon chain nodes need to subscribe to _TWO_ topics
+
+  - **GroupIDBeacon**
+  - **GroupIDBeaconClient**.
+
+- Every new node other than beacon chain nodes, wallet needs to subscribe to _THREE_ topics.
+  - **GroupIDBeaconClient**
+  - **GroupIDShard**
+  - **GroupIDShardClient**

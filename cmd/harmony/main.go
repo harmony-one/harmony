@@ -19,6 +19,7 @@ import (
 
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
@@ -97,6 +98,11 @@ var (
 	nodeType = flag.String("node_type", "validator", "node type: validator, explorer")
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet, localnet")
+	// syncFreq indicates sync frequency
+	syncFreq = flag.Int("sync_freq", 60, "unit in seconds")
+	// beaconSyncFreq indicates beaconchain sync frequency
+	beaconSyncFreq = flag.Int("beacon_sync_freq", 60, "unit in seconds")
+
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
@@ -289,7 +295,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
-	currentConsensus, err := consensus.New(myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey)
+	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	currentConsensus, err := consensus.New(
+		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
+	)
 	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 
 	if err != nil {
@@ -383,11 +392,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	}
 
 	// Set the consensus ID to be the current block number
-	height := currentNode.Blockchain().CurrentBlock().NumberU64()
-
-	currentConsensus.SetViewID(height)
+	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
+	currentConsensus.SetViewID(viewID)
 	utils.Logger().Info().
-		Uint64("height", height).
+		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object
@@ -469,6 +477,9 @@ func main() {
 
 	nodeConfig := createGlobalConfig()
 	currentNode := setupConsensusAndNode(nodeConfig)
+	//setup state syncing and beacon syncing frequency
+	currentNode.SetSyncFreq(*syncFreq)
+	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
 
 	if nodeConfig.ShardID != 0 && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID", nodeConfig.ShardID)
