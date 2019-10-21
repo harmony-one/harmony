@@ -531,7 +531,6 @@ func (t *TransactionsByPriceAndNonce) Pop() {
 }
 
 // Message is a fully derived transaction and implements core.Message
-//
 // NOTE: In a future PR this will be removed.
 type Message struct {
 	to         *common.Address
@@ -542,6 +541,7 @@ type Message struct {
 	gasPrice   *big.Int
 	data       []byte
 	checkNonce bool
+	txType     TransactionType
 }
 
 // NewMessage returns new message.
@@ -596,6 +596,16 @@ func (m Message) Data() []byte {
 // CheckNonce returns checkNonce of Message.
 func (m Message) CheckNonce() bool {
 	return m.checkNonce
+}
+
+// Type returns the type of message
+func (m Message) Type() TransactionType {
+	return m.txType
+}
+
+// SetType set the type of message
+func (m Message) SetType(typ TransactionType) {
+	m.txType = typ
 }
 
 // RecentTxsStats is a recent transactions stats map tracking stats like BlockTxsCounts.

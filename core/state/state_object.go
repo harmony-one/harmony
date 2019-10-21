@@ -198,6 +198,7 @@ func (so *Object) GetCommittedState(db Database, key common.Hash) common.Hash {
 }
 
 // SetState updates a value in account storage.
+// to remove, set value to common.Hash{}
 func (so *Object) SetState(db Database, key, value common.Hash) {
 	// If the new value is the same as old, don't set
 	prev := so.GetState(db, key)
@@ -389,4 +390,8 @@ func (so *Object) Nonce() uint64 {
 // interface. Interfaces are awesome.
 func (so *Object) Value() *big.Int {
 	panic("Value on Object should never be called")
+}
+
+// IsValidator checks whether it is a validator object
+func (so *Object) IsValidator() {
 }

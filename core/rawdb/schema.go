@@ -71,6 +71,8 @@ var (
 	cxReceiptSpentPrefix             = []byte("cxReceiptSpent")             // prefix for indicator of unspent of cxReceiptsProof
 	cxReceiptUnspentCheckpointPrefix = []byte("cxReceiptUnspentCheckpoint") // prefix for cxReceiptsProof unspent checkpoint
 
+	stakingPrefix = []byte("staking") // prefix for staking validator information
+
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
 	epochBlockNumberPrefix = []byte("harmony-epoch-block-number-")
@@ -226,4 +228,9 @@ func cxReceiptUnspentCheckpointKey(shardID uint32) []byte {
 	sKey := make([]byte, 4)
 	binary.BigEndian.PutUint32(sKey, shardID)
 	return append(prefix, sKey...)
+}
+
+func stakingKey(addr common.Address) []byte {
+	prefix := stakingPrefix
+	return append(prefix, addr.Bytes()...)
 }

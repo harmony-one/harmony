@@ -35,6 +35,7 @@ import (
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
 	v2 "github.com/harmony-one/harmony/block/v2"
+	v3 "github.com/harmony-one/harmony/block/v3"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -124,6 +125,8 @@ type Body struct {
 func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
 	var bi BodyInterface
 	switch h.Header.(type) {
+	case *v3.Header:
+		bi = new(BodyV2)
 	case *v2.Header, *v1.Header:
 		bi = new(BodyV1)
 	case *v0.Header:
@@ -179,6 +182,7 @@ var BodyRegistry = taggedrlp.NewRegistry()
 func init() {
 	BodyRegistry.MustRegister(taggedrlp.LegacyTag, new(BodyV0))
 	BodyRegistry.MustRegister("v1", new(BodyV1))
+	BodyRegistry.MustRegister("v2", new(BodyV2))
 }
 
 // Block represents an entire block in the Harmony blockchain.
@@ -186,6 +190,7 @@ type Block struct {
 	header           *block.Header
 	uncles           []*block.Header
 	transactions     Transactions
+	stks             staking.StakingTransactions
 	incomingReceipts CXReceiptsProofs
 
 	// caches
@@ -239,11 +244,21 @@ type extblockV1 struct {
 	IncomingReceipts CXReceiptsProofs
 }
 
+// includes staking transaction
+type extblockV2 struct {
+	Header           *block.Header
+	Txs              []*Transaction
+	Stks             []*staking.StakingTransaction
+	Uncles           []*block.Header
+	IncomingReceipts CXReceiptsProofs
+}
+
 var extblockReg = taggedrlp.NewRegistry()
 
 func init() {
 	extblockReg.MustRegister(taggedrlp.LegacyTag, &extblock{})
 	extblockReg.MustRegister("v1", &extblockV1{})
+	extblockReg.MustRegister("v2", &extblockV2{})
 }
 
 // NewBlock creates a new block. The input data is copied,
@@ -253,7 +268,7 @@ func init() {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs,
 // and receipts.
-func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof) *Block {
+func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof, stks []*staking.StakingTransaction) *Block {
 	b := &Block{header: CopyHeader(header)}
 
 	// TODO: panic if len(txs) != len(receipts)
@@ -282,6 +297,11 @@ func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, out
 		copy(b.incomingReceipts, incxs)
 	}
 
+	if len(stks) > 0 {
+		b.stks = make(staking.StakingTransactions, len(stks))
+		copy(b.stks, stks)
+	}
+
 	return b
 }
 
@@ -308,6 +328,8 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 		return err
 	}
 	switch eb := eb.(type) {
+	case *extblockV2:
+		b.header, b.uncles, b.transactions, b.incomingReceipts, b.stks = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts, eb.Stks
 	case *extblockV1:
 		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
 	case *extblock:
@@ -323,6 +345,8 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
 	switch h := b.header.Header.(type) {
+	case *v3.Header:
+		eb = extblockV2{b.header, b.transactions, b.stks, b.uncles, b.incomingReceipts}
 	case *v2.Header, *v1.Header:
 		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
 	case *v0.Header:
@@ -349,7 +373,7 @@ func (b *Block) Transactions() Transactions {
 
 // StakingTransactions returns stakingTransactions.
 func (b *Block) StakingTransactions() staking.StakingTransactions {
-	return staking.StakingTransactions{}
+	return b.stks
 }
 
 // IncomingReceipts returns verified outgoing receipts
