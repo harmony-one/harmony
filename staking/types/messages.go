@@ -8,6 +8,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
@@ -50,10 +51,10 @@ func (d Directive) String() string {
 type NewValidator struct {
 	Description       `json:"description" yaml:"description"`
 	CommissionRates   `json:"commission" yaml:"commission"`
-	MinSelfDelegation *big.Int       `json:"min_self_delegation" yaml:"min_self_delegation"`
-	StakingAddress    common.Address `json:"staking_address" yaml:"staking_address"`
-	PubKey            bls.PublicKey  `json:"validating_pub_key" yaml:"validating_pub_key"`
-	Amount            *big.Int       `json:"amount" yaml:"amount"`
+	MinSelfDelegation *big.Int           `json:"min_self_delegation" yaml:"min_self_delegation"`
+	StakingAddress    common.Address     `json:"staking_address" yaml:"staking_address"`
+	PubKey            shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
+	Amount            *big.Int           `json:"amount" yaml:"amount"`
 }
 
 // EditValidator - type for edit existing validator
