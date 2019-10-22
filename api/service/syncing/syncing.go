@@ -26,13 +26,13 @@ import (
 
 // Constants for syncing.
 const (
-	TimesToFail                                  = 5 // Downloadblocks service retry limit
-	RegistrationNumber                           = 3
-	SyncingPortDifference                        = 3000
-	inSyncThreshold                              = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
-	BatchSize                             uint32 = 1000 //maximum size for one query of block hashes
-	SyncLoopFrequency                            = 1    // unit in second
-	LastMileBlocksSize                           = 10
+	TimesToFail                  = 5 // Downloadblocks service retry limit
+	RegistrationNumber           = 3
+	SyncingPortDifference        = 3000
+	inSyncThreshold              = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
+	BatchSize             uint32 = 1000 //maximum size for one query of block hashes
+	SyncLoopFrequency            = 1    // unit in second
+	LastMileBlocksSize           = 10
 )
 
 // SyncPeerConfig is peer config to sync.
