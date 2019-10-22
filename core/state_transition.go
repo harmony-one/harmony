@@ -22,7 +22,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -327,17 +326,17 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 func (st *StateTransition) applyNewValidatorTx(newValidator *staking.NewValidator) error {
 	// TODO UpdateHeight and UnbondingHeight
-	commission := staking.Commission{newValidator.CommissionRates, new(big.Int)}
-	v := staking.Validator{newValidator.StakingAddress, newValidator.PubKey,
-		newValidator.Amount, new(big.Int), newValidator.MinSelfDelegation, false,
-		commission, newValidator.Description}
-
-	bytes, err := rlp.EncodeToBytes(&v)
-	if err != nil {
-		return err
-	}
-	hash := crypto.Keccak256Hash(bytes)
-	st.state.SetState(v.Address, staking.ValidatorHashKey, hash)
+	//	commission := staking.Commission{newValidator.CommissionRates, new(big.Int)}
+	//	v := staking.Validator{newValidator.StakingAddress, newValidator.PubKey,
+	//		newValidator.Amount, new(big.Int), newValidator.MinSelfDelegation, false,
+	//		commission, newValidator.Description}
+	//
+	//	bytes, err := rlp.EncodeToBytes(&v)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	hash := crypto.Keccak256Hash(bytes)
+	//	st.state.SetState(v.Address, staking.ValidatorHashKey, hash)
 	return nil
 }
 
