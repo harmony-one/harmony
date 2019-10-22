@@ -31,6 +31,7 @@ import (
 
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // no go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
@@ -48,7 +49,17 @@ const (
 	SameShardTx     TransactionType = iota
 	SubtractionOnly                 // only subtract tokens from source shard account
 	InvalidTx
+	StakeNewVal
+	StakeEditVal
+	Delegate
+	Redelegate
+	Undelegate
 )
+
+// StakingTypeMap is the map from staking type to transactionType
+var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveNewValidator: StakeNewVal,
+	staking.DirectiveEditValidator: StakeEditVal, staking.DirectiveDelegate: Delegate,
+	staking.DirectiveRedelegate: Redelegate, staking.DirectiveUndelegate: Undelegate}
 
 // Transaction struct.
 type Transaction struct {
@@ -67,6 +78,16 @@ func (txType TransactionType) String() string {
 		return "SubtractionOnly"
 	} else if txType == InvalidTx {
 		return "InvalidTx"
+	} else if txType == StakeNewVal {
+		return "StakeNewValidator"
+	} else if txType == StakeEditVal {
+		return "StakeEditValidator"
+	} else if txType == Delegate {
+		return "Delegate"
+	} else if txType == Redelegate {
+		return "Redelegate"
+	} else if txType == Undelegate {
+		return "Undelegate"
 	}
 	return "Unknown"
 }
@@ -555,6 +576,19 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 		gasPrice:   gasPrice,
 		data:       data,
 		checkNonce: checkNonce,
+	}
+}
+
+// NewStakingMessage returns new message of staking type
+// always need checkNonce
+func NewStakingMessage(from common.Address, nonce uint64, gasLimit uint64, gasPrice *big.Int, data []byte) Message {
+	return Message{
+		from:       from,
+		nonce:      nonce,
+		gasLimit:   gasLimit,
+		gasPrice:   new(big.Int).Set(gasPrice),
+		data:       data,
+		checkNonce: true,
 	}
 }
 

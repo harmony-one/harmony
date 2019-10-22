@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -19,6 +20,8 @@ const (
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
 )
+
+var ValidatorHashKey = common.Hash(crypto.Keccak256Hash([]byte("ValidatorHash")))
 
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
