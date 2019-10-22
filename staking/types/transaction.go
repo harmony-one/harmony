@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"math/big"
+	"reflect"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,6 +24,26 @@ type txdata struct {
 	S *big.Int `json:"s" gencodec:"required"`
 	// This is only used when marshaling to JSON.
 	Hash *common.Hash `json:"hash" rlp:"-"`
+}
+
+func (d *txdata) CopyFrom(d2 *txdata) {
+	d.Directive = d2.Directive
+	d.AccountNonce = d2.AccountNonce
+	d.Price = new(big.Int).Set(d2.Price)
+	d.GasLimit = d2.GasLimit
+	d.StakeMsg = reflect.New(reflect.ValueOf(d2.StakeMsg).Elem().Type()).Interface()
+	d.V = new(big.Int).Set(d2.V)
+	d.R = new(big.Int).Set(d2.R)
+	d.S = new(big.Int).Set(d2.S)
+	d.Hash = copyHash(d2.Hash)
+}
+
+func copyHash(hash *common.Hash) *common.Hash {
+	if hash == nil {
+		return nil
+	}
+	copy := *hash
+	return &copy
 }
 
 // StakingTransaction is a record captuing all staking operations
@@ -76,6 +97,13 @@ func (tx *StakingTransaction) Hash() common.Hash {
 	return v
 }
 
+// Copy returns a copy of the transaction.
+func (tx *StakingTransaction) Copy() *StakingTransaction {
+	var tx2 StakingTransaction
+	tx2.data.CopyFrom(&tx.data)
+	return &tx2
+}
+
 // WithSignature returns a new transaction with the given signature.
 func (tx *StakingTransaction) WithSignature(signer Signer, sig []byte) (*StakingTransaction, error) {
 	r, s, v, err := signer.SignatureValues(tx, sig)
@@ -90,6 +118,11 @@ func (tx *StakingTransaction) WithSignature(signer Signer, sig []byte) (*Staking
 // Gas returns gas of StakingTransaction.
 func (tx *StakingTransaction) Gas() uint64 {
 	return tx.data.GasLimit
+}
+
+// Price returns price of StakingTransaction.
+func (tx *StakingTransaction) Price() *big.Int {
+	return tx.data.Price
 }
 
 // ChainID is what chain this staking transaction for
@@ -113,4 +146,56 @@ func (tx *StakingTransaction) DecodeRLP(s *rlp.Stream) error {
 		tx.size.Store(common.StorageSize(rlp.ListSize(size)))
 	}
 	return err
+}
+
+// Nonce returns nonce of staking tx
+func (tx *StakingTransaction) Nonce() uint64 {
+	return tx.data.AccountNonce
+}
+
+// StakingMsgToBytes returns the bytes of staking message
+func (tx *StakingTransaction) StakingMsgToBytes() (by []byte, err error) {
+	stakeType := tx.StakingType()
+
+	switch stakeType {
+	case DirectiveCreateValidator:
+		createValidator := tx.StakingMessage().(CreateValidator)
+		by, err = rlp.EncodeToBytes(createValidator)
+	case DirectiveEditValidator:
+		editValidator := tx.StakingMessage().(EditValidator)
+		by, err = rlp.EncodeToBytes(editValidator)
+	case DirectiveDelegate:
+		delegate := tx.StakingMessage().(Delegate)
+		by, err = rlp.EncodeToBytes(delegate)
+	case DirectiveUndelegate:
+		undelegate := tx.StakingMessage().(Undelegate)
+		by, err = rlp.EncodeToBytes(undelegate)
+	case DirectiveCollectRewards:
+		collectRewards := tx.StakingMessage().(CollectRewards)
+		by, err = rlp.EncodeToBytes(collectRewards)
+	default:
+		by = []byte{}
+		err = ErrInvalidStakingKind
+	}
+	return
+}
+
+// StakingType returns the type of staking transaction
+func (tx *StakingTransaction) StakingType() Directive {
+	return tx.data.Directive
+}
+
+// StakingMessage returns the stake message of staking transaction
+func (tx *StakingTransaction) StakingMessage() interface{} {
+	return tx.data.StakeMsg
+}
+
+// SenderAddress returns the address of staking transaction sender
+func (tx *StakingTransaction) SenderAddress() (common.Address, error) {
+	signer := NewEIP155Signer(tx.ChainID())
+	addr, err := Sender(signer, tx)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return addr, nil
 }

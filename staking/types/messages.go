@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/pkg/errors"
 )
 
@@ -14,8 +16,8 @@ import (
 type Directive byte
 
 const (
-	// DirectiveNewValidator ...
-	DirectiveNewValidator Directive = iota
+	// DirectiveCreateValidator ...
+	DirectiveCreateValidator Directive = iota
 	// DirectiveEditValidator ...
 	DirectiveEditValidator
 	// DirectiveDelegate ...
@@ -24,15 +26,18 @@ const (
 	DirectiveRedelegate
 	// DirectiveUndelegate ...
 	DirectiveUndelegate
+	// DirectiveCollectRewards ...
+	DirectiveCollectRewards
 )
 
 var (
 	directiveNames = map[Directive]string{
-		DirectiveNewValidator:  "NewValidator",
-		DirectiveEditValidator: "EditValidator",
-		DirectiveDelegate:      "Delegate",
-		DirectiveRedelegate:    "Redelegate",
-		DirectiveUndelegate:    "Undelegate",
+		DirectiveCreateValidator: "CreateValidator",
+		DirectiveEditValidator:   "EditValidator",
+		DirectiveDelegate:        "Delegate",
+		DirectiveRedelegate:      "Redelegate",
+		DirectiveUndelegate:      "Undelegate",
+		DirectiveCollectRewards:  "CollectRewards",
 	}
 	// ErrInvalidStakingKind given when caller gives bad staking message kind
 	ErrInvalidStakingKind = errors.New("bad staking kind")
@@ -45,22 +50,26 @@ func (d Directive) String() string {
 	return fmt.Sprintf("Directive %+v", byte(d))
 }
 
-// NewValidator - type for creating a new validator
-type NewValidator struct {
-	Description       `json:"description" yaml:"description"`
-	CommissionRates   `json:"commission" yaml:"commission"`
-	MinSelfDelegation *big.Int           `json:"min_self_delegation" yaml:"min_self_delegation"`
-	StakingAddress    common.Address     `json:"staking_address" yaml:"staking_address"`
-	PubKey            shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
-	Amount            *big.Int           `json:"amount" yaml:"amount"`
+// CreateValidator - type for creating a new validator
+type CreateValidator struct {
+	Description        `json:"description" yaml:"description"`
+	CommissionRates    `json:"commission" yaml:"commission"`
+	MinSelfDelegation  *big.Int             `json:"min_self_delegation" yaml:"min_self_delegation"`
+	MaxTotalDelegation *big.Int             `json:"max_total_delegation" yaml:"max_total_delegation"`
+	ValidatorAddress   common.Address       `json:"validator_address" yaml:"validator_address"`
+	SlotPubKeys        []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
+	Amount             *big.Int             `json:"amount" yaml:"amount"`
 }
 
 // EditValidator - type for edit existing validator
 type EditValidator struct {
-	Description
-	StakingAddress    common.Address `json:"staking_address" yaml:"staking_address"`
-	CommissionRate    numeric.Dec    `json:"commission_rate" yaml:"commission_rate"`
-	MinSelfDelegation *big.Int       `json:"min_self_delegation" yaml:"min_self_delegation"`
+	ValidatorAddress   common.Address      `json:"validator_address" yaml:"validator_address"`
+	Description        *Description        `json:"description" yaml:"description"`
+	CommissionRate     *numeric.Dec        `json:"commission_rate" yaml:"commission_rate"`
+	MinSelfDelegation  *big.Int            `json:"min_self_delegation" yaml:"min_self_delegation"`
+	MaxTotalDelegation *big.Int            `json:"max_total_delegation" yaml:"max_total_delegation"`
+	SlotKeyToRemove    *shard.BlsPublicKey `json:"slot_key_to_remove" yaml:"slot_key_to_remove"`
+	SlotKeyToAdd       *shard.BlsPublicKey `json:"slot_key_to_add" yaml:"slot_key_to_add"`
 }
 
 // Delegate - type for delegating to a validator
@@ -70,17 +79,14 @@ type Delegate struct {
 	Amount           *big.Int       `json:"amount" yaml:"amount"`
 }
 
-// Redelegate - type for reassigning delegation
-type Redelegate struct {
-	DelegatorAddress    common.Address `json:"delegator_address" yaml:"delegator_address"`
-	ValidatorSrcAddress common.Address `json:"validator_src_address" yaml:"validator_src_address"`
-	ValidatorDstAddress common.Address `json:"validator_dst_address" yaml:"validator_dst_address"`
-	Amount              *big.Int       `json:"amount" yaml:"amount"`
-}
-
 // Undelegate - type for removing delegation responsibility
 type Undelegate struct {
 	DelegatorAddress common.Address `json:"delegator_address" yaml:"delegator_address"`
 	ValidatorAddress common.Address `json:"validator_address" yaml:"validator_address"`
 	Amount           *big.Int       `json:"amount" yaml:"amount"`
+}
+
+// CollectRewards - type for collecting token rewards
+type CollectRewards struct {
+	DelegatorAddress common.Address `json:"delegator_address" yaml:"delegator_address"`
 }

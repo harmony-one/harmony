@@ -11,12 +11,13 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
-	"github.com/harmony-one/harmony/internal/common"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/spf13/cobra"
@@ -33,7 +34,7 @@ var (
 	queryID       = 0
 	s             = &staker{}
 	localNetChain = big.NewInt(2)
-	dAddr         = common.ParseAddr(testAccount)
+	dAddr, _      = common2.Bech32ToAddress(testAccount)
 )
 
 const (
@@ -57,7 +58,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		p.DeserializeHexStr(testBLSPubKey)
 		pub := shard.BlsPublicKey{}
 		pub.FromLibBLSPublicKey(p)
-		// return staking.DirectiveNewValidator, staking.NewValidator{
+		// return staking.DirectiveCreateValidator, staking.CreateValidator{
 		// 	Description: staking.Description{
 		// 		Name:            "something",
 		// 		Identity:        "something else",
