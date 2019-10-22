@@ -61,10 +61,11 @@ var (
 	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
 
-	shardLastCrosslinkPrefix = []byte("shard-last-cross-link") // prefix for shard last crosslink
-	crosslinkPrefix          = []byte("crosslink")             // prefix for crosslink
-	tempCrosslinkPrefix      = []byte("tempCrosslink")         // prefix for tempCrosslink
+	shardLastCrosslinkPrefix = []byte("lcl") // prefix for shard last crosslink
+	crosslinkPrefix          = []byte("cl")  // prefix for crosslink
+	tempCrosslinkPrefix      = []byte("tcl") // prefix for tempCrosslink
 
+	// TODO: shorten the key prefix so we don't waste db space
 	cxReceiptPrefix                  = []byte("cxReceipt")                  // prefix for cross shard transaction receipt
 	tempCxReceiptPrefix              = []byte("tempCxReceipt")              // prefix for temporary cross shard transaction receipt
 	cxReceiptHashPrefix              = []byte("cxReceiptHash")              // prefix for cross shard transaction receipt hash
