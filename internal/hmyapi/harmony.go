@@ -50,6 +50,7 @@ type NodeMetadata struct {
 	NetworkType  string `json:"network"`
 	ChainID      string `json:"chainid"`
 	IsLeader     bool   `json:"is-leader"`
+	ShardID      uint32 `json:"shard-id"`
 }
 
 // GetNodeMetadata produces a NodeMetadata record. Note the data is from the answering RPC
@@ -61,5 +62,6 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		string(cfg.GetNetworkType()),
 		s.b.ChainConfig().ChainID.String(),
 		s.b.IsLeader(),
+		cfg.GetShardID(),
 	}
 }
