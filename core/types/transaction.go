@@ -562,6 +562,7 @@ type Message struct {
 	gasPrice   *big.Int
 	data       []byte
 	checkNonce bool
+	blockNum   *big.Int
 	txType     TransactionType
 }
 
@@ -581,7 +582,7 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 
 // NewStakingMessage returns new message of staking type
 // always need checkNonce
-func NewStakingMessage(from common.Address, nonce uint64, gasLimit uint64, gasPrice *big.Int, data []byte) Message {
+func NewStakingMessage(from common.Address, nonce uint64, gasLimit uint64, gasPrice *big.Int, data []byte, blockNum *big.Int) Message {
 	return Message{
 		from:       from,
 		nonce:      nonce,
@@ -589,6 +590,7 @@ func NewStakingMessage(from common.Address, nonce uint64, gasLimit uint64, gasPr
 		gasPrice:   new(big.Int).Set(gasPrice),
 		data:       data,
 		checkNonce: true,
+		blockNum:   blockNum,
 	}
 }
 
@@ -640,6 +642,11 @@ func (m Message) Type() TransactionType {
 // SetType set the type of message
 func (m Message) SetType(typ TransactionType) {
 	m.txType = typ
+}
+
+// BlockNum returns the blockNum of the tx belongs to
+func (m Message) BlockNum() *big.Int {
+	return m.blockNum
 }
 
 // RecentTxsStats is a recent transactions stats map tracking stats like BlockTxsCounts.

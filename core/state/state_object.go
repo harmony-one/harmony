@@ -25,6 +25,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/harmony-one/harmony/staking"
 )
 
 var emptyCodeHash = crypto.Keccak256(nil)
@@ -393,5 +395,10 @@ func (so *Object) Value() *big.Int {
 }
 
 // IsValidator checks whether it is a validator object
-func (so *Object) IsValidator() {
+func (so *Object) IsValidator(db Database) bool {
+	value := so.GetState(db, staking.IsValidatorKey)
+	if value == (common.Hash{}) {
+		return false
+	}
+	return true
 }

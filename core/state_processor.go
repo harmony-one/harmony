@@ -18,6 +18,7 @@ package core
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -184,12 +185,12 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 // and uses the input parameters for its environment. It returns the receipt
 // for the staking transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-// staking transaction will use the storage field in the account to store the staking information
+// staking transaction will use the code field in the account to store the staking information
 func ApplyStakingTransaction(
 	config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB,
 	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gas uint64, err error) {
 
-	msg, err := StakingToMessage(tx)
+	msg, err := StakingToMessage(tx, header.Number())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -252,7 +253,7 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 // StakingToMessage returns the staking transaction as a core.Message.
 // requires a signer to derive the sender.
 // put it here to avoid cyclic import
-func StakingToMessage(tx *staking.StakingTransaction) (types.Message, error) {
+func StakingToMessage(tx *staking.StakingTransaction, blockNum *big.Int) (types.Message, error) {
 	payload, err := tx.StakingMsgToBytes()
 	if err != nil {
 		return types.Message{}, err
@@ -261,6 +262,6 @@ func StakingToMessage(tx *staking.StakingTransaction) (types.Message, error) {
 	if err != nil {
 		return types.Message{}, err
 	}
-	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.Price(), payload)
+	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.Price(), payload, blockNum)
 	return msg, nil
 }

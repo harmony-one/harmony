@@ -32,6 +32,8 @@ import (
 
 var (
 	errInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
+	errValidatorExist            = errors.New("staking validator address already exists")
+	errValidatorNotExist         = errors.New("staking validator address does not exist")
 )
 
 /*
@@ -77,6 +79,7 @@ type Message interface {
 	CheckNonce() bool
 	Data() []byte
 	Type() types.TransactionType
+	BlockNum() *big.Int
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
@@ -290,14 +293,14 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			break
 		}
-		err = st.applyNewValidatorTx(stkMsg)
+		err = st.applyNewValidatorTx(stkMsg, msg.BlockNum())
 
 	case types.StakeEditVal:
 		stkMsg := &staking.EditValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			break
 		}
-		err = st.applyEditValidatorTx(stkMsg)
+		err = st.applyEditValidatorTx(stkMsg, msg.BlockNum())
 	case types.Delegate:
 		stkMsg := &staking.Delegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
@@ -324,23 +327,38 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	return st.gasUsed(), err
 }
 
-func (st *StateTransition) applyNewValidatorTx(newValidator *staking.NewValidator) error {
-	// TODO UpdateHeight and UnbondingHeight
-	//	commission := staking.Commission{newValidator.CommissionRates, new(big.Int)}
-	//	v := staking.Validator{newValidator.StakingAddress, newValidator.PubKey,
-	//		newValidator.Amount, new(big.Int), newValidator.MinSelfDelegation, false,
-	//		commission, newValidator.Description}
-	//
-	//	bytes, err := rlp.EncodeToBytes(&v)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	hash := crypto.Keccak256Hash(bytes)
-	//	st.state.SetState(v.Address, staking.ValidatorHashKey, hash)
+func (st *StateTransition) applyNewValidatorTx(nv *staking.NewValidator, blockNum *big.Int) error {
+	if st.state.IsValidator(nv.StakingAddress) {
+		return errValidatorExist
+	}
+	v, err := staking.CreateValidatorFromNewMsg(nv)
+	if err != nil {
+		return err
+	}
+	v.UpdateHeight = blockNum
+	wrapper := staking.ValidatorWrapper{*v, nil}
+	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
+		return err
+	}
+	if err := st.state.AddValidatorKey(v.Address); err != nil {
+		return err
+	}
+	st.state.SetValidatorFlag(v.Address)
 	return nil
 }
 
-func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValidator) error {
+func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, blockNum *big.Int) error {
+	if !st.state.IsValidator(ev.StakingAddress) {
+		return errValidatorNotExist
+	}
+	wrapper := st.state.GetStakingInfo(ev.StakingAddress)
+	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, ev); err != nil {
+		return err
+	}
+	wrapper.Validator.UpdateHeight = blockNum
+	if err := st.state.UpdateStakingInfo(ev.StakingAddress, wrapper); err != nil {
+		return err
+	}
 	return nil
 }
 

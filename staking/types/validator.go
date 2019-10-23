@@ -1,14 +1,16 @@
 package types
 
 import (
+	"errors"
 	"math/big"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Define validator staking related const
@@ -18,6 +20,10 @@ const (
 	MaxWebsiteLength         = 140
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
+)
+
+var (
+	errAddressNotMatch = errors.New("Validator key not match")
 )
 
 // ValidatorWrapper contains validator and its delegation information
@@ -31,7 +37,7 @@ type Validator struct {
 	// ECDSA address of the validator
 	Address common.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
-	ValidatingPubKey bls.PublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
+	ValidatingPubKey shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
 	// The stake put by the validator itself
 	Stake *big.Int `json:"stake" yaml:"stake"`
 	// if unbonding, height at which this validator has begun unbonding
@@ -125,3 +131,46 @@ func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 
 // GetMinSelfDelegation returns the minimum amount the validator must stake
 func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
+
+// CreateValidatorFromNewMsg creates validator from NewValidator message
+func CreateValidatorFromNewMsg(val *NewValidator) (*Validator, error) {
+	desc, err := val.Description.EnsureLength()
+	if err != nil {
+		return nil, err
+	}
+	commission := Commission{val.CommissionRates, new(big.Int)}
+	v := Validator{val.StakingAddress, val.PubKey,
+		val.Amount, new(big.Int), val.MinSelfDelegation, false,
+		commission, desc}
+	return &v, nil
+}
+
+// UpdateValidatorFromEditMsg updates validator from EditValidator message
+func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error {
+	if validator.Address != edit.StakingAddress {
+		return errAddressNotMatch
+	}
+	desc, err := edit.Description.EnsureLength()
+	if err != nil {
+		return err
+	}
+
+	// update description
+	typ := reflect.TypeOf(desc)
+	val := reflect.ValueOf(desc)
+	val1 := reflect.ValueOf(&validator.Description).Elem()
+	for i := 0; i < typ.NumField(); i++ {
+		if val.Field(i).Len() > 0 {
+			val1.Field(i).SetString(val.Field(i).String())
+		}
+	}
+
+	if edit.CommissionRate != (numeric.Dec{}) {
+		validator.Rate = edit.CommissionRate
+	}
+
+	if edit.MinSelfDelegation != nil {
+		validator.MinSelfDelegation = edit.MinSelfDelegation
+	}
+	return nil
+}

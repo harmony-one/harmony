@@ -30,6 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/staking"
+	stk "github.com/harmony-one/harmony/staking/types"
 )
 
 type revision struct {
@@ -678,4 +680,100 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	})
 	//log.Debug("Trie cache stats after commit", "misses", trie.CacheMisses(), "unloads", trie.CacheUnloads())
 	return root, err
+}
+
+// GetValidatorMap returns the staking validators, if not exist, create one
+func (db *DB) GetValidatorMap() map[common.Address]struct{} {
+	by := db.GetCode(staking.ValidatorMapAddress)
+	m := make(map[common.Address]struct{})
+	if by == nil {
+		return m
+	}
+	if err := rlp.DecodeBytes(by, &m); err != nil {
+		return make(map[common.Address]struct{})
+	}
+	return m
+}
+
+// UpdateValidatorMap updates the whole staking validators
+func (db *DB) UpdateValidatorMap(m map[common.Address]struct{}) error {
+	by, err := rlp.EncodeToBytes(m)
+	if err != nil {
+		return err
+	}
+	db.SetCode(staking.ValidatorMapAddress, by)
+	return nil
+}
+
+// AddValidatorKey updates one staking validator
+func (db *DB) AddValidatorKey(key common.Address) error {
+	m := db.GetValidatorMap()
+	if _, ok := m[key]; ok {
+		return nil
+	}
+	m[key] = struct{}{}
+	by, err := rlp.EncodeToBytes(m)
+	if err != nil {
+		return err
+	}
+	db.SetCode(staking.ValidatorMapAddress, by)
+	return nil
+}
+
+// DeleteValidatorKey updates one staking validator
+func (db *DB) DeleteValidatorKey(key common.Address) error {
+	m := db.GetValidatorMap()
+	if _, ok := m[key]; !ok {
+		return nil
+	}
+	delete(m, key)
+	by, err := rlp.EncodeToBytes(m)
+	if err != nil {
+		return err
+	}
+	db.SetCode(staking.ValidatorMapAddress, by)
+	return nil
+}
+
+// UpdateStakingInfo update staking information of a given validator (including delegation info)
+func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
+	by := db.GetCode(addr)
+	if len(by) == 0 {
+		return nil
+	}
+	val := stk.ValidatorWrapper{}
+	err := rlp.DecodeBytes(by, &val)
+	if err != nil {
+		return nil
+	}
+	return &val
+}
+
+// UpdateStakingInfo update staking information of a given validator (including delegation info)
+func (db *DB) UpdateStakingInfo(addr common.Address, val *stk.ValidatorWrapper) error {
+	by, err := rlp.EncodeToBytes(val)
+	if err != nil {
+		return err
+	}
+	db.SetCode(addr, by)
+	return nil
+}
+
+// SetValidatorFlag checks whether it is a validator object
+func (db *DB) SetValidatorFlag(addr common.Address) {
+	db.SetState(addr, staking.IsValidatorKey, staking.IsValidator)
+}
+
+// UnsetValidatorFlag checks whether it is a validator object
+func (db *DB) UnsetValidatorFlag(addr common.Address) {
+	db.SetState(addr, staking.IsValidatorKey, common.Hash{})
+}
+
+// IsValidator checks whether it is a validator object
+func (db *DB) IsValidator(addr common.Address) bool {
+	so := db.getStateObject(addr)
+	if so == nil {
+		return false
+	}
+	return so.IsValidator(db.db)
 }

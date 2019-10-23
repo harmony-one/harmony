@@ -384,6 +384,7 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Tra
 	}
 
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, pendingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
+
 	selectedStaking, unselectedStaking, invalidStaking :=
 		node.Worker.SelectStakingTransactionsForNewBlock(newBlockNum, pendingStakingTransactions, coinbase)
 
