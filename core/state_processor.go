@@ -194,11 +194,6 @@ func ApplyStakingTransaction(
 	if err != nil {
 		return nil, 0, err
 	}
-	stkType := tx.StakingType()
-	if _, ok := types.StakingTypeMap[stkType]; !ok {
-		return nil, 0, staking.ErrInvalidStakingKind
-	}
-	msg.SetType(types.StakingTypeMap[stkType])
 
 	// Create a new context to be used in the EVM environment
 	context := NewEVMContext(msg, header, bc, author)
@@ -263,5 +258,10 @@ func StakingToMessage(tx *staking.StakingTransaction, blockNum *big.Int) (types.
 		return types.Message{}, err
 	}
 	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.Price(), payload, blockNum)
+	stkType := tx.StakingType()
+	if _, ok := types.StakingTypeMap[stkType]; !ok {
+		return types.Message{}, staking.ErrInvalidStakingKind
+	}
+	msg.SetType(types.StakingTypeMap[stkType])
 	return msg, nil
 }
