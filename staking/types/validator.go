@@ -3,7 +3,6 @@ package types
 import (
 	"errors"
 	"math/big"
-	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -37,7 +36,7 @@ type Validator struct {
 	// ECDSA address of the validator
 	Address common.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
-	ValidatingPubKey shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
+	SlotPubKeys []shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
 	// The stake put by the validator itself
 	Stake *big.Int `json:"stake" yaml:"stake"`
 	// if unbonding, height at which this validator has begun unbonding
@@ -86,7 +85,7 @@ func NewDescription(name, identity, website, securityContact, details string) De
 
 // UpdateDescription updates the fields of a given description. An error is
 // returned if the resulting description contains an invalid length.
-func (d Description) UpdateDescription(d2 Description) (Description, error) {
+func UpdateDescription(d2 *Description) (Description, error) {
 	return NewDescription(
 		d2.Name,
 		d2.Identity,
@@ -133,13 +132,15 @@ func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
 
 // CreateValidatorFromNewMsg creates validator from NewValidator message
-func CreateValidatorFromNewMsg(val *NewValidator) (*Validator, error) {
-	desc, err := val.Description.EnsureLength()
+func CreateValidatorFromNewMsg(val *CreateValidator) (*Validator, error) {
+	desc, err := UpdateDescription(val.Description)
 	if err != nil {
 		return nil, err
 	}
 	commission := Commission{val.CommissionRates, new(big.Int)}
-	v := Validator{val.StakingAddress, val.PubKey,
+	pubKeys := []shard.BlsPublicKey{}
+	pubKeys = append(pubKeys, val.SlotPubKeys...)
+	v := Validator{val.ValidatorAddress, pubKeys,
 		val.Amount, new(big.Int), val.MinSelfDelegation, false,
 		commission, desc}
 	return &v, nil
@@ -147,26 +148,18 @@ func CreateValidatorFromNewMsg(val *NewValidator) (*Validator, error) {
 
 // UpdateValidatorFromEditMsg updates validator from EditValidator message
 func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error {
-	if validator.Address != edit.StakingAddress {
+	if validator.Address != edit.ValidatorAddress {
 		return errAddressNotMatch
 	}
-	desc, err := edit.Description.EnsureLength()
+	desc, err := UpdateDescription(edit.Description)
 	if err != nil {
 		return err
 	}
 
-	// update description
-	typ := reflect.TypeOf(desc)
-	val := reflect.ValueOf(desc)
-	val1 := reflect.ValueOf(&validator.Description).Elem()
-	for i := 0; i < typ.NumField(); i++ {
-		if val.Field(i).Len() > 0 {
-			val1.Field(i).SetString(val.Field(i).String())
-		}
-	}
+	validator.Description = desc
 
-	if edit.CommissionRate != (numeric.Dec{}) {
-		validator.Rate = edit.CommissionRate
+	if edit.CommissionRate != nil {
+		validator.Rate = *edit.CommissionRate
 	}
 
 	if edit.MinSelfDelegation != nil {

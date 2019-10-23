@@ -56,7 +56,7 @@ const (
 )
 
 // StakingTypeMap is the map from staking type to transactionType
-var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveNewValidator: StakeNewVal,
+var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveCreateValidator: StakeNewVal,
 	staking.DirectiveEditValidator: StakeEditVal, staking.DirectiveDelegate: Delegate,
 	staking.DirectiveUndelegate: Undelegate}
 

@@ -58,7 +58,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		p.DeserializeHexStr(testBLSPubKey)
 		pub := shard.BlsPublicKey{}
 		pub.FromLibBLSPublicKey(p)
-		// return staking.DirectiveNewValidator, staking.NewValidator{
+		// return staking.DirectiveCreateValidator, staking.CreateValidator{
 		// 	Description: staking.Description{
 		// 		Name:            "something",
 		// 		Identity:        "something else",

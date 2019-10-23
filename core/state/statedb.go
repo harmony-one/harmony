@@ -735,7 +735,7 @@ func (db *DB) DeleteValidatorKey(key common.Address) error {
 	return nil
 }
 
-// UpdateStakingInfo update staking information of a given validator (including delegation info)
+// GetStakingInfo update staking information of a given validator (including delegation info)
 func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
 	by := db.GetCode(addr)
 	if len(by) == 0 {

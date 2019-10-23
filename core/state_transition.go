@@ -289,11 +289,11 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	switch msg.Type() {
 	case types.StakeNewVal:
-		stkMsg := &staking.NewValidator{}
+		stkMsg := &staking.CreateValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			break
 		}
-		err = st.applyNewValidatorTx(stkMsg, msg.BlockNum())
+		err = st.applyCreateValidatorTx(stkMsg, msg.BlockNum())
 
 	case types.StakeEditVal:
 		stkMsg := &staking.EditValidator{}
@@ -322,8 +322,8 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	return st.gasUsed(), err
 }
 
-func (st *StateTransition) applyNewValidatorTx(nv *staking.NewValidator, blockNum *big.Int) error {
-	if st.state.IsValidator(nv.StakingAddress) {
+func (st *StateTransition) applyCreateValidatorTx(nv *staking.CreateValidator, blockNum *big.Int) error {
+	if st.state.IsValidator(nv.ValidatorAddress) {
 		return errValidatorExist
 	}
 	v, err := staking.CreateValidatorFromNewMsg(nv)
@@ -343,15 +343,15 @@ func (st *StateTransition) applyNewValidatorTx(nv *staking.NewValidator, blockNu
 }
 
 func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, blockNum *big.Int) error {
-	if !st.state.IsValidator(ev.StakingAddress) {
+	if !st.state.IsValidator(ev.ValidatorAddress) {
 		return errValidatorNotExist
 	}
-	wrapper := st.state.GetStakingInfo(ev.StakingAddress)
+	wrapper := st.state.GetStakingInfo(ev.ValidatorAddress)
 	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, ev); err != nil {
 		return err
 	}
 	wrapper.Validator.UpdateHeight = blockNum
-	if err := st.state.UpdateStakingInfo(ev.StakingAddress, wrapper); err != nil {
+	if err := st.state.UpdateStakingInfo(ev.ValidatorAddress, wrapper); err != nil {
 		return err
 	}
 	return nil

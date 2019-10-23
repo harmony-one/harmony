@@ -158,21 +158,21 @@ func (tx *StakingTransaction) StakingMsgToBytes() (by []byte, err error) {
 	stakeType := tx.StakingType()
 
 	switch stakeType {
-	case DirectiveNewValidator:
-		newValidator := tx.StakingMessage().(NewValidator)
-		by, err = rlp.EncodeToBytes(newValidator)
+	case DirectiveCreateValidator:
+		createValidator := tx.StakingMessage().(CreateValidator)
+		by, err = rlp.EncodeToBytes(createValidator)
 	case DirectiveEditValidator:
 		editValidator := tx.StakingMessage().(EditValidator)
 		by, err = rlp.EncodeToBytes(editValidator)
 	case DirectiveDelegate:
 		delegate := tx.StakingMessage().(Delegate)
 		by, err = rlp.EncodeToBytes(delegate)
-	case DirectiveRedelegate:
-		redelegate := tx.StakingMessage().(Redelegate)
-		by, err = rlp.EncodeToBytes(redelegate)
 	case DirectiveUndelegate:
 		undelegate := tx.StakingMessage().(Undelegate)
 		by, err = rlp.EncodeToBytes(undelegate)
+	case DirectiveCollectRewards:
+		collectRewards := tx.StakingMessage().(CollectRewards)
+		by, err = rlp.EncodeToBytes(collectRewards)
 	default:
 		by = []byte{}
 		err = ErrInvalidStakingKind
