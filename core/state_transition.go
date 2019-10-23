@@ -331,7 +331,7 @@ func (st *StateTransition) applyCreateValidatorTx(nv *staking.CreateValidator, b
 		return err
 	}
 	v.UpdateHeight = blockNum
-	wrapper := staking.ValidatorWrapper{*v, nil}
+	wrapper := staking.ValidatorWrapper{*v, nil, nil, nil}
 	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
 		return err
 	}

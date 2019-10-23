@@ -27,8 +27,10 @@ var (
 
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
-	Validator   `json:"validator" yaml:"validator"`
-	Delegations []Delegation `json:"delegations" yaml:"delegations"`
+	Validator           `json:"validator" yaml:"validator"`
+	Delegations         []Delegation `json:"delegations" yaml:"delegations"`
+	SnapshotValidator   *Validator   `json:"snapshot_validator" yaml:"snaphost_validator"`
+	SnapshotDelegations []Delegation `json:"snapshot_delegations" yaml:"snapshot_delegations"`
 }
 
 // Validator - data fields for a validator
