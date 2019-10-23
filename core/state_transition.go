@@ -301,18 +301,13 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 			break
 		}
 		err = st.applyEditValidatorTx(stkMsg, msg.BlockNum())
+
 	case types.Delegate:
 		stkMsg := &staking.Delegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			break
 		}
 		err = st.applyDelegateTx(stkMsg)
-	case types.Redelegate:
-		stkMsg := &staking.Redelegate{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
-		}
-		err = st.applyRedelegateTx(stkMsg)
 
 	case types.Undelegate:
 		stkMsg := &staking.Undelegate{}
@@ -363,10 +358,6 @@ func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, block
 }
 
 func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
-	return nil
-}
-
-func (st *StateTransition) applyRedelegateTx(redelegate *staking.Redelegate) error {
 	return nil
 }
 

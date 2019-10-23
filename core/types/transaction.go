@@ -52,14 +52,13 @@ const (
 	StakeNewVal
 	StakeEditVal
 	Delegate
-	Redelegate
 	Undelegate
 )
 
 // StakingTypeMap is the map from staking type to transactionType
 var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveNewValidator: StakeNewVal,
 	staking.DirectiveEditValidator: StakeEditVal, staking.DirectiveDelegate: Delegate,
-	staking.DirectiveRedelegate: Redelegate, staking.DirectiveUndelegate: Undelegate}
+	staking.DirectiveUndelegate: Undelegate}
 
 // Transaction struct.
 type Transaction struct {
@@ -84,8 +83,6 @@ func (txType TransactionType) String() string {
 		return "StakeEditValidator"
 	} else if txType == Delegate {
 		return "Delegate"
-	} else if txType == Redelegate {
-		return "Redelegate"
 	} else if txType == Undelegate {
 		return "Undelegate"
 	}
