@@ -131,7 +131,9 @@ var (
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
 	publicRPC       = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
-	quorumPolicy    = flag.String("quorum_policy", "one-vote", "What quorum policy to use, staked-vote is alternative (default: one-vote)")
+	quorumPolicy    = flag.String(
+		"quorum_policy", "one-vote", "What quorum policy to use, staked-vote is alternative",
+	)
 )
 
 func stringToPolicy(s string) quorum.Policy {
@@ -222,7 +224,11 @@ func setupInitialAccount() (isLeader bool) {
 	}
 
 	if initialAccount == nil {
-		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
+		fmt.Fprintf(
+			os.Stderr,
+			"ERROR cannot find your BLS key in the genesis/FN tables: %s\n",
+			pubKey.SerializeToHexStr(),
+		)
 		os.Exit(100)
 	}
 
@@ -262,7 +268,8 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// Set network type
 	netType := nodeconfig.NetworkType(*networkType)
 	switch netType {
-	case nodeconfig.Mainnet, nodeconfig.Testnet, nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
+	case nodeconfig.Mainnet, nodeconfig.Testnet,
+		nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
 		nodeconfig.SetNetworkType(netType)
 	default:
 		panic(fmt.Sprintf("invalid network type: %s", *networkType))

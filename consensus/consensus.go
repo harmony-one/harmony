@@ -25,7 +25,6 @@ const (
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	Decider quorum.Decider
-
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -205,11 +204,11 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey,
-	Decider quorum.Decider,
+	host p2p.Host, shard uint32, leader p2p.Peer,
+	blsPriKey *bls.SecretKey, decider quorum.Decider,
 ) (*Consensus, error) {
 	consensus := Consensus{}
-	consensus.Decider = Decider
+	consensus.Decider = decider
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.blockNumLowChan = make(chan struct{})

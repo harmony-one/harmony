@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -22,7 +23,8 @@ var BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One)
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
 func AccumulateRewards(
-	bc engine.ChainReader, state *state.DB, header *block.Header,
+	bc engine.ChainReader, state *state.DB,
+	header *block.Header, d reward.Distributor,
 ) error {
 	blockNum := header.Number().Uint64()
 	if blockNum == 0 {
@@ -58,10 +60,10 @@ func AccumulateRewards(
 	var committerKeys []*bls.PublicKey
 	for _, member := range parentCommittee.NodeList {
 		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {
 			return ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", member.BlsPublicKey).WithCause(err)
+				"blsPublicKey", member.BLSPublicKey).WithCause(err)
 		}
 		committerKeys = append(committerKeys, committerKey)
 	}
@@ -72,32 +74,28 @@ func AccumulateRewards(
 	if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
 		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
 	}
-	totalAmount := big.NewInt(0)
-	var accounts []common.Address
-	signers := []string{}
+
+	accounts := []common2.Address{}
+
 	for idx, member := range parentCommittee.NodeList {
 		if signed, err := mask.IndexEnabled(idx); err != nil {
-			return ctxerror.New("cannot check for committer bit",
-				"committerIndex", idx,
+			return ctxerror.New(
+				"cannot check for committer bit", "committerIndex", idx,
 			).WithCause(err)
 		} else if signed {
-			accounts = append(accounts, member.EcdsaAddress)
+			accounts = append(accounts, common2.Address(member.ECDSAAddress))
 		}
 	}
 
-	numAccounts := big.NewInt(int64(len(accounts)))
-	last := new(big.Int)
-	for i, account := range accounts {
-		cur := new(big.Int)
-		cur.Mul(BlockReward, big.NewInt(int64(i+1))).Div(cur, numAccounts)
-		diff := new(big.Int).Sub(cur, last)
-		signers = append(signers, common2.MustAddressToBech32(account))
-		state.AddBalance(account, diff)
-		totalAmount = new(big.Int).Add(totalAmount, diff)
-		last = cur
-	}
+	signers := []string{}
+	totalAmount := d.Award(
+		BlockReward, accounts, func(receipient common.Address, amount *big.Int) {
+			state.AddBalance(receipient, amount)
+			signers = append(signers, common2.MustAddressToBech32(receipient))
+		})
+
 	header.Logger(utils.Logger()).Debug().
-		Str("NumAccounts", numAccounts.String()).
+		Int("NumAccounts", len(accounts)).
 		Str("TotalAmount", totalAmount.String()).
 		Strs("Signers", signers).
 		Msg("[Block Reward] Successfully paid out block reward")

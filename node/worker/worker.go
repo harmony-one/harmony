@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -158,11 +157,11 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 
 // SelectStakingTransactionsForNewBlock selects staking transactions for new block.
 func (w *Worker) SelectStakingTransactionsForNewBlock(
-	newBlockNum uint64, txs staking.StakingTransactions,
-	coinbase common.Address) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
+	newBlockNum uint64, txs staking.StakingTransactions, coinbase common.Address,
+) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
 
 	// only beaconchain process staking transaction
-	if w.chain.ShardID() != values.BeaconChainShardID {
+	if w.chain.ShardID() != shard.BeaconChainID {
 		utils.Logger().Warn().Msgf("Invalid shardID: %v", w.chain.ShardID())
 		return nil, nil, nil
 	}
@@ -181,16 +180,19 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 		if err != nil {
 			w.current.state.RevertToSnapshot(snap)
 			invalid = append(invalid, tx)
-			utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Commit staking transaction error")
+			utils.Logger().Error().Err(err).
+				Str("stakingTxId", tx.Hash().Hex()).Msg("Commit staking transaction error")
 		} else {
 			selected = append(selected, tx)
-			utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("StakingTransaction gas limit info")
+			utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).
+				Uint64("txGasLimit", tx.Gas()).Msg("StakingTransaction gas limit info")
 		}
 	}
 
 	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Uint64("blockGasLimit",
 		w.current.header.GasLimit()).Uint64("blockGasUsed",
-		w.current.header.GasUsed()).Msg("[SelectStakingTransaction] Block gas limit and usage info")
+		w.current.header.GasUsed()).
+		Msg("[SelectStakingTransaction] Block gas limit and usage info")
 
 	return selected, unselected, invalid
 }
@@ -423,7 +425,10 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 	s := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
-	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stkingTxs)
+	block, err := w.engine.Finalize(
+		w.chain, copyHeader, s, w.current.txs, w.current.receipts,
+		w.current.outcxs, w.current.incxs, w.current.stkingTxs,
+	)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}

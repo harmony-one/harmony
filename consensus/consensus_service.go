@@ -444,11 +444,11 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 	}
 	committerKey := new(bls.PublicKey)
 	for _, member := range committee.NodeList {
-		if member.EcdsaAddress == header.Coinbase() {
-			err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		if member.ECDSAAddress == header.Coinbase() {
+			err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey)
 			if err != nil {
 				return nil, ctxerror.New("cannot convert BLS public key",
-					"blsPublicKey", member.BlsPublicKey,
+					"blsPublicKey", member.BLSPublicKey,
 					"coinbaseAddr", header.Coinbase()).WithCause(err)
 			}
 			return committerKey, nil

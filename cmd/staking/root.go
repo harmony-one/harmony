@@ -72,7 +72,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
 		p := &bls.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKeys[index])
-		pub := shard.BlsPublicKey{}
+		pub := shard.BLSPublicKey{}
 		pub.FromLibBLSPublicKey(p)
 
 		ra, _ := numeric.NewDecFromStr("27.27")

@@ -160,15 +160,20 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 
 // DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
 func (node *Node) DoBeaconSyncing() {
-	go func(node *Node) {
+	go func() {
 		// TODO ek – infinite loop; add shutdown/cleanup logic
 		for {
 			select {
 			case beaconBlock := <-node.BeaconBlockChannel:
 				node.beaconSync.AddLastMileBlock(beaconBlock)
+				ss, sE := beaconBlock.Header().GetShardState()
+				fmt.Println("Beacon suite")
+				if mems := ss.FindCommitteeByID(node.Blockchain().ShardID()); sE == nil && mems != nil {
+					node.Consensus.Decider.UpdateVotingPower(mems.NodeList)
+				}
 			}
 		}
-	}(node)
+	}()
 
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {

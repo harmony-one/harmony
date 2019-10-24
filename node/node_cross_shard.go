@@ -302,7 +302,7 @@ func (node *Node) VerifyCrosslinkHeader(prevHeader, header *block.Header) error 
 	parseKeysSuccess := true
 	for _, member := range committee.NodeList {
 		committerKey := new(bls.PublicKey)
-		err = member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		err = member.BLSPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {
 			parseKeysSuccess = false
 			break

@@ -154,11 +154,11 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 	validators := make([]map[string]interface{}, 0)
 	for _, validator := range committee.NodeList {
 		validatorBalance := new(hexutil.Big)
-		validatorBalance, err = s.b.GetBalance(validator.EcdsaAddress)
+		validatorBalance, err = s.b.GetBalance(validator.ECDSAAddress)
 		if err != nil {
 			return nil, err
 		}
-		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
+		oneAddress, err := internal_common.AddressToBech32(validator.ECDSAAddress)
 		if err != nil {
 			return nil, err
 		}

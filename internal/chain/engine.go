@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -19,10 +20,26 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-type engineImpl struct{}
+type engineImpl struct {
+	r reward.Distributor
+}
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{}
+var Engine = newEngine()
+
+func newEngine() *engineImpl {
+	// Careful, this the nil interface possible issue
+	var d reward.Distributor
+	return &engineImpl{d}
+}
+
+func (e *engineImpl) Rewarder() reward.Distributor {
+	return e.r
+}
+
+func (e *engineImpl) SetRewarder(d reward.Distributor) {
+	e.r = d
+}
 
 // SealHash returns the hash of a block prior to it being sealed.
 func (e *engineImpl) SealHash(header *block.Header) (hash common.Hash) {
@@ -155,7 +172,7 @@ func (e *engineImpl) Finalize(
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	if err := AccumulateRewards(chain, state, header); err != nil {
+	if err := AccumulateRewards(chain, state, header, e.Rewarder()); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
@@ -244,10 +261,10 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 	var committerKeys []*bls.PublicKey
 	for _, member := range committee.NodeList {
 		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {
 			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", member.BlsPublicKey).WithCause(err)
+				"blsPublicKey", member.BLSPublicKey).WithCause(err)
 		}
 		committerKeys = append(committerKeys, committerKey)
 	}

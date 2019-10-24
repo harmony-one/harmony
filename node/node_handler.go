@@ -13,8 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -29,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
@@ -128,12 +127,13 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						Msg("block sync")
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
-					if node.Blockchain().ShardID() != 0 {
+					if node.Blockchain().ShardID() != shard.BeaconChainID {
 						for _, block := range blocks {
-							if block.ShardID() == 0 {
+							if block.ShardID() == shard.BeaconChainID {
 								utils.Logger().Info().
 									Uint64("block", blocks[0].NumberU64()).
 									Msgf("Block being handled by block channel %d %d", block.NumberU64(), block.ShardID())
+								// This is the right place to do the hook of reassigning the consensus quroum members
 								node.BeaconBlockChannel <- block
 							}
 						}
@@ -147,7 +147,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			case proto_node.Header:
 				// only beacon chain will accept the header from other shards
 				utils.Logger().Debug().Uint32("shardID", node.NodeConfig.ShardID).Msg("NET: received message: Node/Header")
-				if node.NodeConfig.ShardID != 0 {
+				if node.NodeConfig.ShardID != shard.BeaconChainID {
 					return
 				}
 				node.ProcessHeaderMessage(msgPayload[1:]) // skip first byte which is blockMsgType
@@ -159,10 +159,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			}
 		case proto_node.PING:
 			node.pingMessageHandler(msgPayload, sender)
-		case proto_node.ShardState:
-			if err := node.epochShardStateMessageHandler(msgPayload); err != nil {
-				ctxerror.Log15(utils.GetLogger().Warn, err)
-			}
 		}
 	default:
 		utils.Logger().Error().
@@ -312,12 +308,27 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		return
 	} else if core.IsEpochLastBlock(newBlock) {
 		node.Consensus.UpdateConsensusInformation()
-		validatorSnapshot := node.Blockchain().ValidatorCandidates()
-		validatorStakes := make([]*big.Int, len(validatorSnapshot))
-		for i, cand := range validatorSnapshot {
-			validatorStakes[i] = node.Blockchain().ValidatorStakingWithDelegation(cand)
-		}
-		// Here pick 400 or 1600?
+		// validatorSnapshot := node.Blockchain().ValidatorCandidates()
+		// vCount := len(validatorSnapshot)
+		// type t struct {
+		// 	*staking.Validator
+		// 	numeric.Dec
+		// }
+		// validatorStakes := make([]t, vCount)
+		// for i, cand := range validatorSnapshot {
+		// 	validatorStakes[i] = t{
+		// 		node.Blockchain().ValidatorInformation(cand),
+		// 		node.Blockchain().ValidatorStakingWithDelegation(cand),
+		// 	}
+		// }
+		// TODO This all goes into CalculateShardState
+		// sort.SliceStable(validatorStakes,
+		// 	func(i, j int) bool {
+		// 		return validatorStakes[i].Stake.LT(validatorStakes[j].Stake)
+		// 	},
+		// )
+		// Now do header.SetShardState?
+		// node.Consensus.Decider.UpdateVotingPower(validatorStakes[:1600])
 
 	}
 
@@ -369,43 +380,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 				node.AddressNonce.Store(msg.From(), nonce)
 			}
 		}
-
-		// TODO: Enable the following after v0
-		if node.Consensus.ShardID == 0 {
-			// TODO: enable drand only for beacon chain
-			// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
-			//if node.DRand != nil {
-			//	go func() {
-			//		node.ConfirmedBlockChannel <- newBlock
-			//	}()
-			//}
-
-			// TODO: enable staking
-			// TODO: update staking information once per epoch.
-			//node.UpdateStakingList(node.QueryStakeInfo())
-			//node.printStakingList()
-		}
-
-		// TODO: enable shard state update
-		//newBlockHeader := newBlock.Header()
-		//if newBlockHeader.ShardStateHash != (common.Hash{}) {
-		//	if node.Consensus.ShardID == 0 {
-		//		// TODO ek – this is a temp hack until beacon chain sync is fixed
-		//		// End-of-epoch block on beacon chain; block's EpochState is the
-		//		// master resharding table.  Broadcast it to the network.
-		//		if err := node.broadcastEpochShardState(newBlock); err != nil {
-		//			e := ctxerror.New("cannot broadcast shard state").WithCause(err)
-		//			ctxerror.Log15(utils.Logger().Error, e)
-		//		}
-		//	}
-		//	shardState, err := newBlockHeader.CalculateShardState()
-		//	if err != nil {
-		//		e := ctxerror.New("cannot get shard state from header").WithCause(err)
-		//		ctxerror.Log15(utils.Logger().Error, e)
-		//	} else {
-		//		node.transitionIntoNextEpoch(shardState)
-		//	}
-		//}
 	}
 }
 
@@ -456,7 +430,7 @@ type genesisNode struct {
 var (
 	genesisCatalogOnce          sync.Once
 	genesisNodeByStakingAddress = make(map[common.Address]*genesisNode)
-	genesisNodeByConsensusKey   = make(map[shard.BlsPublicKey]*genesisNode)
+	genesisNodeByConsensusKey   = make(map[shard.BLSPublicKey]*genesisNode)
 )
 
 func initGenesisCatalog() {
@@ -468,8 +442,8 @@ func initGenesisCatalog() {
 				MemberIndex: i,
 				NodeID:      nodeID,
 			}
-			genesisNodeByStakingAddress[nodeID.EcdsaAddress] = genesisNode
-			genesisNodeByConsensusKey[nodeID.BlsPublicKey] = genesisNode
+			genesisNodeByStakingAddress[nodeID.ECDSAAddress] = genesisNode
+			genesisNodeByConsensusKey[nodeID.BLSPublicKey] = genesisNode
 		}
 	}
 }
@@ -479,7 +453,7 @@ func getGenesisNodeByStakingAddress(address common.Address) *genesisNode {
 	return genesisNodeByStakingAddress[address]
 }
 
-func getGenesisNodeByConsensusKey(key shard.BlsPublicKey) *genesisNode {
+func getGenesisNodeByConsensusKey(key shard.BLSPublicKey) *genesisNode {
 	genesisCatalogOnce.Do(initGenesisCatalog)
 	return genesisNodeByConsensusKey[key]
 }
@@ -511,7 +485,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 
 	utils.Logger().Debug().
 		Str("Version", ping.NodeVer).
-		Str("BlsKey", peer.ConsensusPubKey.SerializeToHexStr()).
+		Str("BLSKey", peer.ConsensusPubKey.SerializeToHexStr()).
 		Str("IP", peer.IP).
 		Str("Port", peer.Port).
 		Interface("PeerID", peer.PeerID).

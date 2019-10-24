@@ -202,13 +202,13 @@ func CalculateShardState(epoch *big.Int) shard.State {
 			index := i + j*shardNum // The initial account to use for genesis nodes
 
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(hmyAccounts[index].BlsPublicKey)
-			pubKey := shard.BlsPublicKey{}
+			pub.DeserializeHexStr(hmyAccounts[index].BLSPublicKey)
+			pubKey := shard.BLSPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
 			curNodeID := shard.NodeID{
-				EcdsaAddress: common2.ParseAddr(hmyAccounts[index].Address),
-				BlsPublicKey: pubKey,
+				ECDSAAddress: common2.ParseAddr(hmyAccounts[index].Address),
+				BLSPublicKey: pubKey,
 			}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
@@ -216,16 +216,14 @@ func CalculateShardState(epoch *big.Int) shard.State {
 		// add FN runner's key
 		for j := shardHarmonyNodes; j < shardSize; j++ {
 			index := i + (j-shardHarmonyNodes)*shardNum
-
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(fnAccounts[index].BlsPublicKey)
-
-			pubKey := shard.BlsPublicKey{}
+			pub.DeserializeHexStr(fnAccounts[index].BLSPublicKey)
+			pubKey := shard.BLSPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
 			curNodeID := shard.NodeID{
-				EcdsaAddress: common2.ParseAddr(fnAccounts[index].Address),
-				BlsPublicKey: pubKey,
+				ECDSAAddress: common2.ParseAddr(fnAccounts[index].Address),
+				BLSPublicKey: pubKey,
 			}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
@@ -247,7 +245,7 @@ func CalculatePublicKeys(epoch *big.Int, shardID uint32) []*bls.PublicKey {
 	pubKeys := []*bls.PublicKey{}
 	for _, node := range committee.NodeList {
 		pubKey := &bls.PublicKey{}
-		pubKeyBytes := node.BlsPublicKey[:]
+		pubKeyBytes := node.BLSPublicKey[:]
 		err := pubKey.Deserialize(pubKeyBytes)
 		if err != nil {
 			utils.Logger().Warn().Str("pubKeyBytes", hex.EncodeToString(pubKeyBytes)).Msg("Cannot Deserialize pubKey")

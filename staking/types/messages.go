@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -53,7 +52,7 @@ type CreateValidator struct {
 	CommissionRates    `json:"commission" yaml:"commission"`
 	MinSelfDelegation  *big.Int             `json:"min_self_delegation" yaml:"min_self_delegation"`
 	MaxTotalDelegation *big.Int             `json:"max_total_delegation" yaml:"max_total_delegation"`
-	SlotPubKeys        []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
+	SlotPubKeys        []shard.BLSPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
 	Amount             *big.Int             `json:"amount" yaml:"amount"`
 }
 
@@ -64,8 +63,8 @@ type EditValidator struct {
 	CommissionRate     *numeric.Dec        `json:"commission_rate" yaml:"commission_rate" rlp:"nil"  rlp:"nil"`
 	MinSelfDelegation  *big.Int            `json:"min_self_delegation" yaml:"min_self_delegation" rlp:"nil"`
 	MaxTotalDelegation *big.Int            `json:"max_total_delegation" yaml:"max_total_delegation" rlp:"nil"`
-	SlotKeyToRemove    *shard.BlsPublicKey `json:"slot_key_to_remove" yaml:"slot_key_to_remove" rlp:"nil"`
-	SlotKeyToAdd       *shard.BlsPublicKey `json:"slot_key_to_add" yaml:"slot_key_to_add" rlp:"nil"`
+	SlotKeyToRemove    *shard.BLSPublicKey `json:"slot_key_to_remove" yaml:"slot_key_to_remove" rlp:"nil"`
+	SlotKeyToAdd       *shard.BLSPublicKey `json:"slot_key_to_add" yaml:"slot_key_to_add" rlp:"nil"`
 }
 
 // Delegate - type for delegating to a validator

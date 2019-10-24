@@ -635,7 +635,7 @@ func WriteStakingValidator(db DatabaseWriter, v *staking.ValidatorWrapper) error
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteStakingValidator] Failed to encode")
 	}
-	if err := db.Put(stakingKey(v.Address), bytes); err != nil {
+	if err := db.Put(stakingKey(common.Address(v.Address)), bytes); err != nil {
 		utils.Logger().Error().Msg("[WriteStakingValidator] Failed to store to database")
 	}
 	return err

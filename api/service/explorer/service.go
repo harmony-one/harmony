@@ -286,19 +286,19 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
 			for i, validator := range committee.NodeList {
 				pubkeys[i] = new(bls.PublicKey)
-				validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
+				validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
 			}
 			mask, err := bls2.NewMask(pubkeys, nil)
 			if err == nil && accountBlocks[id+1] != nil {
 				err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
 				if err == nil {
 					for _, validator := range committee.NodeList {
-						oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+						oneAddress, err := common2.AddressToBech32(validator.ECDSAAddress)
 						if err != nil {
 							continue
 						}
 						blsPublicKey := new(bls.PublicKey)
-						validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
+						validator.BLSPublicKey.ToLibBLSPublicKey(blsPublicKey)
 						if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
 							block.Signers = append(block.Signers, oneAddress)
 						}
@@ -407,19 +407,19 @@ func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offs
 			pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
 			for i, validator := range committee.NodeList {
 				pubkeys[i] = new(bls.PublicKey)
-				validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
+				validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
 			}
 			mask, err := bls2.NewMask(pubkeys, nil)
 			if err == nil && accountBlocks[id+1] != nil {
 				err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
 				if err == nil {
 					for _, validator := range committee.NodeList {
-						oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+						oneAddress, err := common2.AddressToBech32(validator.ECDSAAddress)
 						if err != nil {
 							continue
 						}
 						blsPublicKey := new(bls.PublicKey)
-						validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
+						validator.BLSPublicKey.ToLibBLSPublicKey(blsPublicKey)
 						if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
 							block.Signers = append(block.Signers, oneAddress)
 						}
@@ -595,11 +595,11 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 	validators := &Committee{}
 	for _, validator := range committee.NodeList {
 		validatorBalance := big.NewInt(0)
-		validatorBalance, err := s.GetAccountBalance(validator.EcdsaAddress)
+		validatorBalance, err := s.GetAccountBalance(validator.ECDSAAddress)
 		if err != nil {
 			continue
 		}
-		oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+		oneAddress, err := common2.AddressToBech32(validator.ECDSAAddress)
 		if err != nil {
 			continue
 		}
@@ -648,11 +648,11 @@ func (s *ServiceAPI) GetExplorerCommittee(ctx context.Context, shardID uint32, e
 	validators := &Committee{}
 	for _, validator := range committee.NodeList {
 		validatorBalance := big.NewInt(0)
-		validatorBalance, err := s.Service.GetAccountBalance(validator.EcdsaAddress)
+		validatorBalance, err := s.Service.GetAccountBalance(validator.ECDSAAddress)
 		if err != nil {
 			continue
 		}
-		oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
+		oneAddress, err := common2.AddressToBech32(validator.ECDSAAddress)
 		if err != nil {
 			continue
 		}

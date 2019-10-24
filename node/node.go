@@ -17,10 +17,10 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -218,17 +218,6 @@ type Node struct {
 	ContractCaller *contracts.ContractCaller
 
 	accountManager *accounts.Manager
-
-	// Next shard state
-	nextShardState struct {
-		// The received master shard state
-		master *shard.EpochShardState
-
-		// When for a leader to propose the next shard state,
-		// or for a validator to wait for a proposal before view change.
-		// TODO ek – replace with retry-based logic instead of delay
-		proposeTime time.Time
-	}
 
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
@@ -504,8 +493,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
+		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 
-		if node.Blockchain().ShardID() != values.BeaconChainShardID {
+		if node.Blockchain().ShardID() != shard.BeaconChainID {
 			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
 		}
 
@@ -525,7 +515,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 			} else {
 				node.AddContractKeyAndAddress(scFaucet)
 			}
-			node.ContractCaller = contracts.NewContractCaller(node.Blockchain(), node.Blockchain().Config())
+			node.ContractCaller = contracts.NewContractCaller(
+				node.Blockchain(), node.Blockchain().Config(),
+			)
 			// Create test keys.  Genesis will later need this.
 			var err error
 			node.TestBankKeys, err = CreateTestBankKeys(TestAccountNumber)

@@ -34,3 +34,14 @@ func Median(stakes []numeric.Dec) numeric.Dec {
 		return stakes[l/2]
 	}
 }
+
+// NOTE technically should be done here instead of one-node-staked-vote.go but
+// have current split of needing some nonstaking based logic makes us leak abstraction
+// and need to know if node is harmony node.
+// Code in effective should be pure math computation, no business logic.
+// VotingPower ..
+// func VotingPower(keeper StakeKeeper) map[]{
+
+// }
+// Choose picks the stakers
+// func Choose([]*staking.Validator)

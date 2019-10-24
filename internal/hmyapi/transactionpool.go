@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -185,6 +186,10 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	if tx.ChainID().Cmp(c) != 0 {
 		e := errors.Wrapf(errInvalidChainID, "current chain id:%s", c.String())
 		return common.Hash{}, e
+	}
+	// only beaconchain process staking transaction
+	if sID := s.b.GetShardID(); sID != shard.BeaconChainID {
+		return common.Hash{}, errors.Errorf("current shard %d is not beacon shard", sID)
 	}
 	return SubmitStakingTransaction(ctx, s.b, tx)
 }

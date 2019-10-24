@@ -3,6 +3,7 @@ package quorum
 import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/staking/effective"
 )
 
 // Phase is a phase that needs quorum to proceed
@@ -190,16 +191,11 @@ func newMapBackedSignatureReader() SignatureReader {
 	}
 }
 
-// Voter ..
-type Voter interface {
-	ToggleActive(*bls.PublicKey) bool
-	UpdateVotingPower(func(*bls.PublicKey) numeric.Dec)
-}
-
 // Decider ..
 type Decider interface {
 	SignatureReader
-	Voter
+	ToggleActive(*bls.PublicKey) bool
+	UpdateVotingPower(keeper effective.StakeKeeper)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
 	QuorumThreshold() int64
@@ -214,10 +210,7 @@ func NewDecider(p Policy) Decider {
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
 			newMapBackedSignatureReader(),
-			map[*bls.PublicKey]struct {
-				isActive  bool
-				effective numeric.Dec
-			}{},
+			map[*bls.PublicKey]stakedVoter{},
 			numeric.ZeroDec(),
 		}
 	default:

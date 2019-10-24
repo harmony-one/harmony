@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -39,7 +38,7 @@ type Validator struct {
 	// ECDSA address of the validator
 	Address common.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
-	SlotPubKeys []shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
+	SlotPubKeys []shard.BLSPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
 	// The stake put by the validator itself
 	Stake *big.Int `json:"stake" yaml:"stake"`
 	// if unbonding, height at which this validator has begun unbonding
@@ -154,7 +153,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator) (*Validator, error) {
 		return nil, err
 	}
 	commission := Commission{val.CommissionRates, new(big.Int)}
-	pubKeys := []shard.BlsPublicKey{}
+	pubKeys := []shard.BLSPublicKey{}
 	pubKeys = append(pubKeys, val.SlotPubKeys...)
 	v := Validator{val.ValidatorAddress, pubKeys,
 		val.Amount, new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,

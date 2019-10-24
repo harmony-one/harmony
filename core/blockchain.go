@@ -2422,6 +2422,6 @@ func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Dele
 }
 
 // ValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
-func (bc *BlockChain) ValidatorStakingWithDelegation(addr common.Address) *big.Int {
-	return big.NewInt(0)
+func (bc *BlockChain) ValidatorStakingWithDelegation(addr common.Address) numeric.Dec {
+	return numeric.ZeroDec()
 }

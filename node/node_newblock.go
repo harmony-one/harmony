@@ -136,7 +136,6 @@ func (node *Node) proposeShardState(block *types.Block) error {
 	case 0:
 		return node.proposeBeaconShardState(block)
 	default:
-		node.proposeLocalShardState(block)
 		return nil
 	}
 }
@@ -154,39 +153,6 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 		return err
 	}
 	return block.AddShardState(shardState)
-}
-
-func (node *Node) proposeLocalShardState(block *types.Block) {
-	logger := block.Logger(utils.Logger())
-	// TODO ek – read this from beaconchain once BC sync is fixed
-	if node.nextShardState.master == nil {
-		logger.Debug().Msg("yet to receive master proposal from beaconchain")
-		return
-	}
-
-	nlogger := logger.With().
-		Uint64("nextEpoch", node.nextShardState.master.Epoch).
-		Time("proposeTime", node.nextShardState.proposeTime).
-		Logger()
-	logger = &nlogger
-	if time.Now().Before(node.nextShardState.proposeTime) {
-		logger.Debug().Msg("still waiting for shard state to propagate")
-		return
-	}
-	masterShardState := node.nextShardState.master.ShardState
-	var localShardState shard.State
-	committee := masterShardState.FindCommitteeByID(block.ShardID())
-	if committee != nil {
-		logger.Info().Msg("found local shard info; proposing it")
-		localShardState = append(localShardState, *committee)
-	} else {
-		logger.Info().Msg("beacon committee disowned us; proposing nothing")
-		// Leave local proposal empty to signal the end of shard (disbanding).
-	}
-	err := block.AddShardState(localShardState)
-	if err != nil {
-		logger.Error().Err(err).Msg("Failed proposin local shard state")
-	}
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
