@@ -90,6 +90,10 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 
+	if len(selectedStakingTxs) > 0 {
+		utils.Logger().Debug().Int("selectedStakingtxs", len(selectedStakingTxs)).Msg("hehe, staking txs proposed")
+	}
+
 	// Prepare cross shard transaction receipts
 	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {

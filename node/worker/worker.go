@@ -161,6 +161,7 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 	}
 
 	selected := staking.StakingTransactions{}
+	// TODO: chao add total gas fee checking when needed
 	unselected := staking.StakingTransactions{}
 	invalid := staking.StakingTransactions{}
 	for _, tx := range txs {
@@ -181,7 +182,6 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 		w.current.header.GasUsed()).Msg("[SelectStakingTransaction] Block gas limit and usage info")
 
 	return selected, unselected, invalid
-
 }
 
 func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinbase common.Address) ([]*types.Log, error) {
@@ -256,9 +256,14 @@ func (w *Worker) CommitTransactions(txs types.Transactions, stakingTxns staking.
 
 		}
 	}
-	for _, stakingTx := range stakingTxns {
-		_ = stakingTx
-		// TODO: add logic to commit staking txns
+	for _, tx := range stakingTxns {
+		snap := w.current.state.Snapshot()
+		_, err := w.commitStakingTransaction(tx, coinbase)
+		if err != nil {
+			w.current.state.RevertToSnapshot(snap)
+			return err
+
+		}
 	}
 	return nil
 }
