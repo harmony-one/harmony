@@ -17,8 +17,10 @@ require (
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/golang/mock v1.3.1
-	github.com/golang/protobuf v1.3.1
-	github.com/golangci/golangci-lint v1.17.1
+	github.com/golang/protobuf v1.3.2
+	github.com/golangci/go-tools v0.0.0-20180109140146-af6baa5dc196 // indirect
+	github.com/golangci/golangci-lint v1.21.0
+	github.com/golangci/gosec v0.0.0-20180901114220-66fb7fc33547 // indirect
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.2
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
@@ -46,7 +48,7 @@ require (
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
-	github.com/prometheus/client_golang v0.9.2
+	github.com/prometheus/client_golang v0.9.3
 	github.com/prometheus/common v0.4.1 // indirect
 	github.com/prometheus/procfs v0.0.3 // indirect
 	github.com/rjeczalik/notify v0.9.2
@@ -55,16 +57,17 @@ require (
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
 	github.com/spf13/cobra v0.0.5
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
-	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443
-	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
-	golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3 // indirect
-	golang.org/x/tools v0.0.0-20190924052046-3ac2a5bbd98a
+	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
+	golang.org/x/lint v0.0.0-20190930215403-16217165b5de
+	golang.org/x/tools v0.0.0-20191024210439-377bdac4e7df
 	google.golang.org/appengine v1.4.0 // indirect
 	google.golang.org/grpc v1.22.0
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
+	gopkg.in/airbrake/gobrake.v2 v2.0.9 // indirect
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
+	gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2 // indirect
 	gopkg.in/ini.v1 v1.42.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
