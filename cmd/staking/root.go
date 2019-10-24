@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	numeric "github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/spf13/cobra"
@@ -58,29 +59,30 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		p.DeserializeHexStr(testBLSPubKey)
 		pub := shard.BlsPublicKey{}
 		pub.FromLibBLSPublicKey(p)
-		// return staking.DirectiveCreateValidator, staking.CreateValidator{
-		// 	Description: staking.Description{
-		// 		Name:            "something",
-		// 		Identity:        "something else",
-		// 		Website:         "some site, harmony.one",
-		// 		SecurityContact: "mr.smith",
-		// 		Details:         "blah blah details",
-		// 	},
-		// 	CommissionRates: staking.CommissionRates{
-		// 		Rate:          staking.NewDec(100),
-		// 		MaxRate:       staking.NewDec(150),
-		// 		MaxChangeRate: staking.NewDec(5),
-		// 	},
-		// 	MinSelfDelegation: big.NewInt(10),
-		// 	StakingAddress:    common.Address(dAddr),
-		// 	PubKey:            pub,
-		// 	Amount:            big.NewInt(100),
-		// }
-		return staking.DirectiveDelegate, staking.Delegate{
-			common.Address(dAddr),
-			common.Address(dAddr),
-			big.NewInt(10),
+		return staking.DirectiveCreateValidator, staking.CreateValidator{
+			Description: &staking.Description{
+				Name:            "SuperHero",
+				Identity:        "YouWouldNotKnow",
+				Website:         "Secret Website",
+				SecurityContact: "Mr.DoubleZeroSeven",
+				Details:         "blah blah blah",
+			},
+			CommissionRates: staking.CommissionRates{
+				Rate:          numeric.NewDec(100),
+				MaxRate:       numeric.NewDec(150),
+				MaxChangeRate: numeric.NewDec(5),
+			},
+			MinSelfDelegation:  big.NewInt(10),
+			MaxTotalDelegation: big.NewInt(3000),
+			ValidatorAddress:   common.Address(dAddr),
+			SlotPubKeys:        []shard.BlsPublicKey{pub},
+			Amount:             big.NewInt(100),
 		}
+		//		return staking.DirectiveDelegate, staking.Delegate{
+		//			common.Address(dAddr),
+		//			common.Address(dAddr),
+		//			big.NewInt(10),
+		//		}
 	}
 
 	stakingTx, err := staking.NewStakingTransaction(2, 100, gasPrice, stakePayloadMaker)
