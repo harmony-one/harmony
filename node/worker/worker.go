@@ -197,6 +197,14 @@ func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinba
 	if receipt == nil {
 		return nil, fmt.Errorf("nil staking receipt")
 	}
+
+	err = w.chain.UpdateValidatorMap(tx)
+	// keep offchain database consistency with onchain we need revert
+	// but it should not happend unless local database corrupted
+	if err != nil {
+		w.current.state.RevertToSnapshot(snap)
+		return nil, err
+	}
 	w.current.stkingTxs = append(w.current.stkingTxs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	return receipt.Logs, nil
@@ -210,6 +218,7 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
+		utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Offchain ValidatorMap Read/Write Error")
 		return nil, err
 	}
 	if receipt == nil {
@@ -400,25 +409,6 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 	return block, nil
-}
-
-// UpdateStakeInformation updates validator and its delegation information
-func (w *Worker) UpdateStakeInformation() ([]*staking.StakingTransaction, []*staking.ValidatorWrapper, error) {
-	//	node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
-	//	for _, unselectedStakingTx := range unselectedStaking {
-	//		node.pendingStakingTransactions[unselectedStakingTx.Hash()] = unselectedStakingTx
-	//	}
-
-	addrs, err := w.chain.ReadValidatorList()
-	if err != nil {
-		return nil, nil, err
-	}
-	//validatorInfo := []staking.ValidatorWrapper{}
-	for _, addr := range addrs {
-		_ = addr
-	}
-
-	return nil, nil, nil
 }
 
 // New create a new worker object.

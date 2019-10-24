@@ -53,6 +53,7 @@ const (
 	StakeEditVal
 	Delegate
 	Undelegate
+	CollectRewards
 )
 
 // StakingTypeMap is the map from staking type to transactionType
@@ -85,6 +86,8 @@ func (txType TransactionType) String() string {
 		return "Delegate"
 	} else if txType == Undelegate {
 		return "Undelegate"
+	} else if txType == CollectRewards {
+		return "CollectRewards"
 	}
 	return "Unknown"
 }

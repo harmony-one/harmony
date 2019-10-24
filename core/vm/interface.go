@@ -40,10 +40,6 @@ type StateDB interface {
 	SetCode(common.Address, []byte)
 	GetCodeSize(common.Address) int
 
-	GetValidatorMap() map[common.Address]struct{}
-	UpdateValidatorMap(map[common.Address]struct{}) error
-	AddValidatorKey(common.Address) error
-	DeleteValidatorKey(common.Address) error
 	GetStakingInfo(common.Address) *staking.ValidatorWrapper
 	UpdateStakingInfo(common.Address, *staking.ValidatorWrapper) error
 	SetValidatorFlag(common.Address)

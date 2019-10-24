@@ -275,6 +275,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
 
 	// Pay intrinsic gas
+	// TODO: add new formula for staking transaction
 	gas, err := IntrinsicGas(st.data, false, homestead)
 	if err != nil {
 		return 0, err
@@ -285,7 +286,6 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	// Increment the nonce for the next transaction
 	st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-	st.refundGas()
 
 	switch msg.Type() {
 	case types.StakeNewVal:
@@ -315,9 +315,12 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 			break
 		}
 		err = st.applyUndelegateTx(stkMsg)
+	case types.CollectRewards:
+
 	default:
 		return 0, staking.ErrInvalidStakingKind
 	}
+	st.refundGas()
 
 	return st.gasUsed(), err
 }
@@ -333,9 +336,6 @@ func (st *StateTransition) applyCreateValidatorTx(nv *staking.CreateValidator, b
 	v.UpdateHeight = blockNum
 	wrapper := staking.ValidatorWrapper{*v, nil, nil, nil}
 	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
-		return err
-	}
-	if err := st.state.AddValidatorKey(v.Address); err != nil {
 		return err
 	}
 	st.state.SetValidatorFlag(v.Address)

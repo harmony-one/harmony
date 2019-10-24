@@ -682,59 +682,6 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	return root, err
 }
 
-// GetValidatorMap returns the staking validators, if not exist, create one
-func (db *DB) GetValidatorMap() map[common.Address]struct{} {
-	by := db.GetCode(staking.ValidatorMapAddress)
-	m := make(map[common.Address]struct{})
-	if by == nil {
-		return m
-	}
-	if err := rlp.DecodeBytes(by, &m); err != nil {
-		return make(map[common.Address]struct{})
-	}
-	return m
-}
-
-// UpdateValidatorMap updates the whole staking validators
-func (db *DB) UpdateValidatorMap(m map[common.Address]struct{}) error {
-	by, err := rlp.EncodeToBytes(m)
-	if err != nil {
-		return err
-	}
-	db.SetCode(staking.ValidatorMapAddress, by)
-	return nil
-}
-
-// AddValidatorKey updates one staking validator
-func (db *DB) AddValidatorKey(key common.Address) error {
-	m := db.GetValidatorMap()
-	if _, ok := m[key]; ok {
-		return nil
-	}
-	m[key] = struct{}{}
-	by, err := rlp.EncodeToBytes(m)
-	if err != nil {
-		return err
-	}
-	db.SetCode(staking.ValidatorMapAddress, by)
-	return nil
-}
-
-// DeleteValidatorKey updates one staking validator
-func (db *DB) DeleteValidatorKey(key common.Address) error {
-	m := db.GetValidatorMap()
-	if _, ok := m[key]; !ok {
-		return nil
-	}
-	delete(m, key)
-	by, err := rlp.EncodeToBytes(m)
-	if err != nil {
-		return err
-	}
-	db.SetCode(staking.ValidatorMapAddress, by)
-	return nil
-}
-
 // GetStakingInfo update staking information of a given validator (including delegation info)
 func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
 	by := db.GetCode(addr)
