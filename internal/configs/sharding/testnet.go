@@ -54,7 +54,7 @@ func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
 }
 
 func (ts testnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
-	return (ts.BlocksPerEpoch()+1)*epochNum - 1
+	return ts.BlocksPerEpoch()*(epochNum+1) - 1
 }
 
 func (ts testnetSchedule) VdfDifficulty() int {
