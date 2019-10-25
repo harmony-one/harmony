@@ -57,19 +57,19 @@ var (
 )
 
 const (
-	bodyCacheLimit          = 256
-	blockCacheLimit         = 256
-	receiptsCacheLimit      = 32
-	maxFutureBlocks         = 256
-	maxTimeFutureBlocks     = 30
-	badBlockLimit           = 10
-	triesInMemory           = 128
-	shardCacheLimit         = 2
-	commitsCacheLimit       = 10
-	epochCacheLimit         = 10
-	randomnessCacheLimit    = 10
-	stakingCacheLimit       = 256
-	validatorListCacheLimit = 2
+	bodyCacheLimit         = 256
+	blockCacheLimit        = 256
+	receiptsCacheLimit     = 32
+	maxFutureBlocks        = 256
+	maxTimeFutureBlocks    = 30
+	badBlockLimit          = 10
+	triesInMemory          = 128
+	shardCacheLimit        = 2
+	commitsCacheLimit      = 10
+	epochCacheLimit        = 10
+	randomnessCacheLimit   = 10
+	stakingCacheLimit      = 256
+	validatorMapCacheLimit = 2
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -122,18 +122,18 @@ type BlockChain struct {
 	currentBlock     atomic.Value // Current head of the block chain
 	currentFastBlock atomic.Value // Current head of the fast-sync chain (may be above the block chain!)
 
-	stateCache         state.Database // State database to reuse between imports (contains state cache)
-	bodyCache          *lru.Cache     // Cache for the most recent block bodies
-	bodyRLPCache       *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
-	receiptsCache      *lru.Cache     // Cache for the most recent receipts per block
-	blockCache         *lru.Cache     // Cache for the most recent entire blocks
-	futureBlocks       *lru.Cache     // future blocks are blocks added for later processing
-	shardStateCache    *lru.Cache
-	lastCommitsCache   *lru.Cache
-	epochCache         *lru.Cache // Cache epoch number → first block number
-	randomnessCache    *lru.Cache // Cache for vrf/vdf
-	stakingCache       *lru.Cache // Cache for staking validator
-	validatorListCache *lru.Cache // Cache of validator list
+	stateCache        state.Database // State database to reuse between imports (contains state cache)
+	bodyCache         *lru.Cache     // Cache for the most recent block bodies
+	bodyRLPCache      *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
+	receiptsCache     *lru.Cache     // Cache for the most recent receipts per block
+	blockCache        *lru.Cache     // Cache for the most recent entire blocks
+	futureBlocks      *lru.Cache     // future blocks are blocks added for later processing
+	shardStateCache   *lru.Cache
+	lastCommitsCache  *lru.Cache
+	epochCache        *lru.Cache // Cache epoch number → first block number
+	randomnessCache   *lru.Cache // Cache for vrf/vdf
+	stakingCache      *lru.Cache // Cache for staking validator
+	validatorMapCache *lru.Cache // Cache of validator list
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -171,30 +171,30 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	epochCache, _ := lru.New(epochCacheLimit)
 	randomnessCache, _ := lru.New(randomnessCacheLimit)
 	stakingCache, _ := lru.New(stakingCacheLimit)
-	validatorListCache, _ := lru.New(validatorListCacheLimit)
+	validatorMapCache, _ := lru.New(validatorMapCacheLimit)
 
 	bc := &BlockChain{
-		chainConfig:        chainConfig,
-		cacheConfig:        cacheConfig,
-		db:                 db,
-		triegc:             prque.New(nil),
-		stateCache:         state.NewDatabase(db),
-		quit:               make(chan struct{}),
-		shouldPreserve:     shouldPreserve,
-		bodyCache:          bodyCache,
-		bodyRLPCache:       bodyRLPCache,
-		receiptsCache:      receiptsCache,
-		blockCache:         blockCache,
-		futureBlocks:       futureBlocks,
-		shardStateCache:    shardCache,
-		lastCommitsCache:   commitsCache,
-		epochCache:         epochCache,
-		randomnessCache:    randomnessCache,
-		stakingCache:       stakingCache,
-		validatorListCache: validatorListCache,
-		engine:             engine,
-		vmConfig:           vmConfig,
-		badBlocks:          badBlocks,
+		chainConfig:       chainConfig,
+		cacheConfig:       cacheConfig,
+		db:                db,
+		triegc:            prque.New(nil),
+		stateCache:        state.NewDatabase(db),
+		quit:              make(chan struct{}),
+		shouldPreserve:    shouldPreserve,
+		bodyCache:         bodyCache,
+		bodyRLPCache:      bodyRLPCache,
+		receiptsCache:     receiptsCache,
+		blockCache:        blockCache,
+		futureBlocks:      futureBlocks,
+		shardStateCache:   shardCache,
+		lastCommitsCache:  commitsCache,
+		epochCache:        epochCache,
+		randomnessCache:   randomnessCache,
+		stakingCache:      stakingCache,
+		validatorMapCache: validatorMapCache,
+		engine:            engine,
+		vmConfig:          vmConfig,
+		badBlocks:         badBlocks,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -2280,23 +2280,22 @@ func (bc *BlockChain) WriteStakingValidator(v *staking.ValidatorWrapper) error {
 	return nil
 }
 
-// ReadValidatorList reads the addresses of current all validators
-func (bc *BlockChain) ReadValidatorList() ([]common.Address, error) {
-	if cached, ok := bc.validatorListCache.Get("validatorList"); ok {
+// ReadValidatorMap reads the addresses of current all validators
+func (bc *BlockChain) ReadValidatorMap() (map[common.Address]struct{}, error) {
+	if cached, ok := bc.validatorMapCache.Get("validatorMap"); ok {
 		by := cached.([]byte)
-		list := []common.Address{}
-		if err := rlp.DecodeBytes(by, &list); err != nil {
+		m := make(map[common.Address]struct{})
+		if err := rlp.DecodeBytes(by, &m); err != nil {
 			return nil, err
 		}
-		return list, nil
+		return m, nil
 	}
-
-	return rawdb.ReadValidatorList(bc.db)
+	return rawdb.ReadValidatorMap(bc.db)
 }
 
-// WriteValidatorList writes the list of validator addresses to database
-func (bc *BlockChain) WriteValidatorList(addrs []common.Address) error {
-	err := rawdb.WriteValidatorList(bc.db, addrs)
+// WriteValidatorMap writes the list of validator addresses to database
+func (bc *BlockChain) WriteValidatorMap(addrs map[common.Address]struct{}) error {
+	err := rawdb.WriteValidatorMap(bc.db, addrs)
 	if err != nil {
 		return err
 	}
@@ -2304,7 +2303,33 @@ func (bc *BlockChain) WriteValidatorList(addrs []common.Address) error {
 	if err != nil {
 		return err
 	}
-	bc.validatorListCache.Add("validatorList", by)
+	bc.validatorMapCache.Add("validatorMap", by)
+	return nil
+}
+
+// UpdateValidatorMap updates the validator map according to staking transaction
+func (bc *BlockChain) UpdateValidatorMap(tx *staking.StakingTransaction) error {
+	switch tx.StakingType() {
+	case staking.DirectiveCreateValidator:
+		createValidator := tx.StakingMessage().(staking.CreateValidator)
+		m, err := bc.ReadValidatorMap()
+		if err != nil {
+			return err
+		}
+		if m == nil {
+			m = make(map[common.Address]struct{})
+		}
+		m[createValidator.ValidatorAddress] = struct{}{}
+		err = bc.WriteValidatorMap(m)
+		return err
+
+	// following cases are placeholder for now
+	case staking.DirectiveEditValidator:
+	case staking.DirectiveDelegate:
+	case staking.DirectiveUndelegate:
+	case staking.DirectiveCollectRewards:
+	default:
+	}
 	return nil
 }
 

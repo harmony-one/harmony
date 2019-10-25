@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -144,6 +145,71 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 	return selected, unselected, invalid
 }
 
+// SelectStakingTransactionsForNewBlock selects staking transactions for new block.
+func (w *Worker) SelectStakingTransactionsForNewBlock(
+	newBlockNum uint64, txs staking.StakingTransactions,
+	coinbase common.Address) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
+
+	// only beaconchain process staking transaction
+	if w.chain.ShardID() != values.BeaconChainShardID {
+		return nil, nil, nil
+	}
+
+	// staking transaction share the same gasPool with normal transactions
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
+	}
+
+	selected := staking.StakingTransactions{}
+	unselected := staking.StakingTransactions{}
+	invalid := staking.StakingTransactions{}
+	for _, tx := range txs {
+		snap := w.current.state.Snapshot()
+		_, err := w.commitStakingTransaction(tx, coinbase)
+		if err != nil {
+			w.current.state.RevertToSnapshot(snap)
+			invalid = append(invalid, tx)
+			utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Commit staking transaction error")
+		} else {
+			selected = append(selected, tx)
+			utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("StakingTransaction gas limit info")
+		}
+	}
+
+	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Uint64("blockGasLimit",
+		w.current.header.GasLimit()).Uint64("blockGasUsed",
+		w.current.header.GasUsed()).Msg("[SelectStakingTransaction] Block gas limit and usage info")
+
+	return selected, unselected, invalid
+
+}
+
+func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinbase common.Address) ([]*types.Log, error) {
+	snap := w.current.state.Snapshot()
+	gasUsed := w.current.header.GasUsed()
+	receipt, _, err :=
+		core.ApplyStakingTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	w.current.header.SetGasUsed(gasUsed)
+	if err != nil {
+		w.current.state.RevertToSnapshot(snap)
+		return nil, err
+	}
+	if receipt == nil {
+		return nil, fmt.Errorf("nil staking receipt")
+	}
+
+	err = w.chain.UpdateValidatorMap(tx)
+	// keep offchain database consistency with onchain we need revert
+	// but it should not happend unless local database corrupted
+	if err != nil {
+		w.current.state.RevertToSnapshot(snap)
+		return nil, err
+	}
+	w.current.stkingTxs = append(w.current.stkingTxs, tx)
+	w.current.receipts = append(w.current.receipts, receipt)
+	return receipt.Logs, nil
+}
+
 func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
@@ -152,6 +218,7 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
+		utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Offchain ValidatorMap Read/Write Error")
 		return nil, err
 	}
 	if receipt == nil {
@@ -167,9 +234,8 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-// CommitTransactions commits transactions including staking transactions.
-func (w *Worker) CommitTransactions(
-	txs types.Transactions, coinbase common.Address) error {
+// CommitTransactions commits transactions.
+func (w *Worker) CommitTransactions(txs types.Transactions, stakingTxns staking.StakingTransactions, coinbase common.Address) error {
 	// Must update to the correct current state before processing potential txns
 	if err := w.UpdateCurrent(coinbase); err != nil {
 		utils.Logger().Error().
@@ -189,6 +255,10 @@ func (w *Worker) CommitTransactions(
 			return err
 
 		}
+	}
+	for _, stakingTx := range stakingTxns {
+		_ = stakingTx
+		// TODO: add logic to commit staking txns
 	}
 	return nil
 }
@@ -331,38 +401,14 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 		}
 	}
 
-	stks, _, err := w.UpdateStakeInformation()
-
 	s := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
-	block, err := w.engine.Finalize(
-		w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs,
-		stks,
-	)
+	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stkingTxs)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 	return block, nil
-}
-
-// UpdateStakeInformation updates validator and its delegation information
-func (w *Worker) UpdateStakeInformation() ([]*staking.StakingTransaction, []*staking.ValidatorWrapper, error) {
-	//	node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
-	//	for _, unselectedStakingTx := range unselectedStaking {
-	//		node.pendingStakingTransactions[unselectedStakingTx.Hash()] = unselectedStakingTx
-	//	}
-
-	addrs, err := w.chain.ReadValidatorList()
-	if err != nil {
-		return nil, nil, err
-	}
-	//validatorInfo := []staking.ValidatorWrapper{}
-	for _, addr := range addrs {
-		_ = addr
-	}
-
-	return nil, nil, nil
 }
 
 // New create a new worker object.

@@ -30,6 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/staking"
+	stk "github.com/harmony-one/harmony/staking/types"
 )
 
 type revision struct {
@@ -678,4 +680,47 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	})
 	//log.Debug("Trie cache stats after commit", "misses", trie.CacheMisses(), "unloads", trie.CacheUnloads())
 	return root, err
+}
+
+// GetStakingInfo update staking information of a given validator (including delegation info)
+func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
+	by := db.GetCode(addr)
+	if len(by) == 0 {
+		return nil
+	}
+	val := stk.ValidatorWrapper{}
+	err := rlp.DecodeBytes(by, &val)
+	if err != nil {
+		return nil
+	}
+	return &val
+}
+
+// UpdateStakingInfo update staking information of a given validator (including delegation info)
+func (db *DB) UpdateStakingInfo(addr common.Address, val *stk.ValidatorWrapper) error {
+	by, err := rlp.EncodeToBytes(val)
+	if err != nil {
+		return err
+	}
+	db.SetCode(addr, by)
+	return nil
+}
+
+// SetValidatorFlag checks whether it is a validator object
+func (db *DB) SetValidatorFlag(addr common.Address) {
+	db.SetState(addr, staking.IsValidatorKey, staking.IsValidator)
+}
+
+// UnsetValidatorFlag checks whether it is a validator object
+func (db *DB) UnsetValidatorFlag(addr common.Address) {
+	db.SetState(addr, staking.IsValidatorKey, common.Hash{})
+}
+
+// IsValidator checks whether it is a validator object
+func (db *DB) IsValidator(addr common.Address) bool {
+	so := db.getStateObject(addr)
+	if so == nil {
+		return false
+	}
+	return so.IsValidator(db.db)
 }
