@@ -28,7 +28,7 @@ const (
 	testnetMaxTxPoolSizeLimit             = 8000
 	testnetMaxNumTxsPerBlockLimit         = 1000
 	testnetRecentTxDuration               = time.Hour
-	testnetEnableTxnThrottling            = true
+	testnetEnableTxnThrottling            = false
 
 	// TestNetHTTPPattern is the http pattern for testnet.
 	TestNetHTTPPattern = "https://api.s%d.b.hmny.io"
