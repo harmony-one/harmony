@@ -2,7 +2,6 @@ package node
 
 import (
 	"encoding/binary"
-	"sort"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -147,7 +146,7 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 }
 
 // GetTransactionsHistory returns list of transactions hashes of address.
-func (node *Node) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+func (node *Node) GetTransactionsHistory(address string) ([]common.Hash, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key))
@@ -158,21 +157,10 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
 		return nil, err
 	}
-	if order == "DESC" {
-		sort.Slice(addressData.TXs[:], func(i, j int) bool {
-			return addressData.TXs[i].Timestamp > addressData.TXs[j].Timestamp
-		})
-	} else {
-		sort.Slice(addressData.TXs[:], func(i, j int) bool {
-			return addressData.TXs[i].Timestamp < addressData.TXs[j].Timestamp
-		})
-	}
 	hashes := make([]common.Hash, 0)
 	for _, tx := range addressData.TXs {
-		if txType == "" || txType == "ALL" || txType == tx.Type {
-			hash := common.HexToHash(tx.ID)
-			hashes = append(hashes, hash)
-		}
+		hash := common.HexToHash(tx.ID)
+		hashes = append(hashes, hash)
 	}
 	return hashes, nil
 }
