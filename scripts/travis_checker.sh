@@ -79,6 +79,15 @@ else
 	ok=false
 fi
 
+echo "Building binaries in ./cmd/..."
+if go build ./cmd/...
+then
+	echo "go build succeeded."
+else
+	echo "go build FAILED!"
+	ok=false
+fi
+
 echo "Running go test..."
 if go test -v -count=1 ./...
 then
