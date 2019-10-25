@@ -18,8 +18,8 @@ const (
 	testnetV1Epoch = 1
 	testnetV2Epoch = 2
 
-	testnetEpochBlock1 = 78
-	threeOne           = 111
+	// 10 minutes per epoch (at 8s/block)
+	testnetBlocksPerEpoch = 75
 
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
@@ -48,40 +48,20 @@ func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (testnetSchedule) BlocksPerEpoch() uint64 {
-	// 8 seconds per block, roughly 86400 blocks, around one day
-	return threeOne
+	return testnetBlocksPerEpoch
 }
 
 func (ts testnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
-	blocks := ts.BlocksPerEpoch()
-	switch {
-	case blockNum >= testnetEpochBlock1:
-		return big.NewInt(int64((blockNum-testnetEpochBlock1)/blocks) + 1)
-	default:
-		return big.NewInt(0)
-	}
+	epoch := blockNum % ts.BlocksPerEpoch()
+	return big.NewInt(int64(epoch))
 }
 
 func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
-	blocks := ts.BlocksPerEpoch()
-	switch {
-	case blockNum < testnetEpochBlock1-1:
-		return false
-	case blockNum == testnetEpochBlock1-1:
-		return true
-	default:
-		return ((blockNum-testnetEpochBlock1)%blocks == blocks-1)
-	}
+	return (blockNum+1)%ts.BlocksPerEpoch() == 0
 }
 
 func (ts testnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
-	blocks := ts.BlocksPerEpoch()
-	switch {
-	case epochNum == 0:
-		return testnetEpochBlock1 - 1
-	default:
-		return testnetEpochBlock1 - 1 + blocks*epochNum
-	}
+	return (ts.BlocksPerEpoch()+1)*epochNum - 1
 }
 
 func (ts testnetSchedule) VdfDifficulty() int {
