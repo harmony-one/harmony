@@ -271,7 +271,7 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 		"address":                 validator.Address.String(),
 		"stake":                   hexutil.Uint64(validator.Stake.Uint64()),
 		"name":                    validator.Description.Name,
-		"validatingPublicKey":     validator.ValidatingPubKey.SerializeToHexStr(),
+		"validatingPublicKey":     validator.SlotPubKeys,
 		"unbondingHeight":         hexutil.Uint64(validator.UnbondingHeight.Uint64()),
 		"minSelfDelegation":       hexutil.Uint64(validator.MinSelfDelegation.Uint64()),
 		"active":                  validator.Active,
@@ -311,7 +311,6 @@ func (s *PublicBlockChainAPI) GetDelegatorsInformation(ctx context.Context, addr
 	for _, delegator := range delegators {
 		fields := map[string]interface{}{
 			"delegator": delegator.DelegatorAddress.String(),
-			"validator": delegator.ValidatorAddress.String(),
 			"amount":    hexutil.Uint64(delegator.Amount.Uint64()),
 		}
 		delegatorsFields = append(delegatorsFields, fields)
