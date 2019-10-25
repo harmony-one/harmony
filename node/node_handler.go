@@ -409,7 +409,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 
 // AddNewBlock is usedd to add new block into the blockchain.
 func (node *Node) AddNewBlock(newBlock *types.Block) error {
-	_, err := node.Blockchain().InsertChain([]*types.Block{newBlock})
+	_, err := node.Blockchain().InsertChain([]*types.Block{newBlock}, true /* verifyHeaders */)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
