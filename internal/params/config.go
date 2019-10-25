@@ -35,8 +35,8 @@ var (
 	TestnetChainConfig = &ChainConfig{
 		ChainID:        TestnetChainID,
 		CrossTxEpoch:   big.NewInt(0),
-		CrossLinkEpoch: big.NewInt(2),
-		StakingEpoch:   big.NewInt(3),
+		CrossLinkEpoch: EpochTBD,
+		StakingEpoch:   EpochTBD,
 		EIP155Epoch:    big.NewInt(0),
 		S3Epoch:        big.NewInt(0),
 	}
