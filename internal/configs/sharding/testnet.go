@@ -15,11 +15,8 @@ var TestnetSchedule testnetSchedule
 type testnetSchedule struct{}
 
 const (
-	testnetV1Epoch = 1
-	testnetV2Epoch = 2
-
-	testnetEpochBlock1 = 78
-	threeOne           = 111
+	// 10 minutes per epoch (at 8s/block)
+	testnetBlocksPerEpoch = 75
 
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
@@ -38,50 +35,26 @@ const (
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
-	case epoch.Cmp(big.NewInt(testnetV2Epoch)) >= 0:
-		return testnetV2
-	case epoch.Cmp(big.NewInt(testnetV1Epoch)) >= 0:
-		return testnetV1
 	default: // genesis
 		return testnetV0
 	}
 }
 
 func (testnetSchedule) BlocksPerEpoch() uint64 {
-	// 8 seconds per block, roughly 86400 blocks, around one day
-	return threeOne
+	return testnetBlocksPerEpoch
 }
 
 func (ts testnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
-	blocks := ts.BlocksPerEpoch()
-	switch {
-	case blockNum >= testnetEpochBlock1:
-		return big.NewInt(int64((blockNum-testnetEpochBlock1)/blocks) + 1)
-	default:
-		return big.NewInt(0)
-	}
+	epoch := blockNum % ts.BlocksPerEpoch()
+	return big.NewInt(int64(epoch))
 }
 
 func (ts testnetSchedule) IsLastBlock(blockNum uint64) bool {
-	blocks := ts.BlocksPerEpoch()
-	switch {
-	case blockNum < testnetEpochBlock1-1:
-		return false
-	case blockNum == testnetEpochBlock1-1:
-		return true
-	default:
-		return ((blockNum-testnetEpochBlock1)%blocks == blocks-1)
-	}
+	return (blockNum+1)%ts.BlocksPerEpoch() == 0
 }
 
 func (ts testnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
-	blocks := ts.BlocksPerEpoch()
-	switch {
-	case epochNum == 0:
-		return testnetEpochBlock1 - 1
-	default:
-		return testnetEpochBlock1 - 1 + blocks*epochNum
-	}
+	return ts.BlocksPerEpoch()*(epochNum+1) - 1
 }
 
 func (ts testnetSchedule) VdfDifficulty() int {
@@ -145,8 +118,8 @@ func (ts testnetSchedule) GetShardingStructure(numShard, shardID int) []map[stri
 	return genShardingStructure(numShard, shardID, TestNetHTTPPattern, TestNetWSPattern)
 }
 
-var testnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(testnetV1Epoch), big.NewInt(testnetV2Epoch)}
+var testnetReshardingEpoch = []*big.Int{
+	big.NewInt(0),
+}
 
-var testnetV0 = MustNewInstance(2, 150, 150, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)
-var testnetV1 = MustNewInstance(2, 160, 150, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)
-var testnetV2 = MustNewInstance(2, 170, 150, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)
+var testnetV0 = MustNewInstance(3, 100, 80, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)
