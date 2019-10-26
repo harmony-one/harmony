@@ -123,17 +123,21 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 			invalid = append(invalid, tx)
 
 		case shardingconfig.TxSelect:
-			snap := w.current.state.Snapshot()
-			_, err := w.commitTransaction(tx, coinbase)
-			if err != nil {
-				w.current.state.RevertToSnapshot(snap)
+			if tx.GasPrice().Uint64() == 0 {
 				invalid = append(invalid, tx)
-				utils.Logger().Error().Err(err).Str("txId", tx.Hash().Hex()).Msg("Commit transaction error")
 			} else {
-				selected = append(selected, tx)
-				// handle the case when msg was not able to extracted from tx
-				if len(sender.String()) > 0 {
-					recentTxsStats[newBlockNum][sender]++
+				snap := w.current.state.Snapshot()
+				_, err := w.commitTransaction(tx, coinbase)
+				if err != nil {
+					w.current.state.RevertToSnapshot(snap)
+					invalid = append(invalid, tx)
+					utils.Logger().Error().Err(err).Str("txId", tx.Hash().Hex()).Msg("Commit transaction error")
+				} else {
+					selected = append(selected, tx)
+					// handle the case when msg was not able to extracted from tx
+					if len(sender.String()) > 0 {
+						recentTxsStats[newBlockNum][sender]++
+					}
 				}
 			}
 		}
