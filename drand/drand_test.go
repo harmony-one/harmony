@@ -128,7 +128,7 @@ func TestVrf(test *testing.T) {
 	tx1 := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
 	txs := []*types.Transaction{tx1}
 
-	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, nil, nil, nil)
+	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, nil, nil, nil, nil)
 	blockHash := block.Hash()
 
 	dRand.vrf(blockHash)

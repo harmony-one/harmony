@@ -21,6 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // StateDB is an EVM database for full state querying.
@@ -38,6 +39,12 @@ type StateDB interface {
 	GetCode(common.Address) []byte
 	SetCode(common.Address, []byte)
 	GetCodeSize(common.Address) int
+
+	GetStakingInfo(common.Address) *staking.ValidatorWrapper
+	UpdateStakingInfo(common.Address, *staking.ValidatorWrapper) error
+	SetValidatorFlag(common.Address)
+	UnsetValidatorFlag(common.Address)
+	IsValidator(common.Address) bool
 
 	AddRefund(uint64)
 	SubRefund(uint64)
