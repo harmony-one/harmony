@@ -32,7 +32,7 @@ const (
 	localnetMaxTxPoolSizeLimit             = 8000
 	localnetMaxNumTxsPerBlockLimit         = 1000
 	localnetRecentTxDuration               = time.Hour
-	localnetEnableTxnThrottling            = true
+	localnetEnableTxnThrottling            = false
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
