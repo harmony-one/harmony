@@ -103,16 +103,18 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
 	for _, tx := range txs {
-		// If we don't have enough gas for any further transactions then we're done
-		if w.current.gasPool.Gas() < params.TxGas {
-			utils.Logger().Info().Str("Not enough gas for further transactions, have", w.current.gasPool.String()).Uint64("want", params.TxGas)
-			break
-		}
-
 		if tx.ShardID() != w.chain.ShardID() {
 			invalid = append(invalid, tx)
 			continue
 		}
+
+		// If we don't have enough gas for any further transactions then we're done
+		if w.current.gasPool.Gas() < params.TxGas {
+			utils.Logger().Info().Str("Not enough gas for further transactions, have", w.current.gasPool.String()).Uint64("want", params.TxGas)
+			unselected = append(unselected, tx)
+			continue
+		}
+
 
 		sender, flag := w.throttleTxs(selected, recentTxsStats, txsThrottleConfig, tx)
 		switch flag {
