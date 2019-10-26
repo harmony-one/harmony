@@ -545,7 +545,6 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] Current Block")
 
 	// Verify block signatures
-	// TODO chao: only when block is verified against last commit sigs, we can update the block and status
 	if block.NumberU64() > 1 {
 		// Verify signature every 100 blocks
 		verifySig := block.NumberU64()%100 == 0
@@ -560,7 +559,7 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		}
 	}
 
-	_, err := bc.InsertChain([]*types.Block{block})
+	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msgf("[SYNC] Error adding new block to blockchain %d %d", block.NumberU64(), block.ShardID())
 
