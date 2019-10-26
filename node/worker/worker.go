@@ -103,6 +103,12 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 	unselected := types.Transactions{}
 	invalid := types.Transactions{}
 	for _, tx := range txs {
+		// If we don't have enough gas for any further transactions then we're done
+		if w.current.gasPool.Gas() < params.TxGas {
+			utils.Logger().Info().Str("Not enough gas for further transactions, have", w.current.gasPool.String()).Uint64("want", params.TxGas)
+			break
+		}
+
 		if tx.ShardID() != w.chain.ShardID() {
 			invalid = append(invalid, tx)
 			continue
@@ -140,7 +146,7 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("Transaction gas limit info")
 	}
 
-	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("Block gas limit and usage info")
+	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Int("newTxns", len(selected)).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("Block gas limit and usage info")
 
 	return selected, unselected, invalid
 }
@@ -155,10 +161,11 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 		return nil, nil, nil
 	}
 
+	// TODO: gas pool should be initialized once for both normal and staking transactions
 	// staking transaction share the same gasPool with normal transactions
-	if w.current.gasPool == nil {
-		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
-	}
+	//if w.current.gasPool == nil {
+	//	w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
+	//}
 
 	selected := staking.StakingTransactions{}
 	unselected := staking.StakingTransactions{}
@@ -419,8 +426,8 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 		chain:   chain,
 		engine:  engine,
 	}
-	worker.gasFloor = 500000000000000000
-	worker.gasCeil = 1000000000000000000
+	worker.gasFloor = 80000000
+	worker.gasCeil = 120000000
 
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()
