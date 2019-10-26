@@ -249,7 +249,7 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 // requires a signer to derive the sender.
 // put it here to avoid cyclic import
 func StakingToMessage(tx *staking.StakingTransaction, blockNum *big.Int) (types.Message, error) {
-	payload, err := tx.StakingMsgToBytes()
+	payload, err := tx.RLPEncodeStakeMsg()
 	if err != nil {
 		return types.Message{}, err
 	}
@@ -257,6 +257,7 @@ func StakingToMessage(tx *staking.StakingTransaction, blockNum *big.Int) (types.
 	if err != nil {
 		return types.Message{}, err
 	}
+
 	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.Price(), payload, blockNum)
 	stkType := tx.StakingType()
 	if _, ok := types.StakingTypeMap[stkType]; !ok {
