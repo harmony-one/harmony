@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -312,6 +313,6 @@ func (b *APIBackend) GetDelegatorsInformation(addr common.Address) []*staking.De
 }
 
 // GetValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
-func (b *APIBackend) GetValidatorStakingWithDelegation(addr common.Address) *big.Int {
+func (b *APIBackend) GetValidatorStakingWithDelegation(addr common.Address) numeric.Dec {
 	return b.hmy.BlockChain().ValidatorStakingWithDelegation(addr)
 }

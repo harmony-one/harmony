@@ -47,7 +47,7 @@ func testGenesisccounts(t *testing.T) {
 
 	index := 404
 	for i, one := range ones {
-		fmt.Printf("   {Index: \" %v \", Address: \"%v\", BlsPublicKey: \"%v\"},\n", index, one, bls[i])
+		fmt.Printf("   {Index: \" %v \", Address: \"%v\", BLSPublicKey: \"%v\"},\n", index, one, bls[i])
 		index++
 	}
 }
@@ -81,9 +81,9 @@ func testAccounts(test *testing.T, accounts []DeployAccount) {
 		}
 
 		pubKey := bls.PublicKey{}
-		err = pubKey.DeserializeHexStr(account.BlsPublicKey)
+		err = pubKey.DeserializeHexStr(account.BLSPublicKey)
 		if err != nil {
-			test.Error("Account bls public key", account.BlsPublicKey, "is not valid:", err)
+			test.Error("Account bls public key", account.BLSPublicKey, "is not valid:", err)
 		}
 	}
 }
@@ -103,7 +103,7 @@ func testDeployAccounts(t *testing.T, accounts []DeployAccount) {
 			indicesByAddress[address] = append(indicesByAddress[address], index)
 		}
 		pubKey := bls.PublicKey{}
-		if err := pubKey.DeserializeHexStr(account.BlsPublicKey); err != nil {
+		if err := pubKey.DeserializeHexStr(account.BLSPublicKey); err != nil {
 			t.Errorf("account %+v at index %v has invalid public key (%s)",
 				account, index, err)
 		} else {

@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -77,7 +78,7 @@ type Backend interface {
 	GetValidatorCandidates() []common.Address
 	GetValidatorInformation(addr common.Address) *staking.Validator
 	GetDelegatorsInformation(addr common.Address) []*staking.Delegation
-	GetValidatorStakingWithDelegation(addr common.Address) *big.Int
+	GetValidatorStakingWithDelegation(addr common.Address) numeric.Dec
 }
 
 // GetAPIs returns all the APIs.

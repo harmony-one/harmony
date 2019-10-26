@@ -11,7 +11,7 @@ if __name__ == "__main__":
     index= args.index
     for myline in g:
         ecdsa,bls = myline.strip().split("\t")
-        string = '{Index:' + '"' + str(index) + '"'    +  ',' + ' ' + 'Address:' + '"'+ ecdsa  + '"' + ',' + ' ' + 'BlsPublicKey:' + '"' + bls + '"'+ '}' + ','  
+        string = '{Index:' + '"' + str(index) + '"'    +  ',' + ' ' + 'Address:' + '"'+ ecdsa  + '"' + ',' + ' ' + 'BLSPublicKey:' + '"' + bls + '"'+ '}' + ','  
         f.write(string+"\n")
         index = index + 1
     g.close()
