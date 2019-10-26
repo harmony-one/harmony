@@ -115,7 +115,6 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 			continue
 		}
 
-
 		sender, flag := w.throttleTxs(selected, recentTxsStats, txsThrottleConfig, tx)
 		switch flag {
 		case shardingconfig.TxUnselect:
