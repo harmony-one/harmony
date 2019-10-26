@@ -21,8 +21,6 @@ const (
 	DirectiveEditValidator
 	// DirectiveDelegate ...
 	DirectiveDelegate
-	// DirectiveRedelegate ...
-	DirectiveRedelegate
 	// DirectiveUndelegate ...
 	DirectiveUndelegate
 	// DirectiveCollectRewards ...
@@ -34,7 +32,6 @@ var (
 		DirectiveCreateValidator: "CreateValidator",
 		DirectiveEditValidator:   "EditValidator",
 		DirectiveDelegate:        "Delegate",
-		DirectiveRedelegate:      "Redelegate",
 		DirectiveUndelegate:      "Undelegate",
 		DirectiveCollectRewards:  "CollectRewards",
 	}
