@@ -18,6 +18,7 @@ package core
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -94,7 +95,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.StakingTransactions(), receipts, outcxs, incxs)
+	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, outcxs, incxs, block.StakingTransactions())
 	if err != nil {
 		return nil, nil, nil, 0, ctxerror.New("cannot finalize block").WithCause(err)
 	}
@@ -185,11 +186,42 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 // for the staking transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
 // staking transaction will use the code field in the account to store the staking information
-// TODO chao: Add receipts for staking tx
 func ApplyStakingTransaction(
 	config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB,
-	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gasUsed uint64, oops error) {
-	return nil, 0, nil
+	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gas uint64, err error) {
+
+	msg, err := StakingToMessage(tx, header.Number())
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Create a new context to be used in the EVM environment
+	context := NewEVMContext(msg, header, bc, author)
+
+	// Create a new environment which holds all relevant information
+	// about the transaction and calling mechanisms.
+	vmenv := vm.NewEVM(context, statedb, config, cfg)
+	// Apply the transaction to the current state (included in the env)
+	gas, err = ApplyStakingMessage(vmenv, msg, gp)
+
+	// even there is error, we charge it
+	if err != nil {
+		return nil, gas, err
+	}
+
+	// Update the state with pending changes
+	var root []byte
+	if config.IsS3(header.Epoch()) {
+		statedb.Finalise(true)
+	} else {
+		root = statedb.IntermediateRoot(config.IsS3(header.Epoch())).Bytes()
+	}
+	*usedGas += gas
+	receipt = types.NewReceipt(root, false, *usedGas)
+	receipt.TxHash = tx.Hash()
+	receipt.GasUsed = gas
+
+	return receipt, gas, nil
 }
 
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt
@@ -198,7 +230,6 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 		return nil
 	}
 
-	// TODO: how to charge gas here?
 	for _, cx := range cxp.Receipts {
 		if cx == nil || cx.To == nil { // should not happend
 			return ctxerror.New("ApplyIncomingReceipts: Invalid incomingReceipt!", "receipt", cx)
@@ -212,4 +243,26 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 		db.IntermediateRoot(config.IsS3(header.Epoch()))
 	}
 	return nil
+}
+
+// StakingToMessage returns the staking transaction as a core.Message.
+// requires a signer to derive the sender.
+// put it here to avoid cyclic import
+func StakingToMessage(tx *staking.StakingTransaction, blockNum *big.Int) (types.Message, error) {
+	payload, err := tx.RLPEncodeStakeMsg()
+	if err != nil {
+		return types.Message{}, err
+	}
+	from, err := tx.SenderAddress()
+	if err != nil {
+		return types.Message{}, err
+	}
+
+	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.Price(), payload, blockNum)
+	stkType := tx.StakingType()
+	if _, ok := types.StakingTypeMap[stkType]; !ok {
+		return types.Message{}, staking.ErrInvalidStakingKind
+	}
+	msg.SetType(types.StakingTypeMap[stkType])
+	return msg, nil
 }

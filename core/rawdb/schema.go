@@ -61,15 +61,18 @@ var (
 	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
 
-	shardLastCrosslinkPrefix = []byte("shard-last-cross-link") // prefix for shard last crosslink
-	crosslinkPrefix          = []byte("crosslink")             // prefix for crosslink
-	tempCrosslinkPrefix      = []byte("tempCrosslink")         // prefix for tempCrosslink
+	shardLastCrosslinkPrefix = []byte("lcl") // prefix for shard last crosslink
+	crosslinkPrefix          = []byte("cl")  // prefix for crosslink
+	tempCrosslinkPrefix      = []byte("tcl") // prefix for tempCrosslink
 
+	// TODO: shorten the key prefix so we don't waste db space
 	cxReceiptPrefix                  = []byte("cxReceipt")                  // prefix for cross shard transaction receipt
 	tempCxReceiptPrefix              = []byte("tempCxReceipt")              // prefix for temporary cross shard transaction receipt
 	cxReceiptHashPrefix              = []byte("cxReceiptHash")              // prefix for cross shard transaction receipt hash
 	cxReceiptSpentPrefix             = []byte("cxReceiptSpent")             // prefix for indicator of unspent of cxReceiptsProof
 	cxReceiptUnspentCheckpointPrefix = []byte("cxReceiptUnspentCheckpoint") // prefix for cxReceiptsProof unspent checkpoint
+
+	stakingPrefix = []byte("staking") // prefix for staking validator information
 
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
@@ -226,4 +229,9 @@ func cxReceiptUnspentCheckpointKey(shardID uint32) []byte {
 	sKey := make([]byte, 4)
 	binary.BigEndian.PutUint32(sKey, shardID)
 	return append(prefix, sKey...)
+}
+
+func stakingKey(addr common.Address) []byte {
+	prefix := stakingPrefix
+	return append(prefix, addr.Bytes()...)
 }

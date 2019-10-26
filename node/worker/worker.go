@@ -62,15 +62,15 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 		sender = msg.From()
 	}
 
+	// do not throttle transactions if disabled
+	if !txsThrottleConfig.EnableTxnThrottling {
+		return sender, shardingconfig.TxSelect
+	}
+
 	// already selected max num txs
 	if len(selected) > txsThrottleConfig.MaxNumTxsPerBlockLimit {
 		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Int("MaxNumTxsPerBlockLimit", txsThrottleConfig.MaxNumTxsPerBlockLimit).Msg("Throttling tx with max num txs per block limit")
 		return sender, shardingconfig.TxUnselect
-	}
-
-	// do not throttle transactions if disabled
-	if !txsThrottleConfig.EnableTxnThrottling {
-		return sender, shardingconfig.TxSelect
 	}
 
 	// throttle a single sender sending too many transactions in one block
@@ -197,6 +197,14 @@ func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinba
 	if receipt == nil {
 		return nil, fmt.Errorf("nil staking receipt")
 	}
+
+	err = w.chain.UpdateValidatorMap(tx)
+	// keep offchain database consistency with onchain we need revert
+	// but it should not happend unless local database corrupted
+	if err != nil {
+		w.current.state.RevertToSnapshot(snap)
+		return nil, err
+	}
 	w.current.stkingTxs = append(w.current.stkingTxs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	return receipt.Logs, nil
@@ -210,6 +218,7 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
+		utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Offchain ValidatorMap Read/Write Error")
 		return nil, err
 	}
 	if receipt == nil {
@@ -225,9 +234,8 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	return receipt.Logs, nil
 }
 
-// CommitTransactions commits transactions including staking transactions.
-func (w *Worker) CommitTransactions(
-	txs types.Transactions, stakingTxns staking.StakingTransactions, coinbase common.Address) error {
+// CommitTransactions commits transactions.
+func (w *Worker) CommitTransactions(txs types.Transactions, stakingTxns staking.StakingTransactions, coinbase common.Address) error {
 	// Must update to the correct current state before processing potential txns
 	if err := w.UpdateCurrent(coinbase); err != nil {
 		utils.Logger().Error().
@@ -396,9 +404,7 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 	s := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
-	block, err := w.engine.Finalize(
-		w.chain, copyHeader, s, w.current.txs, w.current.stkingTxs, w.current.receipts, w.current.outcxs, w.current.incxs,
-	)
+	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stkingTxs)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
