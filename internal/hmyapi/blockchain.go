@@ -47,10 +47,39 @@ type BlockArgs struct {
 	Signers     []string `json:"signers"`
 }
 
-// GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx in BlockArgs is true all
+// GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
+// transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
+func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
+	block, err := s.b.BlockByNumber(ctx, blockNr)
+	if block != nil {
+		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx}
+		response, err := RPCMarshalBlock(block, blockArgs)
+		if err == nil && blockNr == rpc.PendingBlockNumber {
+			// Pending blocks need to nil out a few fields
+			for _, field := range []string{"hash", "nonce", "miner"} {
+				response[field] = nil
+			}
+		}
+		return response, err
+	}
+	return nil, err
+}
+
+// GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
+// detail, otherwise only the transaction hash is returned.
+func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
+	block, err := s.b.GetBlock(ctx, blockHash)
+	if block != nil {
+		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx}
+		return RPCMarshalBlock(block, blockArgs)
+	}
+	return nil, err
+}
+
+// GetBlockByNumberNew returns the requested block. When blockNr is -1 the chain head is returned. When fullTx in blockArgs is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
 // it shows block signers for this block in list of one addresses.
-func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, blockArgs BlockArgs) (map[string]interface{}, error) {
+func (s *PublicBlockChainAPI) GetBlockByNumberNew(ctx context.Context, blockNr rpc.BlockNumber, blockArgs BlockArgs) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	blockArgs.InclTx = true
 	if blockArgs.WithSigners {
@@ -72,9 +101,10 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 	return nil, err
 }
 
-// GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
-// detail, otherwise only the transaction hash is returned.
-func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, blockArgs BlockArgs) (map[string]interface{}, error) {
+// GetBlockByHashNew returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full
+// detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
+// it shows block signers for this block in list of one addresses.
+func (s *PublicBlockChainAPI) GetBlockByHashNew(ctx context.Context, blockHash common.Hash, blockArgs BlockArgs) (map[string]interface{}, error) {
 	block, err := s.b.GetBlock(ctx, blockHash)
 	blockArgs.InclTx = true
 	if blockArgs.WithSigners {
@@ -267,11 +297,15 @@ func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 // GetValidatorInformation returns full validator info.
 func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (map[string]interface{}, error) {
 	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
+	slotPubKeys := make([]string, 0)
+	for _, slotPubKey := range validator.SlotPubKeys {
+		slotPubKeys = append(slotPubKeys, slotPubKey.Hex())
+	}
 	fields := map[string]interface{}{
 		"address":                 validator.Address.String(),
 		"stake":                   hexutil.Uint64(validator.Stake.Uint64()),
 		"name":                    validator.Description.Name,
-		"validatingPublicKey":     validator.SlotPubKeys,
+		"slotPubKeys":             slotPubKeys,
 		"unbondingHeight":         hexutil.Uint64(validator.UnbondingHeight.Uint64()),
 		"minSelfDelegation":       hexutil.Uint64(validator.MinSelfDelegation.Uint64()),
 		"active":                  validator.Active,
