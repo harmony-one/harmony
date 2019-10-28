@@ -58,7 +58,7 @@ func (node *Node) setupForNewNode() {
 
 func (node *Node) setupForClientNode() {
 	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, nodeconfig.NewGroupIDByShardID(0), nil, nil, node.networkInfoDHTPath()))
+	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, nodeconfig.NewGroupIDByShardID(0), nil, nil, ""))
 }
 
 func (node *Node) setupForExplorerNode() {
