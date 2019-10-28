@@ -2345,25 +2345,25 @@ func (bc *BlockChain) UpdateValidatorMap(tx *staking.StakingTransaction) error {
 
 // CurrentValidatorAddresses returns the address of active validators for current epoch
 func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
-	return nil
+	return make([]common.Address, 0)
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch
 func (bc *BlockChain) ValidatorCandidates() []common.Address {
-	return nil
+	return make([]common.Address, 0)
 }
 
 // ValidatorInformation returns the information of validator
 func (bc *BlockChain) ValidatorInformation(addr common.Address) *staking.Validator {
-	return nil
+	return &staking.Validator{}
 }
 
 // DelegatorsInformation returns up to date information of delegators of a given validator address
 func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Delegation {
-	return nil
+	return make([]*staking.Delegation, 0)
 }
 
 // ValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
 func (bc *BlockChain) ValidatorStakingWithDelegation(addr common.Address) *big.Int {
-	return nil
+	return big.NewInt(0)
 }
