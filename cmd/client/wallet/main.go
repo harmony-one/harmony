@@ -94,7 +94,7 @@ var (
 	transferSenderPtr     = transferCommand.String("from", "0", "Specify the sender account address or index")
 	transferReceiverPtr   = transferCommand.String("to", "", "Specify the receiver account")
 	transferAmountPtr     = transferCommand.Float64("amount", 0, "Specify the amount to transfer")
-	transferGasPricePtr   = transferCommand.Uint64("gasPrice", 0, "Specify the gas price amount. Unit is Nano.")
+	transferGasPricePtr   = transferCommand.Uint64("gasPrice", 1, "Specify the gas price amount. Unit is Nano.")
 	transferShardIDPtr    = transferCommand.Int("shardID", -1, "Specify the shard ID for the transfer")
 	transferToShardIDPtr  = transferCommand.Int("toShardID", -1, "Specify the destination shard ID for the transfer")
 	transferInputDataPtr  = transferCommand.String("inputData", "", "Base64-encoded input data to embed in the transaction")
@@ -976,6 +976,8 @@ func submitTransaction(tx *types.Transaction, walletNode *node.Node, shardID uin
 		return err
 	}
 	fmt.Printf("Transaction Id for shard %d: %s\n", int(shardID), tx.Hash().Hex())
+	json, err := tx.MarshalJSON()
+	fmt.Printf("Transaction Submitted for shard %d: %s\n", int(shardID), string(json))
 	// FIXME (leo): how to we know the tx was successful sent to the network
 	// this is a hacky way to wait for sometime
 	time.Sleep(3 * time.Second)

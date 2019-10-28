@@ -125,12 +125,12 @@ func fundFaucetContract(chain *core.BlockChain) {
 	amount := 720000
 	tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(4), StakingAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 	txs = append(txs, tx)
-	err := contractworker.CommitTransactions(txs, testUserAddress)
+	err := contractworker.CommitTransactions(txs, nil, testUserAddress)
 	if err != nil {
 		fmt.Println(err)
 	}
 	block, _ := contractworker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
-	_, err = chain.InsertChain(types.Blocks{block})
+	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -163,7 +163,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	callEnc = append(callEnc, paddedAddress...)
 	callfaucettx, _ := types.SignTx(types.NewTransaction(nonce+uint64(5), faucetContractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, FaucetPriKey)
 
-	err = contractworker.CommitTransactions(types.Transactions{callfaucettx}, testUserAddress)
+	err = contractworker.CommitTransactions(types.Transactions{callfaucettx}, nil, testUserAddress)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -171,7 +171,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 		fmt.Println(err)
 	}
 	block, _ := contractworker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
-	_, err = chain.InsertChain(types.Blocks{block})
+	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -241,13 +241,13 @@ func playStaking(chain *core.BlockChain) {
 		tx, _ := types.SignTx(types.NewTransaction(0, stakeContractAddress, 0, big.NewInt(int64(stake)), params.TxGas*5, nil, callEncl), types.HomesteadSigner{}, allRandomUserKey[i])
 		stakingtxns = append(stakingtxns, tx)
 	}
-	err = contractworker.CommitTransactions(stakingtxns, common.Address{})
+	err = contractworker.CommitTransactions(stakingtxns, nil, common.Address{})
 
 	if err != nil {
 		fmt.Println(err)
 	}
 	block, _ := contractworker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
-	_, err = chain.InsertChain(types.Blocks{block})
+	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -299,14 +299,14 @@ func playWithdrawStaking(chain *core.BlockChain) {
 		withdrawstakingtxns = append(withdrawstakingtxns, tx)
 	}
 
-	err = contractworker.CommitTransactions(withdrawstakingtxns, common.Address{})
+	err = contractworker.CommitTransactions(withdrawstakingtxns, nil, common.Address{})
 	if err != nil {
 		fmt.Println("error:")
 		fmt.Println(err)
 	}
 
 	block, _ := contractworker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
-	_, err = chain.InsertChain(types.Blocks{block})
+	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -350,7 +350,7 @@ func main() {
 			gen.SetShardID(0)
 			gen.AddTx(pendingTxs[i])
 		})
-		if _, err := chain.InsertChain(blocks); err != nil {
+		if _, err := chain.InsertChain(blocks, true /* verifyHeaders */); err != nil {
 			log.Fatal(err)
 		}
 	}

@@ -77,9 +77,7 @@ type Engine interface {
 	// and assembles the final block.
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	Finalize(
-		chain ChainReader, header *block.Header, state *state.DB,
-		txs []*types.Transaction,
+	Finalize(chain ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error)
 

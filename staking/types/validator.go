@@ -1,14 +1,15 @@
 package types
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Define validator staking related const
@@ -20,10 +21,16 @@ const (
 	MaxDetailsLength         = 280
 )
 
+var (
+	errAddressNotMatch = errors.New("Validator key not match")
+)
+
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
-	Validator   `json:"validator" yaml:"validator"`
-	Delegations []Delegation `json:"delegations" yaml:"delegations"`
+	Validator           `json:"validator" yaml:"validator"`
+	Delegations         []Delegation `json:"delegations" yaml:"delegations"`
+	SnapshotValidator   *Validator   `json:"snapshot_validator" yaml:"snaphost_validator"`
+	SnapshotDelegations []Delegation `json:"snapshot_delegations" yaml:"snapshot_delegations"`
 }
 
 // Validator - data fields for a validator
@@ -31,7 +38,7 @@ type Validator struct {
 	// ECDSA address of the validator
 	Address common.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
-	ValidatingPubKey bls.PublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
+	SlotPubKeys []shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
 	// The stake put by the validator itself
 	Stake *big.Int `json:"stake" yaml:"stake"`
 	// if unbonding, height at which this validator has begun unbonding
@@ -80,7 +87,7 @@ func NewDescription(name, identity, website, securityContact, details string) De
 
 // UpdateDescription updates the fields of a given description. An error is
 // returned if the resulting description contains an invalid length.
-func (d Description) UpdateDescription(d2 Description) (Description, error) {
+func UpdateDescription(d2 *Description) (Description, error) {
 	return NewDescription(
 		d2.Name,
 		d2.Identity,
@@ -125,3 +132,40 @@ func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 
 // GetMinSelfDelegation returns the minimum amount the validator must stake
 func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
+
+// CreateValidatorFromNewMsg creates validator from NewValidator message
+func CreateValidatorFromNewMsg(val *CreateValidator) (*Validator, error) {
+	desc, err := UpdateDescription(val.Description)
+	if err != nil {
+		return nil, err
+	}
+	commission := Commission{val.CommissionRates, new(big.Int)}
+	pubKeys := []shard.BlsPublicKey{}
+	pubKeys = append(pubKeys, val.SlotPubKeys...)
+	v := Validator{val.ValidatorAddress, pubKeys,
+		val.Amount, new(big.Int), val.MinSelfDelegation, false,
+		commission, desc}
+	return &v, nil
+}
+
+// UpdateValidatorFromEditMsg updates validator from EditValidator message
+func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error {
+	if validator.Address != edit.ValidatorAddress {
+		return errAddressNotMatch
+	}
+	desc, err := UpdateDescription(edit.Description)
+	if err != nil {
+		return err
+	}
+
+	validator.Description = desc
+
+	if edit.CommissionRate != nil {
+		validator.Rate = *edit.CommissionRate
+	}
+
+	if edit.MinSelfDelegation != nil {
+		validator.MinSelfDelegation = edit.MinSelfDelegation
+	}
+	return nil
+}

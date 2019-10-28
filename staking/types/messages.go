@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/harmony-one/harmony/shard"
-
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
@@ -22,8 +21,6 @@ const (
 	DirectiveEditValidator
 	// DirectiveDelegate ...
 	DirectiveDelegate
-	// DirectiveRedelegate ...
-	DirectiveRedelegate
 	// DirectiveUndelegate ...
 	DirectiveUndelegate
 	// DirectiveCollectRewards ...
@@ -35,7 +32,6 @@ var (
 		DirectiveCreateValidator: "CreateValidator",
 		DirectiveEditValidator:   "EditValidator",
 		DirectiveDelegate:        "Delegate",
-		DirectiveRedelegate:      "Redelegate",
 		DirectiveUndelegate:      "Undelegate",
 		DirectiveCollectRewards:  "CollectRewards",
 	}
@@ -52,7 +48,7 @@ func (d Directive) String() string {
 
 // CreateValidator - type for creating a new validator
 type CreateValidator struct {
-	Description        `json:"description" yaml:"description"`
+	Description        *Description `json:"description" yaml:"description"`
 	CommissionRates    `json:"commission" yaml:"commission"`
 	MinSelfDelegation  *big.Int             `json:"min_self_delegation" yaml:"min_self_delegation"`
 	MaxTotalDelegation *big.Int             `json:"max_total_delegation" yaml:"max_total_delegation"`

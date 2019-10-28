@@ -10,13 +10,12 @@ import (
 )
 
 func TestIsEpochBlock(t *testing.T) {
-	block1 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(10)).Header(), nil, nil, nil, nil, nil)
-	block2 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(0)).Header(), nil, nil, nil, nil, nil)
-	block3 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(344064)).Header(), nil, nil, nil, nil, nil)
-	block4 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(77)).Header(), nil, nil, nil, nil, nil)
-	block5 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(78)).Header(), nil, nil, nil, nil, nil)
-	block6 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(188)).Header(), nil, nil, nil, nil, nil)
-	block7 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(189)).Header(), nil, nil, nil, nil, nil)
+	blockNumbered := func(n int64) *types.Block {
+		return types.NewBlock(
+			blockfactory.NewTestHeader().With().Number(big.NewInt(n)).Header(),
+			nil, nil, nil, nil, nil,
+		)
+	}
 	tests := []struct {
 		schedule shardingconfig.Schedule
 		block    *types.Block
@@ -24,37 +23,37 @@ func TestIsEpochBlock(t *testing.T) {
 	}{
 		{
 			shardingconfig.MainnetSchedule,
-			block1,
+			blockNumbered(10),
 			false,
 		},
 		{
 			shardingconfig.MainnetSchedule,
-			block2,
+			blockNumbered(0),
 			true,
 		},
 		{
 			shardingconfig.MainnetSchedule,
-			block3,
+			blockNumbered(344064),
 			true,
 		},
 		{
 			shardingconfig.TestnetSchedule,
-			block4,
+			blockNumbered(74),
 			false,
 		},
 		{
 			shardingconfig.TestnetSchedule,
-			block5,
+			blockNumbered(75),
 			true,
 		},
 		{
 			shardingconfig.TestnetSchedule,
-			block6,
+			blockNumbered(149),
 			false,
 		},
 		{
 			shardingconfig.TestnetSchedule,
-			block7,
+			blockNumbered(150),
 			true,
 		},
 	}

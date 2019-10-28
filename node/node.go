@@ -349,15 +349,11 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(
-	coinbase common.Address,
-) types.Transactions {
-
+func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Transactions, staking.StakingTransactions) {
 	txsThrottleConfig := core.ShardingSchedule.TxsThrottleConfig()
 
 	// the next block number to be added in consensus protocol, which is always one more than current chain header block
 	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
-
 	// remove old (> txsThrottleConfigRecentTxDuration) blockNum keys from recentTxsStats and initiailize for the new block
 	for blockNum := range node.recentTxsStats {
 		recentTxsBlockNumGap := uint64(txsThrottleConfig.RecentTxDuration / node.BlockPeriod)
@@ -366,23 +362,20 @@ func (node *Node) getTransactionsForNewBlock(
 		}
 	}
 	node.recentTxsStats[newBlockNum] = make(types.BlockTxsCounts)
-
 	// Must update to the correct current state before processing potential txns
 	if err := node.Worker.UpdateCurrent(coinbase); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msg("Failed updating worker's state before txn selection")
-		return types.Transactions{}
+		return types.Transactions{}, staking.StakingTransactions{}
 	}
 
 	node.pendingTxMutex.Lock()
 	defer node.pendingTxMutex.Unlock()
 	node.pendingStakingTxMutex.Lock()
 	defer node.pendingStakingTxMutex.Unlock()
-
 	pendingTransactions := types.Transactions{}
 	pendingStakingTransactions := staking.StakingTransactions{}
-
 	for _, tx := range node.pendingTransactions {
 		pendingTransactions = append(pendingTransactions, tx)
 	}
@@ -391,6 +384,9 @@ func (node *Node) getTransactionsForNewBlock(
 	}
 
 	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, pendingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
+
+	selectedStaking, unselectedStaking, invalidStaking :=
+		node.Worker.SelectStakingTransactionsForNewBlock(newBlockNum, pendingStakingTransactions, coinbase)
 
 	node.pendingTransactions = make(map[common.Hash]*types.Transaction)
 	for _, unselectedTx := range unselected {
@@ -402,7 +398,17 @@ func (node *Node) getTransactionsForNewBlock(
 		Int("invalidDiscarded", len(invalid)).
 		Msg("Selecting Transactions")
 
-	return selected
+	node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
+	for _, unselectedStakingTx := range unselectedStaking {
+		node.pendingStakingTransactions[unselectedStakingTx.Hash()] = unselectedStakingTx
+	}
+	utils.Logger().Info().
+		Int("remainPending", len(node.pendingStakingTransactions)).
+		Int("selected", len(unselectedStaking)).
+		Int("invalidDiscarded", len(invalidStaking)).
+		Msg("Selecting Transactions")
+
+	return selected, selectedStaking
 }
 
 func (node *Node) startRxPipeline(

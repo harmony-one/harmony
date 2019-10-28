@@ -33,8 +33,8 @@ func TestAddNewBlock(t *testing.T) {
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
 	node := New(host, consensus, testDBFactory, false)
 
-	selectedTxs := node.getTransactionsForNewBlock(common.Address{})
-	node.Worker.CommitTransactions(selectedTxs, common.Address{})
+	selectedTxs, stks := node.getTransactionsForNewBlock(common.Address{})
+	node.Worker.CommitTransactions(selectedTxs, stks, common.Address{})
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
 	err = node.AddNewBlock(block)
@@ -65,8 +65,8 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	node := New(host, consensus, testDBFactory, false)
 
-	selectedTxs := node.getTransactionsForNewBlock(common.Address{})
-	node.Worker.CommitTransactions(selectedTxs, common.Address{})
+	selectedTxs, stks := node.getTransactionsForNewBlock(common.Address{})
+	node.Worker.CommitTransactions(selectedTxs, stks, common.Address{})
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
 	if err := node.VerifyNewBlock(block); err != nil {
