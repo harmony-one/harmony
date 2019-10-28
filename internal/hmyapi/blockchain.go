@@ -177,7 +177,7 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 
 // GetBlockSigners returns signers for a particular block.
 func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) ([]string, error) {
-	if uint64(blockNr) == 0 {
+	if uint64(blockNr) == 0 || uint64(blockNr) >= uint64(s.BlockNumber()) {
 		return make([]string, 0), nil
 	}
 	block, err := s.b.BlockByNumber(ctx, blockNr)
@@ -225,6 +225,9 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 
 // IsBlockSigner returns true if validator with address signed blockNr block.
 func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.BlockNumber, address string) (bool, error) {
+	if uint64(blockNr) == 0 || uint64(blockNr) >= uint64(s.BlockNumber()) {
+		return false, nil
+	}
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if err != nil {
 		return false, err
@@ -269,13 +272,13 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 
 // GetSignedBlocks returns how many blocks a particular validator signed for last defaultBlocksPeriod (3 hours ~ 1500 blocks).
 func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address string) hexutil.Uint64 {
-	header := s.LatestHeader(ctx)
 	totalSigned := uint64(0)
 	lastBlock := uint64(0)
-	if header.BlockNumber >= defaultBlocksPeriod {
-		lastBlock = header.BlockNumber - defaultBlocksPeriod + 1
+	blockHeight := uint64(s.BlockNumber())
+	if blockHeight >= defaultBlocksPeriod {
+		lastBlock = blockHeight - defaultBlocksPeriod + 1
 	}
-	for i := header.BlockNumber; i >= lastBlock; i-- {
+	for i := lastBlock; i <= blockHeight; i++ {
 		signed, err := s.IsBlockSigner(ctx, rpc.BlockNumber(i), address)
 		if err == nil && signed {
 			totalSigned++
