@@ -21,6 +21,7 @@ RACE=
 VERBOSE=
 DEBUG=false
 NETWORK=main
+STATIC=false
 
 unset -v progdir
 case "${0}" in
@@ -62,6 +63,8 @@ OPTIONS:
    -f folder      set the upload folder name in the bucket (default: $FOLDER)
    -r             enable -race build option (default: $RACE)
    -v             verbose build process (default: $VERBOSE)
+   -s             build static linux executable (default: $STATIC)
+
 
 ACTION:
    build       build binaries only (default action)
@@ -104,7 +107,11 @@ function build_only
          if [ "$DEBUG" == "true" ]; then
             env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-N -l -c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
          else
-            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+            if [ "$STATIC" == "true" ]; then
+               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-c 2" -ldflags='-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags "-static"' -o $BINDIR/$bin $RACE ${SRC[$bin]}
+            else
+               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+            fi
          fi
          if [ "$(uname -s)" == "Linux" ]; then
             $BINDIR/$bin -version || $BINDIR/$bin version
@@ -216,7 +223,7 @@ function upload_wallet
 }
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:rvN:" option; do
+while getopts "hp:a:o:b:f:rvsN:" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;
@@ -227,6 +234,7 @@ while getopts "hp:a:o:b:f:rvN:" option; do
       r) RACE=-race ;;
       v) VERBOSE='-v -x' ;;
       d) DEBUG=true ;;
+      s) STATIC=true ;;
       N) NETWORK=$OPTARG ;;
    esac
 done
