@@ -78,11 +78,11 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 			SlotPubKeys:        []shard.BlsPublicKey{pub},
 			Amount:             big.NewInt(100),
 		}
-		//		return staking.DirectiveDelegate, staking.Delegate{
-		//			common.Address(dAddr),
-		//			common.Address(dAddr),
-		//			big.NewInt(10),
-		//		}
+		// return staking.DirectiveDelegate, staking.Delegate{
+		// 	common.Address(dAddr),
+		// 	common.Address(dAddr),
+		// 	big.NewInt(10),
+		// }
 	}
 
 	stakingTx, err := staking.NewStakingTransaction(2, 100, gasPrice, stakePayloadMaker)
@@ -101,8 +101,16 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	if err := rlp.DecodeBytes(enc, tx); err != nil {
 		return err
 	}
-	fmt.Printf("In Client side: %+v\n", tx)
-	// return nil
+
+	payload, err := tx.RLPEncodeStakeMsg()
+
+	restored, errRestor := staking.RLPDecodeStakeMsg(
+		payload, staking.DirectiveCreateValidator,
+	)
+
+	fmt.Printf("In Client side: %+v\n", restored)
+	fmt.Println(errRestor)
+
 	rlp.DecodeBytes(enc, tx)
 	hexSignature := hexutil.Encode(enc)
 	param := []interface{}{hexSignature}

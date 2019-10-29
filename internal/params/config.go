@@ -34,9 +34,9 @@ var (
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
 		ChainID:        TestnetChainID,
-		CrossTxEpoch:   big.NewInt(1),
-		CrossLinkEpoch: big.NewInt(2),
-		StakingEpoch:   big.NewInt(3),
+		CrossTxEpoch:   big.NewInt(0),
+		CrossLinkEpoch: EpochTBD,
+		StakingEpoch:   EpochTBD,
 		EIP155Epoch:    big.NewInt(0),
 		S3Epoch:        big.NewInt(0),
 	}

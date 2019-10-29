@@ -34,7 +34,7 @@ const (
 	mainnetMaxTxPoolSizeLimit             = 8000
 	mainnetMaxNumTxsPerBlockLimit         = 1000
 	mainnetRecentTxDuration               = time.Hour
-	mainnetEnableTxnThrottling            = true
+	mainnetEnableTxnThrottling            = false
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "https://api.s%d.t.hmny.io"

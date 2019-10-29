@@ -157,46 +157,43 @@ func (tx *StakingTransaction) Nonce() uint64 {
 	return tx.data.AccountNonce
 }
 
-// StakingMsgToBytes returns the bytes of staking message
-func (tx *StakingTransaction) StakingMsgToBytes() (by []byte, err error) {
-	stakeType := tx.StakingType()
+// RLPEncodeStakeMsg ..
+func (tx *StakingTransaction) RLPEncodeStakeMsg() (by []byte, err error) {
+	return rlp.EncodeToBytes(tx.data.StakeMsg)
+}
 
-	switch stakeType {
-	case DirectiveCreateValidator:
-		createValidator, ok := tx.StakingMessage().(CreateValidator)
-		if !ok {
-			return nil, errStakingTransactionTypeCastErr
-		}
-		by, err = rlp.EncodeToBytes(createValidator)
-	case DirectiveEditValidator:
-		editValidator, ok := tx.StakingMessage().(EditValidator)
-		if !ok {
-			return nil, errStakingTransactionTypeCastErr
-		}
-		by, err = rlp.EncodeToBytes(editValidator)
-	case DirectiveDelegate:
-		delegate, ok := tx.StakingMessage().(Delegate)
-		if !ok {
-			return nil, errStakingTransactionTypeCastErr
-		}
-		by, err = rlp.EncodeToBytes(delegate)
-	case DirectiveUndelegate:
-		undelegate, ok := tx.StakingMessage().(Undelegate)
-		if !ok {
-			return nil, errStakingTransactionTypeCastErr
-		}
-		by, err = rlp.EncodeToBytes(undelegate)
-	case DirectiveCollectRewards:
-		collectRewards, ok := tx.StakingMessage().(CollectRewards)
-		if !ok {
-			return nil, errStakingTransactionTypeCastErr
-		}
-		by, err = rlp.EncodeToBytes(collectRewards)
+// RLPDecodeStakeMsg ..
+func RLPDecodeStakeMsg(payload []byte, d Directive) (interface{}, error) {
+	var oops error
+	var ds interface{}
+
+	switch _, ok := directiveNames[d]; ok {
+	case false:
+		return nil, ErrInvalidStakingKind
 	default:
-		by = []byte{}
-		err = ErrInvalidStakingKind
+		switch d {
+		case DirectiveCreateValidator:
+			ds = &CreateValidator{}
+		case DirectiveEditValidator:
+			ds = &EditValidator{}
+		case DirectiveDelegate:
+			ds = &Delegate{}
+		case DirectiveUndelegate:
+			ds = &Undelegate{}
+		case DirectiveCollectRewards:
+			ds = &CollectRewards{}
+		default:
+			return nil, nil
+		}
 	}
-	return
+
+	oops = rlp.DecodeBytes(payload, ds)
+
+	if oops != nil {
+		return nil, oops
+	}
+
+	return ds, nil
 }
 
 // StakingType returns the type of staking transaction
@@ -211,8 +208,7 @@ func (tx *StakingTransaction) StakingMessage() interface{} {
 
 // SenderAddress returns the address of staking transaction sender
 func (tx *StakingTransaction) SenderAddress() (common.Address, error) {
-	signer := NewEIP155Signer(tx.ChainID())
-	addr, err := Sender(signer, tx)
+	addr, err := Sender(NewEIP155Signer(tx.ChainID()), tx)
 	if err != nil {
 		return common.Address{}, err
 	}

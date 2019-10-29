@@ -62,15 +62,15 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 		sender = msg.From()
 	}
 
+	// do not throttle transactions if disabled
+	if !txsThrottleConfig.EnableTxnThrottling {
+		return sender, shardingconfig.TxSelect
+	}
+
 	// already selected max num txs
 	if len(selected) > txsThrottleConfig.MaxNumTxsPerBlockLimit {
 		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Int("MaxNumTxsPerBlockLimit", txsThrottleConfig.MaxNumTxsPerBlockLimit).Msg("Throttling tx with max num txs per block limit")
 		return sender, shardingconfig.TxUnselect
-	}
-
-	// do not throttle transactions if disabled
-	if !txsThrottleConfig.EnableTxnThrottling {
-		return sender, shardingconfig.TxSelect
 	}
 
 	// throttle a single sender sending too many transactions in one block
@@ -108,6 +108,13 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 			continue
 		}
 
+		// If we don't have enough gas for any further transactions then we're done
+		if w.current.gasPool.Gas() < params.TxGas {
+			utils.Logger().Info().Str("Not enough gas for further transactions, have", w.current.gasPool.String()).Uint64("want", params.TxGas)
+			unselected = append(unselected, tx)
+			continue
+		}
+
 		sender, flag := w.throttleTxs(selected, recentTxsStats, txsThrottleConfig, tx)
 		switch flag {
 		case shardingconfig.TxUnselect:
@@ -117,17 +124,21 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 			invalid = append(invalid, tx)
 
 		case shardingconfig.TxSelect:
-			snap := w.current.state.Snapshot()
-			_, err := w.commitTransaction(tx, coinbase)
-			if err != nil {
-				w.current.state.RevertToSnapshot(snap)
+			if tx.GasPrice().Uint64() == 0 {
 				invalid = append(invalid, tx)
-				utils.Logger().Error().Err(err).Str("txId", tx.Hash().Hex()).Msg("Commit transaction error")
 			} else {
-				selected = append(selected, tx)
-				// handle the case when msg was not able to extracted from tx
-				if len(sender.String()) > 0 {
-					recentTxsStats[newBlockNum][sender]++
+				snap := w.current.state.Snapshot()
+				_, err := w.commitTransaction(tx, coinbase)
+				if err != nil {
+					w.current.state.RevertToSnapshot(snap)
+					invalid = append(invalid, tx)
+					utils.Logger().Error().Err(err).Str("txId", tx.Hash().Hex()).Msg("Commit transaction error")
+				} else {
+					selected = append(selected, tx)
+					// handle the case when msg was not able to extracted from tx
+					if len(sender.String()) > 0 {
+						recentTxsStats[newBlockNum][sender]++
+					}
 				}
 			}
 		}
@@ -140,7 +151,7 @@ func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Tra
 		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("Transaction gas limit info")
 	}
 
-	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("Block gas limit and usage info")
+	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Int("newTxns", len(selected)).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("Block gas limit and usage info")
 
 	return selected, unselected, invalid
 }
@@ -155,10 +166,11 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 		return nil, nil, nil
 	}
 
+	// TODO: gas pool should be initialized once for both normal and staking transactions
 	// staking transaction share the same gasPool with normal transactions
-	if w.current.gasPool == nil {
-		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
-	}
+	//if w.current.gasPool == nil {
+	//	w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
+	//}
 
 	selected := staking.StakingTransactions{}
 	// TODO: chao add total gas fee checking when needed
@@ -424,8 +436,8 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 		chain:   chain,
 		engine:  engine,
 	}
-	worker.gasFloor = 500000000000000000
-	worker.gasCeil = 1000000000000000000
+	worker.gasFloor = 80000000
+	worker.gasCeil = 120000000
 
 	parent := worker.chain.CurrentBlock()
 	num := parent.Number()
