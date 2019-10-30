@@ -76,7 +76,7 @@ var (
 	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
 	port             = flag.String("port", "9000", "port of the node.")
 	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	logMaxSize       = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
+	logMaxSize       = flag.Int("log_max_size", 100000, "the max size in megabytes of the log file before it gets rotated")
 	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
