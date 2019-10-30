@@ -138,13 +138,15 @@ function upload
       [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}$FOLDER/$bin --acl public-read
    done
 
-   for lib in "${!LIB[@]}"; do
-      if [ -e ${LIB[$lib]} ]; then
-         $AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}$FOLDER/$lib --acl public-read
-      else
-         echo "!! MISSING ${LIB[$lib]} !!"
-      fi
-   done
+   if [ "$STATIC" != "true" ]; then
+      for lib in "${!LIB[@]}"; do
+         if [ -e ${LIB[$lib]} ]; then
+            $AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}$FOLDER/$lib --acl public-read
+         else
+            echo "!! MISSING ${LIB[$lib]} !!"
+         fi
+      done
+   fi
 
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
 }
@@ -177,13 +179,15 @@ function release
       fi
    done
 
-   for lib in "${!LIB[@]}"; do
-      if [ -e ${LIB[$lib]} ]; then
-         $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$FOLDER/$lib --acl public-read
-      else
-         echo "!! MISSING ${LIB[$lib]} !!"
-      fi
-   done
+   if [ "$STATIC" != "true" ]; then
+      for lib in "${!LIB[@]}"; do
+         if [ -e ${LIB[$lib]} ]; then
+            $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$FOLDER/$lib --acl public-read
+         else
+            echo "!! MISSING ${LIB[$lib]} !!"
+         fi
+      done
+   fi
 
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${PUBBUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
