@@ -92,6 +92,11 @@ EOF
 
 function build_only
 {
+   if [[ "$STATIC" == "true" && "$GOOS" == "darwin" ]]; then
+      echo "static build only supported on Linux platform"
+      exit 2
+   fi
+
    VERSION=$(git rev-list --count HEAD)
    COMMIT=$(git describe --always --long --dirty)
    BUILTAT=$(date +%FT%T%z)
