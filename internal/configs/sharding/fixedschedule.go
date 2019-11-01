@@ -40,8 +40,8 @@ func (s fixedSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	return blocks*(epochNum+1) - 1
 }
 
-func (s fixedSchedule) VdfDifficulty() int {
-	return mainnetVdfDifficulty
+func (s fixedSchedule) VDFDifficulty() int {
+	return mainnetVDFDifficulty
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes

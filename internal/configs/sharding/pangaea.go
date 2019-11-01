@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus/quorum"
 
 	"github.com/harmony-one/harmony/internal/genesis"
 )
@@ -45,8 +46,8 @@ func (ps pangaeaSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	return blocks*(epochNum+1) - 1
 }
 
-func (ps pangaeaSchedule) VdfDifficulty() int {
-	return testnetVdfDifficulty
+func (ps pangaeaSchedule) VDFDifficulty() int {
+	return testnetVDFDifficulty
 }
 
 func (ps pangaeaSchedule) ConsensusRatio() float64 {
@@ -56,7 +57,8 @@ func (ps pangaeaSchedule) ConsensusRatio() float64 {
 var pangaeaReshardingEpoch = []*big.Int{common.Big0}
 
 var pangaeaV0 = MustNewInstance(
-	4, 250, 20, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
+	4, 250, 20, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch, quorum.SuperMajorityVote,
+)
 
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation

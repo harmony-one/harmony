@@ -4,7 +4,6 @@
 package nodeconfig
 
 import (
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"sync"
@@ -79,7 +78,6 @@ type ConfigType struct {
 	PushgatewayIP   string // metrics pushgateway prometheus ip
 	PushgatewayPort string // metrics pushgateway prometheus port
 	StringRole      string
-	StakingPriKey   *ecdsa.PrivateKey
 	P2pPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey *bls.SecretKey
 	ConsensusPubKey *bls.PublicKey
@@ -90,12 +88,11 @@ type ConfigType struct {
 	networkType NetworkType
 }
 
-// configs is a list of node configuration.
-// It has at least one configuration.
-// The first one is the default, global node configuration
-var shardConfigs []ConfigType
-var defaultConfig ConfigType
-var onceForConfigs sync.Once
+var (
+	shardConfigs   []ConfigType
+	defaultConfig  ConfigType
+	onceForConfigs sync.Once
+)
 
 // GetShardConfig return the shard's ConfigType variable
 func GetShardConfig(shardID uint32) *ConfigType {
@@ -224,6 +221,7 @@ func (conf *ConfigType) Role() Role {
 
 // SetNetworkType set the networkType
 func SetNetworkType(networkType NetworkType) {
+	defaultConfig.networkType = networkType
 	for i := range shardConfigs {
 		shardConfigs[i].networkType = networkType
 	}

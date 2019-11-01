@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -22,7 +23,7 @@ const (
 	localnetEpochBlock1 = 10
 	twoOne              = 5
 
-	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
+	localnetVDFDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
 
 	localnetRandomnessStartingEpoch = 0
@@ -82,8 +83,8 @@ func (ls localnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	}
 }
 
-func (ls localnetSchedule) VdfDifficulty() int {
-	return localnetVdfDifficulty
+func (ls localnetSchedule) VDFDifficulty() int {
+	return localnetVDFDifficulty
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes
@@ -152,8 +153,12 @@ func (ls localnetSchedule) GetShardingStructure(numShard, shardID int) []map[str
 	return res
 }
 
-var localnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch)}
+var localnetReshardingEpoch = []*big.Int{
+	big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch),
+}
 
-var localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, localnetReshardingEpoch)
-var localnetV1 = MustNewInstance(2, 8, 5, genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, localnetReshardingEpoch)
-var localnetV2 = MustNewInstance(2, 9, 6, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, localnetReshardingEpoch)
+var (
+	localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, localnetReshardingEpoch, quorum.SuperMajorityVote)
+	localnetV1 = MustNewInstance(2, 8, 5, genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, localnetReshardingEpoch, quorum.SuperMajorityVote)
+	localnetV2 = MustNewInstance(2, 9, 6, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, localnetReshardingEpoch, quorum.SuperMajorityVote)
+)

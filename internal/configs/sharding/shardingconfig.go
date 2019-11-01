@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -28,7 +29,7 @@ type Schedule interface {
 	EpochLastBlock(epochNum uint64) uint64
 
 	// VDFDifficulty returns number of iterations for VDF calculation
-	VdfDifficulty() int
+	VDFDifficulty() int
 
 	// ConsensusRatio ratio of new nodes vs consensus total nodes
 	ConsensusRatio() float64
@@ -88,6 +89,9 @@ type Instance interface {
 
 	// ReshardingEpoch returns a list of Epoch while off-chain resharding happens
 	ReshardingEpoch() []*big.Int
+
+	// QuorumPolicy returns the policy used to decide quorum for epoch
+	QuorumPolicy() quorum.Policy
 }
 
 // TxThrottleFlag is the throttling flag for each transaction

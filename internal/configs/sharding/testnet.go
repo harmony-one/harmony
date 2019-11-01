@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -18,7 +19,7 @@ const (
 	// 10 minutes per epoch (at 8s/block)
 	testnetBlocksPerEpoch = 75
 
-	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
+	testnetVDFDifficulty = 10000 // This takes about 20s to finish the vdf
 
 	testnetMaxTxAmountLimit               = 1e3 // unit is in One
 	testnetMaxNumRecentTxsPerAccountLimit = 1e2
@@ -57,8 +58,8 @@ func (ts testnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	return ts.BlocksPerEpoch()*(epochNum+1) - 1
 }
 
-func (ts testnetSchedule) VdfDifficulty() int {
-	return testnetVdfDifficulty
+func (ts testnetSchedule) VDFDifficulty() int {
+	return testnetVDFDifficulty
 }
 
 // ConsensusRatio ratio of new nodes vs consensus total nodes
@@ -122,4 +123,4 @@ var testnetReshardingEpoch = []*big.Int{
 	big.NewInt(0),
 }
 
-var testnetV0 = MustNewInstance(3, 100, 80, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)
+var testnetV0 = MustNewInstance(3, 100, 80, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, quorum.SuperMajorityVote)
