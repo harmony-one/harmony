@@ -24,8 +24,8 @@ type NodeID struct {
 	ECDSAAddress common.Address `json:"ecdsa_address"`
 	BLSPublicKey BLSPublicKey   `json:"bls_pubkey"`
 	Validator    *struct {
+		// nil means not active, 0 means our node, >= 0 means staked node
 		WithDelegationApplied *big.Int `json:"with-delegation-applied,omitempty"`
-		Active                bool
 	}
 }
 
@@ -38,8 +38,8 @@ type Committee struct {
 	NodeList NodeIDList `json:"node_list"`
 }
 
-// State is the collection of all committees
-type State []Committee
+// SuperCommittee is the collection of all committees
+type SuperCommittee []Committee
 
 // BLSPublicKey defines the bls public key
 type BLSPublicKey [48]byte
@@ -48,24 +48,23 @@ type BLSPublicKey [48]byte
 func (members NodeIDList) Inventory() (result struct {
 	BLSPublicKeys         [][48]byte    `json:"bls_pubkey"`
 	WithDelegationApplied []numeric.Dec `json:"with-delegation-applied,omitempty"`
-	CurrentlyActive       []bool
 }) {
 	count := len(members)
 	result.BLSPublicKeys = make([][48]byte, count)
 	result.WithDelegationApplied = make([]numeric.Dec, count)
-	result.CurrentlyActive = make([]bool, count)
+
 	for i := 0; i < count; i++ {
 		result.BLSPublicKeys[i] = members[i].BLSPublicKey
 		if stake := members[i].Validator; stake != nil {
 			result.WithDelegationApplied[i] = numeric.NewDecFromBigInt(stake.WithDelegationApplied)
-			result.CurrentlyActive[i] = stake.Active
+			// result.CurrentlyActive[i] = stake.Active
 		}
 	}
 
 	return
 }
 
-func (ss State) String() string {
+func (ss SuperCommittee) String() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("[\n\t")
 	committee := ss
@@ -85,7 +84,7 @@ func (ss State) String() string {
 
 // FindCommitteeByID returns the committee configuration for the given shard,
 // or nil if the given shard is not found.
-func (ss State) FindCommitteeByID(shardID uint32) *Committee {
+func (ss SuperCommittee) FindCommitteeByID(shardID uint32) *Committee {
 	for _, committee := range ss {
 		if committee.ShardID == shardID {
 			return &committee
@@ -95,16 +94,16 @@ func (ss State) FindCommitteeByID(shardID uint32) *Committee {
 }
 
 // DeepCopy returns a deep copy of the receiver.
-func (ss State) DeepCopy() State {
-	var r State
+func (ss SuperCommittee) DeepCopy() SuperCommittee {
+	var r SuperCommittee
 	for _, c := range ss {
 		r = append(r, c.DeepCopy())
 	}
 	return r
 }
 
-// CompareShardState compares two State instances.
-func CompareShardState(s1, s2 State) int {
+// CompareShardSuperCommittee compares two SuperCommittee instances.
+func CompareShardSuperCommittee(s1, s2 SuperCommittee) int {
 	commonLen := len(s1)
 	if commonLen > len(s2) {
 		commonLen = len(s2)
@@ -228,8 +227,8 @@ func GetHashFromNodeList(nodeList []NodeID) []byte {
 	return d.Sum(nil)
 }
 
-// Hash is the root hash of State
-func (ss State) Hash() (h common.Hash) {
+// Hash is the root hash of SuperCommittee
+func (ss SuperCommittee) Hash() (h common.Hash) {
 	// TODO ek – this sorting really doesn't belong here; it should instead
 	//  be made an explicit invariant to be maintained and, if needed, checked.
 	copy := ss.DeepCopy()

@@ -34,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Version string variables
@@ -431,6 +432,7 @@ func main() {
 		printVersion()
 	}
 
+	fmt.Printf("nettype: %s\n", *networkType)
 	switch *networkType {
 	case nodeconfig.Mainnet:
 		core.ShardingSchedule = shardingconfig.MainnetSchedule
@@ -446,7 +448,10 @@ func main() {
 		}
 		// TODO (leo): use a passing list of accounts here
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil)
+			uint32(*devnetNumShards), *devnetShardSize,
+			*devnetHarmonySize, genesis.HarmonyAccounts,
+			genesis.FoundationalNodeAccounts, nil, stringToPolicy(*quorumPolicy),
+		)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
@@ -480,7 +485,8 @@ func main() {
 	currentNode.SetSyncFreq(*syncFreq)
 	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
 
-	if nodeConfig.ShardID != 0 && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+	if nodeConfig.ShardID != shard.BeaconChainID &&
+		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID", nodeConfig.ShardID)
 		go currentNode.SupportBeaconSyncing()
 	}

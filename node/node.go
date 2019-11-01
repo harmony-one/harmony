@@ -443,7 +443,10 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 }
 
 // New creates a new node.
-func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
+func New(
+	host p2p.Host, consensusObj *consensus.Consensus,
+	chainDBFactory shardchain.DBFactory, isArchival bool,
+) *Node {
 	node := Node{}
 
 	node.syncFreq = SyncFrequency
@@ -561,7 +564,7 @@ func (node *Node) CalculateInitShardState() (err error) {
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
-	pubKeys := core.CalculatePublicKeys(epoch, shardID)
+	pubKeys := core.CalculatePublicKeys(epoch, shardID, core.GenesisCommitteeAssigner)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
 			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",

@@ -32,11 +32,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	blockfactory "github.com/harmony-one/harmony/block/factory"
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -60,7 +59,7 @@ type Genesis struct {
 	Coinbase       common.Address       `json:"coinbase"`
 	Alloc          GenesisAlloc         `json:"alloc"          gencodec:"required"`
 	ShardStateHash common.Hash          `json:"shardStateHash" gencodec:"required"`
-	ShardState     shard.State          `json:"shardState"     gencodec:"required"`
+	ShardState     shard.SuperCommittee `json:"shardState"     gencodec:"required"`
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.

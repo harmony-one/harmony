@@ -376,16 +376,21 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 }
 
 // ProposeShardStateWithoutBeaconSync proposes the next shard state for next epoch.
-func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.State {
+func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.SuperCommittee {
 	if !core.ShardingSchedule.IsLastBlock(w.current.header.Number().Uint64()) {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
-	return core.CalculateShardState(nextEpoch)
+	return core.CalculateShardState(
+		nextEpoch, core.GenesisCommitteeAssigner,
+	)
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
-func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks types.CrossLinks, shardState shard.State) (*types.Block, error) {
+func (w *Worker) FinalizeNewBlock(
+	sig []byte, signers []byte, viewID uint64, coinbase common.Address,
+	crossLinks types.CrossLinks, shardState shard.SuperCommittee,
+) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		sig2 := w.current.header.LastCommitSignature()
 		copy(sig2[:], sig[:])

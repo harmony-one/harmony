@@ -14,7 +14,7 @@ import (
 )
 
 func findRoleInShardState(
-	key *bls.PublicKey, state shard.State,
+	key *bls.PublicKey, state shard.SuperCommittee,
 ) (shardID uint32, isLeader bool) {
 	keyBytes := key.Serialize()
 	for idx, shard := range state {

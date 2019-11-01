@@ -181,9 +181,11 @@ func (e *engineImpl) Finalize(
 
 // QuorumForBlock returns the quorum for the given block header.
 func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool) (quorum int, err error) {
-	var ss shard.State
+	var ss shard.SuperCommittee
+
 	if reCalculate {
-		ss = core.CalculateShardState(h.Epoch())
+		// core.ShardingSchedule.InstanceForEpoch(h.Epoch())
+		ss = core.CalculateShardState(h.Epoch(), core.GenesisCommitteeAssigner)
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -239,10 +241,11 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 
 // GetPublicKeys finds the public keys of the committee that signed the block header
 func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate bool) ([]*bls.PublicKey, error) {
-	var shardState shard.State
+	var shardState shard.SuperCommittee
 	var err error
 	if reCalculate {
-		shardState = core.CalculateShardState(header.Epoch())
+		// core.ShardingSchedule.InstanceForEpoch(header.Epoch())
+		shardState = core.CalculateShardState(header.Epoch(), core.GenesisCommitteeAssigner)
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {

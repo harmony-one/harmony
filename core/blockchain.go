@@ -44,6 +44,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
@@ -1849,10 +1850,10 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 }
 
 // ReadShardState retrieves sharding state given the epoch number.
-func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.State, error) {
+func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.SuperCommittee, error) {
 	cacheKey := string(epoch.Bytes())
 	if cached, ok := bc.shardStateCache.Get(cacheKey); ok {
-		shardState := cached.(shard.State)
+		shardState := cached.(shard.SuperCommittee)
 		return shardState, nil
 	}
 	shardState, err := rawdb.ReadShardState(bc.db, epoch)
@@ -1865,7 +1866,7 @@ func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.State, error) {
 
 // WriteShardState saves the given sharding state under the given epoch number.
 func (bc *BlockChain) WriteShardState(
-	epoch *big.Int, shardState shard.State,
+	epoch *big.Int, shardState shard.SuperCommittee,
 ) error {
 	shardState = shardState.DeepCopy()
 	err := rawdb.WriteShardState(bc.db, epoch, shardState)
@@ -1881,7 +1882,7 @@ func (bc *BlockChain) WriteShardState(
 func (bc *BlockChain) WriteShardStateBytes(
 	epoch *big.Int, shardState []byte,
 ) error {
-	decodeShardState := shard.State{}
+	decodeShardState := shard.SuperCommittee{}
 	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
 		return err
 	}
@@ -1938,7 +1939,7 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 
 // GetShardState returns the shard state for the given epoch,
 // creating one if needed.
-func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.State, error) {
+func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.SuperCommittee, error) {
 	shardState, err := bc.ReadShardState(epoch)
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err

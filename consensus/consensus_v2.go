@@ -1181,7 +1181,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					if err == nil {
 						vdfInProgress = false
 						// Verify the randomness
-						vdfObject := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
+						vdfObject := vdf_go.New(core.ShardingSchedule.VDFDifficulty(), seed)
 						if !vdfObject.Verify(vdfOutput) {
 							consensus.getLogger().Warn().
 								Uint64("MsgBlockNum", newBlock.NumberU64()).
@@ -1316,7 +1316,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 
 	// TODO ek – limit concurrency
 	go func() {
-		vdf := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
+		vdf := vdf_go.New(core.ShardingSchedule.VDFDifficulty(), seed)
 		outputChannel := vdf.GetOutputChannel()
 		start := time.Now()
 		vdf.Execute()
@@ -1357,7 +1357,7 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
 		}
 	}
 
-	vdfObject := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
+	vdfObject := vdf_go.New(core.ShardingSchedule.VDFDifficulty(), seed)
 	vdfOutput := [516]byte{}
 	copy(vdfOutput[:], headerObj.Vdf())
 	if vdfObject.Verify(vdfOutput) {

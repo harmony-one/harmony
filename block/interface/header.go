@@ -224,7 +224,7 @@ type Header interface {
 
 	// GetShardState returns the deserialized shard state object.
 	// Note that header encoded shard state only exists in the first block of the epoch
-	GetShardState() (shard.State, error)
+	GetShardState() (shard.SuperCommittee, error)
 
 	// Copy returns a copy of the header.
 	Copy() Header
