@@ -48,11 +48,11 @@ func (d Directive) String() string {
 
 // CreateValidator - type for creating a new validator
 type CreateValidator struct {
-	Description        *Description `json:"description" yaml:"description"`
+	ValidatorAddress   common.Address `json:"validator_address" yaml:"validator_address"`
+	Description        *Description   `json:"description" yaml:"description"`
 	CommissionRates    `json:"commission" yaml:"commission"`
 	MinSelfDelegation  *big.Int             `json:"min_self_delegation" yaml:"min_self_delegation"`
 	MaxTotalDelegation *big.Int             `json:"max_total_delegation" yaml:"max_total_delegation"`
-	ValidatorAddress   common.Address       `json:"validator_address" yaml:"validator_address"`
 	SlotPubKeys        []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
 	Amount             *big.Int             `json:"amount" yaml:"amount"`
 }
