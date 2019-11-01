@@ -236,7 +236,7 @@ func (ac *accountCache) scanAccounts() error {
 	// Scan the entire folder metadata for file changes
 	creates, deletes, updates, err := ac.fileC.scan(ac.keydir)
 	if err != nil {
-		utils.GetLogger().Debug("Failed to reload keystore contents", "err", err)
+		utils.Logger().Debug().Err(err).Msg("Failed to reload keystore contents")
 		return err
 	}
 	if creates.Cardinality() == 0 && deletes.Cardinality() == 0 && updates.Cardinality() == 0 {
@@ -252,7 +252,10 @@ func (ac *accountCache) scanAccounts() error {
 	readAccount := func(path string) *accounts.Account {
 		fd, err := os.Open(path)
 		if err != nil {
-			utils.GetLogger().Trace("Failed to open keystore file", "path", path, "err", err)
+			utils.Logger().Debug().
+				Str("path", path).
+				Err(err).
+				Msg("Failed to open keystore file")
 			return nil
 		}
 		defer fd.Close()
@@ -263,9 +266,15 @@ func (ac *accountCache) scanAccounts() error {
 		addr := common2.ParseAddr(key.Address)
 		switch {
 		case err != nil:
-			utils.GetLogger().Debug("Failed to decode keystore key", "path", path, "err", err)
+			utils.Logger().Debug().
+				Str("path", path).
+				Err(err).
+				Msg("Failed to decode keystore key")
 		case (addr == common.Address{}):
-			utils.GetLogger().Debug("Failed to decode keystore key", "path", path, "err", "missing or zero address")
+			utils.Logger().Debug().
+				Str("path", path).
+				Err(err).
+				Msg("Failed to decode keystore key, missing or zero address")
 		default:
 			return &accounts.Account{
 				Address: addr,
@@ -298,6 +307,6 @@ func (ac *accountCache) scanAccounts() error {
 	case ac.notify <- struct{}{}:
 	default:
 	}
-	utils.GetLogger().Trace("Handled keystore changes", "time", end.Sub(start))
+	utils.Logger().Debug().Uint64("time", uint64(end.Sub(start))).Msg("Handled keystore changes")
 	return nil
 }

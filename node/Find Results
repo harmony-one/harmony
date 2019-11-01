@@ -1,0 +1,448 @@
+Searching 2456 files for "utils.GetLogInstance("
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/accounts/abi/bind/util.go:
+   34  	defer queryTicker.Stop()
+   35  
+   36: 	logger := utils.GetLogInstance().New("hash", tx.Hash())
+   37  	for {
+   38  		receipt, err := b.TransactionReceipt(ctx, tx.Hash())
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/api/service/explorer/service.go:
+  689  	defer func() {
+  690  		if err := json.NewEncoder(w).Encode(data.Address); err != nil {
+  691: 			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
+  692  				"cannot JSON-encode Address")
+  693  		}
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/cmd/bootnode/main.go:
+   68  
+   69  	if *logConn {
+   70: 		host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
+   71  	}
+   72  
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/cmd/harmony/main.go:
+  155  
+  156  	if *onlyLogTps {
+  157: 		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
+  158: 		utils.GetLogInstance().SetHandler(matchFilterHandler)
+  159  	}
+  160  
+  ...
+  281  	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
+  282  	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+  283: 		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
+  284  	}
+  285  	if err != nil {
+  ...
+  479  	if nodeConfig.ShardID != 0 && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+  480  		utils.Logger().Info().Uint32("shardID", currentNode.Blockchain().ShardID()).Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
+  481: 		//utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID", nodeConfig.ShardID)
+  482  		go currentNode.SupportBeaconSyncing()
+  483  	}
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/consensus/consensus_v2.go:
+  834  		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
+  835  	// Print to normal log too
+  836: 	utils.GetLogInstance().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "BlockNum", block.NumberU64())
+  837  
+  838  	// Send signal to Node so the new block can be added and new round of consensus can be triggered
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/contracts/contract_caller.go:
+   36  	msg, err := tx.AsMessage(types.MakeSigner(cc.config, currBlock.Header().Epoch()))
+   37  	if err != nil {
+   38: 		utils.GetLogInstance().Error("[ABI] Failed to convert transaction to message", "error", err)
+   39  		return []byte{}, err
+   40  	}
+   ..
+   44  	stateDB, err := cc.blockchain.State()
+   45  	if err != nil {
+   46: 		utils.GetLogInstance().Error("[ABI] Failed to retrieve state db", "error", err)
+   47  		return []byte{}, err
+   48  	}
+   ..
+   52  	returnValue, _, failed, err := core.NewStateTransition(vmenv, msg, gaspool).TransitionDb()
+   53  	if err != nil || failed {
+   54: 		utils.GetLogInstance().Error("[ABI] Failed executing the transaction", "error", err)
+   55  		return []byte{}, err
+   56  	}
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/internal/utils/testing.go:
+   18  //
+   19  //	func TestMyFunc(t *testing.T) {
+   20: //		l := utils.GetLogInstance()
+   21  //		lrd := NewTestLogRedirector(l, t)
+   22  //		defer lrd.Close()
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/node/node_handler.go:
+  337  			Msg("BINGO !!! Reached Consensus")
+  338  		// Print to normal log too
+  339: 		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "BlockNum", newBlock.NumberU64())
+  340  
+  341  		// 15% of the validator also need to do broadcasting
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/node/node_syncing.go:
+  431  		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
+  432  			response.Type = downloader_pb.DownloaderResponse_FAIL
+  433: 			utils.GetLogInstance().Debug("[SYNC] maximum registration limit exceeds", "ip", ip, "port", port)
+  434  			return response, nil
+  435  		} else {
+
+14 matches across 9 files
+
+
+Searching 2433 files for "GetLogger"
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/accounts/keystore/account_cache.go:
+  237  	creates, deletes, updates, err := ac.fileC.scan(ac.keydir)
+  238  	if err != nil {
+  239: 		utils.GetLogger().Debug("Failed to reload keystore contents", "err", err)
+  240  		return err
+  241  	}
+  ...
+  253  		fd, err := os.Open(path)
+  254  		if err != nil {
+  255: 			utils.GetLogger().Trace("Failed to open keystore file", "path", path, "err", err)
+  256  			return nil
+  257  		}
+  ...
+  264  		switch {
+  265  		case err != nil:
+  266: 			utils.GetLogger().Debug("Failed to decode keystore key", "path", path, "err", err)
+  267  		case (addr == common.Address{}):
+  268: 			utils.GetLogger().Debug("Failed to decode keystore key", "path", path, "err", "missing or zero address")
+  269  		default:
+  270  			return &accounts.Account{
+  ...
+  299  	default:
+  300  	}
+  301: 	utils.GetLogger().Trace("Handled keystore changes", "time", end.Sub(start))
+  302  	return nil
+  303  }
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/accounts/keystore/file_cache.go:
+   61  		// Skip any non-key files from the folder
+   62  		if nonKeyFile(fi) {
+   63: 			utils.GetLogger().Trace("Ignoring file on account scan", "path", path)
+   64  			continue
+   65  		}
+   ..
+   86  
+   87  	// Report on the scanning stats and return
+   88: 	utils.GetLogger().Debug("FS scan times", "list", t1.Sub(t0), "set", t2.Sub(t1), "diff", t3.Sub(t2))
+   89  	return creates, deletes, updates, nil
+   90  }
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/api/service/explorer/service.go:
+  689  		if err := json.NewEncoder(w).Encode(data.Address); err != nil {
+  690  			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode Address")
+  691: 			//ctxerror.Warn(utils.WithCallerSkip(utils.GetLogger(), 1), err, "cannot JSON-encode Address")
+  692  		}
+  693  	}()
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/api/service/explorer/storage.go:
+  118  	}
+  119  	if err := batch.Write(); err != nil {
+  120: 		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
+  121  	}
+  122  }
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/bin/0:
+    <binary>
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/bin/bootnode:
+    <binary>
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/bin/harmony:
+    <binary>
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/bin/staking-standalone:
+    <binary>
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/bin/txgen:
+    <binary>
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/bin/wallet:
+    <binary>
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/bin/wallet_stress_test:
+    <binary>
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/cmd/client/txgen/main.go:
+  223  					stateMutex.Lock()
+  224  					if err := txGen.Worker.UpdateCurrent(block.Coinbase()); err != nil {
+  225: 						ctxerror.Warn(utils.GetLogger(), err,
+  226  							"(*Worker).UpdateCurrent failed")
+  227  					}
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/cmd/harmony/main.go:
+  281  	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
+  282  	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+  283: 		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogger()))
+  284  	}
+  285  	if err != nil {
+  ...
+  383  	// This needs to be executed after consensus and drand are setup
+  384  	if err := currentNode.CalculateInitShardState(); err != nil {
+  385: 		ctxerror.Crit(utils.GetLogger(), err, "CalculateInitShardState failed",
+  386  			"shardID", *shardID)
+  387  	}
+  ...
+  507  	// RPC for SDK not supported for mainnet.
+  508  	if err := currentNode.StartRPC(*port); err != nil {
+  509: 		ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
+  510  	}
+  511  
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/consensus/consensus_service.go:
+   67  	// sender address
+   68  	request.SenderPubkey = consensus.PubKey.Serialize()
+   69: 	consensus.getLogger().Debug().
+   70  		Str("senderKey", consensus.PubKey.SerializeToHexStr()).
+   71  		Msg("[populateMessageFields]")
+   ..
+  205  // ResetState resets the state of the consensus
+  206  func (consensus *Consensus) ResetState() {
+  207: 	consensus.getLogger().Debug().
+  208  		Str("Phase", consensus.phase.String()).
+  209  		Msg("[ResetState] Resetting consensus state")
+  ...
+  382  	numOfTxs := len(block.Transactions())
+  383  	tps := float64(numOfTxs) / timeElapsed.Seconds()
+  384: 	consensus.getLogger().Info().
+  385  		Int("numOfTXs", numOfTxs).
+  386  		Time("startTime", startTime).
+  ...
+  413  }
+  414  
+  415: // getLogger returns logger for consensus contexts added
+  416: func (consensus *Consensus) getLogger() *zerolog.Logger {
+  417  	logger := utils.Logger().With().
+  418  		Uint64("myEpoch", consensus.epoch).
+  ...
+  478  	consensus.numPrevPubKeys = len(curPubKeys)
+  479  
+  480: 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
+  481  
+  482  	if core.IsEpochLastBlockByHeader(header) {
+  483  		// increase epoch by one if it's the last block
+  484  		consensus.SetEpochNum(epoch.Uint64() + 1)
+  485: 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
+  486  			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
+  487  		nextEpoch := new(big.Int).Add(epoch, common.Big1)
+  ...
+  493  
+  494  	if len(pubKeys) == 0 {
+  495: 		consensus.getLogger().Warn().
+  496  			Msg("[UpdateConsensusInformation] PublicKeys is Nil")
+  497  		hasError = true
+  ...
+  499  
+  500  	// update public keys committee
+  501: 	consensus.getLogger().Info().
+  502  		Int("numPubKeys", len(pubKeys)).
+  503  		Msg("[UpdateConsensusInformation] Successfully updated public keys")
+  ...
+  508  		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
+  509  		if err != nil || leaderPubKey == nil {
+  510: 			consensus.getLogger().Debug().Err(err).
+  511  				Msg("[SYNC] Unable to get leaderPubKey from coinbase")
+  512  			consensus.ignoreViewIDCheck = true
+  513  			hasError = true
+  514  		} else {
+  515: 			consensus.getLogger().Debug().
+  516  				Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
+  517  				Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/consensus/consensus_v2.go:
+   34  	err := protobuf.Unmarshal(payload, msg)
+   35  	if err != nil {
+   36: 		consensus.getLogger().Error().Err(err).Msg("Failed to unmarshal message payload.")
+   37  		return
+   38  	}
+   ..
+ 1138  						vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(newBlock.Header().Epoch())
+ 1139  						if err != nil {
+ 1140: 							consensus.getLogger().Info().
+ 1141  								Uint64("MsgBlockNum", newBlock.NumberU64()).
+ 1142  								Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
+ ....
+ 1148  						for _, v := range vrfBlockNumbers {
+ 1149  							if v == newBlock.NumberU64() {
+ 1150: 								consensus.getLogger().Info().
+ 1151  									Uint64("MsgBlockNum", newBlock.NumberU64()).
+ 1152  									Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
+ ....
+ 1182  						vdfObject := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
+ 1183  						if !vdfObject.Verify(vdfOutput) {
+ 1184: 							consensus.getLogger().Warn().
+ 1185  								Uint64("MsgBlockNum", newBlock.NumberU64()).
+ 1186  								Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
+ ....
+ 1190  							_, err := consensus.ChainReader.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
+ 1191  							if err == nil {
+ 1192: 								consensus.getLogger().Info().
+ 1193  									Uint64("MsgBlockNum", newBlock.NumberU64()).
+ 1194  									Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
+ 1195  									Msg("[ConsensusMainLoop] VDF has already been generated previously")
+ 1196  							} else {
+ 1197: 								consensus.getLogger().Info().
+ 1198  									Uint64("MsgBlockNum", newBlock.NumberU64()).
+ 1199  									Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
+ ....
+ 1204  						}
+ 1205  					} else {
+ 1206: 						//consensus.getLogger().Error().Err(err). Msg("[ConsensusMainLoop] Failed to get randomness")
+ 1207  					}
+ 1208  				}
+ ....
+ 1248  	newBlock.AddVrf(append(vrf[:], proof...))
+ 1249  
+ 1250: 	consensus.getLogger().Info().
+ 1251  		Uint64("MsgBlockNum", newBlock.NumberU64()).
+ 1252  		Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
+ ....
+ 1271  
+ 1272  	if err != nil {
+ 1273: 		consensus.getLogger().Warn().
+ 1274  			Err(err).
+ 1275  			Str("MsgBlockNum", headerObj.Number().String()).
+ ....
+ 1279  
+ 1280  	if !bytes.Equal(hash[:], headerObj.Vrf()[:32]) {
+ 1281: 		consensus.getLogger().Warn().
+ 1282  			Str("MsgBlockNum", headerObj.Number().String()).
+ 1283  			Msg("[OnAnnounce] VRF proof is not valid")
+ ....
+ 1288  		headerObj.Epoch(),
+ 1289  	)
+ 1290: 	consensus.getLogger().Info().
+ 1291  		Str("MsgBlockNum", headerObj.Number().String()).
+ 1292  		Int("Number of VRF", len(vrfBlockNumbers)).
+ ....
+ 1307  	}
+ 1308  
+ 1309: 	consensus.getLogger().Info().
+ 1310  		Uint64("MsgBlockNum", newBlock.NumberU64()).
+ 1311  		Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
+ ....
+ 1320  		vdf.Execute()
+ 1321  		duration := time.Now().Sub(start)
+ 1322: 		consensus.getLogger().Info().
+ 1323  			Dur("duration", duration).
+ 1324  			Msg("[ConsensusMainLoop] VDF computation finished")
+ ....
+ 1337  	vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(headerObj.Epoch())
+ 1338  	if err != nil {
+ 1339: 		consensus.getLogger().Error().Err(err).
+ 1340  			Str("MsgBlockNum", headerObj.Number().String()).
+ 1341  			Msg("[OnAnnounce] failed to read VRF block numbers for VDF computation")
+ ....
+ 1360  	copy(vdfOutput[:], headerObj.Vdf())
+ 1361  	if vdfObject.Verify(vdfOutput) {
+ 1362: 		consensus.getLogger().Info().
+ 1363  			Str("MsgBlockNum", headerObj.Number().String()).
+ 1364  			Int("Num of VRF", consensus.VdfSeedSize()).
+ ....
+ 1366  
+ 1367  	} else {
+ 1368: 		consensus.getLogger().Warn().
+ 1369  			Str("MsgBlockNum", headerObj.Number().String()).
+ 1370  			Uint64("Epoch", headerObj.Epoch().Uint64()).
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/internal/utils/logging.go:
+   37  }
+   38  
+   39: // GetLogger is a shorthand for WithCaller(GetLogInstance()).
+   40: func GetLogger() log.Logger {
+   41  	return WithCallerSkip(GetLogInstance(), 1)
+   42  }
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/internal/utils/logging_test.go:
+   70  }
+   71  
+   72: func TestGetLogger(t *testing.T) {
+   73  	oldHandler := GetLogInstance().GetHandler()
+   74  	defer GetLogInstance().SetHandler(oldHandler)
+   ..
+   80  			"port", "", // added by the singleton instance
+   81  			"ip", "", // added by the singleton instance
+   82: 			"funcName", thisPkg + ".TestGetLogger",
+   83  			"funcFile", thisFile,
+   84  			"funcLine", 88, // keep this in sync with Debug() call below
+   ..
+   86  	})
+   87  	GetLogInstance().SetHandler(handler)
+   88: 	GetLogger().Debug("omg")
+   89  }
+   90  
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/node/node.go:
+  246  		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
+  247  			WithCause(err)
+  248: 		ctxerror.Log15(utils.GetLogger().Crit, err)
+  249  	}
+  250  	return bc
+  ...
+  256  	if err != nil {
+  257  		err = ctxerror.New("cannot get beaconchain").WithCause(err)
+  258: 		ctxerror.Log15(utils.GetLogger().Crit, err)
+  259  	}
+  260  	return bc
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/node/node_handler.go:
+  162  		case proto_node.ShardState:
+  163  			if err := node.epochShardStateMessageHandler(msgPayload); err != nil {
+  164: 				ctxerror.Log15(utils.GetLogger().Warn, err)
+  165  			}
+  166  		}
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/node/node_newblock.go:
+   85  
+   86  	if err := node.Worker.CommitTransactions(selectedTxs, selectedStakingTxs, coinbase); err != nil {
+   87: 		ctxerror.Log15(utils.GetLogger().Error,
+   88  			ctxerror.New("cannot commit transactions").
+   89  				WithCause(err))
+   ..
+   95  	if len(receiptsList) != 0 {
+   96  		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
+   97: 			ctxerror.Log15(utils.GetLogger().Error,
+   98  				ctxerror.New("cannot commit receipts").
+   99  					WithCause(err))
+  ...
+  116  	sig, mask, err := node.Consensus.LastCommitSig()
+  117  	if err != nil {
+  118: 		ctxerror.Log15(utils.GetLogger().Error,
+  119  			ctxerror.New("Cannot get commit signatures from last block").
+  120  				WithCause(err))
+
+/Users/vladlazarus/go/src/github.com/harmony-one/harmony/node/node_resharding.go:
+   72  			//  Don't treat this as a blocker until we fix the nondeterminism.
+   73  			//return err
+   74: 			ctxerror.Log15(utils.GetLogger().Warn, err)
+   75  		}
+   76  	} else {
+   ..
+  194  
+  195  	if myShardID == math.MaxUint32 {
+  196: 		getLogger().Info("Somehow I got kicked out. Exiting")
+  197  		os.Exit(8) // 8 represents it's a loop and the program restart itself
+  198  	}
+  ...
+  206  		err := key.Deserialize(nodeID.BlsPublicKey[:])
+  207  		if err != nil {
+  208: 			getLogger().Error("Failed to deserialize BLS public key in shard state",
+  209  				"idx", idx,
+  210  				"error", err)
+  ...
+  216  
+  217  	if node.Blockchain().ShardID() == myShardID {
+  218: 		getLogger().Info("staying in the same shard")
+  219  	} else {
+  220: 		getLogger().Info("moving to another shard")
+  221  		if err := node.shardChains.Close(); err != nil {
+  222: 			getLogger().Error("cannot close shard chains", "error", err)
+  223  		}
+  224  		restartProcess(getRestartArguments(myShardID))
+
+165 matches across 21 files

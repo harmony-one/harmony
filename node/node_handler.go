@@ -161,7 +161,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			node.pingMessageHandler(msgPayload, sender)
 		case proto_node.ShardState:
 			if err := node.epochShardStateMessageHandler(msgPayload); err != nil {
-				ctxerror.Log15(utils.GetLogger().Warn, err)
+				utils.Logger().Warn().Err(err)
 			}
 		}
 	default:
@@ -257,15 +257,28 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 
 	err := node.Blockchain().Validator().ValidateHeader(newBlock, true)
 	if err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Err(err).
+			Msg("cannot ValidateHeader for the new block")
 		return ctxerror.New("cannot ValidateHeader for the new block", "blockHash", newBlock.Hash()).WithCause(err)
 	}
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
+		utils.Logger().Error().
+			Uint32("my shard ID", node.Blockchain().ShardID()).
+			Uint32("new block's shard ID", newBlock.ShardID()).
+			Msg("wrong shard ID")
 		return ctxerror.New("wrong shard ID",
 			"my shard ID", node.Blockchain().ShardID(),
 			"new block's shard ID", newBlock.ShardID())
 	}
 	err = node.Blockchain().ValidateNewBlock(newBlock)
 	if err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Int("numTx", len(newBlock.Transactions())).
+			Err(err).
+			Msg("cannot ValidateNewBlock")
 		return ctxerror.New("cannot ValidateNewBlock",
 			"blockHash", newBlock.Hash(),
 			"numTx", len(newBlock.Transactions()),
@@ -285,6 +298,11 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO: move into ValidateNewBlock
 	err = node.verifyIncomingReceipts(newBlock)
 	if err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Int("numIncomingReceipts", len(newBlock.IncomingReceipts())).
+			Err(err).
+			Msg("[VerifyNewBlock] Cannot ValidateNewBlock")
 		return ctxerror.New("[VerifyNewBlock] Cannot ValidateNewBlock", "blockHash", newBlock.Hash(),
 			"numIncomingReceipts", len(newBlock.IncomingReceipts())).WithCause(err)
 	}
@@ -335,9 +353,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		utils.Logger().Info().
 			Uint64("BlockNum", newBlock.NumberU64()).
 			Msg("BINGO !!! Reached Consensus")
-		// Print to normal log too
-		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "BlockNum", newBlock.NumberU64())
-
 		// 15% of the validator also need to do broadcasting
 		rand.Seed(time.Now().UTC().UnixNano())
 		rnd := rand.Intn(100)

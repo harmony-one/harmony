@@ -832,9 +832,6 @@ func (consensus *Consensus) finalizeCommits() {
 		Str("blockHash", block.Hash().String()).
 		Int("index", consensus.Decider.IndexOf(consensus.PubKey)).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
-	// Print to normal log too
-	utils.GetLogInstance().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "BlockNum", block.NumberU64())
-
 	// Send signal to Node so the new block can be added and new round of consensus can be triggered
 	consensus.ReadySignal <- struct{}{}
 }
@@ -965,6 +962,9 @@ func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 	if err != nil || len(lastCommits) < 96 {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
 		if len(msgs) != 1 {
+			utils.Logger().Error().
+				Int("numCommittedMsg", len(msgs)).
+				Msg("GetLastCommitSig failed with wrong number of committed message")
 			return nil, nil, ctxerror.New("GetLastCommitSig failed with wrong number of committed message", "numCommittedMsg", len(msgs))
 		}
 		lastCommits = msgs[0].Payload

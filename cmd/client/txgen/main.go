@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -222,8 +221,7 @@ syncLoop:
 					}
 					stateMutex.Lock()
 					if err := txGen.Worker.UpdateCurrent(block.Coinbase()); err != nil {
-						ctxerror.Warn(utils.GetLogger(), err,
-							"(*Worker).UpdateCurrent failed")
+						utils.Logger().Warn().Err(err).Msg("(*Worker).UpdateCurrent failed")
 					}
 					stateMutex.Unlock()
 					readySignal <- shardID

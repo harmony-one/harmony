@@ -60,7 +60,7 @@ func (fc *fileCache) scan(keyDir string) (mapset.Set, mapset.Set, mapset.Set, er
 		path := filepath.Join(keyDir, fi.Name())
 		// Skip any non-key files from the folder
 		if nonKeyFile(fi) {
-			utils.GetLogger().Trace("Ignoring file on account scan", "path", path)
+			utils.Logger().Debug().Str("path", path).Msg("Ignoring file on account scan")
 			continue
 		}
 		// Gather the set of all and fresly modified files
@@ -85,7 +85,11 @@ func (fc *fileCache) scan(keyDir string) (mapset.Set, mapset.Set, mapset.Set, er
 	t3 := time.Now()
 
 	// Report on the scanning stats and return
-	utils.GetLogger().Debug("FS scan times", "list", t1.Sub(t0), "set", t2.Sub(t1), "diff", t3.Sub(t2))
+	utils.Logger().Debug().
+		Uint64("list", uint64(t1.Sub(t0))).
+		Uint64("set", uint64(t2.Sub(t1))).
+		Uint64("diff", uint64(t3.Sub(t2))).
+		Msg("FS scan times")
 	return creates, deletes, updates, nil
 }
 

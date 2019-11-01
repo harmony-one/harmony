@@ -243,9 +243,10 @@ func (node *Node) Blockchain() *core.BlockChain {
 	shardID := node.NodeConfig.ShardID
 	bc, err := node.shardChains.ShardChain(shardID)
 	if err != nil {
-		err = ctxerror.New("cannot get shard chain", "shardID", shardID).
-			WithCause(err)
-		ctxerror.Log15(utils.GetLogger().Crit, err)
+		utils.Logger().Error().
+			Uint32("shardID", shardID).
+			Err(err).
+			Msg("cannot get shard chain")
 	}
 	return bc
 }
@@ -254,8 +255,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 func (node *Node) Beaconchain() *core.BlockChain {
 	bc, err := node.shardChains.ShardChain(0)
 	if err != nil {
-		err = ctxerror.New("cannot get beaconchain").WithCause(err)
-		ctxerror.Log15(utils.GetLogger().Crit, err)
+		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
 	}
 	return bc
 }
@@ -556,6 +556,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 // CalculateInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
 func (node *Node) CalculateInitShardState() (err error) {
 	if node.Consensus == nil {
+		utils.Logger().Error().Msg("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
 		return ctxerror.New("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
 	}
 	shardID := node.Consensus.ShardID
@@ -571,6 +572,10 @@ func (node *Node) CalculateInitShardState() (err error) {
 		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
 	pubKeys := core.CalculatePublicKeys(epoch, shardID)
 	if len(pubKeys) == 0 {
+		utils.Logger().Error().
+			Uint32("shardID", shardID).
+			Uint64("blockNum", blockNum).
+			Msg("[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys")
 		return ctxerror.New(
 			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",
 			"shardID", shardID,
