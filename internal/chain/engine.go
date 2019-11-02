@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
@@ -184,8 +185,7 @@ func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool)
 	var ss shard.SuperCommittee
 
 	if reCalculate {
-		// core.ShardingSchedule.InstanceForEpoch(h.Epoch())
-		ss = core.CalculateShardState(h.Epoch(), core.GenesisCommitteeAssigner)
+		ss = core.CalculateShardState(h.Epoch(), committee.MemberAssigner)
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -199,6 +199,7 @@ func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool)
 		return 0, errors.Errorf(
 			"cannot find shard %d in shard state", h.ShardID())
 	}
+	// TODO Suspicious about this under stake based epochs
 	return (len(c.NodeList))*2/3 + 1, nil
 }
 
@@ -240,12 +241,13 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 }
 
 // GetPublicKeys finds the public keys of the committee that signed the block header
-func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate bool) ([]*bls.PublicKey, error) {
+func GetPublicKeys(
+	chain engine.ChainReader, header *block.Header, reCalculate bool,
+) ([]*bls.PublicKey, error) {
 	var shardState shard.SuperCommittee
 	var err error
 	if reCalculate {
-		// core.ShardingSchedule.InstanceForEpoch(header.Epoch())
-		shardState = core.CalculateShardState(header.Epoch(), core.GenesisCommitteeAssigner)
+		shardState = core.CalculateShardState(header.Epoch(), committee.MemberAssigner)
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {

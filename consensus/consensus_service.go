@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard/committee"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/rs/zerolog"
 )
@@ -474,7 +475,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	header := consensus.ChainReader.CurrentHeader()
 
 	epoch := header.Epoch()
-	curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID(), core.GenesisCommitteeAssigner)
+	curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID(), committee.GenesisAssigner)
 	consensus.numPrevPubKeys = len(curPubKeys)
 
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
@@ -485,7 +486,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
 		nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		pubKeys = core.CalculatePublicKeys(nextEpoch, header.ShardID(), core.GenesisCommitteeAssigner)
+		pubKeys = core.CalculatePublicKeys(nextEpoch, header.ShardID(), committee.GenesisAssigner)
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
 		pubKeys = curPubKeys

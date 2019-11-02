@@ -33,6 +33,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -564,7 +565,7 @@ func (node *Node) CalculateInitShardState() (err error) {
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
-	pubKeys := core.CalculatePublicKeys(epoch, shardID, core.GenesisCommitteeAssigner)
+	pubKeys := core.CalculatePublicKeys(epoch, shardID, committee.MemberAssigner)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
 			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",

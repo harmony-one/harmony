@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -382,7 +383,7 @@ func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.SuperCommittee {
 	}
 	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
 	return core.CalculateShardState(
-		nextEpoch, core.GenesisCommitteeAssigner,
+		nextEpoch, committee.MemberAssigner,
 	)
 }
 
