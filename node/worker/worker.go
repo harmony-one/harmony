@@ -209,14 +209,6 @@ func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinba
 		return nil, fmt.Errorf("nil staking receipt")
 	}
 
-	err = w.chain.UpdateValidatorList(tx)
-	// keep offchain database consistency with onchain we need revert
-	// but it should not happend unless local database corrupted
-	if err != nil {
-		utils.Logger().Debug().Msgf("oops, UpdateValidatorList failed, err: %+v", err)
-		w.current.state.RevertToSnapshot(snap)
-		return nil, err
-	}
 	w.current.stkingTxs = append(w.current.stkingTxs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	return receipt.Logs, nil

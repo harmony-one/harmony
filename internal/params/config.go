@@ -148,8 +148,7 @@ func (c *ChainConfig) IsCrossTx(epoch *big.Int) bool {
 
 // IsStaking determines whether it is staking epoch
 func (c *ChainConfig) IsStaking(epoch *big.Int) bool {
-	stkEpoch := new(big.Int).Add(c.StakingEpoch, common.Big1)
-	return isForked(stkEpoch, epoch)
+	return isForked(c.StakingEpoch, epoch)
 }
 
 // IsCrossLink returns whether epoch is either equal to the CrossLink fork epoch or greater.

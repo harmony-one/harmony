@@ -1101,6 +1101,19 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		bc.WriteCXReceiptsProofSpent(block.IncomingReceipts())
 	}
 
+	if bc.chainConfig.IsStaking(block.Epoch()) {
+		for _, tx := range block.StakingTransactions() {
+			err = bc.UpdateValidatorList(tx)
+			// keep offchain database consistency with onchain we need revert
+			// but it should not happend unless local database corrupted
+			if err != nil {
+				utils.Logger().Debug().Msgf("oops, UpdateValidatorList failed, err: %+v", err)
+				return NonStatTy, err
+			}
+
+		}
+	}
+
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
 	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
