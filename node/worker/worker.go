@@ -163,14 +163,13 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 
 	// only beaconchain process staking transaction
 	if w.chain.ShardID() != values.BeaconChainShardID {
+		utils.Logger().Warn().Msgf("Invalid shardID: %v", w.chain.ShardID())
 		return nil, nil, nil
 	}
 
-	// TODO: gas pool should be initialized once for both normal and staking transactions
-	// staking transaction share the same gasPool with normal transactions
-	//if w.current.gasPool == nil {
-	//	w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
-	//}
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
+	}
 
 	selected := staking.StakingTransactions{}
 	// TODO: chao add total gas fee checking when needed
@@ -210,10 +209,11 @@ func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinba
 		return nil, fmt.Errorf("nil staking receipt")
 	}
 
-	err = w.chain.UpdateValidatorMap(tx)
+	err = w.chain.UpdateValidatorList(tx)
 	// keep offchain database consistency with onchain we need revert
 	// but it should not happend unless local database corrupted
 	if err != nil {
+		utils.Logger().Debug().Msgf("oops, UpdateValidatorList failed, err: %+v", err)
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
@@ -425,6 +425,8 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
+
+	utils.Logger().Debug().Msgf("hehehe, len stxs: %v", len(block.StakingTransactions()))
 	return block, nil
 }
 

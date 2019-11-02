@@ -271,6 +271,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		return 0, err
 	}
 	msg := st.msg
+
 	sender := vm.AccountRef(msg.From())
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
 

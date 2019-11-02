@@ -42,8 +42,8 @@ const (
 	// Harmony protocol assume beacon chain shard is only place to send
 	// staking, later need to consider logic when beacon chain shard rotates
 	stakingShard        = 0
-	testAccount         = "one1a0x3d6xpmr6f8wsyaxd9v36pytvp48zckswvv9"
-	testBLSPubKey       = "b9486167ab9087ab818dc4ce026edb5bf216863364c32e42df2af03c5ced1ad181e7d12f0e6dd5307a73b62247608611"
+	testAccount         = "one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"
+	testBLSPubKey       = "65f55eb3052f9e9f632b2923be594ba77c55543f5c58ee1454b9cfd658d25e06373b0f7d42a19c84768139ea294f6204"
 	testAccountPassword = ""
 )
 
@@ -53,7 +53,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	ks := keystore.NewKeyStore(keystoreDir, scryptN, scryptP)
 	account := accounts.Account{Address: dAddr}
 	ks.Unlock(account, testAccountPassword)
-	gasPrice := big.NewInt(0)
+	gasPrice := big.NewInt(1)
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
 		p := &bls.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
@@ -85,7 +85,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		// }
 	}
 
-	stakingTx, err := staking.NewStakingTransaction(2, 100, gasPrice, stakePayloadMaker)
+	stakingTx, err := staking.NewStakingTransaction(0, 600000, gasPrice, stakePayloadMaker)
 	if err != nil {
 		return err
 	}
