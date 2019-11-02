@@ -1,6 +1,7 @@
 package node
 
 import (
+	"fmt"
 	"math/big"
 	"sort"
 	"time"
@@ -139,6 +140,8 @@ func (node *Node) proposeShardState(block *types.Block) error {
 	case shard.BeaconChainID:
 		return node.proposeBeaconShardState(block)
 	default:
+		fmt.Println("This should not be happening")
+		// should not be possible - only beaconchain can create new supercommittee
 		return nil
 	}
 }
@@ -150,8 +153,7 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
-	// TODO: add logic for EPoS
-	shardState, err := core.CalculateNewShardState(node.Blockchain(), nextEpoch)
+	shardState, err := core.CalculateNewShardState(node.Blockchain(), nextEpoch, committee.MemberAssigner)
 	if err != nil {
 		return err
 	}

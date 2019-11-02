@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 )
 
 const (
@@ -37,11 +38,12 @@ const (
 // genesisInitializer is a shardchain.DBInitializer adapter.
 type genesisInitializer struct {
 	node *Node
+	committee.Assigner
 }
 
 // InitChainDB sets up a new genesis block in the database for the given shard.
 func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) error {
-	shardState := core.CalculateInitShardState()
+	shardState := gi.InitCommittee(core.ShardingSchedule.InstanceForEpoch(big.NewInt(0)))
 	if shardID != 0 {
 		// store only the local shard for shard chains
 		c := shardState.FindCommitteeByID(shardID)

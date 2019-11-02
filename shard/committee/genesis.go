@@ -1,6 +1,8 @@
 package committee
 
 import (
+	"math/big"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
@@ -9,7 +11,11 @@ import (
 
 type genesisPolicy struct{}
 
-func (genesisPolicy) NextCommittee(s shardingconfig.Instance) shard.SuperCommittee {
+func (g genesisPolicy) NextCommittee(s shardingconfig.Instance, ignored *big.Int) shard.SuperCommittee {
+	return g.InitCommittee(s)
+}
+
+func (genesisPolicy) InitCommittee(s shardingconfig.Instance) shard.SuperCommittee {
 	shardNum := int(s.NumShards())
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 	shardSize := s.NumNodesPerShard()

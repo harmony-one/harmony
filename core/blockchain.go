@@ -46,6 +46,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -1944,7 +1945,7 @@ func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.SuperCommittee, error
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err
 	}
-	shardState, err = CalculateNewShardState(bc, epoch)
+	shardState, err = CalculateNewShardState(bc, epoch, committee.MemberAssigner)
 	if err != nil {
 		return nil, err
 	}

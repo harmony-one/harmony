@@ -26,6 +26,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
@@ -434,7 +435,7 @@ var (
 )
 
 func initGenesisCatalog() {
-	genesisShardState := core.CalculateInitShardState()
+	genesisShardState := committee.GenesisAssigner.InitCommittee(core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch)))
 	for _, committee := range genesisShardState {
 		for i, nodeID := range committee.NodeList {
 			genesisNode := &genesisNode{

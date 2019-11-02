@@ -476,7 +476,7 @@ func New(
 	node.chainConfig = chainConfig
 
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig)
+		chainDBFactory, &genesisInitializer{&node, committee.GenesisAssigner}, chain.Engine, &chainConfig)
 	if isArchival {
 		collection.DisableCache()
 	}
