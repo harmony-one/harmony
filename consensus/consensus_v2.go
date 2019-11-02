@@ -95,16 +95,11 @@ func (consensus *Consensus) announce(block *types.Block) {
 		utils.Logger().Debug().Msg("[Announce] Failed encoding block")
 		return
 	}
-	utils.Logger().Debug().Msgf("haha1, before:%v ", len(block.StakingTransactions()))
 	encodedBlockHeader, err := rlp.EncodeToBytes(block.Header())
 	if err != nil {
 		utils.Logger().Debug().Msg("[Announce] Failed encoding block header")
 		return
 	}
-
-	var blockObj1 types.Block
-	err = rlp.DecodeBytes(encodedBlock, &blockObj1)
-	utils.Logger().Debug().Msgf("haha2, after stks:= %v", len(blockObj1.StakingTransactions()))
 
 	consensus.block = encodedBlock
 	consensus.blockHeader = encodedBlockHeader

@@ -82,9 +82,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare transactions including staking transactions
 	selectedTxs, selectedStakingTxs := node.getTransactionsForNewBlock(coinbase)
-	if len(selectedStakingTxs) > 0 {
-		utils.Logger().Debug().Int("selectedStakingtxs", len(selectedStakingTxs)).Msg("hehe, staking txs proposed")
-	}
 
 	if err := node.Worker.CommitTransactions(selectedTxs, selectedStakingTxs, coinbase); err != nil {
 		ctxerror.Log15(utils.GetLogger().Error,

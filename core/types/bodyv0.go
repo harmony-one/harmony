@@ -7,6 +7,7 @@ import (
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // BodyV0 is the V0 block body
@@ -76,6 +77,13 @@ func (b *BodyV0) SetUncles(newUncle []*block.Header) {
 // IncomingReceipts returns a deep copy of the list of incoming cross-shard
 // transaction receipts of this block.
 func (b *BodyV0) IncomingReceipts() (incomingReceipts CXReceiptsProofs) {
+	return nil
+}
+
+// StakingTransactions returns the list of staking transactions.
+// The returned list is a deep copy; the caller may do anything with it without
+// affecting the original.
+func (b *BodyV0) StakingTransactions() (txs []*staking.StakingTransaction) {
 	return nil
 }
 

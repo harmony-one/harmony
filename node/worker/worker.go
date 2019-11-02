@@ -426,7 +426,6 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 
-	utils.Logger().Debug().Msgf("hehehe, len stxs: %v", len(block.StakingTransactions()))
 	return block, nil
 }
 

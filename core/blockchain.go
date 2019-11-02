@@ -229,14 +229,12 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	// Process block using the parent state as reference point.
 	receipts, cxReceipts, _, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
 	if err != nil {
-		utils.Logger().Info().Msgf("hehe1, usedGas: %v, err: %v", usedGas, err)
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
 
 	err = bc.Validator().ValidateState(block, bc.CurrentBlock(), state, receipts, cxReceipts, usedGas)
 	if err != nil {
-		utils.Logger().Info().Msgf("hehe2, err: %v", err)
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
