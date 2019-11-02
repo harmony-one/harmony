@@ -41,9 +41,11 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
@@ -2345,25 +2347,49 @@ func (bc *BlockChain) UpdateValidatorMap(tx *staking.StakingTransaction) error {
 
 // CurrentValidatorAddresses returns the address of active validators for current epoch
 func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
-	return nil
+	return make([]common.Address, 0)
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch
 func (bc *BlockChain) ValidatorCandidates() []common.Address {
-	return nil
+	return make([]common.Address, 0)
 }
 
 // ValidatorInformation returns the information of validator
 func (bc *BlockChain) ValidatorInformation(addr common.Address) *staking.Validator {
-	return nil
+	commission := staking.Commission{
+		UpdateHeight: big.NewInt(0),
+	}
+	commission.CommissionRates = staking.CommissionRates{
+		Rate:          numeric.Dec{Int: big.NewInt(0)},
+		MaxRate:       numeric.Dec{Int: big.NewInt(0)},
+		MaxChangeRate: numeric.Dec{Int: big.NewInt(0)},
+	}
+	validator := &staking.Validator{
+		Address:           internal_common.ParseAddr("0x0000000000000000000000000000000000000000000000000000000000000000"),
+		SlotPubKeys:       make([]shard.BlsPublicKey, 0),
+		Stake:             big.NewInt(0),
+		UnbondingHeight:   big.NewInt(0),
+		MinSelfDelegation: big.NewInt(0),
+		Active:            false,
+	}
+	validator.Commission = commission
+	validator.Description = staking.Description{
+		Name:            "lol",
+		Identity:        "lol",
+		Website:         "lol",
+		SecurityContact: "lol",
+		Details:         "lol",
+	}
+	return validator
 }
 
 // DelegatorsInformation returns up to date information of delegators of a given validator address
 func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Delegation {
-	return nil
+	return make([]*staking.Delegation, 0)
 }
 
 // ValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
 func (bc *BlockChain) ValidatorStakingWithDelegation(addr common.Address) *big.Int {
-	return nil
+	return big.NewInt(0)
 }

@@ -332,7 +332,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		if request.BlockHash == nil {
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request BlockHash is NIL")
 		}
-		if request.Size == 0 || request.Size > syncing.BatchSize {
+		if request.Size == 0 || request.Size > syncing.SyncLoopBatchSize {
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request contains invalid Size %v", request.Size)
 		}
 		size := uint64(request.Size)
