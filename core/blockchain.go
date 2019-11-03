@@ -41,11 +41,9 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
@@ -2381,32 +2379,16 @@ func (bc *BlockChain) ValidatorCandidates() []common.Address {
 }
 
 // ValidatorInformation returns the information of validator
-func (bc *BlockChain) ValidatorInformation(addr common.Address) *staking.Validator {
-	commission := staking.Commission{
-		UpdateHeight: big.NewInt(0),
+func (bc *BlockChain) ValidatorInformation(addr common.Address) (*staking.Validator, error) {
+	state, err := bc.StateAt(bc.CurrentBlock().Root())
+	if err != nil || state == nil {
+		return nil, err
 	}
-	commission.CommissionRates = staking.CommissionRates{
-		Rate:          numeric.Dec{Int: big.NewInt(0)},
-		MaxRate:       numeric.Dec{Int: big.NewInt(0)},
-		MaxChangeRate: numeric.Dec{Int: big.NewInt(0)},
+	wrapper := state.GetStakingInfo(addr)
+	if wrapper == nil {
+		return nil, fmt.Errorf("ValidatorInformation not found: %v", addr)
 	}
-	validator := &staking.Validator{
-		Address:           internal_common.ParseAddr("0x0000000000000000000000000000000000000000000000000000000000000000"),
-		SlotPubKeys:       make([]shard.BlsPublicKey, 0),
-		Stake:             big.NewInt(0),
-		UnbondingHeight:   big.NewInt(0),
-		MinSelfDelegation: big.NewInt(0),
-		Active:            false,
-	}
-	validator.Commission = commission
-	validator.Description = staking.Description{
-		Name:            "lol",
-		Identity:        "lol",
-		Website:         "lol",
-		SecurityContact: "lol",
-		Details:         "lol",
-	}
-	return validator
+	return &wrapper.Validator, nil
 }
 
 // DelegatorsInformation returns up to date information of delegators of a given validator address

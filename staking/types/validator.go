@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,10 +28,10 @@ var (
 
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
-	Validator           `json:"validator" yaml:"validator"`
-	Delegations         []Delegation `json:"delegations" yaml:"delegations"`
-	SnapshotValidator   *Validator   `json:"snapshot_validator" yaml:"snaphost_validator"`
-	SnapshotDelegations []Delegation `json:"snapshot_delegations" yaml:"snapshot_delegations"`
+	Validator           `json:"validator" yaml:"validator" rlp:"nil"`
+	Delegations         []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
+	SnapshotValidator   *Validator   `json:"snapshot_validator" yaml:"snaphost_validator" rlp:"nil"`
+	SnapshotDelegations []Delegation `json:"snapshot_delegations" yaml:"snapshot_delegations" rlp:"nil"`
 }
 
 // Validator - data fields for a validator
@@ -168,4 +169,18 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		validator.MinSelfDelegation = edit.MinSelfDelegation
 	}
 	return nil
+}
+
+// String returns a human readable string representation of a validator.
+func (v *Validator) String() string {
+	return fmt.Sprintf(`Validator
+  Address:                    %s
+  SlotPubKeys:                %s
+  Stake:                      %s
+  Unbonding Height:           %v
+  Minimum SelfDelegation:     %v
+  Description:                %v
+  Commission:                 %v`, v.Address, v.SlotPubKeys,
+		v.Stake, v.UnbondingHeight,
+		v.MinSelfDelegation, v.Description, v.Commission)
 }
