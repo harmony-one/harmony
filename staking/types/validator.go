@@ -54,6 +54,15 @@ type Validator struct {
 	Description `json:"description" yaml:"description"`
 }
 
+func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
+	str := "["
+	for i, key := range pubKeys {
+		str += fmt.Sprintf("%d: %s,", i, key.Hex())
+	}
+	str += "]"
+	return str
+}
+
 // Description - some possible IRL connections
 type Description struct {
 	Name            string `json:"name" yaml:"name"`                         // name
@@ -180,7 +189,7 @@ func (v *Validator) String() string {
   Unbonding Height:           %v
   Minimum SelfDelegation:     %v
   Description:                %v
-  Commission:                 %v`, v.Address, v.SlotPubKeys,
+  Commission:                 %v`, v.Address.Hex(), printSlotPubKeys(v.SlotPubKeys),
 		v.Stake, v.UnbondingHeight,
 		v.MinSelfDelegation, v.Description, v.Commission)
 }
