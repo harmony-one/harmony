@@ -267,8 +267,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	}
 
 	// Set network type
-	netType := nodeconfig.NetworkType(*networkType)
-	switch netType {
+	switch netType := nodeconfig.NetworkType(*networkType); netType {
 	case nodeconfig.Mainnet, nodeconfig.Testnet,
 		nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
 		nodeconfig.SetNetworkType(netType)
@@ -357,7 +356,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
 	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
-	currentNode.NodeConfig.SetBeaconGroupID(nodeconfig.NewGroupIDByShardID(0))
+	currentNode.NodeConfig.SetBeaconGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainID))
 
 	switch *nodeType {
 	case "explorer":
@@ -366,9 +365,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(*shardID)))
 	case "validator":
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
-		if nodeConfig.ShardID == 0 {
-			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(0))
-			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(0))
+		if nodeConfig.ShardID == shard.BeaconChainID {
+			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainID))
+			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainID))
 		} else {
 			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
@@ -388,7 +387,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// currentNode.DRand = dRand
 
 	// This needs to be executed after consensus and drand are setup
-	if err := currentNode.CalculateInitShardState(); err != nil {
+	if err := currentNode.LoadSuperCommitteeForLatestEpochOnChain(); err != nil {
 		ctxerror.Crit(utils.GetLogger(), err, "CalculateInitShardState failed",
 			"shardID", *shardID)
 	}

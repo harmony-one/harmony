@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -475,7 +476,9 @@ func New(
 	}
 	node.chainConfig = chainConfig
 
+	// TODO actually need to read off the epoch, then pick right committee assigner
 	collection := shardchain.NewCollection(
+		// Here need to hook the creation of the committee assigner & current committee
 		chainDBFactory, &genesisInitializer{&node, committee.GenesisAssigner}, chain.Engine, &chainConfig)
 	if isArchival {
 		collection.DisableCache()
@@ -485,7 +488,6 @@ func New(
 	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensusObj
-
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
@@ -496,7 +498,12 @@ func New(
 		node.recentTxsStats = make(types.RecentTxsStats)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
+
+		// SetCommittee members
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
+
+		// Need to pick the right committee assignment - right
+
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 
 		if node.Blockchain().ShardID() != shard.BeaconChainID {
@@ -509,6 +516,7 @@ func New(
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
+		chain.Engine.SetSuperCommitteeAssigner(committee.AssignerByEpoch(blockchain.CurrentBlock().Epoch()).(committee.Assigner))
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
@@ -550,7 +558,9 @@ func New(
 }
 
 // CalculateInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
-func (node *Node) CalculateInitShardState() (err error) {
+
+// LoadSuperCommitteeForLatestEpochOnChain ..
+func (node *Node) LoadSuperCommitteeForLatestEpochOnChain() (err error) {
 	if node.Consensus == nil {
 		return ctxerror.New("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
 	}
@@ -565,7 +575,11 @@ func (node *Node) CalculateInitShardState() (err error) {
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
-	pubKeys := core.CalculatePublicKeys(epoch, shardID, committee.MemberAssigner)
+	// node.Blockchain().ReadShardState(epoch *big.Int)
+	prev, _ := node.Blockchain().GetShardState(big.NewInt(0).Sub(epoch, big.NewInt(1)))
+	pubKeys := core.CalculatePublicKeys(
+		epoch, shardID, chain.Engine.SuperCommitteeAssigner(), prev,
+	)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
 			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",

@@ -7,12 +7,20 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
+//
+type ShardCommitteeProvider interface {
+	//
+}
+
 // Assigner provides the next committee
 type Assigner interface {
 	NextCommittee(
-		shardingconfig.Instance, *big.Int,
+		config shardingconfig.Instance,
+		newEpoch *big.Int,
+		previous shard.SuperCommittee,
 	) shard.SuperCommittee
 	InitCommittee(s shardingconfig.Instance) shard.SuperCommittee
+	IsInitEpoch(epoch *big.Int) bool
 }
 
 var (

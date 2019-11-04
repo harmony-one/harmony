@@ -124,17 +124,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
 }
 
-func (node *Node) proposeShardStateWithoutBeaconSync(
-	block *types.Block,
-) shard.SuperCommittee {
-	if block == nil || !core.IsEpochLastBlock(block) {
-		return nil
-	}
-
-	nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
-	return core.CalculateShardState(nextEpoch, committee.MemberAssigner)
-}
-
 func (node *Node) proposeShardState(block *types.Block) error {
 	switch node.Consensus.ShardID {
 	case shard.BeaconChainID:

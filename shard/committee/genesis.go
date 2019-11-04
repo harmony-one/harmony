@@ -11,7 +11,21 @@ import (
 
 type genesisPolicy struct{}
 
-func (g genesisPolicy) NextCommittee(s shardingconfig.Instance, ignored *big.Int) shard.SuperCommittee {
+func isHarmonyGenesis(epoch *big.Int) bool {
+	const committeeStartEpoch = 0
+	init := big.NewInt(committeeStartEpoch)
+	return epoch.Cmp(init) == 0
+
+}
+
+func (genesisPolicy) IsInitEpoch(epoch *big.Int) bool {
+	return isHarmonyGenesis(epoch)
+}
+
+func (g genesisPolicy) NextCommittee(
+	s shardingconfig.Instance, ignored *big.Int,
+	prevButalsoIgnored shard.SuperCommittee,
+) shard.SuperCommittee {
 	return g.InitCommittee(s)
 }
 

@@ -68,16 +68,15 @@ type ConfigType struct {
 	group    GroupID // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
 	client   GroupID // the client group ID of the shard
 	isClient bool    // whether this node is a client node, such as wallet
-	isBeacon bool    // whether this node is beacon node doing consensus or not
-	ShardID  uint32  // ShardID of this node; TODO ek – reviisit when resharding
-	role     Role    // Role of the node
-	Port     string  // Port of the node.
-	IP       string  // IP of the node.
+
+	ShardID uint32 // ShardID of this node; TODO ek – reviisit when resharding
+	role    Role   // Role of the node
+	Port    string // Port of the node.
+	IP      string // IP of the node.
 
 	MetricsFlag     bool   // collect and upload metrics flag
 	PushgatewayIP   string // metrics pushgateway prometheus ip
 	PushgatewayPort string // metrics pushgateway prometheus port
-	StringRole      string
 	P2pPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey *bls.SecretKey
 	ConsensusPubKey *bls.PublicKey

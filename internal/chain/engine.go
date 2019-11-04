@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -22,7 +21,8 @@ import (
 )
 
 type engineImpl struct {
-	r reward.Distributor
+	r                 reward.Distributor
+	committeeAssigner committee.Assigner
 }
 
 // Engine is an algorithm-agnostic consensus engine.
@@ -31,7 +31,8 @@ var Engine = newEngine()
 func newEngine() *engineImpl {
 	// Careful, this the nil interface possible issue
 	var d reward.Distributor
-	return &engineImpl{d}
+	var a committee.Assigner
+	return &engineImpl{d, a}
 }
 
 func (e *engineImpl) Rewarder() reward.Distributor {
@@ -145,7 +146,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
+	parentQuorum, err := QuorumForBlock(chain, parentHeader, false, e.committeeAssigner)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
@@ -180,12 +181,24 @@ func (e *engineImpl) Finalize(
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), nil
 }
 
+func (e *engineImpl) SetSuperCommitteeAssigner(assigner committee.Assigner) {
+	e.committeeAssigner = assigner
+}
+
+func (e *engineImpl) SuperCommitteeAssigner() committee.Assigner {
+	return e.committeeAssigner
+}
+
 // QuorumForBlock returns the quorum for the given block header.
-func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool) (quorum int, err error) {
+func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool, assigner committee.Assigner) (quorum int, err error) {
 	var ss shard.SuperCommittee
 
 	if reCalculate {
-		ss = core.CalculateShardState(h.Epoch(), committee.MemberAssigner)
+		// assigner.NextCommittee(ShardingSchedule.InstanceForEpoch(epoch), epoch, previous)
+		// mem := assigner.IsInitEpoch(h.Epoch())
+		// ss, oops := chain.ReadShardState(h.Epoch())
+		// core.CalculateShardState(epoch *big.Int, assign committee.Assigner, previous shard.SuperCommittee)
+		// ss = core.CalculateShardState(h.Epoch(), committee.MemberAssigner, chain)
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -220,7 +233,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 	}
 
 	hash := header.Hash()
-	quorum, err := QuorumForBlock(chain, header, reCalculate)
+	quorum, err := QuorumForBlock(chain, header, reCalculate, e.committeeAssigner)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
@@ -247,7 +260,10 @@ func GetPublicKeys(
 	var shardState shard.SuperCommittee
 	var err error
 	if reCalculate {
-		shardState = core.CalculateShardState(header.Epoch(), committee.MemberAssigner)
+		// TODO come back to this - don't remember what was right
+		currentCommittee, _ := chain.ReadShardState(header.Epoch())
+		shardState = currentCommittee
+		// shardState = core.CalculateShardState(header.Epoch(), committee.MemberAssigner, )
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {

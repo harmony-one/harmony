@@ -9,7 +9,17 @@ import (
 
 type mixedPolicy struct{}
 
-func (m mixedPolicy) NextCommittee(s shardingconfig.Instance, ignored *big.Int) shard.SuperCommittee {
+func (mixedPolicy) IsInitEpoch(epoch *big.Int) bool {
+	// Keep this const locally scoped
+	const committeeStartEpoch = 50
+	init := big.NewInt(committeeStartEpoch)
+	return epoch.Cmp(init) == 0
+}
+
+func (m mixedPolicy) NextCommittee(
+	s shardingconfig.Instance, ignored *big.Int,
+	prevButalsoIgnored shard.SuperCommittee,
+) shard.SuperCommittee {
 	return m.InitCommittee(s)
 }
 

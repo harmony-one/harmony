@@ -27,12 +27,14 @@ func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
 func CalculateNewShardState(
 	bc *BlockChain, epoch *big.Int, assign committee.Assigner,
 ) (shard.SuperCommittee, error) {
-	if init := big.NewInt(GenesisEpoch); epoch.Cmp(init) == 0 {
-		return assign.InitCommittee(ShardingSchedule.InstanceForEpoch(init)), nil
+	if assign.IsInitEpoch(epoch) {
+		return assign.InitCommittee(ShardingSchedule.InstanceForEpoch(epoch)), nil
 	}
 	prevEpoch := new(big.Int).Sub(epoch, common.Big1)
 
-	nextSuperCommittee := assign.NextCommittee(ShardingSchedule.InstanceForEpoch(epoch), prevEpoch)
+	prevSuperCommittee, _ := bc.ReadShardState(prevEpoch)
+
+	nextSuperCommittee := assign.NextCommittee(ShardingSchedule.InstanceForEpoch(epoch), prevEpoch, prevSuperCommittee)
 	if nextSuperCommittee == nil {
 		// TODO make nextcommittee return error
 		return nil, ctxerror.New("cannot retrieve previous sharding state")
@@ -54,14 +56,14 @@ var (
 // CalculateShardState returns the shard state based on epoch number
 // This api for getting shard state is what should be used to get shard state regardless of
 // current chain dependency (ex. getting shard state from block header received during cross-shard transaction)
-func CalculateShardState(epoch *big.Int, assign committee.Assigner) shard.SuperCommittee {
+func CalculateShardState(epoch *big.Int, assign committee.Assigner, previous shard.SuperCommittee) shard.SuperCommittee {
 	utils.Logger().Info().Int64("epoch", epoch.Int64()).Msg("Get Shard State of Epoch.")
-	return assign.NextCommittee(ShardingSchedule.InstanceForEpoch(epoch), epoch)
+	return assign.NextCommittee(ShardingSchedule.InstanceForEpoch(epoch), epoch, previous)
 }
 
 // CalculatePublicKeys returns the publickeys given epoch and shardID
-func CalculatePublicKeys(epoch *big.Int, shardID uint32, assign committee.Assigner) []*bls.PublicKey {
-	shardState := CalculateShardState(epoch, assign)
+func CalculatePublicKeys(epoch *big.Int, shardID uint32, assign committee.Assigner, previous shard.SuperCommittee) []*bls.PublicKey {
+	shardState := CalculateShardState(epoch, assign, previous)
 	// Update validator public keys
 	subCommittee := shardState.FindCommitteeByID(shardID)
 

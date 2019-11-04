@@ -11,9 +11,10 @@ const (
 
 // StakeKeeper ..
 type StakeKeeper interface {
+	// Activity
 	Inventory() struct {
 		BLSPublicKeys         [][48]byte    `json:"bls_pubkey"`
 		WithDelegationApplied []numeric.Dec `json:"with-delegation-applied,omitempty"`
-		CurrentlyActive       []bool
+		// CurrentlyActive       []bool
 	}
 }

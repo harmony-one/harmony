@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -77,6 +78,10 @@ type Engine interface {
 	Rewarder() reward.Distributor
 
 	SetRewarder(reward.Distributor)
+
+	SuperCommitteeAssigner() committee.Assigner
+
+	SetSuperCommitteeAssigner(committee.Assigner)
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.

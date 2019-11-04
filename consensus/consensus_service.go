@@ -475,7 +475,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	header := consensus.ChainReader.CurrentHeader()
 
 	epoch := header.Epoch()
-	curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID(), committee.GenesisAssigner)
+	currentSuperCommittee, _ := consensus.ChainReader.ReadShardState(epoch)
+	curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID(), committee.GenesisAssigner, currentSuperCommittee)
 	consensus.numPrevPubKeys = len(curPubKeys)
 
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
@@ -486,7 +487,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
 		nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		pubKeys = core.CalculatePublicKeys(nextEpoch, header.ShardID(), committee.GenesisAssigner)
+		pubKeys = core.CalculatePublicKeys(nextEpoch, header.ShardID(), committee.GenesisAssigner, currentSuperCommittee)
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
 		pubKeys = curPubKeys
@@ -532,6 +533,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	// not in committee
 	return Listening
 }
+
+// TODO
+// Need to factor into committee
 
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key

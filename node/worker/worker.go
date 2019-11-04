@@ -382,9 +382,8 @@ func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.SuperCommittee {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
-	return core.CalculateShardState(
-		nextEpoch, committee.MemberAssigner,
-	)
+	currentSuperCommittee, _ := w.chain.ReadShardState(w.current.header.Epoch())
+	return core.CalculateShardState(nextEpoch, committee.MemberAssigner, currentSuperCommittee)
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
