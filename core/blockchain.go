@@ -2344,6 +2344,7 @@ func (bc *BlockChain) UpdateValidatorList(tx *staking.StakingTransaction) error 
 	switch tx.StakingType() {
 	case staking.DirectiveCreateValidator:
 		createValidator := decodePayload.(*staking.CreateValidator)
+		// TODO: batch add validator list instead of one by one
 		list, err := bc.ReadValidatorList()
 		if err != nil {
 			return err
