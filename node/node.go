@@ -406,7 +406,7 @@ func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Tra
 		Int("remainPending", len(node.pendingStakingTransactions)).
 		Int("selected", len(unselectedStaking)).
 		Int("invalidDiscarded", len(invalidStaking)).
-		Msg("Selecting Transactions")
+		Msg("Selecting Staking Transactions")
 
 	return selected, selectedStaking
 }

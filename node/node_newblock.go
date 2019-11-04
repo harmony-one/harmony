@@ -120,7 +120,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 				WithCause(err))
 		return nil, err
 	}
-
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
 }
 

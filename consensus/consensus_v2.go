@@ -407,10 +407,12 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		msg := &msg_pb.Message{}
 		_ = protobuf.Unmarshal(msgPayload, msg)
 		FBFTMsg, err := ParseFBFTMessage(msg)
+
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("[OnPrepare] Unable to parse pbft message")
 			return
 		}
+
 		consensus.FBFTLog.AddMessage(FBFTMsg)
 		// Leader add commit phase signature
 		blockNumHash := make([]byte, 8)

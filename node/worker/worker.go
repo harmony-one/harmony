@@ -163,16 +163,16 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 
 	// only beaconchain process staking transaction
 	if w.chain.ShardID() != values.BeaconChainShardID {
+		utils.Logger().Warn().Msgf("Invalid shardID: %v", w.chain.ShardID())
 		return nil, nil, nil
 	}
 
-	// TODO: gas pool should be initialized once for both normal and staking transactions
-	// staking transaction share the same gasPool with normal transactions
-	//if w.current.gasPool == nil {
-	//	w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
-	//}
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
+	}
 
 	selected := staking.StakingTransactions{}
+	// TODO: chao add total gas fee checking when needed
 	unselected := staking.StakingTransactions{}
 	invalid := staking.StakingTransactions{}
 	for _, tx := range txs {
@@ -193,7 +193,6 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 		w.current.header.GasUsed()).Msg("[SelectStakingTransaction] Block gas limit and usage info")
 
 	return selected, unselected, invalid
-
 }
 
 func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinbase common.Address) ([]*types.Log, error) {
@@ -210,13 +209,6 @@ func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinba
 		return nil, fmt.Errorf("nil staking receipt")
 	}
 
-	err = w.chain.UpdateValidatorMap(tx)
-	// keep offchain database consistency with onchain we need revert
-	// but it should not happend unless local database corrupted
-	if err != nil {
-		w.current.state.RevertToSnapshot(snap)
-		return nil, err
-	}
 	w.current.stkingTxs = append(w.current.stkingTxs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	return receipt.Logs, nil
@@ -268,9 +260,14 @@ func (w *Worker) CommitTransactions(txs types.Transactions, stakingTxns staking.
 
 		}
 	}
-	for _, stakingTx := range stakingTxns {
-		_ = stakingTx
-		// TODO: add logic to commit staking txns
+	for _, tx := range stakingTxns {
+		snap := w.current.state.Snapshot()
+		_, err := w.commitStakingTransaction(tx, coinbase)
+		if err != nil {
+			w.current.state.RevertToSnapshot(snap)
+			return err
+
+		}
 	}
 	return nil
 }
@@ -420,6 +417,7 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
+
 	return block, nil
 }
 
