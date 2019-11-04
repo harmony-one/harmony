@@ -46,12 +46,16 @@ type Validator struct {
 	UnbondingHeight *big.Int `json:"unbonding_height" yaml:"unbonding_height"`
 	// validator's self declared minimum self delegation
 	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
+	// maximum total delgation allowed
+	MaxTotalDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
 	// Is the validator active in the validating process or not
 	Active bool `json:"active" yaml:"active"`
 	// commission parameters
 	Commission `json:"commission" yaml:"commission"`
 	// description for the validator
 	Description `json:"description" yaml:"description"`
+	// CreationHeight is the height of creation
+	CreationHeight *big.Int `json:"creation_height" yaml:"creation_height"`
 }
 
 func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
@@ -153,12 +157,13 @@ func CreateValidatorFromNewMsg(val *CreateValidator) (*Validator, error) {
 	pubKeys := []shard.BlsPublicKey{}
 	pubKeys = append(pubKeys, val.SlotPubKeys...)
 	v := Validator{val.ValidatorAddress, pubKeys,
-		val.Amount, new(big.Int), val.MinSelfDelegation, false,
-		commission, desc}
+		val.Amount, new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
+		commission, desc, big.NewInt(0)}
 	return &v, nil
 }
 
 // UpdateValidatorFromEditMsg updates validator from EditValidator message
+// TODO check the validity of the fields of edit message
 func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error {
 	if validator.Address != edit.ValidatorAddress {
 		return errAddressNotMatch
@@ -172,10 +177,40 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 
 	if edit.CommissionRate != nil {
 		validator.Rate = *edit.CommissionRate
+		if err != nil {
+			return err
+		}
+		//TODO update other rates
 	}
 
 	if edit.MinSelfDelegation != nil {
 		validator.MinSelfDelegation = edit.MinSelfDelegation
+	}
+
+	if edit.MaxTotalDelegation != nil {
+		validator.MaxTotalDelegation = edit.MaxTotalDelegation
+	}
+
+	if edit.SlotKeyToAdd != nil {
+		for _, key := range validator.SlotPubKeys {
+			if key == *edit.SlotKeyToAdd {
+				break
+			}
+			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
+		}
+	}
+
+	if edit.SlotKeyToRemove != nil {
+		index := -1
+		for i, key := range validator.SlotPubKeys {
+			if key == *edit.SlotKeyToRemove {
+				index = i
+			}
+		}
+		// we found key to be removed
+		if index >= 0 {
+			validator.SlotPubKeys = append(validator.SlotPubKeys[:index], validator.SlotPubKeys[index+1:]...)
+		}
 	}
 	return nil
 }

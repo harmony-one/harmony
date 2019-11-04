@@ -22,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -52,6 +51,7 @@ var (
 	name    = "NewName"
 	index   = 0
 	minDele = 777
+	rate    = "0.0"
 
 	testAccounts = []string{
 		"one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy",
@@ -74,6 +74,10 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		p.DeserializeHexStr(testBLSPubKeys[index])
 		pub := shard.BlsPublicKey{}
 		pub.FromLibBLSPublicKey(p)
+
+		ra, _ := numeric.NewDecFromStr("27.27")
+		maxRate, _ := numeric.NewDecFromStr("150.99")
+		maxChangeRate, _ := numeric.NewDecFromStr("0.5")
 		if cmdType == "create" {
 			return staking.DirectiveCreateValidator, staking.CreateValidator{
 				Description: &staking.Description{
@@ -84,9 +88,9 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 					Details:         "blah blah blah",
 				},
 				CommissionRates: staking.CommissionRates{
-					Rate:          numeric.NewDec(100),
-					MaxRate:       numeric.NewDec(150),
-					MaxChangeRate: numeric.NewDec(5),
+					Rate:          ra,
+					MaxRate:       maxRate,
+					MaxChangeRate: maxChangeRate,
 				},
 				MinSelfDelegation:  big.NewInt(10),
 				MaxTotalDelegation: big.NewInt(3000),
@@ -106,11 +110,13 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 			}
 		*/
 
+		newRate, _ := numeric.NewDecFromStr(rate)
 		return staking.DirectiveEditValidator, staking.EditValidator{
 			Description: &staking.Description{
 				Name: name,
 			},
 			MinSelfDelegation: big.NewInt(int64(minDele)),
+			CommissionRate:    &newRate,
 			ValidatorAddress:  common.Address(dAddr),
 		}
 	}
@@ -189,8 +195,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cmdType, "type", "t", "create", "type of commands: create|edit")
 	rootCmd.PersistentFlags().StringVarP(&name, "name", "m", "ANewName", "Name of Validator")
 	rootCmd.PersistentFlags().IntVarP(&minDele, "minDele", "d", 666, "MinSelfDelegation Fee")
+	rootCmd.PersistentFlags().StringVarP(&rate, "rate", "r", "22.22", "Commision Rate")
 
-	viper.BindPFlag("nonce", rootCmd.PersistentFlags().Lookup("nonce"))
 	rootCmd.AddCommand(&cobra.Command{
 		Use:               "staking-iterate",
 		Short:             "run through staking process",

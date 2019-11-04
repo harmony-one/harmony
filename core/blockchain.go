@@ -2370,12 +2370,36 @@ func (bc *BlockChain) UpdateValidatorList(tx *staking.StakingTransaction) error 
 
 // CurrentValidatorAddresses returns the address of active validators for current epoch
 func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
-	return make([]common.Address, 0)
+	list, err := bc.ReadValidatorList()
+	if err != nil {
+		return make([]common.Address, 0)
+	}
+
+	currentEpoch := bc.CurrentBlock().Epoch()
+
+	filtered := []common.Address{}
+	for _, addr := range list {
+		val, err := bc.ValidatorInformation(addr)
+		if err != nil {
+			continue
+		}
+		epoch := ShardingSchedule.CalcEpochNumber(val.CreationHeight.Uint64())
+		if epoch.Cmp(currentEpoch) >= 0 {
+			// wait for next epoch
+			continue
+		}
+		filtered = append(filtered, addr)
+	}
+	return filtered
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch
 func (bc *BlockChain) ValidatorCandidates() []common.Address {
-	return make([]common.Address, 0)
+	list, err := bc.ReadValidatorList()
+	if err != nil {
+		return make([]common.Address, 0)
+	}
+	return list
 }
 
 // ValidatorInformation returns the information of validator

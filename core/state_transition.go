@@ -335,6 +335,7 @@ func (st *StateTransition) applyCreateValidatorTx(nv *staking.CreateValidator, b
 		return err
 	}
 	v.UpdateHeight = blockNum
+	v.CreationHeight = blockNum
 	wrapper := staking.ValidatorWrapper{*v, nil, nil, nil}
 	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
 		return err
@@ -348,10 +349,16 @@ func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, block
 		return errValidatorNotExist
 	}
 	wrapper := st.state.GetStakingInfo(ev.ValidatorAddress)
+
+	oldRate := wrapper.Validator.Rate
 	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, ev); err != nil {
 		return err
 	}
-	wrapper.Validator.UpdateHeight = blockNum
+	newRate := wrapper.Validator.Rate
+	// update the commision rate change height
+	if oldRate.IsNil() || (!newRate.IsNil() && !oldRate.Equal(newRate)) {
+		wrapper.Validator.UpdateHeight = blockNum
+	}
 	if err := st.state.UpdateStakingInfo(ev.ValidatorAddress, wrapper); err != nil {
 		return err
 	}
