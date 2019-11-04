@@ -229,8 +229,8 @@ beta)
   ;;
 pangaea)
   bootnodes=(
-    /ip4/54.86.126.90/tcp/9889/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/52.40.84.2/tcp/9889/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
+    /ip4/54.218.73.167/tcp/9876/p2p/QmWBVCPXQmc2ULigm3b9ayCZa15gj25kywiQQwPhHCZeXj
+    /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
   )
   REL=pangaea
   network_type=pangaea
