@@ -217,7 +217,12 @@ main)
   network_type=mainnet
   dns_zone=t.hmny.io
   ;;
-pangaea)
+beta|pangaea)
+  case "${network}" in
+  beta)
+    msg "WARNING: -N beta has been deprecated and will be removed in a future release; please use -N pangaea instead."
+    ;;
+  esac
   bootnodes=(
     /ip4/54.218.73.167/tcp/9876/p2p/QmWBVCPXQmc2ULigm3b9ayCZa15gj25kywiQQwPhHCZeXj
     /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
