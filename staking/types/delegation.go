@@ -2,9 +2,10 @@ package types
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
-	"github.com/harmony-one/harmony/internal/common"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 var (
@@ -69,4 +70,10 @@ func (d *Delegation) DeleteEntry(epoch *big.Int) {
 	if entries != nil {
 		d.Entries = entries
 	}
+}
+
+// String
+func (d *Delegation) String() string {
+	return fmt.Sprintf(`(DelegatorAddress: %s, Amount: %s)`,
+		d.DelegatorAddress, d.Amount)
 }

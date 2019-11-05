@@ -228,3 +228,20 @@ func (v *Validator) String() string {
 		v.Stake, v.UnbondingHeight,
 		v.MinSelfDelegation, v.Description, v.Commission)
 }
+
+// String
+func (w *ValidatorWrapper) String() string {
+	return fmt.Sprintf(`ValidatorWrapper
+      Validator:                %s
+	  Delegations:              %s`,
+		w.Validator, printDelegations(w.Delegations))
+}
+
+func printDelegations(dele []Delegation) string {
+	str := "["
+	for i, item := range dele {
+		str += fmt.Sprintf("%d: %s,", i, item)
+	}
+	str += "]"
+	return str
+}

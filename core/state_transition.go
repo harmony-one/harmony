@@ -34,6 +34,9 @@ var (
 	errInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
 	errValidatorExist            = errors.New("staking validator address already exists")
 	errValidatorNotExist         = errors.New("staking validator address does not exist")
+	errInvalidAmount             = errors.New("staking amount is invalid")
+	errInvalidAddress            = errors.New("staking address is invalid")
+	errWrapperNotExist           = errors.New("staking wrapper object does not exit")
 )
 
 /*
@@ -349,6 +352,9 @@ func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, block
 		return errValidatorNotExist
 	}
 	wrapper := st.state.GetStakingInfo(ev.ValidatorAddress)
+	if wrapper == nil {
+		return errWrapperNotExist
+	}
 
 	oldRate := wrapper.Validator.Rate
 	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, ev); err != nil {
@@ -366,6 +372,31 @@ func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, block
 }
 
 func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
+	if delegate.Amount == nil {
+		return errInvalidAmount
+	}
+	if delegate.DelegatorAddress == (common.Address{}) {
+		return errInvalidAddress
+	}
+	if !st.state.IsValidator(delegate.ValidatorAddress) {
+		return errValidatorNotExist
+	}
+	wrapper := st.state.GetStakingInfo(delegate.ValidatorAddress)
+	if wrapper == nil {
+		return errWrapperNotExist
+	}
+	for i := range wrapper.Delegations {
+		if wrapper.Delegations[i].DelegatorAddress == delegate.DelegatorAddress {
+			wrapper.Delegations[i].Amount.Add(wrapper.Delegations[i].Amount, delegate.Amount)
+			return nil
+		}
+	}
+
+	wrapper.Delegations = append(wrapper.Delegations, staking.Delegation{delegate.DelegatorAddress, delegate.Amount, nil})
+
+	if err := st.state.UpdateStakingInfo(delegate.ValidatorAddress, wrapper); err != nil {
+		return err
+	}
 	return nil
 }
 
