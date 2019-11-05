@@ -292,12 +292,20 @@ verify_checksum() {
 }
 
 download_binaries() {
-   local outdir
+   local outdir status
    ${do_not_download} && return 0
    outdir="${1:-.}"
    mkdir -p "${outdir}"
    for bin in "${BIN[@]}"; do
-      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
+      status=0
+      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || status=$?
+      case "${status}" in
+      0) ;;
+      *)
+         msg "cannot download ${bin} (status ${status})"
+         return ${status}
+         ;;
+      esac
       verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
       msg "downloaded ${bin}"
    done
