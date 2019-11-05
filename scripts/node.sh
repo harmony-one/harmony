@@ -223,7 +223,7 @@ pangaea)
     /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
   )
   REL=pangaea
-  network_type=pangaea
+  network_type=testnet
   dns_zone=p.hmny.io
   ;;
 *)
