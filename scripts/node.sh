@@ -294,7 +294,7 @@ verify_checksum() {
 download_binaries() {
    local outdir status
    ${do_not_download} && return 0
-   outdir="${1:-.}"
+   outdir="${1}"
    mkdir -p "${outdir}"
    for bin in "${BIN[@]}"; do
       status=0
@@ -452,7 +452,7 @@ esac
 any_new_binaries() {
    local outdir
    ${do_not_download} && return 0
-   outdir="${1:-.}"
+   outdir="${1}"
    mkdir -p "${outdir}"
    curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
    if diff $outdir/md5sum.txt.new md5sum.txt
@@ -464,11 +464,11 @@ any_new_binaries() {
    fi
 }
 
-if any_new_binaries
+if any_new_binaries .
 then
    msg "binaries did not change"
 else
-   download_binaries || err 69 "initial node software update failed"
+   download_binaries . || err 69 "initial node software update failed"
 fi
 
 NODE_PORT=9000
