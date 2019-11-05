@@ -23,7 +23,7 @@ func ReturnWithPagination(hashes []common.Hash, args TxHistoryArgs) []common.Has
 	if args.PageSize > 0 {
 		pageSize = args.PageSize
 	}
-	if pageSize*pageIndex >= len(hashes) {
+	if pageIndex < 0 || pageSize*pageIndex >= len(hashes) {
 		return make([]common.Hash, 0)
 	}
 	if pageSize*pageIndex+pageSize > len(hashes) {
