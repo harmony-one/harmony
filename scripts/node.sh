@@ -249,11 +249,9 @@ fi
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/darwin-x86_64/$REL/
-   BIN=( harmony libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib md5sum.txt )
 fi
 if [ "$OS" == "Linux" ]; then
    FOLDER=release/linux-x86_64/$REL/
-   BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
 fi
 
 extract_checksum() {
@@ -296,7 +294,7 @@ download_binaries() {
    ${do_not_download} && return 0
    outdir="${1}"
    mkdir -p "${outdir}"
-   for bin in "${BIN[@]}"; do
+   for bin in $(cut -c35- "${outdir}/md5sum.txt"); do
       status=0
       curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || status=$?
       case "${status}" in
@@ -310,7 +308,7 @@ download_binaries() {
       msg "downloaded ${bin}"
    done
    chmod +x "${outdir}/harmony"
-   (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
+   (cd "${outdir}" && exec openssl sha256 $(cut -c35- md5sum.txt)) > "${outdir}/harmony-checksums.txt"
 }
 
 check_free_disk() {
@@ -607,7 +605,7 @@ kill_node() {
          continue
       fi
       msg "binaries changed; moving from staging into main"
-      (cd staging; exec mv harmony-checksums.txt "${BIN[@]}" ..) || continue
+      (cd staging; exec mv harmony-checksums.txt $(cut -c35- md5sum.txt) ..) || continue
       msg "binaries updated, killing node to restart"
       kill_node
    done
