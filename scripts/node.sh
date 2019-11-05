@@ -217,23 +217,18 @@ main)
   network_type=mainnet
   dns_zone=t.hmny.io
   ;;
-beta)
+beta|pangaea)
+  case "${network}" in
+  beta)
+    msg "WARNING: -N beta has been deprecated and will be removed in a future release; please use -N pangaea instead."
+    ;;
+  esac
   bootnodes=(
-    /ip4/54.213.43.194/tcp/9868/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
-    /ip4/100.26.90.187/tcp/9868/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/13.113.101.219/tcp/12018/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
-  )
-  REL=testnet
-  network_type=testnet
-  dns_zone=b.hmny.io
-  ;;
-pangaea)
-  bootnodes=(
-    /ip4/54.86.126.90/tcp/9889/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/52.40.84.2/tcp/9889/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
+    /ip4/54.218.73.167/tcp/9876/p2p/QmWBVCPXQmc2ULigm3b9ayCZa15gj25kywiQQwPhHCZeXj
+    /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
   )
   REL=pangaea
-  network_type=pangaea
+  network_type=testnet
   dns_zone=p.hmny.io
   ;;
 *)
@@ -254,11 +249,9 @@ fi
 
 if [ "$OS" == "Darwin" ]; then
    FOLDER=release/darwin-x86_64/$REL/
-   BIN=( harmony libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib md5sum.txt )
 fi
 if [ "$OS" == "Linux" ]; then
    FOLDER=release/linux-x86_64/$REL/
-   BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
 fi
 
 extract_checksum() {
@@ -297,17 +290,25 @@ verify_checksum() {
 }
 
 download_binaries() {
-   local outdir
+   local outdir status
    ${do_not_download} && return 0
-   outdir="${1:-.}"
+   outdir="${1}"
    mkdir -p "${outdir}"
-   for bin in "${BIN[@]}"; do
-      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
+   for bin in $(cut -c35- "${outdir}/md5sum.txt"); do
+      status=0
+      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || status=$?
+      case "${status}" in
+      0) ;;
+      *)
+         msg "cannot download ${bin} (status ${status})"
+         return ${status}
+         ;;
+      esac
       verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
       msg "downloaded ${bin}"
    done
    chmod +x "${outdir}/harmony"
-   (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
+   (cd "${outdir}" && exec openssl sha256 $(cut -c35- md5sum.txt)) > "${outdir}/harmony-checksums.txt"
 }
 
 check_free_disk() {
@@ -402,8 +403,13 @@ download_harmony_db_file() {
 }
 
 if ${download_only}; then
-   download_binaries staging || err 69 "download node software failed"
-   msg "downloaded files are in staging direectory"
+   if any_new_binaries staging
+   then
+      msg "binaries did not change in staging"
+   else
+      download_binaries staging || err 69 "download node software failed"
+      msg "downloaded files are in staging direectory"
+   fi
    exit 0
 fi
 
@@ -449,7 +455,7 @@ esac
 any_new_binaries() {
    local outdir
    ${do_not_download} && return 0
-   outdir="${1:-.}"
+   outdir="${1}"
    mkdir -p "${outdir}"
    curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
    if diff $outdir/md5sum.txt.new md5sum.txt
@@ -461,11 +467,11 @@ any_new_binaries() {
    fi
 }
 
-if any_new_binaries
+if any_new_binaries .
 then
    msg "binaries did not change"
 else
-   download_binaries || err 69 "initial node software update failed"
+   download_binaries . || err 69 "initial node software update failed"
 fi
 
 NODE_PORT=9000
@@ -604,7 +610,7 @@ kill_node() {
          continue
       fi
       msg "binaries changed; moving from staging into main"
-      (cd staging; exec mv harmony-checksums.txt "${BIN[@]}" ..) || continue
+      (cd staging; exec mv harmony-checksums.txt $(cut -c35- md5sum.txt) ..) || continue
       msg "binaries updated, killing node to restart"
       kill_node
    done
