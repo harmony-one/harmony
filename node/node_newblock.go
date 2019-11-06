@@ -5,6 +5,8 @@ import (
 	"sort"
 	"time"
 
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -80,10 +82,20 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	coinbase := node.Consensus.SelfAddress
 
-	// Prepare transactions including staking transactions
-	selectedTxs, selectedStakingTxs := node.getTransactionsForNewBlock(coinbase)
+	// Prepare transactions including staking transactions\
+	pending, err := node.TxPool.Pending()
+	if err != nil {
+		utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
+		return nil, err
+	}
 
-	if err := node.Worker.CommitTransactions(selectedTxs, selectedStakingTxs, coinbase); err != nil {
+	// TODO: integrate staking transaction into tx pool
+	pendingStakingTransactions := types2.StakingTransactions{}
+	for _, tx := range node.pendingStakingTransactions {
+		pendingStakingTransactions = append(pendingStakingTransactions, tx)
+	}
+
+	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase); err != nil {
 		ctxerror.Log15(utils.GetLogger().Error,
 			ctxerror.New("cannot commit transactions").
 				WithCause(err))
