@@ -79,9 +79,9 @@ type Engine interface {
 
 	SetRewarder(reward.Distributor)
 
-	SuperCommitteeAssigner() committee.Members
+	SuperCommitteeAssigner() committee.MemberReader
 
-	SetSuperCommitteeAssigner(committee.Members)
+	SetSuperCommitteeAssigner(committee.MemberReader)
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.

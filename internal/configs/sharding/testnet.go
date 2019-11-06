@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/common/denominations"
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -123,4 +122,4 @@ var testnetReshardingEpoch = []*big.Int{
 	big.NewInt(0),
 }
 
-var testnetV0 = MustNewInstance(3, 100, 80, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, quorum.SuperMajorityVote)
+var testnetV0 = MustNewInstance(3, 100, 80, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, Genesis)

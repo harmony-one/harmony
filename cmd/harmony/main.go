@@ -431,7 +431,6 @@ func main() {
 		printVersion()
 	}
 
-	fmt.Printf("nettype: %s\n", *networkType)
 	switch *networkType {
 	case nodeconfig.Mainnet:
 		shard.Schedule = shardingconfig.MainnetSchedule
@@ -449,7 +448,7 @@ func main() {
 		devnetConfig, err := shardingconfig.NewInstance(
 			uint32(*devnetNumShards), *devnetShardSize,
 			*devnetHarmonySize, genesis.HarmonyAccounts,
-			genesis.FoundationalNodeAccounts, nil, stringToPolicy(*quorumPolicy),
+			genesis.FoundationalNodeAccounts, nil, shardingconfig.Genesis,
 		)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",

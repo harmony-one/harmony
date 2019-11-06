@@ -1,7 +1,6 @@
 package committee
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -20,8 +19,8 @@ type PublicKeys interface {
 	ReadPublicKeys(*big.Int) []*bls.PublicKey
 }
 
-// Members ..
-type Members interface {
+// MemberReader ..
+type MemberReader interface {
 	PublicKeys
 	MembershipList
 }
@@ -30,11 +29,12 @@ type partialStakingEnabled struct{}
 
 var (
 	// IncorporatingStaking ..
-	IncorporatingStaking Members = partialStakingEnabled{}
+	IncorporatingStaking MemberReader = partialStakingEnabled{}
+	// Genesis is the committee used at initial creation of Harmony blockchain
+	Genesis = preStakingEnabledCommittee(shard.Schedule.InstanceForEpoch(big.NewInt(0)))
 )
 
-func genesisCommittee() shard.SuperCommittee {
-	s := shard.Schedule.InstanceForEpoch(big.NewInt(0))
+func preStakingEnabledCommittee(s shardingconfig.Instance) shard.SuperCommittee {
 	shardNum := int(s.NumShards())
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 	shardSize := s.NumNodesPerShard()
@@ -76,7 +76,7 @@ func genesisCommittee() shard.SuperCommittee {
 }
 
 func (def partialStakingEnabled) ReadPublicKeys(epoch *big.Int) []*bls.PublicKey {
-	switch shard.Schedule.InstanceForEpoch(epoch).SuperCommittee().(type) {
+	switch instance := shard.Schedule.InstanceForEpoch(epoch); instance.SuperCommittee() {
 	case shardingconfig.Genesis:
 		return nil
 	case shardingconfig.PartiallyOpenStake:
@@ -85,15 +85,14 @@ func (def partialStakingEnabled) ReadPublicKeys(epoch *big.Int) []*bls.PublicKey
 	return nil
 }
 
-// ReadGenesis returns the supercommittee used until staking
+// Read returns the supercommittee used until staking
 // was enabled, previously called CalculateInitShardState
+// Pass as well the chainReader?
 func (def partialStakingEnabled) Read(epoch *big.Int) shard.SuperCommittee {
-	switch shard.Schedule.InstanceForEpoch(epoch).SuperCommittee().(type) {
+	switch instance := shard.Schedule.InstanceForEpoch(epoch); instance.SuperCommittee() {
 	case shardingconfig.Genesis:
-		fmt.Println("calling genesis")
-		return genesisCommittee()
+		return preStakingEnabledCommittee(instance)
 	case shardingconfig.PartiallyOpenStake:
-		fmt.Println("calling partiallopenstake")
 		return nil
 	}
 	return nil

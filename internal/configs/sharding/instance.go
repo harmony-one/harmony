@@ -20,13 +20,14 @@ const (
 )
 
 // SuperCommitteeMembership ..
-type SuperCommitteeMembership interface{}
+type SuperCommitteeMembership byte
 
-// Genesis ..
-type Genesis struct{}
-
-// PartiallyOpenStake ..
-type PartiallyOpenStake struct{}
+const (
+	// Genesis ..
+	Genesis SuperCommitteeMembership = iota
+	// PartiallyOpenStake ..
+	PartiallyOpenStake
+)
 
 type instance struct {
 	numShards                       uint32
