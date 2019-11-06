@@ -1940,25 +1940,6 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 	return header.Vrf()
 }
 
-// GetShardState returns the shard state for the given epoch,
-// creating one if needed.
-// func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.SuperCommittee, error) {
-// 	shardState, err := bc.ReadShardState(epoch)
-// 	if err == nil { // TODO ek – distinguish ErrNotFound
-// 		return shardState, err
-// 	}
-// 	shardState, err = CalculateNewShardState(bc, epoch, committee.MemberAssigner)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	err = bc.WriteShardState(epoch, shardState)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	utils.Logger().Debug().Str("epoch", epoch.String()).Msg("saved new shard state")
-// 	return shardState, nil
-// }
-
 // ChainDb returns the database
 func (bc *BlockChain) ChainDb() ethdb.Database { return bc.db }
 
