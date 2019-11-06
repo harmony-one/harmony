@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -38,7 +39,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte)
 	//#### END Read payload data from committed msg
 
 	epoch := newBlock.Header().Epoch()
-	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
+	shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
 	myShardID := node.Consensus.ShardID
 	utils.Logger().Info().Int("shardNum", shardNum).Uint32("myShardID", myShardID).Uint64("blockNum", newBlock.NumberU64()).Msg("[BroadcastCXReceipts]")
@@ -345,10 +346,8 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 		Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 		Msg("Proposing cross links ...")
 	curBlock := node.Blockchain().CurrentBlock()
-	numShards := core.ShardingSchedule.InstanceForEpoch(curBlock.Header().Epoch()).NumShards()
-
+	numShards := shard.Schedule.InstanceForEpoch(curBlock.Header().Epoch()).NumShards()
 	shardCrossLinks := make([]types.CrossLinks, numShards)
-
 	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
 
 	for i := 0; i < int(numShards); i++ {

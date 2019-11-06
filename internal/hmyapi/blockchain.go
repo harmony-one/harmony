@@ -20,6 +20,7 @@ import (
 	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 const (
@@ -359,10 +360,10 @@ func (s *PublicBlockChainAPI) GetDelegatorsInformation(ctx context.Context, addr
 func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[string]interface{}, error) {
 	// Get header and number of shards.
 	epoch := s.GetEpoch(ctx)
-	numShard := core.ShardingSchedule.InstanceForEpoch(big.NewInt(int64(epoch))).NumShards()
+	numShard := shard.Schedule.InstanceForEpoch(big.NewInt(int64(epoch))).NumShards()
 
 	// Return shareding structure for each case.
-	return core.ShardingSchedule.GetShardingStructure(int(numShard), int(s.b.GetShardID())), nil
+	return shard.Schedule.GetShardingStructure(int(numShard), int(s.b.GetShardID())), nil
 }
 
 // GetShardID returns shard ID of the requested node.

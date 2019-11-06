@@ -22,7 +22,7 @@ import (
 
 type engineImpl struct {
 	r                 reward.Distributor
-	committeeAssigner committee.Assigner
+	committeeAssigner committee.Members
 }
 
 // Engine is an algorithm-agnostic consensus engine.
@@ -31,7 +31,7 @@ var Engine = newEngine()
 func newEngine() *engineImpl {
 	// Careful, this the nil interface possible issue
 	var d reward.Distributor
-	var a committee.Assigner
+	var a committee.Members
 	return &engineImpl{d, a}
 }
 
@@ -181,16 +181,16 @@ func (e *engineImpl) Finalize(
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), nil
 }
 
-func (e *engineImpl) SetSuperCommitteeAssigner(assigner committee.Assigner) {
+func (e *engineImpl) SetSuperCommitteeAssigner(assigner committee.Members) {
 	e.committeeAssigner = assigner
 }
 
-func (e *engineImpl) SuperCommitteeAssigner() committee.Assigner {
+func (e *engineImpl) SuperCommitteeAssigner() committee.Members {
 	return e.committeeAssigner
 }
 
 // QuorumForBlock returns the quorum for the given block header.
-func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool, assigner committee.Assigner) (quorum int, err error) {
+func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool, assigner committee.Members) (quorum int, err error) {
 	var ss shard.SuperCommittee
 
 	if reCalculate {

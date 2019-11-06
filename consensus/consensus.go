@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard/committee"
 )
 
 const (
@@ -24,8 +25,8 @@ const (
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	Decider quorum.Decider
-	// CommitteeMemberAssigner committee.Assigner
+	Decider           quorum.Decider
+	CommitteeAssigner committee.Members
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -207,9 +208,11 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 func New(
 	host p2p.Host, shard uint32, leader p2p.Peer,
 	blsPriKey *bls.SecretKey, decider quorum.Decider,
+	assigner committee.Members,
 ) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.Decider = decider
+	consensus.CommitteeAssigner = assigner
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.blockNumLowChan = make(chan struct{})

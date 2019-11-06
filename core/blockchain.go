@@ -46,7 +46,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -155,7 +154,10 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus_engine.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool) (*BlockChain, error) {
+func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig,
+	chainConfig *params.ChainConfig, engine consensus_engine.Engine,
+	vmConfig vm.Config, shouldPreserve func(block *types.Block) bool,
+) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -248,7 +250,7 @@ func IsEpochBlock(block *types.Block) bool {
 		// genesis block is the first epoch block
 		return true
 	}
-	return ShardingSchedule.IsLastBlock(block.NumberU64() - 1)
+	return shard.Schedule.IsLastBlock(block.NumberU64() - 1)
 }
 
 // EpochFirstBlock returns the block number of the first block of an epoch.
@@ -257,18 +259,18 @@ func EpochFirstBlock(epoch *big.Int) *big.Int {
 	if epoch.Cmp(big.NewInt(0)) == 0 {
 		return big.NewInt(0)
 	}
-	return big.NewInt(int64(ShardingSchedule.EpochLastBlock(epoch.Uint64()-1) + 1))
+	return big.NewInt(int64(shard.Schedule.EpochLastBlock(epoch.Uint64()-1) + 1))
 }
 
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
 func IsEpochLastBlock(block *types.Block) bool {
-	return ShardingSchedule.IsLastBlock(block.NumberU64())
+	return shard.Schedule.IsLastBlock(block.NumberU64())
 }
 
 // IsEpochLastBlockByHeader returns whether this block is the last block of an epoch
 // given block header
 func IsEpochLastBlockByHeader(header *block.Header) bool {
-	return ShardingSchedule.IsLastBlock(header.Number().Uint64())
+	return shard.Schedule.IsLastBlock(header.Number().Uint64())
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -1085,7 +1087,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 	epoch := block.Header().Epoch()
 	if bc.chainConfig.IsCrossTx(block.Epoch()) {
-		shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+		shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 		shardNum := int(shardingConfig.NumShards())
 		for i := 0; i < shardNum; i++ {
 			if i == int(block.ShardID()) {
@@ -1940,22 +1942,22 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 
 // GetShardState returns the shard state for the given epoch,
 // creating one if needed.
-func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.SuperCommittee, error) {
-	shardState, err := bc.ReadShardState(epoch)
-	if err == nil { // TODO ek – distinguish ErrNotFound
-		return shardState, err
-	}
-	shardState, err = CalculateNewShardState(bc, epoch, committee.MemberAssigner)
-	if err != nil {
-		return nil, err
-	}
-	err = bc.WriteShardState(epoch, shardState)
-	if err != nil {
-		return nil, err
-	}
-	utils.Logger().Debug().Str("epoch", epoch.String()).Msg("saved new shard state")
-	return shardState, nil
-}
+// func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.SuperCommittee, error) {
+// 	shardState, err := bc.ReadShardState(epoch)
+// 	if err == nil { // TODO ek – distinguish ErrNotFound
+// 		return shardState, err
+// 	}
+// 	shardState, err = CalculateNewShardState(bc, epoch, committee.MemberAssigner)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	err = bc.WriteShardState(epoch, shardState)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	utils.Logger().Debug().Str("epoch", epoch.String()).Msg("saved new shard state")
+// 	return shardState, nil
+// }
 
 // ChainDb returns the database
 func (bc *BlockChain) ChainDb() ethdb.Database { return bc.db }
@@ -2166,7 +2168,7 @@ func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.
 	}
 
 	epoch := block.Header().Epoch()
-	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+	shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
 
 	for i := 0; i < shardNum; i++ {

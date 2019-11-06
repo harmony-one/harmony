@@ -3,7 +3,6 @@ package shardingconfig
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
@@ -20,6 +19,15 @@ const (
 	DevNet
 )
 
+// SuperCommitteeMembership ..
+type SuperCommitteeMembership interface{}
+
+// Genesis ..
+type Genesis struct{}
+
+// PartiallyOpenStake ..
+type PartiallyOpenStake struct{}
+
 type instance struct {
 	numShards                       uint32
 	numNodesPerShard                int
@@ -27,7 +35,7 @@ type instance struct {
 	hmyAccounts                     []genesis.DeployAccount
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
-	policy                          quorum.Policy
+	committeeMembership             SuperCommitteeMembership
 }
 
 // NewInstance creates and validates a new sharding configuration based
@@ -36,7 +44,7 @@ func NewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int, p quorum.Policy,
+	reshardingEpoch []*big.Int, p SuperCommitteeMembership,
 ) (Instance, error) {
 	if numShards < 1 {
 		return nil, ctxerror.New("sharding config must have at least one shard",
@@ -64,7 +72,7 @@ func NewInstance(
 		hmyAccounts:                     hmyAccounts,
 		fnAccounts:                      fnAccounts,
 		reshardingEpoch:                 reshardingEpoch,
-		policy:                          p,
+		committeeMembership:             p,
 	}, nil
 }
 
@@ -75,7 +83,7 @@ func MustNewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int, p quorum.Policy,
+	reshardingEpoch []*big.Int, p SuperCommitteeMembership,
 ) Instance {
 	sc, err := NewInstance(
 		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, hmyAccounts, fnAccounts, reshardingEpoch, p,
@@ -140,6 +148,6 @@ func (sc instance) GetNetworkID() NetworkID {
 	return DevNet
 }
 
-func (sc instance) QuorumPolicy() quorum.Policy {
-	return sc.policy
+func (sc instance) SuperCommittee() SuperCommitteeMembership {
+	return sc.committeeMembership
 }

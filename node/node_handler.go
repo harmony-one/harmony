@@ -5,11 +5,9 @@ import (
 	"context"
 	"math/big"
 	"math/rand"
-	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -26,7 +24,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
@@ -420,43 +417,6 @@ func (node *Node) AddNewBlock(newBlock *types.Block) error {
 			Msg("Added New Block to Blockchain!!!")
 	}
 	return err
-}
-
-type genesisNode struct {
-	ShardID     uint32
-	MemberIndex int
-	NodeID      shard.NodeID
-}
-
-var (
-	genesisCatalogOnce          sync.Once
-	genesisNodeByStakingAddress = make(map[common.Address]*genesisNode)
-	genesisNodeByConsensusKey   = make(map[shard.BLSPublicKey]*genesisNode)
-)
-
-func initGenesisCatalog() {
-	genesisShardState := committee.GenesisAssigner.InitCommittee(core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch)))
-	for _, committee := range genesisShardState {
-		for i, nodeID := range committee.NodeList {
-			genesisNode := &genesisNode{
-				ShardID:     committee.ShardID,
-				MemberIndex: i,
-				NodeID:      nodeID,
-			}
-			genesisNodeByStakingAddress[nodeID.ECDSAAddress] = genesisNode
-			genesisNodeByConsensusKey[nodeID.BLSPublicKey] = genesisNode
-		}
-	}
-}
-
-func getGenesisNodeByStakingAddress(address common.Address) *genesisNode {
-	genesisCatalogOnce.Do(initGenesisCatalog)
-	return genesisNodeByStakingAddress[address]
-}
-
-func getGenesisNodeByConsensusKey(key shard.BLSPublicKey) *genesisNode {
-	genesisCatalogOnce.Do(initGenesisCatalog)
-	return genesisNodeByConsensusKey[key]
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {

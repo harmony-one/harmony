@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -90,8 +89,8 @@ type Instance interface {
 	// ReshardingEpoch returns a list of Epoch while off-chain resharding happens
 	ReshardingEpoch() []*big.Int
 
-	// QuorumPolicy returns the policy used to decide quorum for epoch
-	QuorumPolicy() quorum.Policy
+	//SuperCommittee returns the policy used to decide quorum for epoch
+	SuperCommittee() SuperCommitteeMembership
 }
 
 // TxThrottleFlag is the throttling flag for each transaction

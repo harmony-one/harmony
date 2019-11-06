@@ -103,7 +103,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare cross links
 	var crossLinks types.CrossLinks
-	if node.NodeConfig.ShardID == 0 {
+	if node.NodeConfig.ShardID == shard.BeaconChainID {
 		crossLinksToPropose, localErr := node.ProposeCrossLinkDataForBeaconchain()
 		if localErr == nil {
 			crossLinks = crossLinksToPropose
@@ -141,11 +141,14 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 		// We haven't reached the end of this epoch; don't propose yet.
 		return nil
 	}
-	nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
-	shardState, err := core.CalculateNewShardState(node.Blockchain(), nextEpoch, committee.MemberAssigner)
-	if err != nil {
-		return err
-	}
+	// TODO need to pass it the ChainReader?
+	shardState := committee.IncorporatingStaking.Read(
+		new(big.Int).Add(block.Header().Epoch(), common.Big1),
+	)
+	// shardState, err := core.CalculateNewShardState(node.Blockchain(), nextEpoch, committee.MemberAssigner)
+	// if err != nil {
+	// 	return err
+	// }
 	return block.AddShardState(shardState)
 }
 

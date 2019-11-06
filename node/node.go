@@ -3,7 +3,6 @@ package node
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -268,7 +267,7 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	txPoolLimit := shard.Schedule.MaxTxPoolSizeLimit()
 	node.pendingTxMutex.Lock()
 	for _, tx := range newTxs {
 		if _, ok := node.pendingTransactions[tx.Hash()]; !ok {
@@ -284,7 +283,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
-	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	txPoolLimit := shard.Schedule.MaxTxPoolSizeLimit()
 	node.pendingStakingTxMutex.Lock()
 	for _, tx := range newStakingTxs {
 		if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
@@ -341,7 +340,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Transactions, staking.StakingTransactions) {
-	txsThrottleConfig := core.ShardingSchedule.TxsThrottleConfig()
+	txsThrottleConfig := shard.Schedule.TxsThrottleConfig()
 
 	// the next block number to be added in consensus protocol, which is always one more than current chain header block
 	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
@@ -479,10 +478,16 @@ func New(
 	// TODO actually need to read off the epoch, then pick right committee assigner
 	collection := shardchain.NewCollection(
 		// Here need to hook the creation of the committee assigner & current committee
-		chainDBFactory, &genesisInitializer{&node, committee.GenesisAssigner}, chain.Engine, &chainConfig)
+		chainDBFactory,
+		&genesisInitializer{&node},
+		chain.Engine,
+		&chainConfig,
+	)
+
 	if isArchival {
 		collection.DisableCache()
 	}
+
 	node.shardChains = collection
 
 	if host != nil && consensusObj != nil {
@@ -516,7 +521,8 @@ func New(
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
-		chain.Engine.SetSuperCommitteeAssigner(committee.AssignerByEpoch(blockchain.CurrentBlock().Epoch()).(committee.Assigner))
+		chain.Engine.SetSuperCommitteeAssigner(committee.IncorporatingStaking)
+		// chain.Engine.SetSuperCommitteeAssigner(committee.AssignerByEpoch(blockchain.CurrentBlock().Epoch()).(committee.Assigner))
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
@@ -569,17 +575,13 @@ func (node *Node) LoadSuperCommitteeForLatestEpochOnChain() (err error) {
 	// Get genesis epoch shard state from chain
 	blockNum := node.Blockchain().CurrentBlock().NumberU64()
 	node.Consensus.SetMode(consensus.Listening)
-	epoch := core.ShardingSchedule.CalcEpochNumber(blockNum)
+	epoch := shard.Schedule.CalcEpochNumber(blockNum)
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
-	// node.Blockchain().ReadShardState(epoch *big.Int)
-	prev, _ := node.Blockchain().GetShardState(big.NewInt(0).Sub(epoch, big.NewInt(1)))
-	pubKeys := core.CalculatePublicKeys(
-		epoch, shardID, chain.Engine.SuperCommitteeAssigner(), prev,
-	)
+	pubKeys := committee.IncorporatingStaking.ReadPublicKeys(epoch)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
 			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",

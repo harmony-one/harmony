@@ -14,7 +14,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -22,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
 )
 
@@ -1084,6 +1084,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		utils.Logger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		defer close(stoppedChan)
 		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
@@ -1181,7 +1182,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					if err == nil {
 						vdfInProgress = false
 						// Verify the randomness
-						vdfObject := vdf_go.New(core.ShardingSchedule.VDFDifficulty(), seed)
+						vdfObject := vdf_go.New(shard.Schedule.VDFDifficulty(), seed)
 						if !vdfObject.Verify(vdfOutput) {
 							consensus.getLogger().Warn().
 								Uint64("MsgBlockNum", newBlock.NumberU64()).
@@ -1316,7 +1317,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 
 	// TODO ek – limit concurrency
 	go func() {
-		vdf := vdf_go.New(core.ShardingSchedule.VDFDifficulty(), seed)
+		vdf := vdf_go.New(shard.Schedule.VDFDifficulty(), seed)
 		outputChannel := vdf.GetOutputChannel()
 		start := time.Now()
 		vdf.Execute()
@@ -1357,7 +1358,7 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
 		}
 	}
 
-	vdfObject := vdf_go.New(core.ShardingSchedule.VDFDifficulty(), seed)
+	vdfObject := vdf_go.New(shard.Schedule.VDFDifficulty(), seed)
 	vdfOutput := [516]byte{}
 	copy(vdfOutput[:], headerObj.Vdf())
 	if vdfObject.Verify(vdfOutput) {

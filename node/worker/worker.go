@@ -19,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -378,12 +377,13 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 
 // ProposeShardStateWithoutBeaconSync proposes the next shard state for next epoch.
 func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.SuperCommittee {
-	if !core.ShardingSchedule.IsLastBlock(w.current.header.Number().Uint64()) {
+	if !shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
-	currentSuperCommittee, _ := w.chain.ReadShardState(w.current.header.Epoch())
-	return core.CalculateShardState(nextEpoch, committee.MemberAssigner, currentSuperCommittee)
+	// currentSuperCommittee, _ := w.chain.ReadShardState(w.current.header.Epoch())
+	return w.engine.SuperCommitteeAssigner().Read(nextEpoch)
+	// return core.CalculateShardState(nextEpoch, committee.MemberAssigner, currentSuperCommittee)
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.

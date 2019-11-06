@@ -24,13 +24,14 @@ type Collection interface {
 	// CloseShardChain closes the given shard chain.
 	CloseShardChain(shardID uint32) error
 
+	// DisableCache disables caching mode for newly opened chains.
+	DisableCache()
+
 	// Close closes all shard chains.
 	Close() error
 }
 
-// CollectionImpl is the main implementation of the shard chain collection.
-// See the Collection interface for details.
-type CollectionImpl struct {
+type collectionImpl struct {
 	dbFactory    DBFactory
 	dbInit       DBInitializer
 	engine       engine.Engine
@@ -49,8 +50,8 @@ type CollectionImpl struct {
 func NewCollection(
 	dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine,
 	chainConfig *params.ChainConfig,
-) *CollectionImpl {
-	return &CollectionImpl{
+) Collection {
+	return &collectionImpl{
 		dbFactory:   dbFactory,
 		dbInit:      dbInit,
 		engine:      engine,
@@ -61,7 +62,7 @@ func NewCollection(
 
 // ShardChain returns the blockchain for the given shard,
 // opening one as necessary.
-func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
+func (sc *collectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 	if bc, ok := sc.pool[shardID]; ok {
@@ -108,12 +109,12 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 // DisableCache disables caching mode for newly opened chains.
 // It does not affect already open chains.  For best effect,
 // use this immediately after creating collection.
-func (sc *CollectionImpl) DisableCache() {
+func (sc *collectionImpl) DisableCache() {
 	sc.disableCache = true
 }
 
 // CloseShardChain closes the given shard chain.
-func (sc *CollectionImpl) CloseShardChain(shardID uint32) error {
+func (sc *collectionImpl) CloseShardChain(shardID uint32) error {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 	bc, ok := sc.pool[shardID]
@@ -133,7 +134,7 @@ func (sc *CollectionImpl) CloseShardChain(shardID uint32) error {
 }
 
 // Close closes all shard chains.
-func (sc *CollectionImpl) Close() error {
+func (sc *collectionImpl) Close() error {
 	newPool := make(map[uint32]*core.BlockChain)
 	sc.mtx.Lock()
 	oldPool := sc.pool

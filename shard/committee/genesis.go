@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -9,27 +10,31 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-type genesisPolicy struct{}
-
-func isHarmonyGenesis(epoch *big.Int) bool {
-	const committeeStartEpoch = 0
-	init := big.NewInt(committeeStartEpoch)
-	return epoch.Cmp(init) == 0
-
+// MembershipList  ..
+type MembershipList interface {
+	Read(*big.Int) shard.SuperCommittee
 }
 
-func (genesisPolicy) IsInitEpoch(epoch *big.Int) bool {
-	return isHarmonyGenesis(epoch)
+// PublicKeys per epoch
+type PublicKeys interface {
+	ReadPublicKeys(*big.Int) []*bls.PublicKey
 }
 
-func (g genesisPolicy) NextCommittee(
-	s shardingconfig.Instance, ignored *big.Int,
-	prevButalsoIgnored shard.SuperCommittee,
-) shard.SuperCommittee {
-	return g.InitCommittee(s)
+// Members ..
+type Members interface {
+	PublicKeys
+	MembershipList
 }
 
-func (genesisPolicy) InitCommittee(s shardingconfig.Instance) shard.SuperCommittee {
+type partialStakingEnabled struct{}
+
+var (
+	// IncorporatingStaking ..
+	IncorporatingStaking Members = partialStakingEnabled{}
+)
+
+func genesisCommittee() shard.SuperCommittee {
+	s := shard.Schedule.InstanceForEpoch(big.NewInt(0))
 	shardNum := int(s.NumShards())
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 	shardSize := s.NumNodesPerShard()
@@ -40,7 +45,6 @@ func (genesisPolicy) InitCommittee(s shardingconfig.Instance) shard.SuperCommitt
 		com := shard.Committee{ShardID: uint32(i)}
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardNum // The initial account to use for genesis nodes
-
 			pub := &bls.PublicKey{}
 			pub.DeserializeHexStr(hmyAccounts[index].BLSPublicKey)
 			pubKey := shard.BLSPublicKey{}
@@ -52,7 +56,6 @@ func (genesisPolicy) InitCommittee(s shardingconfig.Instance) shard.SuperCommitt
 			}
 			com.NodeList = append(com.NodeList, curNodeID)
 		}
-
 		// add FN runner's key
 		for j := shardHarmonyNodes; j < shardSize; j++ {
 			index := i + (j-shardHarmonyNodes)*shardNum
@@ -70,4 +73,28 @@ func (genesisPolicy) InitCommittee(s shardingconfig.Instance) shard.SuperCommitt
 		shardState = append(shardState, com)
 	}
 	return shardState
+}
+
+func (def partialStakingEnabled) ReadPublicKeys(epoch *big.Int) []*bls.PublicKey {
+	switch shard.Schedule.InstanceForEpoch(epoch).SuperCommittee().(type) {
+	case shardingconfig.Genesis:
+		return nil
+	case shardingconfig.PartiallyOpenStake:
+		return nil
+	}
+	return nil
+}
+
+// ReadGenesis returns the supercommittee used until staking
+// was enabled, previously called CalculateInitShardState
+func (def partialStakingEnabled) Read(epoch *big.Int) shard.SuperCommittee {
+	switch shard.Schedule.InstanceForEpoch(epoch).SuperCommittee().(type) {
+	case shardingconfig.Genesis:
+		fmt.Println("calling genesis")
+		return genesisCommittee()
+	case shardingconfig.PartiallyOpenStake:
+		fmt.Println("calling partiallopenstake")
+		return nil
+	}
+	return nil
 }

@@ -16,7 +16,7 @@ import (
 
 // ChainReader defines a small collection of methods needed to access the local
 // blockchain during header and/or uncle verification.
-// Note this reader interface is still in process of being integrated with the BFT consensus.
+// Note this reader interface is still in process of being integrated with the FBFT consensus.
 type ChainReader interface {
 	// Config retrieves the blockchain's chain configuration.
 	Config() *params.ChainConfig
@@ -43,7 +43,7 @@ type ChainReader interface {
 }
 
 // Engine is an algorithm agnostic consensus engine.
-// Note this engine interface is still in process of being integrated with the BFT consensus.
+// Note this engine interface is still in process of being integrated with the FBFT consensus.
 type Engine interface {
 	// Author retrieves the Harmony address of the account that validated the given
 	// block.
@@ -79,9 +79,9 @@ type Engine interface {
 
 	SetRewarder(reward.Distributor)
 
-	SuperCommitteeAssigner() committee.Assigner
+	SuperCommitteeAssigner() committee.Members
 
-	SetSuperCommitteeAssigner(committee.Assigner)
+	SetSuperCommitteeAssigner(committee.Members)
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.

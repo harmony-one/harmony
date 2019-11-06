@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -23,7 +22,7 @@ import (
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/shard"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/rs/zerolog"
 )
@@ -471,14 +470,12 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	pubKeys := []*bls.PublicKey{}
 	hasError := false
-
 	header := consensus.ChainReader.CurrentHeader()
-
 	epoch := header.Epoch()
-	currentSuperCommittee, _ := consensus.ChainReader.ReadShardState(epoch)
-	curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID(), committee.GenesisAssigner, currentSuperCommittee)
+	// currentSuperCommittee, _ := consensus.ChainReader.ReadShardState(epoch)
+	curPubKeys := consensus.CommitteeAssigner.ReadPublicKeys(epoch)
+	// curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID(), committee.GenesisAssigner, currentSuperCommittee)
 	consensus.numPrevPubKeys = len(curPubKeys)
-
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
 
 	if core.IsEpochLastBlockByHeader(header) {
@@ -486,8 +483,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		pubKeys = core.CalculatePublicKeys(nextEpoch, header.ShardID(), committee.GenesisAssigner, currentSuperCommittee)
+		// nextEpoch := new(big.Int).Add(epoch, common.Big1)
+		pubKeys = consensus.CommitteeAssigner.ReadPublicKeys(epoch)
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
 		pubKeys = curPubKeys
@@ -548,7 +545,7 @@ func (consensus *Consensus) IsLeader() bool {
 
 // NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
 func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
-	if consensus.ShardID == 0 && epoch.Uint64() >= core.ShardingSchedule.RandomnessStartingEpoch() {
+	if consensus.ShardID == shard.BeaconChainID && epoch.Uint64() >= shard.Schedule.RandomnessStartingEpoch() {
 		return true
 	}
 
