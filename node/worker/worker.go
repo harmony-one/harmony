@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"time"
 
+	common2 "github.com/harmony-one/harmony/internal/common"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
@@ -25,6 +27,8 @@ import (
 
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
+	signer types.Signer
+
 	state   *state.DB     // apply state changes here
 	gasPool *core.GasPool // available gas used to pack transactions
 
@@ -92,68 +96,96 @@ func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.R
 	return sender, shardingconfig.TxSelect
 }
 
-// SelectTransactionsForNewBlock selects transactions for new block.
-func (w *Worker) SelectTransactionsForNewBlock(newBlockNum uint64, txs types.Transactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, coinbase common.Address) (types.Transactions, types.Transactions, types.Transactions) {
+// CommitTransactions commits transactions for new block.
+func (w *Worker) CommitTransactions(
+	pendingNormal map[common.Address]types.Transactions,
+	pendingStaking staking.StakingTransactions, coinbase common.Address,
+	txnErrorSink func([]types.RPCTransactionError),
+) error {
 
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
 
-	selected := types.Transactions{}
-	unselected := types.Transactions{}
-	invalid := types.Transactions{}
-	for _, tx := range txs {
-		if tx.ShardID() != w.chain.ShardID() {
-			invalid = append(invalid, tx)
-			continue
-		}
-
+	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
+	coalescedLogs := []*types.Log{}
+	erroredTxns := []types.RPCTransactionError{}
+	// NORMAL
+	for {
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
-			utils.Logger().Info().Str("Not enough gas for further transactions, have", w.current.gasPool.String()).Uint64("want", params.TxGas)
-			unselected = append(unselected, tx)
+			utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("Not enough gas for further transactions")
+			break
+		}
+		// Retrieve the next transaction and abort if all done
+		tx := txs.Peek()
+		if tx == nil {
+			break
+		}
+		// Error may be ignored here. The error has already been checked
+		// during transaction acceptance is the transaction pool.
+		// We use the eip155 signer regardless of the current hf.
+		from, _ := types.Sender(w.current.signer, tx)
+		// Check whether the tx is replay protected. If we're not in the EIP155 hf
+		// phase, start ignoring the sender until we do.
+		if tx.Protected() && !w.config.IsEIP155(w.current.header.Number()) {
+			utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
+			txs.Pop()
+			continue
+		}
+		// Start executing the transaction
+		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
+
+		if tx.ShardID() != w.chain.ShardID() {
+			txs.Shift()
 			continue
 		}
 
-		sender, flag := w.throttleTxs(selected, recentTxsStats, txsThrottleConfig, tx)
-		switch flag {
-		case shardingconfig.TxUnselect:
-			unselected = append(unselected, tx)
-
-		case shardingconfig.TxInvalid:
-			invalid = append(invalid, tx)
-
-		case shardingconfig.TxSelect:
-			if tx.GasPrice().Uint64() == 0 {
-				invalid = append(invalid, tx)
-			} else {
-				snap := w.current.state.Snapshot()
-				_, err := w.commitTransaction(tx, coinbase)
-				if err != nil {
-					w.current.state.RevertToSnapshot(snap)
-					invalid = append(invalid, tx)
-					utils.Logger().Error().Err(err).Str("txId", tx.Hash().Hex()).Msg("Commit transaction error")
-				} else {
-					selected = append(selected, tx)
-					// handle the case when msg was not able to extracted from tx
-					if len(sender.String()) > 0 {
-						recentTxsStats[newBlockNum][sender]++
-					}
-				}
-			}
+		logs, err := w.commitTransaction(tx, coinbase)
+		if err != nil {
+			erroredTxns = append(erroredTxns, types.RPCTransactionError{
+				tx.Hash().Hex(), time.Now().Unix(), err.Error(),
+			})
 		}
+		sender, _ := common2.AddressToBech32(from)
+		switch err {
+		case core.ErrGasLimitReached:
+			// Pop the current out-of-gas transaction without shifting in the next from the account
+			utils.Logger().Info().Str("sender", sender).Msg("Gas limit exceeded for current block")
+			txs.Pop()
 
-		// log invalid or unselected txs
-		if flag == shardingconfig.TxUnselect || flag == shardingconfig.TxInvalid {
-			utils.Logger().Info().Str("txId", tx.Hash().Hex()).Str("txThrottleFlag", flag.String()).Msg("Transaction Throttle flag")
+		case core.ErrNonceTooLow:
+			// New head notification data race between the transaction pool and miner, shift
+			utils.Logger().Info().Str("sender", sender).Uint64("nonce", tx.Nonce()).Msg("Skipping transaction with low nonce")
+			txs.Shift()
+
+		case core.ErrNonceTooHigh:
+			// Reorg notification data race between the transaction pool and miner, skip account =
+			utils.Logger().Info().Str("sender", sender).Uint64("nonce", tx.Nonce()).Msg("Skipping account with high nonce")
+			txs.Pop()
+
+		case nil:
+			// Everything ok, collect the logs and shift in the next transaction from the same account
+			coalescedLogs = append(coalescedLogs, logs...)
+			txs.Shift()
+
+		default:
+			// Strange error, discard the transaction and get the next in line (note, the
+			// nonce-too-high clause will prevent us from executing in vain).
+			utils.Logger().Info().Str("hash", tx.Hash().Hex()).AnErr("err", err).Msg("Transaction failed, account skipped")
+			txs.Shift()
 		}
-
-		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("Transaction gas limit info")
 	}
 
-	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Int("newTxns", len(selected)).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("Block gas limit and usage info")
+	// Here call the error functions
+	txnErrorSink(erroredTxns)
 
-	return selected, unselected, invalid
+	utils.Logger().Info().
+		Int("newTxns", len(w.current.txs)).
+		Uint64("blockGasLimit", w.current.header.GasLimit()).
+		Uint64("blockGasUsed", w.current.header.GasUsed()).
+		Msg("Block gas limit and usage info")
+	return nil
 }
 
 // SelectStakingTransactionsForNewBlock selects staking transactions for new block.
@@ -188,12 +220,9 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 		}
 	}
 
-	utils.Logger().Info().Uint64("newBlockNum", newBlockNum).Uint64("blockGasLimit",
-		w.current.header.GasLimit()).Uint64("blockGasUsed",
-		w.current.header.GasUsed()).Msg("[SelectStakingTransaction] Block gas limit and usage info")
+	utils.Logger().Info().Int("newTxns", len(w.current.txs)).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("Block gas limit and usage info")
 
 	return selected, unselected, invalid
-
 }
 
 func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinbase common.Address) ([]*types.Log, error) {
@@ -235,43 +264,6 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 	}
 
 	return receipt.Logs, nil
-}
-
-// CommitTransactions commits transactions including staking transactions.
-func (w *Worker) CommitTransactions(
-	txs types.Transactions,
-	stakingTxns staking.StakingTransactions,
-	coinbase common.Address,
-	txnErrorSink func([]types.RPCTransactionError),
-) error {
-	// Must update to the correct current state before processing potential txns
-	if err := w.UpdateCurrent(coinbase); err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("Failed updating worker's state before committing txns")
-		return err
-	}
-
-	if w.current.gasPool == nil {
-		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
-	}
-
-	for _, tx := range txs {
-		snap := w.current.state.Snapshot()
-		_, err := w.commitTransaction(tx, coinbase)
-		if err != nil {
-			txnErrorSink([]types.RPCTransactionError{{
-				tx.Hash().Hex(), time.Now().Unix(), err.Error(),
-			}})
-			w.current.state.RevertToSnapshot(snap)
-			return err
-		}
-	}
-	for _, stakingTx := range stakingTxns {
-		_ = stakingTx
-		// TODO: add logic to commit staking txns
-	}
-	return nil
 }
 
 // CommitReceipts commits a list of already verified incoming cross shard receipts
@@ -324,6 +316,7 @@ func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 		return err
 	}
 	env := &environment{
+		signer: types.NewEIP155Signer(w.config.ChainID),
 		state:  state,
 		header: header,
 	}

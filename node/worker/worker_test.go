@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -75,12 +77,15 @@ func TestCommitTransactions(t *testing.T) {
 	tx, _ := types.SignTx(types.NewTransaction(baseNonce, testBankAddress, uint32(0), big.NewInt(int64(denominations.One*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
 
 	// Commit the tx to the worker
+	txs := make(map[common.Address]types.Transactions)
+	txs[testBankAddress] = types.Transactions{tx}
 	err := worker.CommitTransactions(
-		types.Transactions{tx},
+		txs,
 		staking.StakingTransactions{},
 		testBankAddress,
 		func([]types.RPCTransactionError) {},
 	)
+
 	if err != nil {
 		t.Error(err)
 	}
