@@ -81,7 +81,7 @@ func (s *Server) Process(ctx context.Context, message *Message) (*Response, erro
 // Start starts the Server on given ip and port.
 func (s *Server) Start() (*grpc.Server, error) {
 	addr := net.JoinHostPort(IP, Port)
-	lis, err := net.Listen("tcp", addr)
+	lis, err := net.Listen("tcp4", addr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
