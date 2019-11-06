@@ -1155,7 +1155,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 // After insertion is done, all accumulated events will be fired.
 func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
-	bc.PostChainEvents(events, logs)
 	if err == nil {
 		for idx, block := range chain {
 			header := block.Header()
@@ -1197,6 +1196,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 	}
 
+	bc.PostChainEvents(events, logs)
 	return n, err
 }
 
