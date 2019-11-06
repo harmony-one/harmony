@@ -78,7 +78,18 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.SuperCommittee 
 func (def partialStakingEnabled) ReadPublicKeys(epoch *big.Int) []*bls.PublicKey {
 	switch instance := shard.Schedule.InstanceForEpoch(epoch); instance.SuperCommittee() {
 	case shardingconfig.Genesis:
-		return nil
+		superComm := preStakingEnabledCommittee(instance)
+		identities := make([]*bls.PublicKey, int(instance.NumShards())*instance.NumNodesPerShard())
+		spot := 0
+		for i := range superComm {
+			for j := range superComm[i].NodeList {
+				identity := &bls.PublicKey{}
+				superComm[i].NodeList[j].BLSPublicKey.ToLibBLSPublicKey(identity)
+				identities[spot] = identity
+				spot++
+			}
+		}
+		return identities
 	case shardingconfig.PartiallyOpenStake:
 		return nil
 	}
