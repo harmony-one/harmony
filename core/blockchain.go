@@ -1176,6 +1176,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 		}
 	}
 
+	bc.PostChainEvents(events, logs)
 	return n, err
 }
 

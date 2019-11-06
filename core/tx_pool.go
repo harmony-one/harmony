@@ -292,7 +292,7 @@ func (pool *TxPool) loop() {
 	defer journal.Stop()
 
 	// Track the previous head headers for transaction reorgs
-	//head := pool.chain.CurrentBlock()
+	head := pool.chain.CurrentBlock()
 
 	// Keep waiting for and reacting to the various events
 	for {
@@ -301,12 +301,25 @@ func (pool *TxPool) loop() {
 		case ev := <-pool.chainHeadCh:
 			if ev.Block != nil {
 				pool.mu.Lock()
-				//if pool.chainconfig.IsHomestead(ev.Block.Number()) {
-				//	pool.homestead = true
-				//}
-				//pool.reset(head.Header(), ev.Block.Header())
-				//head = ev.Block
+				if pool.chainconfig.IsS3(ev.Block.Epoch()) {
+					pool.homestead = true
+				}
+				pool.reset(head.Header(), ev.Block.Header())
+				head = ev.Block
 
+				// DEBUG-
+				pending, queued := pool.stats()
+				stales := pool.priced.stales
+
+				if pending != prevPending || queued != prevQueued || stales != prevStales {
+					utils.Logger().Debug().
+						Int("executable", pending).
+						Int("queued", queued).
+						Int("stales", stales).
+						Msg("Transaction pool status report")
+					prevPending, prevQueued, prevStales = pending, queued, stales
+				}
+				// -
 				pool.mu.Unlock()
 			}
 		// Be unsubscribed due to system stopped
