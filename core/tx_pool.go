@@ -306,20 +306,6 @@ func (pool *TxPool) loop() {
 				}
 				pool.reset(head.Header(), ev.Block.Header())
 				head = ev.Block
-
-				// DEBUG-
-				pending, queued := pool.stats()
-				stales := pool.priced.stales
-
-				if pending != prevPending || queued != prevQueued || stales != prevStales {
-					utils.Logger().Debug().
-						Int("executable", pending).
-						Int("queued", queued).
-						Int("stales", stales).
-						Msg("Transaction pool status report")
-					prevPending, prevQueued, prevStales = pending, queued, stales
-				}
-				// -
 				pool.mu.Unlock()
 			}
 		// Be unsubscribed due to system stopped

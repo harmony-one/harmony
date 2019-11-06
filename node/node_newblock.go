@@ -82,7 +82,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	coinbase := node.Consensus.SelfAddress
 
-	utils.Logger().Info().Msg("11111111111")
 	// Prepare transactions including staking transactions\
 	pending, err := node.TxPool.Pending()
 	if err != nil {
@@ -90,13 +89,13 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 
-	utils.Logger().Info().Msg("222222222222")
 	// TODO: integrate staking transaction into tx pool
 	pendingStakingTransactions := types2.StakingTransactions{}
 	for _, tx := range node.pendingStakingTransactions {
 		pendingStakingTransactions = append(pendingStakingTransactions, tx)
 	}
 
+	node.Worker.UpdateCurrent(coinbase)
 	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase); err != nil {
 		ctxerror.Log15(utils.GetLogger().Error,
 			ctxerror.New("cannot commit transactions").
@@ -104,7 +103,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 
-	utils.Logger().Info().Msg("33333333333333")
 	// Prepare cross shard transaction receipts
 	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {
