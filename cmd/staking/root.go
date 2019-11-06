@@ -95,7 +95,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 				MinSelfDelegation:  big.NewInt(10),
 				MaxTotalDelegation: big.NewInt(3000),
 				ValidatorAddress:   common.Address(dAddr),
-				SlotPubKeys:        []shard.BlsPublicKey{pub},
+				SlotPubKeys:        []shard.BLSPublicKey{pub},
 				Amount:             big.NewInt(100),
 			}
 		}

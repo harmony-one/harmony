@@ -2388,7 +2388,7 @@ func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
 		if err != nil {
 			continue
 		}
-		epoch := ShardingSchedule.CalcEpochNumber(val.CreationHeight.Uint64())
+		epoch := shard.Schedule.CalcEpochNumber(val.CreationHeight.Uint64())
 		if epoch.Cmp(currentEpoch) >= 0 {
 			// wait for next epoch
 			continue

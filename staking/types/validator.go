@@ -57,7 +57,7 @@ type Validator struct {
 	CreationHeight *big.Int `json:"creation_height" yaml:"creation_height"`
 }
 
-func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
+func printSlotPubKeys(pubKeys []shard.BLSPublicKey) string {
 	str := "["
 	for i, key := range pubKeys {
 		str += fmt.Sprintf("%d: %s,", i, key.Hex())
