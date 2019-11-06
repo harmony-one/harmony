@@ -27,8 +27,11 @@ func (node *Node) setupForValidator() {
 	node.serviceManager.RegisterService(service.Consensus, consensus.New(node.BlockChannel, node.Consensus, node.startConsensus))
 	// Register new block service.
 	node.serviceManager.RegisterService(service.BlockProposal, blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyV2))
-	// Register client support service.
-	node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.Blockchain().State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+
+	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+		// Register client support service.
+		node.serviceManager.RegisterService(service.ClientSupport, clientsupport.New(node.Blockchain().State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port))
+	}
 	// Register new metrics service
 	if node.NodeConfig.GetMetricsFlag() {
 		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort()))
