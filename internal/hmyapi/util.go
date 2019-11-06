@@ -13,7 +13,7 @@ import (
 
 // defaultPageSize is to have default pagination.
 const (
-	defaultPageSize = 100
+	defaultPageSize = uint32(100)
 )
 
 // ReturnWithPagination returns result with pagination (offset, page in TxHistoryArgs).
@@ -23,10 +23,10 @@ func ReturnWithPagination(hashes []common.Hash, args TxHistoryArgs) []common.Has
 	if args.PageSize > 0 {
 		pageSize = args.PageSize
 	}
-	if pageIndex < 0 || pageSize*pageIndex >= len(hashes) {
+	if uint64(pageSize)*uint64(pageIndex) >= uint64(len(hashes)) {
 		return make([]common.Hash, 0)
 	}
-	if pageSize*pageIndex+pageSize > len(hashes) {
+	if uint64(pageSize)*uint64(pageIndex)+uint64(pageSize) > uint64(len(hashes)) {
 		return hashes[pageSize*pageIndex:]
 	}
 	return hashes[pageSize*pageIndex : pageSize*pageIndex+pageSize]
