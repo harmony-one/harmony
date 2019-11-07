@@ -12,6 +12,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 )
 
 func TestConstructPrepareMessage(test *testing.T) {
@@ -23,7 +25,8 @@ func TestConstructPrepareMessage(test *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		committee.IncorporatingStaking,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)

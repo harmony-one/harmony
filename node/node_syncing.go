@@ -166,7 +166,7 @@ func (node *Node) DoBeaconSyncing() {
 			case beaconBlock := <-node.BeaconBlockChannel:
 				node.beaconSync.AddLastMileBlock(beaconBlock)
 				ss, sE := beaconBlock.Header().GetShardState()
-				fmt.Println("Beacon suite")
+				// TODO Remove this updatevotingpower here, move to addLastMileBlock
 				if mems := ss.FindCommitteeByID(node.Blockchain().ShardID()); sE == nil && mems != nil {
 					node.Consensus.Decider.UpdateVotingPower(mems.NodeList)
 				}

@@ -7,12 +7,13 @@ import (
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {
@@ -24,7 +25,8 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		committee.IncorporatingStaking,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
@@ -57,7 +59,8 @@ func TestConstructPreparedMessage(test *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		committee.IncorporatingStaking,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)

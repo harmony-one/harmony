@@ -86,12 +86,12 @@ func TestDumpCommittee(t *testing.T) {
 	assert.Nil(t, err, "should be nil")
 	err = blsPubKey2.DeserializeHexStr("02c8ff0b88f313717bc3a627d2f8bb172ba3ad3bb9ba3ecb8eed4b7c878653d3d4faf769876c528b73f343967f74a917")
 	assert.Nil(t, err, "should be nil")
-	BlsPublicKey1 := new(shard.BlsPublicKey)
-	BlsPublicKey2 := new(shard.BlsPublicKey)
-	BlsPublicKey1.FromLibBLSPublicKey(blsPubKey1)
-	BlsPublicKey2.FromLibBLSPublicKey(blsPubKey2)
-	nodeID1 := shard.NodeID{EcdsaAddress: common.HexToAddress("52789f18a342da8023cc401e5d2b14a6b710fba9"), BlsPublicKey: *BlsPublicKey1}
-	nodeID2 := shard.NodeID{EcdsaAddress: common.HexToAddress("7c41e0668b551f4f902cfaec05b5bdca68b124ce"), BlsPublicKey: *BlsPublicKey2}
+	BLSPublicKey1 := new(shard.BLSPublicKey)
+	BLSPublicKey2 := new(shard.BLSPublicKey)
+	BLSPublicKey1.FromLibBLSPublicKey(blsPubKey1)
+	BLSPublicKey2.FromLibBLSPublicKey(blsPubKey2)
+	nodeID1 := shard.NodeID{ECDSAAddress: common.HexToAddress("52789f18a342da8023cc401e5d2b14a6b710fba9"), BLSPublicKey: *BLSPublicKey1}
+	nodeID2 := shard.NodeID{ECDSAAddress: common.HexToAddress("7c41e0668b551f4f902cfaec05b5bdca68b124ce"), BLSPublicKey: *BLSPublicKey2}
 	nodeIDList := []shard.NodeID{nodeID1, nodeID2}
 	committee := shard.Committee{ShardID: uint32(0), NodeList: nodeIDList}
 	shardID := uint32(0)
