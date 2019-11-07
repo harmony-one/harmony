@@ -546,7 +546,8 @@ func (consensus *Consensus) IsLeader() bool {
 
 // NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
 func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
-	if consensus.ShardID == shard.BeaconChainID && epoch.Uint64() >= shard.Schedule.RandomnessStartingEpoch() {
+	if consensus.ShardID == shard.BeaconChainShardID &&
+		epoch.Uint64() >= shard.Schedule.RandomnessStartingEpoch() {
 		return true
 	}
 

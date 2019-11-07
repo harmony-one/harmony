@@ -125,9 +125,9 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						Msg("block sync")
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
-					if node.Blockchain().ShardID() != shard.BeaconChainID {
+					if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 						for _, block := range blocks {
-							if block.ShardID() == shard.BeaconChainID {
+							if block.ShardID() == shard.BeaconChainShardID {
 								utils.Logger().Info().
 									Uint64("block", blocks[0].NumberU64()).
 									Msgf("Block being handled by block channel %d %d", block.NumberU64(), block.ShardID())
@@ -145,7 +145,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			case proto_node.Header:
 				// only beacon chain will accept the header from other shards
 				utils.Logger().Debug().Uint32("shardID", node.NodeConfig.ShardID).Msg("NET: received message: Node/Header")
-				if node.NodeConfig.ShardID != shard.BeaconChainID {
+				if node.NodeConfig.ShardID != shard.BeaconChainShardID {
 					return
 				}
 				node.ProcessHeaderMessage(msgPayload[1:]) // skip first byte which is blockMsgType

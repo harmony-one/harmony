@@ -357,7 +357,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
 	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
-	currentNode.NodeConfig.SetBeaconGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainID))
+	currentNode.NodeConfig.SetBeaconGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID))
 
 	switch *nodeType {
 	case "explorer":
@@ -366,9 +366,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(*shardID)))
 	case "validator":
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
-		if nodeConfig.ShardID == shard.BeaconChainID {
-			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainID))
-			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainID))
+		if nodeConfig.ShardID == shard.BeaconChainShardID {
+			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID))
+			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 		} else {
 			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
@@ -484,7 +484,7 @@ func main() {
 	currentNode.SetSyncFreq(*syncFreq)
 	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
 
-	if nodeConfig.ShardID != shard.BeaconChainID &&
+	if nodeConfig.ShardID != shard.BeaconChainShardID &&
 		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID", nodeConfig.ShardID)
 		go currentNode.SupportBeaconSyncing()

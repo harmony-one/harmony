@@ -507,11 +507,9 @@ func New(
 		// SetCommittee members
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
-		// Need to pick the right committee assignment - right
-
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 
-		if node.Blockchain().ShardID() != shard.BeaconChainID {
+		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
 		}
 
@@ -522,8 +520,6 @@ func New(
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 		chain.Engine.SetSuperCommitteeAssigner(committee.IncorporatingStaking)
-		// chain.Engine.SetSuperCommitteeAssigner(committee.AssignerByEpoch(blockchain.CurrentBlock().Epoch()).(committee.Assigner))
-
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
 		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {

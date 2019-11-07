@@ -188,7 +188,7 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 		return common.Hash{}, e
 	}
 	// only beaconchain process staking transaction
-	if sID := s.b.GetShardID(); sID != shard.BeaconChainID {
+	if sID := s.b.GetShardID(); sID != shard.BeaconChainShardID {
 		return common.Hash{}, errors.Errorf("current shard %d is not beacon shard", sID)
 	}
 	return SubmitStakingTransaction(ctx, s.b, tx)

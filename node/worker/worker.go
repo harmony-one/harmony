@@ -161,7 +161,7 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 ) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
 
 	// only beaconchain process staking transaction
-	if w.chain.ShardID() != shard.BeaconChainID {
+	if w.chain.ShardID() != shard.BeaconChainShardID {
 		utils.Logger().Warn().Msgf("Invalid shardID: %v", w.chain.ShardID())
 		return nil, nil, nil
 	}

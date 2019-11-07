@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	// BeaconChainID is the ShardID of the BeaconChain
-	BeaconChainID = 0
+	// BeaconChainShardID is the ShardID of the BeaconChain
+	BeaconChainShardID = 0
 )
 
 // ShardingSchedule is the sharding configuration schedule.

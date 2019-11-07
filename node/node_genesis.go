@@ -46,7 +46,7 @@ type genesisInitializer struct {
 // InitChainDB sets up a new genesis block in the database for the given shard.
 func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) error {
 	shardState := committee.IncorporatingStaking.Read(big.NewInt(0))
-	if shardID != shard.BeaconChainID {
+	if shardID != shard.BeaconChainShardID {
 		// store only the local shard for shard chains
 		c := shardState.FindCommitteeByID(shardID)
 		if c == nil {
@@ -73,7 +73,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	switch node.NodeConfig.GetNetworkType() {
 	case nodeconfig.Mainnet:
 		chainConfig = *params.MainnetChainConfig
-		if shardID == shard.BeaconChainID {
+		if shardID == shard.BeaconChainShardID {
 			foundationAddress := common.HexToAddress("0xE25ABC3f7C3d5fB7FB81EAFd421FF1621A61107c")
 			genesisFunds := big.NewInt(GenesisFund)
 			genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))

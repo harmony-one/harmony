@@ -103,7 +103,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare cross links
 	var crossLinks types.CrossLinks
-	if node.NodeConfig.ShardID == shard.BeaconChainID {
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		crossLinksToPropose, localErr := node.ProposeCrossLinkDataForBeaconchain()
 		if localErr == nil {
 			crossLinks = crossLinksToPropose
@@ -126,7 +126,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 func (node *Node) proposeShardState(block *types.Block) error {
 	switch node.Consensus.ShardID {
-	case shard.BeaconChainID:
+	case shard.BeaconChainShardID:
 		return node.proposeBeaconShardState(block)
 	default:
 		fmt.Println("This should not be happening")
