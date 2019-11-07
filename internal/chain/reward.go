@@ -14,10 +14,14 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 )
 
-// BlockReward is the block reward, to be split evenly among block signers.
-var BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
+var (
+	// BlockReward is the block reward, to be split evenly among block signers.
+	BlockReward                  = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
+	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
+)
 
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
@@ -86,13 +90,26 @@ func AccumulateRewards(
 			accounts = append(accounts, common2.Address(member.ECDSAAddress))
 		}
 	}
-
+	type t struct {
+		common.Address
+		*big.Int
+	}
 	signers := []string{}
+	payable := []t{}
+
 	totalAmount := d.Award(
 		BlockReward, accounts, func(receipient common.Address, amount *big.Int) {
-			state.AddBalance(receipient, amount)
 			signers = append(signers, common2.MustAddressToBech32(receipient))
+			payable = append(payable, t{receipient, amount})
 		})
+
+	if totalAmount.Cmp(BlockReward) != 0 {
+		return errors.Wrapf(errPayoutNotEqualBlockReward, "payout "+totalAmount.String())
+	}
+
+	for i := range payable {
+		state.AddBalance(payable[i].Address, payable[i].Int)
+	}
 
 	header.Logger(utils.Logger()).Debug().
 		Int("NumAccounts", len(accounts)).
