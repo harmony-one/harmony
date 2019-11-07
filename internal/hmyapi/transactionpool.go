@@ -24,8 +24,8 @@ var (
 // TxHistoryArgs is struct to make GetTransactionsHistory request
 type TxHistoryArgs struct {
 	Address   string `json:"address"`
-	PageIndex int    `json:"pageIndex"`
-	PageSize  int    `json:"pageSize"`
+	PageIndex uint32 `json:"pageIndex"`
+	PageSize  uint32 `json:"pageSize"`
 	FullTx    bool   `json:"fullTx"`
 	TxType    string `json:"txType"`
 	Order     string `json:"order"`
