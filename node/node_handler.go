@@ -306,28 +306,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		return
 	} else if core.IsEpochLastBlock(newBlock) {
 		node.Consensus.UpdateConsensusInformation()
-		// validatorSnapshot := node.Blockchain().ValidatorCandidates()
-		// vCount := len(validatorSnapshot)
-		// type t struct {
-		// 	*staking.Validator
-		// 	numeric.Dec
-		// }
-		// validatorStakes := make([]t, vCount)
-		// for i, cand := range validatorSnapshot {
-		// 	validatorStakes[i] = t{
-		// 		node.Blockchain().ValidatorInformation(cand),
-		// 		node.Blockchain().ValidatorStakingWithDelegation(cand),
-		// 	}
-		// }
-		// TODO This all goes into CalculateShardState
-		// sort.SliceStable(validatorStakes,
-		// 	func(i, j int) bool {
-		// 		return validatorStakes[i].Stake.LT(validatorStakes[j].Stake)
-		// 	},
-		// )
-		// Now do header.SetShardState?
-		// node.Consensus.Decider.UpdateVotingPower(validatorStakes[:1600])
-
 	}
 
 	// Update last consensus time for metrics
