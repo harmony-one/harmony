@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/harmony-one/go-sdk/pkg/address"
+	common2 "github.com/harmony-one/harmony/internal/common"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -141,20 +141,21 @@ func (w *Worker) CommitTransactions(pendingNormal map[common.Address]types.Trans
 		}
 
 		logs, err := w.commitTransaction(tx, coinbase)
+		sender, _ := common2.AddressToBech32(from)
 		switch err {
 		case core.ErrGasLimitReached:
 			// Pop the current out-of-gas transaction without shifting in the next from the account
-			utils.Logger().Info().Str("sender", address.ToBech32(from)).Msg("Gas limit exceeded for current block")
+			utils.Logger().Info().Str("sender", sender).Msg("Gas limit exceeded for current block")
 			txs.Pop()
 
 		case core.ErrNonceTooLow:
 			// New head notification data race between the transaction pool and miner, shift
-			utils.Logger().Info().Str("sender", address.ToBech32(from)).Uint64("nonce", tx.Nonce()).Msg("Skipping transaction with low nonce")
+			utils.Logger().Info().Str("sender", sender).Uint64("nonce", tx.Nonce()).Msg("Skipping transaction with low nonce")
 			txs.Shift()
 
 		case core.ErrNonceTooHigh:
 			// Reorg notification data race between the transaction pool and miner, skip account =
-			utils.Logger().Info().Str("sender", address.ToBech32(from)).Uint64("nonce", tx.Nonce()).Msg("Skipping account with high nonce")
+			utils.Logger().Info().Str("sender", sender).Uint64("nonce", tx.Nonce()).Msg("Skipping account with high nonce")
 			txs.Pop()
 
 		case nil:
