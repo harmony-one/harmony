@@ -7,7 +7,6 @@ import (
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -57,7 +56,8 @@ func TestConstructCommitMessage(test *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		committee.IncorporatingStaking,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)

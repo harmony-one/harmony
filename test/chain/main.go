@@ -109,7 +109,6 @@ func fundFaucetContract(chain *core.BlockChain) {
 		allRandomUserKey = append(allRandomUserKey, randomUserKey)
 		txs = append(txs, tx)
 	}
-	amount := 720000
 
 	err := contractworker.CommitTransactions(txs, nil, testUserAddress)
 	if err != nil {

@@ -31,14 +31,14 @@ func init() {
 
 func TestGetHashFromNodeList(t *testing.T) {
 	l1 := []NodeID{
-		{common.Address{0x11}, blsPubKey1},
-		{common.Address{0x22}, blsPubKey2},
-		{common.Address{0x33}, blsPubKey3},
+		{common.Address{0x11}, blsPubKey1, nil},
+		{common.Address{0x22}, blsPubKey2, nil},
+		{common.Address{0x33}, blsPubKey3, nil},
 	}
 	l2 := []NodeID{
-		{common.Address{0x22}, blsPubKey2},
-		{common.Address{0x11}, blsPubKey1},
-		{common.Address{0x33}, blsPubKey3},
+		{common.Address{0x22}, blsPubKey2, nil},
+		{common.Address{0x11}, blsPubKey1, nil},
+		{common.Address{0x33}, blsPubKey3, nil},
 	}
 	h1 := GetHashFromNodeList(l1)
 	h2 := GetHashFromNodeList(l2)
@@ -52,40 +52,40 @@ func TestHash(t *testing.T) {
 	com1 := Committee{
 		ShardID: 22,
 		NodeList: []NodeID{
-			{common.Address{0x12}, blsPubKey11},
-			{common.Address{0x23}, blsPubKey22},
-			{common.Address{0x11}, blsPubKey1},
+			{common.Address{0x12}, blsPubKey11, nil},
+			{common.Address{0x23}, blsPubKey22, nil},
+			{common.Address{0x11}, blsPubKey1, nil},
 		},
 	}
 	com2 := Committee{
 		ShardID: 2,
 		NodeList: []NodeID{
-			{common.Address{0x44}, blsPubKey4},
-			{common.Address{0x55}, blsPubKey5},
-			{common.Address{0x66}, blsPubKey6},
+			{common.Address{0x44}, blsPubKey4, nil},
+			{common.Address{0x55}, blsPubKey5, nil},
+			{common.Address{0x66}, blsPubKey6, nil},
 		},
 	}
-	shardState1 := State{com1, com2}
+	shardState1 := SuperCommittee{com1, com2}
 	h1 := shardState1.Hash()
 
 	com3 := Committee{
 		ShardID: 2,
 		NodeList: []NodeID{
-			{common.Address{0x44}, blsPubKey4},
-			{common.Address{0x55}, blsPubKey5},
-			{common.Address{0x66}, blsPubKey6},
+			{common.Address{0x44}, blsPubKey4, nil},
+			{common.Address{0x55}, blsPubKey5, nil},
+			{common.Address{0x66}, blsPubKey6, nil},
 		},
 	}
 	com4 := Committee{
 		ShardID: 22,
 		NodeList: []NodeID{
-			{common.Address{0x12}, blsPubKey11},
-			{common.Address{0x23}, blsPubKey22},
-			{common.Address{0x11}, blsPubKey1},
+			{common.Address{0x12}, blsPubKey11, nil},
+			{common.Address{0x23}, blsPubKey22, nil},
+			{common.Address{0x11}, blsPubKey1, nil},
 		},
 	}
 
-	shardState2 := State{com3, com4}
+	shardState2 := SuperCommittee{com3, com4}
 	h2 := shardState2.Hash()
 
 	if bytes.Compare(h1[:], h2[:]) != 0 {

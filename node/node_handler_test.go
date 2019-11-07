@@ -6,12 +6,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 )
 
 func TestAddNewBlock(t *testing.T) {
@@ -25,7 +26,8 @@ func TestAddNewBlock(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, shard.BeaconChainShardID, leader, blsKey, decider,
+		committee.IncorporatingStaking,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -58,7 +60,8 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, shard.BeaconChainShardID, leader, blsKey, decider,
+		committee.IncorporatingStaking,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
