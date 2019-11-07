@@ -79,9 +79,6 @@ type Consensus struct {
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers int
 
-	// Leader's address
-	leader p2p.Peer
-
 	CommitteePublicKeys map[string]bool
 
 	pubKeyLock sync.Mutex
