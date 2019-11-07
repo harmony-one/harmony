@@ -347,7 +347,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
 
-	// Update consensus keys at last so the change of leader don't mess up Z
+	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if core.IsEpochLastBlock(newBlock) {
 		node.Consensus.UpdateConsensusInformation()
 	}
