@@ -355,6 +355,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.LeaderPubKey = consensus.PubKey
 		consensus.ResetState()
 		if len(consensus.m1Payload) == 0 {
+			// TODO(Chao): explain why ReadySignal is sent only in this case but not the other case.
 			go func() {
 				consensus.ReadySignal <- struct{}{}
 			}()
