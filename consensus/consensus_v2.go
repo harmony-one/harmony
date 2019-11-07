@@ -1026,6 +1026,7 @@ func (consensus *Consensus) tryCatchup() {
 		}
 		utils.Logger().Info().Msg("[TryCatchup] prepared message found to commit")
 
+		// TODO(Chao): Explain the reasoning for these code
 		consensus.blockHash = [32]byte{}
 		consensus.blockNum = consensus.blockNum + 1
 		consensus.viewID = msgs[0].ViewID + 1
@@ -1129,6 +1130,11 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				utils.Logger().Info().Msg("Node is out of sync")
 
 			case newBlock := <-blockChannel:
+				// Debug code to trigger leader change.
+				//if consensus.ShardID == 0 && newBlock.NumberU64() == 2 && strings.Contains(consensus.PubKey.SerializeToHexStr(), "65f55eb") {
+				//	continue
+				//}
+
 				utils.Logger().Info().
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
@@ -1223,6 +1229,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				consensus.handleMessageUpdate(msg)
 
 			case viewID := <-consensus.commitFinishChan:
+				// Only Leader execute this condition
 				func() {
 					consensus.mutex.Lock()
 					defer consensus.mutex.Unlock()
