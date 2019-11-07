@@ -142,11 +142,13 @@ func (w *Worker) CommitTransactions(
 		}
 
 		logs, err := w.commitTransaction(tx, coinbase)
+
 		if err != nil {
 			erroredTxns = append(erroredTxns, types.RPCTransactionError{
 				tx.Hash().Hex(), time.Now().Unix(), err.Error(),
 			})
 		}
+
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
 		case core.ErrGasLimitReached:
