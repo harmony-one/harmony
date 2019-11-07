@@ -30,7 +30,7 @@ type Consensus struct {
 	Decider quorum.Decider
 	// CommitteeAssigner provides information about who the SuperCommittee members are, their public
 	// keys
-	CommitteeAssigner committee.MemberReader
+	CommitteeReader committee.MemberReader
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -212,11 +212,11 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 func New(
 	host p2p.Host, shard uint32, leader p2p.Peer,
 	blsPriKey *bls.SecretKey, decider quorum.Decider,
-	assigner committee.MemberReader,
+	reader committee.MemberReader,
 ) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.Decider = decider
-	consensus.CommitteeAssigner = assigner
+	consensus.CommitteeReader = reader
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.blockNumLowChan = make(chan struct{})

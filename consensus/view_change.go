@@ -157,7 +157,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 	if consensus.Decider.IsQuorumAchieved(quorum.ViewChange) {
 		utils.Logger().Debug().
-			Int64("have", consensus.Decider.SignatoriesCount(quorum.ViewChange)).
+			Int64("have", consensus.Decider.SignersCount(quorum.ViewChange)).
 			Int64("need", consensus.Decider.QuorumThreshold()).
 			Str("validatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
 			Msg("[onViewChange] Received Enough View Change Messages")
@@ -345,7 +345,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	// Set the bitmap indicating that this validator signed.
 	consensus.viewIDBitmap.SetKey(recvMsg.SenderPubkey, true)
 	utils.Logger().Debug().
-		Int64("numSigs", consensus.Decider.SignatoriesCount(quorum.ViewChange)).
+		Int64("numSigs", consensus.Decider.SignersCount(quorum.ViewChange)).
 		Int64("needed", consensus.Decider.QuorumThreshold()).
 		Msg("[onViewChange]")
 

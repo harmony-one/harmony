@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -473,7 +474,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	header := consensus.ChainReader.CurrentHeader()
 	epoch := header.Epoch()
 	// currentSuperCommittee, _ := consensus.ChainReader.ReadShardState(epoch)
-	curPubKeys := consensus.CommitteeAssigner.ReadPublicKeys(epoch)
+	curPubKeys := consensus.CommitteeReader.ReadPublicKeys(epoch)
 	// curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID(), committee.GenesisAssigner, currentSuperCommittee)
 	consensus.numPrevPubKeys = len(curPubKeys)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
@@ -483,8 +484,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		// nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		pubKeys = consensus.CommitteeAssigner.ReadPublicKeys(epoch)
+		nextEpoch := new(big.Int).Add(epoch, common.Big1)
+		pubKeys = consensus.CommitteeReader.ReadPublicKeys(nextEpoch)
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
 		pubKeys = curPubKeys

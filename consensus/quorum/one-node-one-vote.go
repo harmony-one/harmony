@@ -20,7 +20,7 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
-	return v.SignatoriesCount(p) >= v.QuorumThreshold()
+	return v.SignersCount(p) >= v.QuorumThreshold()
 }
 
 // QuorumThreshold ..
@@ -30,7 +30,7 @@ func (v *uniformVoteWeight) QuorumThreshold() int64 {
 
 // RewardThreshold ..
 func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
-	return v.SignatoriesCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
+	return v.SignersCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }
 
 func (v *uniformVoteWeight) UpdateVotingPower(effective.StakeKeeper) {
@@ -45,6 +45,8 @@ func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
 
 // Award ..
 func (v *uniformVoteWeight) Award(
+	// Here hook is the callback which gets the amount the earner is due in just reward
+	// up to the hook to do side-effects like write the statedb
 	Pie *big.Int, earners []common2.Address, hook func(earner common.Address, due *big.Int),
 ) (payout *big.Int) {
 

@@ -34,6 +34,11 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+const (
+	// GenesisEpoch is the number of the genesis epoch.
+	GenesisEpoch = 0
+)
+
 // BlockGen creates blocks for testing.
 // See GenerateChain for a detailed explanation.
 type BlockGen struct {

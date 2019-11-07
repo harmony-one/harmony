@@ -75,6 +75,7 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.SuperCommittee 
 	return shardState
 }
 
+// ReadPublicKeys produces publicKeys of entire supercommittee per epoch
 func (def partialStakingEnabled) ReadPublicKeys(epoch *big.Int) []*bls.PublicKey {
 	switch instance := shard.Schedule.InstanceForEpoch(epoch); instance.SuperCommittee() {
 	case shardingconfig.Genesis:

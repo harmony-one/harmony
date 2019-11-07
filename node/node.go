@@ -565,8 +565,8 @@ func New(
 
 // CalculateInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
 
-// LoadSuperCommitteeForLatestEpochOnChain ..
-func (node *Node) LoadSuperCommitteeForLatestEpochOnChain() (err error) {
+// LoadSuperCommitteeForCurrentEpochOnChain ..
+func (node *Node) LoadSuperCommitteeForCurrentEpochOnChain() (err error) {
 	if node.Consensus == nil {
 		return ctxerror.New("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
 	}

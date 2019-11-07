@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -208,7 +209,7 @@ func passphraseForBls() {
 }
 
 func setupInitialAccount() (isLeader bool) {
-	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(0))
+	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
@@ -387,7 +388,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// currentNode.DRand = dRand
 
 	// This needs to be executed after consensus and drand are setup
-	if err := currentNode.LoadSuperCommitteeForLatestEpochOnChain(); err != nil {
+	if err := currentNode.LoadSuperCommitteeForCurrentEpochOnChain(); err != nil {
 		ctxerror.Crit(utils.GetLogger(), err, "CalculateInitShardState failed",
 			"shardID", *shardID)
 	}

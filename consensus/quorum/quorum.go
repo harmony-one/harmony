@@ -43,7 +43,7 @@ type SignatoryTracker interface {
 	ParticipantTracker
 	AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign)
 	// Caller assumes concurrency protection
-	SignatoriesCount(Phase) int64
+	SignersCount(Phase) int64
 	Reset([]Phase)
 }
 
@@ -106,7 +106,7 @@ func (s *cIdentities) ParticipantsCount() int64 {
 	return int64(len(s.publicKeys))
 }
 
-func (s *cIdentities) SignatoriesCount(p Phase) int64 {
+func (s *cIdentities) SignersCount(p Phase) int64 {
 	switch p {
 	case Prepare:
 		return int64(len(s.prepare))
