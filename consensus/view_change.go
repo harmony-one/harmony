@@ -158,7 +158,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	if consensus.Decider.IsQuorumAchieved(quorum.ViewChange) {
 		utils.Logger().Debug().
 			Int64("have", consensus.Decider.SignersCount(quorum.ViewChange)).
-			Int64("need", consensus.Decider.QuorumThreshold()).
+			Int64("need", consensus.Decider.QuorumThreshold().Int64()).
 			Str("validatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
 			Msg("[onViewChange] Received Enough View Change Messages")
 		return
@@ -283,8 +283,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 			// check has 2f+1 signature in m1 type message
 			need := consensus.Decider.QuorumThreshold()
-			if count := utils.CountOneBits(mask.Bitmap); count < need {
-				utils.Logger().Debug().Int64("need", need).Int64("have", count).
+			if count := utils.CountOneBits(mask.Bitmap); count < need.Int64() {
+				utils.Logger().Debug().Int64("need", need.Int64()).Int64("have", count).
 					Msg("[onViewChange] M1 Payload Not Have Enough Signature")
 				return
 			}
@@ -346,7 +346,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	consensus.viewIDBitmap.SetKey(recvMsg.SenderPubkey, true)
 	utils.Logger().Debug().
 		Int64("numSigs", consensus.Decider.SignersCount(quorum.ViewChange)).
-		Int64("needed", consensus.Decider.QuorumThreshold()).
+		Int64("needed", consensus.Decider.QuorumThreshold().Int64()).
 		Msg("[onViewChange]")
 
 	// received enough view change messages, change state to normal consensus
@@ -446,8 +446,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 	// check total number of sigs >= 2f+1
 	need := consensus.Decider.QuorumThreshold()
-	if count := utils.CountOneBits(m3Mask.Bitmap); count < need {
-		utils.Logger().Debug().Int64("need", need).Int64("have", count).
+	if count := utils.CountOneBits(m3Mask.Bitmap); count < need.Int64() {
+		utils.Logger().Debug().Int64("need", need.Int64()).Int64("have", count).
 			Msg("[onNewView] Not Have Enough M3 (ViewID) Signature")
 		return
 	}

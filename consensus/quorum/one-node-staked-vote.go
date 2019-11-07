@@ -38,8 +38,8 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // QuorumThreshold ..
-func (v *stakedVoteWeight) QuorumThreshold() int64 {
-	return v.totalEffectiveStakedAmount.Mul(twoThirds).Int64()
+func (v *stakedVoteWeight) QuorumThreshold() *big.Int {
+	return big.NewInt(v.totalEffectiveStakedAmount.Mul(twoThirds).Int64())
 }
 
 // RewardThreshold ..

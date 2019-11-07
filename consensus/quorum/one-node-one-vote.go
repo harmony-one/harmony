@@ -20,12 +20,12 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
-	return v.SignersCount(p) >= v.QuorumThreshold()
+	return v.SignersCount(p) >= v.QuorumThreshold().Int64()
 }
 
 // QuorumThreshold ..
-func (v *uniformVoteWeight) QuorumThreshold() int64 {
-	return v.ParticipantsCount()*2/3 + 1
+func (v *uniformVoteWeight) QuorumThreshold() *big.Int {
+	return big.NewInt(v.ParticipantsCount()*2/3 + 1)
 }
 
 // RewardThreshold ..

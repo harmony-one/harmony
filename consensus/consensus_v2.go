@@ -886,9 +886,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	switch consensus.Decider.Policy() {
 	case quorum.SuperMajorityVote:
 		threshold := consensus.Decider.QuorumThreshold()
-		if count := utils.CountOneBits(mask.Bitmap); int64(count) < threshold {
+		if count := utils.CountOneBits(mask.Bitmap); count < threshold.Int64() {
 			utils.Logger().Warn().
-				Int64("need", threshold).
+				Int64("need", threshold.Int64()).
 				Int64("got", count).
 				Msg("[OnCommitted] Not enough signature in committed msg")
 			return

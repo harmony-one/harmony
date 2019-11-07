@@ -1,6 +1,8 @@
 package quorum
 
 import (
+	"math/big"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -198,7 +200,7 @@ type Decider interface {
 	UpdateVotingPower(keeper effective.StakeKeeper)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	QuorumThreshold() int64
+	QuorumThreshold() *big.Int
 	IsRewardThresholdAchieved() bool
 }
 
