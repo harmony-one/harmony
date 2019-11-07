@@ -315,8 +315,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			Err(err).
 			Msg("Error when adding new block")
 		return
-	} else if core.IsEpochLastBlock(newBlock) {
-		node.Consensus.UpdateConsensusInformation()
 	}
 
 	// Update last consensus time for metrics
@@ -348,6 +346,11 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
+
+	// Update consensus keys at last so the change of leader don't mess up Z
+	if core.IsEpochLastBlock(newBlock) {
+		node.Consensus.UpdateConsensusInformation()
+	}
 
 	// TODO chao: uncomment this after beacon syncing is stable
 	// node.Blockchain().UpdateCXReceiptsCheckpointsByBlock(newBlock)
