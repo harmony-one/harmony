@@ -82,7 +82,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	coinbase := node.Consensus.SelfAddress
 
-	// Prepare transactions including staking transactions\
+	// Prepare transactions including staking transactions
 	pending, err := node.TxPool.Pending()
 	if err != nil {
 		utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
