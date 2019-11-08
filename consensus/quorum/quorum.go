@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 )
 
@@ -212,8 +212,8 @@ func NewDecider(p Policy) Decider {
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
 			newMapBackedSignatureReader(),
-			map[*bls.PublicKey]stakedVoter{},
-			numeric.ZeroDec(),
+			map[[shard.PublicKeySize]byte]stakedVoter{},
+			big.NewInt(0),
 		}
 	default:
 		// Should not be possible

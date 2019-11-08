@@ -6,11 +6,12 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 )
 
 var (
-	twoThirds = numeric.NewDec(2).QuoInt64(3)
+	twoThirds = numeric.NewDec(2).QuoInt64(3).Int
 )
 
 type stakedVoter struct {
@@ -21,8 +22,8 @@ type stakedVoter struct {
 type stakedVoteWeight struct {
 	SignatureReader
 	// EPOS based staking
-	validatorStakes            map[*bls.PublicKey]stakedVoter
-	totalEffectiveStakedAmount numeric.Dec
+	validatorStakes            map[[shard.PublicKeySize]byte]stakedVoter
+	totalEffectiveStakedAmount *big.Int
 }
 
 // Policy ..
@@ -34,16 +35,18 @@ func (v *stakedVoteWeight) Policy() Policy {
 // we divide that out & you
 // IsQuorumAchieved ..
 func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
+	// TODO Implement this logic
 	return true
 }
 
 // QuorumThreshold ..
 func (v *stakedVoteWeight) QuorumThreshold() *big.Int {
-	return big.NewInt(v.totalEffectiveStakedAmount.Mul(twoThirds).Int64())
+	return new(big.Int).Mul(v.totalEffectiveStakedAmount, twoThirds)
 }
 
 // RewardThreshold ..
 func (v *stakedVoteWeight) IsRewardThresholdAchieved() bool {
+	// TODO Implement
 	return false
 }
 
@@ -57,48 +60,16 @@ var (
 func (v *stakedVoteWeight) Award(
 	Pie *big.Int, earners []common.Address, hook func(earner common.Address, due *big.Int),
 ) *big.Int {
+	// TODO Implement
 	return nil
 }
 
 // UpdateVotingPower called only at epoch change, prob need to move to CalculateShardState
 func (v *stakedVoteWeight) UpdateVotingPower(keeper effective.StakeKeeper) {
-	members := keeper.Inventory()
-	count := len(members.BLSPublicKeys)
-	totalAmount := numeric.ZeroDec()
-	realStakes := []numeric.Dec{}
-
-	for i := 0; i < count; i++ {
-		bPublic := &bls.PublicKey{}
-		// TODO handle error
-		bPublic.Deserialize(members.BLSPublicKeys[i][:])
-
-		switch stake := members.WithDelegationApplied[i]; stake.Cmp(hSentinel) {
-		// Our node
-		case 0:
-			v.validatorStakes[bPublic] = stakedVoter{
-				true, true, hEffectiveSentinel,
-			}
-		default:
-			realStakes = append(realStakes, members.WithDelegationApplied[i])
-			v.validatorStakes[bPublic] = stakedVoter{
-				true, false, members.WithDelegationApplied[i],
-			}
-		}
-	}
-
-	median := effective.Median(realStakes)
-	for _, voter := range v.validatorStakes {
-		if !voter.isHarmonyNode {
-			voter.effective = effective.Stake(median, voter.effective)
-			totalAmount.Add(voter.effective)
-		}
-	}
-
-	//
-
+	// TODO Implement
 }
 
 func (v *stakedVoteWeight) ToggleActive(*bls.PublicKey) bool {
-
+	// TODO Implement
 	return true
 }

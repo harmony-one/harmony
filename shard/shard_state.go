@@ -19,6 +19,9 @@ var (
 	emptyBLSPubKey = BLSPublicKey{}
 )
 
+// PublicKeySize is size in bytes of BLS Public key
+const PublicKeySize = 48
+
 // StakedValidator ..
 type StakedValidator struct {
 	// nil means not active, 0 means our node, >= 0 means staked node
@@ -45,7 +48,7 @@ type Committee struct {
 type SuperCommittee []Committee
 
 // BLSPublicKey defines the bls public key
-type BLSPublicKey [48]byte
+type BLSPublicKey [PublicKeySize]byte
 
 // Inventory ..
 func (members NodeIDList) Inventory() (result struct {

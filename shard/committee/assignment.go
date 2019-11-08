@@ -141,21 +141,21 @@ func with400Stakers(s shardingconfig.Instance, stakerReader StakingCandidatesRea
 
 // ReadPublicKeys produces publicKeys of entire supercommittee per epoch
 func (def partialStakingEnabled) ReadPublicKeys(epoch *big.Int, config params.ChainConfig) []*bls.PublicKey {
-	// instance := shard.Schedule.InstanceForEpoch(epoch)
-	// if !config.IsStaking(epoch) {
-	// 	superComm := preStakingEnabledCommittee(instance)
-	// 	identities := make([]*bls.PublicKey, int(instance.NumShards())*instance.NumNodesPerShard())
-	// 	spot := 0
-	// 	for i := range superComm {
-	// 		for j := range superComm[i].NodeList {
-	// 			identity := &bls.PublicKey{}
-	// 			superComm[i].NodeList[j].BLSPublicKey.ToLibBLSPublicKey(identity)
-	// 			identities[spot] = identity
-	// 			spot++
-	// 		}
-	// 	}
-	// 	return identities
-	// }
+	instance := shard.Schedule.InstanceForEpoch(epoch)
+	if !config.IsStaking(epoch) {
+		superComm := preStakingEnabledCommittee(instance)
+		identities := make([]*bls.PublicKey, int(instance.NumShards())*instance.NumNodesPerShard())
+		spot := 0
+		for i := range superComm {
+			for j := range superComm[i].NodeList {
+				identity := &bls.PublicKey{}
+				superComm[i].NodeList[j].BLSPublicKey.ToLibBLSPublicKey(identity)
+				identities[spot] = identity
+				spot++
+			}
+		}
+		return identities
+	}
 	return nil
 }
 
