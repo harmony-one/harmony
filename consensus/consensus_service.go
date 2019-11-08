@@ -485,10 +485,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		// TODO Read from block header when staking epoch past
 		pubKeys = consensus.CommitteeReader.ReadPublicKeys(
-			nextEpoch, *consensus.ChainReader.Config(),
+			new(big.Int).Add(epoch, common.Big1), *consensus.ChainReader.Config(),
 		)
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
@@ -535,9 +533,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	// not in committee
 	return Listening
 }
-
-// TODO
-// Need to factor into committee
 
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
