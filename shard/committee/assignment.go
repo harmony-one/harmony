@@ -2,12 +2,14 @@ package committee
 
 import (
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -91,17 +93,50 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.SuperCommittee 
 func with400Stakers(s shardingconfig.Instance, stakerReader StakingCandidatesReader) (shard.SuperCommittee, error) {
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
-	validators := make([]*staking.Validator, len(candidates))
+	stakers := make([]*staking.Validator, len(candidates))
 	for i := range candidates {
 		// TODO Should be using .ValidatorStakingWithDelegation, not implemented yet
 		validator, err := stakerReader.ValidatorInformation(candidates[i])
 		if err != nil {
 			return nil, err
 		}
-		validators[i] = validator
+		stakers[i] = validator
 	}
 
-	return nil, nil
+	sort.SliceStable(
+		stakers,
+		func(i, j int) bool { return stakers[i].Stake.Cmp(stakers[j].Stake) >= 0 },
+	)
+	const sCount = 401
+	top := stakers[:sCount]
+	shardCount := int(s.NumShards())
+	superComm := make(shard.SuperCommittee, shardCount)
+	fillCount := make([]int, shardCount)
+
+	for i := 0; i < shardCount; i++ {
+		superComm[i] = shard.Committee{}
+		superComm[i].NodeList = make(shard.NodeIDList, s.NumNodesPerShard())
+	}
+	scratchPad := &bls.PublicKey{}
+	// TODO Finish this logic
+	for i := range top {
+		spot := int(top[i].Address.Big().Int64()) % shardCount
+		fillCount[spot]++
+		// scratchPad.DeserializeHexStr()
+		pubKey := shard.BLSPublicKey{}
+		pubKey.FromLibBLSPublicKey(scratchPad)
+		superComm[spot].NodeList = append(
+			superComm[spot].NodeList,
+			shard.NodeID{
+				ECDSAAddress: top[i].Address,
+				BLSPublicKey: pubKey,
+				Validator:    &shard.StakedValidator{big.NewInt(0)},
+			},
+		)
+	}
+
+	utils.Logger().Info().Ints("distribution of Stakers in Shards", fillCount)
+	return superComm, nil
 }
 
 // ReadPublicKeys produces publicKeys of entire supercommittee per epoch

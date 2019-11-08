@@ -19,14 +19,17 @@ var (
 	emptyBLSPubKey = BLSPublicKey{}
 )
 
+// StakedValidator ..
+type StakedValidator struct {
+	// nil means not active, 0 means our node, >= 0 means staked node
+	WithDelegationApplied *big.Int `json:"with-delegation-applied,omitempty"`
+}
+
 // NodeID represents node id (BLS address)
 type NodeID struct {
-	ECDSAAddress common.Address `json:"ecdsa_address"`
-	BLSPublicKey BLSPublicKey   `json:"bls_pubkey"`
-	Validator    *struct {
-		// nil means not active, 0 means our node, >= 0 means staked node
-		WithDelegationApplied *big.Int `json:"with-delegation-applied,omitempty"`
-	}
+	ECDSAAddress common.Address   `json:"ecdsa_address"`
+	BLSPublicKey BLSPublicKey     `json:"bls_pubkey"`
+	Validator    *StakedValidator `json:"staked-validator,omitempty"`
 }
 
 // NodeIDList is a list of NodeID
