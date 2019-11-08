@@ -103,7 +103,7 @@ func setUpTXGen() *node.Node {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensusObj, err := consensus.New(
-		myhost, uint32(shardID), p2p.Peer{}, nil, decider, committee.IncorporatingStaking,
+		myhost, uint32(shardID), p2p.Peer{}, nil, decider, committee.WithStakingEnabled,
 	)
 	chainDBFactory := &shardchain.MemDBFactory{}
 	txGen := node.New(myhost, consensusObj, chainDBFactory, false) //Changed it : no longer archival node.

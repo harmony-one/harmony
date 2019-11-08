@@ -21,8 +21,8 @@ import (
 )
 
 type engineImpl struct {
-	r                 reward.Distributor
-	committeeAssigner committee.MemberReader
+	blockDistributor reward.Distributor
+	committeeReader  committee.Reader
 }
 
 // Engine is an algorithm-agnostic consensus engine.
@@ -31,16 +31,16 @@ var Engine = newEngine()
 func newEngine() *engineImpl {
 	// Careful, this the nil interface possible issue
 	var d reward.Distributor
-	var a committee.MemberReader
+	var a committee.Reader
 	return &engineImpl{d, a}
 }
 
 func (e *engineImpl) Rewarder() reward.Distributor {
-	return e.r
+	return e.blockDistributor
 }
 
 func (e *engineImpl) SetRewarder(d reward.Distributor) {
-	e.r = d
+	e.blockDistributor = d
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -146,7 +146,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	parentQuorum, err := QuorumForBlock(chain, parentHeader, false, e.committeeAssigner)
+	parentQuorum, err := QuorumForBlock(chain, parentHeader, false, e.committeeReader)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
@@ -181,24 +181,20 @@ func (e *engineImpl) Finalize(
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), nil
 }
 
-func (e *engineImpl) SetSuperCommitteeAssigner(assigner committee.MemberReader) {
-	e.committeeAssigner = assigner
+func (e *engineImpl) SetCommitteeReader(assigner committee.Reader) {
+	e.committeeReader = assigner
 }
 
-func (e *engineImpl) SuperCommitteeAssigner() committee.MemberReader {
-	return e.committeeAssigner
+func (e *engineImpl) CommitteeReader() committee.Reader {
+	return e.committeeReader
 }
 
 // QuorumForBlock returns the quorum for the given block header.
-func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool, assigner committee.MemberReader) (quorum int, err error) {
+func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool, assigner committee.Reader) (quorum int, err error) {
 	var ss shard.SuperCommittee
 
 	if reCalculate {
-		// assigner.NextCommittee(ShardingSchedule.InstanceForEpoch(epoch), epoch, previous)
-		// mem := assigner.IsInitEpoch(h.Epoch())
-		// ss, oops := chain.ReadShardState(h.Epoch())
-		// core.CalculateShardState(epoch *big.Int, assign committee.Assigner, previous shard.SuperCommittee)
-		// ss = core.CalculateShardState(h.Epoch(), committee.MemberAssigner, chain)
+		// REgular assigner.REad
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -233,7 +229,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 	}
 
 	hash := header.Hash()
-	quorum, err := QuorumForBlock(chain, header, reCalculate, e.committeeAssigner)
+	quorum, err := QuorumForBlock(chain, header, reCalculate, e.committeeReader)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())

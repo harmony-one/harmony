@@ -131,6 +131,8 @@ func (d Description) EnsureLength() (Description, error) {
 	return d, nil
 }
 
+// TODO Whats the point of these accessor functions?
+
 // GetAddress returns address
 func (v *Validator) GetAddress() common.Address { return v.Address }
 

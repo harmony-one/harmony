@@ -37,7 +37,7 @@ func TestNewNode(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, blsKey, decider,
-		committee.IncorporatingStaking,
+		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -205,7 +205,7 @@ func TestAddPeers(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, blsKey, decider,
-		committee.IncorporatingStaking,
+		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -256,7 +256,7 @@ func TestAddBeaconPeer(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, blsKey, decider,
-		committee.IncorporatingStaking,
+		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

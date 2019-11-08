@@ -1,6 +1,7 @@
 package quorum
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -20,7 +21,9 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
-	return v.SignersCount(p) >= v.QuorumThreshold().Int64()
+	r := v.SignersCount(p) >= v.QuorumThreshold().Int64()
+	fmt.Println("EDGAR", v.SignersCount(p), v.QuorumThreshold().Int64(), v.ParticipantsCount(), r)
+	return r
 }
 
 // QuorumThreshold ..

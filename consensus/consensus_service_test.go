@@ -25,7 +25,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, blsPriKey, decider,
-		committee.IncorporatingStaking,
+		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -63,7 +63,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
-		committee.IncorporatingStaking,
+		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -92,7 +92,7 @@ func TestSetViewID(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
-		committee.IncorporatingStaking,
+		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

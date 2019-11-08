@@ -380,9 +380,14 @@ func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.SuperCommittee {
 	if !shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
 		return nil
 	}
-	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
+	// TODO ASK RJ
+	return nil
+
+	// just read from beaconchain
+
+	// nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
 	// currentSuperCommittee, _ := w.chain.ReadShardState(w.current.header.Epoch())
-	return w.engine.SuperCommitteeAssigner().Read(nextEpoch)
+	// return w.engine.CommitteeReader().Read(nextEpoch)
 	// return core.CalculateShardState(nextEpoch, committee.MemberAssigner, currentSuperCommittee)
 }
 

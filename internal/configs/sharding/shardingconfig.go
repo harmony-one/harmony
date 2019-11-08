@@ -88,9 +88,6 @@ type Instance interface {
 
 	// ReshardingEpoch returns a list of Epoch while off-chain resharding happens
 	ReshardingEpoch() []*big.Int
-
-	//SuperCommittee returns the policy used to decide quorum for epoch
-	SuperCommittee() SuperCommitteeMembership
 }
 
 // TxThrottleFlag is the throttling flag for each transaction

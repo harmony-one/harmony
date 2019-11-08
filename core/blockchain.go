@@ -2383,7 +2383,7 @@ func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
 func (bc *BlockChain) ValidatorCandidates() []common.Address {
 	list, err := bc.ReadValidatorList()
 	if err != nil {
-		return make([]common.Address, 0)
+		return []common.Address{}
 	}
 	return list
 }

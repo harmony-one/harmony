@@ -308,7 +308,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	decider := quorum.NewDecider(stringToPolicy(*quorumPolicy))
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, p2p.Peer{},
-		nodeConfig.ConsensusPriKey, decider, committee.IncorporatingStaking,
+		nodeConfig.ConsensusPriKey, decider, committee.WithStakingEnabled,
 	)
 	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 
@@ -450,7 +450,7 @@ func main() {
 		devnetConfig, err := shardingconfig.NewInstance(
 			uint32(*devnetNumShards), *devnetShardSize,
 			*devnetHarmonySize, genesis.HarmonyAccounts,
-			genesis.FoundationalNodeAccounts, nil, shardingconfig.Genesis,
+			genesis.FoundationalNodeAccounts, nil,
 		)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",

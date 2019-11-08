@@ -519,7 +519,7 @@ func New(
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
-		chain.Engine.SetSuperCommitteeAssigner(committee.IncorporatingStaking)
+		chain.Engine.SetCommitteeReader(committee.WithStakingEnabled)
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
 		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
@@ -577,7 +577,7 @@ func (node *Node) LoadSuperCommitteeForCurrentEpochOnChain() (err error) {
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
-	pubKeys := committee.IncorporatingStaking.ReadPublicKeys(epoch)
+	pubKeys := committee.WithStakingEnabled.ReadPublicKeys(epoch, node.chainConfig)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
 			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",

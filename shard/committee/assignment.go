@@ -3,33 +3,46 @@ package committee
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // MembershipList  ..
 type MembershipList interface {
-	Read(*big.Int) shard.SuperCommittee
+	Read(
+		epoch *big.Int, config params.ChainConfig, stakerReader StakingCandidatesReader,
+	) (shard.SuperCommittee, error)
 }
 
 // PublicKeys per epoch
 type PublicKeys interface {
-	ReadPublicKeys(*big.Int) []*bls.PublicKey
+	ReadPublicKeys(epoch *big.Int, config params.ChainConfig) []*bls.PublicKey
 }
 
-// MemberReader ..
-type MemberReader interface {
+// Reader ..
+type Reader interface {
 	PublicKeys
 	MembershipList
+}
+
+// StakingCandidatesReader ..
+type StakingCandidatesReader interface {
+	ValidatorInformation(addr common.Address) (*staking.Validator, error)
+	ValidatorStakingWithDelegation(addr common.Address) numeric.Dec
+	ValidatorCandidates() []common.Address
 }
 
 type partialStakingEnabled struct{}
 
 var (
-	// IncorporatingStaking ..
-	IncorporatingStaking MemberReader = partialStakingEnabled{}
+	// WithStakingEnabled ..
+	WithStakingEnabled Reader = partialStakingEnabled{}
 	// Genesis is the committee used at initial creation of Harmony blockchain
 	Genesis = preStakingEnabledCommittee(shard.Schedule.InstanceForEpoch(big.NewInt(0)))
 )
@@ -75,37 +88,51 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.SuperCommittee 
 	return shardState
 }
 
-// ReadPublicKeys produces publicKeys of entire supercommittee per epoch
-func (def partialStakingEnabled) ReadPublicKeys(epoch *big.Int) []*bls.PublicKey {
-	switch instance := shard.Schedule.InstanceForEpoch(epoch); instance.SuperCommittee() {
-	case shardingconfig.Genesis:
-		superComm := preStakingEnabledCommittee(instance)
-		identities := make([]*bls.PublicKey, int(instance.NumShards())*instance.NumNodesPerShard())
-		spot := 0
-		for i := range superComm {
-			for j := range superComm[i].NodeList {
-				identity := &bls.PublicKey{}
-				superComm[i].NodeList[j].BLSPublicKey.ToLibBLSPublicKey(identity)
-				identities[spot] = identity
-				spot++
-			}
+func with400Stakers(s shardingconfig.Instance, stakerReader StakingCandidatesReader) (shard.SuperCommittee, error) {
+	// TODO Nervous about this because overtime the list will become quite large
+	candidates := stakerReader.ValidatorCandidates()
+	validators := make([]*staking.Validator, len(candidates))
+	for i := range candidates {
+		// TODO Should be using .ValidatorStakingWithDelegation, not implemented yet
+		validator, err := stakerReader.ValidatorInformation(candidates[i])
+		if err != nil {
+			return nil, err
 		}
-		return identities
-	case shardingconfig.PartiallyOpenStake:
-		return nil
+		validators[i] = validator
 	}
+
+	return nil, nil
+}
+
+// ReadPublicKeys produces publicKeys of entire supercommittee per epoch
+func (def partialStakingEnabled) ReadPublicKeys(epoch *big.Int, config params.ChainConfig) []*bls.PublicKey {
+	// instance := shard.Schedule.InstanceForEpoch(epoch)
+	// if !config.IsStaking(epoch) {
+	// 	superComm := preStakingEnabledCommittee(instance)
+	// 	identities := make([]*bls.PublicKey, int(instance.NumShards())*instance.NumNodesPerShard())
+	// 	spot := 0
+	// 	for i := range superComm {
+	// 		for j := range superComm[i].NodeList {
+	// 			identity := &bls.PublicKey{}
+	// 			superComm[i].NodeList[j].BLSPublicKey.ToLibBLSPublicKey(identity)
+	// 			identities[spot] = identity
+	// 			spot++
+	// 		}
+	// 	}
+	// 	return identities
+	// }
 	return nil
 }
 
 // Read returns the supercommittee used until staking
 // was enabled, previously called CalculateInitShardState
 // Pass as well the chainReader?
-func (def partialStakingEnabled) Read(epoch *big.Int) shard.SuperCommittee {
-	switch instance := shard.Schedule.InstanceForEpoch(epoch); instance.SuperCommittee() {
-	case shardingconfig.Genesis:
-		return preStakingEnabledCommittee(instance)
-	case shardingconfig.PartiallyOpenStake:
-		return nil
+func (def partialStakingEnabled) Read(
+	epoch *big.Int, config params.ChainConfig, stakerReader StakingCandidatesReader,
+) (shard.SuperCommittee, error) {
+	instance := shard.Schedule.InstanceForEpoch(epoch)
+	if !config.IsStaking(epoch) {
+		return preStakingEnabledCommittee(instance), nil
 	}
-	return nil
+	return with400Stakers(instance, stakerReader)
 }

@@ -129,6 +129,7 @@ func (node *Node) proposeShardState(block *types.Block) error {
 	case shard.BeaconChainShardID:
 		return node.proposeBeaconShardState(block)
 	default:
+		// if beaconchain is going to next epoch, use its supercommite, update votingpower, otherwise do nothing
 		fmt.Println("This should not be happening")
 		// should not be possible - only beaconchain can create new supercommittee
 		return nil
@@ -141,15 +142,15 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 		// We haven't reached the end of this epoch; don't propose yet.
 		return nil
 	}
-	// TODO need to pass it the ChainReader?
-	shardState := committee.IncorporatingStaking.Read(
+	superCommittee, err := committee.WithStakingEnabled.Read(
 		new(big.Int).Add(block.Header().Epoch(), common.Big1),
+		node.chainConfig,
+		node.Beaconchain(),
 	)
-	// shardState, err := core.CalculateNewShardState(node.Blockchain(), nextEpoch, committee.MemberAssigner)
-	// if err != nil {
-	// 	return err
-	// }
-	return block.AddShardState(shardState)
+	if err != nil {
+		return err
+	}
+	return block.AddShardState(superCommittee)
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
@@ -171,7 +172,9 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 	}
 
 	sort.Slice(pendingCXReceipts, func(i, j int) bool {
-		return pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID || (pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID && pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
+		return pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID ||
+			(pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID &&
+				pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
 	})
 
 	m := make(map[common.Hash]bool)

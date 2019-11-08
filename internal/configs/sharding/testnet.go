@@ -122,4 +122,4 @@ var testnetReshardingEpoch = []*big.Int{
 	big.NewInt(0),
 }
 
-var testnetV0 = MustNewInstance(3, 100, 80, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, Genesis)
+var testnetV0 = MustNewInstance(3, 100, 80, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)

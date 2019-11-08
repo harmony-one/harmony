@@ -19,16 +19,6 @@ const (
 	DevNet
 )
 
-// SuperCommitteeMembership ..
-type SuperCommitteeMembership byte
-
-const (
-	// Genesis ..
-	Genesis SuperCommitteeMembership = iota
-	// PartiallyOpenStake ..
-	PartiallyOpenStake
-)
-
 type instance struct {
 	numShards                       uint32
 	numNodesPerShard                int
@@ -36,7 +26,6 @@ type instance struct {
 	hmyAccounts                     []genesis.DeployAccount
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
-	committeeMembership             SuperCommitteeMembership
 }
 
 // NewInstance creates and validates a new sharding configuration based
@@ -45,7 +34,7 @@ func NewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int, p SuperCommitteeMembership,
+	reshardingEpoch []*big.Int,
 ) (Instance, error) {
 	if numShards < 1 {
 		return nil, ctxerror.New("sharding config must have at least one shard",
@@ -73,7 +62,6 @@ func NewInstance(
 		hmyAccounts:                     hmyAccounts,
 		fnAccounts:                      fnAccounts,
 		reshardingEpoch:                 reshardingEpoch,
-		committeeMembership:             p,
 	}, nil
 }
 
@@ -84,10 +72,10 @@ func MustNewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int, p SuperCommitteeMembership,
+	reshardingEpoch []*big.Int,
 ) Instance {
 	sc, err := NewInstance(
-		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, hmyAccounts, fnAccounts, reshardingEpoch, p,
+		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, hmyAccounts, fnAccounts, reshardingEpoch,
 	)
 	if err != nil {
 		panic(err)
@@ -147,8 +135,4 @@ func (sc instance) ReshardingEpoch() []*big.Int {
 // ReshardingEpoch returns the list of epoch number
 func (sc instance) GetNetworkID() NetworkID {
 	return DevNet
-}
-
-func (sc instance) SuperCommittee() SuperCommitteeMembership {
-	return sc.committeeMembership
 }

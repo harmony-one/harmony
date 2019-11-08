@@ -75,13 +75,15 @@ type Engine interface {
 	// rules of a particular engine. The changes are executed inline.
 	Prepare(chain ChainReader, header *block.Header) error
 
+	// Rewarder handles the distribution of block rewards
 	Rewarder() reward.Distributor
 
 	SetRewarder(reward.Distributor)
 
-	SuperCommitteeAssigner() committee.MemberReader
+	// CommitteeReader provides the members needed for consensus
+	CommitteeReader() committee.Reader
 
-	SetSuperCommitteeAssigner(committee.MemberReader)
+	SetCommitteeReader(committee.Reader)
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.
