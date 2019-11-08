@@ -1156,6 +1156,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	if err == nil {
+		// TODO: incorporate these into insertChain
 		for idx, block := range chain {
 			header := block.Header()
 			header.Logger(utils.Logger()).Info().
@@ -1196,6 +1197,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 	}
 
+	// This should be done after everything about adding a block is done.
 	bc.PostChainEvents(events, logs)
 	return n, err
 }
