@@ -51,8 +51,6 @@ const (
 )
 
 const (
-	// TxPoolLimit is the limit of transaction pool.
-	TxPoolLimit = 20000
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
 	// ClientRxQueueSize is the number of client messages to queue before tail-dropping.
@@ -289,7 +287,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
-	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	txPoolLimit := 1000 // TODO: incorporate staking txn into TxPool
 	node.pendingStakingTxMutex.Lock()
 	for _, tx := range newStakingTxs {
 		if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {

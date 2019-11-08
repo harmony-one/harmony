@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
-	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -52,48 +51,6 @@ type Worker struct {
 
 	gasFloor uint64
 	gasCeil  uint64
-}
-
-// Returns a tuple where the first value is the txs sender account address,
-// the second is the throttling result enum for the transaction of interest.
-// Throttling happens based on the amount, frequency, etc.
-func (w *Worker) throttleTxs(selected types.Transactions, recentTxsStats types.RecentTxsStats, txsThrottleConfig *shardingconfig.TxsThrottleConfig, tx *types.Transaction) (common.Address, shardingconfig.TxThrottleFlag) {
-	var sender common.Address
-	msg, err := tx.AsMessage(types.MakeSigner(w.config, w.chain.CurrentBlock().Epoch()))
-	if err != nil {
-		utils.Logger().Error().Err(err).Str("txId", tx.Hash().Hex()).Msg("Error when parsing tx into message")
-	} else {
-		sender = msg.From()
-	}
-
-	// do not throttle transactions if disabled
-	if !txsThrottleConfig.EnableTxnThrottling {
-		return sender, shardingconfig.TxSelect
-	}
-
-	// already selected max num txs
-	if len(selected) > txsThrottleConfig.MaxNumTxsPerBlockLimit {
-		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Int("MaxNumTxsPerBlockLimit", txsThrottleConfig.MaxNumTxsPerBlockLimit).Msg("Throttling tx with max num txs per block limit")
-		return sender, shardingconfig.TxUnselect
-	}
-
-	// throttle a single sender sending too many transactions in one block
-	if tx.Value().Cmp(txsThrottleConfig.MaxTxAmountLimit) > 0 {
-		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Uint64("MaxTxAmountLimit", txsThrottleConfig.MaxTxAmountLimit.Uint64()).Uint64("txAmount", tx.Value().Uint64()).Msg("Throttling tx with max amount limit")
-		return sender, shardingconfig.TxInvalid
-	}
-
-	// throttle too large transaction
-	var numTxsPastHour uint64
-	for _, blockTxsCounts := range recentTxsStats {
-		numTxsPastHour += blockTxsCounts[sender]
-	}
-	if numTxsPastHour >= txsThrottleConfig.MaxNumRecentTxsPerAccountLimit {
-		utils.Logger().Info().Str("txId", tx.Hash().Hex()).Uint64("MaxNumRecentTxsPerAccountLimit", txsThrottleConfig.MaxNumRecentTxsPerAccountLimit).Msg("Throttling tx with max txs per account in a single block limit")
-		return sender, shardingconfig.TxInvalid
-	}
-
-	return sender, shardingconfig.TxSelect
 }
 
 // CommitTransactions commits transactions for new block.

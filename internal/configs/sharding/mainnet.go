@@ -2,9 +2,7 @@ package shardingconfig
 
 import (
 	"math/big"
-	"time"
 
-	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -28,13 +26,6 @@ const (
 	mainnetV1_3Epoch = 36
 	mainnetV1_4Epoch = 46
 	mainnetV1_5Epoch = 54
-
-	mainnetMaxTxAmountLimit               = 1e3 // unit is interface{} One
-	mainnetMaxNumRecentTxsPerAccountLimit = 1e2
-	mainnetMaxTxPoolSizeLimit             = 8000
-	mainnetMaxNumTxsPerBlockLimit         = 1000
-	mainnetRecentTxDuration               = time.Hour
-	mainnetEnableTxnThrottling            = false
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "https://api.s%d.t.hmny.io"
@@ -133,43 +124,6 @@ func (ms mainnetSchedule) ConsensusRatio() float64 {
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ms mainnetSchedule) RandomnessStartingEpoch() uint64 {
 	return mainnetRandomnessStartingEpoch
-}
-
-func (ms mainnetSchedule) MaxTxAmountLimit() *big.Int {
-	amountBigInt := big.NewInt(mainnetMaxTxAmountLimit)
-	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
-	return amountBigInt
-}
-
-func (ms mainnetSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
-	return mainnetMaxNumRecentTxsPerAccountLimit
-}
-
-func (ms mainnetSchedule) MaxTxPoolSizeLimit() int {
-	return mainnetMaxTxPoolSizeLimit
-}
-
-func (ms mainnetSchedule) MaxNumTxsPerBlockLimit() int {
-	return mainnetMaxNumTxsPerBlockLimit
-}
-
-func (ms mainnetSchedule) RecentTxDuration() time.Duration {
-	return mainnetRecentTxDuration
-}
-
-func (ms mainnetSchedule) EnableTxnThrottling() bool {
-	return mainnetEnableTxnThrottling
-}
-
-func (ms mainnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
-	return &TxsThrottleConfig{
-		MaxTxAmountLimit:               ms.MaxTxAmountLimit(),
-		MaxNumRecentTxsPerAccountLimit: ms.MaxNumRecentTxsPerAccountLimit(),
-		MaxTxPoolSizeLimit:             ms.MaxTxPoolSizeLimit(),
-		MaxNumTxsPerBlockLimit:         ms.MaxNumTxsPerBlockLimit(),
-		RecentTxDuration:               ms.RecentTxDuration(),
-		EnableTxnThrottling:            ms.EnableTxnThrottling(),
-	}
 }
 
 func (ms mainnetSchedule) GetNetworkID() NetworkID {
