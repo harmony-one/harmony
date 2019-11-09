@@ -144,7 +144,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	parentQuorum, err := QuorumForBlock(chain, parentHeader, false, committee.WithStakingEnabled)
+	parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
@@ -180,25 +180,23 @@ func (e *engineImpl) Finalize(
 }
 
 // QuorumForBlock returns the quorum for the given block header.
-func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool, assigner committee.Reader) (quorum int, err error) {
+func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool) (quorum int, err error) {
 	var ss shard.SuperCommittee
 
 	if reCalculate {
-		// REgular assigner.REad
+		ss, err = committee.WithStakingEnabled.ReadFromComputation(h.Epoch(), *chain.Config(), chain)
 	} else {
-		ss, err = chain.ReadShardState(h.Epoch())
-		if err != nil {
-			return 0, ctxerror.New("failed to read shard state of epoch",
-				"epoch", h.Epoch().Uint64()).WithCause(err)
-		}
+		ss, err = committee.WithStakingEnabled.ReadFromChain(h.Epoch(), chain)
+	}
+	if err != nil {
+		return 0, ctxerror.New("failed to read shard state of epoch",
+			"epoch", h.Epoch().Uint64()).WithCause(err)
 	}
 
 	c := ss.FindCommitteeByID(h.ShardID())
 	if c == nil {
-		return 0, errors.Errorf(
-			"cannot find shard %d in shard state", h.ShardID())
+		return 0, errors.Errorf("cannot find shard %d in shard state", h.ShardID())
 	}
-	// TODO Suspicious about this under stake based epochs
 	return (len(c.NodeList))*2/3 + 1, nil
 }
 
@@ -219,7 +217,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 	}
 
 	hash := header.Hash()
-	quorum, err := QuorumForBlock(chain, header, reCalculate, committee.WithStakingEnabled)
+	quorum, err := QuorumForBlock(chain, header, reCalculate)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
