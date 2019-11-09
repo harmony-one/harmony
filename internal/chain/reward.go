@@ -105,6 +105,10 @@ func AccumulateRewards(
 		})
 
 	if totalAmount.Cmp(BlockReward) != 0 {
+		utils.Logger().Error().
+			Int64("block-reward", BlockReward.Int64()).
+			Int64("total-amount-paid-out", totalAmount.Int64()).
+			Msg("Total paid out was not equal to block-reward")
 		return errors.Wrapf(errPayoutNotEqualBlockReward, "payout "+totalAmount.String())
 	}
 

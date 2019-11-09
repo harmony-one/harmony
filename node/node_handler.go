@@ -319,10 +319,11 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	// TODO: refactor the asynchronous calls to separate go routine.
 	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
-		if node.NodeConfig.ShardID == 0 {
+		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)
 		}
-		if node.NodeConfig.ShardID != 0 && newBlock.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) >= 0 {
+		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
+			newBlock.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) >= 0 {
 			node.BroadcastCrossLinkHeader(newBlock)
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
