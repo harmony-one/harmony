@@ -30,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -276,4 +277,14 @@ func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Hea
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
 func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (shard.SuperCommittee, error) {
 	return nil, nil
+}
+
+func (cr *fakeChainReader) ValidatorInformation(addr common.Address) (*staking.Validator, error) {
+	return nil, nil
+}
+func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) numeric.Dec {
+	return numeric.ZeroDec()
+}
+func (cr *fakeChainReader) ValidatorCandidates() []common.Address {
+	return nil
 }

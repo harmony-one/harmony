@@ -22,7 +22,6 @@ import (
 
 type engineImpl struct {
 	blockDistributor reward.Distributor
-	committeeReader  committee.Reader
 }
 
 // Engine is an algorithm-agnostic consensus engine.
@@ -31,8 +30,7 @@ var Engine = newEngine()
 func newEngine() *engineImpl {
 	// Careful, this the nil interface possible issue
 	var d reward.Distributor
-	var a committee.Reader
-	return &engineImpl{d, a}
+	return &engineImpl{d}
 }
 
 func (e *engineImpl) Rewarder() reward.Distributor {
@@ -146,7 +144,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	parentQuorum, err := QuorumForBlock(chain, parentHeader, false, e.committeeReader)
+	parentQuorum, err := QuorumForBlock(chain, parentHeader, false, committee.WithStakingEnabled)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
@@ -179,14 +177,6 @@ func (e *engineImpl) Finalize(
 	}
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), nil
-}
-
-func (e *engineImpl) SetCommitteeReader(assigner committee.Reader) {
-	e.committeeReader = assigner
-}
-
-func (e *engineImpl) CommitteeReader() committee.Reader {
-	return e.committeeReader
 }
 
 // QuorumForBlock returns the quorum for the given block header.
@@ -229,7 +219,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 	}
 
 	hash := header.Hash()
-	quorum, err := QuorumForBlock(chain, header, reCalculate, e.committeeReader)
+	quorum, err := QuorumForBlock(chain, header, reCalculate, committee.WithStakingEnabled)
 	if err != nil {
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
@@ -253,13 +243,13 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 func GetPublicKeys(
 	chain engine.ChainReader, header *block.Header, reCalculate bool,
 ) ([]*bls.PublicKey, error) {
-	var shardState shard.SuperCommittee
+	shardState := shard.SuperCommittee{}
 	var err error
 	if reCalculate {
-		// TODO come back to this - don't remember what was right
-		currentCommittee, _ := chain.ReadShardState(header.Epoch())
+		currentCommittee, _ := committee.WithStakingEnabled.ReadFromComputation(
+			header.Epoch(), *chain.Config(), chain,
+		)
 		shardState = currentCommittee
-		// shardState = core.CalculateShardState(header.Epoch(), committee.MemberAssigner, )
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {

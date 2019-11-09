@@ -71,6 +71,7 @@ func AccumulateRewards(
 		}
 		committerKeys = append(committerKeys, committerKey)
 	}
+
 	mask, err := bls2.NewMask(committerKeys, nil)
 	if err != nil {
 		return ctxerror.New("cannot create group sig mask").WithCause(err)

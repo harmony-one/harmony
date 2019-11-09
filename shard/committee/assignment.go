@@ -15,16 +15,25 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+// SuperCommitteeID means reading off whole network when using calls that accept
+// a shardID parameter
+const SuperCommitteeID = -1
+
 // MembershipList  ..
 type MembershipList interface {
-	Read(
-		epoch *big.Int, config params.ChainConfig, stakerReader StakingCandidatesReader,
+	ReadFromComputation(
+		epoch *big.Int, config params.ChainConfig, reader StakingCandidatesReader,
 	) (shard.SuperCommittee, error)
+	ReadFromChain(epoch *big.Int, reader SuperCommitteeCachedReader) (shard.SuperCommittee, error)
 }
 
 // PublicKeys per epoch
 type PublicKeys interface {
-	ReadPublicKeys(epoch *big.Int, config params.ChainConfig) []*bls.PublicKey
+	// If call shardID with SuperCommitteeID then only superCommittee is non-nil,
+	// otherwise get back the shardSpecific slice as well.
+	ReadPublicKeys(
+		epoch *big.Int, config params.ChainConfig, shardID int,
+	) (superCommittee, shardSpecific []*bls.PublicKey)
 }
 
 // Reader ..
@@ -40,13 +49,16 @@ type StakingCandidatesReader interface {
 	ValidatorCandidates() []common.Address
 }
 
+// SuperCommitteeCachedReader way to use ChainReader without cyclic import from engine
+type SuperCommitteeCachedReader interface {
+	ReadShardState(epoch *big.Int) (shard.SuperCommittee, error)
+}
+
 type partialStakingEnabled struct{}
 
 var (
 	// WithStakingEnabled ..
 	WithStakingEnabled Reader = partialStakingEnabled{}
-	// Genesis is the committee used at initial creation of Harmony blockchain
-	Genesis = preStakingEnabledCommittee(shard.Schedule.InstanceForEpoch(big.NewInt(0)))
 )
 
 func preStakingEnabledCommittee(s shardingconfig.Instance) shard.SuperCommittee {
@@ -90,7 +102,9 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.SuperCommittee 
 	return shardState
 }
 
-func with400Stakers(s shardingconfig.Instance, stakerReader StakingCandidatesReader) (shard.SuperCommittee, error) {
+func with400Stakers(
+	s shardingconfig.Instance, stakerReader StakingCandidatesReader,
+) (shard.SuperCommittee, error) {
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
 	stakers := make([]*staking.Validator, len(candidates))
@@ -112,13 +126,16 @@ func with400Stakers(s shardingconfig.Instance, stakerReader StakingCandidatesRea
 	shardCount := int(s.NumShards())
 	superComm := make(shard.SuperCommittee, shardCount)
 	fillCount := make([]int, shardCount)
+	// TODO Finish this logic, not correct, need to operate EPoS on slot level,
+	// not validator level
 
 	for i := 0; i < shardCount; i++ {
 		superComm[i] = shard.Committee{}
 		superComm[i].NodeList = make(shard.NodeIDList, s.NumNodesPerShard())
 	}
+
 	scratchPad := &bls.PublicKey{}
-	// TODO Finish this logic
+
 	for i := range top {
 		spot := int(top[i].Address.Big().Int64()) % shardCount
 		fillCount[spot]++
@@ -139,32 +156,56 @@ func with400Stakers(s shardingconfig.Instance, stakerReader StakingCandidatesRea
 	return superComm, nil
 }
 
-// ReadPublicKeys produces publicKeys of entire supercommittee per epoch
-func (def partialStakingEnabled) ReadPublicKeys(epoch *big.Int, config params.ChainConfig) []*bls.PublicKey {
+// ReadPublicKeys produces publicKeys of entire supercommittee per epoch, optionally providing a
+// shard specific subcommittee
+func (def partialStakingEnabled) ReadPublicKeys(
+	epoch *big.Int, config params.ChainConfig, shardID int,
+) ([]*bls.PublicKey, []*bls.PublicKey) {
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	if !config.IsStaking(epoch) {
 		superComm := preStakingEnabledCommittee(instance)
-		identities := make([]*bls.PublicKey, int(instance.NumShards())*instance.NumNodesPerShard())
 		spot := 0
+		allIdentities := make([]*bls.PublicKey, int(instance.NumShards())*instance.NumNodesPerShard())
 		for i := range superComm {
 			for j := range superComm[i].NodeList {
 				identity := &bls.PublicKey{}
 				superComm[i].NodeList[j].BLSPublicKey.ToLibBLSPublicKey(identity)
-				identities[spot] = identity
+				allIdentities[spot] = identity
 				spot++
 			}
 		}
-		return identities
+
+		if shardID == SuperCommitteeID {
+			return allIdentities, nil
+		}
+
+		subCommittee := superComm.FindCommitteeByID(uint32(shardID))
+		subCommitteeIdentities := make([]*bls.PublicKey, len(subCommittee.NodeList))
+		spot = 0
+		for i := range subCommittee.NodeList {
+			identity := &bls.PublicKey{}
+			subCommittee.NodeList[i].BLSPublicKey.ToLibBLSPublicKey(identity)
+			subCommitteeIdentities[spot] = identity
+			spot++
+		}
+
+		return allIdentities, subCommitteeIdentities
 	}
-	return nil
+
+	// TODO Implement for the staked case
+	return nil, nil
 }
 
-// Read returns the supercommittee used until staking
-// was enabled, previously called CalculateInitShardState
-// Pass as well the chainReader?
-func (def partialStakingEnabled) Read(
+func (def partialStakingEnabled) ReadFromChain(
+	epoch *big.Int, reader SuperCommitteeCachedReader,
+) (newSuperComm shard.SuperCommittee, err error) {
+	return reader.ReadShardState(epoch)
+}
+
+// ReadFromComputation is single entry point for reading the SuperCommittee of the network
+func (def partialStakingEnabled) ReadFromComputation(
 	epoch *big.Int, config params.ChainConfig, stakerReader StakingCandidatesReader,
-) (shard.SuperCommittee, error) {
+) (newSuperComm shard.SuperCommittee, err error) {
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	if !config.IsStaking(epoch) {
 		return preStakingEnabledCommittee(instance), nil

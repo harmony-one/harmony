@@ -269,7 +269,8 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	// Set network type
 	switch netType := nodeconfig.NetworkType(*networkType); netType {
-	case nodeconfig.Mainnet, nodeconfig.Testnet,
+	case
+		nodeconfig.Mainnet, nodeconfig.Testnet,
 		nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
 		nodeconfig.SetNetworkType(netType)
 	default:
@@ -390,7 +391,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// This needs to be executed after consensus and drand are setup
 	if err := currentNode.LoadSuperCommitteeForCurrentEpochOnChain(); err != nil {
-		ctxerror.Crit(utils.GetLogger(), err, "CalculateInitShardState failed",
+		ctxerror.Crit(utils.GetLogger(), err, "LoadSuperCommitteeForCurrentEpochOnChain failed",
 			"shardID", *shardID)
 	}
 

@@ -126,13 +126,16 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
 					if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-						for _, block := range blocks {
-							if block.ShardID() == shard.BeaconChainShardID {
+						for i := range blocks {
+							if blocks[i].ShardID() == shard.BeaconChainShardID {
 								utils.Logger().Info().
 									Uint64("block", blocks[0].NumberU64()).
-									Msgf("Block being handled by block channel %d %d", block.NumberU64(), block.ShardID())
-								// This is the right place to do the hook of reassigning the consensus quroum members
-								node.BeaconBlockChannel <- block
+									Msgf(
+										"Block being handled by block channel %d %d",
+										blocks[i].NumberU64(),
+										blocks[i].ShardID(),
+									)
+								node.BeaconBlockChannel <- blocks[i]
 							}
 						}
 					}
@@ -157,7 +160,12 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			}
 		case proto_node.PING:
 			node.pingMessageHandler(msgPayload, sender)
+		case proto_node.ShardState:
+			if err := node.epochShardStateMessageHandler(msgPayload); err != nil {
+				ctxerror.Log15(utils.GetLogger().Warn, err)
+			}
 		}
+
 	default:
 		utils.Logger().Error().
 			Str("Unknown MsgCateogry", string(msgCategory))

@@ -87,7 +87,8 @@ type Consensus struct {
 	// Leader's address
 	leader p2p.Peer
 
-	CommitteePublicKeys map[string]bool
+	// SuperCommitteePublicKeys are the public keys all validator nodes
+	SuperCommitteePublicKeys map[string]struct{}
 
 	pubKeyLock sync.Mutex
 
@@ -98,9 +99,6 @@ type Consensus struct {
 	SelfAddress common.Address
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
-
-	// number of publickeys of previous epoch
-	numPrevPubKeys int
 
 	viewID uint64
 
@@ -226,7 +224,7 @@ func New(
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
-	consensus.CommitteePublicKeys = make(map[string]bool)
+	consensus.SuperCommitteePublicKeys = map[string]struct{}{}
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if blsPriKey != nil {

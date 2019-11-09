@@ -123,18 +123,22 @@ func (consensus *Consensus) DebugPrintPublicKeys() {
 }
 
 // UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
+func (consensus *Consensus) UpdatePublicKeys(
+	superCommittee, shardSubcommittee []*bls.PublicKey,
+) int64 {
 	consensus.pubKeyLock.Lock()
-	consensus.Decider.UpdateParticipants(pubKeys)
-	consensus.CommitteePublicKeys = map[string]bool{}
+	consensus.Decider.UpdateParticipants(shardSubcommittee)
+	consensus.SuperCommitteePublicKeys = map[string]struct{}{}
 	utils.Logger().Info().Msg("My Committee updated")
-	for i, pubKey := range consensus.Decider.DumpParticipants() {
-		utils.Logger().Info().Int("index", i).Str("BlsPubKey", pubKey).Msg("Member")
-		consensus.CommitteePublicKeys[pubKey] = true
+	for i := range superCommittee {
+		s := superCommittee[i].SerializeToHexStr()
+		utils.Logger().Info().Int("index", i).Str("BLSPubKey", s).Msg("Member")
+		consensus.SuperCommitteePublicKeys[s] = struct{}{}
 	}
 	// TODO: use pubkey to identify leader rather than p2p.Peer.
-	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
-	consensus.LeaderPubKey = pubKeys[0]
+	shardLeader := shardSubcommittee[0]
+	consensus.leader = p2p.Peer{ConsensusPubKey: shardLeader}
+	consensus.LeaderPubKey = shardLeader
 	utils.Logger().Info().
 		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
 	consensus.pubKeyLock.Unlock()
@@ -243,8 +247,7 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
-	_, ok := consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()]
-	return ok
+	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
 // Verify the signature of the message are valid from the signer's public key.
@@ -470,14 +473,14 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	pubKeys := []*bls.PublicKey{}
+	shardPubKeys := []*bls.PublicKey{}
+
 	hasError := false
 	header := consensus.ChainReader.CurrentHeader()
 	epoch := header.Epoch()
-
-	curPubKeys := consensus.CommitteeReader.ReadPublicKeys(
-		epoch, *consensus.ChainReader.Config(),
+	curSuperCommittee, curShardCommittee := consensus.CommitteeReader.ReadPublicKeys(
+		epoch, *consensus.ChainReader.Config(), int(consensus.ShardID),
 	)
-	consensus.numPrevPubKeys = len(curPubKeys)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
 
 	if core.IsEpochLastBlockByHeader(header) {
@@ -485,12 +488,15 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		pubKeys = consensus.CommitteeReader.ReadPublicKeys(
-			new(big.Int).Add(epoch, common.Big1), *consensus.ChainReader.Config(),
+		pubKeys, shardPubKeys = consensus.CommitteeReader.ReadPublicKeys(
+			new(big.Int).Add(epoch, common.Big1),
+			*consensus.ChainReader.Config(),
+			int(header.ShardID()),
 		)
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
-		pubKeys = curPubKeys
+		pubKeys = curSuperCommittee
+		shardPubKeys = curShardCommittee
 	}
 
 	if len(pubKeys) == 0 {
@@ -503,7 +509,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
-	consensus.UpdatePublicKeys(pubKeys)
+	consensus.UpdatePublicKeys(pubKeys, shardPubKeys)
 
 	// take care of possible leader change during the epoch
 	if !core.IsEpochLastBlockByHeader(header) && header.Number().Uint64() != 0 {

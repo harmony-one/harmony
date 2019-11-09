@@ -220,6 +220,17 @@ type Node struct {
 
 	accountManager *accounts.Manager
 
+	// Next shard state
+	nextShardState struct {
+		// The received master shard state
+		master *shard.EpochSuperCommittee
+
+		// When for a leader to propose the next shard state,
+		// or for a validator to wait for a proposal before view change.
+		// TODO ek – replace with retry-based logic instead of delay
+		proposeTime time.Time
+	}
+
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
@@ -242,7 +253,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(0)
+	bc, err := node.shardChains.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
 		err = ctxerror.New("cannot get beaconchain").WithCause(err)
 		ctxerror.Log15(utils.GetLogger().Crit, err)
@@ -496,17 +507,13 @@ func New(
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
-
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		node.recentTxsStats = make(types.RecentTxsStats)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
-
-		// SetCommittee members
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
-
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 
 		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
@@ -519,7 +526,7 @@ func New(
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
-		chain.Engine.SetCommitteeReader(committee.WithStakingEnabled)
+
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
 		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
 		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
@@ -551,47 +558,41 @@ func New(
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
-
 	node.startConsensus = make(chan struct{})
-
 	go node.bootstrapConsensus()
-
 	return &node
 }
-
-// CalculateInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
 
 // LoadSuperCommitteeForCurrentEpochOnChain ..
 func (node *Node) LoadSuperCommitteeForCurrentEpochOnChain() (err error) {
 	if node.Consensus == nil {
-		return ctxerror.New("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
+		return ctxerror.New("node.Consenus is nil; Cannot figure out shardID")
 	}
-	shardID := node.Consensus.ShardID
-
+	shardID := int(node.Consensus.ShardID)
 	// Get genesis epoch shard state from chain
 	blockNum := node.Blockchain().CurrentBlock().NumberU64()
 	node.Consensus.SetMode(consensus.Listening)
 	epoch := shard.Schedule.CalcEpochNumber(blockNum)
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
-		Uint32("shardID", shardID).
+		Int("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
-		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
-	pubKeys := committee.WithStakingEnabled.ReadPublicKeys(epoch, node.chainConfig)
-	if len(pubKeys) == 0 {
+		Msg("[ReadPublicKeys] Try To Get PublicKeys from database")
+	pubKeys, shardPubKeys := committee.WithStakingEnabled.ReadPublicKeys(epoch, node.chainConfig, shardID)
+	if len(pubKeys) == 0 || len(shardPubKeys) == 0 {
 		return ctxerror.New(
-			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",
+			"PublicKeys are Empty, Cannot update public keys",
 			"shardID", shardID,
 			"blockNum", blockNum)
 	}
 
-	for _, key := range pubKeys {
-		if key.IsEqual(node.Consensus.PubKey) {
+	for i := range shardPubKeys {
+		if shardPubKeys[i].IsEqual(node.Consensus.PubKey) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
-				Msg("[CalculateInitShardState] Successfully updated public keys")
-			node.Consensus.UpdatePublicKeys(pubKeys)
+				Msg("Successfully updated public keys")
+			node.Consensus.UpdatePublicKeys(pubKeys, shardPubKeys)
 			node.Consensus.SetMode(consensus.Normal)
 			return nil
 		}
@@ -654,7 +655,7 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		utils.Logger().Error().Err(err).Msg("Failed to create shard receiver")
 	}
 
-	node.globalGroupReceiver, err = node.host.GroupReceiver(nodeconfig.NewClientGroupIDByShardID(0))
+	node.globalGroupReceiver, err = node.host.GroupReceiver(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to create global receiver")
 	}

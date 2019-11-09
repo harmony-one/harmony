@@ -44,12 +44,12 @@ func (m Mode) String() string {
 	if name, ok := modeNames[m]; ok {
 		return name
 	}
-	return fmt.Sprintf("Mode %+v", byte(m))
+	return fmt.Sprintf("Unknown Mode %+v", byte(m))
 }
 
 func (p FBFTPhase) String() string {
 	if name, ok := phaseNames[p]; ok {
 		return name
 	}
-	return fmt.Sprintf("FBFTPhase %+v", byte(p))
+	return fmt.Sprintf("Unknown FBFTPhase %+v", byte(p))
 }

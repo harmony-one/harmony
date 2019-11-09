@@ -1,7 +1,6 @@
 package node
 
 import (
-	"fmt"
 	"math/big"
 	"sort"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 )
 
 // Constants of proposing a new block
@@ -55,6 +53,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					newBlock, err := node.proposeNewBlock()
+
 					if err == nil {
 						utils.Logger().Debug().
 							Uint64("blockNum", newBlock.NumberU64()).
@@ -103,7 +102,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare cross links
 	var crossLinks types.CrossLinks
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+	if node.NodeConfig.ShardID == 0 {
 		crossLinksToPropose, localErr := node.ProposeCrossLinkDataForBeaconchain()
 		if localErr == nil {
 			crossLinks = crossLinksToPropose
@@ -112,7 +111,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare shard state
 	shardState := node.Worker.ProposeShardStateWithoutBeaconSync()
-
 	// Prepare last commit signatures
 	sig, mask, err := node.Consensus.LastCommitSig()
 	if err != nil {
@@ -124,14 +122,23 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
 }
 
+func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) shard.SuperCommittee {
+	if block == nil || !core.IsEpochLastBlock(block) {
+		return nil
+	}
+	superComm, _ := node.Consensus.CommitteeReader.ReadFromChain(
+		new(big.Int).Add(block.Header().Epoch(), common.Big1),
+		node.Blockchain(),
+	)
+	return superComm
+}
+
 func (node *Node) proposeShardState(block *types.Block) error {
 	switch node.Consensus.ShardID {
 	case shard.BeaconChainShardID:
 		return node.proposeBeaconShardState(block)
 	default:
-		// if beaconchain is going to next epoch, use its supercommite, update votingpower, otherwise do nothing
-		fmt.Println("This should not be happening")
-		// should not be possible - only beaconchain can create new supercommittee
+		node.proposeLocalShardState(block)
 		return nil
 	}
 }
@@ -142,15 +149,51 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 		// We haven't reached the end of this epoch; don't propose yet.
 		return nil
 	}
-	superCommittee, err := committee.WithStakingEnabled.Read(
+
+	shardState, err := node.Consensus.CommitteeReader.ReadFromComputation(
 		new(big.Int).Add(block.Header().Epoch(), common.Big1),
 		node.chainConfig,
-		node.Beaconchain(),
+		// Invariant here on choice because caller in proposeShardState guarded on right ShardID
+		node.Blockchain(),
 	)
+
 	if err != nil {
 		return err
 	}
-	return block.AddShardState(superCommittee)
+	return block.AddShardState(shardState)
+}
+
+func (node *Node) proposeLocalShardState(block *types.Block) {
+	logger := block.Logger(utils.Logger())
+	// TODO ek – read this from beaconchain once BC sync is fixed
+	if node.nextShardState.master == nil {
+		logger.Debug().Msg("yet to receive master proposal from beaconchain")
+		return
+	}
+
+	nlogger := logger.With().
+		Uint64("nextEpoch", node.nextShardState.master.Epoch).
+		Time("proposeTime", node.nextShardState.proposeTime).
+		Logger()
+	logger = &nlogger
+	if time.Now().Before(node.nextShardState.proposeTime) {
+		logger.Debug().Msg("still waiting for shard state to propagate")
+		return
+	}
+	masterShardState := node.nextShardState.master.SuperCommittee
+	var localShardState shard.SuperCommittee
+	committee := masterShardState.FindCommitteeByID(block.ShardID())
+	if committee != nil {
+		logger.Info().Msg("found local shard info; proposing it")
+		localShardState = append(localShardState, *committee)
+	} else {
+		logger.Info().Msg("beacon committee disowned us; proposing nothing")
+		// Leave local proposal empty to signal the end of shard (disbanding).
+	}
+	err := block.AddShardState(localShardState)
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed proposin local shard state")
+	}
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
@@ -172,9 +215,7 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 	}
 
 	sort.Slice(pendingCXReceipts, func(i, j int) bool {
-		return pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID ||
-			(pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID &&
-				pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
+		return pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID || (pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID && pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
 	})
 
 	m := make(map[common.Hash]bool)

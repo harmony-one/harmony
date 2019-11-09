@@ -1,12 +1,12 @@
 package quorum
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/staking/effective"
 )
 
@@ -22,7 +22,11 @@ func (v *uniformVoteWeight) Policy() Policy {
 // IsQuorumAchieved ..
 func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 	r := v.SignersCount(p) >= v.QuorumThreshold().Int64()
-	fmt.Println("EDGAR", v.SignersCount(p), v.QuorumThreshold().Int64(), v.ParticipantsCount(), r)
+	utils.Logger().Info().Str("phase", p.String()).
+		Int64("signers-count", v.SignersCount(p)).
+		Int64("threshold", v.QuorumThreshold().Int64()).
+		Int64("participants", v.ParticipantsCount()).
+		Msg("Quorum details")
 	return r
 }
 
@@ -51,8 +55,8 @@ func (v *uniformVoteWeight) Award(
 	// Here hook is the callback which gets the amount the earner is due in just reward
 	// up to the hook to do side-effects like write the statedb
 	Pie *big.Int, earners []common2.Address, hook func(earner common.Address, due *big.Int),
-) (payout *big.Int) {
-
+) *big.Int {
+	payout := big.NewInt(0)
 	last := big.NewInt(0)
 	count := big.NewInt(int64(len(earners)))
 
@@ -65,5 +69,5 @@ func (v *uniformVoteWeight) Award(
 		last = cur
 	}
 
-	return
+	return payout
 }

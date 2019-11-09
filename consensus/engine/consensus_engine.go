@@ -40,6 +40,8 @@ type ChainReader interface {
 	// This api reads the shard state cached or saved on the chaindb.
 	// Thus, only should be used to read the shard state of the current chain.
 	ReadShardState(epoch *big.Int) (shard.SuperCommittee, error)
+
+	committee.StakingCandidatesReader
 }
 
 // Engine is an algorithm agnostic consensus engine.
@@ -78,20 +80,18 @@ type Engine interface {
 	// Rewarder handles the distribution of block rewards
 	Rewarder() reward.Distributor
 
+	// SetRewarder assigns the Distributor used in block reward
 	SetRewarder(reward.Distributor)
-
-	// CommitteeReader provides the members needed for consensus
-	CommitteeReader() committee.Reader
-
-	SetCommitteeReader(committee.Reader)
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	Finalize(chain ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
+	Finalize(
+		chain ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
-		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error)
+		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+	) (*types.Block, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.

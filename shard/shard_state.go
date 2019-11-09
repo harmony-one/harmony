@@ -3,6 +3,7 @@ package shard
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sort"
@@ -28,11 +29,17 @@ type StakedValidator struct {
 	WithDelegationApplied *big.Int `json:"with-delegation-applied,omitempty"`
 }
 
+// EpochSuperCommittee is the state of an epoch
+type EpochSuperCommittee struct {
+	Epoch uint64
+	SuperCommittee
+}
+
 // NodeID represents node id (BLS address)
 type NodeID struct {
 	ECDSAAddress common.Address   `json:"ecdsa_address"`
 	BLSPublicKey BLSPublicKey     `json:"bls_pubkey"`
-	Validator    *StakedValidator `json:"staked-validator,omitempty"`
+	Validator    *StakedValidator `json:"staked-validator,omitempty" rlp:"nil"`
 }
 
 // NodeIDList is a list of NodeID
@@ -70,19 +77,20 @@ func (members NodeIDList) Inventory() (result struct {
 	return
 }
 
+func (subCommittee Committee) String() string {
+	buf := bytes.Buffer{}
+	for member := range subCommittee.NodeList {
+		b, _ := json.Marshal(subCommittee.NodeList[member])
+		buf.Write(b)
+	}
+	return buf.String()
+}
+
 func (ss SuperCommittee) String() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("[\n\t")
-	committee := ss
-	for _, subcommittee := range committee {
-		for _, committee := range subcommittee.NodeList {
-			buf.WriteString(fmt.Sprintf(
-				`{"shard-%d":"%s"},\n`,
-				subcommittee.ShardID,
-				committee.String(),
-			))
-
-		}
+	for i := range ss {
+		buf.WriteString(ss[i].String())
 	}
 	buf.WriteString("]\n")
 	return buf.String()
@@ -108,8 +116,8 @@ func (ss SuperCommittee) DeepCopy() SuperCommittee {
 	return r
 }
 
-// CompareShardSuperCommittee compares two SuperCommittee instances.
-func CompareShardSuperCommittee(s1, s2 SuperCommittee) int {
+// CompareSuperCommittee compares two SuperCommittee instances.
+func CompareSuperCommittee(s1, s2 SuperCommittee) int {
 	commonLen := len(s1)
 	if commonLen > len(s2) {
 		commonLen = len(s2)
@@ -197,10 +205,10 @@ func CompareNodeIDList(l1, l2 NodeIDList) int {
 }
 
 // DeepCopy returns a deep copy of the receiver.
-func (c Committee) DeepCopy() Committee {
+func (subCommittee Committee) DeepCopy() Committee {
 	r := Committee{}
-	r.ShardID = c.ShardID
-	r.NodeList = c.NodeList.DeepCopy()
+	r.ShardID = subCommittee.ShardID
+	r.NodeList = subCommittee.NodeList.DeepCopy()
 	return r
 }
 

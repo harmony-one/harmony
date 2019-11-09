@@ -1,6 +1,7 @@
 package quorum
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -19,6 +20,19 @@ const (
 	// ViewChange ..
 	ViewChange
 )
+
+var phaseNames = map[Phase]string{
+	Prepare:    "Announce",
+	Commit:     "Prepare",
+	ViewChange: "Commit",
+}
+
+func (p Phase) String() string {
+	if name, ok := phaseNames[p]; ok {
+		return name
+	}
+	return fmt.Sprintf("Unknown Quorum Phase %+v", byte(p))
+}
 
 // Policy is the rule we used to decide is quorum achieved
 type Policy byte
