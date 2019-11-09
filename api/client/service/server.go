@@ -43,7 +43,7 @@ func (s *Server) GetFreeToken(ctx context.Context, request *proto.GetFreeTokenRe
 func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 	// TODO(minhdoan): Currently not using ip. Fix it later.
 	addr := net.JoinHostPort("", port)
-	lis, err := net.Listen("tcp", addr)
+	lis, err := net.Listen("tcp4", addr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
