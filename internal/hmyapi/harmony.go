@@ -53,7 +53,7 @@ type NodeMetadata struct {
 	ShardID      uint32 `json:"shard-id"`
 }
 
-// GetNodeMetadata produces a NodeMetadata record. Note the data is from the answering RPC
+// GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
 func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 	cfg := nodeconfig.GetDefaultConfig()
 	return NodeMetadata{
@@ -62,6 +62,6 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		string(cfg.GetNetworkType()),
 		s.b.ChainConfig().ChainID.String(),
 		s.b.IsLeader(),
-		cfg.GetShardID(),
+		s.b.GetShardID(),
 	}
 }
