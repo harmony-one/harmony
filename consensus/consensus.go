@@ -15,7 +15,6 @@ import (
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/shard/committee"
 )
 
 const (
@@ -28,9 +27,6 @@ type Consensus struct {
 	// Decider handles whether quorum achieved on the shard this consensus running on and decides on
 	// distribution of blockrewards - Both parameterized by quorum.Policy
 	Decider quorum.Decider
-	// CommitteeAssigner provides information about who the SuperCommittee members are, their public
-	// keys
-	CommitteeReader committee.Reader
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -207,11 +203,9 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 func New(
 	host p2p.Host, shard uint32, leader p2p.Peer,
 	blsPriKey *bls.SecretKey, decider quorum.Decider,
-	reader committee.Reader,
 ) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.Decider = decider
-	consensus.CommitteeReader = reader
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.blockNumLowChan = make(chan struct{})

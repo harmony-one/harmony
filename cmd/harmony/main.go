@@ -35,7 +35,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 )
 
 // Version string variables
@@ -309,7 +308,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	decider := quorum.NewDecider(stringToPolicy(*quorumPolicy))
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, p2p.Peer{},
-		nodeConfig.ConsensusPriKey, decider, committee.WithStakingEnabled,
+		nodeConfig.ConsensusPriKey, decider,
 	)
 	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 

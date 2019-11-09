@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 )
 
 func TestPopulateMessageFields(t *testing.T) {
@@ -25,7 +24,6 @@ func TestPopulateMessageFields(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, blsPriKey, decider,
-		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -63,7 +61,6 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
-		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -92,7 +89,6 @@ func TestSetViewID(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
-		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

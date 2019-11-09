@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -103,7 +102,7 @@ func setUpTXGen() *node.Node {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensusObj, err := consensus.New(
-		myhost, uint32(shardID), p2p.Peer{}, nil, decider, committee.WithStakingEnabled,
+		myhost, uint32(shardID), p2p.Peer{}, nil, decider,
 	)
 	chainDBFactory := &shardchain.MemDBFactory{}
 	txGen := node.New(myhost, consensusObj, chainDBFactory, false) //Changed it : no longer archival node.

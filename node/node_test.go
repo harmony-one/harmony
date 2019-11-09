@@ -19,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,7 +36,6 @@ func TestNewNode(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, blsKey, decider,
-		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -205,7 +203,6 @@ func TestAddPeers(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, blsKey, decider,
-		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -256,7 +253,6 @@ func TestAddBeaconPeer(t *testing.T) {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, blsKey, decider,
-		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

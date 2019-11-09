@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 )
 
 // Constants of proposing a new block
@@ -126,7 +127,7 @@ func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) shard.S
 	if block == nil || !core.IsEpochLastBlock(block) {
 		return nil
 	}
-	superComm, _ := node.Consensus.CommitteeReader.ReadFromChain(
+	superComm, _ := committee.WithStakingEnabled.ReadFromChain(
 		new(big.Int).Add(block.Header().Epoch(), common.Big1),
 		node.Blockchain(),
 	)
@@ -150,7 +151,7 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 		return nil
 	}
 
-	shardState, err := node.Consensus.CommitteeReader.ReadFromComputation(
+	shardState, err := committee.WithStakingEnabled.ReadFromComputation(
 		new(big.Int).Add(block.Header().Epoch(), common.Big1),
 		node.chainConfig,
 		// Invariant here on choice because caller in proposeShardState guarded on right ShardID

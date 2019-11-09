@@ -24,6 +24,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/rs/zerolog"
 )
@@ -466,7 +467,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	hasError := false
 	header := consensus.ChainReader.CurrentHeader()
 	epoch := header.Epoch()
-	curSuperCommittee, curShardCommittee := consensus.CommitteeReader.ReadPublicKeys(
+	curSuperCommittee, curShardCommittee := committee.WithStakingEnabled.ReadPublicKeys(
 		epoch, *consensus.ChainReader.Config(), int(consensus.ShardID),
 	)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
@@ -476,7 +477,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		pubKeys, shardPubKeys = consensus.CommitteeReader.ReadPublicKeys(
+		pubKeys, shardPubKeys = committee.WithStakingEnabled.ReadPublicKeys(
 			new(big.Int).Add(epoch, common.Big1),
 			*consensus.ChainReader.Config(),
 			int(header.ShardID()),

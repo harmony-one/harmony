@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 )
 
 func constructAnnounceMessage(t *testing.T) []byte {
@@ -25,7 +24,6 @@ func constructAnnounceMessage(t *testing.T) []byte {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
-		committee.WithStakingEnabled,
 	)
 	if err != nil {
 		t.Fatalf("Cannot create consensus: %v", err)
