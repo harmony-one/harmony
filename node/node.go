@@ -578,7 +578,7 @@ func (node *Node) LoadSuperCommitteeForCurrentEpochOnChain() (err error) {
 		Int("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[ReadPublicKeys] Try To Get PublicKeys from database")
-	pubKeys, shardPubKeys := committee.WithStakingEnabled.ReadPublicKeys(epoch, node.chainConfig, shardID)
+	pubKeys, shardPubKeys := committee.WithStakingEnabled.ReadPublicKeysFromComputation(epoch, node.chainConfig, shardID)
 	if len(pubKeys) == 0 || len(shardPubKeys) == 0 {
 		return ctxerror.New(
 			"PublicKeys are Empty, Cannot update public keys",
@@ -638,13 +638,14 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		PushgatewayIP:   node.NodeConfig.GetPushgatewayIP(),
 		PushgatewayPort: node.NodeConfig.GetPushgatewayPort(),
 		IsClient:        node.NodeConfig.IsClient(),
-		Beacon:          nodeconfig.NewGroupIDByShardID(0),
+		Beacon:          nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 		ShardGroupID:    node.NodeConfig.GetShardGroupID(),
 		Actions:         make(map[nodeconfig.GroupID]nodeconfig.ActionType),
 	}
 
 	if nodeConfig.IsClient {
-		nodeConfig.Actions[nodeconfig.NewClientGroupIDByShardID(0)] = nodeconfig.ActionStart
+		cGroup := nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID)
+		nodeConfig.Actions[cGroup] = nodeconfig.ActionStart
 	} else {
 		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = nodeconfig.ActionStart
 	}
@@ -655,7 +656,9 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		utils.Logger().Error().Err(err).Msg("Failed to create shard receiver")
 	}
 
-	node.globalGroupReceiver, err = node.host.GroupReceiver(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
+	node.globalGroupReceiver, err = node.host.GroupReceiver(
+		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
+	)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to create global receiver")
 	}

@@ -119,12 +119,6 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 	return abort, results
 }
 
-// ReadPublicKeysFromLastBlock finds the public keys of last block's committee
-func ReadPublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
-	parentHeader := bc.GetHeaderByHash(header.ParentHash())
-	return GetPublicKeys(bc, parentHeader, false)
-}
-
 // VerifySeal implements Engine, checking whether the given block's parent block satisfies
 // the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
 // Note that each block header contains the bls signature of the parent block
@@ -132,7 +126,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
 		return nil
 	}
-	publicKeys, err := ReadPublicKeysFromLastBlock(chain, header)
+	publicKeys, err := committee.WithStakingEnabled.ReadPublicKeysFromChain(header.ParentHash(), chain)
 	if err != nil {
 		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys from last block").WithCause(err)
 	}
@@ -205,7 +199,19 @@ func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool)
 // i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
 // for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.
 func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte, reCalculate bool) error {
-	publicKeys, err := GetPublicKeys(chain, header, reCalculate)
+
+	publicKeys := []*bls.PublicKey{}
+	var err error
+	if reCalculate {
+		_, publicKeys = committee.WithStakingEnabled.ReadPublicKeysFromComputation(
+			header.Epoch(), *chain.Config(), int(header.ShardID()),
+		)
+	} else {
+		publicKeys, err = committee.WithStakingEnabled.ReadPublicKeysFromChain(
+			header.Hash(), chain,
+		)
+	}
+
 	if err != nil {
 		return ctxerror.New("[VerifyHeaderWithSignature] Cannot get publickeys for block header").WithCause(err)
 	}
@@ -235,43 +241,4 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature for block", "blockNum", header.Number().Uint64()-1, "blockHash", hash)
 	}
 	return nil
-}
-
-// GetPublicKeys finds the public keys of the committee that signed the block header
-func GetPublicKeys(
-	chain engine.ChainReader, header *block.Header, reCalculate bool,
-) ([]*bls.PublicKey, error) {
-	shardState := shard.SuperCommittee{}
-	var err error
-	if reCalculate {
-		currentCommittee, _ := committee.WithStakingEnabled.ReadFromComputation(
-			header.Epoch(), *chain.Config(), chain,
-		)
-		shardState = currentCommittee
-	} else {
-		shardState, err = chain.ReadShardState(header.Epoch())
-		if err != nil {
-			return nil, ctxerror.New("failed to read shard state of epoch",
-				"epoch", header.Epoch().Uint64())
-		}
-	}
-
-	committee := shardState.FindCommitteeByID(header.ShardID())
-	if committee == nil {
-		return nil, ctxerror.New("cannot find shard in the shard state",
-			"blockNumber", header.Number(),
-			"shardID", header.ShardID(),
-		)
-	}
-	var committerKeys []*bls.PublicKey
-	for _, member := range committee.NodeList {
-		committerKey := new(bls.PublicKey)
-		err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", member.BLSPublicKey).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	return committerKeys, nil
 }

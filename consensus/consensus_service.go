@@ -467,7 +467,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	hasError := false
 	header := consensus.ChainReader.CurrentHeader()
 	epoch := header.Epoch()
-	curSuperCommittee, curShardCommittee := committee.WithStakingEnabled.ReadPublicKeys(
+	curSuperCommittee, curShardCommittee := committee.WithStakingEnabled.ReadPublicKeysFromComputation(
 		epoch, *consensus.ChainReader.Config(), int(consensus.ShardID),
 	)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
@@ -477,7 +477,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		pubKeys, shardPubKeys = committee.WithStakingEnabled.ReadPublicKeys(
+		pubKeys, shardPubKeys = committee.WithStakingEnabled.ReadPublicKeysFromComputation(
 			new(big.Int).Add(epoch, common.Big1),
 			*consensus.ChainReader.Config(),
 			int(header.ShardID()),

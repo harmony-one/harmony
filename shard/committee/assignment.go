@@ -6,8 +6,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/block"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -24,16 +26,20 @@ type MembershipList interface {
 	ReadFromComputation(
 		epoch *big.Int, config params.ChainConfig, reader StakingCandidatesReader,
 	) (shard.SuperCommittee, error)
-	ReadFromChain(epoch *big.Int, reader SuperCommitteeCachedReader) (shard.SuperCommittee, error)
+	ReadFromChain(epoch *big.Int, reader ChainReader) (shard.SuperCommittee, error)
 }
 
 // PublicKeys per epoch
 type PublicKeys interface {
 	// If call shardID with SuperCommitteeID then only superCommittee is non-nil,
 	// otherwise get back the shardSpecific slice as well.
-	ReadPublicKeys(
+	ReadPublicKeysFromComputation(
 		epoch *big.Int, config params.ChainConfig, shardID int,
 	) (superCommittee, shardSpecific []*bls.PublicKey)
+
+	ReadPublicKeysFromChain(
+		hash common.Hash, reader ChainReader,
+	) ([]*bls.PublicKey, error)
 }
 
 // Reader ..
@@ -49,9 +55,13 @@ type StakingCandidatesReader interface {
 	ValidatorCandidates() []common.Address
 }
 
-// SuperCommitteeCachedReader way to use ChainReader without cyclic import from engine
-type SuperCommitteeCachedReader interface {
+type ChainReader interface {
+	// ReadShardState retrieves sharding state given the epoch number.
+	// This api reads the shard state cached or saved on the chaindb.
+	// Thus, only should be used to read the shard state of the current chain.
 	ReadShardState(epoch *big.Int) (shard.SuperCommittee, error)
+	// GetHeader retrieves a block header from the database by hash and number.
+	GetHeaderByHash(common.Hash) *block.Header
 }
 
 type partialStakingEnabled struct{}
@@ -156,9 +166,41 @@ func with400Stakers(
 	return superComm, nil
 }
 
-// ReadPublicKeys produces publicKeys of entire supercommittee per epoch, optionally providing a
+func (def partialStakingEnabled) ReadPublicKeysFromChain(
+	h common.Hash, reader ChainReader,
+) ([]*bls.PublicKey, error) {
+	header := reader.GetHeaderByHash(h)
+	shardID := header.ShardID()
+	superCommittee, err := reader.ReadShardState(header.Epoch())
+	if err != nil {
+		return nil, err
+	}
+	subCommittee := superCommittee.FindCommitteeByID(shardID)
+	if subCommittee == nil {
+		return nil, ctxerror.New("cannot find shard in the shard state",
+			"blockNumber", header.Number(),
+			"shardID", header.ShardID(),
+		)
+	}
+	committerKeys := []*bls.PublicKey{}
+
+	for i := range subCommittee.NodeList {
+		committerKey := new(bls.PublicKey)
+		err := subCommittee.NodeList[i].BLSPublicKey.ToLibBLSPublicKey(committerKey)
+		if err != nil {
+			return nil, ctxerror.New("cannot convert BLS public key",
+				"blsPublicKey", subCommittee.NodeList[i].BLSPublicKey).WithCause(err)
+		}
+		committerKeys = append(committerKeys, committerKey)
+	}
+	return committerKeys, nil
+
+	return nil, nil
+}
+
+// ReadPublicKeysFromChain produces publicKeys of entire supercommittee per epoch, optionally providing a
 // shard specific subcommittee
-func (def partialStakingEnabled) ReadPublicKeys(
+func (def partialStakingEnabled) ReadPublicKeysFromComputation(
 	epoch *big.Int, config params.ChainConfig, shardID int,
 ) ([]*bls.PublicKey, []*bls.PublicKey) {
 	instance := shard.Schedule.InstanceForEpoch(epoch)
@@ -197,7 +239,7 @@ func (def partialStakingEnabled) ReadPublicKeys(
 }
 
 func (def partialStakingEnabled) ReadFromChain(
-	epoch *big.Int, reader SuperCommitteeCachedReader,
+	epoch *big.Int, reader ChainReader,
 ) (newSuperComm shard.SuperCommittee, err error) {
 	return reader.ReadShardState(epoch)
 }
