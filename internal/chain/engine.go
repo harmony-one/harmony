@@ -116,6 +116,23 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		return nil
 	}
 	publicKeys, err := ReadPublicKeysFromLastBlock(chain, header)
+
+	// type T struct {
+	// 	Epoch      int      `json:"for-epoch"`
+	// 	ShardID    int      `json:"shard-id"`
+	// 	Count      int      `json:"count"`
+	// 	PublicKeys []string `json:"public-keys"`
+	// }
+	// t := T{
+	// 	int(header.Epoch().Int64()), int(header.ShardID()),
+	// 	len(publicKeys), make([]string, len(publicKeys)),
+	// }
+	// for i := range publicKeys {
+	// 	t.PublicKeys[i] = publicKeys[i].SerializeToHexStr()
+	// }
+	// b, _ := json.Marshal(t)
+	// fmt.Println(string(b))
+
 	if err != nil {
 		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys from last block").WithCause(err)
 	}

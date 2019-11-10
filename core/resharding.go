@@ -1,22 +1,17 @@
 package core
 
 import (
-	"errors"
 	"math/big"
 	"math/rand"
 	"sort"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
 const (
-	// GenesisEpoch is the number of the genesis epoch.
-	GenesisEpoch = 0
 	// CuckooRate is the percentage of nodes getting reshuffled in the second step of cuckoo resharding.
 	CuckooRate = 0.1
 )
@@ -132,45 +127,6 @@ func Shuffle(list []shard.NodeID) {
 // GetEpochFromBlockNumber calculates the epoch number the block belongs to
 func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
 	return shard.Schedule.CalcEpochNumber(blockNumber).Uint64()
-}
-
-// GetShardingStateFromBlockChain will retrieve random seed and shard map from beacon chain for given a epoch
-func GetShardingStateFromBlockChain(bc *BlockChain, epoch *big.Int) (*ShardingState, error) {
-	if bc == nil {
-		return nil, errors.New("no blockchain is supplied to get shard state")
-	}
-	shardState, err := bc.ReadShardState(epoch)
-	if err != nil {
-		return nil, err
-	}
-	shardState = shardState.DeepCopy()
-
-	// TODO(RJ,HB): use real randomness for resharding
-	//blockNumber := GetBlockNumberFromEpoch(epoch.Uint64())
-	//rndSeedBytes := bc.GetVdfByNumber(blockNumber)
-	rndSeed := uint64(0)
-
-	return &ShardingState{epoch: epoch.Uint64(), rnd: rndSeed, shardState: shardState, numShards: len(shardState)}, nil
-}
-
-// CalculateNewShardState get sharding state from previous epoch and calculate sharding state for new epoch
-func CalculateNewShardState(bc *BlockChain, epoch *big.Int) (shard.State, error) {
-	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
-		return CalculateInitShardState(), nil
-	}
-	prevEpoch := new(big.Int).Sub(epoch, common.Big1)
-	ss, err := GetShardingStateFromBlockChain(bc, prevEpoch)
-	if err != nil {
-		return nil, ctxerror.New("cannot retrieve previous sharding state").
-			WithCause(err)
-	}
-	utils.Logger().Info().Float64("percentage", CuckooRate).Msg("Cuckoo Rate")
-	return ss.shardState, nil
-}
-
-// CalculateInitShardState returns the initial shard state at genesis.
-func CalculateInitShardState() shard.State {
-	return CalculateShardState(big.NewInt(GenesisEpoch))
 }
 
 // CalculateShardState returns the shard state based on epoch number

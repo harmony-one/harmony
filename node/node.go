@@ -483,7 +483,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	node.chainConfig = chainConfig
 
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig)
+		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig,
+	)
 	if isArchival {
 		collection.DisableCache()
 	}

@@ -45,6 +45,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -256,11 +257,6 @@ func EpochFirstBlock(epoch *big.Int) *big.Int {
 		return big.NewInt(GenesisEpoch)
 	}
 	return big.NewInt(int64(shard.Schedule.EpochLastBlock(epoch.Uint64()-1) + 1))
-}
-
-// IsEpochLastBlock returns whether this block is the last block of an epoch.
-func IsEpochLastBlock(block *types.Block) bool {
-	return shard.Schedule.IsLastBlock(block.NumberU64())
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -1937,7 +1933,18 @@ func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.State, error) {
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err
 	}
-	shardState, err = CalculateNewShardState(bc, epoch)
+
+	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
+		shardState, err = committee.WithStakingEnabled.ReadFromComputation(
+			big.NewInt(GenesisEpoch), *bc.Config(), nil,
+		)
+	} else {
+		prevEpoch := new(big.Int).Sub(epoch, common.Big1)
+		shardState, err = committee.WithStakingEnabled.ReadFromChain(
+			prevEpoch, bc,
+		)
+	}
+
 	if err != nil {
 		return nil, err
 	}
