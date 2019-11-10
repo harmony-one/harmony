@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/rs/zerolog"
 )
@@ -544,7 +545,7 @@ func (consensus *Consensus) IsLeader() bool {
 
 // NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
 func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
-	if consensus.ShardID == 0 && epoch.Uint64() >= core.ShardingSchedule.RandomnessStartingEpoch() {
+	if consensus.ShardID == 0 && epoch.Uint64() >= shard.Schedule.RandomnessStartingEpoch() {
 		return true
 	}
 

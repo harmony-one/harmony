@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -133,7 +132,7 @@ func Shuffle(list []shard.NodeID) {
 
 // GetEpochFromBlockNumber calculates the epoch number the block belongs to
 func GetEpochFromBlockNumber(blockNumber uint64) uint64 {
-	return ShardingSchedule.CalcEpochNumber(blockNumber).Uint64()
+	return shard.Schedule.CalcEpochNumber(blockNumber).Uint64()
 }
 
 // GetShardingStateFromBlockChain will retrieve random seed and shard map from beacon chain for given a epoch
@@ -170,14 +169,6 @@ func CalculateNewShardState(bc *BlockChain, epoch *big.Int) (shard.State, error)
 	return ss.shardState, nil
 }
 
-// TODO ek – shardingSchedule should really be part of a general-purpose network
-//  configuration.  We are OK for the time being,
-//  until the day we should let one node process join multiple networks.
-
-// ShardingSchedule is the sharding configuration schedule.
-// Depends on the type of the network.  Defaults to the mainnet schedule.
-var ShardingSchedule shardingconfig.Schedule = shardingconfig.MainnetSchedule
-
 // CalculateInitShardState returns the initial shard state at genesis.
 func CalculateInitShardState() shard.State {
 	return CalculateShardState(big.NewInt(GenesisEpoch))
@@ -188,7 +179,7 @@ func CalculateInitShardState() shard.State {
 // current chain dependency (ex. getting shard state from block header received during cross-shard transaction)
 func CalculateShardState(epoch *big.Int) shard.State {
 	utils.Logger().Info().Int64("epoch", epoch.Int64()).Msg("Get Shard State of Epoch.")
-	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+	shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
 	shardHarmonyNodes := shardingConfig.NumHarmonyOperatedNodesPerShard()
 	shardSize := shardingConfig.NumNodesPerShard()
@@ -237,7 +228,6 @@ func CalculateShardState(epoch *big.Int) shard.State {
 // CalculatePublicKeys returns the publickeys given epoch and shardID
 func CalculatePublicKeys(epoch *big.Int, shardID uint32) []*bls.PublicKey {
 	shardState := CalculateShardState(epoch)
-
 	// Update validator public keys
 	committee := shardState.FindCommitteeByID(shardID)
 	if committee == nil {

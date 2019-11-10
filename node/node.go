@@ -277,7 +277,7 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	txPoolLimit := shard.Schedule.MaxTxPoolSizeLimit()
 	node.pendingTxMutex.Lock()
 	for _, tx := range newTxs {
 		if _, ok := node.pendingTransactions[tx.Hash()]; !ok {
@@ -293,7 +293,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
-	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	txPoolLimit := shard.Schedule.MaxTxPoolSizeLimit()
 	node.pendingStakingTxMutex.Lock()
 	for _, tx := range newStakingTxs {
 		if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
@@ -350,7 +350,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Transactions, staking.StakingTransactions) {
-	txsThrottleConfig := core.ShardingSchedule.TxsThrottleConfig()
+	txsThrottleConfig := shard.Schedule.TxsThrottleConfig()
 
 	// the next block number to be added in consensus protocol, which is always one more than current chain header block
 	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
@@ -563,7 +563,7 @@ func (node *Node) CalculateInitShardState() (err error) {
 	// Get genesis epoch shard state from chain
 	blockNum := node.Blockchain().CurrentBlock().NumberU64()
 	node.Consensus.SetMode(consensus.Listening)
-	epoch := core.ShardingSchedule.CalcEpochNumber(blockNum)
+	epoch := shard.Schedule.CalcEpochNumber(blockNum)
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).

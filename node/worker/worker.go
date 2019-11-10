@@ -365,7 +365,8 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 
 // ProposeShardStateWithoutBeaconSync proposes the next shard state for next epoch.
 func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.State {
-	if !core.ShardingSchedule.IsLastBlock(w.current.header.Number().Uint64()) {
+
+	if !shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
 		return nil
 	}
 	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)

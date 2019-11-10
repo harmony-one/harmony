@@ -4,13 +4,9 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/harmony-one/harmony/p2p/host"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
-
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
@@ -19,6 +15,8 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
@@ -38,7 +36,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte)
 	//#### END Read payload data from committed msg
 
 	epoch := newBlock.Header().Epoch()
-	shardingConfig := core.ShardingSchedule.InstanceForEpoch(epoch)
+	shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
 	myShardID := node.Consensus.ShardID
 	utils.Logger().Info().Int("shardNum", shardNum).Uint32("myShardID", myShardID).Uint64("blockNum", newBlock.NumberU64()).Msg("[BroadcastCXReceipts]")
@@ -345,7 +343,7 @@ func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error)
 		Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 		Msg("Proposing cross links ...")
 	curBlock := node.Blockchain().CurrentBlock()
-	numShards := core.ShardingSchedule.InstanceForEpoch(curBlock.Header().Epoch()).NumShards()
+	numShards := shard.Schedule.InstanceForEpoch(curBlock.Header().Epoch()).NumShards()
 
 	shardCrossLinks := make([]types.CrossLinks, numShards)
 

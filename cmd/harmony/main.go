@@ -34,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Version string variables
@@ -203,13 +204,13 @@ func passphraseForBls() {
 }
 
 func setupInitialAccount() (isLeader bool) {
-	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
+	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
 	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
-			config := core.ShardingSchedule.InstanceForEpoch(epoch)
+			config := shard.Schedule.InstanceForEpoch(epoch)
 			isLeader, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
 			if initialAccount != nil {
 				break
@@ -323,7 +324,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
-		epochConfig := core.ShardingSchedule.InstanceForEpoch(ethCommon.Big0)
+		epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
 		selfPort, err := strconv.ParseUint(*port, 10, 16)
 		if err != nil {
 			utils.Logger().Fatal().
@@ -429,13 +430,13 @@ func main() {
 
 	switch *networkType {
 	case nodeconfig.Mainnet:
-		core.ShardingSchedule = shardingconfig.MainnetSchedule
+		shard.Schedule = shardingconfig.MainnetSchedule
 	case nodeconfig.Testnet:
-		core.ShardingSchedule = shardingconfig.TestnetSchedule
+		shard.Schedule = shardingconfig.TestnetSchedule
 	case nodeconfig.Pangaea:
-		core.ShardingSchedule = shardingconfig.PangaeaSchedule
+		shard.Schedule = shardingconfig.PangaeaSchedule
 	case nodeconfig.Localnet:
-		core.ShardingSchedule = shardingconfig.LocalnetSchedule
+		shard.Schedule = shardingconfig.LocalnetSchedule
 	case nodeconfig.Devnet:
 		if *devnetHarmonySize < 0 {
 			*devnetHarmonySize = *devnetShardSize
@@ -448,7 +449,7 @@ func main() {
 				err)
 			os.Exit(1)
 		}
-		core.ShardingSchedule = shardingconfig.NewFixedSchedule(devnetConfig)
+		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
 	}
 
 	initSetup()
