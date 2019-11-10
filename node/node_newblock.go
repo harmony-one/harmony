@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -128,9 +127,10 @@ func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) shard.S
 	if block == nil || !shard.Schedule.IsLastBlock(block.Number().Uint64()) {
 		return nil
 	}
-
-	nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
-	return core.CalculateShardState(nextEpoch)
+	shardState, _ := committee.WithStakingEnabled.ReadFromComputation(
+		new(big.Int).Add(block.Header().Epoch(), common.Big1), node.chainConfig, nil,
+	)
+	return shardState
 }
 
 func (node *Node) proposeShardState(block *types.Block) error {
