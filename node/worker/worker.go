@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -162,7 +161,7 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 	coinbase common.Address) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
 
 	// only beaconchain process staking transaction
-	if w.chain.ShardID() != values.BeaconChainShardID {
+	if w.chain.ShardID() != shard.BeaconChainShardID {
 		utils.Logger().Warn().Msgf("Invalid shardID: %v", w.chain.ShardID())
 		return nil, nil, nil
 	}

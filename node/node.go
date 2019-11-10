@@ -20,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -33,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -505,7 +505,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
-		if node.Blockchain().ShardID() != values.BeaconChainShardID {
+		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
 		}
 
@@ -550,14 +550,12 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	return &node
 }
 
-// CalculateInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
-func (node *Node) CalculateInitShardState() (err error) {
+// InitConsensusWithMembers initialize shard state from latest epoch and update committee pub keys for consensus and drand
+func (node *Node) InitConsensusWithMembers() (err error) {
 	if node.Consensus == nil {
 		return ctxerror.New("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
 	}
 	shardID := node.Consensus.ShardID
-
-	// Get genesis epoch shard state from chain
 	blockNum := node.Blockchain().CurrentBlock().NumberU64()
 	node.Consensus.SetMode(consensus.Listening)
 	epoch := shard.Schedule.CalcEpochNumber(blockNum)
@@ -565,21 +563,23 @@ func (node *Node) CalculateInitShardState() (err error) {
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
-		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
-	pubKeys := core.CalculatePublicKeys(epoch, shardID)
+		Msg("[InitConsensusWithMembers] Try To Get PublicKeys")
+	_, pubKeys := committee.WithStakingEnabled.ReadPublicKeysFromComputation(
+		epoch, node.Consensus.ChainReader, int(shardID),
+	)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
-			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",
+			"[InitConsensusWithMembers] PublicKeys is Empty, Cannot update public keys",
 			"shardID", shardID,
 			"blockNum", blockNum)
 	}
 
-	for _, key := range pubKeys {
-		if key.IsEqual(node.Consensus.PubKey) {
+	for i := range pubKeys {
+		if pubKeys[i].IsEqual(node.Consensus.PubKey) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
-				Msg("[CalculateInitShardState] Successfully updated public keys")
+				Msg("[InitConsensusWithMembers] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
 			node.Consensus.SetMode(consensus.Normal)
 			return nil

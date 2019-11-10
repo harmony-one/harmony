@@ -14,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -24,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/rs/zerolog"
 )
@@ -455,22 +455,19 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	pubKeys := []*bls.PublicKey{}
 	hasError := false
-
 	header := consensus.ChainReader.CurrentHeader()
-
 	epoch := header.Epoch()
-	curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID())
+	_, curPubKeys := committee.WithStakingEnabled.ReadPublicKeysFromComputation(epoch, consensus.ChainReader, int(header.ShardID()))
 	consensus.numPrevPubKeys = len(curPubKeys)
-
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
-
-	if core.IsEpochLastBlockByHeader(header) {
+	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
 		// increase epoch by one if it's the last block
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		pubKeys = core.CalculatePublicKeys(nextEpoch, header.ShardID())
+		_, pubKeys = committee.WithStakingEnabled.ReadPublicKeysFromComputation(
+			new(big.Int).Add(epoch, common.Big1), consensus.ChainReader, int(header.ShardID()),
+		)
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
 		pubKeys = curPubKeys
@@ -490,7 +487,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.UpdatePublicKeys(pubKeys)
 
 	// take care of possible leader change during the epoch
-	if !core.IsEpochLastBlockByHeader(header) && header.Number().Uint64() != 0 {
+	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) &&
+		header.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).

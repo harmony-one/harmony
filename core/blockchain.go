@@ -252,8 +252,8 @@ func IsEpochBlock(block *types.Block) bool {
 // EpochFirstBlock returns the block number of the first block of an epoch.
 // TODO: instead of using fixed epoch schedules, determine the first block by epoch changes.
 func EpochFirstBlock(epoch *big.Int) *big.Int {
-	if epoch.Cmp(big.NewInt(0)) == 0 {
-		return big.NewInt(0)
+	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
+		return big.NewInt(GenesisEpoch)
 	}
 	return big.NewInt(int64(shard.Schedule.EpochLastBlock(epoch.Uint64()-1) + 1))
 }
@@ -261,12 +261,6 @@ func EpochFirstBlock(epoch *big.Int) *big.Int {
 // IsEpochLastBlock returns whether this block is the last block of an epoch.
 func IsEpochLastBlock(block *types.Block) bool {
 	return shard.Schedule.IsLastBlock(block.NumberU64())
-}
-
-// IsEpochLastBlockByHeader returns whether this block is the last block of an epoch
-// given block header
-func IsEpochLastBlockByHeader(header *block.Header) bool {
-	return shard.Schedule.IsLastBlock(header.Number().Uint64())
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
