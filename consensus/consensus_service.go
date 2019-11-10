@@ -111,17 +111,14 @@ func (consensus *Consensus) DebugPrintPublicKeys() {
 	utils.Logger().Debug().Strs("PublicKeys", keys).Int("count", len(keys)).Msgf("Debug Public Keys")
 }
 
-// UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
+// UpdatePublicKeys updates the PublicKeys for quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
-	consensus.CommitteePublicKeys = map[string]bool{}
 	utils.Logger().Info().Msg("My Committee updated")
-	for i, pubKey := range consensus.Decider.DumpParticipants() {
-		utils.Logger().Info().Int("index", i).Str("BlsPubKey", pubKey).Msg("Member")
-		consensus.CommitteePublicKeys[pubKey] = true
+	for i := range pubKeys {
+		utils.Logger().Info().Int("index", i).Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).Msg("Member")
 	}
-
 	consensus.LeaderPubKey = pubKeys[0]
 	utils.Logger().Info().
 		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
@@ -231,8 +228,7 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
-	_, ok := consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()]
-	return ok
+	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
 // Verify the signature of the message are valid from the signer's public key.
@@ -509,9 +505,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 	}
 
-	for _, key := range pubKeys {
+	for i := range pubKeys {
 		// in committee
-		if key.IsEqual(consensus.PubKey) {
+		if pubKeys[i].IsEqual(consensus.PubKey) {
 			if hasError {
 				return Syncing
 			}

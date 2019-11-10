@@ -545,11 +545,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
-
 	node.startConsensus = make(chan struct{})
-
 	go node.bootstrapConsensus()
-
 	return &node
 }
 
