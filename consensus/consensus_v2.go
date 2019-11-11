@@ -1085,6 +1085,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		utils.Logger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		defer close(stoppedChan)
 		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
