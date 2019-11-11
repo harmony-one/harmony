@@ -231,6 +231,9 @@ func New(
 	// displayed on explorer as Height right now
 	consensus.viewID = 0
 	consensus.ShardID = shard
+	consensus.Decider.SetShardIDProvider(func() (uint32, error) {
+		return consensus.ShardID, nil
+	})
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
