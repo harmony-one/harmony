@@ -57,7 +57,7 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 		// TODO ek – this may be called from regular shards,
 		//  for vetting beacon chain blocks received during block syncing.
 		//  DRand may or or may not get in the way.  Test this out.
-		expected, err := committee.WithStakingEnabled.ReadFromChain(
+		expected, err := committee.WithStakingEnabled.ReadFromDB(
 			new(big.Int).Sub(block.Header().Epoch(), common.Big1),
 			node.Beaconchain(),
 		)

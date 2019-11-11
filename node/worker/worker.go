@@ -368,7 +368,7 @@ func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.State {
 	if !shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
 		return nil
 	}
-	shardState, _ := committee.WithStakingEnabled.ReadFromComputation(
+	shardState, _ := committee.WithStakingEnabled.Compute(
 		new(big.Int).Add(w.current.header.Epoch(), common.Big1), *w.config, nil,
 	)
 	return shardState

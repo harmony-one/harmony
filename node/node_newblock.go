@@ -127,7 +127,7 @@ func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) shard.S
 	if block == nil || !shard.Schedule.IsLastBlock(block.Number().Uint64()) {
 		return nil
 	}
-	shardState, _ := committee.WithStakingEnabled.ReadFromComputation(
+	shardState, _ := committee.WithStakingEnabled.Compute(
 		new(big.Int).Add(block.Header().Epoch(), common.Big1), node.chainConfig, nil,
 	)
 	return shardState
@@ -151,7 +151,7 @@ func (node *Node) proposeBeaconShardState(block *types.Block) error {
 	}
 	// TODO Use ReadFromComputation
 	prevEpoch := new(big.Int).Sub(block.Header().Epoch(), common.Big1)
-	shardState, err := committee.WithStakingEnabled.ReadFromChain(
+	shardState, err := committee.WithStakingEnabled.ReadFromDB(
 		prevEpoch, node.Blockchain(),
 	)
 	if err != nil {

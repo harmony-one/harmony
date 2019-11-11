@@ -8,10 +8,8 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
@@ -42,7 +40,7 @@ type genesisInitializer struct {
 
 // InitChainDB sets up a new genesis block in the database for the given shard.
 func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) error {
-	shardState, _ := committee.WithStakingEnabled.ReadFromComputation(
+	shardState, _ := committee.WithStakingEnabled.Compute(
 		big.NewInt(core.GenesisEpoch), gi.node.chainConfig, nil,
 	)
 	if shardID != shard.BeaconChainShardID {
