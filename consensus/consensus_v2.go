@@ -14,7 +14,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -22,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
 )
 
@@ -385,7 +385,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	logger = logger.With().
-		Int64("NumReceivedSoFar", consensus.Decider.SignatoriesCount(quorum.Prepare)).
+		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
 	consensus.Decider.AddSignature(quorum.Prepare, validatorPubKey, &sign)
@@ -407,10 +407,12 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		msg := &msg_pb.Message{}
 		_ = protobuf.Unmarshal(msgPayload, msg)
 		FBFTMsg, err := ParseFBFTMessage(msg)
+
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("[OnPrepare] Unable to parse pbft message")
 			return
 		}
+
 		consensus.FBFTLog.AddMessage(FBFTMsg)
 		// Leader add commit phase signature
 		blockNumHash := make([]byte, 8)
@@ -495,7 +497,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		utils.Logger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!!")
 		return
 	}
-	prepareCount := consensus.Decider.SignatoriesCount(quorum.Prepare)
+	prepareCount := consensus.Decider.SignersCount(quorum.Prepare)
 	if count := utils.CountOneBits(mask.Bitmap); count < prepareCount {
 		utils.Logger().Debug().
 			Int64("Need", prepareCount).
@@ -727,7 +729,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	logger = logger.With().
-		Int64("numReceivedSoFar", consensus.Decider.SignatoriesCount(quorum.Commit)).
+		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).
 		Logger()
 	logger.Info().Msg("[OnCommit] Received new commit message")
 	consensus.Decider.AddSignature(quorum.Commit, validatorPubKey, &sign)
@@ -759,7 +761,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 func (consensus *Consensus) finalizeCommits() {
 	utils.Logger().Info().
-		Int64("NumCommits", consensus.Decider.SignatoriesCount(quorum.Commit)).
+		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
 		Msg("[Finalizing] Finalizing Block")
 
 	beforeCatchupNum := consensus.blockNum
@@ -880,7 +882,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	switch consensus.Decider.Policy() {
 	case quorum.SuperMajorityVote:
-		threshold := consensus.Decider.QuorumThreshold()
+		threshold := consensus.Decider.QuorumThreshold().Int64()
 		if count := utils.CountOneBits(mask.Bitmap); int64(count) < threshold {
 			utils.Logger().Warn().
 				Int64("need", threshold).
@@ -1024,6 +1026,7 @@ func (consensus *Consensus) tryCatchup() {
 		}
 		utils.Logger().Info().Msg("[TryCatchup] prepared message found to commit")
 
+		// TODO(Chao): Explain the reasoning for these code
 		consensus.blockHash = [32]byte{}
 		consensus.blockNum = consensus.blockNum + 1
 		consensus.viewID = msgs[0].ViewID + 1
@@ -1082,6 +1085,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		utils.Logger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		defer close(stoppedChan)
 		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
@@ -1127,6 +1131,11 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				utils.Logger().Info().Msg("Node is out of sync")
 
 			case newBlock := <-blockChannel:
+				// Debug code to trigger leader change.
+				//if consensus.ShardID == 0 && newBlock.NumberU64() == 2 && strings.Contains(consensus.PubKey.SerializeToHexStr(), "65f55eb") {
+				//	continue
+				//}
+
 				utils.Logger().Info().
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
@@ -1179,7 +1188,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					if err == nil {
 						vdfInProgress = false
 						// Verify the randomness
-						vdfObject := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
+						vdfObject := vdf_go.New(shard.Schedule.VdfDifficulty(), seed)
 						if !vdfObject.Verify(vdfOutput) {
 							consensus.getLogger().Warn().
 								Uint64("MsgBlockNum", newBlock.NumberU64()).
@@ -1221,6 +1230,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				consensus.handleMessageUpdate(msg)
 
 			case viewID := <-consensus.commitFinishChan:
+				// Only Leader execute this condition
 				func() {
 					consensus.mutex.Lock()
 					defer consensus.mutex.Unlock()
@@ -1314,7 +1324,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 
 	// TODO ek – limit concurrency
 	go func() {
-		vdf := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
+		vdf := vdf_go.New(shard.Schedule.VdfDifficulty(), seed)
 		outputChannel := vdf.GetOutputChannel()
 		start := time.Now()
 		vdf.Execute()
@@ -1355,7 +1365,7 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
 		}
 	}
 
-	vdfObject := vdf_go.New(core.ShardingSchedule.VdfDifficulty(), seed)
+	vdfObject := vdf_go.New(shard.Schedule.VdfDifficulty(), seed)
 	vdfOutput := [516]byte{}
 	copy(vdfOutput[:], headerObj.Vdf())
 	if vdfObject.Verify(vdfOutput) {

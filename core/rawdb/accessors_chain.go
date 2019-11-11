@@ -641,29 +641,28 @@ func WriteStakingValidator(db DatabaseWriter, v *staking.ValidatorWrapper) error
 	return err
 }
 
-// ReadValidatorMap retrieves staking validator by its address
-func ReadValidatorMap(db DatabaseReader) (map[common.Address]struct{}, error) {
-	data, err := db.Get([]byte("validatorMap"))
+// ReadValidatorList retrieves staking validator by its address
+func ReadValidatorList(db DatabaseReader) ([]common.Address, error) {
+	data, err := db.Get([]byte("validatorList"))
 	if len(data) == 0 || err != nil {
-		utils.Logger().Info().Err(err).Msg("ReadValidatorMap")
-		return nil, err
+		return []common.Address{}, nil
 	}
-	addrs := make(map[common.Address]struct{})
+	addrs := []common.Address{}
 	if err := rlp.DecodeBytes(data, &addrs); err != nil {
-		utils.Logger().Error().Err(err).Msg("Unable to Decode validator Map from database")
+		utils.Logger().Error().Err(err).Msg("Unable to Decode validator List from database")
 		return nil, err
 	}
 	return addrs, nil
 }
 
-// WriteValidatorMap stores staking validator's information by its address
-func WriteValidatorMap(db DatabaseWriter, addrs map[common.Address]struct{}) error {
+// WriteValidatorList stores staking validator's information by its address
+func WriteValidatorList(db DatabaseWriter, addrs []common.Address) error {
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err != nil {
-		utils.Logger().Error().Msg("[WriteValidatorMap] Failed to encode")
+		utils.Logger().Error().Msg("[WriteValidatorList] Failed to encode")
 	}
-	if err := db.Put([]byte("validatorMap"), bytes); err != nil {
-		utils.Logger().Error().Msg("[WriteValidatorMap] Failed to store to database")
+	if err := db.Put([]byte("validatorList"), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorList] Failed to store to database")
 	}
 	return err
 }

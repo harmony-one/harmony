@@ -245,3 +245,13 @@ func GetPendingCXKey(shardID uint32, blockNum uint64) string {
 	key := strconv.FormatUint(uint64(shardID), 10) + "-" + strconv.FormatUint(blockNum, 10)
 	return key
 }
+
+// AppendIfMissing returns a list of unique addresses
+func AppendIfMissing(slice []common.Address, addr common.Address) []common.Address {
+	for _, ele := range slice {
+		if ele == addr {
+			return slice
+		}
+	}
+	return append(slice, addr)
+}

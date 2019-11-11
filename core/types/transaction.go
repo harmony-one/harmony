@@ -640,7 +640,7 @@ func (m Message) Type() TransactionType {
 }
 
 // SetType set the type of message
-func (m Message) SetType(typ TransactionType) {
+func (m *Message) SetType(typ TransactionType) {
 	m.txType = typ
 }
 

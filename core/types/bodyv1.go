@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/harmony/block"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // BodyV1 is the V1 block body
@@ -28,6 +29,13 @@ func (b *BodyV1) Transactions() (txs []*Transaction) {
 		txs = append(txs, tx.Copy())
 	}
 	return txs
+}
+
+// StakingTransactions returns the list of staking transactions.
+// The returned list is a deep copy; the caller may do anything with it without
+// affecting the original.
+func (b *BodyV1) StakingTransactions() (txs []*staking.StakingTransaction) {
+	return nil
 }
 
 // TransactionAt returns the transaction at the given index in this block.
