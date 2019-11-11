@@ -3,9 +3,7 @@ package shardingconfig
 import (
 	"fmt"
 	"math/big"
-	"time"
 
-	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -26,13 +24,6 @@ const (
 	localnetConsensusRatio = float64(0.1)
 
 	localnetRandomnessStartingEpoch = 0
-
-	localnetMaxTxAmountLimit               = 1e3 // unit is in One
-	localnetMaxNumRecentTxsPerAccountLimit = 1e2
-	localnetMaxTxPoolSizeLimit             = 8000
-	localnetMaxNumTxsPerBlockLimit         = 1000
-	localnetRecentTxDuration               = time.Hour
-	localnetEnableTxnThrottling            = false
 )
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -95,43 +86,6 @@ func (ls localnetSchedule) ConsensusRatio() float64 {
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ls localnetSchedule) RandomnessStartingEpoch() uint64 {
 	return localnetRandomnessStartingEpoch
-}
-
-func (ls localnetSchedule) MaxTxAmountLimit() *big.Int {
-	amountBigInt := big.NewInt(localnetMaxTxAmountLimit)
-	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
-	return amountBigInt
-}
-
-func (ls localnetSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
-	return localnetMaxNumRecentTxsPerAccountLimit
-}
-
-func (ls localnetSchedule) MaxTxPoolSizeLimit() int {
-	return localnetMaxTxPoolSizeLimit
-}
-
-func (ls localnetSchedule) MaxNumTxsPerBlockLimit() int {
-	return localnetMaxNumTxsPerBlockLimit
-}
-
-func (ls localnetSchedule) RecentTxDuration() time.Duration {
-	return localnetRecentTxDuration
-}
-
-func (ls localnetSchedule) EnableTxnThrottling() bool {
-	return localnetEnableTxnThrottling
-}
-
-func (ls localnetSchedule) TxsThrottleConfig() *TxsThrottleConfig {
-	return &TxsThrottleConfig{
-		MaxTxAmountLimit:               ls.MaxTxAmountLimit(),
-		MaxNumRecentTxsPerAccountLimit: ls.MaxNumRecentTxsPerAccountLimit(),
-		MaxTxPoolSizeLimit:             ls.MaxTxPoolSizeLimit(),
-		MaxNumTxsPerBlockLimit:         ls.MaxNumTxsPerBlockLimit(),
-		RecentTxDuration:               ls.RecentTxDuration(),
-		EnableTxnThrottling:            ls.EnableTxnThrottling(),
-	}
 }
 
 func (ls localnetSchedule) GetNetworkID() NetworkID {
