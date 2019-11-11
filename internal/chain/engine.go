@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -19,10 +20,22 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-type engineImpl struct{}
+type engineImpl struct {
+	d reward.Distributor
+}
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{}
+var Engine = &engineImpl{nil}
+
+// Rewarder handles the distribution of block rewards
+func (e *engineImpl) Rewarder() reward.Distributor {
+	return e.d
+}
+
+// SetRewarder ..
+func (e *engineImpl) SetRewarder(d reward.Distributor) {
+	e.d = d
+}
 
 // SealHash returns the hash of a block prior to it being sealed.
 func (e *engineImpl) SealHash(header *block.Header) (hash common.Hash) {
@@ -156,7 +169,7 @@ func (e *engineImpl) Finalize(
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	if err := AccumulateRewards(chain, state, header); err != nil {
+	if err := AccumulateRewards(chain, state, header, e.Rewarder()); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))

@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	// "github.com/harmony-one/harmony/staking/effective"
 )
@@ -19,10 +18,6 @@ type uniformVoteWeight struct {
 func (v *uniformVoteWeight) Policy() Policy {
 	return SuperMajorityVote
 }
-
-// func (v *uniformVoteWeight) SetShardIDProvider(p func() (uint32, error)) {
-// 	v.p = p
-// }
 
 // IsQuorumAchieved ..
 func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
@@ -59,7 +54,7 @@ func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
 func (v *uniformVoteWeight) Award(
 	// Here hook is the callback which gets the amount the earner is due in just reward
 	// up to the hook to do side-effects like write the statedb
-	Pie *big.Int, earners []common2.Address, hook func(earner common.Address, due *big.Int),
+	Pie *big.Int, earners []common.Address, hook func(earner common.Address, due *big.Int),
 ) *big.Int {
 	payout := big.NewInt(0)
 	last := big.NewInt(0)
