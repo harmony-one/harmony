@@ -430,7 +430,10 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			return response, nil
 		} else if len(node.peerRegistrationRecord) >= maxBroadcastNodes {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			utils.GetLogInstance().Debug("[SYNC] maximum registration limit exceeds", "ip", ip, "port", port)
+			utils.Logger().Debug().
+				Str("ip", ip).
+				Str("port", port).
+				Msg("[SYNC] maximum registration limit exceeds")
 			return response, nil
 		} else {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
