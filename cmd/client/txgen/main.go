@@ -22,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -220,7 +221,8 @@ syncLoop:
 					}
 					stateMutex.Lock()
 					if err := txGen.Worker.UpdateCurrent(block.Coinbase()); err != nil {
-						utils.Logger().Warn().Err(err).Msg("(*Worker).UpdateCurrent failed")
+						ctxerror.Warn(utils.GetLogger(), err,
+							"(*Worker).UpdateCurrent failed")
 					}
 					stateMutex.Unlock()
 					readySignal <- shardID

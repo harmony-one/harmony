@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
@@ -83,7 +84,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	selectedTxs, selectedStakingTxs := node.getTransactionsForNewBlock(coinbase)
 
 	if err := node.Worker.CommitTransactions(selectedTxs, selectedStakingTxs, coinbase); err != nil {
-		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
+		ctxerror.Log15(utils.GetLogger().Error,
+			ctxerror.New("cannot commit transactions").
+				WithCause(err))
 		return nil, err
 	}
 
@@ -91,7 +94,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {
 		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
-			utils.Logger().Error().Err(err).Msg("cannot commit receipts")
+			ctxerror.Log15(utils.GetLogger().Error,
+				ctxerror.New("cannot commit receipts").
+					WithCause(err))
 		}
 	}
 
@@ -110,7 +115,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Prepare last commit signatures
 	sig, mask, err := node.Consensus.LastCommitSig()
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Cannot get commit signatures from last block")
+		ctxerror.Log15(utils.GetLogger().Error,
+			ctxerror.New("Cannot get commit signatures from last block").
+				WithCause(err))
 		return nil, err
 	}
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)

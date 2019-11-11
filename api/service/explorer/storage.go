@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -116,7 +117,7 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		storage.UpdateAddress(batch, explorerTransaction, tx)
 	}
 	if err := batch.Write(); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot write batch")
+		ctxerror.Warn(utils.GetLogger(), err, "cannot write batch")
 	}
 }
 

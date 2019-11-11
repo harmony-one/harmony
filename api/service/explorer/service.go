@@ -25,6 +25,7 @@ import (
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/bech32"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -668,7 +669,7 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 		parsedAddr := common2.ParseAddr(id)
 		oneAddr, err := common2.AddressToBech32(parsedAddr)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("unrecognized address format")
+			utils.Logger().Warn().Msg("unrecognized address format")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -687,7 +688,8 @@ func (s *Service) GetExplorerAddress(w http.ResponseWriter, r *http.Request) {
 	data := &Data{}
 	defer func() {
 		if err := json.NewEncoder(w).Encode(data.Address); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode Address")
+			ctxerror.Warn(utils.WithCallerSkip(utils.GetLogInstance(), 1), err,
+				"cannot JSON-encode Address")
 		}
 	}()
 	if id == "" {

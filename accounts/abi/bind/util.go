@@ -32,16 +32,17 @@ import (
 func WaitMined(ctx context.Context, b DeployBackend, tx *types.Transaction) (*types.Receipt, error) {
 	queryTicker := time.NewTicker(time.Second)
 	defer queryTicker.Stop()
-	utils.Logger().Info().Str("hash", tx.Hash().Hex())
+
+	logger := utils.GetLogInstance().New("hash", tx.Hash())
 	for {
 		receipt, err := b.TransactionReceipt(ctx, tx.Hash())
 		if receipt != nil {
 			return receipt, nil
 		}
 		if err != nil {
-			utils.Logger().Debug().Err(err).Msg("Receipt retrieval failed")
+			logger.Trace("Receipt retrieval failed", "err", err)
 		} else {
-			utils.Logger().Debug().Msg("Transaction not yet mined")
+			logger.Trace("Transaction not yet mined")
 		}
 		// Wait for the next round.
 		select {

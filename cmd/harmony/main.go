@@ -24,6 +24,7 @@ import (
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/memprofiling"
@@ -268,7 +269,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
 	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogger()))
+		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
 	}
 	if err != nil {
 		panic("unable to new host in harmony")
@@ -373,10 +374,8 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// This needs to be executed after consensus and drand are setup
 	if err := currentNode.InitConsensusWithValidators(); err != nil {
-		utils.Logger().Warn().
-			Int("shardID", *shardID).
-			Err(err).
-			Msg("InitConsensusWithMembers failed")
+		ctxerror.Crit(utils.GetLogger(), err, "InitConsensusWithMembers failed",
+			"shardID", *shardID)
 	}
 
 	// Set the consensus ID to be the current block number
@@ -470,7 +469,7 @@ func main() {
 	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
 
 	if nodeConfig.ShardID != shard.BeaconChainShardID && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
-		utils.Logger().Info().Uint32("shardID", currentNode.Blockchain().ShardID()).Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
+		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID", nodeConfig.ShardID)
 		go currentNode.SupportBeaconSyncing()
 	}
 
@@ -498,9 +497,7 @@ func main() {
 	currentNode.RunServices()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
-		utils.Logger().Warn().
-			Err(err).
-			Msg("StartRPC failed")
+		ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
 	}
 
 	// Run additional node collectors
