@@ -208,7 +208,6 @@ func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
 
 func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
 	m := map[string]*bls.Sign{}
-
 	switch p {
 	case Prepare:
 		m = s.prepare
@@ -217,12 +216,9 @@ func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
 	case ViewChange:
 		m = s.viewID
 	}
-
-	sigs := make([]*bls.Sign, len(m))
-	spot := 0
-	for sig := range m {
-		sigs[spot] = m[sig]
-		spot++
+	sigs := make([]*bls.Sign, 0, len(m))
+	for _, value := range m {
+		sigs = append(sigs, value)
 	}
 	return sigs
 }
