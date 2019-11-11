@@ -236,7 +236,7 @@ func (b *APIBackend) RPCGasCap() *big.Int {
 	return b.hmy.RPCGasCap // TODO(ricl): should be hmy.config.RPCGasCap
 }
 
-// GetShardID returns the gas cap of rpc
+// GetShardID returns shardID of this node
 func (b *APIBackend) GetShardID() uint32 {
 	return b.hmy.shardID
 }

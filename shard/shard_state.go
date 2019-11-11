@@ -3,6 +3,8 @@ package shard
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
+	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,14 +18,70 @@ var (
 	emptyBlsPubKey = BlsPublicKey{}
 )
 
+// PublicKeySizeInBytes ..
+const PublicKeySizeInBytes = 48
+
 // EpochShardState is the shard state of an epoch
 type EpochShardState struct {
 	Epoch      uint64
 	ShardState State
 }
 
+// StakedMember is a committee member with stake
+type StakedMember struct {
+	// nil means not active, 0 means our node, >= 0 means staked node
+	WithDelegationApplied *big.Int `json:"with-delegation-applied,omitempty"`
+}
+
 // State is the collection of all committees
 type State []Committee
+
+// BlsPublicKey defines the bls public key
+type BlsPublicKey [PublicKeySizeInBytes]byte
+
+// NodeID represents node id (BLS address)
+type NodeID struct {
+	EcdsaAddress common.Address `json:"ecdsa_address"`
+	BlsPublicKey BlsPublicKey   `json:"bls_pubkey"`
+	Validator    *StakedMember  `json:"staked-validator,omitempty" rlp:"nil"`
+}
+
+// NodeIDList is a list of NodeIDList.
+type NodeIDList []NodeID
+
+// Committee contains the active nodes in one shard
+type Committee struct {
+	ShardID  uint32     `json:"shard_id"`
+	NodeList NodeIDList `json:"node_list"`
+}
+
+// JSON produces a non-pretty printed JSON string of the SuperCommittee
+func (ss State) JSON() string {
+	type V struct {
+		ECDSAAddress common.Address `json:"ecdsa_address"`
+		BLSPublicKey string         `json:"bls-public-key"`
+	}
+
+	type T struct {
+		ShardID  uint32 `json:"shard_id"`
+		Total    int    `json:"count"`
+		NodeList []V    `json:"entries"`
+	}
+	t := []T{}
+	for i := range ss {
+		sub := ss[i]
+		subList := []V{}
+		for j := range sub.NodeList {
+			subList = append(subList, V{
+				sub.NodeList[j].EcdsaAddress,
+				sub.NodeList[j].BlsPublicKey.Hex(),
+			})
+		}
+		t = append(t, T{sub.ShardID, len(sub.NodeList), subList})
+	}
+	buf, _ := json.Marshal(t)
+	return string(buf)
+}
 
 // FindCommitteeByID returns the committee configuration for the given shard,
 // or nil if the given shard is not found.
@@ -65,9 +123,6 @@ func CompareShardState(s1, s2 State) int {
 	return 0
 }
 
-// BlsPublicKey defines the bls public key
-type BlsPublicKey [48]byte
-
 // IsEmpty returns whether the bls public key is empty 0 bytes
 func (pk BlsPublicKey) IsEmpty() bool {
 	return bytes.Compare(pk[:], emptyBlsPubKey[:]) == 0
@@ -100,12 +155,6 @@ func CompareBlsPublicKey(k1, k2 BlsPublicKey) int {
 	return bytes.Compare(k1[:], k2[:])
 }
 
-// NodeID represents node id (BLS address)
-type NodeID struct {
-	EcdsaAddress common.Address `json:"ecdsa_address"`
-	BlsPublicKey BlsPublicKey   `json:"bls_pubkey"`
-}
-
 // CompareNodeID compares two node IDs.
 func CompareNodeID(id1, id2 *NodeID) int {
 	if c := bytes.Compare(id1.EcdsaAddress[:], id2.EcdsaAddress[:]); c != 0 {
@@ -116,9 +165,6 @@ func CompareNodeID(id1, id2 *NodeID) int {
 	}
 	return 0
 }
-
-// NodeIDList is a list of NodeIDList.
-type NodeIDList []NodeID
 
 // DeepCopy returns a deep copy of the receiver.
 func (l NodeIDList) DeepCopy() NodeIDList {
@@ -143,12 +189,6 @@ func CompareNodeIDList(l1, l2 NodeIDList) int {
 		return +1
 	}
 	return 0
-}
-
-// Committee contains the active nodes in one shard
-type Committee struct {
-	ShardID  uint32     `json:"shard_id"`
-	NodeList NodeIDList `json:"node_list"`
 }
 
 // DeepCopy returns a deep copy of the receiver.

@@ -5,11 +5,9 @@ import (
 	"context"
 	"math/big"
 	"math/rand"
-	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -19,7 +17,6 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -161,7 +158,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			node.pingMessageHandler(msgPayload, sender)
 		case proto_node.ShardState:
 			if err := node.epochShardStateMessageHandler(msgPayload); err != nil {
-				ctxerror.Log15(utils.GetLogger().Warn, err)
+				utils.Logger().Warn().Err(err)
 			}
 		}
 	default:
@@ -257,15 +254,28 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 
 	err := node.Blockchain().Validator().ValidateHeader(newBlock, true)
 	if err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Err(err).
+			Msg("cannot ValidateHeader for the new block")
 		return ctxerror.New("cannot ValidateHeader for the new block", "blockHash", newBlock.Hash()).WithCause(err)
 	}
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
+		utils.Logger().Error().
+			Uint32("my shard ID", node.Blockchain().ShardID()).
+			Uint32("new block's shard ID", newBlock.ShardID()).
+			Msg("wrong shard ID")
 		return ctxerror.New("wrong shard ID",
 			"my shard ID", node.Blockchain().ShardID(),
 			"new block's shard ID", newBlock.ShardID())
 	}
 	err = node.Blockchain().ValidateNewBlock(newBlock)
 	if err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Int("numTx", len(newBlock.Transactions())).
+			Err(err).
+			Msg("cannot ValidateNewBlock")
 		return ctxerror.New("cannot ValidateNewBlock",
 			"blockHash", newBlock.Hash(),
 			"numTx", len(newBlock.Transactions()),
@@ -285,6 +295,11 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	// TODO: move into ValidateNewBlock
 	err = node.verifyIncomingReceipts(newBlock)
 	if err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Int("numIncomingReceipts", len(newBlock.IncomingReceipts())).
+			Err(err).
+			Msg("[VerifyNewBlock] Cannot ValidateNewBlock")
 		return ctxerror.New("[VerifyNewBlock] Cannot ValidateNewBlock", "blockHash", newBlock.Hash(),
 			"numIncomingReceipts", len(newBlock.IncomingReceipts())).WithCause(err)
 	}
@@ -325,7 +340,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		if node.NodeConfig.ShardID == 0 {
 			node.BroadcastNewBlock(newBlock)
 		}
-		if node.NodeConfig.ShardID != 0 && newBlock.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) >= 0 {
+		if node.NodeConfig.ShardID != shard.BeaconChainShardID && newBlock.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) >= 0 {
 			node.BroadcastCrossLinkHeader(newBlock)
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
@@ -333,9 +348,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		utils.Logger().Info().
 			Uint64("BlockNum", newBlock.NumberU64()).
 			Msg("BINGO !!! Reached Consensus")
-		// Print to normal log too
-		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "BlockNum", newBlock.NumberU64())
-
 		// 15% of the validator also need to do broadcasting
 		rand.Seed(time.Now().UTC().UnixNano())
 		rnd := rand.Intn(100)
@@ -348,7 +360,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	node.BroadcastMissingCXReceipts()
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
-	if core.IsEpochLastBlock(newBlock) {
+	if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
 		node.Consensus.UpdateConsensusInformation()
 	}
 
@@ -380,33 +392,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			//		node.ConfirmedBlockChannel <- newBlock
 			//	}()
 			//}
-
-			// TODO: enable staking
-			// TODO: update staking information once per epoch.
-			//node.UpdateStakingList(node.QueryStakeInfo())
-			//node.printStakingList()
 		}
-
-		// TODO: enable shard state update
-		//newBlockHeader := newBlock.Header()
-		//if newBlockHeader.ShardStateHash != (common.Hash{}) {
-		//	if node.Consensus.ShardID == 0 {
-		//		// TODO ek – this is a temp hack until beacon chain sync is fixed
-		//		// End-of-epoch block on beacon chain; block's EpochState is the
-		//		// master resharding table.  Broadcast it to the network.
-		//		if err := node.broadcastEpochShardState(newBlock); err != nil {
-		//			e := ctxerror.New("cannot broadcast shard state").WithCause(err)
-		//			ctxerror.Log15(utils.Logger().Error, e)
-		//		}
-		//	}
-		//	shardState, err := newBlockHeader.CalculateShardState()
-		//	if err != nil {
-		//		e := ctxerror.New("cannot get shard state from header").WithCause(err)
-		//		ctxerror.Log15(utils.Logger().Error, e)
-		//	} else {
-		//		node.transitionIntoNextEpoch(shardState)
-		//	}
-		//}
 	}
 }
 
@@ -446,43 +432,6 @@ func (node *Node) AddNewBlock(newBlock *types.Block) error {
 			Msg("Added New Block to Blockchain!!!")
 	}
 	return err
-}
-
-type genesisNode struct {
-	ShardID     uint32
-	MemberIndex int
-	NodeID      shard.NodeID
-}
-
-var (
-	genesisCatalogOnce          sync.Once
-	genesisNodeByStakingAddress = make(map[common.Address]*genesisNode)
-	genesisNodeByConsensusKey   = make(map[shard.BlsPublicKey]*genesisNode)
-)
-
-func initGenesisCatalog() {
-	genesisShardState := core.CalculateInitShardState()
-	for _, committee := range genesisShardState {
-		for i, nodeID := range committee.NodeList {
-			genesisNode := &genesisNode{
-				ShardID:     committee.ShardID,
-				MemberIndex: i,
-				NodeID:      nodeID,
-			}
-			genesisNodeByStakingAddress[nodeID.EcdsaAddress] = genesisNode
-			genesisNodeByConsensusKey[nodeID.BlsPublicKey] = genesisNode
-		}
-	}
-}
-
-func getGenesisNodeByStakingAddress(address common.Address) *genesisNode {
-	genesisCatalogOnce.Do(initGenesisCatalog)
-	return genesisNodeByStakingAddress[address]
-}
-
-func getGenesisNodeByConsensusKey(key shard.BlsPublicKey) *genesisNode {
-	genesisCatalogOnce.Do(initGenesisCatalog)
-	return genesisNodeByConsensusKey[key]
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
@@ -545,6 +494,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 // bootstrapConsensus is the a goroutine to check number of peers and start the consensus
 func (node *Node) bootstrapConsensus() {
 	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
 	lastPeerNum := node.numPeers
 	for {
 		select {

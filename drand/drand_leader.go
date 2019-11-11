@@ -4,17 +4,17 @@ import (
 	"bytes"
 	"time"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/vdf"
 	"github.com/harmony-one/harmony/crypto/vrf/p256"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/shard"
 )
 
 const (
@@ -30,7 +30,7 @@ func (dRand *DRand) WaitForEpochBlock(blockChannel chan *types.Block, stopChan c
 			default:
 				// keep waiting for epoch block
 				newBlock := <-blockChannel
-				if core.IsEpochLastBlock(newBlock) {
+				if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
 					dRand.init(newBlock)
 				}
 				// TODO: use real vrf

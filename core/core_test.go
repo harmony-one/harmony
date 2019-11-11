@@ -7,6 +7,7 @@ import (
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core/types"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/shard"
 )
 
 func TestIsEpochBlock(t *testing.T) {
@@ -58,7 +59,7 @@ func TestIsEpochBlock(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		ShardingSchedule = test.schedule
+		shard.Schedule = test.schedule
 		r := IsEpochBlock(test.block)
 		if r != test.expected {
 			t.Errorf("index: %v, expected: %v, got: %v\n", i, test.expected, r)

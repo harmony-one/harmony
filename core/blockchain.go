@@ -45,6 +45,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -246,27 +247,16 @@ func IsEpochBlock(block *types.Block) bool {
 		// genesis block is the first epoch block
 		return true
 	}
-	return ShardingSchedule.IsLastBlock(block.NumberU64() - 1)
+	return shard.Schedule.IsLastBlock(block.NumberU64() - 1)
 }
 
 // EpochFirstBlock returns the block number of the first block of an epoch.
 // TODO: instead of using fixed epoch schedules, determine the first block by epoch changes.
 func EpochFirstBlock(epoch *big.Int) *big.Int {
-	if epoch.Cmp(big.NewInt(0)) == 0 {
-		return big.NewInt(0)
+	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
+		return big.NewInt(GenesisEpoch)
 	}
-	return big.NewInt(int64(ShardingSchedule.EpochLastBlock(epoch.Uint64()-1) + 1))
-}
-
-// IsEpochLastBlock returns whether this block is the last block of an epoch.
-func IsEpochLastBlock(block *types.Block) bool {
-	return ShardingSchedule.IsLastBlock(block.NumberU64())
-}
-
-// IsEpochLastBlockByHeader returns whether this block is the last block of an epoch
-// given block header
-func IsEpochLastBlockByHeader(header *block.Header) bool {
-	return ShardingSchedule.IsLastBlock(header.Number().Uint64())
+	return big.NewInt(int64(shard.Schedule.EpochLastBlock(epoch.Uint64()-1) + 1))
 }
 
 func (bc *BlockChain) getProcInterrupt() bool {
@@ -1083,7 +1073,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 	epoch := block.Header().Epoch()
 	if bc.chainConfig.IsCrossTx(block.Epoch()) {
-		shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+		shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 		shardNum := int(shardingConfig.NumShards())
 		for i := 0; i < shardNum; i++ {
 			if i == int(block.ShardID()) {
@@ -1945,7 +1935,18 @@ func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.State, error) {
 	if err == nil { // TODO ek – distinguish ErrNotFound
 		return shardState, err
 	}
-	shardState, err = CalculateNewShardState(bc, epoch)
+
+	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
+		shardState, err = committee.WithStakingEnabled.Compute(
+			big.NewInt(GenesisEpoch), *bc.Config(), nil,
+		)
+	} else {
+		prevEpoch := new(big.Int).Sub(epoch, common.Big1)
+		shardState, err = committee.WithStakingEnabled.ReadFromDB(
+			prevEpoch, bc,
+		)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -2166,7 +2167,7 @@ func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.
 	}
 
 	epoch := block.Header().Epoch()
-	shardingConfig := ShardingSchedule.InstanceForEpoch(epoch)
+	shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 	shardNum := int(shardingConfig.NumShards())
 
 	for i := 0; i < shardNum; i++ {
@@ -2386,7 +2387,7 @@ func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
 		if err != nil {
 			continue
 		}
-		epoch := ShardingSchedule.CalcEpochNumber(val.CreationHeight.Uint64())
+		epoch := shard.Schedule.CalcEpochNumber(val.CreationHeight.Uint64())
 		if epoch.Cmp(currentEpoch) >= 0 {
 			// wait for next epoch
 			continue

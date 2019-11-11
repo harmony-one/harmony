@@ -8,21 +8,34 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
 )
 
-type engineImpl struct{}
+type engineImpl struct {
+	d reward.Distributor
+}
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{}
+var Engine = &engineImpl{nil}
+
+// Rewarder handles the distribution of block rewards
+func (e *engineImpl) Rewarder() reward.Distributor {
+	return e.d
+}
+
+// SetRewarder ..
+func (e *engineImpl) SetRewarder(d reward.Distributor) {
+	e.d = d
+}
 
 // SealHash returns the hash of a block prior to it being sealed.
 func (e *engineImpl) SealHash(header *block.Header) (hash common.Hash) {
@@ -116,6 +129,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		return nil
 	}
 	publicKeys, err := ReadPublicKeysFromLastBlock(chain, header)
+
 	if err != nil {
 		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys from last block").WithCause(err)
 	}
@@ -155,7 +169,7 @@ func (e *engineImpl) Finalize(
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	if err := AccumulateRewards(chain, state, header); err != nil {
+	if err := AccumulateRewards(chain, state, header, e.Rewarder()); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
@@ -166,7 +180,7 @@ func (e *engineImpl) Finalize(
 func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool) (quorum int, err error) {
 	var ss shard.State
 	if reCalculate {
-		ss = core.CalculateShardState(h.Epoch())
+		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), *chain.Config(), nil)
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -225,7 +239,7 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 	var shardState shard.State
 	var err error
 	if reCalculate {
-		shardState = core.CalculateShardState(header.Epoch())
+		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), *chain.Config(), nil)
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {

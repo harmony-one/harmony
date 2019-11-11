@@ -36,7 +36,7 @@ var (
 		ChainID:        TestnetChainID,
 		CrossTxEpoch:   big.NewInt(0),
 		CrossLinkEpoch: big.NewInt(0),
-		StakingEpoch:   big.NewInt(0),
+		StakingEpoch:   EpochTBD,
 		EIP155Epoch:    big.NewInt(0),
 		S3Epoch:        big.NewInt(0),
 	}

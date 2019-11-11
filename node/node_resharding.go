@@ -15,13 +15,13 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 )
 
 // validateNewShardState validate whether the new shard state root matches
@@ -30,8 +30,8 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 	header := block.Header()
 	if header.ShardStateHash() == (common.Hash{}) {
 		// No new shard state was proposed
-		if block.ShardID() == 0 {
-			if core.IsEpochLastBlock(block) {
+		if block.ShardID() == shard.BeaconChainShardID {
+			if shard.Schedule.IsLastBlock(block.Number().Uint64()) {
 				// TODO ek - invoke view change
 				return errors.New("beacon leader did not propose resharding")
 			}
@@ -51,15 +51,19 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 		return err
 	}
 	proposed := *shardState
-	if block.ShardID() == 0 {
+	if block.ShardID() == shard.BeaconChainShardID {
 		// Beacon validators independently recalculate the master state and
 		// compare it against the proposed copy.
-		nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
 		// TODO ek – this may be called from regular shards,
 		//  for vetting beacon chain blocks received during block syncing.
 		//  DRand may or or may not get in the way.  Test this out.
-		expected, err := core.CalculateNewShardState(node.Blockchain(), nextEpoch)
+		expected, err := committee.WithStakingEnabled.ReadFromDB(
+			new(big.Int).Sub(block.Header().Epoch(), common.Big1),
+			node.Beaconchain(),
+		)
+
 		if err != nil {
+			utils.Logger().Error().Err(err).Msg("cannot calculate expected shard state")
 			return ctxerror.New("cannot calculate expected shard state").
 				WithCause(err)
 		}
@@ -70,8 +74,7 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 			// TODO ek/chao – calculated shard state is different even with the
 			//  same input, i.e. it is nondeterministic.
 			//  Don't treat this as a blocker until we fix the nondeterminism.
-			//return err
-			ctxerror.Log15(utils.GetLogger().Warn, err)
+			utils.Logger().Warn().Err(err).Msg("shard state proposal is different from expected")
 		}
 	} else {
 		// Regular validators fetch the local-shard copy on the beacon chain
@@ -90,6 +93,7 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 			// Proposal to discontinue shard
 			if expected != nil {
 				// TODO ek – invoke view change
+				utils.Logger().Error().Msg("leader proposed to disband against beacon decision")
 				return errors.New(
 					"leader proposed to disband against beacon decision")
 			}
@@ -99,6 +103,10 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 			// Sanity check: Shard ID should match
 			if proposed.ShardID != block.ShardID() {
 				// TODO ek – invoke view change
+				utils.Logger().Error().
+					Uint32("proposedShard", proposed.ShardID).
+					Uint32("blockShard", block.ShardID()).
+					Msg("proposal has incorrect shard ID")
 				return ctxerror.New("proposal has incorrect shard ID",
 					"proposedShard", proposed.ShardID,
 					"blockShard", block.ShardID())
@@ -106,6 +114,8 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 			// Did beaconchain say we are no more?
 			if expected == nil {
 				// TODO ek – invoke view change
+
+				utils.Logger().Error().Msg("leader proposed to continue against beacon decision")
 				return errors.New(
 					"leader proposed to continue against beacon decision")
 			}
@@ -113,10 +123,14 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 			if shard.CompareCommittee(expected, &proposed) != 0 {
 				// TODO ek – log differences
 				// TODO ek – invoke view change
+				utils.Logger().Error().Msg("proposal differs from one in beacon chain")
 				return errors.New("proposal differs from one in beacon chain")
 			}
 		default:
 			// TODO ek – invoke view change
+			utils.Logger().Error().
+				Int("numShards", len(proposed)).
+				Msg("regular resharding proposal has incorrect number of shards")
 			return ctxerror.New(
 				"regular resharding proposal has incorrect number of shards",
 				"numShards", len(proposed))
@@ -144,6 +158,7 @@ func (node *Node) broadcastEpochShardState(newBlock *types.Block) error {
 func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 	epochShardState, err := proto_node.DeserializeEpochShardStateFromMessage(msgPayload)
 	if err != nil {
+		utils.Logger().Error().Err(err).Msg("Can't get shard state message")
 		return ctxerror.New("Can't get shard state message").WithCause(err)
 	}
 	if node.Consensus == nil {
@@ -168,6 +183,9 @@ func (node *Node) epochShardStateMessageHandler(msgPayload []byte) error {
 	err = node.Beaconchain().WriteShardState(
 		receivedEpoch, epochShardState.ShardState)
 	if err != nil {
+		utils.Logger().Error().
+			Uint64("epoch", receivedEpoch.Uint64()).
+			Err(err).Msg("cannot store shard state")
 		return ctxerror.New("cannot store shard state", "epoch", receivedEpoch).
 			WithCause(err)
 	}

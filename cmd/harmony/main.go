@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -25,7 +24,6 @@ import (
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/memprofiling"
@@ -34,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Version string variables
@@ -71,7 +70,6 @@ func printVersion() {
 	os.Exit(0)
 }
 
-// Flags
 var (
 	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
 	port             = flag.String("port", "9000", "port of the node.")
@@ -102,7 +100,6 @@ var (
 	syncFreq = flag.Int("sync_freq", 60, "unit in seconds")
 	// beaconSyncFreq indicates beaconchain sync frequency
 	beaconSyncFreq = flag.Int("beacon_sync_freq", 60, "unit in seconds")
-
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
@@ -113,34 +110,25 @@ var (
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 	blsPassphrase      string
-
 	// Sharding configuration parameters for devnet
 	devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
 	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
 	devnetHarmonySize = flag.Int("dn_hmy_size", -1, "number of Harmony-operated nodes per shard for -network_type=devnet; negative (default) means equal to -dn_shard_size")
-
 	// logConn logs incoming/outgoing connections
-	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
-
-	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
-
+	logConn        = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	keystoreDir    = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 	initialAccount = &genesis.DeployAccount{}
-
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
-
 	// dbDir is the database directory.
 	dbDir = flag.String("db_dir", "", "blockchain database directory")
-
 	// Disable view change.
 	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
-
 	// metrics flag to collct meetrics or not, pushgateway ip and port for metrics
 	metricsFlag     = flag.Bool("metrics", false, "Collect and upload node metrics")
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
-
-	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+	publicRPC       = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
 )
 
 func initSetup() {
@@ -203,13 +191,13 @@ func passphraseForBls() {
 }
 
 func setupInitialAccount() (isLeader bool) {
-	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
+	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
 	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
-			config := core.ShardingSchedule.InstanceForEpoch(epoch)
+			config := shard.Schedule.InstanceForEpoch(epoch)
 			isLeader, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
 			if initialAccount != nil {
 				break
@@ -280,7 +268,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
 	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
+		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogger()))
 	}
 	if err != nil {
 		panic("unable to new host in harmony")
@@ -299,6 +287,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
 	)
+	currentConsensus.Decider.SetShardIDProvider(func() (uint32, error) {
+		return currentConsensus.ShardID, nil
+	})
 	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 
 	if err != nil {
@@ -323,7 +314,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
-		epochConfig := core.ShardingSchedule.InstanceForEpoch(ethCommon.Big0)
+		epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
 		selfPort, err := strconv.ParseUint(*port, 10, 16)
 		if err != nil {
 			utils.Logger().Fatal().
@@ -359,9 +350,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(*shardID)))
 	case "validator":
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
-		if nodeConfig.ShardID == 0 {
-			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(0))
-			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(0))
+		if nodeConfig.ShardID == shard.BeaconChainShardID {
+			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID))
+			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 		} else {
 			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
@@ -381,9 +372,11 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// currentNode.DRand = dRand
 
 	// This needs to be executed after consensus and drand are setup
-	if err := currentNode.CalculateInitShardState(); err != nil {
-		ctxerror.Crit(utils.GetLogger(), err, "CalculateInitShardState failed",
-			"shardID", *shardID)
+	if err := currentNode.InitConsensusWithValidators(); err != nil {
+		utils.Logger().Warn().
+			Int("shardID", *shardID).
+			Err(err).
+			Msg("InitConsensusWithMembers failed")
 	}
 
 	// Set the consensus ID to be the current block number
@@ -429,13 +422,13 @@ func main() {
 
 	switch *networkType {
 	case nodeconfig.Mainnet:
-		core.ShardingSchedule = shardingconfig.MainnetSchedule
+		shard.Schedule = shardingconfig.MainnetSchedule
 	case nodeconfig.Testnet:
-		core.ShardingSchedule = shardingconfig.TestnetSchedule
+		shard.Schedule = shardingconfig.TestnetSchedule
 	case nodeconfig.Pangaea:
-		core.ShardingSchedule = shardingconfig.PangaeaSchedule
+		shard.Schedule = shardingconfig.PangaeaSchedule
 	case nodeconfig.Localnet:
-		core.ShardingSchedule = shardingconfig.LocalnetSchedule
+		shard.Schedule = shardingconfig.LocalnetSchedule
 	case nodeconfig.Devnet:
 		if *devnetHarmonySize < 0 {
 			*devnetHarmonySize = *devnetShardSize
@@ -448,7 +441,7 @@ func main() {
 				err)
 			os.Exit(1)
 		}
-		core.ShardingSchedule = shardingconfig.NewFixedSchedule(devnetConfig)
+		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
 	}
 
 	initSetup()
@@ -476,8 +469,8 @@ func main() {
 	currentNode.SetSyncFreq(*syncFreq)
 	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
 
-	if nodeConfig.ShardID != 0 && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
-		utils.GetLogInstance().Info("SupportBeaconSyncing", "shardID", currentNode.Blockchain().ShardID(), "shardID", nodeConfig.ShardID)
+	if nodeConfig.ShardID != shard.BeaconChainShardID && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+		utils.Logger().Info().Uint32("shardID", currentNode.Blockchain().ShardID()).Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
 		go currentNode.SupportBeaconSyncing()
 	}
 
@@ -505,7 +498,9 @@ func main() {
 	currentNode.RunServices()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
-		ctxerror.Warn(utils.GetLogger(), err, "StartRPC failed")
+		utils.Logger().Warn().
+			Err(err).
+			Msg("StartRPC failed")
 	}
 
 	// Run additional node collectors

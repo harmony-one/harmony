@@ -14,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -23,6 +22,8 @@ import (
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/rs/zerolog"
 )
@@ -110,17 +111,14 @@ func (consensus *Consensus) DebugPrintPublicKeys() {
 	utils.Logger().Debug().Strs("PublicKeys", keys).Int("count", len(keys)).Msgf("Debug Public Keys")
 }
 
-// UpdatePublicKeys updates the PublicKeys variable, protected by a mutex
+// UpdatePublicKeys updates the PublicKeys for quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
-	consensus.CommitteePublicKeys = map[string]bool{}
 	utils.Logger().Info().Msg("My Committee updated")
-	for i, pubKey := range consensus.Decider.DumpParticipants() {
-		utils.Logger().Info().Int("index", i).Str("BlsPubKey", pubKey).Msg("Member")
-		consensus.CommitteePublicKeys[pubKey] = true
+	for i := range pubKeys {
+		utils.Logger().Info().Int("index", i).Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).Msg("Member")
 	}
-
 	consensus.LeaderPubKey = pubKeys[0]
 	utils.Logger().Info().
 		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
@@ -230,8 +228,7 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
-	_, ok := consensus.CommitteePublicKeys[pubKey.SerializeToHexStr()]
-	return ok
+	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
 // Verify the signature of the message are valid from the signer's public key.
@@ -458,22 +455,21 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	pubKeys := []*bls.PublicKey{}
 	hasError := false
-
 	header := consensus.ChainReader.CurrentHeader()
-
 	epoch := header.Epoch()
-	curPubKeys := core.CalculatePublicKeys(epoch, header.ShardID())
+	_, curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
+		epoch, consensus.ChainReader, int(header.ShardID()),
+	)
 	consensus.numPrevPubKeys = len(curPubKeys)
-
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
-
-	if core.IsEpochLastBlockByHeader(header) {
+	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
 		// increase epoch by one if it's the last block
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		nextEpoch := new(big.Int).Add(epoch, common.Big1)
-		pubKeys = core.CalculatePublicKeys(nextEpoch, header.ShardID())
+		_, pubKeys = committee.WithStakingEnabled.ComputePublicKeys(
+			new(big.Int).Add(epoch, common.Big1), consensus.ChainReader, int(header.ShardID()),
+		)
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())
 		pubKeys = curPubKeys
@@ -493,7 +489,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.UpdatePublicKeys(pubKeys)
 
 	// take care of possible leader change during the epoch
-	if !core.IsEpochLastBlockByHeader(header) && header.Number().Uint64() != 0 {
+	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) &&
+		header.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).
@@ -508,9 +505,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 	}
 
-	for _, key := range pubKeys {
+	for i := range pubKeys {
 		// in committee
-		if key.IsEqual(consensus.PubKey) {
+		if pubKeys[i].IsEqual(consensus.PubKey) {
 			if hasError {
 				return Syncing
 			}
@@ -544,7 +541,7 @@ func (consensus *Consensus) IsLeader() bool {
 
 // NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
 func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
-	if consensus.ShardID == 0 && epoch.Uint64() >= core.ShardingSchedule.RandomnessStartingEpoch() {
+	if consensus.ShardID == 0 && epoch.Uint64() >= shard.Schedule.RandomnessStartingEpoch() {
 		return true
 	}
 
