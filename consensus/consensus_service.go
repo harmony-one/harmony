@@ -457,7 +457,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	hasError := false
 	header := consensus.ChainReader.CurrentHeader()
 	epoch := header.Epoch()
-	_, curPubKeys := committee.WithStakingEnabled.ReadPublicKeysFromComputation(epoch, consensus.ChainReader, int(header.ShardID()))
+	_, curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
+		epoch, consensus.ChainReader, int(header.ShardID()),
+	)
 	consensus.numPrevPubKeys = len(curPubKeys)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
 	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
@@ -465,7 +467,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		_, pubKeys = committee.WithStakingEnabled.ReadPublicKeysFromComputation(
+		_, pubKeys = committee.WithStakingEnabled.ComputePublicKeys(
 			new(big.Int).Add(epoch, common.Big1), consensus.ChainReader, int(header.ShardID()),
 		)
 	} else {

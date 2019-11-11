@@ -59,7 +59,7 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 		//  DRand may or or may not get in the way.  Test this out.
 		expected, err := committee.WithStakingEnabled.ReadFromChain(
 			new(big.Int).Sub(block.Header().Epoch(), common.Big1),
-			node.Blockchain(),
+			node.Beaconchain(),
 		)
 
 		if err != nil {

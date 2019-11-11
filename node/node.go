@@ -551,10 +551,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	return &node
 }
 
-// InitConsensusWithMembers initialize shard state from latest epoch and update committee pub keys for consensus and drand
-func (node *Node) InitConsensusWithMembers() (err error) {
+// InitConsensusWithValidators initialize shard state from latest epoch and update committee pub
+// keys for consensus and drand
+func (node *Node) InitConsensusWithValidators() (err error) {
 	if node.Consensus == nil {
-		return ctxerror.New("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
+		return ctxerror.New("[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID")
 	}
 	shardID := node.Consensus.ShardID
 	blockNum := node.Blockchain().CurrentBlock().NumberU64()
@@ -564,13 +565,13 @@ func (node *Node) InitConsensusWithMembers() (err error) {
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
-		Msg("[InitConsensusWithMembers] Try To Get PublicKeys")
-	_, pubKeys := committee.WithStakingEnabled.ReadPublicKeysFromComputation(
+		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
+	_, pubKeys := committee.WithStakingEnabled.ComputePublicKeys(
 		epoch, node.Consensus.ChainReader, int(shardID),
 	)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
-			"[InitConsensusWithMembers] PublicKeys is Empty, Cannot update public keys",
+			"[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys",
 			"shardID", shardID,
 			"blockNum", blockNum)
 	}
@@ -580,7 +581,7 @@ func (node *Node) InitConsensusWithMembers() (err error) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
-				Msg("[InitConsensusWithMembers] Successfully updated public keys")
+				Msg("[InitConsensusWithValidators] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
 			node.Consensus.SetMode(consensus.Normal)
 			return nil

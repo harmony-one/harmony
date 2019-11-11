@@ -370,7 +370,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// currentNode.DRand = dRand
 
 	// This needs to be executed after consensus and drand are setup
-	if err := currentNode.InitConsensusWithMembers(); err != nil {
+	if err := currentNode.InitConsensusWithValidators(); err != nil {
 		ctxerror.Crit(utils.GetLogger(), err, "InitConsensusWithMembers failed",
 			"shardID", *shardID)
 	}

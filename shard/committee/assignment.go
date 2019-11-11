@@ -33,13 +33,13 @@ type MembershipList interface {
 type PublicKeys interface {
 	// If call shardID with StateID then only superCommittee is non-nil,
 	// otherwise get back the shardSpecific slice as well.
-	ReadPublicKeysFromComputation(
+	ComputePublicKeys(
 		epoch *big.Int, reader ChainReader, shardID int,
 	) (superCommittee, shardSpecific []*bls.PublicKey)
 
-	// ReadPublicKeysFromChain(
-	// 	hash common.Hash, reader ChainReader,
-	// ) ([]*bls.PublicKey, error)
+	ReadPublicKeysFromDB(
+		hash common.Hash, reader ChainReader,
+	) ([]*bls.PublicKey, error)
 }
 
 // Reader ..
@@ -171,7 +171,7 @@ func with400Stakers(
 	return superComm, nil
 }
 
-func (def partialStakingEnabled) ReadPublicKeysFromChain(
+func (def partialStakingEnabled) ReadPublicKeysFromDB(
 	h common.Hash, reader ChainReader,
 ) ([]*bls.PublicKey, error) {
 	header := reader.GetHeaderByHash(h)
@@ -205,7 +205,7 @@ func (def partialStakingEnabled) ReadPublicKeysFromChain(
 
 // ReadPublicKeysFromChain produces publicKeys of entire supercommittee per epoch, optionally providing a
 // shard specific subcommittee
-func (def partialStakingEnabled) ReadPublicKeysFromComputation(
+func (def partialStakingEnabled) ComputePublicKeys(
 	epoch *big.Int, reader ChainReader, shardID int,
 ) ([]*bls.PublicKey, []*bls.PublicKey) {
 	config := reader.Config()
