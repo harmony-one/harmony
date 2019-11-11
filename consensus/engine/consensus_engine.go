@@ -74,6 +74,9 @@ type Engine interface {
 	// rules of a particular engine. The changes are executed inline.
 	Prepare(chain ChainReader, header *block.Header) error
 
+	// Rewarder handles the distribution of block rewards
+	Rewarder() reward.Distributor
+
 	// SetRewarder assigns the Distributor used in block reward
 	SetRewarder(reward.Distributor)
 

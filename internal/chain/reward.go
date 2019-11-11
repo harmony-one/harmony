@@ -8,21 +8,26 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 )
 
-// BlockReward is the block reward, to be split evenly among block signers.
-var BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
+var (
+	// BlockReward is the block reward, to be split evenly among block signers.
+	BlockReward                  = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
+	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
+)
 
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
 func AccumulateRewards(
-	bc engine.ChainReader, state *state.DB, header *block.Header,
+	bc engine.ChainReader, state *state.DB, header *block.Header, rewarder reward.Distributor,
 ) error {
 	blockNum := header.Number().Uint64()
 	if blockNum == 0 {
@@ -72,9 +77,9 @@ func AccumulateRewards(
 	if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
 		return ctxerror.New("cannot set group sig mask bits").WithCause(err)
 	}
-	totalAmount := big.NewInt(0)
-	var accounts []common.Address
-	signers := []string{}
+
+	accounts := []common.Address{}
+
 	for idx, member := range parentCommittee.NodeList {
 		if signed, err := mask.IndexEnabled(idx); err != nil {
 			return ctxerror.New("cannot check for committer bit",
@@ -85,19 +90,33 @@ func AccumulateRewards(
 		}
 	}
 
-	numAccounts := big.NewInt(int64(len(accounts)))
-	last := new(big.Int)
-	for i, account := range accounts {
-		cur := new(big.Int)
-		cur.Mul(BlockReward, big.NewInt(int64(i+1))).Div(cur, numAccounts)
-		diff := new(big.Int).Sub(cur, last)
-		signers = append(signers, common2.MustAddressToBech32(account))
-		state.AddBalance(account, diff)
-		totalAmount = new(big.Int).Add(totalAmount, diff)
-		last = cur
+	type t struct {
+		common.Address
+		*big.Int
 	}
+	signers := []string{}
+	payable := []t{}
+
+	totalAmount := rewarder.Award(
+		BlockReward, accounts, func(receipient common.Address, amount *big.Int) {
+			signers = append(signers, common2.MustAddressToBech32(receipient))
+			payable = append(payable, t{receipient, amount})
+		})
+
+	if totalAmount.Cmp(BlockReward) != 0 {
+		utils.Logger().Error().
+			Int64("block-reward", BlockReward.Int64()).
+			Int64("total-amount-paid-out", totalAmount.Int64()).
+			Msg("Total paid out was not equal to block-reward")
+		return errors.Wrapf(errPayoutNotEqualBlockReward, "payout "+totalAmount.String())
+	}
+
+	for i := range payable {
+		state.AddBalance(payable[i].Address, payable[i].Int)
+	}
+
 	header.Logger(utils.Logger()).Debug().
-		Str("NumAccounts", numAccounts.String()).
+		Int("NumAccounts", len(accounts)).
 		Str("TotalAmount", totalAmount.String()).
 		Strs("Signers", signers).
 		Msg("[Block Reward] Successfully paid out block reward")

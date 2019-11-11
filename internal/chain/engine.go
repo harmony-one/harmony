@@ -27,6 +27,11 @@ type engineImpl struct {
 // Engine is an algorithm-agnostic consensus engine.
 var Engine = &engineImpl{nil}
 
+// Rewarder handles the distribution of block rewards
+func (e *engineImpl) Rewarder() reward.Distributor {
+	return e.d
+}
+
 // SetRewarder ..
 func (e *engineImpl) SetRewarder(d reward.Distributor) {
 	e.d = d
@@ -164,7 +169,7 @@ func (e *engineImpl) Finalize(
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	if err := AccumulateRewards(chain, state, header); err != nil {
+	if err := AccumulateRewards(chain, state, header, e.Rewarder()); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
