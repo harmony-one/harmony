@@ -238,7 +238,7 @@ func NewDecider(p Policy) Decider {
 	dependencies := &depInject{}
 	switch p {
 	case SuperMajorityVote:
-		return &uniformVoteWeight{signatureStore, nil}
+		return &uniformVoteWeight{signatureStore, dependencies}
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
 			signatureStore,
