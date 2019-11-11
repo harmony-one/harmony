@@ -20,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -33,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -277,7 +277,7 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	txPoolLimit := shard.Schedule.MaxTxPoolSizeLimit()
 	node.pendingTxMutex.Lock()
 	for _, tx := range newTxs {
 		if _, ok := node.pendingTransactions[tx.Hash()]; !ok {
@@ -293,7 +293,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
-	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	txPoolLimit := shard.Schedule.MaxTxPoolSizeLimit()
 	node.pendingStakingTxMutex.Lock()
 	for _, tx := range newStakingTxs {
 		if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
@@ -350,7 +350,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 // Take out a subset of valid transactions from the pending transaction list
 // Note the pending transaction list will then contain the rest of the txs
 func (node *Node) getTransactionsForNewBlock(coinbase common.Address) (types.Transactions, staking.StakingTransactions) {
-	txsThrottleConfig := core.ShardingSchedule.TxsThrottleConfig()
+	txsThrottleConfig := shard.Schedule.TxsThrottleConfig()
 
 	// the next block number to be added in consensus protocol, which is always one more than current chain header block
 	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
@@ -483,7 +483,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 	node.chainConfig = chainConfig
 
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig)
+		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig,
+	)
 	if isArchival {
 		collection.DisableCache()
 	}
@@ -505,7 +506,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
-		if node.Blockchain().ShardID() != values.BeaconChainShardID {
+		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
 		}
 
@@ -545,44 +546,42 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
-
 	node.startConsensus = make(chan struct{})
-
 	go node.bootstrapConsensus()
-
 	return &node
 }
 
-// CalculateInitShardState initialize shard state from latest epoch and update committee pub keys for consensus and drand
-func (node *Node) CalculateInitShardState() (err error) {
+// InitConsensusWithValidators initialize shard state from latest epoch and update committee pub
+// keys for consensus and drand
+func (node *Node) InitConsensusWithValidators() (err error) {
 	if node.Consensus == nil {
-		return ctxerror.New("[CalculateInitShardState] consenus is nil; Cannot figure out shardID")
+		return ctxerror.New("[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID")
 	}
 	shardID := node.Consensus.ShardID
-
-	// Get genesis epoch shard state from chain
 	blockNum := node.Blockchain().CurrentBlock().NumberU64()
 	node.Consensus.SetMode(consensus.Listening)
-	epoch := core.ShardingSchedule.CalcEpochNumber(blockNum)
+	epoch := shard.Schedule.CalcEpochNumber(blockNum)
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
-		Msg("[CalculateInitShardState] Try To Get PublicKeys from database")
-	pubKeys := core.CalculatePublicKeys(epoch, shardID)
+		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
+	_, pubKeys := committee.WithStakingEnabled.ComputePublicKeys(
+		epoch, node.Consensus.ChainReader, int(shardID),
+	)
 	if len(pubKeys) == 0 {
 		return ctxerror.New(
-			"[CalculateInitShardState] PublicKeys is Empty, Cannot update public keys",
+			"[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys",
 			"shardID", shardID,
 			"blockNum", blockNum)
 	}
 
-	for _, key := range pubKeys {
-		if key.IsEqual(node.Consensus.PubKey) {
+	for i := range pubKeys {
+		if pubKeys[i].IsEqual(node.Consensus.PubKey) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
-				Msg("[CalculateInitShardState] Successfully updated public keys")
+				Msg("[InitConsensusWithValidators] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
 			node.Consensus.SetMode(consensus.Normal)
 			return nil

@@ -46,6 +46,11 @@ import (
 
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 
+const (
+	// GenesisEpoch is the number of the genesis epoch.
+	GenesisEpoch = 0
+)
+
 // Genesis specifies the header fields, state of a genesis block. It also defines hard
 // fork switch-over blocks through the chain configuration.
 type Genesis struct {

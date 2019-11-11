@@ -15,13 +15,13 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 )
 
 // validateNewShardState validate whether the new shard state root matches
@@ -30,8 +30,8 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 	header := block.Header()
 	if header.ShardStateHash() == (common.Hash{}) {
 		// No new shard state was proposed
-		if block.ShardID() == 0 {
-			if core.IsEpochLastBlock(block) {
+		if block.ShardID() == shard.BeaconChainShardID {
+			if shard.Schedule.IsLastBlock(block.Number().Uint64()) {
 				// TODO ek - invoke view change
 				return errors.New("beacon leader did not propose resharding")
 			}
@@ -51,14 +51,17 @@ func (node *Node) validateNewShardState(block *types.Block) error {
 		return err
 	}
 	proposed := *shardState
-	if block.ShardID() == 0 {
+	if block.ShardID() == shard.BeaconChainShardID {
 		// Beacon validators independently recalculate the master state and
 		// compare it against the proposed copy.
-		nextEpoch := new(big.Int).Add(block.Header().Epoch(), common.Big1)
 		// TODO ek – this may be called from regular shards,
 		//  for vetting beacon chain blocks received during block syncing.
 		//  DRand may or or may not get in the way.  Test this out.
-		expected, err := core.CalculateNewShardState(node.Blockchain(), nextEpoch)
+		expected, err := committee.WithStakingEnabled.ReadFromChain(
+			new(big.Int).Sub(block.Header().Epoch(), common.Big1),
+			node.Beaconchain(),
+		)
+
 		if err != nil {
 			return ctxerror.New("cannot calculate expected shard state").
 				WithCause(err)

@@ -30,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -122,7 +123,7 @@ func getTransactionType(config *params.ChainConfig, header *block.Header, tx *ty
 	if header.ShardID() == tx.ShardID() && (!config.IsCrossTx(header.Epoch()) || tx.ShardID() == tx.ToShardID()) {
 		return types.SameShardTx
 	}
-	numShards := ShardingSchedule.InstanceForEpoch(header.Epoch()).NumShards()
+	numShards := shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards()
 	// Assuming here all the shards are consecutive from 0 to n-1, n is total number of shards
 	if tx.ShardID() != tx.ToShardID() && header.ShardID() == tx.ShardID() && tx.ToShardID() < numShards {
 		return types.SubtractionOnly

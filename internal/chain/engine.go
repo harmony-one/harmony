@@ -8,12 +8,12 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
@@ -116,6 +116,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		return nil
 	}
 	publicKeys, err := ReadPublicKeysFromLastBlock(chain, header)
+
 	if err != nil {
 		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys from last block").WithCause(err)
 	}
@@ -166,7 +167,7 @@ func (e *engineImpl) Finalize(
 func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool) (quorum int, err error) {
 	var ss shard.State
 	if reCalculate {
-		ss = core.CalculateShardState(h.Epoch())
+		ss, _ = committee.WithStakingEnabled.ReadFromComputation(h.Epoch(), *chain.Config(), nil)
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -225,7 +226,7 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 	var shardState shard.State
 	var err error
 	if reCalculate {
-		shardState = core.CalculateShardState(header.Epoch())
+		shardState, _ = committee.WithStakingEnabled.ReadFromComputation(header.Epoch(), *chain.Config(), nil)
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {

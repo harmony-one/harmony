@@ -13,13 +13,13 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/core/vm"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -162,7 +162,7 @@ func (w *Worker) SelectStakingTransactionsForNewBlock(
 	coinbase common.Address) (staking.StakingTransactions, staking.StakingTransactions, staking.StakingTransactions) {
 
 	// only beaconchain process staking transaction
-	if w.chain.ShardID() != values.BeaconChainShardID {
+	if w.chain.ShardID() != shard.BeaconChainShardID {
 		utils.Logger().Warn().Msgf("Invalid shardID: %v", w.chain.ShardID())
 		return nil, nil, nil
 	}
@@ -365,11 +365,13 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 
 // ProposeShardStateWithoutBeaconSync proposes the next shard state for next epoch.
 func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.State {
-	if !core.ShardingSchedule.IsLastBlock(w.current.header.Number().Uint64()) {
+	if !shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
 		return nil
 	}
-	nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
-	return core.CalculateShardState(nextEpoch)
+	shardState, _ := committee.WithStakingEnabled.ReadFromComputation(
+		new(big.Int).Add(w.current.header.Epoch(), common.Big1), *w.config, nil,
+	)
+	return shardState
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
