@@ -385,7 +385,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	logger = logger.With().
-		Int64("NumReceivedSoFar", consensus.Decider.SignatoriesCount(quorum.Prepare)).
+		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
 	consensus.Decider.AddSignature(quorum.Prepare, validatorPubKey, &sign)
@@ -497,7 +497,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		utils.Logger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!!")
 		return
 	}
-	prepareCount := consensus.Decider.SignatoriesCount(quorum.Prepare)
+	prepareCount := consensus.Decider.SignersCount(quorum.Prepare)
 	if count := utils.CountOneBits(mask.Bitmap); count < prepareCount {
 		utils.Logger().Debug().
 			Int64("Need", prepareCount).
@@ -729,7 +729,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	logger = logger.With().
-		Int64("numReceivedSoFar", consensus.Decider.SignatoriesCount(quorum.Commit)).
+		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).
 		Logger()
 	logger.Info().Msg("[OnCommit] Received new commit message")
 	consensus.Decider.AddSignature(quorum.Commit, validatorPubKey, &sign)
@@ -761,7 +761,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 func (consensus *Consensus) finalizeCommits() {
 	utils.Logger().Info().
-		Int64("NumCommits", consensus.Decider.SignatoriesCount(quorum.Commit)).
+		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
 		Msg("[Finalizing] Finalizing Block")
 
 	beforeCatchupNum := consensus.blockNum
@@ -885,7 +885,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	switch consensus.Decider.Policy() {
 	case quorum.SuperMajorityVote:
-		threshold := consensus.Decider.QuorumThreshold()
+		threshold := consensus.Decider.QuorumThreshold().Int64()
 		if count := utils.CountOneBits(mask.Bitmap); int64(count) < threshold {
 			utils.Logger().Warn().
 				Int64("need", threshold).

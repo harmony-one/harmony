@@ -50,7 +50,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		}
 
 		// check has 2f+1 signatures
-		need := node.Consensus.Decider.QuorumThreshold()
+		need := node.Consensus.Decider.QuorumThreshold().Int64()
 		if count := utils.CountOneBits(mask.Bitmap); count < need {
 			utils.Logger().Error().Int64("need", need).Int64("have", count).
 				Msg("[Explorer] not have enough signature")
