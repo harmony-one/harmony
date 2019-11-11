@@ -281,15 +281,35 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 	return w.current.incxs
 }
 
-// ProposeShardStateWithoutBeaconSync proposes the next shard state for next epoch.
-func (w *Worker) ProposeShardStateWithoutBeaconSync() shard.State {
-	if !shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
-		return nil
-	}
-	shardState, _ := committee.WithStakingEnabled.Compute(
-		new(big.Int).Add(w.current.header.Epoch(), common.Big1), *w.config, nil,
+// SuperCommitteeForNextEpoch assumes only called by consensus leader
+func (w *Worker) SuperCommitteeForNextEpoch(
+	shardID uint32,
+	beacon *core.BlockChain,
+) (shard.State, error) {
+	var (
+		nextCommittee shard.State = nil
+		oops          error       = nil
 	)
-	return shardState
+
+	switch shardID {
+	case shard.BeaconChainShardID:
+		if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
+			nextCommittee, oops = committee.WithStakingEnabled.Compute(
+				new(big.Int).Add(w.current.header.Epoch(), common.Big1),
+				*w.config,
+				beacon,
+			)
+		}
+	default:
+		switch beacon.CurrentHeader().Epoch().Cmp(w.current.header.Epoch()) {
+		case 1:
+			nextCommittee, oops = committee.WithStakingEnabled.ReadFromDB(
+				w.current.header.Epoch(), beacon,
+			)
+		}
+
+	}
+	return nextCommittee, oops
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
