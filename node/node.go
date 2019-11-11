@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -514,6 +515,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.pendingTransactions = make(map[common.Hash]*types.Transaction)
 		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
+		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 

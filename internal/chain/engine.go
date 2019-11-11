@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -19,10 +20,17 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-type engineImpl struct{}
+type engineImpl struct {
+	d reward.Distributor
+}
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{}
+var Engine = &engineImpl{nil}
+
+// SetRewarder ..
+func (e *engineImpl) SetRewarder(d reward.Distributor) {
+	e.d = d
+}
 
 // SealHash returns the hash of a block prior to it being sealed.
 func (e *engineImpl) SealHash(header *block.Header) (hash common.Hash) {
