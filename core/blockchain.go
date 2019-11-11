@@ -1935,12 +1935,12 @@ func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.State, error) {
 	}
 
 	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
-		shardState, err = committee.WithStakingEnabled.ReadFromComputation(
+		shardState, err = committee.WithStakingEnabled.Compute(
 			big.NewInt(GenesisEpoch), *bc.Config(), nil,
 		)
 	} else {
 		prevEpoch := new(big.Int).Sub(epoch, common.Big1)
-		shardState, err = committee.WithStakingEnabled.ReadFromChain(
+		shardState, err = committee.WithStakingEnabled.ReadFromDB(
 			prevEpoch, bc,
 		)
 	}

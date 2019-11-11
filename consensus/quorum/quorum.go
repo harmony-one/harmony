@@ -1,7 +1,12 @@
 package quorum
 
 import (
+	"fmt"
+	"math/big"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/shard"
+	// "github.com/harmony-one/harmony/staking/effective"
 )
 
 // Phase is a phase that needs quorum to proceed
@@ -15,6 +20,19 @@ const (
 	// ViewChange ..
 	ViewChange
 )
+
+var phaseNames = map[Phase]string{
+	Prepare:    "Announce",
+	Commit:     "Prepare",
+	ViewChange: "Commit",
+}
+
+func (p Phase) String() string {
+	if name, ok := phaseNames[p]; ok {
+		return name
+	}
+	return fmt.Sprintf("Unknown Quorum Phase %+v", byte(p))
+}
 
 // Policy is the rule we used to decide is quorum achieved
 type Policy byte
@@ -41,7 +59,7 @@ type SignatoryTracker interface {
 	ParticipantTracker
 	AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign)
 	// Caller assumes concurrency protection
-	SignatoriesCount(Phase) int64
+	SignersCount(Phase) int64
 	Reset([]Phase)
 }
 
@@ -50,6 +68,23 @@ type SignatureReader interface {
 	SignatoryTracker
 	ReadAllSignatures(Phase) []*bls.Sign
 	ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign
+}
+
+// DependencyInjectionWriter ..
+type DependencyInjectionWriter interface {
+	SetShardIDProvider(func() (uint32, error))
+}
+
+// Decider ..
+type Decider interface {
+	SignatureReader
+	DependencyInjectionWriter
+	ToggleActive(*bls.PublicKey) bool
+	// UpdateVotingPower(keeper effective.StakeKeeper)
+	Policy() Policy
+	IsQuorumAchieved(Phase) bool
+	QuorumThreshold() *big.Int
+	IsRewardThresholdAchieved() bool
 }
 
 // These maps represent the signatories (validators), keys are BLS public keys
@@ -62,6 +97,14 @@ type cIdentities struct {
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewID map[string]*bls.Sign
+}
+
+type depInject struct {
+	shardIDProvider func() (uint32, error)
+}
+
+func (d *depInject) SetShardIDProvider(p func() (uint32, error)) {
+	d.shardIDProvider = p
 }
 
 func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
@@ -104,7 +147,7 @@ func (s *cIdentities) ParticipantsCount() int64 {
 	return int64(len(s.publicKeys))
 }
 
-func (s *cIdentities) SignatoriesCount(p Phase) int64 {
+func (s *cIdentities) SignersCount(p Phase) int64 {
 	switch p {
 	case Prepare:
 		return int64(len(s.prepare))
@@ -164,9 +207,7 @@ func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
 }
 
 func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
-	sigs := []*bls.Sign{}
 	m := map[string]*bls.Sign{}
-
 	switch p {
 	case Prepare:
 		m = s.prepare
@@ -175,9 +216,9 @@ func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
 	case ViewChange:
 		m = s.viewID
 	}
-
-	for _, sig := range m {
-		sigs = append(sigs, sig)
+	sigs := make([]*bls.Sign, 0, len(m))
+	for _, value := range m {
+		sigs = append(sigs, value)
 	}
 	return sigs
 }
@@ -189,47 +230,22 @@ func newMapBackedSignatureReader() SignatureReader {
 	}
 }
 
-// Decider ..
-type Decider interface {
-	SignatureReader
-	Policy() Policy
-	IsQuorumAchieved(Phase) bool
-	QuorumThreshold() int64
-	IsRewardThresholdAchieved() bool
-}
-
-type uniformVoteWeight struct {
-	SignatureReader
-}
-
 // NewDecider ..
 func NewDecider(p Policy) Decider {
+	signatureStore := newMapBackedSignatureReader()
+	dependencies := &depInject{}
 	switch p {
 	case SuperMajorityVote:
-		return &uniformVoteWeight{newMapBackedSignatureReader()}
-	// case SuperMajorityStake:
+		return &uniformVoteWeight{signatureStore, dependencies}
+	case SuperMajorityStake:
+		return &stakedVoteWeight{
+			signatureStore,
+			dependencies,
+			map[[shard.PublicKeySizeInBytes]byte]stakedVoter{},
+			big.NewInt(0),
+		}
 	default:
 		// Should not be possible
 		return nil
 	}
-}
-
-// Policy ..
-func (v *uniformVoteWeight) Policy() Policy {
-	return SuperMajorityVote
-}
-
-// IsQuorumAchieved ..
-func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
-	return v.SignatoriesCount(p) >= v.QuorumThreshold()
-}
-
-// QuorumThreshold ..
-func (v *uniformVoteWeight) QuorumThreshold() int64 {
-	return v.ParticipantsCount()*2/3 + 1
-}
-
-// RewardThreshold ..
-func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
-	return v.SignatoriesCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }

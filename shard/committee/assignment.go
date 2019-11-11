@@ -21,12 +21,12 @@ import (
 // a shardID parameter
 const StateID = -1
 
-// MembershipList  ..
-type MembershipList interface {
-	ReadFromComputation(
+// ValidatorList ..
+type ValidatorList interface {
+	Compute(
 		epoch *big.Int, config params.ChainConfig, reader StakingCandidatesReader,
 	) (shard.State, error)
-	ReadFromChain(epoch *big.Int, reader ChainReader) (shard.State, error)
+	ReadFromDB(epoch *big.Int, reader ChainReader) (shard.State, error)
 }
 
 // PublicKeys per epoch
@@ -45,7 +45,7 @@ type PublicKeys interface {
 // Reader ..
 type Reader interface {
 	PublicKeys
-	MembershipList
+	ValidatorList
 }
 
 // StakingCandidatesReader ..
@@ -243,14 +243,14 @@ func (def partialStakingEnabled) ComputePublicKeys(
 	return nil, nil
 }
 
-func (def partialStakingEnabled) ReadFromChain(
+func (def partialStakingEnabled) ReadFromDB(
 	epoch *big.Int, reader ChainReader,
 ) (newSuperComm shard.State, err error) {
 	return reader.ReadShardState(epoch)
 }
 
 // ReadFromComputation is single entry point for reading the State of the network
-func (def partialStakingEnabled) ReadFromComputation(
+func (def partialStakingEnabled) Compute(
 	epoch *big.Int, config params.ChainConfig, stakerReader StakingCandidatesReader,
 ) (newSuperComm shard.State, err error) {
 	instance := shard.Schedule.InstanceForEpoch(epoch)
