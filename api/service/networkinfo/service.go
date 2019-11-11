@@ -41,8 +41,8 @@ type Service struct {
 
 // ConnectionRetry set the number of retry of connection to bootnode in case the initial connection is failed
 var (
-	// retry for 10 minutes and give up then
-	ConnectionRetry = 300
+	// retry for 30s and give up then
+	ConnectionRetry = 15
 
 	// context
 	ctx context.Context

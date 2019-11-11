@@ -7,12 +7,12 @@ import (
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/shard"
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {
@@ -24,7 +24,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
@@ -46,7 +46,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 func TestConstructPreparedMessage(test *testing.T) {
 	leaderPriKey := bls.RandPrivateKey()
 	leaderPubKey := leaderPriKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "6000", ConsensusPubKey: leaderPubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999", ConsensusPubKey: leaderPubKey}
 
 	validatorPriKey := bls.RandPrivateKey()
 	validatorPubKey := leaderPriKey.GetPublicKey()
@@ -57,7 +57,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)

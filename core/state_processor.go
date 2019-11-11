@@ -30,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -86,6 +87,20 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 
+	// Iterate over staking transactions
+	L := len(block.Transactions())
+	for i, tx := range block.StakingTransactions() {
+		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
+		receipt, _, err :=
+			ApplyStakingTransaction(p.config, p.bc, &coinbase, gp, statedb, header, tx, usedGas, cfg)
+
+		if err != nil {
+			return nil, nil, nil, 0, err
+		}
+		receipts = append(receipts, receipt)
+		allLogs = append(allLogs, receipt.Logs...)
+	}
+
 	// incomingReceipts should always be processed after transactions (to be consistent with the block proposal)
 	for _, cx := range block.IncomingReceipts() {
 		err := ApplyIncomingReceipt(p.config, statedb, header, cx)
@@ -108,7 +123,7 @@ func getTransactionType(config *params.ChainConfig, header *block.Header, tx *ty
 	if header.ShardID() == tx.ShardID() && (!config.IsCrossTx(header.Epoch()) || tx.ShardID() == tx.ToShardID()) {
 		return types.SameShardTx
 	}
-	numShards := ShardingSchedule.InstanceForEpoch(header.Epoch()).NumShards()
+	numShards := shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards()
 	// Assuming here all the shards are consecutive from 0 to n-1, n is total number of shards
 	if tx.ShardID() != tx.ToShardID() && header.ShardID() == tx.ShardID() && tx.ToShardID() < numShards {
 		return types.SubtractionOnly
@@ -201,8 +216,10 @@ func ApplyStakingTransaction(
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(context, statedb, config, cfg)
+
 	// Apply the transaction to the current state (included in the env)
 	gas, err = ApplyStakingMessage(vmenv, msg, gp)
+	utils.Logger().Info().Msgf("ApplyStakingMessage: usedGas: %v, err: %v", gas, err)
 
 	// even there is error, we charge it
 	if err != nil {

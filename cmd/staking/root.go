@@ -18,7 +18,7 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/numeric"
+	numeric "github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/spf13/cobra"
@@ -35,57 +35,93 @@ var (
 	queryID       = 0
 	s             = &staker{}
 	localNetChain = big.NewInt(2)
-	dAddr, _      = common2.Bech32ToAddress(testAccount)
 )
 
 const (
 	// Harmony protocol assume beacon chain shard is only place to send
 	// staking, later need to consider logic when beacon chain shard rotates
 	stakingShard        = 0
-	testAccount         = "one1a0x3d6xpmr6f8wsyaxd9v36pytvp48zckswvv9"
-	testBLSPubKey       = "b9486167ab9087ab818dc4ce026edb5bf216863364c32e42df2af03c5ced1ad181e7d12f0e6dd5307a73b62247608611"
 	testAccountPassword = ""
+)
+
+// command line options var
+var (
+	nonce   = 0
+	cmdType = "create"
+	name    = "NewName"
+	index   = 0
+	minDele = 777
+	rate    = "0.0"
+
+	testAccounts = []string{
+		"one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy",
+		"one12fuf7x9rgtdgqg7vgq0962c556m3p7afsxgvll"}
+	testBLSPubKeys = []string{
+		"65f55eb3052f9e9f632b2923be594ba77c55543f5c58ee1454b9cfd658d25e06373b0f7d42a19c84768139ea294f6204",
+		"02c8ff0b88f313717bc3a627d2f8bb172ba3ad3bb9ba3ecb8eed4b7c878653d3d4faf769876c528b73f343967f74a917"}
 )
 
 func (s *staker) run(cmd *cobra.Command, args []string) error {
 	scryptN := keystore.StandardScryptN
 	scryptP := keystore.StandardScryptP
 	ks := keystore.NewKeyStore(keystoreDir, scryptN, scryptP)
+	dAddr, _ := common2.Bech32ToAddress(testAccounts[index])
 	account := accounts.Account{Address: dAddr}
 	ks.Unlock(account, testAccountPassword)
-	gasPrice := big.NewInt(0)
+	gasPrice := big.NewInt(1)
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
 		p := &bls.PublicKey{}
-		p.DeserializeHexStr(testBLSPubKey)
+		p.DeserializeHexStr(testBLSPubKeys[index])
 		pub := shard.BlsPublicKey{}
 		pub.FromLibBLSPublicKey(p)
-		return staking.DirectiveCreateValidator, staking.CreateValidator{
-			Description: &staking.Description{
-				Name:            "SuperHero",
-				Identity:        "YouWouldNotKnow",
-				Website:         "Secret Website",
-				SecurityContact: "Mr.DoubleZeroSeven",
-				Details:         "blah blah blah",
-			},
-			CommissionRates: staking.CommissionRates{
-				Rate:          numeric.NewDec(100),
-				MaxRate:       numeric.NewDec(150),
-				MaxChangeRate: numeric.NewDec(5),
-			},
-			MinSelfDelegation:  big.NewInt(10),
-			MaxTotalDelegation: big.NewInt(3000),
-			ValidatorAddress:   common.Address(dAddr),
-			SlotPubKeys:        []shard.BlsPublicKey{pub},
-			Amount:             big.NewInt(100),
+
+		ra, _ := numeric.NewDecFromStr("27.27")
+		maxRate, _ := numeric.NewDecFromStr("150.99")
+		maxChangeRate, _ := numeric.NewDecFromStr("0.5")
+		if cmdType == "create" {
+			return staking.DirectiveCreateValidator, staking.CreateValidator{
+				Description: &staking.Description{
+					Name:            "SuperHero",
+					Identity:        "YouWouldNotKnow",
+					Website:         "Secret Website",
+					SecurityContact: "Mr.DoubleZeroSeven",
+					Details:         "blah blah blah",
+				},
+				CommissionRates: staking.CommissionRates{
+					Rate:          ra,
+					MaxRate:       maxRate,
+					MaxChangeRate: maxChangeRate,
+				},
+				MinSelfDelegation:  big.NewInt(10),
+				MaxTotalDelegation: big.NewInt(3000),
+				ValidatorAddress:   common.Address(dAddr),
+				SlotPubKeys:        []shard.BlsPublicKey{pub},
+				Amount:             big.NewInt(100),
+			}
 		}
-		// return staking.DirectiveDelegate, staking.Delegate{
-		// 	common.Address(dAddr),
-		// 	common.Address(dAddr),
-		// 	big.NewInt(10),
-		// }
+		/*
+			ValidatorAddress   common.Address      `json:"validator_address" yaml:"validator_address"`
+				Description        *Description        `json:"description" yaml:"description"`
+				CommissionRate     *numeric.Dec        `json:"commission_rate" yaml:"commission_rate"`
+				MinSelfDelegation  *big.Int            `json:"min_self_delegation" yaml:"min_self_delegation"`
+				MaxTotalDelegation *big.Int            `json:"max_total_delegation" yaml:"max_total_delegation"`
+				SlotKeyToRemove    *shard.BlsPublicKey `json:"slot_key_to_remove" yaml:"slot_key_to_remove"`
+				SlotKeyToAdd       *shard.BlsPublicKey `json:"slot_key_to_add" yaml:"slot_key_to_add"`
+			}
+		*/
+
+		newRate, _ := numeric.NewDecFromStr(rate)
+		return staking.DirectiveEditValidator, staking.EditValidator{
+			Description: &staking.Description{
+				Name: name,
+			},
+			MinSelfDelegation: big.NewInt(int64(minDele)),
+			CommissionRate:    &newRate,
+			ValidatorAddress:  common.Address(dAddr),
+		}
 	}
 
-	stakingTx, err := staking.NewStakingTransaction(2, 100, gasPrice, stakePayloadMaker)
+	stakingTx, err := staking.NewStakingTransaction(uint64(nonce), 600000, gasPrice, stakePayloadMaker)
 	if err != nil {
 		return err
 	}
@@ -154,6 +190,12 @@ func baseRequest(method, node string, params interface{}) ([]byte, error) {
 }
 
 func init() {
+	rootCmd.PersistentFlags().IntVarP(&index, "index", "i", 0, "account index:0|1")
+	rootCmd.PersistentFlags().IntVarP(&nonce, "nonce", "n", 0, "nonce of address")
+	rootCmd.PersistentFlags().StringVarP(&cmdType, "type", "t", "create", "type of commands: create|edit")
+	rootCmd.PersistentFlags().StringVarP(&name, "name", "m", "ANewName", "Name of Validator")
+	rootCmd.PersistentFlags().IntVarP(&minDele, "minDele", "d", 666, "MinSelfDelegation Fee")
+	rootCmd.PersistentFlags().StringVarP(&rate, "rate", "r", "22.22", "Commision Rate")
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:               "staking-iterate",
@@ -170,6 +212,7 @@ func init() {
 			os.Exit(0)
 		},
 	})
+
 }
 
 var (

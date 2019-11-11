@@ -79,11 +79,6 @@ type Consensus struct {
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers int
 
-	// Leader's address
-	leader p2p.Peer
-
-	CommitteePublicKeys map[string]bool
-
 	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
@@ -219,7 +214,6 @@ func New(
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
-	consensus.CommitteePublicKeys = make(map[string]bool)
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if blsPriKey != nil {

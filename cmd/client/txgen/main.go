@@ -10,28 +10,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/shardchain"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	"github.com/harmony-one/harmony/shard"
 )
 
 var (
@@ -104,7 +104,7 @@ func setUpTXGen() *node.Node {
 	txGen := node.New(myhost, consensusObj, chainDBFactory, false) //Changed it : no longer archival node.
 	txGen.Client = client.NewClient(txGen.GetHost(), uint32(shardID))
 	consensusObj.ChainReader = txGen.Blockchain()
-	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
+	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	startIdx := 0
 	endIdx := startIdx + genesisShardingConfig.NumNodesPerShard()
 	pubs := []*bls2.PublicKey{}

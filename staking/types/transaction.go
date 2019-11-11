@@ -12,6 +12,10 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 )
 
+var (
+	errStakingTransactionTypeCastErr = errors.New("Cannot type cast to matching staking type")
+)
+
 type txdata struct {
 	Directive
 	StakeMsg     interface{}

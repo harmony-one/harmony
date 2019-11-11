@@ -691,6 +691,7 @@ func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
 	val := stk.ValidatorWrapper{}
 	err := rlp.DecodeBytes(by, &val)
 	if err != nil {
+		fmt.Printf("GetStakingInfo unable to decode: %v\n", err)
 		return nil
 	}
 	return &val
@@ -703,6 +704,7 @@ func (db *DB) UpdateStakingInfo(addr common.Address, val *stk.ValidatorWrapper) 
 		return err
 	}
 	db.SetCode(addr, by)
+
 	return nil
 }
 
