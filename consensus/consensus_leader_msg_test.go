@@ -46,7 +46,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 func TestConstructPreparedMessage(test *testing.T) {
 	leaderPriKey := bls.RandPrivateKey()
 	leaderPubKey := leaderPriKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "6000", ConsensusPubKey: leaderPubKey}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999", ConsensusPubKey: leaderPubKey}
 
 	validatorPriKey := bls.RandPrivateKey()
 	validatorPubKey := leaderPriKey.GetPublicKey()
