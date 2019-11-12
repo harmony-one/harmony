@@ -39,7 +39,7 @@ type NodeID struct {
 	EcdsaAddress common.Address `json:"ecdsa-address"`
 	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
 	// nil means not active, 0 means our node, >= 0 means staked node
-	StakeWithDelegationApplied *numeric.Dec `json:"staked-validator" rlp:"nil"`
+	StakeWithDelegationApplied *big.Int `json:"staked-validator" rlp:"nil"`
 }
 
 // NodeIDList is a list of NodeIDList.
@@ -55,7 +55,7 @@ type Committee struct {
 func (ss State) JSON() string {
 	type t struct {
 		NodeID
-		EcdsaAddress string `json:"one-address"`
+		EcdsaAddress string `json:"ecdsa-address"`
 	}
 	type v struct {
 		Committee
