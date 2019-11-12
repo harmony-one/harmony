@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -51,7 +50,7 @@ type Reader interface {
 // StakingCandidatesReader ..
 type StakingCandidatesReader interface {
 	ValidatorInformation(addr common.Address) (*staking.Validator, error)
-	ValidatorStakingWithDelegation(addr common.Address) numeric.Dec
+	ValidatorStakingWithDelegation(addr common.Address) *big.Int
 	ValidatorCandidates() []common.Address
 }
 
@@ -203,7 +202,7 @@ func (def partialStakingEnabled) ReadPublicKeysFromDB(
 	return nil, nil
 }
 
-// ReadPublicKeysFromChain produces publicKeys of entire supercommittee per epoch, optionally providing a
+// ComputePublicKeys produces publicKeys of entire supercommittee per epoch, optionally providing a
 // shard specific subcommittee
 func (def partialStakingEnabled) ComputePublicKeys(
 	epoch *big.Int, reader ChainReader, shardID int,
