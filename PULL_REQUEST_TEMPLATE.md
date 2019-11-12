@@ -51,6 +51,6 @@ After:
 
 10. **What should node operators know about this change?**
 
-11. **Describe this PR introduce significant changes to the operational requirements of the node software, such as >20% increase in CPU, memory, and/or disk usage?**
+11. **Does this PR introduce significant changes to the operational requirements of the node software, such as >20% increase in CPU, memory, and/or disk usage?**
 
 ## TODO
