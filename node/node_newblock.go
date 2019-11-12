@@ -1,7 +1,6 @@
 package node
 
 import (
-	"math/big"
 	"sort"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 )
 
 // Constants of proposing a new block
@@ -118,7 +116,13 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare shard state
-	shardState := node.Worker.ProposeShardStateWithoutBeaconSync()
+	shardState, err := node.Worker.SuperCommitteeForNextEpoch(
+		node.Consensus.ShardID, node.Beaconchain(),
+	)
+
+	if err != nil {
+		return nil, err
+	}
 
 	// Prepare last commit signatures
 	sig, mask, err := node.Consensus.LastCommitSig()
@@ -127,43 +131,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
-}
-
-func (node *Node) proposeShardStateWithoutBeaconSync(block *types.Block) shard.State {
-	if block == nil || !shard.Schedule.IsLastBlock(block.Number().Uint64()) {
-		return nil
-	}
-	shardState, _ := committee.WithStakingEnabled.Compute(
-		new(big.Int).Add(block.Header().Epoch(), common.Big1), node.chainConfig, nil,
-	)
-	return shardState
-}
-
-func (node *Node) proposeShardState(block *types.Block) error {
-	switch node.Consensus.ShardID {
-	case 0:
-		return node.proposeBeaconShardState(block)
-	default:
-		node.proposeLocalShardState(block)
-		return nil
-	}
-}
-
-func (node *Node) proposeBeaconShardState(block *types.Block) error {
-	// TODO ek - replace this with variable epoch logic.
-	if !shard.Schedule.IsLastBlock(block.Number().Uint64()) {
-		// We haven't reached the end of this epoch; don't propose yet.
-		return nil
-	}
-	// TODO Use ReadFromComputation
-	prevEpoch := new(big.Int).Sub(block.Header().Epoch(), common.Big1)
-	shardState, err := committee.WithStakingEnabled.ReadFromDB(
-		prevEpoch, node.Blockchain(),
-	)
-	if err != nil {
-		return err
-	}
-	return block.AddShardState(shardState)
 }
 
 func (node *Node) proposeLocalShardState(block *types.Block) {
