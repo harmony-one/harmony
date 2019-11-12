@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -256,5 +257,6 @@ func (def partialStakingEnabled) Compute(
 	if !config.IsStaking(epoch) {
 		return preStakingEnabledCommittee(instance), nil
 	}
+	fmt.Println("Staking epoch happened", config.String())
 	return with400Stakers(instance, stakerReader)
 }
