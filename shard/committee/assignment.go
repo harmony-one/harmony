@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -248,8 +249,6 @@ func (def partialStakingEnabled) Compute(
 	if !config.IsStaking(epoch) {
 		return preStakingEnabledCommittee(instance), nil
 	}
-	stakedSlots :=
-		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
-			int(instance.NumShards())
-	return eposStakedCommittee(instance, stakerReader, stakedSlots)
+	fmt.Println("Staking epoch happened", config.String())
+	return with400Stakers(instance, stakerReader)
 }
