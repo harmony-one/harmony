@@ -287,8 +287,8 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 	beacon *core.BlockChain,
 ) (shard.State, error) {
 	var (
-		nextCommittee shard.State = nil
-		oops          error       = nil
+		nextCommittee shard.State
+		oops          error
 	)
 
 	switch shardID {
@@ -301,10 +301,11 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 			)
 		}
 	default:
+		// WARN When we first enable staking, this condition may not be robust by itself.
 		switch beacon.CurrentHeader().Epoch().Cmp(w.current.header.Epoch()) {
 		case 1:
 			nextCommittee, oops = committee.WithStakingEnabled.ReadFromDB(
-				w.current.header.Epoch(), beacon,
+				beacon.CurrentHeader().Epoch(), beacon,
 			)
 		}
 
