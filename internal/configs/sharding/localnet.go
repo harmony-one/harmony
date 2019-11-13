@@ -17,7 +17,7 @@ const (
 	localnetV1Epoch = 1
 	localnetV2Epoch = 2
 
-	localnetEpochBlock1 = 10
+	localnetEpochBlock1 = 5
 	twoOne              = 5
 
 	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
@@ -110,6 +110,7 @@ var (
 	localnetReshardingEpoch = []*big.Int{
 		big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch),
 	}
+	// Number of shards, how many slots on each , how many slots owned by Harmony
 	localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, localnetReshardingEpoch)
 	localnetV1 = MustNewInstance(2, 8, 5, genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, localnetReshardingEpoch)
 	localnetV2 = MustNewInstance(2, 9, 6, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, localnetReshardingEpoch)

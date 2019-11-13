@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sort"
@@ -12,8 +13,8 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -21,31 +22,31 @@ import (
 // a shardID parameter
 const StateID = -1
 
-// ValidatorList ..
-type ValidatorList interface {
+// ValidatorListProvider ..
+type ValidatorListProvider interface {
 	Compute(
-		epoch *big.Int, config params.ChainConfig, reader StakingCandidatesReader,
+		epoch *big.Int, config params.ChainConfig, reader DataProvider,
 	) (shard.State, error)
-	ReadFromDB(epoch *big.Int, reader ChainReader) (shard.State, error)
+	ReadFromDB(epoch *big.Int, reader DataProvider) (shard.State, error)
 }
 
-// PublicKeys per epoch
-type PublicKeys interface {
+// PublicKeysProvider per epoch
+type PublicKeysProvider interface {
 	// If call shardID with StateID then only superCommittee is non-nil,
 	// otherwise get back the shardSpecific slice as well.
 	ComputePublicKeys(
-		epoch *big.Int, reader ChainReader, shardID int,
+		epoch *big.Int, reader DataProvider, shardID int,
 	) (superCommittee, shardSpecific []*bls.PublicKey)
 
 	ReadPublicKeysFromDB(
-		hash common.Hash, reader ChainReader,
+		hash common.Hash, reader DataProvider,
 	) ([]*bls.PublicKey, error)
 }
 
-// Reader ..
+// Reader is committee.Reader and it is the API that committee membership assignment needs
 type Reader interface {
-	PublicKeys
-	ValidatorList
+	PublicKeysProvider
+	ValidatorListProvider
 }
 
 // StakingCandidatesReader ..
@@ -65,6 +66,12 @@ type ChainReader interface {
 	GetHeaderByHash(common.Hash) *block.Header
 	// Config retrieves the blockchain's chain configuration.
 	Config() *params.ChainConfig
+}
+
+// DataProvider ..
+type DataProvider interface {
+	StakingCandidatesReader
+	ChainReader
 }
 
 type partialStakingEnabled struct{}
@@ -118,11 +125,12 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.State {
 }
 
 func with400Stakers(
-	s shardingconfig.Instance, stakerReader StakingCandidatesReader,
+	s shardingconfig.Instance, stakerReader DataProvider,
 ) (shard.State, error) {
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
 	stakers := make([]*staking.Validator, len(candidates))
+	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		// TODO Should be using .ValidatorStakingWithDelegation, not implemented yet
 		validator, err := stakerReader.ValidatorInformation(candidates[i])
@@ -132,47 +140,156 @@ func with400Stakers(
 		stakers[i] = validator
 	}
 
+	for i := range stakers {
+		staker := stakers[i]
+		stakers[i].Stake = new(big.Int).Div(
+			staker.Stake, big.NewInt(int64(len(staker.SlotPubKeys))),
+		)
+	}
+
+	unsortedStakes := make([]int, len(stakers))
+	eposStakes := make([]*big.Int, len(stakers))
+
+	for i, j := range stakers {
+		unsortedStakes[i] = int(j.Stake.Int64())
+		eposStakes[i] = j.Stake
+	}
+
+	s3 := effective.Apply(eposStakes)
+
 	sort.SliceStable(
 		stakers,
 		func(i, j int) bool { return stakers[i].Stake.Cmp(stakers[j].Stake) >= 0 },
 	)
-	const sCount = 401
-	top := stakers[:sCount]
+
+	// for i, j := range stakers {
+	// 	sortedStakes[i] = int(j.Stake.Int64())
+	// }
+
+	type t struct {
+		Stakes []int
+	}
+
+	t2 := t{make([]int, len(eposStakes))}
+	for i := range s3 {
+		t2.Stakes[i] = int(s3[i].TruncateInt64())
+	}
+
+	s1, _ := json.Marshal(t{unsortedStakes})
+	s2, _ := json.Marshal(t2)
+
+	fmt.Println("Unsorted")
+	fmt.Println(string(s1))
+	fmt.Println("as EPOS")
+	fmt.Println(string(s2))
+
+	// fmt.Println("Sorted stakers %+v\n", stakers)
+
 	shardCount := int(s.NumShards())
 	superComm := make(shard.State, shardCount)
 	fillCount := make([]int, shardCount)
-	// TODO Finish this logic, not correct, need to operate EPoS on slot level,
-	// not validator level
 
 	for i := 0; i < shardCount; i++ {
-		superComm[i] = shard.Committee{}
-		superComm[i].NodeList = make(shard.NodeIDList, s.NumNodesPerShard())
+		superComm[i] = shard.Committee{
+			uint32(i), make(shard.NodeIDList, s.NumNodesPerShard()),
+		}
 	}
 
-	scratchPad := &bls.PublicKey{}
+	shardBig := big.NewInt(int64(s.NumShards()))
 
-	for i := range top {
-		spot := int(top[i].Address.Big().Int64()) % shardCount
-		fillCount[spot]++
-		// scratchPad.DeserializeHexStr()
-		pubKey := shard.BlsPublicKey{}
-		pubKey.FromLibBLSPublicKey(scratchPad)
-		superComm[spot].NodeList = append(
-			superComm[spot].NodeList,
-			shard.NodeID{
-				top[i].Address,
+	for i := 0; i < len(s.FnAccounts()); i++ {
+		bucket := int(new(big.Int).Mod(stakers[i].Address.Big(), shardBig).Int64())
+		org := stakers[i].Stake
+		epos := big.NewInt(s3[i].TruncateInt64())
+		fmt.Println("stakes", org, epos)
+		superComm[bucket].NodeList[fillCount[bucket]] = shard.NodeID{
+			stakers[i].Address,
+			stakers[i].SlotPubKeys[0],
+			epos,
+		}
+		fillCount[bucket]++
+	}
+
+	hAccounts := s.HmyAccounts()
+	offset := 0
+
+	for i := range fillCount {
+		missing := s.NumNodesPerShard() - fillCount[i]
+		for j := 0; j < missing; j++ {
+			pub := &bls.PublicKey{}
+			pub.DeserializeHexStr(hAccounts[offset].BlsPublicKey)
+			pubKey := shard.BlsPublicKey{}
+			pubKey.FromLibBLSPublicKey(pub)
+			superComm[i].NodeList[fillCount[i]+j] = shard.NodeID{
+				common2.ParseAddr(hAccounts[offset].Address),
 				pubKey,
-				&shard.StakedMember{big.NewInt(0)},
-			},
-		)
+				nil,
+			}
+			offset++
+		}
 	}
 
-	utils.Logger().Info().Ints("distribution of Stakers in Shards", fillCount)
+	fmt.Println("Final", superComm.JSON())
+	fmt.Println("stakers", fillCount)
 	return superComm, nil
 }
 
+// ComputePublicKeys produces publicKeys of entire supercommittee per epoch, optionally providing a
+// shard specific subcommittee
+func (def partialStakingEnabled) ComputePublicKeys(
+	epoch *big.Int, d DataProvider, shardID int,
+) ([]*bls.PublicKey, []*bls.PublicKey) {
+	config := d.Config()
+	instance := shard.Schedule.InstanceForEpoch(epoch)
+	superComm := shard.State{}
+
+	if config.IsStaking(epoch) {
+		superComm, _ = with400Stakers(instance, d)
+	} else {
+		superComm = preStakingEnabledCommittee(instance)
+	}
+
+	spot := 0
+	shouldBe := int(instance.NumShards()) * instance.NumNodesPerShard()
+
+	total := 0
+	for i := range superComm {
+		total += len(superComm[i].NodeList)
+	}
+
+	if shouldBe != total {
+		fmt.Println("Count mismatch", shouldBe, total)
+	}
+
+	allIdentities := make([]*bls.PublicKey, shouldBe)
+	for i := range superComm {
+		for j := range superComm[i].NodeList {
+			identity := &bls.PublicKey{}
+			superComm[i].NodeList[j].BlsPublicKey.ToLibBLSPublicKey(identity)
+			allIdentities[spot] = identity
+			spot++
+		}
+	}
+
+	if shardID == StateID {
+		return allIdentities, nil
+	}
+
+	subCommittee := superComm.FindCommitteeByID(uint32(shardID))
+	subCommitteeIdentities := make([]*bls.PublicKey, len(subCommittee.NodeList))
+	spot = 0
+	for i := range subCommittee.NodeList {
+		identity := &bls.PublicKey{}
+		subCommittee.NodeList[i].BlsPublicKey.ToLibBLSPublicKey(identity)
+		subCommitteeIdentities[spot] = identity
+		spot++
+	}
+
+	return allIdentities, subCommitteeIdentities
+}
+
 func (def partialStakingEnabled) ReadPublicKeysFromDB(
-	h common.Hash, reader ChainReader,
+	h common.Hash, reader DataProvider,
 ) ([]*bls.PublicKey, error) {
 	header := reader.GetHeaderByHash(h)
 	shardID := header.ShardID()
@@ -203,55 +320,15 @@ func (def partialStakingEnabled) ReadPublicKeysFromDB(
 	return nil, nil
 }
 
-// ComputePublicKeys produces publicKeys of entire supercommittee per epoch, optionally providing a
-// shard specific subcommittee
-func (def partialStakingEnabled) ComputePublicKeys(
-	epoch *big.Int, reader ChainReader, shardID int,
-) ([]*bls.PublicKey, []*bls.PublicKey) {
-	config := reader.Config()
-	instance := shard.Schedule.InstanceForEpoch(epoch)
-	if !config.IsStaking(epoch) {
-		superComm := preStakingEnabledCommittee(instance)
-		spot := 0
-		allIdentities := make([]*bls.PublicKey, int(instance.NumShards())*instance.NumNodesPerShard())
-		for i := range superComm {
-			for j := range superComm[i].NodeList {
-				identity := &bls.PublicKey{}
-				superComm[i].NodeList[j].BlsPublicKey.ToLibBLSPublicKey(identity)
-				allIdentities[spot] = identity
-				spot++
-			}
-		}
-
-		if shardID == StateID {
-			return allIdentities, nil
-		}
-
-		subCommittee := superComm.FindCommitteeByID(uint32(shardID))
-		subCommitteeIdentities := make([]*bls.PublicKey, len(subCommittee.NodeList))
-		spot = 0
-		for i := range subCommittee.NodeList {
-			identity := &bls.PublicKey{}
-			subCommittee.NodeList[i].BlsPublicKey.ToLibBLSPublicKey(identity)
-			subCommitteeIdentities[spot] = identity
-			spot++
-		}
-
-		return allIdentities, subCommitteeIdentities
-	}
-	// TODO Implement for the staked case
-	return nil, nil
-}
-
 func (def partialStakingEnabled) ReadFromDB(
-	epoch *big.Int, reader ChainReader,
+	epoch *big.Int, reader DataProvider,
 ) (newSuperComm shard.State, err error) {
 	return reader.ReadShardState(epoch)
 }
 
 // ReadFromComputation is single entry point for reading the State of the network
 func (def partialStakingEnabled) Compute(
-	epoch *big.Int, config params.ChainConfig, stakerReader StakingCandidatesReader,
+	epoch *big.Int, config params.ChainConfig, stakerReader DataProvider,
 ) (newSuperComm shard.State, err error) {
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	if !config.IsStaking(epoch) {

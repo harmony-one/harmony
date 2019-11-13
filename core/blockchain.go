@@ -37,13 +37,13 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -2441,74 +2441,65 @@ func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
 }
 
 const (
-	a = "one1x4080kv34a4s3s886vs3rvvhm28pk3r0fnfh6n"
-	b = "one1pjq82a97vfxvmlm60htyc7kafhyjm59f7wgz22"
-	c = "one1yc06ghr2p8xnl2380kpfayweguuhxdtupkhqzw"
-	d = "one1wh4p0kuc7unxez2z8f82zfnhsg4ty6dupqyjt2"
-	e = "one16qsd5ant9v94jrs89mruzx62h7ekcfxmduh2rx"
-	f = "one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj"
-	g = "one1v788ag7ukh6wjujvpempss6h9ugvfxmnsyklr5"
-	h = "one1hx3gy5e864eycmjtpcvsuz59m3lu7y89q0ddhl"
-	i = "one1mmvhupm7ejytype664mhs2m95vn9pfdjrqfadv"
+	blsKey1 = "9a010ea58079ddcd31d5d10ac85e9b5a7732972ee5478d7296091b2af96fcd673c49d6dd7a4a9e7acd2e4aab0add0e00"
+	blsKey2 = "9275355e60f8c78337d538eb15e3f8eda120c28635f996d8a13f544d118db32749bcc0ed02a795770141d979a8b9de14"
+	// Pick big number for interesting looking one addresses
+	amount               = 400
+	fixedRandomGen       = 98765654323
+	fixedRandomGenStakeL = 40
+	fixedRandomGenStakeH = 150
 )
 
-// ValidatorCandidates returns the up to date validator candidates for next epoch
-func (bc *BlockChain) ValidatorCandidates() []common.Address {
-	// TODO Turn this into 400 length generated slice
-	return []common.Address{
-		common2.ParseAddr(a),
-		common2.ParseAddr(b),
-		common2.ParseAddr(c),
-		common2.ParseAddr(d),
-		common2.ParseAddr(e),
-		common2.ParseAddr(f),
-		common2.ParseAddr(g),
-		common2.ParseAddr(h),
+var (
+	// By fixing the source, we have predicable sequence
+	sequenceL        = rand.New(rand.NewSource(42))
+	sequenceH        = rand.New(rand.NewSource(84))
+	accountGenerator = rand.New(rand.NewSource(1337))
+)
+
+var (
+	tempBank map[common.Address]*staking.Validator = map[common.Address]*staking.Validator{}
+	addrs    []common.Address
+)
+
+func init() {
+	addrs = make([]common.Address, amount)
+	for i := 0; i < amount; i++ {
+		addr := common.Address{}
+		addr.SetBytes(
+			big.NewInt(int64(accountGenerator.Intn(fixedRandomGen))).Bytes(),
+		)
+		addrs[i] = addr
+		someValidator := &staking.Validator{}
+		someValidator.Address = addr
+		low := sequenceL.Intn(fixedRandomGenStakeL)
+		high := sequenceL.Intn(fixedRandomGenStakeH)
+		r := sequenceL.Intn(fixedRandomGenStakeH) + 1
+		modBy := high - low + 1
+		if modBy <= 0 {
+			modBy *= -1
+			modBy++
+		}
+		someValidator.Stake = new(big.Int).Abs(big.NewInt(int64(
+			(r % modBy) + low,
+		)))
+		k := shard.BlsPublicKey{}
+		j := bls.PublicKey{}
+		j.DeserializeHexStr(blsKey1)
+		k.FromLibBLSPublicKey(&j)
+		someValidator.SlotPubKeys = []shard.BlsPublicKey{k}
+		tempBank[addr] = someValidator
 	}
 }
 
-var (
-	sequence = rand.New(rand.NewSource(42))
-)
+// ValidatorCandidates returns the up to date validator candidates for next epoch
+func (bc *BlockChain) ValidatorCandidates() []common.Address {
+	return addrs
+}
 
 // ValidatorInformation returns the information of validator
 func (bc *BlockChain) ValidatorInformation(addr common.Address) (*staking.Validator, error) {
-	// EDGAR 0x355E77D991Af6B08C0e7d32111b197da8e1B446f
-	// EDGAR 0x0C807574BE624CcdFf7A7dD64c7ADd4dC92dd0a9
-	// EDGAR 0x261fa45c6A09cD3Faa277d829e91d9473973357C
-	// EDGAR 0x75eA17DB98F7266C89423A4EA12677822Ab269Bc
-	// EDGAR 0xD020dA766b2b0b590E072ec7c11b4AbFb36c24DB
-	// EDGAR 0x806171f95C5a74371a19e8a312c9e5Cb4E1D24f6
-	// EDGAR 0x678E7Ea3DCb5f4e9724C0e761843572f10c49B73
-	// EDGAR 0xB9A2825327D5724C6E4b0e190E0a85dc7FCf10e5
-	someValidator := &staking.Validator{}
-	someValidator.Address = addr
-	someValidator.Stake = big.NewInt(int64(sequence.Intn(100)))
-	switch B := common2.MustAddressToBech32(addr); true {
-	case B == a:
-		fmt.Println("Called here:", B, a)
-		return someValidator, nil
-	case B == b:
-	case B == c:
-	case B == d:
-	case B == e:
-	case B == f:
-	case B == g:
-	case B == h:
-
-	}
-
-	fmt.Println("EDGAR", addr.String())
-	return nil, nil
-	// state, err := bc.StateAt(bc.CurrentBlock().Root())
-	// if err != nil || state == nil {
-	// 	return nil, err
-	// }
-	// wrapper := state.GetStakingInfo(addr)
-	// if wrapper == nil {
-	// 	return nil, fmt.Errorf("ValidatorInformation not found: %v", addr)
-	// }
-	// return &wrapper.Validator, nil
+	return tempBank[addr], nil
 }
 
 // DelegatorsInformation returns up to date information of delegators of a given validator address

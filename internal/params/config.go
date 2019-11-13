@@ -36,9 +36,10 @@ var (
 		ChainID:        TestnetChainID,
 		CrossTxEpoch:   big.NewInt(0),
 		CrossLinkEpoch: big.NewInt(0),
-		StakingEpoch:   big.NewInt(5),
-		EIP155Epoch:    big.NewInt(0),
-		S3Epoch:        big.NewInt(0),
+		// MinEpoch needed is at least 1, crashes on 0
+		StakingEpoch: big.NewInt(1),
+		EIP155Epoch:  big.NewInt(0),
+		S3Epoch:      big.NewInt(0),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
