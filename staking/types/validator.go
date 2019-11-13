@@ -198,12 +198,11 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	commission := Commission{val.CommissionRates, blockNum}
 	pubKeys := []shard.BlsPublicKey{}
 	pubKeys = append(pubKeys, val.SlotPubKeys...)
-
-	// TODO: a new validator should have a minimum of 1 token as self delegation, and that should be added as a delegation entry here.
 	v := Validator{
 		val.ValidatorAddress, pubKeys,
 		val.Amount, new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
-		commission, desc, blockNum}
+		commission, desc, big.NewInt(0),
+	}
 	return &v, nil
 }
 

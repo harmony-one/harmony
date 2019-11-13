@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -16,6 +17,10 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+// StateID means reading off whole network when using calls that accept
+// a shardID parameter
+const StateID = -1
+
 // ValidatorListProvider ..
 type ValidatorListProvider interface {
 	Compute(
@@ -26,7 +31,12 @@ type ValidatorListProvider interface {
 
 // PublicKeysProvider per epoch
 type PublicKeysProvider interface {
-	ComputePublicKeys(epoch *big.Int, reader DataProvider) [][]*bls.PublicKey
+	// If call shardID with StateID then only superCommittee is non-nil,
+	// otherwise get back the shardSpecific slice as well.
+	ComputePublicKeys(
+		epoch *big.Int, reader DataProvider, shardID int,
+	) (superCommittee, shardSpecific []*bls.PublicKey)
+
 	ReadPublicKeysFromDB(
 		hash common.Hash, reader DataProvider,
 	) ([]*bls.PublicKey, error)
@@ -113,13 +123,12 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.State {
 	return shardState
 }
 
-func eposStakedCommittee(
-	s shardingconfig.Instance, stakerReader DataProvider, stakedSlotsCount int,
+func with400Stakers(
+	s shardingconfig.Instance, stakerReader DataProvider,
 ) (shard.State, error) {
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
-	essentials := map[common.Address]effective.SlotOrder{}
-
+	stakers := make([]*staking.Validator, len(candidates))
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		// TODO Should be using .ValidatorStakingWithDelegation, not implemented yet
@@ -133,74 +142,152 @@ func eposStakedCommittee(
 		}
 	}
 
+	for i := range stakers {
+		staker := stakers[i]
+		stakers[i].Stake = new(big.Int).Div(
+			staker.Stake, big.NewInt(int64(len(staker.SlotPubKeys))),
+		)
+	}
+
+	unsortedStakes := make([]int, len(stakers))
+	eposStakes := make([]*big.Int, len(stakers))
+
+	for i, j := range stakers {
+		unsortedStakes[i] = int(j.Stake.Int64())
+		eposStakes[i] = j.Stake
+	}
+
+	s3 := effective.Apply(eposStakes)
+
+	sort.SliceStable(
+		stakers,
+		func(i, j int) bool { return stakers[i].Stake.Cmp(stakers[j].Stake) >= 0 },
+	)
+
+	// for i, j := range stakers {
+	// 	sortedStakes[i] = int(j.Stake.Int64())
+	// }
+
+	type t struct {
+		Stakes []int
+	}
+
+	t2 := t{make([]int, len(eposStakes))}
+	for i := range s3 {
+		t2.Stakes[i] = int(s3[i].TruncateInt64())
+	}
+
+	s1, _ := json.Marshal(t{unsortedStakes})
+	s2, _ := json.Marshal(t2)
+
+	fmt.Println("Unsorted")
+	fmt.Println(string(s1))
+	fmt.Println("as EPOS")
+	fmt.Println(string(s2))
+
+	// fmt.Println("Sorted stakers %+v\n", stakers)
+
 	shardCount := int(s.NumShards())
 	superComm := make(shard.State, shardCount)
-	hAccounts := s.HmyAccounts()
+	fillCount := make([]int, shardCount)
 
 	for i := 0; i < shardCount; i++ {
-		superComm[i] = shard.Committee{uint32(i), shard.NodeIDList{}}
+		superComm[i] = shard.Committee{
+			uint32(i), make(shard.NodeIDList, s.NumNodesPerShard()),
+		}
 	}
 
-	for i := range hAccounts {
-		spot := i % shardCount
-		pub := &bls.PublicKey{}
-		pub.DeserializeHexStr(hAccounts[i].BlsPublicKey)
-		pubKey := shard.BlsPublicKey{}
-		pubKey.FromLibBLSPublicKey(pub)
-		superComm[spot].NodeList = append(superComm[spot].NodeList, shard.NodeID{
-			common2.ParseAddr(hAccounts[i].Address),
-			pubKey,
-			nil,
-		})
+	shardBig := big.NewInt(int64(s.NumShards()))
+
+	for i := 0; i < len(s.FnAccounts()); i++ {
+		bucket := int(new(big.Int).Mod(stakers[i].Address.Big(), shardBig).Int64())
+		org := stakers[i].Stake
+		epos := big.NewInt(s3[i].TruncateInt64())
+		fmt.Println("stakes", org, epos)
+		superComm[bucket].NodeList[fillCount[bucket]] = shard.NodeID{
+			stakers[i].Address,
+			stakers[i].SlotPubKeys[0],
+			epos,
+		}
+		fillCount[bucket]++
 	}
 
-	staked := effective.Apply(essentials, stakedSlotsCount)
-	shardBig := big.NewInt(int64(shardCount))
+	hAccounts := s.HmyAccounts()
+	offset := 0
 
-	if l := len(staked); l < stakedSlotsCount {
-		// WARN unlikely to happen in production but will happen as we are developing
-		stakedSlotsCount = l
+	for i := range fillCount {
+		missing := s.NumNodesPerShard() - fillCount[i]
+		for j := 0; j < missing; j++ {
+			pub := &bls.PublicKey{}
+			pub.DeserializeHexStr(hAccounts[offset].BlsPublicKey)
+			pubKey := shard.BlsPublicKey{}
+			pubKey.FromLibBLSPublicKey(pub)
+			superComm[i].NodeList[fillCount[i]+j] = shard.NodeID{
+				common2.ParseAddr(hAccounts[offset].Address),
+				pubKey,
+				nil,
+			}
+			offset++
+		}
 	}
 
-	for i := 0; i < stakedSlotsCount; i++ {
-		bucket := int(new(big.Int).Mod(staked[i].BlsPublicKey.Big(), shardBig).Int64())
-		slot := staked[i]
-		superComm[bucket].NodeList = append(superComm[bucket].NodeList, shard.NodeID{
-			slot.Address,
-			staked[i].BlsPublicKey,
-			&slot.Dec,
-		})
-	}
-
+	fmt.Println("Final", superComm.JSON())
+	fmt.Println("stakers", fillCount)
 	return superComm, nil
 }
 
-// ComputePublicKeys produces publicKeys of entire supercommittee per epoch
+// ComputePublicKeys produces publicKeys of entire supercommittee per epoch, optionally providing a
+// shard specific subcommittee
 func (def partialStakingEnabled) ComputePublicKeys(
-	epoch *big.Int, d DataProvider,
-) [][]*bls.PublicKey {
-
+	epoch *big.Int, d DataProvider, shardID int,
+) ([]*bls.PublicKey, []*bls.PublicKey) {
 	config := d.Config()
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	superComm := shard.State{}
+
 	if config.IsStaking(epoch) {
-		superComm, _ = eposStakedCommittee(instance, d, 320)
+		superComm, _ = with400Stakers(instance, d)
 	} else {
 		superComm = preStakingEnabledCommittee(instance)
 	}
 
-	allIdentities := make([][]*bls.PublicKey, len(superComm))
+	spot := 0
+	shouldBe := int(instance.NumShards()) * instance.NumNodesPerShard()
 
+	total := 0
 	for i := range superComm {
-		allIdentities[i] = make([]*bls.PublicKey, len(superComm[i].NodeList))
+		total += len(superComm[i].NodeList)
+	}
+
+	if shouldBe != total {
+		fmt.Println("Count mismatch", shouldBe, total)
+	}
+
+	allIdentities := make([]*bls.PublicKey, shouldBe)
+	for i := range superComm {
 		for j := range superComm[i].NodeList {
 			identity := &bls.PublicKey{}
 			superComm[i].NodeList[j].BlsPublicKey.ToLibBLSPublicKey(identity)
-			allIdentities[i][j] = identity
+			allIdentities[spot] = identity
+			spot++
 		}
 	}
 
-	return allIdentities
+	if shardID == StateID {
+		return allIdentities, nil
+	}
+
+	subCommittee := superComm.FindCommitteeByID(uint32(shardID))
+	subCommitteeIdentities := make([]*bls.PublicKey, len(subCommittee.NodeList))
+	spot = 0
+	for i := range subCommittee.NodeList {
+		identity := &bls.PublicKey{}
+		subCommittee.NodeList[i].BlsPublicKey.ToLibBLSPublicKey(identity)
+		subCommitteeIdentities[spot] = identity
+		spot++
+	}
+
+	return allIdentities, subCommitteeIdentities
 }
 
 func (def partialStakingEnabled) ReadPublicKeysFromDB(
