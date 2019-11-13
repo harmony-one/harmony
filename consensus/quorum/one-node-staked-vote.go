@@ -7,6 +7,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 )
 
 var (
@@ -21,6 +22,8 @@ type stakedVoter struct {
 type stakedVoteWeight struct {
 	SignatureReader
 	DependencyInjectionWriter
+	DependencyInjectionReader
+	slash.ThresholdDecider
 	// EPOS based staking
 	validatorStakes            map[[shard.PublicKeySizeInBytes]byte]stakedVoter
 	totalEffectiveStakedAmount *big.Int
@@ -72,4 +75,14 @@ func (v *stakedVoteWeight) Award(
 func (v *stakedVoteWeight) ToggleActive(*bls.PublicKey) bool {
 	// TODO Implement
 	return true
+}
+
+func (v *stakedVoteWeight) ShouldSlash(key shard.BlsPublicKey) bool {
+	s, _ := v.ShardIDProvider()()
+	switch s {
+	case shard.BeaconChainShardID:
+		return v.SlashThresholdMet(key)
+	default:
+		return false
+	}
 }

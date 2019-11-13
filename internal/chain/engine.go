@@ -177,12 +177,16 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 // Finalize implements Engine, accumulating the block rewards,
 // setting the final state and assembling the block.
 func (e *engineImpl) Finalize(
-	chain engine.ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
+	chain engine.ChainReader, header *block.Header,
+	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
-	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error) {
+	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	if err := AccumulateRewards(chain, state, header, e.Rewarder(), e.Slasher()); err != nil {
+	if err := AccumulateRewards(
+		chain, state, header, e.Rewarder(), e.Slasher(),
+	); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 
@@ -221,7 +225,9 @@ func (e *engineImpl) Finalize(
 }
 
 // QuorumForBlock returns the quorum for the given block header.
-func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool) (quorum int, err error) {
+func QuorumForBlock(
+	chain engine.ChainReader, h *block.Header, reCalculate bool,
+) (quorum int, err error) {
 	var ss shard.State
 	if reCalculate {
 		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), *chain.Config(), nil)

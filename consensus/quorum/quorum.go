@@ -6,6 +6,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	// "github.com/harmony-one/harmony/staking/effective"
 )
 
@@ -75,10 +76,16 @@ type DependencyInjectionWriter interface {
 	SetShardIDProvider(func() (uint32, error))
 }
 
+// DependencyInjectionReader ..
+type DependencyInjectionReader interface {
+	ShardIDProvider() func() (uint32, error)
+}
+
 // Decider ..
 type Decider interface {
 	SignatureReader
 	DependencyInjectionWriter
+	slash.Slasher
 	ToggleActive(*bls.PublicKey) bool
 	// UpdateVotingPower(keeper effective.StakeKeeper)
 	Policy() Policy
@@ -96,15 +103,12 @@ type cIdentities struct {
 	commit     map[string]*bls.Sign
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
-	viewID map[string]*bls.Sign
+	viewID      map[string]*bls.Sign
+	seenCounter map[[shard.PublicKeySizeInBytes]byte]int
 }
 
 type depInject struct {
 	shardIDProvider func() (uint32, error)
-}
-
-func (d *depInject) SetShardIDProvider(p func() (uint32, error)) {
-	d.shardIDProvider = p
 }
 
 func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
@@ -132,7 +136,21 @@ func (s *cIdentities) Participants() []*bls.PublicKey {
 }
 
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
+	// TODO - might need to put this in separate method
+	s.seenCounter = make(map[[shard.PublicKeySizeInBytes]byte]int, len(pubKeys))
+	for i := range pubKeys {
+		k := shard.BlsPublicKey{}
+		k.FromLibBLSPublicKey(pubKeys[i])
+		s.seenCounter[k] = 0
+	}
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
+}
+
+func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
+	s.seenCounter[key]++
+	fmt.Println("Slash Map", s.seenCounter)
+	return s.seenCounter[key] == slash.UnavailabilityInConsecutiveBlockSigning
+
 }
 
 func (s *cIdentities) DumpParticipants() []string {
@@ -174,8 +192,8 @@ func (s *cIdentities) AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign
 }
 
 func (s *cIdentities) Reset(ps []Phase) {
-	for _, p := range ps {
-		switch m := map[string]*bls.Sign{}; p {
+	for i := range ps {
+		switch m := map[string]*bls.Sign{}; ps[i] {
 		case Prepare:
 			s.prepare = m
 		case Commit:
@@ -223,43 +241,45 @@ func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
 	return sigs
 }
 
-func newMapBackedSignatureReader() cIdentities {
-	return cIdentities{
+func newMapBackedSignatureReader() *cIdentities {
+	return &cIdentities{
 		[]*bls.PublicKey{}, map[string]*bls.Sign{},
 		map[string]*bls.Sign{}, map[string]*bls.Sign{},
-	}
-}
-
-func (c *composite) ShouldSlash(shard.BlsPublicKey) bool {
-	s, _ := c.shardIDProvider()
-	switch s {
-	case shard.BeaconChainShardID:
-		return true
-	default:
-		return false
+		map[[shard.PublicKeySizeInBytes]byte]int{},
 	}
 }
 
 type composite struct {
-	cIdentities
-	depInject
+	DependencyInjectionWriter
+	SignatureReader
+}
+
+func (d *depInject) SetShardIDProvider(p func() (uint32, error)) {
+	d.shardIDProvider = p
+}
+
+func (d *depInject) ShardIDProvider() func() (uint32, error) {
+	return d.shardIDProvider
 }
 
 // NewDecider ..
 func NewDecider(p Policy) Decider {
 	signatureStore := newMapBackedSignatureReader()
-	dependencies := depInject{}
-	c := &composite{signatureStore, dependencies}
+	deps := &depInject{}
+	c := &composite{deps, signatureStore}
 	switch p {
 	case SuperMajorityVote:
-		return &uniformVoteWeight{&c.cIdentities, &c.depInject}
+		return &uniformVoteWeight{c.DependencyInjectionWriter, c}
 	case SuperMajorityStake:
+		fmt.Println("HRS")
 		return &stakedVoteWeight{
-			&c.cIdentities, &c.depInject,
+			c.SignatureReader,
+			c.DependencyInjectionWriter,
+			c.DependencyInjectionWriter.(DependencyInjectionReader),
+			c.SignatureReader.(slash.ThresholdDecider),
 			map[[shard.PublicKeySizeInBytes]byte]stakedVoter{},
 			big.NewInt(0),
 		}
-
 	default:
 		// Should not be possible
 		return nil

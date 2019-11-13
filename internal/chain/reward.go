@@ -2,6 +2,7 @@ package chain
 
 import (
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -14,6 +15,7 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
@@ -82,29 +84,54 @@ func AccumulateRewards(
 	}
 
 	accounts := []common.Address{}
+	missing := shard.NodeIDList{}
 
 	for idx, member := range parentCommittee.NodeList {
-		if signed, err := mask.IndexEnabled(idx); err != nil {
+		switch signed, err := mask.IndexEnabled(idx); true {
+		case err != nil:
 			return ctxerror.New("cannot check for committer bit",
 				"committerIndex", idx,
 			).WithCause(err)
-		} else if signed {
+		case signed:
 			accounts = append(accounts, member.EcdsaAddress)
+		default:
+			missing = append(missing, member)
 		}
 	}
 
-	type t struct {
+	// do it quickly
+	w := sync.WaitGroup{}
+	for i := range missing {
+		w.Add(1)
+		go func(member int) {
+			defer w.Add(-1)
+			// Slash if missing block was long enough
+			if slasher.ShouldSlash(missing[member].BlsPublicKey) {
+				// TODO Logic
+			}
+		}(i)
+	}
+
+	w.Wait()
+
+	payable := []struct {
+		string
 		common.Address
 		*big.Int
-	}
-	signers := []string{}
-	payable := []t{}
+	}{}
 
 	totalAmount := rewarder.Award(
 		BlockReward, accounts, func(receipient common.Address, amount *big.Int) {
-			signers = append(signers, common2.MustAddressToBech32(receipient))
-			payable = append(payable, t{receipient, amount})
-		})
+			payable = append(payable, struct {
+				string
+				common.Address
+				*big.Int
+			}{
+				common2.MustAddressToBech32(receipient), receipient, amount,
+			},
+			)
+		},
+	)
 
 	if totalAmount.Cmp(BlockReward) != 0 {
 		utils.Logger().Error().
@@ -114,7 +141,10 @@ func AccumulateRewards(
 		return errors.Wrapf(errPayoutNotEqualBlockReward, "payout "+totalAmount.String())
 	}
 
+	signers := make([]string, len(payable))
+
 	for i := range payable {
+		signers[i] = payable[i].string
 		state.AddBalance(payable[i].Address, payable[i].Int)
 	}
 

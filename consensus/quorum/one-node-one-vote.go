@@ -6,12 +6,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 	// "github.com/harmony-one/harmony/staking/effective"
 )
 
 type uniformVoteWeight struct {
-	SignatureReader
 	DependencyInjectionWriter
+	SignatureReader
 }
 
 // Policy ..
@@ -70,4 +71,10 @@ func (v *uniformVoteWeight) Award(
 	}
 
 	return payout
+}
+
+func (v *uniformVoteWeight) ShouldSlash(k shard.BlsPublicKey) bool {
+	// No-op, no semantic meaning in one-slot-one-vote
+	// fmt.Println("Called here for key:", k.Hex())
+	return false
 }
