@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
@@ -23,10 +24,11 @@ import (
 
 type engineImpl struct {
 	d reward.Distributor
+	s slash.Slasher
 }
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{nil}
+var Engine = &engineImpl{nil, nil}
 
 // Rewarder handles the distribution of block rewards
 func (e *engineImpl) Rewarder() reward.Distributor {
@@ -36,6 +38,16 @@ func (e *engineImpl) Rewarder() reward.Distributor {
 // SetRewarder ..
 func (e *engineImpl) SetRewarder(d reward.Distributor) {
 	e.d = d
+}
+
+// Slasher handles slashing accounts due to inavailibility or double-signing
+func (e *engineImpl) Slasher() slash.Slasher {
+	return e.s
+}
+
+// SetSlasher assigns the slasher used
+func (e *engineImpl) SetSlasher(s slash.Slasher) {
+	e.s = s
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -170,8 +182,7 @@ func (e *engineImpl) Finalize(
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	// TODO: Block rewards should be done only in beacon chain based on cross-links
-	if err := AccumulateRewards(chain, state, header, e.Rewarder()); err != nil {
+	if err := AccumulateRewards(chain, state, header, e.Rewarder(), e.Slasher()); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 

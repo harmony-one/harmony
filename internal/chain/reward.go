@@ -14,6 +14,7 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
 
@@ -27,7 +28,9 @@ var (
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
 func AccumulateRewards(
-	bc engine.ChainReader, state *state.DB, header *block.Header, rewarder reward.Distributor,
+	bc engine.ChainReader, state *state.DB,
+	header *block.Header, rewarder reward.Distributor,
+	slasher slash.Slasher,
 ) error {
 	blockNum := header.Number().Uint64()
 	if blockNum == 0 {

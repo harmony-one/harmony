@@ -223,27 +223,43 @@ func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
 	return sigs
 }
 
-func newMapBackedSignatureReader() SignatureReader {
-	return &cIdentities{
+func newMapBackedSignatureReader() cIdentities {
+	return cIdentities{
 		[]*bls.PublicKey{}, map[string]*bls.Sign{},
 		map[string]*bls.Sign{}, map[string]*bls.Sign{},
 	}
 }
 
+func (c *composite) ShouldSlash(shard.BlsPublicKey) bool {
+	s, _ := c.shardIDProvider()
+	switch s {
+	case shard.BeaconChainShardID:
+		return true
+	default:
+		return false
+	}
+}
+
+type composite struct {
+	cIdentities
+	depInject
+}
+
 // NewDecider ..
 func NewDecider(p Policy) Decider {
 	signatureStore := newMapBackedSignatureReader()
-	dependencies := &depInject{}
+	dependencies := depInject{}
+	c := &composite{signatureStore, dependencies}
 	switch p {
 	case SuperMajorityVote:
-		return &uniformVoteWeight{signatureStore, dependencies}
+		return &uniformVoteWeight{&c.cIdentities, &c.depInject}
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
-			signatureStore,
-			dependencies,
+			&c.cIdentities, &c.depInject,
 			map[[shard.PublicKeySizeInBytes]byte]stakedVoter{},
 			big.NewInt(0),
 		}
+
 	default:
 		// Should not be possible
 		return nil
