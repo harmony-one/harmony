@@ -300,7 +300,12 @@ func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 
 // GetValidatorInformation returns full validator info.
 func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (map[string]interface{}, error) {
-	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
+	utils.Logger().Info().Msgf("address %s", internal_common.ParseAddr(address).Hex())
+	validator, err := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
+	if err != nil || validator == nil {
+		return nil, err
+	}
+	utils.Logger().Info().Msgf("LOL %d", validator.Stake.Uint64())
 	slotPubKeys := make([]string, 0)
 	for _, slotPubKey := range validator.SlotPubKeys {
 		slotPubKeys = append(slotPubKeys, slotPubKey.Hex())
@@ -326,15 +331,21 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 }
 
 // GetStake returns validator stake.
-func (s *PublicBlockChainAPI) GetStake(ctx context.Context, address string) hexutil.Uint64 {
-	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
-	return hexutil.Uint64(validator.Stake.Uint64())
+func (s *PublicBlockChainAPI) GetStake(ctx context.Context, address string) (hexutil.Uint64, error) {
+	validator, err := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
+	if err != nil {
+		return hexutil.Uint64(0), err
+	}
+	return hexutil.Uint64(validator.Stake.Uint64()), nil
 }
 
 // GetValidatorStakingAddress stacking address returns validator stacking address.
-func (s *PublicBlockChainAPI) GetValidatorStakingAddress(ctx context.Context, address string) string {
-	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
-	return validator.Address.String()
+func (s *PublicBlockChainAPI) GetValidatorStakingAddress(ctx context.Context, address string) (string, error) {
+	validator, err := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
+	if err != nil {
+		return "", err
+	}
+	return validator.Address.String(), nil
 }
 
 // GetValidatorStakingWithDelegation returns total balace stacking for validator with delegation.

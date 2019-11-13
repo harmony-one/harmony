@@ -75,7 +75,7 @@ type Backend interface {
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
 	GetCurrentValidatorAddresses() []common.Address
 	GetValidatorCandidates() []common.Address
-	GetValidatorInformation(addr common.Address) *staking.Validator
+	GetValidatorInformation(addr common.Address) (*staking.Validator, error)
 	GetDelegatorsInformation(addr common.Address) []*staking.Delegation
 	GetValidatorStakingWithDelegation(addr common.Address) *big.Int
 }

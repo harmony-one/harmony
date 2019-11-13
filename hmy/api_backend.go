@@ -301,9 +301,8 @@ func (b *APIBackend) GetValidatorCandidates() []common.Address {
 }
 
 // GetValidatorInformation returns the information of validator
-func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Validator {
-	val, _ := b.hmy.BlockChain().ValidatorInformation(addr)
-	return val
+func (b *APIBackend) GetValidatorInformation(addr common.Address) (*staking.Validator, error) {
+	return b.hmy.BlockChain().ValidatorInformationDummy(addr)
 }
 
 // GetDelegatorsInformation returns up to date information of delegators of a given validator address

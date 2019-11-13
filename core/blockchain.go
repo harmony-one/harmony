@@ -41,9 +41,11 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -2404,6 +2406,35 @@ func (bc *BlockChain) ValidatorCandidates() []common.Address {
 		return make([]common.Address, 0)
 	}
 	return list
+}
+
+// ValidatorInformationDummy returns the information of validator
+func (bc *BlockChain) ValidatorInformationDummy(addr common.Address) (*staking.Validator, error) {
+	commission := staking.Commission{
+		UpdateHeight: big.NewInt(0),
+	}
+	commission.CommissionRates = staking.CommissionRates{
+		Rate:          numeric.Dec{Int: big.NewInt(0)},
+		MaxRate:       numeric.Dec{Int: big.NewInt(0)},
+		MaxChangeRate: numeric.Dec{Int: big.NewInt(0)},
+	}
+	validator := &staking.Validator{
+		Address:           internal_common.ParseAddr("0x0000000000000000000000000000000000000000000000000000000000000000"),
+		SlotPubKeys:       make([]shard.BlsPublicKey, 0),
+		Stake:             big.NewInt(0),
+		UnbondingHeight:   big.NewInt(0),
+		MinSelfDelegation: big.NewInt(0),
+		Active:            false,
+	}
+	validator.Commission = commission
+	validator.Description = staking.Description{
+		Name:            "lol",
+		Identity:        "lol",
+		Website:         "lol",
+		SecurityContact: "lol",
+		Details:         "lol",
+	}
+	return validator, nil
 }
 
 // ValidatorInformation returns the information of validator
