@@ -396,9 +396,8 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 					stateDB.SubBalance(delegate.DelegatorAddress, delegate.Amount)
 				}
 				return err
-			} else {
-				return errInsufficientBalanceForStake
 			}
+			return errInsufficientBalanceForStake
 		}
 	}
 
