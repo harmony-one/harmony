@@ -28,8 +28,9 @@ var (
 
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
-	Validator           `json:"validator" yaml:"validator" rlp:"nil"`
-	Delegations         []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
+	Validator   `json:"validator" yaml:"validator" rlp:"nil"`
+	Delegations []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
+	// TODO: move snapshot into off-chain db.
 	SnapshotValidator   *Validator   `json:"snapshot_validator" yaml:"snaphost_validator" rlp:"nil"`
 	SnapshotDelegations []Delegation `json:"snapshot_delegations" yaml:"snapshot_delegations" rlp:"nil"`
 }
@@ -184,10 +185,12 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 	}
 
 	if edit.MinSelfDelegation != nil {
+		// TODO: add condition that minSelfDelegation can not be higher than the current self delegation
 		validator.MinSelfDelegation = edit.MinSelfDelegation
 	}
 
 	if edit.MaxTotalDelegation != nil {
+		// TODO: add condition that MaxTotalDelegation can not be lower than the current total delegation
 		validator.MaxTotalDelegation = edit.MaxTotalDelegation
 	}
 

@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"errors"
 	"math"
 	"math/big"
@@ -31,9 +32,11 @@ import (
 )
 
 var (
-	errInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
-	errValidatorExist            = errors.New("staking validator address already exists")
-	errValidatorNotExist         = errors.New("staking validator address does not exist")
+	errInsufficientBalanceForGas   = errors.New("insufficient balance to pay for gas")
+	errInsufficientBalanceForStake = errors.New("insufficient balance to stake")
+	errValidatorExist              = errors.New("staking validator already exists")
+	errValidatorNotExist           = errors.New("staking validator does not exist")
+	errNoDelegationToUndelegate    = errors.New("no delegation to undelegate")
 )
 
 /*
@@ -292,28 +295,28 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	case types.StakeNewVal:
 		stkMsg := &staking.CreateValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
+			return 0, err
 		}
 		err = st.applyCreateValidatorTx(stkMsg, msg.BlockNum())
 
 	case types.StakeEditVal:
 		stkMsg := &staking.EditValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
+			return 0, err
 		}
 		err = st.applyEditValidatorTx(stkMsg, msg.BlockNum())
 
 	case types.Delegate:
 		stkMsg := &staking.Delegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
+			return 0, err
 		}
 		err = st.applyDelegateTx(stkMsg)
 
 	case types.Undelegate:
 		stkMsg := &staking.Undelegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			break
+			return 0, err
 		}
 		err = st.applyUndelegateTx(stkMsg)
 	case types.CollectRewards:
@@ -330,6 +333,7 @@ func (st *StateTransition) applyCreateValidatorTx(nv *staking.CreateValidator, b
 	if st.state.IsValidator(nv.ValidatorAddress) {
 		return errValidatorExist
 	}
+	// TODO: move balance into staking
 	v, err := staking.CreateValidatorFromNewMsg(nv)
 	if err != nil {
 		return err
@@ -349,6 +353,9 @@ func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, block
 		return errValidatorNotExist
 	}
 	wrapper := st.state.GetStakingInfo(ev.ValidatorAddress)
+	if wrapper == nil {
+		return errValidatorNotExist
+	}
 
 	oldRate := wrapper.Validator.Rate
 	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, ev); err != nil {
@@ -356,6 +363,7 @@ func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, block
 	}
 	newRate := wrapper.Validator.Rate
 	// update the commision rate change height
+	// TODO: make sure the rule of MaxChangeRate is not violated
 	if oldRate.IsNil() || (!newRate.IsNil() && !oldRate.Equal(newRate)) {
 		wrapper.Validator.UpdateHeight = blockNum
 	}
@@ -366,9 +374,77 @@ func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, block
 }
 
 func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
+	if !st.state.IsValidator(delegate.ValidatorAddress) {
+		return errValidatorNotExist
+	}
+	wrapper := st.state.GetStakingInfo(delegate.ValidatorAddress)
+	if wrapper == nil {
+		return errValidatorNotExist
+	}
+
+	stateDB := st.state
+	delegatorExist := false
+	for i := range wrapper.Delegations {
+		delegation := wrapper.Delegations[i]
+		if bytes.Equal(delegation.DelegatorAddress.Bytes(), delegate.DelegatorAddress.Bytes()) {
+			delegatorExist = true
+			if CanTransfer(stateDB, delegate.DelegatorAddress, delegate.Amount) {
+				delegation.Amount.Add(delegation.Amount, delegate.Amount)
+				err := stateDB.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
+				if err == nil {
+					// TODO: use undelegated token in locking period
+					stateDB.SubBalance(delegate.DelegatorAddress, delegate.Amount)
+				}
+				return err
+			} else {
+				return errInsufficientBalanceForStake
+			}
+		}
+	}
+
+	if !delegatorExist {
+		if CanTransfer(stateDB, delegate.DelegatorAddress, delegate.Amount) {
+			newDelegator := staking.Delegation{DelegatorAddress: delegate.DelegatorAddress, Amount: delegate.Amount}
+			wrapper.Delegations = append(wrapper.Delegations, newDelegator)
+
+			if err := stateDB.UpdateStakingInfo(wrapper.Validator.Address, wrapper); err == nil {
+				stateDB.SubBalance(delegate.DelegatorAddress, delegate.Amount)
+			} else {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
 func (st *StateTransition) applyUndelegateTx(undelegate *staking.Undelegate) error {
+	if !st.state.IsValidator(undelegate.ValidatorAddress) {
+		return errValidatorNotExist
+	}
+	wrapper := st.state.GetStakingInfo(undelegate.ValidatorAddress)
+	if wrapper == nil {
+		return errValidatorNotExist
+	}
+
+	stateDB := st.state
+	delegatorExist := false
+	for i := range wrapper.Delegations {
+		delegation := wrapper.Delegations[i]
+		if bytes.Equal(delegation.DelegatorAddress.Bytes(), undelegate.DelegatorAddress.Bytes()) {
+			delegatorExist = true
+
+			err := delegation.Undelegate(st.evm.EpochNumber, undelegate.Amount)
+			if err != nil {
+				return err
+			}
+			err = stateDB.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
+			return err
+		}
+	}
+	if !delegatorExist {
+		return errNoDelegationToUndelegate
+	}
+	// TODO: do undelegated token distribution after locking period. (in leader block proposal phase)
 	return nil
 }

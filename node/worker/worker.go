@@ -31,12 +31,12 @@ type environment struct {
 	state   *state.DB     // apply state changes here
 	gasPool *core.GasPool // available gas used to pack transactions
 
-	header    *block.Header
-	txs       []*types.Transaction
-	stkingTxs staking.StakingTransactions
-	receipts  []*types.Receipt
-	outcxs    []*types.CXReceipt       // cross shard transaction receipts (source shard)
-	incxs     []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
+	header     *block.Header
+	txs        []*types.Transaction
+	stakingTxs staking.StakingTransactions
+	receipts   []*types.Receipt
+	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
+	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -160,7 +160,7 @@ func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinba
 		return nil, fmt.Errorf("nil staking receipt")
 	}
 
-	w.current.stkingTxs = append(w.current.stkingTxs, tx)
+	w.current.stakingTxs = append(w.current.stakingTxs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	return receipt.Logs, nil
 }
@@ -354,7 +354,7 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 	s := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
-	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stkingTxs)
+	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stakingTxs)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
