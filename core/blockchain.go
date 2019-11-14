@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -35,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -2399,13 +2401,64 @@ func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
 	return filtered
 }
 
+const (
+	blsKey1 = "9a010ea58079ddcd31d5d10ac85e9b5a7732972ee5478d7296091b2af96fcd673c49d6dd7a4a9e7acd2e4aab0add0e00"
+	blsKey2 = "9275355e60f8c78337d538eb15e3f8eda120c28635f996d8a13f544d118db32749bcc0ed02a795770141d979a8b9de14"
+	// Pick big number for interesting looking one addresses
+	amount               = 400
+	fixedRandomGen       = 98765654323
+	fixedRandomGenStakeL = 40
+	fixedRandomGenStakeH = 150
+)
+
+var (
+	// By fixing the source, we have predicable sequence
+	sequenceL        = rand.New(rand.NewSource(42))
+	sequenceH        = rand.New(rand.NewSource(84))
+	accountGenerator = rand.New(rand.NewSource(1337))
+)
+
+var (
+	tempBank map[common.Address]*staking.Validator = map[common.Address]*staking.Validator{}
+	addrs    []common.Address
+)
+
+func init() {
+	addrs = make([]common.Address, amount)
+	for i := 0; i < amount; i++ {
+		addr := common.Address{}
+		addr.SetBytes(
+			big.NewInt(int64(accountGenerator.Intn(fixedRandomGen))).Bytes(),
+		)
+		addrs[i] = addr
+		someValidator := &staking.Validator{}
+		someValidator.Address = addr
+		low := sequenceL.Intn(fixedRandomGenStakeL)
+		high := sequenceL.Intn(fixedRandomGenStakeH)
+		r := sequenceL.Intn(fixedRandomGenStakeH) + 1
+		modBy := high - low + 1
+		if modBy <= 0 {
+			modBy *= -1
+			modBy++
+		}
+		someValidator.Stake = new(big.Int).Abs(big.NewInt(int64(
+			(r % modBy) + low,
+		)))
+		// TODO Follow example to generate input bytes for BLS keys
+		k := shard.BlsPublicKey{}
+		j := bls.PublicKey{}
+		j.DeserializeHexStr(blsKey1)
+		k.FromLibBLSPublicKey(&j)
+		someValidator.SlotPubKeys = []shard.BlsPublicKey{k}
+		someValidator.Description.Website = "http://staking-service.com"
+		// TODO Fill out whatever else fields on someValidator
+		tempBank[addr] = someValidator
+	}
+}
+
 // ValidatorCandidates returns the up to date validator candidates for next epoch
 func (bc *BlockChain) ValidatorCandidates() []common.Address {
-	list, err := bc.ReadValidatorList()
-	if err != nil {
-		return make([]common.Address, 0)
-	}
-	return list
+	return addrs
 }
 
 // ValidatorInformationDummy returns the information of validator
@@ -2439,15 +2492,7 @@ func (bc *BlockChain) ValidatorInformationDummy(addr common.Address) (*staking.V
 
 // ValidatorInformation returns the information of validator
 func (bc *BlockChain) ValidatorInformation(addr common.Address) (*staking.Validator, error) {
-	state, err := bc.StateAt(bc.CurrentBlock().Root())
-	if err != nil || state == nil {
-		return nil, err
-	}
-	wrapper := state.GetStakingInfo(addr)
-	if wrapper == nil {
-		return nil, fmt.Errorf("ValidatorInformation not found: %v", addr)
-	}
-	return &wrapper.Validator, nil
+	return tempBank[addr], nil
 }
 
 // DelegatorsInformation returns up to date information of delegators of a given validator address
