@@ -726,3 +726,13 @@ func (db *DB) IsValidator(addr common.Address) bool {
 	}
 	return so.IsValidator(db.db)
 }
+
+func (db *DB) AddReward(validator common.Address, reward *big.Int) {
+	//TODO: implement reward logic
+	// the reward will be distributed to all the delegators based on stake percentage.
+}
+
+func (db *DB) CollectReward(delegator common.Address) {
+	//TODO: implement collect reward logic
+	// The reward will be withdrawn to the delegator's address balance as a whole.
+}
