@@ -62,6 +62,15 @@ func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 	return nil
 }
 
+// TotalInUndelegation - return the total amount of token in undelegation (locking period)
+func (d *Delegation) TotalInUndelegation() *big.Int {
+	total := big.NewInt(0)
+	for _, entry := range d.Entries {
+		total.Add(total, entry.Amount)
+	}
+	return total
+}
+
 // DeleteEntry - delete an entry from the undelegation
 // Opimize it
 func (d *Delegation) DeleteEntry(epoch *big.Int) {
