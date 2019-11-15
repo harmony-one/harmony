@@ -2441,11 +2441,9 @@ func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
 }
 
 const (
-	blsKey1 = "9a010ea58079ddcd31d5d10ac85e9b5a7732972ee5478d7296091b2af96fcd673c49d6dd7a4a9e7acd2e4aab0add0e00"
-	blsKey2 = "9275355e60f8c78337d538eb15e3f8eda120c28635f996d8a13f544d118db32749bcc0ed02a795770141d979a8b9de14"
 	// Pick big number for interesting looking one addresses
 	amount               = 400
-	fixedRandomGen       = 98765654323
+	fixedRandomGen       = 98765654323123134
 	fixedRandomGenStakeL = 40
 	fixedRandomGenStakeH = 150
 )
@@ -2455,6 +2453,8 @@ var (
 	sequenceL        = rand.New(rand.NewSource(42))
 	sequenceH        = rand.New(rand.NewSource(84))
 	accountGenerator = rand.New(rand.NewSource(1337))
+	blsKeyGen        = rand.New(rand.NewSource(4040))
+	blsSlotsGen      = rand.New(rand.NewSource(8080))
 )
 
 var (
@@ -2467,7 +2467,7 @@ func init() {
 	for i := 0; i < amount; i++ {
 		addr := common.Address{}
 		addr.SetBytes(
-			big.NewInt(int64(accountGenerator.Intn(fixedRandomGen))).Bytes(),
+			big.NewInt(int64(accountGenerator.Int63n(fixedRandomGen))).Bytes(),
 		)
 		addrs[i] = addr
 		someValidator := &staking.Validator{}
@@ -2483,11 +2483,28 @@ func init() {
 		someValidator.Stake = new(big.Int).Abs(big.NewInt(int64(
 			(r % modBy) + low,
 		)))
-		k := shard.BlsPublicKey{}
-		j := bls.PublicKey{}
-		j.DeserializeHexStr(blsKey1)
-		k.FromLibBLSPublicKey(&j)
-		someValidator.SlotPubKeys = []shard.BlsPublicKey{k}
+
+		slotsCount := blsSlotsGen.Intn(10)
+		if slotsCount <= 0 {
+			slotsCount *= -1
+			slotsCount++
+		}
+		pubKeys := make([]shard.BlsPublicKey, slotsCount)
+
+		for i := 0; i < slotsCount; i++ {
+			k := shard.BlsPublicKey{}
+			j := bls.PublicKey{}
+			b := bytes.Buffer{}
+			b.Write(big.NewInt(int64(accountGenerator.Int63n(fixedRandomGen))).Bytes())
+			b.Write(big.NewInt(int64(accountGenerator.Int63n(fixedRandomGen))).Bytes())
+			b.Write(big.NewInt(int64(accountGenerator.Int63n(fixedRandomGen))).Bytes())
+			b.Write(big.NewInt(int64(accountGenerator.Int63n(fixedRandomGen))).Bytes())
+			j.Deserialize(b.Bytes()[:shard.PublicKeySizeInBytes])
+			k.FromLibBLSPublicKey(&j)
+			pubKeys[i] = k
+		}
+
+		someValidator.SlotPubKeys = pubKeys
 		tempBank[addr] = someValidator
 	}
 }

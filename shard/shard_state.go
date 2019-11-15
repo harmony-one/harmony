@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/numeric"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -38,7 +38,7 @@ type NodeID struct {
 	EcdsaAddress common.Address `json:"ecdsa-address"`
 	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
 	// nil means not active, 0 means our node, >= 0 means staked node
-	StakeWithDelegationApplied *big.Int `json:"staked-validator" rlp:"nil"`
+	StakeWithDelegationApplied *numeric.Dec `json:"staked-validator" rlp:"nil"`
 }
 
 // NodeIDList is a list of NodeIDList.
