@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/harmony-one/harmony/internal/common"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 var (
@@ -18,6 +18,7 @@ var (
 type Delegation struct {
 	DelegatorAddress common.Address       `json:"delegator_address" yaml:"delegator_address"`
 	Amount           *big.Int             `json:"amount" yaml:"amount"`
+	Reward           *big.Int             `json:"reward" yaml:"reward"`
 	Entries          []*UndelegationEntry `json:"entries" yaml:"entries"`
 }
 
@@ -36,25 +37,39 @@ func NewDelegation(delegatorAddr common.Address,
 	}
 }
 
-// AddEntry - append entry to the undelegation
-func (d *Delegation) AddEntry(epoch *big.Int, amt *big.Int) error {
-	if d.Amount.Cmp(amt) < 0 {
-		return errInsufficientBalance
-	}
+// Undelegate - append entry to the undelegation
+func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 	if amt.Sign() <= 0 {
 		return errInvalidAmount
 	}
+	if d.Amount.Cmp(amt) < 0 {
+		return errInsufficientBalance
+	}
 	d.Amount.Sub(d.Amount, amt)
 
+	exist := false
 	for _, entry := range d.Entries {
 		if entry.Epoch.Cmp(epoch) == 0 {
+			exist = true
 			entry.Amount.Add(entry.Amount, amt)
 			return nil
 		}
 	}
-	item := UndelegationEntry{amt, epoch}
-	d.Entries = append(d.Entries, &item)
+
+	if !exist {
+		item := UndelegationEntry{amt, epoch}
+		d.Entries = append(d.Entries, &item)
+	}
 	return nil
+}
+
+// TotalInUndelegation - return the total amount of token in undelegation (locking period)
+func (d *Delegation) TotalInUndelegation() *big.Int {
+	total := big.NewInt(0)
+	for _, entry := range d.Entries {
+		total.Add(total, entry.Amount)
+	}
+	return total
 }
 
 // DeleteEntry - delete an entry from the undelegation

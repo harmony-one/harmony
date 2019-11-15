@@ -28,8 +28,9 @@ var (
 
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
-	Validator           `json:"validator" yaml:"validator" rlp:"nil"`
-	Delegations         []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
+	Validator   `json:"validator" yaml:"validator" rlp:"nil"`
+	Delegations []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
+	// TODO: move snapshot into off-chain db.
 	SnapshotValidator   *Validator   `json:"snapshot_validator" yaml:"snaphost_validator" rlp:"nil"`
 	SnapshotDelegations []Delegation `json:"snapshot_delegations" yaml:"snapshot_delegations" rlp:"nil"`
 }
@@ -65,6 +66,15 @@ func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
 	}
 	str += "]"
 	return str
+}
+
+// TotalDelegation - return the total amount of token in delegation
+func (w *ValidatorWrapper) TotalDelegation() *big.Int {
+	total := big.NewInt(0)
+	for _, entry := range w.Delegations {
+		total.Add(total, entry.Amount)
+	}
+	return total
 }
 
 // Description - some possible IRL connections
@@ -156,6 +166,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator) (*Validator, error) {
 	commission := Commission{val.CommissionRates, new(big.Int)}
 	pubKeys := []shard.BlsPublicKey{}
 	pubKeys = append(pubKeys, val.SlotPubKeys...)
+	// TODO: a new validator should have a minimum of 1 token as self delegation, and that should be added as a delegation entry here.
 	v := Validator{val.ValidatorAddress, pubKeys,
 		val.Amount, new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
 		commission, desc, big.NewInt(0)}
@@ -184,10 +195,12 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 	}
 
 	if edit.MinSelfDelegation != nil {
+		// TODO: add condition that minSelfDelegation can not be higher than the current self delegation
 		validator.MinSelfDelegation = edit.MinSelfDelegation
 	}
 
 	if edit.MaxTotalDelegation != nil {
+		// TODO: add condition that MaxTotalDelegation can not be lower than the current total delegation
 		validator.MaxTotalDelegation = edit.MaxTotalDelegation
 	}
 

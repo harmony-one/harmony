@@ -483,9 +483,9 @@ func (d Dec) RoundInt64() int64 {
 }
 
 // RoundInt round the decimal using bankers rounding
-//func (d Dec) RoundInt() big.Int {
-//	return NewIntFromBigInt(chopPrecisionAndRoundNonMutative(d.Int))
-//}
+func (d Dec) RoundInt() *big.Int {
+	return chopPrecisionAndRoundNonMutative(d.Int)
+}
 
 //___________________________________________________________________________________
 
@@ -509,9 +509,9 @@ func (d Dec) TruncateInt64() int64 {
 }
 
 // TruncateInt truncates the decimals from the number and returns an Int
-//func (d Dec) TruncateInt() big.Int {
-//	return NewIntFromBigInt(chopPrecisionAndTruncateNonMutative(d.Int))
-//}
+func (d Dec) TruncateInt() *big.Int {
+	return chopPrecisionAndTruncateNonMutative(d.Int)
+}
 
 // TruncateDec truncates the decimals from the number and returns a Dec
 func (d Dec) TruncateDec() Dec {
