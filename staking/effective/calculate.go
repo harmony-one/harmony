@@ -55,13 +55,14 @@ func median(stakes []SlotPurchase) numeric.Dec {
 // Apply ..
 func Apply(shortHand map[common.Address]SlotOrder) Slots {
 	eposedSlots := Slots{}
-
+	if len(shortHand) == 0 {
+		return eposedSlots
+	}
 	// Expand
 	for staker := range shortHand {
 		slotsCount := int64(len(shortHand[staker].SpreadAmong))
-
-		var i int64 = 0
 		spread := numeric.NewDecFromBigInt(shortHand[staker].Stake).QuoInt64(slotsCount)
+		var i int64
 		for ; i < slotsCount; i++ {
 			eposedSlots = append(eposedSlots, SlotPurchase{staker, spread})
 		}
@@ -69,7 +70,6 @@ func Apply(shortHand map[common.Address]SlotOrder) Slots {
 	if len(eposedSlots) < len(shortHand) {
 		// WARN Should never happen
 	}
-
 	median := median(eposedSlots)
 
 	for i := range eposedSlots {
