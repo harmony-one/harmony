@@ -181,6 +181,10 @@ func eposStakedCommittee(
 
 	shardBig := big.NewInt(int64(shardCount))
 
+	if len(staked) <= stakedSlotsCount {
+		// WARN unlikely to happen in production but will happen as we are developing
+	}
+
 	for i := 0; i < stakedSlotsCount; i++ {
 		bucket := int(new(big.Int).Mod(staked[i].Address.Big(), shardBig).Int64())
 		slot := staked[i]
@@ -309,6 +313,5 @@ func (def partialStakingEnabled) Compute(
 	stakedSlots :=
 		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
 			int(instance.NumShards())
-	fmt.Println("Staking epoch happened", config.String())
 	return eposStakedCommittee(instance, stakerReader, stakedSlots)
 }
