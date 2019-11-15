@@ -52,11 +52,6 @@ func median(stakes []SlotPurchase) numeric.Dec {
 	}
 }
 
-// MarshalJSON ..
-func (p Slots) MarshalJSON() ([]byte, error) {
-	return nil, nil
-}
-
 // Apply ..
 func Apply(shortHand map[common.Address]SlotOrder) Slots {
 	eposedSlots := Slots{}

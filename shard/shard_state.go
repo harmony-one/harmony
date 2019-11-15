@@ -54,7 +54,7 @@ type Committee struct {
 func (ss State) JSON() string {
 	type t struct {
 		NodeID
-		EcdsaAddress string `json:"ecdsa-address"`
+		EcdsaAddress string `json:"one-address"`
 	}
 	type v struct {
 		Committee
@@ -81,9 +81,9 @@ func (ss State) JSON() string {
 // FindCommitteeByID returns the committee configuration for the given shard,
 // or nil if the given shard is not found.
 func (ss State) FindCommitteeByID(shardID uint32) *Committee {
-	for _, committee := range ss {
-		if committee.ShardID == shardID {
-			return &committee
+	for committee := range ss {
+		if ss[committee].ShardID == shardID {
+			return &ss[committee]
 		}
 	}
 	return nil
