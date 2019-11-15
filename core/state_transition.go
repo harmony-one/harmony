@@ -394,7 +394,6 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 				// Firstly use the tokens in undelegation to delegate (redelegate)
 				undelegateAmount := big.NewInt(0).Set(delegate.Amount)
 				// Use the latest undelegated token first as it has the longest remaining locking time.
-				// TODO: always order the list by epoch.
 				i := len(delegation.Entries) - 1
 				for ; i >= 0; i-- {
 					if delegation.Entries[i].Amount.Cmp(undelegateAmount) <= 0 {

@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -59,7 +60,14 @@ func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 	if !exist {
 		item := UndelegationEntry{amt, epoch}
 		d.Entries = append(d.Entries, &item)
+
+		// Always sort the undelegate by epoch in increasing order
+		sort.SliceStable(
+			d.Entries,
+			func(i, j int) bool { return d.Entries[i].Epoch.Cmp(d.Entries[j].Epoch) < 0 },
+		)
 	}
+
 	return nil
 }
 
