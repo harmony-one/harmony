@@ -1068,6 +1068,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	}
 
 	// Write other block data using a batch.
+	// TODO: put following into a func
 	batch := bc.db.NewBatch()
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
 
@@ -1083,10 +1084,74 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			err := rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts, false)
 			if err != nil {
 				utils.Logger().Debug().Err(err).Interface("shardReceipts", shardReceipts).Int("toShardID", i).Msg("WriteCXReceipts cannot write into database")
+				return NonStatTy, err
 			}
 		}
 		// Mark incomingReceipts in the block as spent
 		bc.WriteCXReceiptsProofSpent(block.IncomingReceipts())
+	}
+
+	//check non zero VRF field in header and add to local db
+	if len(block.Vrf()) > 0 {
+		vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch())
+		if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
+			utils.Logger().Error().
+				Str("number", block.Number().String()).
+				Str("epoch", block.Header().Epoch().String()).
+				Msg("VRF block number is already in local db")
+		} else {
+			vrfBlockNumbers = append(vrfBlockNumbers, block.NumberU64())
+			err = bc.WriteEpochVrfBlockNums(block.Header().Epoch(), vrfBlockNumbers)
+			if err != nil {
+				utils.Logger().Error().
+					Str("number", block.Number().String()).
+					Str("epoch", block.Header().Epoch().String()).
+					Msg("failed to write VRF block number to local db")
+				return NonStatTy, err
+			}
+		}
+	}
+
+	//check non zero Vdf in header and add to local db
+	if len(block.Vdf()) > 0 {
+		err = bc.WriteEpochVdfBlockNum(block.Header().Epoch(), block.Number())
+		if err != nil {
+			utils.Logger().Error().
+				Str("number", block.Number().String()).
+				Str("epoch", block.Header().Epoch().String()).
+				Msg("failed to write VDF block number to local db")
+			return NonStatTy, err
+		}
+	}
+
+	header := block.Header()
+	if header.ShardStateHash() != (common.Hash{}) {
+		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
+		err = bc.WriteShardStateBytes(batch, epoch, header.ShardState())
+		if err != nil {
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
+			return NonStatTy, err
+		}
+	}
+
+	if len(header.CrossLinks()) > 0 {
+		crossLinks := &types.CrossLinks{}
+		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
+		if err != nil {
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cannot parse cross links")
+			return NonStatTy, err
+		}
+		if !crossLinks.IsSorted() {
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cross links are not sorted")
+			return NonStatTy, errors.New("proposed cross links are not sorted")
+		}
+		for _, crossLink := range *crossLinks {
+			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}, false); err == nil {
+				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum().Uint64()).Uint32("shardID", crossLink.ShardID()).Msg("[InsertChain] Cross Link Added to Beaconchain")
+			}
+			bc.DeleteCrossLinks(types.CrossLinks{crossLink}, true)
+			bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
+		}
 	}
 
 	if bc.chainConfig.IsStaking(block.Epoch()) {
@@ -1101,6 +1166,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 		}
 	}
+	// END - TODO
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
@@ -1145,49 +1211,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 // After insertion is done, all accumulated events will be fired.
 func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
-	if err == nil {
-		// TODO: incorporate these into insertChain
-		for idx, block := range chain {
-			header := block.Header()
-			header.Logger(utils.Logger()).Info().
-				Int("segmentIndex", idx).
-				Str("parentHash", header.ParentHash().Hex()).
-				Msg("added block to chain")
-
-				// TODO: move into WriteBlockWithState
-			if header.ShardStateHash() != (common.Hash{}) {
-				epoch := new(big.Int).Add(header.Epoch(), common.Big1)
-				err = bc.WriteShardStateBytes(epoch, header.ShardState())
-				if err != nil {
-					header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
-					return n, err
-				}
-			}
-
-			// TODO: move into WriteBlockWithState
-			if len(header.CrossLinks()) > 0 {
-				crossLinks := &types.CrossLinks{}
-				err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
-				if err != nil {
-					header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cannot parse cross links")
-					return n, err
-				}
-				if !crossLinks.IsSorted() {
-					header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cross links are not sorted")
-					return n, errors.New("proposed cross links are not sorted")
-				}
-				for _, crossLink := range *crossLinks {
-					if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}, false); err == nil {
-						utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum().Uint64()).Uint32("shardID", crossLink.ShardID()).Msg("[InsertChain] Cross Link Added to Beaconchain")
-					}
-					bc.DeleteCrossLinks(types.CrossLinks{crossLink}, true)
-					bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
-				}
-			}
-		}
-	}
-
-	// This should be done after everything about adding a block is done.
 	bc.PostChainEvents(events, logs)
 	return n, err
 }
@@ -1396,37 +1419,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 
 		cache, _ := bc.stateCache.TrieDB().Size()
 		stats.report(chain, i, cache)
-
-		//check non zero VRF field in header and add to local db
-		if len(block.Vrf()) > 0 {
-			vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch())
-			if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
-				utils.Logger().Error().
-					Str("number", chain[i].Number().String()).
-					Str("epoch", block.Header().Epoch().String()).
-					Msg("VRF block number is already in local db")
-			} else {
-				vrfBlockNumbers = append(vrfBlockNumbers, block.NumberU64())
-				err = bc.WriteEpochVrfBlockNums(block.Header().Epoch(), vrfBlockNumbers)
-				if err != nil {
-					utils.Logger().Error().
-						Str("number", chain[i].Number().String()).
-						Str("epoch", block.Header().Epoch().String()).
-						Msg("failed to write VRF block number to local db")
-				}
-			}
-		}
-
-		//check non zero Vdf in header and add to local db
-		if len(block.Vdf()) > 0 {
-			err = bc.WriteEpochVdfBlockNum(block.Header().Epoch(), block.Number())
-			if err != nil {
-				utils.Logger().Error().
-					Str("number", chain[i].Number().String()).
-					Str("epoch", block.Header().Epoch().String()).
-					Msg("failed to write VDF block number to local db")
-			}
-		}
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
@@ -1870,14 +1862,14 @@ func (bc *BlockChain) WriteShardState(
 }
 
 // WriteShardStateBytes saves the given sharding state under the given epoch number.
-func (bc *BlockChain) WriteShardStateBytes(
+func (bc *BlockChain) WriteShardStateBytes(db rawdb.DatabaseWriter,
 	epoch *big.Int, shardState []byte,
 ) error {
 	decodeShardState := shard.State{}
 	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
 		return err
 	}
-	err := rawdb.WriteShardStateBytes(bc.db, epoch, shardState)
+	err := rawdb.WriteShardStateBytes(db, epoch, shardState)
 	if err != nil {
 		return err
 	}
