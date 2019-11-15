@@ -2407,6 +2407,7 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction) erro
 		return err
 	case staking.DirectiveUndelegate:
 	case staking.DirectiveCollectRewards:
+		// TODO: Check whether the delegation reward can be cleared after reward is collected
 	default:
 	}
 	return nil

@@ -18,7 +18,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/reward"
-	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/drand"
@@ -212,9 +211,6 @@ type Node struct {
 
 	// map of service type to its message channel.
 	serviceMessageChan map[service.Type]chan *msg_pb.Message
-
-	// Used to call smart contract locally
-	ContractCaller *contracts.ContractCaller
 
 	accountManager *accounts.Manager
 
@@ -457,7 +453,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 			} else {
 				node.AddContractKeyAndAddress(scFaucet)
 			}
-			node.ContractCaller = contracts.NewContractCaller(node.Blockchain(), node.Blockchain().Config())
 			// Create test keys.  Genesis will later need this.
 			var err error
 			node.TestBankKeys, err = CreateTestBankKeys(TestAccountNumber)

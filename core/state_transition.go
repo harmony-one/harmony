@@ -66,6 +66,7 @@ type StateTransition struct {
 	data       []byte
 	state      vm.StateDB
 	evm        *vm.EVM
+	bc         ChainContext
 }
 
 // Message represents a message sent to a contract.
@@ -119,7 +120,7 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 }
 
 // NewStateTransition initialises and returns a new state transition object.
-func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
+func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) *StateTransition {
 	return &StateTransition{
 		gp:       gp,
 		evm:      evm,
@@ -128,6 +129,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 		value:    msg.Value(),
 		data:     msg.Data(),
 		state:    evm.StateDB,
+		bc:       bc,
 	}
 }
 
@@ -139,12 +141,12 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) ([]byte, uint64, bool, error) {
-	return NewStateTransition(evm, msg, gp).TransitionDb()
+	return NewStateTransition(evm, msg, gp, nil).TransitionDb()
 }
 
 // ApplyStakingMessage computes the new state for staking message
-func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool) (uint64, error) {
-	return NewStateTransition(evm, msg, gp).StakingTransitionDb()
+func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) (uint64, error) {
+	return NewStateTransition(evm, msg, gp, bc).StakingTransitionDb()
 }
 
 // to returns the recipient of the message.
@@ -320,7 +322,11 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		}
 		err = st.applyUndelegateTx(stkMsg)
 	case types.CollectRewards:
-
+		stkMsg := &staking.CollectRewards{}
+		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
+			return 0, err
+		}
+		err = st.applyCollectRewards(stkMsg)
 	default:
 		return 0, staking.ErrInvalidStakingKind
 	}
@@ -462,5 +468,44 @@ func (st *StateTransition) applyUndelegateTx(undelegate *staking.Undelegate) err
 		return errNoDelegationToUndelegate
 	}
 	// TODO: do undelegated token distribution after locking period. (in leader block proposal phase)
+	return nil
+}
+
+func (st *StateTransition) applyCollectRewards(collectRewards *staking.CollectRewards) error {
+	if st.bc == nil {
+		return errors.New("[CollectRewards] No chain context provided")
+	}
+	chainContext := st.bc
+	validators, err := chainContext.ReadValidatorListByDelegator(collectRewards.DelegatorAddress)
+
+	if err != nil {
+		return err
+	}
+
+	totalRewards := big.NewInt(0)
+	for i := range validators {
+		wrapper := st.state.GetStakingInfo(validators[i])
+		if wrapper == nil {
+			return errValidatorNotExist
+		}
+
+		// TODO: add the index of the validator-delegation position in the ReadValidatorListByDelegator record to avoid looping
+		for j := range wrapper.Delegations {
+			delegation := wrapper.Delegations[j]
+			if bytes.Equal(delegation.DelegatorAddress.Bytes(), collectRewards.DelegatorAddress.Bytes()) {
+				if delegation.Reward.Cmp(big.NewInt(0)) > 0 {
+					totalRewards.Add(totalRewards, delegation.Reward)
+				}
+
+				delegation.Reward.SetUint64(0)
+				break
+			}
+		}
+		err = st.state.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
+		if err != nil {
+			return err
+		}
+	}
+	st.state.AddBalance(collectRewards.DelegatorAddress, totalRewards)
 	return nil
 }

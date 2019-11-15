@@ -35,6 +35,9 @@ type ChainContext interface {
 
 	// GetHeader returns the hash corresponding to their hash.
 	GetHeader(common.Hash, uint64) *block.Header
+
+	// ReadValidatorListByDelegator returns the validators list of a delegator
+	ReadValidatorListByDelegator(common.Address) ([]common.Address, error)
 }
 
 // NewEVMContext creates a new context for use in the EVM.
