@@ -23,6 +23,8 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -727,9 +729,39 @@ func (db *DB) IsValidator(addr common.Address) bool {
 	return so.IsValidator(db.db)
 }
 
-func (db *DB) AddReward(validator common.Address, reward *big.Int) {
-	//TODO: implement reward logic
-	// the reward will be distributed to all the delegators based on stake percentage.
+// AddReward distributes the reward to all the delegators based on stake percentage.
+func (db *DB) AddReward(validator common.Address, reward *big.Int) error {
+	rewardPool := big.NewInt(0).Set(reward)
+
+	wrapper := db.GetStakingInfo(validator)
+	if wrapper == nil {
+		return errors.New("failed to distribute rewards: validator does not exist")
+	}
+
+	// Payout commission
+	commissionInt := wrapper.Validator.CommissionRates.Rate.MulInt(reward).RoundInt()
+	wrapper.Delegations[0].Reward.Add(wrapper.Delegations[0].Reward, commissionInt)
+	rewardPool.Sub(rewardPool, commissionInt)
+
+	totalRewardForDelegators := big.NewInt(0).Set(rewardPool)
+
+	// Payout each delegator's reward pro-rata
+	totalDelegationDec := numeric.NewDecFromBigInt(wrapper.TotalDelegation())
+	for i := range wrapper.Delegations {
+		delegation := wrapper.Delegations[i]
+		percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec) // percentage = <this_delegator_amount>/<total_delegation>
+		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
+
+		delegation.Reward.Add(delegation.Reward, rewardInt)
+		rewardPool.Sub(rewardPool, rewardInt)
+	}
+
+	// The last remaining bit belongs to the validator (remember the validator's self delegation is always at index 0)
+	if rewardPool.Cmp(big.NewInt(0)) > 0 {
+		wrapper.Delegations[0].Reward.Add(wrapper.Delegations[0].Reward, rewardPool)
+	}
+
+	return db.UpdateStakingInfo(validator, wrapper)
 }
 
 func (db *DB) CollectReward(delegator common.Address) {

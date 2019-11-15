@@ -68,6 +68,15 @@ func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
 	return str
 }
 
+// TotalDelegation - return the total amount of token in delegation
+func (w *ValidatorWrapper) TotalDelegation() *big.Int {
+	total := big.NewInt(0)
+	for _, entry := range w.Delegations {
+		total.Add(total, entry.Amount)
+	}
+	return total
+}
+
 // Description - some possible IRL connections
 type Description struct {
 	Name            string `json:"name" yaml:"name"`                         // name
@@ -157,6 +166,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator) (*Validator, error) {
 	commission := Commission{val.CommissionRates, new(big.Int)}
 	pubKeys := []shard.BlsPublicKey{}
 	pubKeys = append(pubKeys, val.SlotPubKeys...)
+	// TODO: a new validator should have a minimum of 1 token as self delegation, and that should be added as a delegation entry here.
 	v := Validator{val.ValidatorAddress, pubKeys,
 		val.Amount, new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
 		commission, desc, big.NewInt(0)}

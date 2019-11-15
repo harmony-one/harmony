@@ -18,6 +18,7 @@ var (
 type Delegation struct {
 	DelegatorAddress common.Address       `json:"delegator_address" yaml:"delegator_address"`
 	Amount           *big.Int             `json:"amount" yaml:"amount"`
+	Reward           *big.Int             `json:"reward" yaml:"reward"`
 	Entries          []*UndelegationEntry `json:"entries" yaml:"entries"`
 }
 
