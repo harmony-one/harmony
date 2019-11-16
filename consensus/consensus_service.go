@@ -428,7 +428,7 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 		)
 	}
 	committerKey := new(bls.PublicKey)
-	for _, member := range committee.NodeList {
+	for _, member := range committee.Slots {
 		if member.EcdsaAddress == header.Coinbase() {
 			err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 			if err != nil {

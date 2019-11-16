@@ -36,9 +36,6 @@ var (
 type ValidatorWrapper struct {
 	Validator   `json:"validator" yaml:"validator" rlp:"nil"`
 	Delegations []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
-	// TODO: move snapshot into off-chain db.
-	SnapshotValidator   *Validator   `json:"snapshot_validator" yaml:"snaphost_validator" rlp:"nil"`
-	SnapshotDelegations []Delegation `json:"snapshot_delegations" yaml:"snapshot_delegations" rlp:"nil"`
 }
 
 // Validator - data fields for a validator

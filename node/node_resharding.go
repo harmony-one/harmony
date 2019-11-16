@@ -201,7 +201,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.State) {
 	for _, c := range shardState {
 		utils.Logger().Debug().
 			Uint32("shardID", c.ShardID).
-			Str("nodeList", c.NodeList).
+			Str("nodeList", c.Slots).
          Msg("new shard information")
 	}
 	myShardID, isNextLeader := findRoleInShardState(
@@ -219,7 +219,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.State) {
 
 	// Update public keys
 	var publicKeys []*bls.PublicKey
-	for idx, nodeID := range myShardState.NodeList {
+	for idx, nodeID := range myShardState.Slots {
 		key := &bls.PublicKey{}
 		err := key.Deserialize(nodeID.BlsPublicKey[:])
 		if err != nil {
@@ -249,7 +249,7 @@ func findRoleInShardState(
 ) (shardID uint32, isLeader bool) {
 	keyBytes := key.Serialize()
 	for idx, shard := range state {
-		for nodeIdx, nodeID := range shard.NodeList {
+		for nodeIdx, nodeID := range shard.Slots {
 			if bytes.Compare(nodeID.BlsPublicKey[:], keyBytes) == 0 {
 				return uint32(idx), nodeIdx == 0
 			}

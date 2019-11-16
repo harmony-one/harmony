@@ -40,8 +40,8 @@ type ChainReader interface {
 	// Thus, only should be used to read the shard state of the current chain.
 	ReadShardState(epoch *big.Int) (shard.State, error)
 
-	// CurrentValidatorAddresses retrieves the current list of validators
-	CurrentValidatorAddresses() []common.Address
+	// ActiveValidatorAddresses retrieves the list of active validators
+	ActiveValidatorAddresses() []common.Address
 }
 
 // Engine is an algorithm agnostic consensus engine.

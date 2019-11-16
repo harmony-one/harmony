@@ -179,7 +179,7 @@ func (e *engineImpl) Finalize(
 	// Only do such at the last block of an epoch
 	if len(header.ShardState()) > 0 {
 		// TODO: make sure we are using the correct validator list
-		validators := chain.CurrentValidatorAddresses()
+		validators := chain.ActiveValidatorAddresses()
 		for _, validator := range validators {
 			wrapper := state.GetStakingInfo(validator)
 			if wrapper != nil {
@@ -227,7 +227,7 @@ func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool)
 		return 0, errors.Errorf(
 			"cannot find shard %d in shard state", h.ShardID())
 	}
-	return (len(c.NodeList))*2/3 + 1, nil
+	return (len(c.Slots))*2/3 + 1, nil
 }
 
 // Similiar to VerifyHeader, which is only for verifying the block headers of one's own chain, this verification
@@ -289,7 +289,7 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 		)
 	}
 	var committerKeys []*bls.PublicKey
-	for _, member := range committee.NodeList {
+	for _, member := range committee.Slots {
 		committerKey := new(bls.PublicKey)
 		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {
