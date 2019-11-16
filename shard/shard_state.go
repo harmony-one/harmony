@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
