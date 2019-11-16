@@ -395,8 +395,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			priKey.DeserializeHexStr(priv)
 			fmt.Println("new-pair", pair)
 
-			node.NodeConfig.ConsensusPriKey = &priKey
-			node.NodeConfig.ConsensusPubKey = &pubKey
+			// node.NodeConfig.ConsensusPriKey = &priKey
+			// node.NodeConfig.ConsensusPubKey = &pubKey
 
 			node.Consensus.PubKey = &pubKey
 			node.Consensus.SetPrivateKey(&priKey)

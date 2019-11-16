@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -316,21 +317,21 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	senderKey, err := consensus.verifySenderKey(msg)
-	// fmt.Println("prepare-sender-key", senderKey.SerializeToHexStr())
+	fmt.Println("prepare-sender-key", senderKey.SerializeToHexStr())
 
 	// for _, v := range consensus.Decider.DumpParticipants() {
 	// 	fmt.Println("in-committee-", consensus.ShardID, v)
 	// }
 
 	if err != nil {
-		fmt.Println("On Prepare is busted =/")
+		fmt.Println("On Prepare is busted =/", err)
 
-		// type t struct {
-		// 	Participants []string `json:"committee-members"`
-		// 	ShardID      uint32   `json:"shard-id"`
-		// }
-		// b, _ := json.Marshal(t{consensus.Decider.DumpParticipants(), consensus.ShardID})
-		// fmt.Println(string(b))
+		type t struct {
+			Participants []string `json:"committee-members"`
+			ShardID      uint32   `json:"shard-id"`
+		}
+		b, _ := json.Marshal(t{consensus.Decider.DumpParticipants(), consensus.ShardID})
+		fmt.Println(string(b))
 
 		utils.Logger().Error().Err(err).Msg("[OnPrepare] VerifySenderKey failed")
 		return

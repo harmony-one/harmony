@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -170,7 +171,7 @@ func eposStakedCommittee(
 			&slot.Dec,
 		})
 	}
-
+	fmt.Println("epos-comm", superComm.JSON())
 	return superComm, nil
 }
 
@@ -183,7 +184,10 @@ func (def partialStakingEnabled) ComputePublicKeys(
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	superComm := shard.State{}
 	if config.IsStaking(epoch) {
-		superComm, _ = eposStakedCommittee(instance, d, 320)
+		stakedSlots :=
+			(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
+				int(instance.NumShards())
+		superComm, _ = eposStakedCommittee(instance, d, stakedSlots)
 	} else {
 		superComm = preStakingEnabledCommittee(instance)
 	}
