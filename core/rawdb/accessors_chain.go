@@ -542,7 +542,7 @@ func WriteShardLastCrossLink(db DatabaseWriter, shardID uint32, data []byte) err
 // ReadCXReceipts retrieves all the transactions of receipts given destination shardID, number and blockHash
 func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash, temp bool) (types.CXReceipts, error) {
 	data, err := db.Get(cxReceiptKey(shardID, number, hash, temp))
-	if len(data) == 0 || err != nil {
+	if err != nil || len(data) == 0 {
 		utils.Logger().Info().Err(err).Uint64("number", number).Int("dataLen", len(data)).Msg("ReadCXReceipts")
 		return nil, err
 	}
@@ -617,7 +617,7 @@ func WriteCXReceiptsProofUnspentCheckpoint(db DatabaseWriter, shardID uint32, bl
 // ReadValidatorData retrieves staking validator by its address
 func ReadValidatorData(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
 	data, err := db.Get(validatorKey(addr))
-	if len(data) == 0 || err != nil {
+	if err != nil || len(data) == 0 {
 		utils.Logger().Info().Err(err).Msg("ReadValidatorData")
 		return nil, err
 	}
@@ -646,7 +646,7 @@ func WriteValidatorData(db DatabaseWriter, v *staking.ValidatorWrapper) error {
 // ReadValidatorSnapshot retrieves validator's snapshot by its address
 func ReadValidatorSnapshot(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
 	data, err := db.Get(validatorSnapshotKey(addr))
-	if len(data) == 0 || err != nil {
+	if err != nil || len(data) == 0 {
 		utils.Logger().Info().Err(err).Msg("ReadValidatorSnapshot")
 		return nil, err
 	}
@@ -687,7 +687,7 @@ func ReadValidatorList(db DatabaseReader, isActive bool) ([]common.Address, erro
 		key = activeValidatorListKey
 	}
 	data, err := db.Get(key)
-	if len(data) == 0 || err != nil {
+	if err != nil || len(data) == 0 {
 		return []common.Address{}, nil
 	}
 	addrs := []common.Address{}
@@ -719,7 +719,7 @@ func WriteValidatorList(db DatabaseWriter, addrs []common.Address, isActive bool
 // ReadValidatorListByDelegator retrieves the list of validators delegated by a delegator
 func ReadValidatorListByDelegator(db DatabaseReader, delegator common.Address) ([]common.Address, error) {
 	data, err := db.Get(delegatorValidatorListKey(delegator))
-	if len(data) == 0 || err != nil {
+	if err != nil || len(data) == 0 {
 		return []common.Address{}, nil
 	}
 	addrs := []common.Address{}
