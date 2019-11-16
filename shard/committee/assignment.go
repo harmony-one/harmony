@@ -1,7 +1,6 @@
 package committee
 
 import (
-	"fmt"
 	"math/big"
 	"sort"
 
@@ -18,9 +17,9 @@ import (
 )
 
 const (
-	// StateID means reading off whole network when using calls that accept
+	// SuperCommittee means reading off whole network when using calls that accept
 	// a shardID parameter
-	StateID = -1
+	SuperCommittee = -1
 )
 
 // ValidatorListProvider ..
@@ -148,15 +147,11 @@ func eposStakedCommittee(
 	}
 
 	shardCount := int(s.NumShards())
-	maxNodePerShard := s.NumNodesPerShard()
 	superComm := make(shard.State, shardCount)
-	fillCount := make([]int, shardCount)
 	hAccounts := s.HmyAccounts()
 
 	for i := 0; i < shardCount; i++ {
-		superComm[i] = shard.Committee{
-			uint32(i), make(shard.NodeIDList, s.NumNodesPerShard()),
-		}
+		superComm[i] = shard.Committee{uint32(i), shard.NodeIDList{}}
 	}
 
 	for i := range hAccounts {
@@ -165,12 +160,11 @@ func eposStakedCommittee(
 		pub.DeserializeHexStr(hAccounts[i].BlsPublicKey)
 		pubKey := shard.BlsPublicKey{}
 		pubKey.FromLibBLSPublicKey(pub)
-		superComm[spot].NodeList[fillCount[spot]] = shard.NodeID{
+		superComm[spot].NodeList = append(superComm[spot].NodeList, shard.NodeID{
 			common2.ParseAddr(hAccounts[i].Address),
 			pubKey,
 			nil,
-		}
-		fillCount[spot]++
+		})
 	}
 
 	staked := effective.Apply(essentials)
@@ -182,8 +176,9 @@ func eposStakedCommittee(
 
 	shardBig := big.NewInt(int64(shardCount))
 
-	if len(staked) <= stakedSlotsCount {
+	if l := len(staked); l < stakedSlotsCount {
 		// WARN unlikely to happen in production but will happen as we are developing
+		stakedSlotsCount = l
 	}
 
 	for i := 0; i < stakedSlotsCount; i++ {
@@ -191,18 +186,11 @@ func eposStakedCommittee(
 		slot := staked[i]
 		pubKey := essentials[slot.Address].SpreadAmong[slotUsage[slot.Address]-1]
 		slotUsage[slot.Address]--
-		// Keep going round till find an open spot
-		for j := bucket; ; j = (j + 1) % shardCount {
-			if fillCount[j] != maxNodePerShard {
-				superComm[j].NodeList[fillCount[j]] = shard.NodeID{
-					slot.Address,
-					pubKey,
-					&slot.Dec,
-				}
-				fillCount[j]++
-				break
-			}
-		}
+		superComm[bucket].NodeList = append(superComm[bucket].NodeList, shard.NodeID{
+			slot.Address,
+			pubKey,
+			&slot.Dec,
+		})
 	}
 
 	return superComm, nil
@@ -227,18 +215,12 @@ func (def partialStakingEnabled) ComputePublicKeys(
 	}
 
 	spot := 0
-	shouldBe := int(instance.NumShards()) * instance.NumNodesPerShard()
-
 	total := 0
 	for i := range superComm {
 		total += len(superComm[i].NodeList)
 	}
 
-	if shouldBe != total {
-		fmt.Println("Count mismatch", shouldBe, total)
-	}
-
-	allIdentities := make([]*bls.PublicKey, shouldBe)
+	allIdentities := make([]*bls.PublicKey, total)
 	for i := range superComm {
 		for j := range superComm[i].NodeList {
 			identity := &bls.PublicKey{}
@@ -248,7 +230,7 @@ func (def partialStakingEnabled) ComputePublicKeys(
 		}
 	}
 
-	if shardID == StateID {
+	if shardID == SuperCommittee {
 		return allIdentities, nil
 	}
 

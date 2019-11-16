@@ -1,6 +1,7 @@
 package effective
 
 import (
+	"encoding/json"
 	"math/big"
 	"sort"
 
@@ -37,6 +38,15 @@ type SlotOrder struct {
 
 // Slots ..
 type Slots []SlotPurchase
+
+// JSON is a plain JSON dump
+func (s Slots) JSON() string {
+	type t struct {
+		Slots []SlotPurchase `json:"slots"`
+	}
+	b, _ := json.Marshal(t{s})
+	return string(b)
+}
 
 func median(stakes []SlotPurchase) numeric.Dec {
 	sort.SliceStable(
@@ -80,12 +90,12 @@ func Apply(shortHand map[common.Address]SlotOrder) Slots {
 	if l := len(eposedSlots); l < pull {
 		pull = l
 	}
+	picks := eposedSlots[:pull]
+	median := median(picks)
 
-	median := median(eposedSlots[:pull])
-
-	for i := range eposedSlots {
-		eposedSlots[i].Dec = stake(median, eposedSlots[i].Dec)
+	for i := range picks {
+		picks[i].Dec = stake(median, picks[i].Dec)
 	}
 
-	return eposedSlots
+	return picks
 }
