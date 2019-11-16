@@ -701,6 +701,10 @@ func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
 
 // UpdateStakingInfo update staking information of a given validator (including delegation info)
 func (db *DB) UpdateStakingInfo(addr common.Address, val *stk.ValidatorWrapper) error {
+	if err := val.SanityCheck(); err != nil {
+		return err
+	}
+
 	by, err := rlp.EncodeToBytes(val)
 	if err != nil {
 		return err

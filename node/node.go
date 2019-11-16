@@ -445,7 +445,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
-		// TODO (leo): we need to have support of cross-shard tx later so that the token can be transferred from beacon chain shard to other tx shards.
 		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 			if node.isFirstTime {
 				// Setup one time smart contracts

@@ -37,6 +37,10 @@ var (
 	errValidatorExist              = errors.New("staking validator already exists")
 	errValidatorNotExist           = errors.New("staking validator does not exist")
 	errNoDelegationToUndelegate    = errors.New("no delegation to undelegate")
+	errInvalidSelfDelegation       = errors.New("self delegation can not be less than min_self_delegation")
+	errInvalidTotalDelegation      = errors.New("total delegation can not be bigger than max_total_delegation")
+	errMinSelfDelegationTooSmall   = errors.New("min_self_delegation has to be greater than 1 ONE")
+	errInvalidMaxTotalDelegation   = errors.New("max_total_delegation can not be less than min_self_delegation")
 )
 
 /*
@@ -281,7 +285,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
 
 	// Pay intrinsic gas
-	// TODO: add new formula for staking transaction
+	// TODO: propose staking-specific formula for staking transaction
 	gas, err := IntrinsicGas(st.data, false, homestead)
 	if err != nil {
 		return 0, err
@@ -335,18 +339,21 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	return st.gasUsed(), err
 }
 
-func (st *StateTransition) applyCreateValidatorTx(nv *staking.CreateValidator, blockNum *big.Int) error {
-	if st.state.IsValidator(nv.ValidatorAddress) {
+func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.CreateValidator, blockNum *big.Int) error {
+	if st.state.IsValidator(createValidator.ValidatorAddress) {
 		return errValidatorExist
 	}
-	// TODO: move balance into staking
-	v, err := staking.CreateValidatorFromNewMsg(nv)
+
+	v, err := staking.CreateValidatorFromNewMsg(createValidator, blockNum)
 	if err != nil {
 		return err
 	}
-	v.UpdateHeight = blockNum
-	v.CreationHeight = blockNum
-	wrapper := staking.ValidatorWrapper{*v, nil, nil, nil}
+
+	delegations := []staking.Delegation{}
+	delegations = append(delegations, staking.NewDelegation(v.Address, createValidator.Amount))
+
+	wrapper := staking.ValidatorWrapper{*v, delegations, nil, nil}
+
 	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
 		return err
 	}
@@ -426,7 +433,7 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 
 	if !delegatorExist {
 		if CanTransfer(stateDB, delegate.DelegatorAddress, delegate.Amount) {
-			newDelegator := staking.Delegation{DelegatorAddress: delegate.DelegatorAddress, Amount: delegate.Amount}
+			newDelegator := staking.NewDelegation(delegate.DelegatorAddress, delegate.Amount)
 			wrapper.Delegations = append(wrapper.Delegations, newDelegator)
 
 			if err := stateDB.UpdateStakingInfo(wrapper.Validator.Address, wrapper); err == nil {
