@@ -70,7 +70,18 @@ func Apply(shortHand map[common.Address]SlotOrder) Slots {
 	if len(eposedSlots) < len(shortHand) {
 		// WARN Should never happen
 	}
-	median := median(eposedSlots)
+
+	sort.SliceStable(
+		eposedSlots,
+		func(i, j int) bool { return eposedSlots[i].Dec.GTE(eposedSlots[j].Dec) },
+	)
+
+	pull := 320
+	if l := len(eposedSlots); l < pull {
+		pull = l
+	}
+
+	median := median(eposedSlots[:pull])
 
 	for i := range eposedSlots {
 		eposedSlots[i].Dec = stake(median, eposedSlots[i].Dec)
