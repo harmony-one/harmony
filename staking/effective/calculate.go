@@ -64,7 +64,7 @@ func median(stakes []SlotPurchase) numeric.Dec {
 }
 
 // Apply ..
-func Apply(shortHand map[common.Address]SlotOrder) Slots {
+func Apply(shortHand map[common.Address]SlotOrder, pull int) Slots {
 	eposedSlots := Slots{}
 	if len(shortHand) == 0 {
 		return eposedSlots
@@ -72,7 +72,8 @@ func Apply(shortHand map[common.Address]SlotOrder) Slots {
 	// Expand
 	for staker := range shortHand {
 		slotsCount := len(shortHand[staker].SpreadAmong)
-		spread := numeric.NewDecFromBigInt(shortHand[staker].Stake).QuoInt64(int64(slotsCount))
+		spread := numeric.NewDecFromBigInt(shortHand[staker].Stake).
+			QuoInt64(int64(slotsCount))
 		for i := 0; i < slotsCount; i++ {
 			eposedSlots = append(eposedSlots, SlotPurchase{
 				staker,
@@ -90,7 +91,6 @@ func Apply(shortHand map[common.Address]SlotOrder) Slots {
 		func(i, j int) bool { return eposedSlots[i].Dec.GT(eposedSlots[j].Dec) },
 	)
 
-	pull := 320
 	if l := len(eposedSlots); l < pull {
 		pull = l
 	}
