@@ -18,7 +18,7 @@ var (
 	oneMinusC = numeric.OneDec().Sub(c)
 )
 
-func stake(median, actual numeric.Dec) numeric.Dec {
+func effectiveStake(median, actual numeric.Dec) numeric.Dec {
 	left := numeric.MinDec(onePlusC.Mul(median), actual)
 	right := oneMinusC.Mul(median)
 	return numeric.MaxDec(left, right)
@@ -26,8 +26,9 @@ func stake(median, actual numeric.Dec) numeric.Dec {
 
 // SlotPurchase ..
 type SlotPurchase struct {
-	common.Address `json:"slot-owner"`
-	numeric.Dec    `json:"eposed-stake"`
+	common.Address     `json:"slot-owner"`
+	shard.BlsPublicKey `json:"bls-public-key"`
+	numeric.Dec        `json:"eposed-stake"`
 }
 
 // SlotOrder ..
@@ -70,11 +71,14 @@ func Apply(shortHand map[common.Address]SlotOrder) Slots {
 	}
 	// Expand
 	for staker := range shortHand {
-		slotsCount := int64(len(shortHand[staker].SpreadAmong))
-		spread := numeric.NewDecFromBigInt(shortHand[staker].Stake).QuoInt64(slotsCount)
-		var i int64
-		for ; i < slotsCount; i++ {
-			eposedSlots = append(eposedSlots, SlotPurchase{staker, spread})
+		slotsCount := len(shortHand[staker].SpreadAmong)
+		spread := numeric.NewDecFromBigInt(shortHand[staker].Stake).QuoInt64(int64(slotsCount))
+		for i := 0; i < slotsCount; i++ {
+			eposedSlots = append(eposedSlots, SlotPurchase{
+				staker,
+				shortHand[staker].SpreadAmong[i],
+				spread,
+			})
 		}
 	}
 	if len(eposedSlots) < len(shortHand) {
@@ -83,7 +87,7 @@ func Apply(shortHand map[common.Address]SlotOrder) Slots {
 
 	sort.SliceStable(
 		eposedSlots,
-		func(i, j int) bool { return eposedSlots[i].Dec.GTE(eposedSlots[j].Dec) },
+		func(i, j int) bool { return eposedSlots[i].Dec.GT(eposedSlots[j].Dec) },
 	)
 
 	pull := 320
@@ -94,7 +98,7 @@ func Apply(shortHand map[common.Address]SlotOrder) Slots {
 	median := median(picks)
 
 	for i := range picks {
-		picks[i].Dec = stake(median, picks[i].Dec)
+		picks[i].Dec = effectiveStake(median, picks[i].Dec)
 	}
 
 	return picks

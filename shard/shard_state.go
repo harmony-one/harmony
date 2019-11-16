@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -116,6 +117,11 @@ func CompareShardState(s1, s2 State) int {
 		return +1
 	}
 	return 0
+}
+
+// Big ..
+func (pk BlsPublicKey) Big() *big.Int {
+	return new(big.Int).SetBytes(pk[:])
 }
 
 // IsEmpty returns whether the bls public key is empty 0 bytes
