@@ -2343,7 +2343,7 @@ func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.Valid
 }
 
 // WriteValidatorSnapshots writes the snapshot of provided list of validators
-func (bc *BlockChain) WriteValidatorsSnapshot(addrs []common.Address) error {
+func (bc *BlockChain) WriteValidatorSnapshots(addrs []common.Address) error {
 	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
 	for _, addr := range addrs {
@@ -2376,8 +2376,8 @@ func (bc *BlockChain) WriteValidatorsSnapshot(addrs []common.Address) error {
 	return nil
 }
 
-// DeleteValidatorData deletes the snapshot staking information of given validator address
-func (bc *BlockChain) DeleteValidatorsSnapshot(addrs []common.Address) error {
+// DeleteValidatorSnapshots deletes the snapshot staking information of given validator address
+func (bc *BlockChain) DeleteValidatorSnapshots(addrs []common.Address) error {
 	batch := bc.db.NewBatch()
 	for i := range addrs {
 		rawdb.DeleteValidatorSnapshot(batch, addrs[i])
@@ -2398,12 +2398,12 @@ func (bc *BlockChain) UpdateActiveValidatorsSnapshot(activeValidators []common.A
 		return err
 	}
 
-	err = bc.DeleteValidatorsSnapshot(prevActiveValidators)
+	err = bc.DeleteValidatorSnapshots(prevActiveValidators)
 	if err != nil {
 		return err
 	}
 
-	if err = bc.WriteValidatorsSnapshot(activeValidators); err != nil {
+	if err = bc.WriteValidatorSnapshots(activeValidators); err != nil {
 		return err
 	}
 	return nil
