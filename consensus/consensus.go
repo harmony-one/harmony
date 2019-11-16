@@ -160,6 +160,11 @@ func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
 	consensus.delayCommit = delay
 }
 
+// SetPrivateKey sets the private key used for message signing in consensus
+func (consensus *Consensus) SetPrivateKey(priKey *bls.SecretKey) {
+	consensus.priKey = priKey
+}
+
 // DisableViewChangeForTestingOnly makes the receiver not propose view
 // changes when it should, e.g. leader timeout.
 //
