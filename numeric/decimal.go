@@ -1,5 +1,7 @@
 package numeric
 
+// Incorporated from cosmos-sdk
+
 import (
 	"encoding/json"
 	"errors"
@@ -7,7 +9,6 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
-	"testing"
 )
 
 // Dec represent a decimal. NOTE: never use new(Dec) or else we will panic unmarshalling into the
@@ -540,50 +541,10 @@ func (d Dec) Ceil() Dec {
 
 //___________________________________________________________________________________
 
-// reuse nil values
-var (
-	nilAmino string
-	nilJSON  []byte
-)
-
-func init() {
-	empty := new(big.Int)
-	bz, err := empty.MarshalText()
-	if err != nil {
-		panic("bad nil amino init")
-	}
-	nilAmino = string(bz)
-
-	nilJSON, err = json.Marshal(string(bz))
-	if err != nil {
-		panic("bad nil json init")
-	}
-}
-
-// MarshalAmino wraps d.MarshalText()
-func (d Dec) MarshalAmino() (string, error) {
-	if d.Int == nil {
-		return nilAmino, nil
-	}
-	bz, err := d.Int.MarshalText()
-	return string(bz), err
-}
-
-// UnmarshalAmino requires a valid JSON string - strings quotes and calls UnmarshalText
-func (d *Dec) UnmarshalAmino(text string) (err error) {
-	tempInt := new(big.Int)
-	err = tempInt.UnmarshalText([]byte(text))
-	if err != nil {
-		return err
-	}
-	d.Int = tempInt
-	return nil
-}
-
 // MarshalJSON marshals the decimal
 func (d Dec) MarshalJSON() ([]byte, error) {
 	if d.Int == nil {
-		return nilJSON, nil
+		return []byte{}, nil
 	}
 
 	return json.Marshal(d.String())
@@ -643,9 +604,4 @@ func MaxDec(d1, d2 Dec) Dec {
 		return d2
 	}
 	return d1
-}
-
-// DecEq intended to be used with require/assert:  require.True(DecEq(...))
-func DecEq(t *testing.T, exp, got Dec) (*testing.T, bool, string, string, string) {
-	return t, exp.Equal(got), "expected:\t%v\ngot:\t\t%v", exp.String(), got.String()
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -67,8 +67,8 @@ type Validator struct {
 
 func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
 	str := "["
-	for i, key := range pubKeys {
-		str += fmt.Sprintf("%d: %s,", i, key.Hex())
+	for i := range pubKeys {
+		str += fmt.Sprintf("%d: %s,", i, pubKeys[i].Hex())
 	}
 	str += "]"
 	return str
@@ -198,8 +198,10 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	commission := Commission{val.CommissionRates, blockNum}
 	pubKeys := []shard.BlsPublicKey{}
 	pubKeys = append(pubKeys, val.SlotPubKeys...)
+
 	// TODO: a new validator should have a minimum of 1 token as self delegation, and that should be added as a delegation entry here.
-	v := Validator{val.ValidatorAddress, pubKeys,
+	v := Validator{
+		val.ValidatorAddress, pubKeys,
 		val.Amount, new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
 		commission, desc, blockNum}
 	return &v, nil
@@ -268,7 +270,9 @@ func (v *Validator) String() string {
   Unbonding Height:           %v
   Minimum SelfDelegation:     %v
   Description:                %v
-  Commission:                 %v`, v.Address.Hex(), printSlotPubKeys(v.SlotPubKeys),
+  Commission:                 %v`,
+		common2.MustAddressToBech32(v.Address), printSlotPubKeys(v.SlotPubKeys),
 		v.Stake, v.UnbondingHeight,
-		v.MinSelfDelegation, v.Description, v.Commission)
+		v.MinSelfDelegation, v.Description, v.Commission,
+	)
 }

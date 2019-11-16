@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/numeric"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -27,12 +28,6 @@ type EpochShardState struct {
 	ShardState State
 }
 
-// StakedMember is a committee member with stake
-type StakedMember struct {
-	// nil means not active, 0 means our node, >= 0 means staked node
-	WithDelegationApplied *big.Int `json:"with-delegation-applied,omitempty"`
-}
-
 // State is the collection of all committees
 type State []Committee
 
@@ -41,9 +36,10 @@ type BlsPublicKey [PublicKeySizeInBytes]byte
 
 // NodeID represents node id (BLS address)
 type NodeID struct {
-	EcdsaAddress common.Address `json:"ecdsa_address"`
-	BlsPublicKey BlsPublicKey   `json:"bls_pubkey"`
-	Validator    *StakedMember  `json:"staked-validator,omitempty" rlp:"nil"`
+	EcdsaAddress common.Address `json:"ecdsa-address"`
+	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
+	// nil means not active, 0 means our node, >= 0 means staked node
+	StakeWithDelegationApplied *numeric.Dec `json:"staked-validator" rlp:"nil"`
 }
 
 // NodeIDList is a list of NodeIDList.
@@ -51,44 +47,44 @@ type NodeIDList []NodeID
 
 // Committee contains the active nodes in one shard
 type Committee struct {
-	ShardID  uint32     `json:"shard_id"`
-	NodeList NodeIDList `json:"node_list"`
+	ShardID  uint32     `json:"shard-id"`
+	NodeList NodeIDList `json:"subcommittee"`
 }
 
 // JSON produces a non-pretty printed JSON string of the SuperCommittee
 func (ss State) JSON() string {
-	type V struct {
-		ECDSAAddress common.Address `json:"ecdsa_address"`
-		BLSPublicKey string         `json:"bls-public-key"`
+	type t struct {
+		NodeID
+		EcdsaAddress string `json:"one-address"`
 	}
-
-	type T struct {
-		ShardID  uint32 `json:"shard_id"`
-		Total    int    `json:"count"`
-		NodeList []V    `json:"entries"`
+	type v struct {
+		Committee
+		Count    int `json:"member-count"`
+		NodeList []t `json:"subcommittee"`
 	}
-	t := []T{}
+	dump := make([]v, len(ss))
 	for i := range ss {
-		sub := ss[i]
-		subList := []V{}
-		for j := range sub.NodeList {
-			subList = append(subList, V{
-				sub.NodeList[j].EcdsaAddress,
-				sub.NodeList[j].BlsPublicKey.Hex(),
-			})
+		c := len(ss[i].NodeList)
+		dump[i].ShardID = ss[i].ShardID
+		dump[i].NodeList = make([]t, c)
+		dump[i].Count = c
+		for j := range ss[i].NodeList {
+			n := ss[i].NodeList[j]
+			dump[i].NodeList[j].BlsPublicKey = n.BlsPublicKey
+			dump[i].NodeList[j].StakeWithDelegationApplied = n.StakeWithDelegationApplied
+			dump[i].NodeList[j].EcdsaAddress = common2.MustAddressToBech32(n.EcdsaAddress)
 		}
-		t = append(t, T{sub.ShardID, len(sub.NodeList), subList})
 	}
-	buf, _ := json.Marshal(t)
+	buf, _ := json.Marshal(dump)
 	return string(buf)
 }
 
 // FindCommitteeByID returns the committee configuration for the given shard,
 // or nil if the given shard is not found.
 func (ss State) FindCommitteeByID(shardID uint32) *Committee {
-	for _, committee := range ss {
-		if committee.ShardID == shardID {
-			return &committee
+	for committee := range ss {
+		if ss[committee].ShardID == shardID {
+			return &ss[committee]
 		}
 	}
 	return nil
@@ -123,6 +119,11 @@ func CompareShardState(s1, s2 State) int {
 	return 0
 }
 
+// Big ..
+func (pk BlsPublicKey) Big() *big.Int {
+	return new(big.Int).SetBytes(pk[:])
+}
+
 // IsEmpty returns whether the bls public key is empty 0 bytes
 func (pk BlsPublicKey) IsEmpty() bool {
 	return bytes.Compare(pk[:], emptyBlsPubKey[:]) == 0
@@ -131,6 +132,15 @@ func (pk BlsPublicKey) IsEmpty() bool {
 // Hex returns the hex string of bls public key
 func (pk BlsPublicKey) Hex() string {
 	return hex.EncodeToString(pk[:])
+}
+
+// MarshalJSON ..
+func (pk BlsPublicKey) MarshalJSON() ([]byte, error) {
+	buf := bytes.Buffer{}
+	buf.WriteString(`"`)
+	buf.WriteString(pk.Hex())
+	buf.WriteString(`"`)
+	return buf.Bytes(), nil
 }
 
 // FromLibBLSPublicKey replaces the key contents with the given key,
