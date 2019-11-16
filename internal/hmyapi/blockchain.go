@@ -153,7 +153,7 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 		return nil, err
 	}
 	validators := make([]map[string]interface{}, 0)
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		validatorBalance := new(hexutil.Big)
 		validatorBalance, err = s.b.GetBalance(validator.EcdsaAddress)
 		if err != nil {
@@ -193,8 +193,8 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 	if err != nil {
 		return nil, err
 	}
-	pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-	for i, validator := range committee.NodeList {
+	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+	for i, validator := range committee.Slots {
 		pubkeys[i] = new(bls.PublicKey)
 		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
@@ -210,7 +210,7 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 	if err != nil {
 		return result, err
 	}
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return result, err
@@ -241,8 +241,8 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 	if err != nil {
 		return false, err
 	}
-	pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-	for i, validator := range committee.NodeList {
+	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+	for i, validator := range committee.Slots {
 		pubkeys[i] = new(bls.PublicKey)
 		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
@@ -254,7 +254,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 	if err != nil {
 		return false, err
 	}
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return false, err

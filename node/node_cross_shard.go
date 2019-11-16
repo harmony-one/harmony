@@ -298,7 +298,7 @@ func (node *Node) VerifyCrosslinkHeader(prevHeader, header *block.Header) error 
 	var committerKeys []*bls.PublicKey
 
 	parseKeysSuccess := true
-	for _, member := range committee.NodeList {
+	for _, member := range committee.Slots {
 		committerKey := new(bls.PublicKey)
 		err = member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {

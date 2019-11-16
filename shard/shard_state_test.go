@@ -30,12 +30,12 @@ func init() {
 }
 
 func TestGetHashFromNodeList(t *testing.T) {
-	l1 := []NodeID{
+	l1 := []Slot{
 		{common.Address{0x11}, blsPubKey1, nil},
 		{common.Address{0x22}, blsPubKey2, nil},
 		{common.Address{0x33}, blsPubKey3, nil},
 	}
-	l2 := []NodeID{
+	l2 := []Slot{
 		{common.Address{0x22}, blsPubKey2, nil},
 		{common.Address{0x11}, blsPubKey1, nil},
 		{common.Address{0x33}, blsPubKey3, nil},
@@ -51,7 +51,7 @@ func TestGetHashFromNodeList(t *testing.T) {
 func TestHash(t *testing.T) {
 	com1 := Committee{
 		ShardID: 22,
-		NodeList: []NodeID{
+		Slots: []Slot{
 			{common.Address{0x12}, blsPubKey11, nil},
 			{common.Address{0x23}, blsPubKey22, nil},
 			{common.Address{0x11}, blsPubKey1, nil},
@@ -59,7 +59,7 @@ func TestHash(t *testing.T) {
 	}
 	com2 := Committee{
 		ShardID: 2,
-		NodeList: []NodeID{
+		Slots: []Slot{
 			{common.Address{0x44}, blsPubKey4, nil},
 			{common.Address{0x55}, blsPubKey5, nil},
 			{common.Address{0x66}, blsPubKey6, nil},
@@ -70,7 +70,7 @@ func TestHash(t *testing.T) {
 
 	com3 := Committee{
 		ShardID: 2,
-		NodeList: []NodeID{
+		Slots: []Slot{
 			{common.Address{0x44}, blsPubKey4, nil},
 			{common.Address{0x55}, blsPubKey5, nil},
 			{common.Address{0x66}, blsPubKey6, nil},
@@ -78,7 +78,7 @@ func TestHash(t *testing.T) {
 	}
 	com4 := Committee{
 		ShardID: 22,
-		NodeList: []NodeID{
+		Slots: []Slot{
 			{common.Address{0x12}, blsPubKey11, nil},
 			{common.Address{0x23}, blsPubKey22, nil},
 			{common.Address{0x11}, blsPubKey1, nil},

@@ -629,7 +629,7 @@ func ReadValidatorData(db DatabaseReader, addr common.Address) (*staking.Validat
 	return &v, nil
 }
 
-// WriteValidatorData stores staking validator's information by its address
+// WriteValidatorData stores validator's information by its address
 func WriteValidatorData(db DatabaseWriter, v *staking.ValidatorWrapper) error {
 	bytes, err := rlp.EncodeToBytes(v)
 	if err != nil {
@@ -643,7 +643,7 @@ func WriteValidatorData(db DatabaseWriter, v *staking.ValidatorWrapper) error {
 	return err
 }
 
-// ReadValidatorSnapshot retrieves staking validator's snapshot by its address
+// ReadValidatorSnapshot retrieves validator's snapshot by its address
 func ReadValidatorSnapshot(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
 	data, err := db.Get(validatorSnapshotKey(addr))
 	if len(data) == 0 || err != nil {
@@ -658,7 +658,7 @@ func ReadValidatorSnapshot(db DatabaseReader, addr common.Address) (*staking.Val
 	return &v, nil
 }
 
-// WriteValidatorSnapshot stores staking validator's snapshot by its address
+// WriteValidatorSnapshot stores validator's snapshot by its address
 func WriteValidatorSnapshot(db DatabaseWriter, v *staking.ValidatorWrapper) error {
 	bytes, err := rlp.EncodeToBytes(v)
 	if err != nil {

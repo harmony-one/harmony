@@ -61,7 +61,7 @@ func AccumulateRewards(
 		)
 	}
 	var committerKeys []*bls.PublicKey
-	for _, member := range parentCommittee.NodeList {
+	for _, member := range parentCommittee.Slots {
 		committerKey := new(bls.PublicKey)
 		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {
@@ -80,7 +80,7 @@ func AccumulateRewards(
 
 	accounts := []common.Address{}
 
-	for idx, member := range parentCommittee.NodeList {
+	for idx, member := range parentCommittee.Slots {
 		if signed, err := mask.IndexEnabled(idx); err != nil {
 			return ctxerror.New("cannot check for committer bit",
 				"committerIndex", idx,

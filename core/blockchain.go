@@ -1135,6 +1135,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	//// Shard State and Validator Update
 	header := block.Header()
 	if header.ShardStateHash() != (common.Hash{}) {
+		// Write shard state for the new epoch
 		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
 		shardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
 		if err != nil {
@@ -1142,15 +1143,18 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			return NonStatTy, err
 		}
 
-		processed := make(map[common.Address]struct{})
+		// Find all the active validator addresses and do a snapshot
 		allActiveValidators := []common.Address{}
+		processed := make(map[common.Address]struct{})
 		for i := range *shardState {
 			shard := (*shardState)[i]
-			for j := range shard.NodeList {
-				if shard.NodeList[j].StakeWithDelegationApplied != nil { // For external validator
-					_, ok := processed[shard.NodeList[j].EcdsaAddress]
+			for j := range shard.Slots {
+				slot := shard.Slots[j]
+				if slot.StakeWithDelegationApplied != nil { // For external validator
+					_, ok := processed[slot.EcdsaAddress]
 					if !ok {
-						allActiveValidators = append(allActiveValidators, shard.NodeList[j].EcdsaAddress)
+						processed[slot.EcdsaAddress] = struct{}{}
+						allActiveValidators = append(allActiveValidators, shard.Slots[j].EcdsaAddress)
 					}
 				}
 			}
@@ -1158,6 +1162,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		bc.UpdateActiveValidatorsSnapshot(allActiveValidators)
 	}
 
+	// Do bookkeeping for new staking txns
 	if bc.chainConfig.IsStaking(block.Epoch()) {
 		for _, tx := range block.StakingTransactions() {
 			err = bc.UpdateStakingMetaData(tx)
@@ -2296,7 +2301,7 @@ func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, 
 
 // ReadValidatorData reads staking information of given validatorWrapper
 func (bc *BlockChain) ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error) {
-	if cached, ok := bc.validatorCache.Get("v-" + string(addr.Bytes())); ok {
+	if cached, ok := bc.validatorCache.Get("validator-" + string(addr.Bytes())); ok {
 		by := cached.([]byte)
 		v := staking.ValidatorWrapper{}
 		if err := rlp.DecodeBytes(by, &v); err != nil {
@@ -2318,14 +2323,14 @@ func (bc *BlockChain) WriteValidatorData(v *staking.ValidatorWrapper) error {
 	if err != nil {
 		return err
 	}
-	bc.validatorCache.Add("v-"+string(v.Address.Bytes()), by)
+	bc.validatorCache.Add("validator-"+string(v.Address.Bytes()), by)
 	return nil
 }
 
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
 // TODO: put epoch number in to snapshot too.
 func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
-	if cached, ok := bc.validatorCache.Get("vs-" + string(addr.Bytes())); ok {
+	if cached, ok := bc.validatorCache.Get("validator-snapshot-" + string(addr.Bytes())); ok {
 		by := cached.([]byte)
 		v := staking.ValidatorWrapper{}
 		if err := rlp.DecodeBytes(by, &v); err != nil {
@@ -2339,6 +2344,7 @@ func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.Valid
 
 // WriteValidatorSnapshots writes the snapshot of provided list of validators
 func (bc *BlockChain) WriteValidatorsSnapshot(addrs []common.Address) error {
+	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
 	for _, addr := range addrs {
 		validator, err := bc.ReadValidatorData(addr)
@@ -2348,6 +2354,7 @@ func (bc *BlockChain) WriteValidatorsSnapshot(addrs []common.Address) error {
 		validators = append(validators, validator)
 	}
 
+	// Batch write the current data as snapshot
 	batch := bc.db.NewBatch()
 	for i := range validators {
 		err := rawdb.WriteValidatorSnapshot(batch, validators[i])
@@ -2359,10 +2366,11 @@ func (bc *BlockChain) WriteValidatorsSnapshot(addrs []common.Address) error {
 		return err
 	}
 
+	// Update cache
 	for i := range validators {
 		by, err := rlp.EncodeToBytes(validators[i])
 		if err == nil {
-			bc.validatorCache.Add("vs-"+string(validators[i].Address.Bytes()), by)
+			bc.validatorCache.Add("validator-snapshot-"+string(validators[i].Address.Bytes()), by)
 		}
 	}
 	return nil
@@ -2378,7 +2386,25 @@ func (bc *BlockChain) DeleteValidatorsSnapshot(addrs []common.Address) error {
 		return err
 	}
 	for i := range addrs {
-		bc.validatorCache.Remove("vs-" + string(addrs[i].Bytes()))
+		bc.validatorCache.Remove("validator-snapshot-" + string(addrs[i].Bytes()))
+	}
+	return nil
+}
+
+// UpdateActiveValidatorsSnapshot updates the list of active validators and updates the content snapshot of the active validators
+func (bc *BlockChain) UpdateActiveValidatorsSnapshot(activeValidators []common.Address) error {
+	prevActiveValidators, err := bc.ReadActiveValidatorList()
+	if err != nil {
+		return err
+	}
+
+	err = bc.DeleteValidatorsSnapshot(prevActiveValidators)
+	if err != nil {
+		return err
+	}
+
+	if err = bc.WriteValidatorsSnapshot(activeValidators); err != nil {
+		return err
 	}
 	return nil
 }
@@ -2431,24 +2457,6 @@ func (bc *BlockChain) WriteActiveValidatorList(addrs []common.Address) error {
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err == nil {
 		bc.validatorListCache.Add("activeValidatorList", bytes)
-	}
-	return nil
-}
-
-// UpdateActiveValidatorsSnapshot updates the list of active validators and updates the content snapshot of the active validators
-func (bc *BlockChain) UpdateActiveValidatorsSnapshot(activeValidators []common.Address) error {
-	prevActiveValidators, err := bc.ReadActiveValidatorList()
-	if err != nil {
-		return err
-	}
-
-	err = bc.DeleteValidatorsSnapshot(prevActiveValidators)
-	if err != nil {
-		return err
-	}
-
-	if err = bc.WriteValidatorsSnapshot(activeValidators); err != nil {
-		return err
 	}
 	return nil
 }
