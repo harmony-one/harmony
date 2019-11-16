@@ -187,7 +187,6 @@ func (e *engineImpl) Finalize(
 					delegation := wrapper.Delegations[i]
 					totalWithdraw := big.NewInt(0)
 					count := 0
-					// TODO: need ot make sure the entries are ordered by epoch
 					for j := range delegation.Entries {
 						if delegation.Entries[j].Epoch.Cmp(header.Epoch()) > 14 { // need to wait at least 14 epochs to withdraw;
 							totalWithdraw.Add(totalWithdraw, delegation.Entries[j].Amount)

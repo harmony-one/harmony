@@ -666,3 +666,29 @@ func WriteValidatorList(db DatabaseWriter, addrs []common.Address) error {
 	}
 	return err
 }
+
+// ReadValidatorListByDelegator retrieves the list of validators delegated by a delegator
+func ReadValidatorListByDelegator(db DatabaseReader, delegator common.Address) ([]common.Address, error) {
+	data, err := db.Get(delegatorValidatorListKey(delegator))
+	if len(data) == 0 || err != nil {
+		return []common.Address{}, nil
+	}
+	addrs := []common.Address{}
+	if err := rlp.DecodeBytes(data, &addrs); err != nil {
+		utils.Logger().Error().Err(err).Msg("Unable to Decode validator List from database")
+		return nil, err
+	}
+	return addrs, nil
+}
+
+// WriteValidatorListByDelegator stores the list of validators delegated by a delegator
+func WriteValidatorListByDelegator(db DatabaseWriter, delegator common.Address, addrs []common.Address) error {
+	bytes, err := rlp.EncodeToBytes(addrs)
+	if err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorListByDelegator] Failed to encode")
+	}
+	if err := db.Put(delegatorValidatorListKey(delegator), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorListByDelegator] Failed to store to database")
+	}
+	return err
+}

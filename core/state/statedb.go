@@ -701,6 +701,10 @@ func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
 
 // UpdateStakingInfo update staking information of a given validator (including delegation info)
 func (db *DB) UpdateStakingInfo(addr common.Address, val *stk.ValidatorWrapper) error {
+	if err := val.SanityCheck(); err != nil {
+		return err
+	}
+
 	by, err := rlp.EncodeToBytes(val)
 	if err != nil {
 		return err
@@ -766,6 +770,6 @@ func (db *DB) AddReward(validator common.Address, reward *big.Int) error {
 
 // CollectReward moves the rewards into the delegator's normal balance.
 func (db *DB) CollectReward(delegator common.Address) {
-	//TODO: implement collect reward logic
 	// The reward will be withdrawn to the delegator's address balance as a whole.
+
 }

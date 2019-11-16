@@ -65,6 +65,8 @@ var (
 	crosslinkPrefix          = []byte("cl")  // prefix for crosslink
 	tempCrosslinkPrefix      = []byte("tcl") // prefix for tempCrosslink
 
+	delegatorValidatorListPrefix = []byte("dvl") // prefix for delegator's validator list
+
 	// TODO: shorten the key prefix so we don't waste db space
 	cxReceiptPrefix                  = []byte("cxReceipt")                  // prefix for cross shard transaction receipt
 	tempCxReceiptPrefix              = []byte("tempCxReceipt")              // prefix for temporary cross shard transaction receipt
@@ -199,6 +201,10 @@ func crosslinkKey(shardID uint32, blockNum uint64, temp bool) []byte {
 	binary.BigEndian.PutUint64(sbKey[4:], blockNum)
 	key := append(prefix, sbKey...)
 	return key
+}
+
+func delegatorValidatorListKey(delegator common.Address) []byte {
+	return append(delegatorValidatorListPrefix, delegator.Bytes()...)
 }
 
 // cxReceiptKey = cxReceiptsPrefix + shardID + num (uint64 big endian) + hash

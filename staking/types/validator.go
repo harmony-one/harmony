@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/common/denominations"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -23,7 +25,11 @@ const (
 )
 
 var (
-	errAddressNotMatch = errors.New("Validator key not match")
+	errAddressNotMatch           = errors.New("Validator key not match")
+	errInvalidSelfDelegation     = errors.New("self delegation can not be less than min_self_delegation")
+	errInvalidTotalDelegation    = errors.New("total delegation can not be bigger than max_total_delegation")
+	errMinSelfDelegationTooSmall = errors.New("min_self_delegation has to be greater than 1 ONE")
+	errInvalidMaxTotalDelegation = errors.New("max_total_delegation can not be less than min_self_delegation")
 )
 
 // ValidatorWrapper contains validator and its delegation information
@@ -75,6 +81,32 @@ func (w *ValidatorWrapper) TotalDelegation() *big.Int {
 		total.Add(total, entry.Amount)
 	}
 	return total
+}
+
+// SanityCheck checks the basic requirements
+func (w *ValidatorWrapper) SanityCheck() error {
+	// MinSelfDelegation must be >= 1 ONE
+	if w.Validator.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+		return errMinSelfDelegationTooSmall
+	}
+
+	// MaxTotalDelegation must not be less than MinSelfDelegation
+	if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
+		return errInvalidMaxTotalDelegation
+	}
+
+	selfDelegation := w.Delegations[0].Amount
+	// Self delegation must be >= MinSelfDelegation
+	if selfDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
+		return errInvalidSelfDelegation
+	}
+
+	totalDelegation := w.TotalDelegation()
+	// Total delegation must be <= MaxTotalDelegation
+	if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
+		return errInvalidTotalDelegation
+	}
+	return nil
 }
 
 // Description - some possible IRL connections
@@ -158,18 +190,18 @@ func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
 
 // CreateValidatorFromNewMsg creates validator from NewValidator message
-func CreateValidatorFromNewMsg(val *CreateValidator) (*Validator, error) {
+func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Validator, error) {
 	desc, err := UpdateDescription(val.Description)
 	if err != nil {
 		return nil, err
 	}
-	commission := Commission{val.CommissionRates, new(big.Int)}
+	commission := Commission{val.CommissionRates, blockNum}
 	pubKeys := []shard.BlsPublicKey{}
 	pubKeys = append(pubKeys, val.SlotPubKeys...)
 	// TODO: a new validator should have a minimum of 1 token as self delegation, and that should be added as a delegation entry here.
 	v := Validator{val.ValidatorAddress, pubKeys,
 		val.Amount, new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
-		commission, desc, big.NewInt(0)}
+		commission, desc, blockNum}
 	return &v, nil
 }
 
@@ -188,27 +220,25 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 
 	if edit.CommissionRate != nil {
 		validator.Rate = *edit.CommissionRate
-		if err != nil {
-			return err
-		}
-		//TODO update other rates
 	}
 
 	if edit.MinSelfDelegation != nil {
-		// TODO: add condition that minSelfDelegation can not be higher than the current self delegation
 		validator.MinSelfDelegation = edit.MinSelfDelegation
 	}
 
 	if edit.MaxTotalDelegation != nil {
-		// TODO: add condition that MaxTotalDelegation can not be lower than the current total delegation
 		validator.MaxTotalDelegation = edit.MaxTotalDelegation
 	}
 
 	if edit.SlotKeyToAdd != nil {
+		found := false
 		for _, key := range validator.SlotPubKeys {
 			if key == *edit.SlotKeyToAdd {
+				found = true
 				break
 			}
+		}
+		if !found {
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
 		}
 	}
@@ -218,6 +248,7 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		for i, key := range validator.SlotPubKeys {
 			if key == *edit.SlotKeyToRemove {
 				index = i
+				break
 			}
 		}
 		// we found key to be removed

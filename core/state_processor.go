@@ -218,7 +218,7 @@ func ApplyStakingTransaction(
 	vmenv := vm.NewEVM(context, statedb, config, cfg)
 
 	// Apply the transaction to the current state (included in the env)
-	gas, err = ApplyStakingMessage(vmenv, msg, gp)
+	gas, err = ApplyStakingMessage(vmenv, msg, gp, bc)
 	utils.Logger().Info().Msgf("ApplyStakingMessage: usedGas: %v, err: %v", gas, err)
 
 	// even there is error, we charge it

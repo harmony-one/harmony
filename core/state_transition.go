@@ -37,6 +37,12 @@ var (
 	errValidatorExist              = errors.New("staking validator already exists")
 	errValidatorNotExist           = errors.New("staking validator does not exist")
 	errNoDelegationToUndelegate    = errors.New("no delegation to undelegate")
+	errInvalidSelfDelegation       = errors.New("self delegation can not be less than min_self_delegation")
+	errInvalidTotalDelegation      = errors.New("total delegation can not be bigger than max_total_delegation")
+	errMinSelfDelegationTooSmall   = errors.New("min_self_delegation has to be greater than 1 ONE")
+	errInvalidMaxTotalDelegation   = errors.New("max_total_delegation can not be less than min_self_delegation")
+	errCommissionRateChangeTooFast = errors.New("commission rate can not be changed more than MaxChangeRate within the same epoch")
+	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than MaxCommissionRate")
 )
 
 /*
@@ -66,6 +72,7 @@ type StateTransition struct {
 	data       []byte
 	state      vm.StateDB
 	evm        *vm.EVM
+	bc         ChainContext
 }
 
 // Message represents a message sent to a contract.
@@ -119,7 +126,7 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 }
 
 // NewStateTransition initialises and returns a new state transition object.
-func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
+func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) *StateTransition {
 	return &StateTransition{
 		gp:       gp,
 		evm:      evm,
@@ -128,6 +135,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 		value:    msg.Value(),
 		data:     msg.Data(),
 		state:    evm.StateDB,
+		bc:       bc,
 	}
 }
 
@@ -139,12 +147,12 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition 
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) ([]byte, uint64, bool, error) {
-	return NewStateTransition(evm, msg, gp).TransitionDb()
+	return NewStateTransition(evm, msg, gp, nil).TransitionDb()
 }
 
 // ApplyStakingMessage computes the new state for staking message
-func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool) (uint64, error) {
-	return NewStateTransition(evm, msg, gp).StakingTransitionDb()
+func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) (uint64, error) {
+	return NewStateTransition(evm, msg, gp, bc).StakingTransitionDb()
 }
 
 // to returns the recipient of the message.
@@ -279,7 +287,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
 
 	// Pay intrinsic gas
-	// TODO: add new formula for staking transaction
+	// TODO: propose staking-specific formula for staking transaction
 	gas, err := IntrinsicGas(st.data, false, homestead)
 	if err != nil {
 		return 0, err
@@ -320,7 +328,11 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		}
 		err = st.applyUndelegateTx(stkMsg)
 	case types.CollectRewards:
-
+		stkMsg := &staking.CollectRewards{}
+		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
+			return 0, err
+		}
+		err = st.applyCollectRewards(stkMsg)
 	default:
 		return 0, staking.ErrInvalidStakingKind
 	}
@@ -329,18 +341,21 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	return st.gasUsed(), err
 }
 
-func (st *StateTransition) applyCreateValidatorTx(nv *staking.CreateValidator, blockNum *big.Int) error {
-	if st.state.IsValidator(nv.ValidatorAddress) {
+func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.CreateValidator, blockNum *big.Int) error {
+	if st.state.IsValidator(createValidator.ValidatorAddress) {
 		return errValidatorExist
 	}
-	// TODO: move balance into staking
-	v, err := staking.CreateValidatorFromNewMsg(nv)
+
+	v, err := staking.CreateValidatorFromNewMsg(createValidator, blockNum)
 	if err != nil {
 		return err
 	}
-	v.UpdateHeight = blockNum
-	v.CreationHeight = blockNum
-	wrapper := staking.ValidatorWrapper{*v, nil, nil, nil}
+
+	delegations := []staking.Delegation{}
+	delegations = append(delegations, staking.NewDelegation(v.Address, createValidator.Amount))
+
+	wrapper := staking.ValidatorWrapper{*v, delegations, nil, nil}
+
 	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
 		return err
 	}
@@ -348,26 +363,36 @@ func (st *StateTransition) applyCreateValidatorTx(nv *staking.CreateValidator, b
 	return nil
 }
 
-func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, blockNum *big.Int) error {
-	if !st.state.IsValidator(ev.ValidatorAddress) {
+func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValidator, blockNum *big.Int) error {
+	if !st.state.IsValidator(editValidator.ValidatorAddress) {
 		return errValidatorNotExist
 	}
-	wrapper := st.state.GetStakingInfo(ev.ValidatorAddress)
+
+	wrapper := st.state.GetStakingInfo(editValidator.ValidatorAddress)
 	if wrapper == nil {
 		return errValidatorNotExist
 	}
 
-	oldRate := wrapper.Validator.Rate
-	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, ev); err != nil {
+	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, editValidator); err != nil {
 		return err
 	}
 	newRate := wrapper.Validator.Rate
-	// update the commision rate change height
-	// TODO: make sure the rule of MaxChangeRate is not violated
-	if oldRate.IsNil() || (!newRate.IsNil() && !oldRate.Equal(newRate)) {
+
+	// TODO: Use snapshot of validator in this epoch.
+	rateAtBeginningOfEpoch := wrapper.Validator.Rate
+	if rateAtBeginningOfEpoch.IsNil() || (!newRate.IsNil() && !rateAtBeginningOfEpoch.Equal(newRate)) {
 		wrapper.Validator.UpdateHeight = blockNum
 	}
-	if err := st.state.UpdateStakingInfo(ev.ValidatorAddress, wrapper); err != nil {
+
+	if newRate.Sub(rateAtBeginningOfEpoch).GT(wrapper.Validator.MaxChangeRate) {
+		return errCommissionRateChangeTooFast
+	}
+
+	if newRate.GT(wrapper.Validator.MaxRate) {
+		return errCommissionRateChangeTooHigh
+	}
+
+	if err := st.state.UpdateStakingInfo(editValidator.ValidatorAddress, wrapper); err != nil {
 		return err
 	}
 	return nil
@@ -394,7 +419,6 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 				// Firstly use the tokens in undelegation to delegate (redelegate)
 				undelegateAmount := big.NewInt(0).Set(delegate.Amount)
 				// Use the latest undelegated token first as it has the longest remaining locking time.
-				// TODO: always order the list by epoch.
 				i := len(delegation.Entries) - 1
 				for ; i >= 0; i-- {
 					if delegation.Entries[i].Amount.Cmp(undelegateAmount) <= 0 {
@@ -421,7 +445,7 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 
 	if !delegatorExist {
 		if CanTransfer(stateDB, delegate.DelegatorAddress, delegate.Amount) {
-			newDelegator := staking.Delegation{DelegatorAddress: delegate.DelegatorAddress, Amount: delegate.Amount}
+			newDelegator := staking.NewDelegation(delegate.DelegatorAddress, delegate.Amount)
 			wrapper.Delegations = append(wrapper.Delegations, newDelegator)
 
 			if err := stateDB.UpdateStakingInfo(wrapper.Validator.Address, wrapper); err == nil {
@@ -463,5 +487,44 @@ func (st *StateTransition) applyUndelegateTx(undelegate *staking.Undelegate) err
 		return errNoDelegationToUndelegate
 	}
 	// TODO: do undelegated token distribution after locking period. (in leader block proposal phase)
+	return nil
+}
+
+func (st *StateTransition) applyCollectRewards(collectRewards *staking.CollectRewards) error {
+	if st.bc == nil {
+		return errors.New("[CollectRewards] No chain context provided")
+	}
+	chainContext := st.bc
+	validators, err := chainContext.ReadValidatorListByDelegator(collectRewards.DelegatorAddress)
+
+	if err != nil {
+		return err
+	}
+
+	totalRewards := big.NewInt(0)
+	for i := range validators {
+		wrapper := st.state.GetStakingInfo(validators[i])
+		if wrapper == nil {
+			return errValidatorNotExist
+		}
+
+		// TODO: add the index of the validator-delegation position in the ReadValidatorListByDelegator record to avoid looping
+		for j := range wrapper.Delegations {
+			delegation := wrapper.Delegations[j]
+			if bytes.Equal(delegation.DelegatorAddress.Bytes(), collectRewards.DelegatorAddress.Bytes()) {
+				if delegation.Reward.Cmp(big.NewInt(0)) > 0 {
+					totalRewards.Add(totalRewards, delegation.Reward)
+				}
+
+				delegation.Reward.SetUint64(0)
+				break
+			}
+		}
+		err = st.state.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
+		if err != nil {
+			return err
+		}
+	}
+	st.state.AddBalance(collectRewards.DelegatorAddress, totalRewards)
 	return nil
 }
