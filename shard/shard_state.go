@@ -54,7 +54,7 @@ type Committee struct {
 func (ss State) JSON() string {
 	type t struct {
 		NodeID
-		EcdsaAddress string `json:"one-address"`
+		EcdsaAddress string `json:"ecdsa-address"`
 	}
 	type v struct {
 		Committee

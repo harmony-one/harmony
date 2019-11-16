@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -315,11 +316,37 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	senderKey, err := consensus.verifySenderKey(msg)
+	// fmt.Println("prepare-sender-key", senderKey.SerializeToHexStr())
+
+	// for _, v := range consensus.Decider.DumpParticipants() {
+	// 	fmt.Println("in-committee-", consensus.ShardID, v)
+	// }
+
 	if err != nil {
+		fmt.Println("On Prepare is busted =/")
+
+		// type t struct {
+		// 	Participants []string `json:"committee-members"`
+		// 	ShardID      uint32   `json:"shard-id"`
+		// }
+		// b, _ := json.Marshal(t{consensus.Decider.DumpParticipants(), consensus.ShardID})
+		// fmt.Println(string(b))
+
 		utils.Logger().Error().Err(err).Msg("[OnPrepare] VerifySenderKey failed")
 		return
 	}
+
 	if err = verifyMessageSig(senderKey, msg); err != nil {
+		fmt.Println("unable to verify message sig")
+
+		// p := consensus.Decider.DumpParticipants()
+		// for _, k := range p {
+		// 	if senderKey.SerializeToHexStr() == k {
+		// 		fmt.Println("Sender is in my committee quorum", consensus.PubKey.SerializeToHexStr())
+		// 		break
+		// 	}
+		// }
+		// fmt.Println("Bad sender?", senderKey.SerializeToHexStr())
 		utils.Logger().Error().Err(err).Msg("[OnPrepare] Failed to verify sender's signature")
 		return
 	}

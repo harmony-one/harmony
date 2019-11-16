@@ -203,7 +203,7 @@ func eposStakedCommittee(
 			}
 		}
 	}
-
+	// fmt.Println("epos-based-committee", superComm.JSON())
 	return superComm, nil
 }
 
@@ -313,5 +313,6 @@ func (def partialStakingEnabled) Compute(
 	stakedSlots :=
 		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
 			int(instance.NumShards())
+	fmt.Println("Hit staking epoch -- compute")
 	return eposStakedCommittee(instance, stakerReader, stakedSlots)
 }

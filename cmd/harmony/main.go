@@ -310,7 +310,11 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, *isArchival)
+	// fmt.Println("What is my port at this moment", *port)
+
+	currentNode := node.New(
+		myHost, currentConsensus, chainDBFactory, *isArchival, *port,
+	)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
@@ -340,7 +344,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
 	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
-
 	currentNode.NodeConfig.SetBeaconGroupID(nodeconfig.NewGroupIDByShardID(0))
 
 	switch *nodeType {
@@ -496,6 +499,8 @@ func main() {
 	currentNode.ServiceManagerSetup()
 
 	currentNode.RunServices()
+	// fmt.Println("CurrentRPC-port", *port)
+
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
 		utils.Logger().Warn().

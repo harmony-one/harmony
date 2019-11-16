@@ -1,6 +1,7 @@
 package node
 
 import (
+	"math/big"
 	"sort"
 	"time"
 
@@ -120,6 +121,15 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		node.Consensus.ShardID, node.Beaconchain(),
 	)
 
+	// fmt.Println("Update my keys, right", "on port", node.NodeConfig.Port)
+
+	if node.Beaconchain().CurrentHeader().Epoch().Cmp(big.NewInt(1)) == 0 {
+		// fmt.Println("Update my keys, right", "on port", node.NodeConfig.Port)
+		// node.NodeConfig.ConsensusPriKey
+		// node.NodeConfig.ConsensusPubKey
+	}
+
+	// fmt.Println("super-comm", shardState.JSON())
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +143,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
 }
 
+// TODO is this still needed?
 func (node *Node) proposeLocalShardState(block *types.Block) {
 	logger := block.Logger(utils.Logger())
 	// TODO ek – read this from beaconchain once BC sync is fixed
