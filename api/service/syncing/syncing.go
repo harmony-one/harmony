@@ -29,7 +29,7 @@ import (
 // Constants for syncing.
 const (
 	downloadBlocksRetryLimit        = 5 // downloadBlocks service retry limit
-	TimesToFail                     = 5 // downloadBlocks service retry limit
+	stateSyncRetryLimit             = 5 // ProcessStateSync retry limit
 	RegistrationNumber              = 3
 	SyncingPortDifference           = 3000
 	inSyncThreshold                 = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
@@ -66,8 +66,10 @@ type SyncConfig struct {
 	// mtx locks peers, and *SyncPeerConfig pointers in peers.
 	// SyncPeerConfig itself is guarded by its own mutex.
 	mtx sync.RWMutex
-
-	peers []*SyncPeerConfig
+	// failedPeers contains the sync peer config that had been chosen
+	// as the max consensus sync peer config but failed during chain insertion
+	failedPeers []*SyncPeerConfig
+	peers       []*SyncPeerConfig
 }
 
 // AddPeer adds the given sync peer.
@@ -199,8 +201,8 @@ func CreateTestSyncPeerConfig(client *downloader.Client, blockHashes [][]byte) *
 	}
 }
 
-// CompareSyncPeerConfigByblockHashes compares two SyncPeerConfig by blockHashes.
-func CompareSyncPeerConfigByblockHashes(a *SyncPeerConfig, b *SyncPeerConfig) int {
+// CompareSyncPeerConfigByBlockHashes compares two SyncPeerConfig by blockHashes.
+func CompareSyncPeerConfigByBlockHashes(a *SyncPeerConfig, b *SyncPeerConfig) int {
 	if len(a.blockHashes) != len(b.blockHashes) {
 		if len(a.blockHashes) < len(b.blockHashes) {
 			return -1
@@ -283,7 +285,19 @@ func (sc *SyncConfig) getHowManyMaxConsensus() (int, int) {
 	maxCount := 0
 	maxFirstID := -1
 	for i := range sc.peers {
-		if curFirstID == -1 || CompareSyncPeerConfigByblockHashes(sc.peers[curFirstID], sc.peers[i]) != 0 {
+		// skip if among the previously failed peer config
+		skip := false
+		for j := range sc.failedPeers {
+			if CompareSyncPeerConfigByBlockHashes(sc.peers[i], sc.failedPeers[j]) == 0 {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+
+		if curFirstID == -1 || CompareSyncPeerConfigByBlockHashes(sc.peers[curFirstID], sc.peers[i]) != 0 {
 			curCount = 1
 			curFirstID = i
 		} else {
@@ -312,10 +326,10 @@ func (sc *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]
 func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	fixedPeer := sc.peers[maxFirstID]
 	for i := 0; i < len(sc.peers); i++ {
-		if CompareSyncPeerConfigByblockHashes(fixedPeer, sc.peers[i]) != 0 {
+		if CompareSyncPeerConfigByBlockHashes(fixedPeer, sc.peers[i]) != 0 {
 			// TODO: move it into a util delete func.
 			// See tip https://github.com/golang/go/wiki/SliceTricks
-			// Close the client and remove the peer out of the
+			// Close the client and remove the peer out of the peers set
 			sc.peers[i].client.Close()
 			copy(sc.peers[i:], sc.peers[i+1:])
 			sc.peers[len(sc.peers)-1] = nil
@@ -333,7 +347,7 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() {
 	defer sc.mtx.Unlock()
 	// Sort all peers by the blockHashes.
 	sort.Slice(sc.peers, func(i, j int) bool {
-		return CompareSyncPeerConfigByblockHashes(sc.peers[i], sc.peers[j]) == -1
+		return CompareSyncPeerConfigByBlockHashes(sc.peers[i], sc.peers[j]) == -1
 	})
 	maxFirstID, maxCount := sc.getHowManyMaxConsensus()
 	utils.Logger().Info().
@@ -784,14 +798,33 @@ Loop:
 			if size > SyncLoopBatchSize {
 				size = SyncLoopBatchSize
 			}
-			err := ss.ProcessStateSync(startHash[:], size, bc, worker)
+
+			retryCount := 0
+			var err error
+			for err == nil && retryCount < stateSyncRetryLimit {
+				err = ss.ProcessStateSync(startHash[:], size, bc, worker)
+				if err != nil {
+					utils.Logger().Warn().Err(err).
+						Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d, retryCount: %d)",
+							isBeacon, bc.ShardID(), otherHeight, currentHeight, retryCount)
+					if err != nil {
+						ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
+							ss.syncConfig.failedPeers = append(ss.syncConfig.failedPeers, configPeer)
+							brk = true
+							return
+						})
+					}
+					retryCount++
+				} else {
+					break
+				}
+			}
 			if err != nil {
 				utils.Logger().Error().Err(err).
-					Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+					Msgf("[SYNC] ProcessStateSync failed despite retries (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 						isBeacon, bc.ShardID(), otherHeight, currentHeight)
-				// should we still call UpdateConsensusInformation() upon state sync failure?
-				// how to handle error here?
 			}
+
 			ss.purgeOldBlocksFromCache()
 			if consensus != nil {
 				consensus.UpdateConsensusInformation()
