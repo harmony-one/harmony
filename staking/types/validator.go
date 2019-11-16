@@ -220,27 +220,25 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 
 	if edit.CommissionRate != nil {
 		validator.Rate = *edit.CommissionRate
-		if err != nil {
-			return err
-		}
-		//TODO update other rates
 	}
 
 	if edit.MinSelfDelegation != nil {
-		// TODO: add condition that minSelfDelegation can not be higher than the current self delegation
 		validator.MinSelfDelegation = edit.MinSelfDelegation
 	}
 
 	if edit.MaxTotalDelegation != nil {
-		// TODO: add condition that MaxTotalDelegation can not be lower than the current total delegation
 		validator.MaxTotalDelegation = edit.MaxTotalDelegation
 	}
 
 	if edit.SlotKeyToAdd != nil {
+		found := false
 		for _, key := range validator.SlotPubKeys {
 			if key == *edit.SlotKeyToAdd {
+				found = true
 				break
 			}
+		}
+		if !found {
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
 		}
 	}
@@ -250,6 +248,7 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		for i, key := range validator.SlotPubKeys {
 			if key == *edit.SlotKeyToRemove {
 				index = i
+				break
 			}
 		}
 		// we found key to be removed

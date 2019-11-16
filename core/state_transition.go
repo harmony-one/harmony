@@ -41,6 +41,8 @@ var (
 	errInvalidTotalDelegation      = errors.New("total delegation can not be bigger than max_total_delegation")
 	errMinSelfDelegationTooSmall   = errors.New("min_self_delegation has to be greater than 1 ONE")
 	errInvalidMaxTotalDelegation   = errors.New("max_total_delegation can not be less than min_self_delegation")
+	errCommissionRateChangeTooFast = errors.New("commission rate can not be changed more than MaxChangeRate within the same epoch")
+	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than MaxCommissionRate")
 )
 
 /*
@@ -361,26 +363,36 @@ func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.Creat
 	return nil
 }
 
-func (st *StateTransition) applyEditValidatorTx(ev *staking.EditValidator, blockNum *big.Int) error {
-	if !st.state.IsValidator(ev.ValidatorAddress) {
+func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValidator, blockNum *big.Int) error {
+	if !st.state.IsValidator(editValidator.ValidatorAddress) {
 		return errValidatorNotExist
 	}
-	wrapper := st.state.GetStakingInfo(ev.ValidatorAddress)
+
+	wrapper := st.state.GetStakingInfo(editValidator.ValidatorAddress)
 	if wrapper == nil {
 		return errValidatorNotExist
 	}
 
-	oldRate := wrapper.Validator.Rate
-	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, ev); err != nil {
+	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, editValidator); err != nil {
 		return err
 	}
 	newRate := wrapper.Validator.Rate
-	// update the commision rate change height
-	// TODO: make sure the rule of MaxChangeRate is not violated
-	if oldRate.IsNil() || (!newRate.IsNil() && !oldRate.Equal(newRate)) {
+
+	// TODO: Use snapshot of validator in this epoch.
+	rateAtBeginningOfEpoch := wrapper.Validator.Rate
+	if rateAtBeginningOfEpoch.IsNil() || (!newRate.IsNil() && !rateAtBeginningOfEpoch.Equal(newRate)) {
 		wrapper.Validator.UpdateHeight = blockNum
 	}
-	if err := st.state.UpdateStakingInfo(ev.ValidatorAddress, wrapper); err != nil {
+
+	if newRate.Sub(rateAtBeginningOfEpoch).GT(wrapper.Validator.MaxChangeRate) {
+		return errCommissionRateChangeTooFast
+	}
+
+	if newRate.GT(wrapper.Validator.MaxRate) {
+		return errCommissionRateChangeTooHigh
+	}
+
+	if err := st.state.UpdateStakingInfo(editValidator.ValidatorAddress, wrapper); err != nil {
 		return err
 	}
 	return nil
