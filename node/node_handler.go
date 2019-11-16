@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"sync/atomic"
@@ -17,6 +18,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -332,6 +334,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		return
 	}
 
+	// fmt.Println("Finished consensus->", node.NodeConfig.Port)
+
 	// Update last consensus time for metrics
 	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
 	// TODO: refactor the asynchronous calls to separate go routine.
@@ -360,8 +364,44 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	node.BroadcastMissingCXReceipts()
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
+	// Not just at end of epoch, but end of pre-staking now
 	if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
+		type t struct {
+			ShardID      uint32   `json:"shard-id"`
+			Count        int      `json:"count"`
+			Participants []string `json:"committee-members"`
+		}
+		// b1, _ := json.Marshal(t{node.Consensus.ShardID, len(node.Consensus.Decider.DumpParticipants()), node.Consensus.Decider.DumpParticipants()})
+		// fmt.Println("before", string(b1))
+
 		node.Consensus.UpdateConsensusInformation()
+		newKeys := node.Consensus.Decider.DumpParticipants()
+		myK := node.Consensus.PubKey.SerializeToHexStr()
+		myKeyInCommittee := false
+
+		for _, k := range newKeys {
+			if k == myK {
+				myKeyInCommittee = true
+				break
+			}
+		}
+
+		if myKeyInCommittee == false {
+			pair := core.NewKeys[node.myPort]
+			pub, priv := pair.Public, pair.Private
+			priKey := bls.SecretKey{}
+			pubKey := bls.PublicKey{}
+			pubKey.DeserializeHexStr(pub)
+			priKey.DeserializeHexStr(priv)
+			fmt.Println("new-pair", pair)
+
+			node.NodeConfig.ConsensusPriKey = &priKey
+			node.NodeConfig.ConsensusPubKey = &pubKey
+
+			node.Consensus.PubKey = &pubKey
+			node.Consensus.SetPrivateKey(&priKey)
+		}
+
 	}
 
 	// TODO chao: uncomment this after beacon syncing is stable

@@ -119,6 +119,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	for i := range pubKeys {
 		utils.Logger().Info().Int("index", i).Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).Msg("Member")
 	}
+
 	consensus.LeaderPubKey = pubKeys[0]
 	utils.Logger().Info().
 		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
@@ -461,6 +462,16 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		epoch, consensus.ChainReader,
 	)[int(header.ShardID())]
 
+	// fmt.Println("update-consensus",
+	// 	epoch,
+	// 	consensus.Decider.Policy() != quorum.SuperMajorityStake,
+	// 	consensus.ChainReader.Config().IsStaking(epoch),
+	// )
+	if consensus.Decider.Policy() != quorum.SuperMajorityStake &&
+		consensus.ChainReader.Config().IsStaking(epoch) {
+		fmt.Println("Hit new decider on quorum")
+		consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
+	}
 	consensus.numPrevPubKeys = len(curPubKeys)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
 	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {

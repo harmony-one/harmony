@@ -271,7 +271,6 @@ func NewDecider(p Policy) Decider {
 	case SuperMajorityVote:
 		return &uniformVoteWeight{c.DependencyInjectionWriter, c}
 	case SuperMajorityStake:
-		fmt.Println("HRS")
 		return &stakedVoteWeight{
 			c.SignatureReader,
 			c.DependencyInjectionWriter,
