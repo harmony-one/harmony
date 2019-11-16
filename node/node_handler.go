@@ -411,7 +411,7 @@ func (node *Node) AddNewBlock(newBlock *types.Block) error {
 			}
 			utils.Logger().Debug().Msgf("ValidatorInformation %v: %v", i, val)
 		}
-		currAddrs := node.Blockchain().CurrentValidatorAddresses()
+		currAddrs := node.Blockchain().ActiveValidatorAddresses()
 		utils.Logger().Debug().Msgf("CurrentValidators : %v", currAddrs)
 		candidates := node.Blockchain().ValidatorCandidates()
 		utils.Logger().Debug().Msgf("CandidateValidators : %v", candidates)

@@ -74,7 +74,10 @@ var (
 	cxReceiptSpentPrefix             = []byte("cxReceiptSpent")             // prefix for indicator of unspent of cxReceiptsProof
 	cxReceiptUnspentCheckpointPrefix = []byte("cxReceiptUnspentCheckpoint") // prefix for cxReceiptsProof unspent checkpoint
 
-	stakingPrefix = []byte("staking") // prefix for staking validator information
+	validatorPrefix         = []byte("validator-")            // prefix for staking validator information
+	validatorSnapshotPrefix = []byte("validator-snapshot-")   // prefix for staking validator's snapshot information
+	validatorListKey        = []byte("validator-list")        // key for all validators list
+	activeValidatorListKey  = []byte("active-validator-list") // key for active validators list
 
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
@@ -237,7 +240,12 @@ func cxReceiptUnspentCheckpointKey(shardID uint32) []byte {
 	return append(prefix, sKey...)
 }
 
-func stakingKey(addr common.Address) []byte {
-	prefix := stakingPrefix
+func validatorKey(addr common.Address) []byte {
+	prefix := validatorPrefix
+	return append(prefix, addr.Bytes()...)
+}
+
+func validatorSnapshotKey(addr common.Address) []byte {
+	prefix := validatorSnapshotPrefix
 	return append(prefix, addr.Bytes()...)
 }

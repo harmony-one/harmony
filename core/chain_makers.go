@@ -270,4 +270,4 @@ func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *block.Header      
 func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Header { return nil }
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
 func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (shard.State, error)      { return nil, nil }
-func (cr *fakeChainReader) CurrentValidatorAddresses() []common.Address             { return nil }
+func (cr *fakeChainReader) ActiveValidatorAddresses() []common.Address              { return nil }

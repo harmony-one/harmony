@@ -614,11 +614,11 @@ func WriteCXReceiptsProofUnspentCheckpoint(db DatabaseWriter, shardID uint32, bl
 	return db.Put(cxReceiptUnspentCheckpointKey(shardID), by)
 }
 
-// ReadStakingValidator retrieves staking validator by its address
-func ReadStakingValidator(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
-	data, err := db.Get(stakingKey(addr))
+// ReadValidatorData retrieves staking validator by its address
+func ReadValidatorData(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
+	data, err := db.Get(validatorKey(addr))
 	if len(data) == 0 || err != nil {
-		utils.Logger().Info().Err(err).Msg("ReadStakingValidator")
+		utils.Logger().Info().Err(err).Msg("ReadValidatorData")
 		return nil, err
 	}
 	v := staking.ValidatorWrapper{}
@@ -629,21 +629,64 @@ func ReadStakingValidator(db DatabaseReader, addr common.Address) (*staking.Vali
 	return &v, nil
 }
 
-// WriteStakingValidator stores staking validator's information by its address
-func WriteStakingValidator(db DatabaseWriter, v *staking.ValidatorWrapper) error {
+// WriteValidatorData stores staking validator's information by its address
+func WriteValidatorData(db DatabaseWriter, v *staking.ValidatorWrapper) error {
 	bytes, err := rlp.EncodeToBytes(v)
 	if err != nil {
-		utils.Logger().Error().Msg("[WriteStakingValidator] Failed to encode")
+		utils.Logger().Error().Msg("[WriteValidatorData] Failed to encode")
+		return err
 	}
-	if err := db.Put(stakingKey(v.Address), bytes); err != nil {
-		utils.Logger().Error().Msg("[WriteStakingValidator] Failed to store to database")
+	if err := db.Put(validatorKey(v.Address), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorData] Failed to store to database")
+		return err
 	}
 	return err
 }
 
+// ReadValidatorSnapshot retrieves staking validator's snapshot by its address
+func ReadValidatorSnapshot(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
+	data, err := db.Get(validatorSnapshotKey(addr))
+	if len(data) == 0 || err != nil {
+		utils.Logger().Info().Err(err).Msg("ReadValidatorSnapshot")
+		return nil, err
+	}
+	v := staking.ValidatorWrapper{}
+	if err := rlp.DecodeBytes(data, &v); err != nil {
+		utils.Logger().Error().Err(err).Str("address", addr.Hex()).Msg("Unable to Decode staking validator from database")
+		return nil, err
+	}
+	return &v, nil
+}
+
+// WriteValidatorSnapshot stores staking validator's snapshot by its address
+func WriteValidatorSnapshot(db DatabaseWriter, v *staking.ValidatorWrapper) error {
+	bytes, err := rlp.EncodeToBytes(v)
+	if err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorSnapshot] Failed to encode")
+		return err
+	}
+	if err := db.Put(validatorSnapshotKey(v.Address), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorSnapshot] Failed to store to database")
+		return err
+	}
+	return err
+}
+
+// DeleteValidatorSnapshot removes the validator's snapshot by its address
+func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address) {
+	if err := db.Delete(validatorSnapshotKey(addr)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete snapshot of a validator")
+	}
+}
+
 // ReadValidatorList retrieves staking validator by its address
-func ReadValidatorList(db DatabaseReader) ([]common.Address, error) {
-	data, err := db.Get([]byte("validatorList"))
+// Return only active validators if isActive==true, otherwise, return all validators
+func ReadValidatorList(db DatabaseReader, isActive bool) ([]common.Address, error) {
+	key := validatorListKey
+	if isActive {
+		key = activeValidatorListKey
+	}
+	data, err := db.Get(key)
 	if len(data) == 0 || err != nil {
 		return []common.Address{}, nil
 	}
@@ -656,12 +699,18 @@ func ReadValidatorList(db DatabaseReader) ([]common.Address, error) {
 }
 
 // WriteValidatorList stores staking validator's information by its address
-func WriteValidatorList(db DatabaseWriter, addrs []common.Address) error {
+// Writes only for active validators if isActive==true, otherwise, writes for all validators
+func WriteValidatorList(db DatabaseWriter, addrs []common.Address, isActive bool) error {
+	key := validatorListKey
+	if isActive {
+		key = activeValidatorListKey
+	}
+
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorList] Failed to encode")
 	}
-	if err := db.Put([]byte("validatorList"), bytes); err != nil {
+	if err := db.Put(key, bytes); err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorList] Failed to store to database")
 	}
 	return err

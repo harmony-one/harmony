@@ -354,7 +354,7 @@ func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.Creat
 	delegations := []staking.Delegation{}
 	delegations = append(delegations, staking.NewDelegation(v.Address, createValidator.Amount))
 
-	wrapper := staking.ValidatorWrapper{*v, delegations, nil, nil}
+	wrapper := staking.ValidatorWrapper{*v, delegations}
 
 	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
 		return err

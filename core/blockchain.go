@@ -70,9 +70,9 @@ const (
 	commitsCacheLimit                  = 10
 	epochCacheLimit                    = 10
 	randomnessCacheLimit               = 10
-	stakingCacheLimit                  = 256
-	validatorListCacheLimit            = 2
-	validatorListByDelegatorCacheLimit = 256
+	validatorCacheLimit                = 1024
+	validatorListCacheLimit            = 10
+	validatorListByDelegatorCacheLimit = 1024
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -135,7 +135,7 @@ type BlockChain struct {
 	lastCommitsCache              *lru.Cache
 	epochCache                    *lru.Cache // Cache epoch number → first block number
 	randomnessCache               *lru.Cache // Cache for vrf/vdf
-	stakingCache                  *lru.Cache // Cache for staking validator
+	validatorCache                *lru.Cache // Cache for staking validator
 	validatorListCache            *lru.Cache // Cache of validator list
 	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
 
@@ -174,7 +174,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	commitsCache, _ := lru.New(commitsCacheLimit)
 	epochCache, _ := lru.New(epochCacheLimit)
 	randomnessCache, _ := lru.New(randomnessCacheLimit)
-	stakingCache, _ := lru.New(stakingCacheLimit)
+	stakingCache, _ := lru.New(validatorCacheLimit)
 	validatorListCache, _ := lru.New(validatorListCacheLimit)
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 
@@ -195,7 +195,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		lastCommitsCache:              commitsCache,
 		epochCache:                    epochCache,
 		randomnessCache:               randomnessCache,
-		stakingCache:                  stakingCache,
+		validatorCache:                stakingCache,
 		validatorListCache:            validatorListCache,
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		engine:                        engine,
@@ -1078,6 +1078,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	batch := bc.db.NewBatch()
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
 
+	//// Cross-shard txns
 	epoch := block.Header().Epoch()
 	if bc.chainConfig.IsCrossTx(block.Epoch()) {
 		shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
@@ -1097,6 +1098,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		bc.WriteCXReceiptsProofSpent(block.IncomingReceipts())
 	}
 
+	//// VRF + VDF
 	//check non zero VRF field in header and add to local db
 	if len(block.Vrf()) > 0 {
 		vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch())
@@ -1130,16 +1132,45 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		}
 	}
 
+	//// Shard State and Validator Update
 	header := block.Header()
 	if header.ShardStateHash() != (common.Hash{}) {
 		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
-		err = bc.WriteShardStateBytes(batch, epoch, header.ShardState())
+		shardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
 		if err != nil {
 			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
 			return NonStatTy, err
 		}
+
+		processed := make(map[common.Address]struct{})
+		allActiveValidators := []common.Address{}
+		for i := range *shardState {
+			shard := (*shardState)[i]
+			for j := range shard.NodeList {
+				if shard.NodeList[j].StakeWithDelegationApplied != nil { // For external validator
+					_, ok := processed[shard.NodeList[j].EcdsaAddress]
+					if !ok {
+						allActiveValidators = append(allActiveValidators, shard.NodeList[j].EcdsaAddress)
+					}
+				}
+			}
+		}
+		bc.UpdateActiveValidatorsSnapshot(allActiveValidators)
 	}
 
+	if bc.chainConfig.IsStaking(block.Epoch()) {
+		for _, tx := range block.StakingTransactions() {
+			err = bc.UpdateStakingMetaData(tx)
+			// keep offchain database consistency with onchain we need revert
+			// but it should not happend unless local database corrupted
+			if err != nil {
+				utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
+				return NonStatTy, err
+			}
+		}
+	}
+
+	//// Cross-links
 	if len(header.CrossLinks()) > 0 {
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
@@ -1159,19 +1190,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
 		}
 	}
-
-	if bc.chainConfig.IsStaking(block.Epoch()) {
-		for _, tx := range block.StakingTransactions() {
-			err = bc.UpdateStakingMetaData(tx)
-			// keep offchain database consistency with onchain we need revert
-			// but it should not happend unless local database corrupted
-			if err != nil {
-				utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
-				return NonStatTy, err
-			}
-		}
-	}
-
 	/////////////////////////// END
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
@@ -1870,18 +1888,18 @@ func (bc *BlockChain) WriteShardState(
 // WriteShardStateBytes saves the given sharding state under the given epoch number.
 func (bc *BlockChain) WriteShardStateBytes(db rawdb.DatabaseWriter,
 	epoch *big.Int, shardState []byte,
-) error {
+) (*shard.State, error) {
 	decodeShardState := shard.State{}
 	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
-		return err
+		return nil, err
 	}
 	err := rawdb.WriteShardStateBytes(db, epoch, shardState)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cacheKey := string(epoch.Bytes())
 	bc.shardStateCache.Add(cacheKey, decodeShardState)
-	return nil
+	return &decodeShardState, nil
 }
 
 // ReadLastCommits retrieves last commits.
@@ -2276,9 +2294,9 @@ func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, 
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }
 
-// ReadStakingValidator reads staking information of given validatorWrapper
-func (bc *BlockChain) ReadStakingValidator(addr common.Address) (*staking.ValidatorWrapper, error) {
-	if cached, ok := bc.stakingCache.Get("staking-" + string(addr.Bytes())); ok {
+// ReadValidatorData reads staking information of given validatorWrapper
+func (bc *BlockChain) ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error) {
+	if cached, ok := bc.validatorCache.Get("v-" + string(addr.Bytes())); ok {
 		by := cached.([]byte)
 		v := staking.ValidatorWrapper{}
 		if err := rlp.DecodeBytes(by, &v); err != nil {
@@ -2287,12 +2305,12 @@ func (bc *BlockChain) ReadStakingValidator(addr common.Address) (*staking.Valida
 		return &v, nil
 	}
 
-	return rawdb.ReadStakingValidator(bc.db, addr)
+	return rawdb.ReadValidatorData(bc.db, addr)
 }
 
-// WriteStakingValidator reads staking information of given validatorWrapper
-func (bc *BlockChain) WriteStakingValidator(v *staking.ValidatorWrapper) error {
-	err := rawdb.WriteStakingValidator(bc.db, v)
+// WriteValidatorData writes staking information of given validatorWrapper
+func (bc *BlockChain) WriteValidatorData(v *staking.ValidatorWrapper) error {
+	err := rawdb.WriteValidatorData(bc.db, v)
 	if err != nil {
 		return err
 	}
@@ -2300,7 +2318,68 @@ func (bc *BlockChain) WriteStakingValidator(v *staking.ValidatorWrapper) error {
 	if err != nil {
 		return err
 	}
-	bc.stakingCache.Add("staking-"+string(v.Address.Bytes()), by)
+	bc.validatorCache.Add("v-"+string(v.Address.Bytes()), by)
+	return nil
+}
+
+// ReadValidatorSnapshot reads the snapshot staking information of given validator address
+// TODO: put epoch number in to snapshot too.
+func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
+	if cached, ok := bc.validatorCache.Get("vs-" + string(addr.Bytes())); ok {
+		by := cached.([]byte)
+		v := staking.ValidatorWrapper{}
+		if err := rlp.DecodeBytes(by, &v); err != nil {
+			return nil, err
+		}
+		return &v, nil
+	}
+
+	return rawdb.ReadValidatorSnapshot(bc.db, addr)
+}
+
+// WriteValidatorSnapshots writes the snapshot of provided list of validators
+func (bc *BlockChain) WriteValidatorsSnapshot(addrs []common.Address) error {
+	validators := []*staking.ValidatorWrapper{}
+	for _, addr := range addrs {
+		validator, err := bc.ReadValidatorData(addr)
+		if err != nil {
+			return err
+		}
+		validators = append(validators, validator)
+	}
+
+	batch := bc.db.NewBatch()
+	for i := range validators {
+		err := rawdb.WriteValidatorSnapshot(batch, validators[i])
+		if err != nil {
+			return err
+		}
+	}
+	if err := batch.Write(); err != nil {
+		return err
+	}
+
+	for i := range validators {
+		by, err := rlp.EncodeToBytes(validators[i])
+		if err == nil {
+			bc.validatorCache.Add("vs-"+string(validators[i].Address.Bytes()), by)
+		}
+	}
+	return nil
+}
+
+// DeleteValidatorData deletes the snapshot staking information of given validator address
+func (bc *BlockChain) DeleteValidatorsSnapshot(addrs []common.Address) error {
+	batch := bc.db.NewBatch()
+	for i := range addrs {
+		rawdb.DeleteValidatorSnapshot(batch, addrs[i])
+	}
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	for i := range addrs {
+		bc.validatorCache.Remove("vs-" + string(addrs[i].Bytes()))
+	}
 	return nil
 }
 
@@ -2314,18 +2393,62 @@ func (bc *BlockChain) ReadValidatorList() ([]common.Address, error) {
 		}
 		return m, nil
 	}
-	return rawdb.ReadValidatorList(bc.db)
+	return rawdb.ReadValidatorList(bc.db, false)
 }
 
 // WriteValidatorList writes the list of validator addresses to database
 func (bc *BlockChain) WriteValidatorList(addrs []common.Address) error {
-	err := rawdb.WriteValidatorList(bc.db, addrs)
+	err := rawdb.WriteValidatorList(bc.db, addrs, false)
 	if err != nil {
 		return err
 	}
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err == nil {
 		bc.validatorListCache.Add("validatorList", bytes)
+	}
+	return nil
+}
+
+// ReadActiveValidatorList reads the addresses of active validators
+func (bc *BlockChain) ReadActiveValidatorList() ([]common.Address, error) {
+	if cached, ok := bc.validatorListCache.Get("activeValidatorList"); ok {
+		by := cached.([]byte)
+		m := []common.Address{}
+		if err := rlp.DecodeBytes(by, &m); err != nil {
+			return nil, err
+		}
+		return m, nil
+	}
+	return rawdb.ReadValidatorList(bc.db, true)
+}
+
+// WriteActiveValidatorList writes the list of active validator addresses to database
+func (bc *BlockChain) WriteActiveValidatorList(addrs []common.Address) error {
+	err := rawdb.WriteValidatorList(bc.db, addrs, true)
+	if err != nil {
+		return err
+	}
+	bytes, err := rlp.EncodeToBytes(addrs)
+	if err == nil {
+		bc.validatorListCache.Add("activeValidatorList", bytes)
+	}
+	return nil
+}
+
+// UpdateActiveValidatorsSnapshot updates the list of active validators and updates the content snapshot of the active validators
+func (bc *BlockChain) UpdateActiveValidatorsSnapshot(activeValidators []common.Address) error {
+	prevActiveValidators, err := bc.ReadActiveValidatorList()
+	if err != nil {
+		return err
+	}
+
+	err = bc.DeleteValidatorsSnapshot(prevActiveValidators)
+	if err != nil {
+		return err
+	}
+
+	if err = bc.WriteValidatorsSnapshot(activeValidators); err != nil {
+		return err
 	}
 	return nil
 }
@@ -2413,8 +2536,9 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction) erro
 	return nil
 }
 
-// CurrentValidatorAddresses returns the address of active validators for current epoch
-func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
+// ActiveValidatorAddresses returns the address of active validators for current epoch
+// TODO: should only return those that are selected by epos.
+func (bc *BlockChain) ActiveValidatorAddresses() []common.Address {
 	list, err := bc.ReadValidatorList()
 	if err != nil {
 		return make([]common.Address, 0)
@@ -2428,6 +2552,7 @@ func (bc *BlockChain) CurrentValidatorAddresses() []common.Address {
 		if err != nil {
 			continue
 		}
+		// TODO: double check this logic here.
 		epoch := shard.Schedule.CalcEpochNumber(val.CreationHeight.Uint64())
 		if epoch.Cmp(currentEpoch) >= 0 {
 			// wait for next epoch
