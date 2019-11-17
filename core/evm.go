@@ -19,6 +19,8 @@ package core
 import (
 	"math/big"
 
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/harmony-one/harmony/block"
@@ -38,6 +40,9 @@ type ChainContext interface {
 
 	// ReadValidatorListByDelegator returns the validators list of a delegator
 	ReadValidatorListByDelegator(common.Address) ([]common.Address, error)
+
+	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
+	ReadValidatorSnapshot(common.Address) (*types2.ValidatorWrapper, error)
 }
 
 // NewEVMContext creates a new context for use in the EVM.

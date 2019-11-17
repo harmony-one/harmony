@@ -680,10 +680,10 @@ func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address) {
 }
 
 // ReadValidatorList retrieves staking validator by its address
-// Return only active validators if isActive==true, otherwise, return all validators
-func ReadValidatorList(db DatabaseReader, isActive bool) ([]common.Address, error) {
+// Return only active validators if activeOnly==true, otherwise, return all validators
+func ReadValidatorList(db DatabaseReader, activeOnly bool) ([]common.Address, error) {
 	key := validatorListKey
-	if isActive {
+	if activeOnly {
 		key = activeValidatorListKey
 	}
 	data, err := db.Get(key)
@@ -699,10 +699,10 @@ func ReadValidatorList(db DatabaseReader, isActive bool) ([]common.Address, erro
 }
 
 // WriteValidatorList stores staking validator's information by its address
-// Writes only for active validators if isActive==true, otherwise, writes for all validators
-func WriteValidatorList(db DatabaseWriter, addrs []common.Address, isActive bool) error {
+// Writes only for active validators if activeOnly==true, otherwise, writes for all validators
+func WriteValidatorList(db DatabaseWriter, addrs []common.Address, activeOnly bool) error {
 	key := validatorListKey
-	if isActive {
+	if activeOnly {
 		key = activeValidatorListKey
 	}
 

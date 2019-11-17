@@ -1143,7 +1143,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			return NonStatTy, err
 		}
 
-		// Find all the active validator addresses and do a snapshot
+		// Find all the active validator addresses and store them in db
 		allActiveValidators := []common.Address{}
 		processed := make(map[common.Address]struct{})
 		for i := range *shardState {
@@ -1159,7 +1159,15 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 				}
 			}
 		}
-		bc.UpdateActiveValidatorsSnapshot(allActiveValidators)
+
+		if err := bc.WriteActiveValidatorList(allActiveValidators); err != nil {
+			return NonStatTy, err
+		}
+
+		// Create snapshot for all validators
+		if err := bc.UpdateValidatorSnapshots(); err != nil {
+			return NonStatTy, err
+		}
 	}
 
 	// Do bookkeeping for new staking txns
@@ -2391,23 +2399,20 @@ func (bc *BlockChain) DeleteValidatorSnapshots(addrs []common.Address) error {
 	return nil
 }
 
-// UpdateActiveValidatorsSnapshot updates the list of active validators and updates the content snapshot of the active validators
-func (bc *BlockChain) UpdateActiveValidatorsSnapshot(activeValidators []common.Address) error {
-	prevActiveValidators, err := bc.ReadActiveValidatorList()
+// UpdateValidatorSnapshots updates the content snapshot of all validators
+func (bc *BlockChain) UpdateValidatorSnapshots() error {
+	allValidators, err := bc.ReadValidatorList()
 	if err != nil {
 		return err
 	}
 
-	err = bc.DeleteValidatorSnapshots(prevActiveValidators)
-	if err != nil {
-		return err
-	}
+	// TODO: enable this once we allow validator to delete itself.
+	//err = bc.DeleteValidatorSnapshots(allValidators)
+	//if err != nil {
+	//	return err
+	//}
 
-	if err = bc.WriteValidatorSnapshots(activeValidators); err != nil {
-		return err
-	}
-
-	if err = bc.WriteActiveValidatorList(activeValidators); err != nil {
+	if err := bc.WriteValidatorSnapshots(allValidators); err != nil {
 		return err
 	}
 	return nil
