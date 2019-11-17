@@ -179,7 +179,10 @@ func (e *engineImpl) Finalize(
 	// Only do such at the last block of an epoch
 	if len(header.ShardState()) > 0 {
 		// TODO: make sure we are using the correct validator list
-		validators := chain.ActiveValidatorAddresses()
+		validators, err := chain.ReadActiveValidatorList()
+		if err != nil {
+			return nil, ctxerror.New("failed to read active validators").WithCause(err)
+		}
 		for _, validator := range validators {
 			wrapper := state.GetStakingInfo(validator)
 			if wrapper != nil {

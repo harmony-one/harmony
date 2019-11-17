@@ -2406,6 +2406,10 @@ func (bc *BlockChain) UpdateActiveValidatorsSnapshot(activeValidators []common.A
 	if err = bc.WriteValidatorSnapshots(activeValidators); err != nil {
 		return err
 	}
+
+	if err = bc.WriteActiveValidatorList(activeValidators); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -2542,33 +2546,6 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction) erro
 	default:
 	}
 	return nil
-}
-
-// ActiveValidatorAddresses returns the address of active validators for current epoch
-// TODO: should only return those that are selected by epos.
-func (bc *BlockChain) ActiveValidatorAddresses() []common.Address {
-	list, err := bc.ReadValidatorList()
-	if err != nil {
-		return make([]common.Address, 0)
-	}
-
-	currentEpoch := bc.CurrentBlock().Epoch()
-
-	filtered := []common.Address{}
-	for _, addr := range list {
-		val, err := bc.ValidatorInformation(addr)
-		if err != nil {
-			continue
-		}
-		// TODO: double check this logic here.
-		epoch := shard.Schedule.CalcEpochNumber(val.CreationHeight.Uint64())
-		if epoch.Cmp(currentEpoch) >= 0 {
-			// wait for next epoch
-			continue
-		}
-		filtered = append(filtered, addr)
-	}
-	return filtered
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch
