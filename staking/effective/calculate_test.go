@@ -50,7 +50,7 @@ func init() {
 	}
 
 	// Generate random data, TODO maybe should test both even & odd number slots
-	testingPurchases = generateRandomSlots(21)
+	testingPurchases = generateRandomSlots(20)
 }
 
 func generateRandomSlots(num int) Slots {
@@ -96,7 +96,7 @@ func TestMedian(t *testing.T) {
 	}
 	med := median(testingPurchases)
 	if !med.Equal(expectedResult) {
-		t.Error()
+		t.Errorf("Expected: %s, Got: %s", expectedResult.String(), med.String())
 	}
 }
 
