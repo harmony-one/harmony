@@ -298,13 +298,3 @@ func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash 
 	}
 	return nil
 }
-
-// GetAllValidatorAddresses returns ...
-func (s *PublicTransactionPoolAPI) GetAllValidatorAddresses() ([]common.Address, error) {
-	return s.b.GetAllValidatorAddresses(), nil
-}
-
-// GetActiveValidatorAddresses returns ...
-func (s *PublicTransactionPoolAPI) GetActiveValidatorAddresses() ([]common.Address, error) {
-	return s.b.GetActiveValidatorAddresses(), nil
-}

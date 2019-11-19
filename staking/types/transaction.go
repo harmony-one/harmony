@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"math/big"
+	"reflect"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -34,20 +35,7 @@ func (d *txdata) CopyFrom(d2 *txdata) {
 	d.AccountNonce = d2.AccountNonce
 	d.Price = new(big.Int).Set(d2.Price)
 	d.GasLimit = d2.GasLimit
-	//switch d.Directive { // TODO: make these deep copies.
-	//case DirectiveCreateValidator:
-	//	d.StakeMsg = d2.StakeMsg.(CreateValidator)
-	//case DirectiveEditValidator:
-	//	d.StakeMsg = d2.StakeMsg.(EditValidator)
-	//case DirectiveDelegate:
-	//	d.StakeMsg = d2.StakeMsg.(Delegate)
-	//case DirectiveUndelegate:
-	//	d.StakeMsg = d2.StakeMsg.(Undelegate)
-	//case DirectiveCollectRewards:
-	//	d.StakeMsg = d2.StakeMsg.(CollectRewards)
-	//default:
-	//	return
-	//}
+	d.StakeMsg = reflect.New(reflect.ValueOf(d2.StakeMsg).Elem().Type()).Interface()
 	d.V = new(big.Int).Set(d2.V)
 	d.R = new(big.Int).Set(d2.R)
 	d.S = new(big.Int).Set(d2.S)

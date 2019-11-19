@@ -31,7 +31,7 @@ var (
 	errMinSelfDelegationTooSmall = errors.New("min_self_delegation has to be greater than 1 ONE")
 	errInvalidMaxTotalDelegation = errors.New("max_total_delegation can not be less than min_self_delegation")
 	errCommissionRateTooLarge    = errors.New("commission rate and change rate can not be larger than max commission rate")
-	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100%")
+	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
 )
 
 // ValidatorWrapper contains validator and its delegation information
@@ -45,7 +45,7 @@ type Validator struct {
 	// ECDSA address of the validator
 	Address common.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
-	SlotPubKeys []shard.BlsPublicKey `json:"validating_pub_key" yaml:"validating_pub_key"`
+	SlotPubKeys []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
 	// The stake put by the validator itself
 	Stake *big.Int `json:"stake" yaml:"stake"`
 	// if unbonding, height at which this validator has begun unbonding
