@@ -2,7 +2,6 @@ package hmyapi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"math/big"
@@ -518,7 +517,7 @@ func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]common.Address, e
 func (s *PublicBlockChainAPI) GetValidatorInfo(ctx context.Context, address common.Address) (*RPCValidator, error) {
 	validator := s.b.GetValidatorInformation(address)
 	if validator == nil {
-		return nil, errors.New(fmt.Sprintf("validator not found: %s", address.Hex()))
+		return nil, fmt.Errorf("validator not found: %s", address.Hex())
 	}
 	return newRPCValidator(validator), nil
 }
