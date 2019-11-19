@@ -14,7 +14,7 @@ var (
 )
 
 const (
-	// The number of epochs a undelegated token needs to be before it's released to the delegator's balance
+	// LockPeriodInEpoch is the number of epochs a undelegated token needs to be before it's released to the delegator's balance
 	LockPeriodInEpoch = 14
 )
 
