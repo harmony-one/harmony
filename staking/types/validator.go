@@ -30,6 +30,8 @@ var (
 	errInvalidTotalDelegation    = errors.New("total delegation can not be bigger than max_total_delegation")
 	errMinSelfDelegationTooSmall = errors.New("min_self_delegation has to be greater than 1 ONE")
 	errInvalidMaxTotalDelegation = errors.New("max_total_delegation can not be less than min_self_delegation")
+	errCommissionRateTooLarge    = errors.New("commission rate and change rate can not be larger than max commission rate")
+	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100%")
 )
 
 // ValidatorWrapper contains validator and its delegation information
@@ -103,6 +105,26 @@ func (w *ValidatorWrapper) SanityCheck() error {
 	if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
 		return errInvalidTotalDelegation
 	}
+
+	hundredPercent := numeric.NewDec(1)
+	zeroPercent := numeric.NewDec(0)
+	if w.Validator.Rate.LT(zeroPercent) || w.Validator.Rate.GT(hundredPercent) {
+		return errInvalidComissionRate
+	}
+	if w.Validator.MaxRate.LT(zeroPercent) || w.Validator.MaxRate.GT(hundredPercent) {
+		return errInvalidComissionRate
+	}
+	if w.Validator.MaxChangeRate.LT(zeroPercent) || w.Validator.MaxChangeRate.GT(hundredPercent) {
+		return errInvalidComissionRate
+	}
+
+	if w.Validator.Rate.GT(w.Validator.MaxRate) {
+		return errCommissionRateTooLarge
+	}
+	if w.Validator.MaxChangeRate.GT(w.Validator.MaxRate) {
+		return errCommissionRateTooLarge
+	}
+
 	return nil
 }
 

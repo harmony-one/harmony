@@ -91,6 +91,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	for _, tx := range node.pendingStakingTransactions {
 		pendingStakingTransactions = append(pendingStakingTransactions, tx)
 	}
+	node.pendingStakingTransactions = make(map[common.Hash]*types2.StakingTransaction)
 
 	node.Worker.UpdateCurrent(coinbase)
 	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase); err != nil {

@@ -11,6 +11,8 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/harmony-one/harmony/common/denominations"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -75,9 +77,9 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		pub := shard.BlsPublicKey{}
 		pub.FromLibBLSPublicKey(p)
 
-		ra, _ := numeric.NewDecFromStr("27.27")
-		maxRate, _ := numeric.NewDecFromStr("150.99")
-		maxChangeRate, _ := numeric.NewDecFromStr("0.5")
+		ra, _ := numeric.NewDecFromStr("0.2")
+		maxRate, _ := numeric.NewDecFromStr("1")
+		maxChangeRate, _ := numeric.NewDecFromStr("0.05")
 		if cmdType == "create" {
 			return staking.DirectiveCreateValidator, staking.CreateValidator{
 				Description: &staking.Description{
@@ -92,11 +94,11 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 					MaxRate:       maxRate,
 					MaxChangeRate: maxChangeRate,
 				},
-				MinSelfDelegation:  big.NewInt(10),
-				MaxTotalDelegation: big.NewInt(3000),
+				MinSelfDelegation:  big.NewInt(denominations.One),
+				MaxTotalDelegation: big.NewInt(0).Mul(big.NewInt(denominations.One), big.NewInt(1000)),
 				ValidatorAddress:   common.Address(dAddr),
 				SlotPubKeys:        []shard.BlsPublicKey{pub},
-				Amount:             big.NewInt(100),
+				Amount:             big.NewInt(denominations.One),
 			}
 		}
 		/*
@@ -133,6 +135,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	if oops1 != nil {
 		return oops1
 	}
+
 	tx := new(staking.StakingTransaction)
 	if err := rlp.DecodeBytes(enc, tx); err != nil {
 		return err

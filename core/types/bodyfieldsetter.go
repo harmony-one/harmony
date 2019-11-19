@@ -1,6 +1,9 @@
 package types
 
-import "github.com/harmony-one/harmony/block"
+import (
+	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/staking/types"
+)
 
 // BodyFieldSetter is a body field setter.
 type BodyFieldSetter struct {
@@ -10,6 +13,12 @@ type BodyFieldSetter struct {
 // Transactions sets the Transactions field of the body.
 func (bfs BodyFieldSetter) Transactions(newTransactions []*Transaction) BodyFieldSetter {
 	bfs.b.SetTransactions(newTransactions)
+	return bfs
+}
+
+// StakingTransactions sets the StakingTransactions field of the body.
+func (bfs BodyFieldSetter) StakingTransactions(newStakingTransactions []*types.StakingTransaction) BodyFieldSetter {
+	bfs.b.SetStakingTransactions(newStakingTransactions)
 	return bfs
 }
 
