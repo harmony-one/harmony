@@ -13,6 +13,11 @@ var (
 	errInvalidAmount       = errors.New("Invalid amount, must be positive")
 )
 
+const (
+	// LockPeriodInEpoch is the number of epochs a undelegated token needs to be before it's released to the delegator's balance
+	LockPeriodInEpoch = 14
+)
+
 // Delegation represents the bond with tokens held by an account. It is
 // owned by one delegator, and is associated with the voting power of one
 // validator.
@@ -92,4 +97,21 @@ func (d *Delegation) DeleteEntry(epoch *big.Int) {
 	if entries != nil {
 		d.Entries = entries
 	}
+}
+
+// RemoveUnlockedUndelegations removes all fully unlocked undelegations and returns the total sum
+func (d *Delegation) RemoveUnlockedUndelegations(curEpoch *big.Int) *big.Int {
+	totalWithdraw := big.NewInt(0)
+	count := 0
+	for j := range d.Entries {
+		if big.NewInt(0).Sub(curEpoch, d.Entries[j].Epoch).Int64() > LockPeriodInEpoch { // need to wait at least 14 epochs to withdraw;
+			totalWithdraw.Add(totalWithdraw, d.Entries[j].Amount)
+			count++
+		} else {
+			break
+		}
+
+	}
+	d.Entries = d.Entries[count:]
+	return totalWithdraw
 }

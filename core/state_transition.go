@@ -378,8 +378,13 @@ func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValid
 	}
 	newRate := wrapper.Validator.Rate
 
-	// TODO: Use snapshot of validator in this epoch.
-	rateAtBeginningOfEpoch := wrapper.Validator.Rate
+	// TODO: make sure we are reading from the correct snapshot
+	snapshotValidator, err := st.bc.ReadValidatorSnapshot(wrapper.Address)
+	if err != nil {
+		return err
+	}
+	rateAtBeginningOfEpoch := snapshotValidator.Rate
+
 	if rateAtBeginningOfEpoch.IsNil() || (!newRate.IsNil() && !rateAtBeginningOfEpoch.Equal(newRate)) {
 		wrapper.Validator.UpdateHeight = blockNum
 	}

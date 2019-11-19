@@ -73,6 +73,20 @@ func (b *BodyV1) SetTransactions(newTransactions []*Transaction) {
 	b.f.Transactions = txs
 }
 
+// SetStakingTransactions sets the list of staking transactions with a deep copy of the given
+// list. (not supported by Body V1)
+func (b *BodyV1) SetStakingTransactions(newTransactions []*staking.StakingTransaction) {
+	// not supported
+	return
+}
+
+// StakingTransactionAt returns the staking transaction at the given index in this block.
+// It returns nil if index is out of bounds. (not supported by Body V1)
+func (b *BodyV1) StakingTransactionAt(index int) *staking.StakingTransaction {
+	// not supported
+	return nil
+}
+
 // Uncles returns a deep copy of the list of uncle headers of this block.
 func (b *BodyV1) Uncles() (uncles []*block.Header) {
 	for _, uncle := range b.f.Uncles {

@@ -400,23 +400,21 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 func (node *Node) AddNewBlock(newBlock *types.Block) error {
 	_, err := node.Blockchain().InsertChain([]*types.Block{newBlock}, true /* verifyHeaders */)
 
-	/*
-		// Debug only
-		addrs, err := node.Blockchain().ReadValidatorList()
-		utils.Logger().Debug().Msgf("validator list updated, err=%v, len(addrs)=%v", err, len(addrs))
-		for i, addr := range addrs {
-			val, err := node.Blockchain().ValidatorInformation(addr)
-			if err != nil {
-				utils.Logger().Debug().Msgf("ValidatorInformation Error %v: err %v", i, err)
-			}
-			utils.Logger().Debug().Msgf("ValidatorInformation %v: %v", i, val)
-		}
-		currAddrs := node.Blockchain().ActiveValidatorAddresses()
-		utils.Logger().Debug().Msgf("CurrentValidators : %v", currAddrs)
-		candidates := node.Blockchain().ValidatorCandidates()
-		utils.Logger().Debug().Msgf("CandidateValidators : %v", candidates)
-		// Finish debug
-	*/
+	// Debug only
+	//addrs, err := node.Blockchain().ReadValidatorList()
+	//utils.Logger().Debug().Msgf("validator list updated, err=%v, len(addrs)=%v", err, len(addrs))
+	//for i, addr := range addrs {
+	//	val, err := node.Blockchain().ValidatorInformation(addr)
+	//	if err != nil {
+	//		utils.Logger().Debug().Msgf("ValidatorInformation Error %v: err %v", i, err)
+	//	}
+	//	utils.Logger().Debug().Msgf("ValidatorInformation %v: %v", i, val)
+	//}
+	//currAddrs, err := node.Blockchain().ReadActiveValidatorList()
+	//utils.Logger().Debug().Msgf("CurrentValidators : %v", currAddrs)
+	//candidates := node.Blockchain().ValidatorCandidates()
+	//utils.Logger().Debug().Msgf("CandidateValidators : %v", candidates)
+	// Finish debug
 
 	if err != nil {
 		utils.Logger().Error().

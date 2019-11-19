@@ -74,7 +74,7 @@ type Backend interface {
 	IsLeader() bool
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
 	GetActiveValidatorAddresses() []common.Address
-	GetValidatorCandidates() []common.Address
+	GetAllValidatorAddresses() []common.Address
 	GetValidatorInformation(addr common.Address) *staking.Validator
 	GetDelegatorsInformation(addr common.Address) []*staking.Delegation
 	GetValidatorStakingWithDelegation(addr common.Address) *big.Int
