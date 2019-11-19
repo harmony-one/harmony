@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"math/big"
 	"sort"
-	"fmt"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/numeric"
@@ -63,7 +61,7 @@ func (s Slots) JSON() string {
 		}
 		data.Slots = append(data.Slots, newData)
 	}
-	b, _ := json.MarshalIndent(data, "", "\t")
+	b, _ := json.Marshal(data)
 	return string(b)
 }
 
@@ -77,12 +75,10 @@ func median(stakes []SlotPurchase) numeric.Dec {
 	case isEven:
 		left := (l / 2) - 1
 		right := (l / 2)
-		msg := fmt.Sprintf("Len(stakes) is even. Left = %d. Right = %d.", left, right)
-		utils.Logger().Info().Str("median", strconv.FormatInt(int64(len(stakes)), 10)).Msg(msg)
+		utils.Logger().Info().Int("left", left).Int("right", right)
 		return stakes[left].Dec.Add(stakes[right].Dec).Quo(two)
 	default:
-		msg := fmt.Sprintf("Median index = %d", l / 2)
-		utils.Logger().Info().Str("median", strconv.FormatInt(int64(len(stakes)), 10)).Msg(msg)
+		utils.Logger().Info().Int("median index", l / 2)
 		return stakes[l/2].Dec
 	}
 }

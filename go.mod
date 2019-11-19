@@ -58,10 +58,14 @@ require (
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
-	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443
-	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
-	golang.org/x/sys v0.0.0-20190801041406-cbf593c0f2f3 // indirect
-	golang.org/x/tools v0.0.0-20190924052046-3ac2a5bbd98a
+	golang.org/x/crypto v0.0.0-20191117063200-497ca9f6d64f
+	golang.org/x/lint v0.0.0-20190930215403-16217165b5de
+	golang.org/x/net v0.0.0-20191118183410-d06c31c94cae // indirect
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
+	golang.org/x/sys v0.0.0-20191118133127-cf1e2d577169 // indirect
+	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/tools v0.0.0-20191118222007-07fc4c7f2b98
+	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 	google.golang.org/appengine v1.4.0 // indirect
 	google.golang.org/grpc v1.22.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
