@@ -6,10 +6,10 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/internal/utils"
-	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // medium.com/harmony-one/introducing-harmonys-effective-proof-of-stake-epos-2d39b4b8d58
