@@ -57,8 +57,6 @@ func generateRandomSlots(num int) Slots {
 	for i := 0; i < num; i++ {
 		addr := common.Address{}
 		addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
-		// key := shard.BlsPublicKey{}
-		// copy(key[:], randomKey())
 		secretKey := bls.SecretKey{}
 		secretKey.Deserialize(big.NewInt(int64(keyGen.Int63n(maxKeyGen))).Bytes())
 		key := shard.BlsPublicKey{}
