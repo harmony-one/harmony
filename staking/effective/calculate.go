@@ -4,10 +4,14 @@ import (
 	"encoding/json"
 	"math/big"
 	"sort"
+	"fmt"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/internal/utils"
+	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 // medium.com/harmony-one/introducing-harmonys-effective-proof-of-stake-epos-2d39b4b8d58
@@ -43,9 +47,23 @@ type Slots []SlotPurchase
 // JSON is a plain JSON dump
 func (s Slots) JSON() string {
 	type t struct {
-		Slots []SlotPurchase `json:"slots"`
+		Address string `json:"slot-owner"`
+		Key     string `json:"bls-public-key"`
+		Stake   string `json:"actual-stake"`
 	}
-	b, _ := json.Marshal(t{s})
+	type v struct {
+		Slots []t `json:"slots"`
+	}
+	data := v{}
+	for i := range s {
+		newData := t{
+			common2.MustAddressToBech32(s[i].Address),
+			s[i].BlsPublicKey.Hex(),
+			s[i].Dec.String(),
+		}
+		data.Slots = append(data.Slots, newData)
+	}
+	b, _ := json.MarshalIndent(data, "", "\t")
 	return string(b)
 }
 
@@ -57,8 +75,14 @@ func median(stakes []SlotPurchase) numeric.Dec {
 	const isEven = 0
 	switch l := len(stakes); l % 2 {
 	case isEven:
-		return stakes[(l/2)-1].Dec.Add(stakes[(l/2)+1].Dec).Quo(two)
+		left := (l / 2) - 1
+		right := (l / 2)
+		msg := fmt.Sprintf("Len(stakes) is even. Left = %d. Right = %d.", left, right)
+		utils.Logger().Info().Str("median", strconv.FormatInt(int64(len(stakes)), 10)).Msg(msg)
+		return stakes[left].Dec.Add(stakes[right].Dec).Quo(two)
 	default:
+		msg := fmt.Sprintf("Median index = %d", l / 2)
+		utils.Logger().Info().Str("median", strconv.FormatInt(int64(len(stakes)), 10)).Msg(msg)
 		return stakes[l/2].Dec
 	}
 }
