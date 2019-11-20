@@ -33,13 +33,7 @@ func (d *txdata) CopyFrom(d2 *txdata) {
 	d.AccountNonce = d2.AccountNonce
 	d.Price = new(big.Int).Set(d2.Price)
 	d.GasLimit = d2.GasLimit
-	// TODO: add code to protect crashing
-	// This is workaround, direct RLP encoding/decoding not work
-	payload, _ := rlp.EncodeToBytes(d2.StakeMsg)
-	restored, _ := RLPDecodeStakeMsg(
-		payload, d2.Directive,
-	)
-	d.StakeMsg = restored.(StakeMsg).Copy()
+	// d.StakeMsg = reflect.New(reflect.ValueOf(d2.StakeMsg).Elem().Type()).Interface()
 	d.V = new(big.Int).Set(d2.V)
 	d.R = new(big.Int).Set(d2.R)
 	d.S = new(big.Int).Set(d2.S)
