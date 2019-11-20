@@ -30,11 +30,11 @@ type txdata struct {
 }
 
 func (d *txdata) CopyFrom(d2 *txdata) {
-	d.Directive = d2.Directive
 	d.AccountNonce = d2.AccountNonce
 	d.Price = new(big.Int).Set(d2.Price)
 	d.GasLimit = d2.GasLimit
-	d.StakeMsg = d2.StakeMsg
+	// TODO: add code to protect crashing
+	d.StakeMsg = d2.StakeMsg.(StakeMsg).Copy()
 	d.V = new(big.Int).Set(d2.V)
 	d.R = new(big.Int).Set(d2.R)
 	d.S = new(big.Int).Set(d2.S)
