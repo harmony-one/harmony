@@ -14,6 +14,12 @@ import (
 // Directive says what kind of payload follows
 type Directive byte
 
+// StakeMsg defines the interface of Stake Message
+type StakeMsg interface {
+	Type() Directive
+	Copy() StakeMsg
+}
+
 const (
 	// DirectiveCreateValidator ...
 	DirectiveCreateValidator Directive = iota
@@ -85,4 +91,63 @@ type Undelegate struct {
 // CollectRewards - type for collecting token rewards
 type CollectRewards struct {
 	DelegatorAddress common.Address `json:"delegator_address" yaml:"delegator_address"`
+}
+
+// Type of CreateValidator
+func (v CreateValidator) Type() Directive {
+	return DirectiveCreateValidator
+}
+
+// Type of EditValidator
+func (v EditValidator) Type() Directive {
+	return DirectiveEditValidator
+}
+
+// Type of Delegate
+func (v Delegate) Type() Directive {
+	return DirectiveDelegate
+}
+
+// Type of Undelegate
+func (v Undelegate) Type() Directive {
+	return DirectiveUndelegate
+}
+
+// Type of CollectRewards
+func (v CollectRewards) Type() Directive {
+	return DirectiveCollectRewards
+}
+
+// Copy deep copy of the interface
+func (v CreateValidator) Copy() StakeMsg {
+	v1 := v
+	desc := *v.Description
+	v1.Description = &desc
+	return v1
+}
+
+// Copy deep copy of the interface
+func (v EditValidator) Copy() StakeMsg {
+	v1 := v
+	desc := *v.Description
+	v1.Description = &desc
+	return v1
+}
+
+// Copy deep copy of the interface
+func (v Delegate) Copy() StakeMsg {
+	v1 := v
+	return v1
+}
+
+// Copy deep copy of the interface
+func (v Undelegate) Copy() StakeMsg {
+	v1 := v
+	return v1
+}
+
+// Copy deep copy of the interface
+func (v CollectRewards) Copy() StakeMsg {
+	v1 := v
+	return v1
 }
