@@ -6,6 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harmony-one/harmony/shard"
+
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -58,6 +62,20 @@ type HeaderInformation struct {
 	UnixTime         uint64      `json:"unixtime"`
 	LastCommitSig    string      `json:"lastCommitSig"`
 	LastCommitBitmap string      `json:"lastCommitBitmap"`
+}
+
+// RPCValidator represents a validator
+type RPCValidator struct {
+	Address            common.Address       `json:"address"`
+	SlotPubKeys        []shard.BlsPublicKey `json:"slot_pub_keys"`
+	Stake              *big.Int             `json:"stake" yaml:"stake"`
+	UnbondingHeight    *big.Int             `json:"unbonding_height"`
+	MinSelfDelegation  *big.Int             `json:"min_self_delegation"`
+	MaxTotalDelegation *big.Int             `json:"min_self_delegation"`
+	Active             bool                 `json:"active"`
+	Commission         types2.Commission    `json:"commission"`
+	Description        types2.Description   `json:"description"`
+	CreationHeight     *big.Int             `json:"creation_height"`
 }
 
 func newHeaderInformation(header *block.Header) *HeaderInformation {
@@ -116,6 +134,21 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 	result.To = toAddr
 
 	return result
+}
+
+func newRPCValidator(validator *types2.Validator) *RPCValidator {
+	return &RPCValidator{
+		validator.Address,
+		validator.SlotPubKeys,
+		validator.Stake,
+		validator.UnbondingHeight,
+		validator.MinSelfDelegation,
+		validator.MaxTotalDelegation,
+		validator.Active,
+		validator.Commission,
+		validator.Description,
+		validator.CreationHeight,
+	}
 }
 
 // newRPCTransaction returns a transaction that will serialize to the RPC

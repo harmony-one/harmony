@@ -90,6 +90,10 @@ type BodyInterface interface {
 	// It returns nil if index is out of bounds.
 	TransactionAt(index int) *Transaction
 
+	// StakingTransactionAt returns the staking transaction at the given index in this block.
+	// It returns nil if index is out of bounds.
+	StakingTransactionAt(index int) *staking.StakingTransaction
+
 	// CXReceiptAt returns the CXReceipt given index (calculated from IncomingReceipts)
 	// It returns nil if index is out of bounds
 	CXReceiptAt(index int) *CXReceipt
@@ -97,6 +101,10 @@ type BodyInterface interface {
 	// SetTransactions sets the list of transactions with a deep copy of the
 	// given list.
 	SetTransactions(newTransactions []*Transaction)
+
+	// SetStakingTransactions sets the list of staking transactions with a deep copy of the
+	// given list.
+	SetStakingTransactions(newStakingTransactions []*staking.StakingTransaction)
 
 	// Uncles returns a deep copy of the list of uncle headers of this block.
 	Uncles() []*block.Header
@@ -190,11 +198,11 @@ func init() {
 
 // Block represents an entire block in the Harmony blockchain.
 type Block struct {
-	header           *block.Header
-	uncles           []*block.Header
-	transactions     Transactions
-	stks             staking.StakingTransactions
-	incomingReceipts CXReceiptsProofs
+	header              *block.Header
+	uncles              []*block.Header
+	transactions        Transactions
+	stakingTransactions staking.StakingTransactions
+	incomingReceipts    CXReceiptsProofs
 
 	// caches
 	hash atomic.Value
@@ -301,8 +309,8 @@ func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, out
 	}
 
 	if len(stks) > 0 {
-		b.stks = make(staking.StakingTransactions, len(stks))
-		copy(b.stks, stks)
+		b.stakingTransactions = make(staking.StakingTransactions, len(stks))
+		copy(b.stakingTransactions, stks)
 	}
 
 	return b
@@ -332,7 +340,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	}
 	switch eb := eb.(type) {
 	case *extblockV2:
-		b.header, b.uncles, b.transactions, b.incomingReceipts, b.stks = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts, eb.Stks
+		b.header, b.uncles, b.transactions, b.incomingReceipts, b.stakingTransactions = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts, eb.Stks
 	case *extblockV1:
 		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
 	case *extblock:
@@ -349,7 +357,7 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
 	switch h := b.header.Header.(type) {
 	case *v3.Header:
-		eb = extblockV2{b.header, b.transactions, b.stks, b.uncles, b.incomingReceipts}
+		eb = extblockV2{b.header, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
 	case *v2.Header, *v1.Header:
 		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
 	case *v0.Header:
@@ -376,7 +384,7 @@ func (b *Block) Transactions() Transactions {
 
 // StakingTransactions returns stakingTransactions.
 func (b *Block) StakingTransactions() staking.StakingTransactions {
-	return b.stks
+	return b.stakingTransactions
 }
 
 // IncomingReceipts returns verified outgoing receipts
@@ -454,6 +462,7 @@ func (b *Block) Body() *Body {
 	}
 	return body.With().
 		Transactions(b.transactions).
+		StakingTransactions(b.stakingTransactions).
 		Uncles(b.uncles).
 		IncomingReceipts(b.incomingReceipts).
 		Body()

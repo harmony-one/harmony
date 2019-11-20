@@ -684,7 +684,7 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	return root, err
 }
 
-// GetStakingInfo update staking information of a given validator (including delegation info)
+// GetStakingInfo returns staking information of a given validator (including delegation info)
 func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
 	by := db.GetCode(addr)
 	if len(by) == 0 {

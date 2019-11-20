@@ -354,7 +354,7 @@ func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.Creat
 	delegations := []staking.Delegation{}
 	delegations = append(delegations, staking.NewDelegation(v.Address, createValidator.Amount))
 
-	wrapper := staking.ValidatorWrapper{*v, delegations, nil, nil}
+	wrapper := staking.ValidatorWrapper{*v, delegations}
 
 	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
 		return err
@@ -378,8 +378,13 @@ func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValid
 	}
 	newRate := wrapper.Validator.Rate
 
-	// TODO: Use snapshot of validator in this epoch.
-	rateAtBeginningOfEpoch := wrapper.Validator.Rate
+	// TODO: make sure we are reading from the correct snapshot
+	snapshotValidator, err := st.bc.ReadValidatorSnapshot(wrapper.Address)
+	if err != nil {
+		return err
+	}
+	rateAtBeginningOfEpoch := snapshotValidator.Rate
+
 	if rateAtBeginningOfEpoch.IsNil() || (!newRate.IsNil() && !rateAtBeginningOfEpoch.Equal(newRate)) {
 		wrapper.Validator.UpdateHeight = blockNum
 	}

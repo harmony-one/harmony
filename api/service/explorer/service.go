@@ -282,8 +282,8 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			curEpoch = int64(block.Epoch)
 		}
 		if withSigners {
-			pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-			for i, validator := range committee.NodeList {
+			pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+			for i, validator := range committee.Slots {
 				pubkeys[i] = new(bls.PublicKey)
 				validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 			}
@@ -291,7 +291,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			if err == nil && accountBlocks[id+1] != nil {
 				err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
 				if err == nil {
-					for _, validator := range committee.NodeList {
+					for _, validator := range committee.Slots {
 						oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
 						if err != nil {
 							continue
@@ -403,8 +403,8 @@ func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offs
 			curEpoch = int64(block.Epoch)
 		}
 		if withSigners {
-			pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-			for i, validator := range committee.NodeList {
+			pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+			for i, validator := range committee.Slots {
 				pubkeys[i] = new(bls.PublicKey)
 				validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 			}
@@ -412,7 +412,7 @@ func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offs
 			if err == nil && accountBlocks[id+1] != nil {
 				err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
 				if err == nil {
-					for _, validator := range committee.NodeList {
+					for _, validator := range committee.Slots {
 						oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
 						if err != nil {
 							continue
@@ -592,7 +592,7 @@ func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	validators := &Committee{}
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		validatorBalance := big.NewInt(0)
 		validatorBalance, err := s.GetAccountBalance(validator.EcdsaAddress)
 		if err != nil {
@@ -645,7 +645,7 @@ func (s *ServiceAPI) GetExplorerCommittee(ctx context.Context, shardID uint32, e
 		return nil, err
 	}
 	validators := &Committee{}
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		validatorBalance := big.NewInt(0)
 		validatorBalance, err := s.Service.GetAccountBalance(validator.EcdsaAddress)
 		if err != nil {

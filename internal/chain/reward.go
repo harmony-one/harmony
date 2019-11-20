@@ -66,7 +66,7 @@ func AccumulateRewards(
 		)
 	}
 	var committerKeys []*bls.PublicKey
-	for _, member := range parentCommittee.NodeList {
+	for _, member := range parentCommittee.Slots {
 		committerKey := new(bls.PublicKey)
 		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {
@@ -86,7 +86,7 @@ func AccumulateRewards(
 	accounts := []common.Address{}
 	missing := shard.NodeIDList{}
 
-	for idx, member := range parentCommittee.NodeList {
+	for idx, member := range parentCommittee.Slots {
 		switch signed, err := mask.IndexEnabled(idx); true {
 		case err != nil:
 			return ctxerror.New("cannot check for committer bit",
@@ -119,28 +119,6 @@ func AccumulateRewards(
 		common.Address
 		*big.Int
 	}{}
-
-	// fmt.Println("Calling reward", rewarder)
-
-	// hack :=
-
-	type t struct {
-		Count   int      `json:"count"`
-		Members []string `json:"members"`
-		ShardID uint32   `json:"shard-id"`
-	}
-
-	// g := rewarder.(quorum.Decider).DumpParticipants()
-
-	// if e := parentHeader.Epoch(); e.Cmp(big.NewInt(0)) == 0 {
-	// 	b, _ := json.Marshal(t{len(g), g, parentHeader.ShardID()})
-	// 	fmt.Println("epoch", e, string(b), "\n")
-	// }
-
-	// if e := parentHeader.Epoch(); e.Cmp(big.NewInt(1)) == 0 {
-	// 	b, _ := json.Marshal(t{len(g), g, parentHeader.ShardID()})
-	// fmt.Println("epoch", e, string(b), "\n")
-	// }
 
 	totalAmount := rewarder.Award(
 		BlockReward, accounts, func(receipient common.Address, amount *big.Int) {

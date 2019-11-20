@@ -51,6 +51,15 @@ func (b *BodyV2) TransactionAt(index int) *Transaction {
 	return b.f.Transactions[index].Copy()
 }
 
+// StakingTransactionAt returns the staking transaction at the given index in this block.
+// It returns nil if index is out of bounds.
+func (b *BodyV2) StakingTransactionAt(index int) *staking.StakingTransaction {
+	if index < 0 || index >= len(b.f.StakingTransactions) {
+		return nil
+	}
+	return b.f.StakingTransactions[index].Copy()
+}
+
 // CXReceiptAt returns the CXReceipt at given index in this block
 // It returns nil if index is out of bounds
 func (b *BodyV2) CXReceiptAt(index int) *CXReceipt {

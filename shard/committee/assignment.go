@@ -85,12 +85,12 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.State {
 			pubKey := shard.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := shard.NodeID{
+			curNodeID := shard.Slot{
 				common2.ParseAddr(hmyAccounts[index].Address),
 				pubKey,
 				nil,
 			}
-			com.NodeList = append(com.NodeList, curNodeID)
+			com.Slots = append(com.Slots, curNodeID)
 		}
 		// add FN runner's key
 		for j := shardHarmonyNodes; j < shardSize; j++ {
@@ -100,12 +100,12 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.State {
 			pubKey := shard.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := shard.NodeID{
+			curNodeID := shard.Slot{
 				common2.ParseAddr(fnAccounts[index].Address),
 				pubKey,
 				nil,
 			}
-			com.NodeList = append(com.NodeList, curNodeID)
+			com.Slots = append(com.Slots, curNodeID)
 		}
 		shardState = append(shardState, com)
 	}
@@ -137,7 +137,7 @@ func eposStakedCommittee(
 	hAccounts := s.HmyAccounts()
 
 	for i := 0; i < shardCount; i++ {
-		superComm[i] = shard.Committee{uint32(i), shard.NodeIDList{}}
+		superComm[i] = shard.Committee{uint32(i), shard.SlotList{}}
 	}
 
 	for i := range hAccounts {
@@ -146,7 +146,7 @@ func eposStakedCommittee(
 		pub.DeserializeHexStr(hAccounts[i].BlsPublicKey)
 		pubKey := shard.BlsPublicKey{}
 		pubKey.FromLibBLSPublicKey(pub)
-		superComm[spot].NodeList = append(superComm[spot].NodeList, shard.NodeID{
+		superComm[spot].Slots = append(superComm[spot].Slots, shard.Slot{
 			common2.ParseAddr(hAccounts[i].Address),
 			pubKey,
 			nil,
@@ -164,7 +164,7 @@ func eposStakedCommittee(
 	for i := 0; i < stakedSlotsCount; i++ {
 		bucket := int(new(big.Int).Mod(staked[i].BlsPublicKey.Big(), shardBig).Int64())
 		slot := staked[i]
-		superComm[bucket].NodeList = append(superComm[bucket].NodeList, shard.NodeID{
+		superComm[bucket].Slots = append(superComm[bucket].Slots, shard.Slot{
 			slot.Address,
 			staked[i].BlsPublicKey,
 			&slot.Dec,
@@ -194,10 +194,10 @@ func (def partialStakingEnabled) ComputePublicKeys(
 	allIdentities := make([][]*bls.PublicKey, len(superComm))
 
 	for i := range superComm {
-		allIdentities[i] = make([]*bls.PublicKey, len(superComm[i].NodeList))
-		for j := range superComm[i].NodeList {
+		allIdentities[i] = make([]*bls.PublicKey, len(superComm[i].Slots))
+		for j := range superComm[i].Slots {
 			identity := &bls.PublicKey{}
-			superComm[i].NodeList[j].BlsPublicKey.ToLibBLSPublicKey(identity)
+			superComm[i].Slots[j].BlsPublicKey.ToLibBLSPublicKey(identity)
 			allIdentities[i][j] = identity
 		}
 	}
@@ -223,12 +223,12 @@ func (def partialStakingEnabled) ReadPublicKeysFromDB(
 	}
 	committerKeys := []*bls.PublicKey{}
 
-	for i := range subCommittee.NodeList {
+	for i := range subCommittee.Slots {
 		committerKey := new(bls.PublicKey)
-		err := subCommittee.NodeList[i].BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		err := subCommittee.Slots[i].BlsPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {
 			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", subCommittee.NodeList[i].BlsPublicKey).WithCause(err)
+				"blsPublicKey", subCommittee.Slots[i].BlsPublicKey).WithCause(err)
 		}
 		committerKeys = append(committerKeys, committerKey)
 	}

@@ -34,27 +34,27 @@ type State []Committee
 // BlsPublicKey defines the bls public key
 type BlsPublicKey [PublicKeySizeInBytes]byte
 
-// NodeID represents node id (BLS address)
-type NodeID struct {
+// Slot represents node id (BLS address)
+type Slot struct {
 	EcdsaAddress common.Address `json:"ecdsa-address"`
 	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
-	// nil means not active, 0 means our node, >= 0 means staked node
+	// nil means our node, 0 means not active, >= 0 means staked node
 	StakeWithDelegationApplied *numeric.Dec `json:"staked-validator" rlp:"nil"`
 }
 
-// NodeIDList is a list of NodeIDList.
-type NodeIDList []NodeID
+// SlotList is a list of SlotList.
+type SlotList []Slot
 
 // Committee contains the active nodes in one shard
 type Committee struct {
-	ShardID  uint32     `json:"shard-id"`
-	NodeList NodeIDList `json:"subcommittee"`
+	ShardID uint32   `json:"shard-id"`
+	Slots   SlotList `json:"subcommittee"`
 }
 
 // JSON produces a non-pretty printed JSON string of the SuperCommittee
 func (ss State) JSON() string {
 	type t struct {
-		NodeID
+		Slot
 		EcdsaAddress string `json:"ecdsa-address"`
 	}
 	type v struct {
@@ -64,12 +64,12 @@ func (ss State) JSON() string {
 	}
 	dump := make([]v, len(ss))
 	for i := range ss {
-		c := len(ss[i].NodeList)
+		c := len(ss[i].Slots)
 		dump[i].ShardID = ss[i].ShardID
 		dump[i].NodeList = make([]t, c)
 		dump[i].Count = c
-		for j := range ss[i].NodeList {
-			n := ss[i].NodeList[j]
+		for j := range ss[i].Slots {
+			n := ss[i].Slots[j]
 			dump[i].NodeList[j].BlsPublicKey = n.BlsPublicKey
 			dump[i].NodeList[j].StakeWithDelegationApplied = n.StakeWithDelegationApplied
 			dump[i].NodeList[j].EcdsaAddress = common2.MustAddressToBech32(n.EcdsaAddress)
@@ -166,7 +166,7 @@ func CompareBlsPublicKey(k1, k2 BlsPublicKey) int {
 }
 
 // CompareNodeID compares two node IDs.
-func CompareNodeID(id1, id2 *NodeID) int {
+func CompareNodeID(id1, id2 *Slot) int {
 	if c := bytes.Compare(id1.EcdsaAddress[:], id2.EcdsaAddress[:]); c != 0 {
 		return c
 	}
@@ -177,12 +177,12 @@ func CompareNodeID(id1, id2 *NodeID) int {
 }
 
 // DeepCopy returns a deep copy of the receiver.
-func (l NodeIDList) DeepCopy() NodeIDList {
+func (l SlotList) DeepCopy() SlotList {
 	return append(l[:0:0], l...)
 }
 
 // CompareNodeIDList compares two node ID lists.
-func CompareNodeIDList(l1, l2 NodeIDList) int {
+func CompareNodeIDList(l1, l2 SlotList) int {
 	commonLen := len(l1)
 	if commonLen > len(l2) {
 		commonLen = len(l2)
@@ -205,7 +205,7 @@ func CompareNodeIDList(l1, l2 NodeIDList) int {
 func (c Committee) DeepCopy() Committee {
 	r := Committee{}
 	r.ShardID = c.ShardID
-	r.NodeList = c.NodeList.DeepCopy()
+	r.Slots = c.Slots.DeepCopy()
 	return r
 }
 
@@ -217,7 +217,7 @@ func CompareCommittee(c1, c2 *Committee) int {
 	case c1.ShardID > c2.ShardID:
 		return +1
 	}
-	if c := CompareNodeIDList(c1.NodeList, c2.NodeList); c != 0 {
+	if c := CompareNodeIDList(c1.Slots, c2.Slots); c != 0 {
 		return c
 	}
 	return 0
@@ -225,7 +225,7 @@ func CompareCommittee(c1, c2 *Committee) int {
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
 // NOTE: do not modify the underlining content for hash
-func GetHashFromNodeList(nodeList []NodeID) []byte {
+func GetHashFromNodeList(nodeList []Slot) []byte {
 	// in general, nodeList should not be empty
 	if nodeList == nil || len(nodeList) == 0 {
 		return []byte{}
@@ -248,7 +248,7 @@ func (ss State) Hash() (h common.Hash) {
 	})
 	d := sha3.NewLegacyKeccak256()
 	for i := range copy {
-		hash := GetHashFromNodeList(copy[i].NodeList)
+		hash := GetHashFromNodeList(copy[i].Slots)
 		d.Write(hash)
 	}
 	d.Sum(h[:0])
@@ -256,15 +256,15 @@ func (ss State) Hash() (h common.Hash) {
 }
 
 // CompareNodeIDByBLSKey compares two nodes by their ID; used to sort node list
-func CompareNodeIDByBLSKey(n1 NodeID, n2 NodeID) int {
+func CompareNodeIDByBLSKey(n1 Slot, n2 Slot) int {
 	return bytes.Compare(n1.BlsPublicKey[:], n2.BlsPublicKey[:])
 }
 
-// Serialize serialize NodeID into bytes
-func (n NodeID) Serialize() []byte {
+// Serialize serialize Slot into bytes
+func (n Slot) Serialize() []byte {
 	return append(n.EcdsaAddress[:], n.BlsPublicKey[:]...)
 }
 
-func (n NodeID) String() string {
+func (n Slot) String() string {
 	return "ECDSA: " + common2.MustAddressToBech32(n.EcdsaAddress) + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:])
 }

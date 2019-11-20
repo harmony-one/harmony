@@ -153,7 +153,7 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 		return nil, err
 	}
 	validators := make([]map[string]interface{}, 0)
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		validatorBalance := new(hexutil.Big)
 		validatorBalance, err = s.b.GetBalance(validator.EcdsaAddress)
 		if err != nil {
@@ -193,8 +193,8 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 	if err != nil {
 		return nil, err
 	}
-	pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-	for i, validator := range committee.NodeList {
+	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+	for i, validator := range committee.Slots {
 		pubkeys[i] = new(bls.PublicKey)
 		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
@@ -210,7 +210,7 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 	if err != nil {
 		return result, err
 	}
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return result, err
@@ -241,8 +241,8 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 	if err != nil {
 		return false, err
 	}
-	pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-	for i, validator := range committee.NodeList {
+	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+	for i, validator := range committee.Slots {
 		pubkeys[i] = new(bls.PublicKey)
 		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
@@ -254,7 +254,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 	if err != nil {
 		return false, err
 	}
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return false, err
@@ -296,33 +296,6 @@ func (s *PublicBlockChainAPI) GetEpoch(ctx context.Context) hexutil.Uint64 {
 // GetLeader returns current shard leader.
 func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 	return s.LatestHeader(ctx).Leader
-}
-
-// GetValidatorInformation returns full validator info.
-func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (map[string]interface{}, error) {
-	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
-	slotPubKeys := make([]string, 0)
-	for _, slotPubKey := range validator.SlotPubKeys {
-		slotPubKeys = append(slotPubKeys, slotPubKey.Hex())
-	}
-	fields := map[string]interface{}{
-		"address":                 validator.Address.String(),
-		"stake":                   hexutil.Uint64(validator.Stake.Uint64()),
-		"name":                    validator.Description.Name,
-		"slotPubKeys":             slotPubKeys,
-		"unbondingHeight":         hexutil.Uint64(validator.UnbondingHeight.Uint64()),
-		"minSelfDelegation":       hexutil.Uint64(validator.MinSelfDelegation.Uint64()),
-		"active":                  validator.Active,
-		"identity":                validator.Description.Identity,
-		"commissionRate":          hexutil.Uint64(validator.Commission.CommissionRates.Rate.Int.Uint64()),
-		"commissionUpdateHeight":  hexutil.Uint64(validator.Commission.UpdateHeight.Uint64()),
-		"commissionMaxRate":       hexutil.Uint64(validator.Commission.CommissionRates.MaxRate.Uint64()),
-		"commissionMaxChangeRate": hexutil.Uint64(validator.Commission.CommissionRates.MaxChangeRate.Uint64()),
-		"website":                 validator.Description.Website,
-		"securityContact":         validator.Description.SecurityContact,
-		"details":                 validator.Description.Details,
-	}
-	return fields, nil
 }
 
 // GetStake returns validator stake.
@@ -528,4 +501,23 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformation {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
 	return newHeaderInformation(header)
+}
+
+// GetAllValidatorAddresses returns all validator addresses.
+func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]common.Address, error) {
+	return s.b.GetAllValidatorAddresses(), nil
+}
+
+// GetActiveValidatorAddresses returns active validator addresses.
+func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]common.Address, error) {
+	return s.b.GetActiveValidatorAddresses(), nil
+}
+
+// GetValidatorInfo returns information about a validator.
+func (s *PublicBlockChainAPI) GetValidatorInfo(ctx context.Context, address common.Address) (*RPCValidator, error) {
+	validator := s.b.GetValidatorInformation(address)
+	if validator == nil {
+		return nil, fmt.Errorf("validator not found: %s", address.Hex())
+	}
+	return newRPCValidator(validator), nil
 }

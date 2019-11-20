@@ -2,7 +2,6 @@ package chain
 
 import (
 	"encoding/binary"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -194,29 +193,23 @@ func (e *engineImpl) Finalize(
 	// Only do such at the last block of an epoch
 	if len(header.ShardState()) > 0 {
 		// TODO: make sure we are using the correct validator list
-		validators := chain.CurrentValidatorAddresses()
+		validators, err := chain.ReadActiveValidatorList()
+		if err != nil {
+			return nil, ctxerror.New("failed to read active validators").WithCause(err)
+		}
 		for _, validator := range validators {
 			wrapper := state.GetStakingInfo(validator)
 			if wrapper != nil {
 				for i := range wrapper.Delegations {
 					delegation := wrapper.Delegations[i]
-					totalWithdraw := big.NewInt(0)
-					count := 0
-					for j := range delegation.Entries {
-						if delegation.Entries[j].Epoch.Cmp(header.Epoch()) > 14 { // need to wait at least 14 epochs to withdraw;
-							totalWithdraw.Add(totalWithdraw, delegation.Entries[j].Amount)
-							count++
-						} else {
-							break
-						}
-
-					}
+					totalWithdraw := delegation.RemoveUnlockedUndelegations(header.Epoch())
 					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
-					delegation.Entries = delegation.Entries[count:]
 				}
 				if err := state.UpdateStakingInfo(validator, wrapper); err != nil {
 					return nil, ctxerror.New("failed update validator info").WithCause(err)
 				}
+			} else {
+				return nil, ctxerror.New("failed getting validator info").WithCause(err)
 			}
 		}
 	}
@@ -244,7 +237,7 @@ func QuorumForBlock(
 		return 0, errors.Errorf(
 			"cannot find shard %d in shard state", h.ShardID())
 	}
-	return (len(c.NodeList))*2/3 + 1, nil
+	return (len(c.Slots))*2/3 + 1, nil
 }
 
 // Similiar to VerifyHeader, which is only for verifying the block headers of one's own chain, this verification
@@ -306,7 +299,7 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 		)
 	}
 	var committerKeys []*bls.PublicKey
-	for _, member := range committee.NodeList {
+	for _, member := range committee.Slots {
 		committerKey := new(bls.PublicKey)
 		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
 		if err != nil {

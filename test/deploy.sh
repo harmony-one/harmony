@@ -59,6 +59,17 @@ function cleanup_and_result() {
    [ -e $RESULT_FILE ] && cat $RESULT_FILE
 }
 
+function debug_staking() {
+   hmy_one_dir="$(go env GOPATH)/src/github.com/harmony-one"
+   hmy_bin="${hmy_one_dir}/go-sdk/hmy"
+   keystore="${hmy_one_dir}/harmony-ops/test-automation/api-tests/LocalnetValidatorKeys"
+   python3 -m pip install pyhmy
+   python3 -m pip install requests
+   python3 "${hmy_one_dir}/harmony-ops/test-automation/api-tests/test.py" --keystore ${keystore} \
+            --cli_path ${hmy_bin} --test_dir "${hmy_one_dir}/harmony-ops/test-automation/api-tests/tests/"  \
+            --rpc_endpoint_src="http://localhost:9500/" --rpc_endpoint_dst="http://localhost:9501/" --ignore_regression_test
+}
+
 trap cleanup_and_result SIGINT SIGTERM
 
 function usage {
@@ -192,6 +203,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 done < $config
 
 if [ "$DOTEST" == "true" ]; then
+   debug_staking
    echo "waiting for some block rewards"
    sleep 60
    i=1
