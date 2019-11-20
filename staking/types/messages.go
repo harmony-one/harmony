@@ -105,7 +105,7 @@ func (v EditValidator) Type() Directive {
 
 // Type of Delegate
 func (v Delegate) Type() Directive {
-	return DirectiveCreateValidator
+	return DirectiveDelegate
 }
 
 // Type of Undelegate

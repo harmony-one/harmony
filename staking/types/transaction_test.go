@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -63,8 +64,12 @@ func TestTransactionCopy(t *testing.T) {
 	tx2 := tx1.Copy()
 
 	cv1 := tx1.data.StakeMsg.(CreateValidator)
+
+	// modify cv1 fields
 	cv1.Amount = big.NewInt(20)
 	cv1.Description.Name = "NewName"
+	newRate, _ := numeric.NewDecFromStr("0.5")
+	cv1.CommissionRates.Rate = newRate
 
 	p := &bls.PublicKey{}
 	p.DeserializeHexStr(testBLSPubKey2)
@@ -87,4 +92,13 @@ func TestTransactionCopy(t *testing.T) {
 	if len(cv1.Description.Name) == len(cv2.Description.Name) {
 		t.Errorf("Description name should not be the same")
 	}
+
+	if cv1.CommissionRates.Rate.Equal(cv2.CommissionRates.Rate) {
+		t.Errorf("CommissionRate should not be equal")
+	}
+
+	fmt.Println("cv1", cv1)
+	fmt.Println("cv2", cv2)
+	fmt.Println("cv1", cv1.Description)
+	fmt.Println("cv2", cv2.Description)
 }
