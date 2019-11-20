@@ -107,7 +107,7 @@ func (v *stakedVoteWeight) Award(
 	return payout
 }
 
-func (v *stakedVoteWeight) UpdateVotingPower(staked shard.NodeIDList) {
+func (v *stakedVoteWeight) UpdateVotingPower(staked shard.SlotList) {
 	s, _ := v.ShardIDProvider()()
 
 	v.validatorStakes = map[[shard.PublicKeySizeInBytes]byte]stakedVoter{}

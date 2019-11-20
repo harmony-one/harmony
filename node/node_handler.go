@@ -377,7 +377,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 				next, node.chainConfig, node.Consensus.ChainReader,
 			)
 			node.Consensus.Decider.UpdateVotingPower(
-				s.FindCommitteeByID(node.Consensus.ShardID).NodeList,
+				s.FindCommitteeByID(node.Consensus.ShardID).Slots,
 			)
 		}
 

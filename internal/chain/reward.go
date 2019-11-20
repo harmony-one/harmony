@@ -84,7 +84,7 @@ func AccumulateRewards(
 	}
 
 	accounts := []common.Address{}
-	missing := shard.NodeIDList{}
+	missing := shard.SlotList{}
 
 	for idx, member := range parentCommittee.Slots {
 		switch signed, err := mask.IndexEnabled(idx); true {

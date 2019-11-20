@@ -107,7 +107,7 @@ type Decider interface {
 	slash.Slasher
 	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
-	UpdateVotingPower(shard.NodeIDList)
+	UpdateVotingPower(shard.SlotList)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
 	QuorumThreshold() *big.Int

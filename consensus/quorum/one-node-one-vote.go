@@ -43,7 +43,7 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 	return v.SignersCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }
 
-func (v *uniformVoteWeight) UpdateVotingPower(shard.NodeIDList) {
+func (v *uniformVoteWeight) UpdateVotingPower(shard.SlotList) {
 	// NO-OP do not add anything here
 }
 
