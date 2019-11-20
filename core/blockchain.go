@@ -1177,7 +1177,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	}
 
 	// Do bookkeeping for new staking txns
-	if bc.chainConfig.IsStaking(block.Epoch()) {
+	//if bc.chainConfig.IsStaking(block.Epoch()) {
 		for _, tx := range block.StakingTransactions() {
 			err = bc.UpdateStakingMetaData(tx, root)
 			// keep offchain database consistency with onchain we need revert
@@ -1188,6 +1188,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			}
 		}
 	}
+	// }
 
 	//// Cross-links
 	if len(header.CrossLinks()) > 0 {
