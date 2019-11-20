@@ -53,7 +53,7 @@ var (
 	name    = "NewName"
 	index   = 0
 	minDele = 777
-	rate    = "0.0"
+	rate    = "0.15"
 
 	testAccounts = []string{
 		"one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy",
@@ -68,6 +68,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	scryptP := keystore.StandardScryptP
 	ks := keystore.NewKeyStore(keystoreDir, scryptN, scryptP)
 	dAddr, _ := common2.Bech32ToAddress(testAccounts[index])
+	dAddr2, _ := common2.Bech32ToAddress(testAccounts[0])
 	account := accounts.Account{Address: dAddr}
 	ks.Unlock(account, testAccountPassword)
 	gasPrice := big.NewInt(1)
@@ -100,6 +101,31 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 				SlotPubKeys:        []shard.BlsPublicKey{pub},
 				Amount:             big.NewInt(denominations.One),
 			}
+		} else if cmdType == "edit" {
+			newRate, _ := numeric.NewDecFromStr(rate)
+			edit := staking.EditValidator{
+				Description: &staking.Description{
+					Name: name,
+				},
+				CommissionRate:   &newRate,
+				ValidatorAddress: common.Address(dAddr),
+			}
+			return staking.DirectiveEditValidator, edit
+		} else if cmdType == "delegate" {
+			return staking.DirectiveDelegate, staking.Delegate{
+				dAddr,
+				dAddr2,
+				big.NewInt(1000),
+			}
+		} else if cmdType == "undelegate" {
+			return staking.DirectiveUndelegate, staking.Undelegate{
+				dAddr,
+				dAddr2,
+				big.NewInt(1000),
+			}
+		}
+		return staking.DirectiveCollectRewards, staking.CollectRewards{
+			dAddr,
 		}
 		/*
 			ValidatorAddress   common.Address      `json:"validator_address" yaml:"validator_address"`
@@ -112,15 +138,6 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 			}
 		*/
 
-		newRate, _ := numeric.NewDecFromStr(rate)
-		return staking.DirectiveEditValidator, staking.EditValidator{
-			Description: &staking.Description{
-				Name: name,
-			},
-			MinSelfDelegation: big.NewInt(int64(minDele)),
-			CommissionRate:    &newRate,
-			ValidatorAddress:  common.Address(dAddr),
-		}
 	}
 
 	stakingTx, err := staking.NewStakingTransaction(uint64(nonce), 600000, gasPrice, stakePayloadMaker)
