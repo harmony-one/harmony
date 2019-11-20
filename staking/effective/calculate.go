@@ -78,7 +78,7 @@ func median(stakes []SlotPurchase) numeric.Dec {
 		utils.Logger().Info().Int("left", left).Int("right", right)
 		return stakes[left].Dec.Add(stakes[right].Dec).Quo(two)
 	default:
-		utils.Logger().Info().Int("median index", l / 2)
+		utils.Logger().Info().Int("median index", l/2)
 		return stakes[l/2].Dec
 	}
 }

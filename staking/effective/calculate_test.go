@@ -70,7 +70,7 @@ func generateRandomSlots(num int) Slots {
 func TestMedian(t *testing.T) {
 	copyPurchases := append([]SlotPurchase{}, testingPurchases...)
 	sort.SliceStable(copyPurchases,
-	        func(i, j int) bool { return copyPurchases[i].Dec.LTE(copyPurchases[j].Dec) })
+		func(i, j int) bool { return copyPurchases[i].Dec.LTE(copyPurchases[j].Dec) })
 	numPurchases := len(copyPurchases) / 2
 	expectedResult := numeric.ZeroDec()
 	if len(copyPurchases)%2 == 0 {
