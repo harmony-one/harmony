@@ -322,16 +322,33 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	// 	fmt.Println("in-committee-", consensus.ShardID, v)
 	// }
 
+	type t struct {
+		Participants  []string `json:"committee-members"`
+		ShardID       uint32   `json:"shard-id"`
+		MissingID     string   `json"missing-key"`
+		CurrentEpoch  uint64   `json:"current-epoch"`
+		CurrentObject uint64   `json:"current-epoch-from-obj"`
+		PossibleError string   `json:"possible-error"`
+	}
+
+	// e := ""
+
+	// if err != nil {
+	// 	e = err.Error()
+	// }
+
+	// b, _ := json.Marshal(t{
+	// 	consensus.Decider.DumpParticipants(),
+	// 	consensus.ShardID,
+	// 	senderKey.SerializeToHexStr(),
+	// 	consensus.ChainReader.CurrentHeader().Epoch().Uint64(),
+	// 	consensus.epoch,
+	// 	e,
+	// })
+	// fmt.Println(string(b))
+
 	if err != nil {
-		fmt.Println("On Prepare is busted =/")
-
-		// type t struct {
-		// 	Participants []string `json:"committee-members"`
-		// 	ShardID      uint32   `json:"shard-id"`
-		// }
-		// b, _ := json.Marshal(t{consensus.Decider.DumpParticipants(), consensus.ShardID})
-		// fmt.Println(string(b))
-
+		// fmt.Println("On Prepare is busted =/", err, "on shard-", consensus.ShardID)
 		utils.Logger().Error().Err(err).Msg("[OnPrepare] VerifySenderKey failed")
 		return
 	}

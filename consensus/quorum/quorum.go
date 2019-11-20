@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	// "github.com/harmony-one/harmony/staking/effective"
@@ -45,6 +46,19 @@ const (
 	SuperMajorityStake
 )
 
+var policyNames = map[Policy]string{
+	SuperMajorityStake: "SuperMajorityStake",
+	SuperMajorityVote:  "SuperMajorityVote",
+}
+
+func (p Policy) String() string {
+	if name, ok := policyNames[p]; ok {
+		return name
+	}
+	return fmt.Sprintf("Unknown Quorum Policy %+v", byte(p))
+
+}
+
 // ParticipantTracker ..
 type ParticipantTracker interface {
 	Participants() []*bls.PublicKey
@@ -81,13 +95,19 @@ type DependencyInjectionReader interface {
 	ShardIDProvider() func() (uint32, error)
 }
 
+//WithJSONDump representation dump
+type WithJSONDump interface {
+	JSON() string
+}
+
 // Decider ..
 type Decider interface {
 	SignatureReader
 	DependencyInjectionWriter
 	slash.Slasher
+	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
-	// UpdateVotingPower(keeper effective.StakeKeeper)
+	UpdateVotingPower(shard.NodeIDList)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
 	QuorumThreshold() *big.Int
@@ -155,7 +175,7 @@ func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
 
 func (s *cIdentities) DumpParticipants() []string {
 	keys := make([]string, len(s.publicKeys))
-	for i := 0; i < len(s.publicKeys); i++ {
+	for i := range s.publicKeys {
 		keys[i] = s.publicKeys[i].SerializeToHexStr()
 	}
 	return keys
@@ -251,6 +271,7 @@ func newMapBackedSignatureReader() *cIdentities {
 
 type composite struct {
 	DependencyInjectionWriter
+	DependencyInjectionReader
 	SignatureReader
 }
 
@@ -266,10 +287,12 @@ func (d *depInject) ShardIDProvider() func() (uint32, error) {
 func NewDecider(p Policy) Decider {
 	signatureStore := newMapBackedSignatureReader()
 	deps := &depInject{}
-	c := &composite{deps, signatureStore}
+	c := &composite{deps, deps, signatureStore}
 	switch p {
 	case SuperMajorityVote:
-		return &uniformVoteWeight{c.DependencyInjectionWriter, c}
+		return &uniformVoteWeight{
+			c.DependencyInjectionWriter, c.DependencyInjectionReader, c,
+		}
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
 			c.SignatureReader,
@@ -277,7 +300,7 @@ func NewDecider(p Policy) Decider {
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
 			c.SignatureReader.(slash.ThresholdDecider),
 			map[[shard.PublicKeySizeInBytes]byte]stakedVoter{},
-			big.NewInt(0),
+			numeric.ZeroDec(),
 		}
 	default:
 		// Should not be possible

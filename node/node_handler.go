@@ -3,12 +3,12 @@ package node
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -18,7 +18,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -27,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -362,46 +363,35 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
+	next := new(big.Int).Add(newBlock.Epoch(), common.Big1)
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
-	// Not just at end of epoch, but end of pre-staking now
 	if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
-		type t struct {
-			ShardID      uint32   `json:"shard-id"`
-			Count        int      `json:"count"`
-			Participants []string `json:"committee-members"`
+		if node.chainConfig.StakingEpoch.Cmp(next) == 0 &&
+			node.Consensus.Decider.Policy() != quorum.SuperMajorityStake {
+			node.Consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
+			node.Consensus.Decider.SetShardIDProvider(func() (uint32, error) {
+				return node.Consensus.ShardID, nil
+			})
+			s, _ := committee.WithStakingEnabled.Compute(
+				next, node.chainConfig, node.Consensus.ChainReader,
+			)
+			node.Consensus.Decider.UpdateVotingPower(
+				s.FindCommitteeByID(node.Consensus.ShardID).NodeList,
+			)
 		}
-		// b1, _ := json.Marshal(t{node.Consensus.ShardID, len(node.Consensus.Decider.DumpParticipants()), node.Consensus.Decider.DumpParticipants()})
-		// fmt.Println("before", string(b1))
 
 		node.Consensus.UpdateConsensusInformation()
-		newKeys := node.Consensus.Decider.DumpParticipants()
-		myK := node.Consensus.PubKey.SerializeToHexStr()
-		myKeyInCommittee := false
 
-		for _, k := range newKeys {
-			if k == myK {
-				myKeyInCommittee = true
-				break
+		if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
+			if node.chainConfig.StakingEpoch.Cmp(next) == 0 {
+				// Hit this case again, need after UpdateConsensus
+				curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
+					next, node.Consensus.ChainReader,
+				)[int(node.Consensus.ShardID)]
+				node.Consensus.Decider.UpdateParticipants(curPubKeys)
 			}
 		}
-
-		if myKeyInCommittee == false {
-			pair := core.NewKeys[node.myPort]
-			pub, priv := pair.Public, pair.Private
-			priKey := bls.SecretKey{}
-			pubKey := bls.PublicKey{}
-			pubKey.DeserializeHexStr(pub)
-			priKey.DeserializeHexStr(priv)
-			fmt.Println("new-pair", pair)
-
-			node.NodeConfig.ConsensusPriKey = &priKey
-			node.NodeConfig.ConsensusPubKey = &pubKey
-
-			node.Consensus.PubKey = &pubKey
-			node.Consensus.SetPrivateKey(&priKey)
-		}
-
 	}
 
 	// TODO chao: uncomment this after beacon syncing is stable

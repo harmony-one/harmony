@@ -160,10 +160,6 @@ func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
 	consensus.delayCommit = delay
 }
 
-func (consensus *Consensus) SetPrivateKey(priKey *bls.SecretKey) {
-	consensus.priKey = priKey
-}
-
 // DisableViewChangeForTestingOnly makes the receiver not propose view
 // changes when it should, e.g. leader timeout.
 //

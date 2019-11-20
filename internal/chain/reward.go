@@ -120,6 +120,28 @@ func AccumulateRewards(
 		*big.Int
 	}{}
 
+	// fmt.Println("Calling reward", rewarder)
+
+	// hack :=
+
+	type t struct {
+		Count   int      `json:"count"`
+		Members []string `json:"members"`
+		ShardID uint32   `json:"shard-id"`
+	}
+
+	// g := rewarder.(quorum.Decider).DumpParticipants()
+
+	// if e := parentHeader.Epoch(); e.Cmp(big.NewInt(0)) == 0 {
+	// 	b, _ := json.Marshal(t{len(g), g, parentHeader.ShardID()})
+	// 	fmt.Println("epoch", e, string(b), "\n")
+	// }
+
+	// if e := parentHeader.Epoch(); e.Cmp(big.NewInt(1)) == 0 {
+	// 	b, _ := json.Marshal(t{len(g), g, parentHeader.ShardID()})
+	// fmt.Println("epoch", e, string(b), "\n")
+	// }
+
 	totalAmount := rewarder.Award(
 		BlockReward, accounts, func(receipient common.Address, amount *big.Int) {
 			payable = append(payable, struct {

@@ -1,7 +1,6 @@
 package committee
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,12 +15,6 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-const (
-	// StateID means reading off whole network when using calls that accept
-	// a shardID parameter
-	StateID = -1
-)
-
 // ValidatorListProvider ..
 type ValidatorListProvider interface {
 	Compute(
@@ -32,12 +25,7 @@ type ValidatorListProvider interface {
 
 // PublicKeysProvider per epoch
 type PublicKeysProvider interface {
-	// If call shardID with StateID then only superCommittee is non-nil,
-	// otherwise get back the shardSpecific slice as well.
-	ComputePublicKeys(
-		epoch *big.Int, reader DataProvider, shardID int,
-	) (superCommittee, shardSpecific []*bls.PublicKey)
-
+	ComputePublicKeys(epoch *big.Int, reader DataProvider) [][]*bls.PublicKey
 	ReadPublicKeysFromDB(
 		hash common.Hash, reader DataProvider,
 	) ([]*bls.PublicKey, error)
@@ -130,7 +118,6 @@ func eposStakedCommittee(
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
-	slotUsage := map[common.Address]int{}
 
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
@@ -143,19 +130,14 @@ func eposStakedCommittee(
 			validator.Stake,
 			validator.SlotPubKeys,
 		}
-		slotUsage[validator.Address] = len(validator.SlotPubKeys)
 	}
 
 	shardCount := int(s.NumShards())
-	maxNodePerShard := s.NumNodesPerShard()
 	superComm := make(shard.State, shardCount)
-	fillCount := make([]int, shardCount)
 	hAccounts := s.HmyAccounts()
 
 	for i := 0; i < shardCount; i++ {
-		superComm[i] = shard.Committee{
-			uint32(i), make(shard.NodeIDList, s.NumNodesPerShard()),
-		}
+		superComm[i] = shard.Committee{uint32(i), shard.NodeIDList{}}
 	}
 
 	for i := range hAccounts {
@@ -164,104 +146,63 @@ func eposStakedCommittee(
 		pub.DeserializeHexStr(hAccounts[i].BlsPublicKey)
 		pubKey := shard.BlsPublicKey{}
 		pubKey.FromLibBLSPublicKey(pub)
-		superComm[spot].NodeList[fillCount[spot]] = shard.NodeID{
+		superComm[spot].NodeList = append(superComm[spot].NodeList, shard.NodeID{
 			common2.ParseAddr(hAccounts[i].Address),
 			pubKey,
 			nil,
-		}
-		fillCount[spot]++
+		})
 	}
 
-	staked := effective.Apply(essentials)
-
-	sort.SliceStable(
-		staked,
-		func(i, j int) bool { return staked[i].Dec.GTE(staked[j].Dec) },
-	)
-
+	staked := effective.Apply(essentials, stakedSlotsCount)
 	shardBig := big.NewInt(int64(shardCount))
 
-	if len(staked) <= stakedSlotsCount {
+	if l := len(staked); l < stakedSlotsCount {
 		// WARN unlikely to happen in production but will happen as we are developing
+		stakedSlotsCount = l
 	}
 
 	for i := 0; i < stakedSlotsCount; i++ {
-		bucket := int(new(big.Int).Mod(staked[i].Address.Big(), shardBig).Int64())
+		bucket := int(new(big.Int).Mod(staked[i].BlsPublicKey.Big(), shardBig).Int64())
 		slot := staked[i]
-		pubKey := essentials[slot.Address].SpreadAmong[slotUsage[slot.Address]-1]
-		slotUsage[slot.Address]--
-		// Keep going round till find an open spot
-		for j := bucket; ; j = (j + 1) % shardCount {
-			if fillCount[j] != maxNodePerShard {
-				superComm[j].NodeList[fillCount[j]] = shard.NodeID{
-					slot.Address,
-					pubKey,
-					&slot.Dec,
-				}
-				fillCount[j]++
-				break
-			}
-		}
+		superComm[bucket].NodeList = append(superComm[bucket].NodeList, shard.NodeID{
+			slot.Address,
+			staked[i].BlsPublicKey,
+			&slot.Dec,
+		})
 	}
-	// fmt.Println("epos-based-committee", superComm.JSON())
+	// fmt.Println("epos-comm", superComm.JSON())
 	return superComm, nil
 }
 
-// ComputePublicKeys produces publicKeys of entire supercommittee per epoch, optionally providing a
-// shard specific subcommittee
+// ComputePublicKeys produces publicKeys of entire supercommittee per epoch
 func (def partialStakingEnabled) ComputePublicKeys(
-	epoch *big.Int, d DataProvider, shardID int,
-) ([]*bls.PublicKey, []*bls.PublicKey) {
+	epoch *big.Int, d DataProvider,
+) [][]*bls.PublicKey {
+
 	config := d.Config()
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	superComm := shard.State{}
-	stakedSlots :=
-		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
-			int(instance.NumShards())
-
 	if config.IsStaking(epoch) {
+		stakedSlots :=
+			(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
+				int(instance.NumShards())
 		superComm, _ = eposStakedCommittee(instance, d, stakedSlots)
 	} else {
 		superComm = preStakingEnabledCommittee(instance)
 	}
 
-	spot := 0
-	shouldBe := int(instance.NumShards()) * instance.NumNodesPerShard()
+	allIdentities := make([][]*bls.PublicKey, len(superComm))
 
-	total := 0
 	for i := range superComm {
-		total += len(superComm[i].NodeList)
-	}
-
-	if shouldBe != total {
-		fmt.Println("Count mismatch", shouldBe, total)
-	}
-
-	allIdentities := make([]*bls.PublicKey, shouldBe)
-	for i := range superComm {
+		allIdentities[i] = make([]*bls.PublicKey, len(superComm[i].NodeList))
 		for j := range superComm[i].NodeList {
 			identity := &bls.PublicKey{}
 			superComm[i].NodeList[j].BlsPublicKey.ToLibBLSPublicKey(identity)
-			allIdentities[spot] = identity
-			spot++
+			allIdentities[i][j] = identity
 		}
 	}
 
-	if shardID == StateID {
-		return allIdentities, nil
-	}
-
-	subCommittee := superComm.FindCommitteeByID(uint32(shardID))
-	subCommitteeIdentities := make([]*bls.PublicKey, len(subCommittee.NodeList))
-	spot = 0
-	for i := range subCommittee.NodeList {
-		identity := &bls.PublicKey{}
-		subCommittee.NodeList[i].BlsPublicKey.ToLibBLSPublicKey(identity)
-		subCommitteeIdentities[spot] = identity
-		spot++
-	}
-
-	return allIdentities, subCommitteeIdentities
+	return allIdentities
 }
 
 func (def partialStakingEnabled) ReadPublicKeysFromDB(
@@ -313,6 +254,5 @@ func (def partialStakingEnabled) Compute(
 	stakedSlots :=
 		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
 			int(instance.NumShards())
-	fmt.Println("Hit staking epoch -- compute")
 	return eposStakedCommittee(instance, stakerReader, stakedSlots)
 }
