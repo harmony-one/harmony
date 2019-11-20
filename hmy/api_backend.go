@@ -1,6 +1,7 @@
 package hmy
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"math/big"
@@ -303,13 +304,53 @@ func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
 
 // GetValidatorInformation returns the information of validator
 func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Validator {
-	val, _ := b.hmy.BlockChain().ValidatorInformation(addr)
-	return val
+	val, _ := b.hmy.BlockChain().ReadValidatorData(addr)
+	return &val.Validator
 }
 
-// GetDelegatorsInformation returns up to date information of delegators of a given validator address
-func (b *APIBackend) GetDelegatorsInformation(addr common.Address) []*staking.Delegation {
-	return b.hmy.BlockChain().DelegatorsInformation(addr)
+// GetDelegationsByValidator returns all delegation information of a validator
+func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*staking.Delegation {
+	wrapper, err := b.hmy.BlockChain().ReadValidatorData(validator)
+	if err != nil || wrapper == nil {
+		return nil
+	}
+	delegations := []*staking.Delegation{}
+	for i := range wrapper.Delegations {
+		delegations = append(delegations, &wrapper.Delegations[i])
+	}
+	return delegations
+}
+
+// GetDelegationsByDelegator returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation) {
+	delegations := []*staking.Delegation{}
+	addresses, err := b.hmy.BlockChain().ReadValidatorListByDelegator(delegator)
+	if err != nil {
+		return nil, nil
+	}
+
+	for i := range addresses {
+		wrapper, err := b.hmy.BlockChain().ReadValidatorData(addresses[i])
+		if err != nil || wrapper == nil {
+			return nil, nil
+		}
+
+		// TODO: add the index of the validator-delegation position in the ReadValidatorListByDelegator record to avoid looping
+		found := -1
+		for j := range wrapper.Delegations {
+			delegation := wrapper.Delegations[j]
+			if bytes.Equal(delegation.DelegatorAddress.Bytes(), delegator.Bytes()) {
+				found = j
+				break
+			}
+		}
+		if found != -1 {
+			delegations = append(delegations, &wrapper.Delegations[found])
+		} else {
+			delegations = append(delegations, nil)
+		}
+	}
+	return addresses, delegations
 }
 
 // GetValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes

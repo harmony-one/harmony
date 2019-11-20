@@ -53,7 +53,7 @@ type Validator struct {
 	// validator's self declared minimum self delegation
 	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
 	// maximum total delgation allowed
-	MaxTotalDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
+	MaxTotalDelegation *big.Int `json:"max_total_delegation" yaml:"max_total_delegation"`
 	// Is the validator active in the validating process or not
 	Active bool `json:"active" yaml:"active"`
 	// commission parameters
@@ -243,11 +243,11 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		validator.Rate = *edit.CommissionRate
 	}
 
-	if edit.MinSelfDelegation != nil {
+	if edit.MinSelfDelegation != nil && edit.MinSelfDelegation.Cmp(big.NewInt(0)) != 0 {
 		validator.MinSelfDelegation = edit.MinSelfDelegation
 	}
 
-	if edit.MaxTotalDelegation != nil {
+	if edit.MaxTotalDelegation != nil && edit.MaxTotalDelegation.Cmp(big.NewInt(0)) != 0 {
 		validator.MaxTotalDelegation = edit.MaxTotalDelegation
 	}
 
@@ -287,11 +287,12 @@ func (v *Validator) String() string {
   SlotPubKeys:                %s
   Stake:                      %s
   Unbonding Height:           %v
-  Minimum SelfDelegation:     %v
+  Minimum Self Delegation:     %v
+  Maximum Total Delegation:     %v
   Description:                %v
   Commission:                 %v`,
 		common2.MustAddressToBech32(v.Address), printSlotPubKeys(v.SlotPubKeys),
 		v.Stake, v.UnbondingHeight,
-		v.MinSelfDelegation, v.Description, v.Commission,
+		v.MinSelfDelegation, v.MaxTotalDelegation, v.Description, v.Commission,
 	)
 }

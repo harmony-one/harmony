@@ -39,7 +39,7 @@ type Reader interface {
 
 // StakingCandidatesReader ..
 type StakingCandidatesReader interface {
-	ValidatorInformation(addr common.Address) (*staking.Validator, error)
+	ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error)
 	ValidatorStakingWithDelegation(addr common.Address) *big.Int
 	ValidatorCandidates() []common.Address
 }
@@ -122,7 +122,7 @@ func eposStakedCommittee(
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		// TODO Should be using .ValidatorStakingWithDelegation, not implemented yet
-		validator, err := stakerReader.ValidatorInformation(candidates[i])
+		validator, err := stakerReader.ReadValidatorData(candidates[i])
 		if err != nil {
 			return nil, err
 		}

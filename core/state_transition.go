@@ -37,10 +37,6 @@ var (
 	errValidatorExist              = errors.New("staking validator already exists")
 	errValidatorNotExist           = errors.New("staking validator does not exist")
 	errNoDelegationToUndelegate    = errors.New("no delegation to undelegate")
-	errInvalidSelfDelegation       = errors.New("self delegation can not be less than min_self_delegation")
-	errInvalidTotalDelegation      = errors.New("total delegation can not be bigger than max_total_delegation")
-	errMinSelfDelegationTooSmall   = errors.New("min_self_delegation has to be greater than 1 ONE")
-	errInvalidMaxTotalDelegation   = errors.New("max_total_delegation can not be less than min_self_delegation")
 	errCommissionRateChangeTooFast = errors.New("commission rate can not be changed more than MaxChangeRate within the same epoch")
 	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than MaxCommissionRate")
 )
@@ -389,7 +385,7 @@ func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValid
 		wrapper.Validator.UpdateHeight = blockNum
 	}
 
-	if newRate.Sub(rateAtBeginningOfEpoch).GT(wrapper.Validator.MaxChangeRate) {
+	if newRate.Sub(rateAtBeginningOfEpoch).Abs().GT(wrapper.Validator.MaxChangeRate) {
 		return errCommissionRateChangeTooFast
 	}
 
@@ -415,7 +411,7 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 	stateDB := st.state
 	delegatorExist := false
 	for i := range wrapper.Delegations {
-		delegation := wrapper.Delegations[i]
+		delegation := &wrapper.Delegations[i]
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), delegate.DelegatorAddress.Bytes()) {
 			delegatorExist = true
 			totalInUndelegation := delegation.TotalInUndelegation()
@@ -424,16 +420,16 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 				// Firstly use the tokens in undelegation to delegate (redelegate)
 				undelegateAmount := big.NewInt(0).Set(delegate.Amount)
 				// Use the latest undelegated token first as it has the longest remaining locking time.
-				i := len(delegation.Entries) - 1
+				i := len(delegation.Undelegations) - 1
 				for ; i >= 0; i-- {
-					if delegation.Entries[i].Amount.Cmp(undelegateAmount) <= 0 {
-						undelegateAmount.Sub(undelegateAmount, delegation.Entries[i].Amount)
+					if delegation.Undelegations[i].Amount.Cmp(undelegateAmount) <= 0 {
+						undelegateAmount.Sub(undelegateAmount, delegation.Undelegations[i].Amount)
 					} else {
-						delegation.Entries[i].Amount.Sub(delegation.Entries[i].Amount, undelegateAmount)
+						delegation.Undelegations[i].Amount.Sub(delegation.Undelegations[i].Amount, undelegateAmount)
 						break
 					}
 				}
-				delegation.Entries = delegation.Entries[:i+1]
+				delegation.Undelegations = delegation.Undelegations[:i+1]
 
 				delegation.Amount.Add(delegation.Amount, delegate.Amount)
 				err := stateDB.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
@@ -476,7 +472,7 @@ func (st *StateTransition) applyUndelegateTx(undelegate *staking.Undelegate) err
 	stateDB := st.state
 	delegatorExist := false
 	for i := range wrapper.Delegations {
-		delegation := wrapper.Delegations[i]
+		delegation := &wrapper.Delegations[i]
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), undelegate.DelegatorAddress.Bytes()) {
 			delegatorExist = true
 
@@ -515,7 +511,7 @@ func (st *StateTransition) applyCollectRewards(collectRewards *staking.CollectRe
 
 		// TODO: add the index of the validator-delegation position in the ReadValidatorListByDelegator record to avoid looping
 		for j := range wrapper.Delegations {
-			delegation := wrapper.Delegations[j]
+			delegation := &wrapper.Delegations[j]
 			if bytes.Equal(delegation.DelegatorAddress.Bytes(), collectRewards.DelegatorAddress.Bytes()) {
 				if delegation.Reward.Cmp(big.NewInt(0)) > 0 {
 					totalRewards.Add(totalRewards, delegation.Reward)

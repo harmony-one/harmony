@@ -71,11 +71,26 @@ type RPCValidator struct {
 	Stake              *big.Int             `json:"stake" yaml:"stake"`
 	UnbondingHeight    *big.Int             `json:"unbonding_height"`
 	MinSelfDelegation  *big.Int             `json:"min_self_delegation"`
-	MaxTotalDelegation *big.Int             `json:"min_self_delegation"`
+	MaxTotalDelegation *big.Int             `json:"max_total_delegation"`
 	Active             bool                 `json:"active"`
 	Commission         types2.Commission    `json:"commission"`
 	Description        types2.Description   `json:"description"`
 	CreationHeight     *big.Int             `json:"creation_height"`
+}
+
+// RPCDelegation represents a particular delegation to a validator
+type RPCDelegation struct {
+	ValidatorAddress common.Address    `json:"validator_address" yaml:"validator_address"`
+	DelegatorAddress common.Address    `json:"delegator_address" yaml:"delegator_address"`
+	Amount           *big.Int          `json:"amount" yaml:"amount"`
+	Reward           *big.Int          `json:"reward" yaml:"reward"`
+	Undelegations    []RPCUndelegation `json:"Undelegations" yaml:"Undelegations"`
+}
+
+// RPCUndelegation represents one undelegation entry
+type RPCUndelegation struct {
+	Amount *big.Int
+	Epoch  *big.Int
 }
 
 func newHeaderInformation(header *block.Header) *HeaderInformation {

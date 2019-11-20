@@ -2309,30 +2309,15 @@ func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, 
 
 // ReadValidatorData reads staking information of given validatorWrapper
 func (bc *BlockChain) ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error) {
-	if cached, ok := bc.validatorCache.Get("validator-" + string(addr.Bytes())); ok {
-		by := cached.([]byte)
-		v := staking.ValidatorWrapper{}
-		if err := rlp.DecodeBytes(by, &v); err != nil {
-			return nil, err
-		}
-		return &v, nil
+	state, err := bc.StateAt(bc.CurrentBlock().Root())
+	if err != nil || state == nil {
+		return nil, err
 	}
-
-	return rawdb.ReadValidatorData(bc.db, addr)
-}
-
-// WriteValidatorData writes staking information of given validatorWrapper
-func (bc *BlockChain) WriteValidatorData(v *staking.ValidatorWrapper) error {
-	err := rawdb.WriteValidatorData(bc.db, v)
-	if err != nil {
-		return err
+	wrapper := state.GetStakingInfo(addr)
+	if wrapper == nil {
+		return nil, fmt.Errorf("ValidatorData not found: %v", addr)
 	}
-	by, err := rlp.EncodeToBytes(v)
-	if err != nil {
-		return err
-	}
-	bc.validatorCache.Add("validator-"+string(v.Address.Bytes()), by)
-	return nil
+	return wrapper, nil
 }
 
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
@@ -2472,7 +2457,7 @@ func (bc *BlockChain) WriteActiveValidatorList(addrs []common.Address) error {
 
 // ReadValidatorListByDelegator reads the addresses of validators delegated by a delegator
 func (bc *BlockChain) ReadValidatorListByDelegator(delegator common.Address) ([]common.Address, error) {
-	if cached, ok := bc.validatorListByDelegatorCache.Get(delegator.Bytes()); ok {
+	if cached, ok := bc.validatorListByDelegatorCache.Get(string(delegator.Bytes())); ok {
 		by := cached.([]byte)
 		m := []common.Address{}
 		if err := rlp.DecodeBytes(by, &m); err != nil {
@@ -2491,7 +2476,7 @@ func (bc *BlockChain) WriteValidatorListByDelegator(delegator common.Address, ad
 	}
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err == nil {
-		bc.validatorListByDelegatorCache.Add(delegator.Bytes(), bytes)
+		bc.validatorListByDelegatorCache.Add(string(delegator.Bytes()), bytes)
 	}
 	return nil
 }
@@ -2523,6 +2508,23 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction) erro
 		if len(list) > beforeLen {
 			err = bc.WriteValidatorList(list)
 		}
+
+		// TODO: combine this code with the one for Delegate.
+		validators, err := bc.ReadValidatorListByDelegator(createValidator.ValidatorAddress)
+		if err != nil {
+			return err
+		}
+		found := false
+		for _, validator := range validators {
+			if bytes.Compare(validator.Bytes(), createValidator.ValidatorAddress.Bytes()) == 0 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			validators = append(validators, createValidator.ValidatorAddress)
+		}
+		err = bc.WriteValidatorListByDelegator(createValidator.ValidatorAddress, validators)
 		return err
 
 	// following cases are placeholder for now
@@ -2560,19 +2562,6 @@ func (bc *BlockChain) ValidatorCandidates() []common.Address {
 		return make([]common.Address, 0)
 	}
 	return list
-}
-
-// ValidatorInformation returns the information of validator
-func (bc *BlockChain) ValidatorInformation(addr common.Address) (*staking.Validator, error) {
-	state, err := bc.StateAt(bc.CurrentBlock().Root())
-	if err != nil || state == nil {
-		return nil, err
-	}
-	wrapper := state.GetStakingInfo(addr)
-	if wrapper == nil {
-		return nil, fmt.Errorf("ValidatorInformation not found: %v", addr)
-	}
-	return &wrapper.Validator, nil
 }
 
 // DelegatorsInformation returns up to date information of delegators of a given validator address

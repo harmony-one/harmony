@@ -60,8 +60,8 @@ type CreateValidator struct {
 // EditValidator - type for edit existing validator
 type EditValidator struct {
 	ValidatorAddress   common.Address      `json:"validator_address" yaml:"validator_address" rlp:"nil"`
-	Description        *Description        `json:"description" yaml:"description"`
-	CommissionRate     *numeric.Dec        `json:"commission_rate" yaml:"commission_rate" rlp:"nil"  rlp:"nil"`
+	Description        *Description        `json:"description" yaml:"description" rlp:"nil"`
+	CommissionRate     *numeric.Dec        `json:"commission_rate" yaml:"commission_rate" rlp:"nil"`
 	MinSelfDelegation  *big.Int            `json:"min_self_delegation" yaml:"min_self_delegation" rlp:"nil"`
 	MaxTotalDelegation *big.Int            `json:"max_total_delegation" yaml:"max_total_delegation" rlp:"nil"`
 	SlotKeyToRemove    *shard.BlsPublicKey `json:"slot_key_to_remove" yaml:"slot_key_to_remove" rlp:"nil"`
