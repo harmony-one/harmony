@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -44,9 +45,8 @@ type ChainReader interface {
 	// ReadActiveValidatorList retrieves the list of active validators
 	ReadActiveValidatorList() ([]common.Address, error)
 
-	ValidatorCandidates() []common.Address
-	ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error)
-	ValidatorStakingWithDelegation(addr common.Address) *big.Int
+	// Methods needed for EPoS committee assignment calculation
+	committee.StakingCandidatesReader
 }
 
 // Engine is an algorithm agnostic consensus engine.

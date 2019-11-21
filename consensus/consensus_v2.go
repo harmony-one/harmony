@@ -319,7 +319,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		utils.Logger().Error().Err(err).Msg("[OnPrepare] VerifySenderKey failed")
 		return
 	}
-
 	if err = verifyMessageSig(senderKey, msg); err != nil {
 		utils.Logger().Error().Err(err).Msg("[OnPrepare] Failed to verify sender's signature")
 		return

@@ -120,10 +120,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare shard state
 	shardState, err := node.Worker.SuperCommitteeForNextEpoch(
-		node.Consensus.ShardID, node.Beaconchain(),
+		node.Consensus.ShardID, node.Blockchain(),
 	)
 
-	// fmt.Println("super-comm", shardState.JSON())
 	if err != nil {
 		return nil, err
 	}

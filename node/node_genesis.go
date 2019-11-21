@@ -43,7 +43,6 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 	shardState, _ := committee.WithStakingEnabled.Compute(
 		big.NewInt(core.GenesisEpoch), gi.node.chainConfig, nil,
 	)
-
 	if shardID != shard.BeaconChainShardID {
 		// store only the local shard for shard chains
 		c := shardState.FindCommitteeByID(shardID)
