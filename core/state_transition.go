@@ -285,8 +285,10 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	// Pay intrinsic gas
 	// TODO: propose staking-specific formula for staking transaction
 	gas, err := IntrinsicGas(st.data, false, homestead)
+	// TODO Remove this logging
+	utils.Logger().Info().Uint64("Using", gas).Msg("Gas cost of staking transaction being processed")
+
 	if err != nil {
-		utils.Logger().Error().Uint64("needed", gas).Msg("Not enough gas in staking transaction")
 		return 0, err
 	}
 	if err = st.useGas(gas); err != nil {

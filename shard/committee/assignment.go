@@ -119,7 +119,8 @@ func eposStakedCommittee(
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
-	utils.Logger().Info().Int("candidates-count", len(candidates)).Msg("Preparing EPoS Staked Committee")
+
+	utils.Logger().Info().Int("staked-candidates", len(candidates)).Msg("preparing epos staked committee")
 
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
@@ -172,7 +173,11 @@ func eposStakedCommittee(
 			&slot.Dec,
 		})
 	}
-
+	if c := len(candidates); c != 0 {
+		utils.Logger().Info().Int("staked-candidates", c).
+			RawJSON("staked-super-committee", []byte(superComm.JSON())).
+			Msg("EPoS based super-committe")
+	}
 	return superComm, nil
 }
 
