@@ -496,31 +496,28 @@ func (st *StateTransition) applyCollectRewards(collectRewards *staking.CollectRe
 		return errors.New("[CollectRewards] No chain context provided")
 	}
 	chainContext := st.bc
-	validators, err := chainContext.ReadValidatorListByDelegator(collectRewards.DelegatorAddress)
+	delegations, err := chainContext.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
 
 	if err != nil {
 		return err
 	}
 
 	totalRewards := big.NewInt(0)
-	for i := range validators {
-		wrapper := st.state.GetStakingInfo(validators[i])
+	for i := range delegations {
+		wrapper := st.state.GetStakingInfo(delegations[i].ValidatorAddress)
 		if wrapper == nil {
 			return errValidatorNotExist
 		}
 
-		// TODO: add the index of the validator-delegation position in the ReadValidatorListByDelegator record to avoid looping
-		for j := range wrapper.Delegations {
-			delegation := &wrapper.Delegations[j]
-			if bytes.Equal(delegation.DelegatorAddress.Bytes(), collectRewards.DelegatorAddress.Bytes()) {
-				if delegation.Reward.Cmp(big.NewInt(0)) > 0 {
-					totalRewards.Add(totalRewards, delegation.Reward)
-				}
-
-				delegation.Reward.SetUint64(0)
-				break
+		if uint64(len(wrapper.Delegations)) > delegations[i].Index {
+			delegation := &wrapper.Delegations[delegations[i].Index]
+			if delegation.Reward.Cmp(big.NewInt(0)) > 0 {
+				totalRewards.Add(totalRewards, delegation.Reward)
 			}
+
+			delegation.Reward.SetUint64(0)
 		}
+
 		err = st.state.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
 		if err != nil {
 			return err

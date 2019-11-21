@@ -38,8 +38,8 @@ type ChainContext interface {
 	// GetHeader returns the hash corresponding to their hash.
 	GetHeader(common.Hash, uint64) *block.Header
 
-	// ReadValidatorListByDelegator returns the validators list of a delegator
-	ReadValidatorListByDelegator(common.Address) ([]common.Address, error)
+	// ReadDelegationsByDelegator returns the validators list of a delegator
+	ReadDelegationsByDelegator(common.Address) ([]types2.DelegationIndex, error)
 
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
 	ReadValidatorSnapshot(common.Address) (*types2.ValidatorWrapper, error)

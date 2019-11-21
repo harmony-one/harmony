@@ -1173,7 +1173,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	// Do bookkeeping for new staking txns
 	if bc.chainConfig.IsStaking(block.Epoch()) {
 		for _, tx := range block.StakingTransactions() {
-			err = bc.UpdateStakingMetaData(tx)
+			err = bc.UpdateStakingMetaData(tx, root)
 			// keep offchain database consistency with onchain we need revert
 			// but it should not happend unless local database corrupted
 			if err != nil {
@@ -2307,9 +2307,9 @@ func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, 
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }
 
-// ReadValidatorData reads staking information of given validatorWrapper
-func (bc *BlockChain) ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error) {
-	state, err := bc.StateAt(bc.CurrentBlock().Root())
+// ReadValidatorDataAt reads staking information of given validatorWrapper at a specific state root
+func (bc *BlockChain) ReadValidatorDataAt(addr common.Address, root common.Hash) (*staking.ValidatorWrapper, error) {
+	state, err := bc.StateAt(root)
 	if err != nil || state == nil {
 		return nil, err
 	}
@@ -2318,6 +2318,11 @@ func (bc *BlockChain) ReadValidatorData(addr common.Address) (*staking.Validator
 		return nil, fmt.Errorf("ValidatorData not found: %v", addr)
 	}
 	return wrapper, nil
+}
+
+// ReadValidatorData reads staking information of given validatorWrapper
+func (bc *BlockChain) ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error) {
+	return bc.ReadValidatorDataAt(addr, bc.CurrentBlock().Root())
 }
 
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
@@ -2455,26 +2460,26 @@ func (bc *BlockChain) WriteActiveValidatorList(addrs []common.Address) error {
 	return nil
 }
 
-// ReadValidatorListByDelegator reads the addresses of validators delegated by a delegator
-func (bc *BlockChain) ReadValidatorListByDelegator(delegator common.Address) ([]common.Address, error) {
+// ReadDelegationsByDelegator reads the addresses of validators delegated by a delegator
+func (bc *BlockChain) ReadDelegationsByDelegator(delegator common.Address) ([]staking.DelegationIndex, error) {
 	if cached, ok := bc.validatorListByDelegatorCache.Get(string(delegator.Bytes())); ok {
 		by := cached.([]byte)
-		m := []common.Address{}
+		m := []staking.DelegationIndex{}
 		if err := rlp.DecodeBytes(by, &m); err != nil {
 			return nil, err
 		}
 		return m, nil
 	}
-	return rawdb.ReadValidatorListByDelegator(bc.db, delegator)
+	return rawdb.ReadDelegationsByDelegator(bc.db, delegator)
 }
 
-// WriteValidatorListByDelegator writes the list of validator addresses to database
-func (bc *BlockChain) WriteValidatorListByDelegator(delegator common.Address, addrs []common.Address) error {
-	err := rawdb.WriteValidatorListByDelegator(bc.db, delegator, addrs)
+// WriteDelegationsByDelegator writes the list of validator addresses to database
+func (bc *BlockChain) WriteDelegationsByDelegator(delegator common.Address, indices []staking.DelegationIndex) error {
+	err := rawdb.WriteDelegationsByDelegator(bc.db, delegator, indices)
 	if err != nil {
 		return err
 	}
-	bytes, err := rlp.EncodeToBytes(addrs)
+	bytes, err := rlp.EncodeToBytes(indices)
 	if err == nil {
 		bc.validatorListByDelegatorCache.Add(string(delegator.Bytes()), bytes)
 	}
@@ -2482,7 +2487,7 @@ func (bc *BlockChain) WriteValidatorListByDelegator(delegator common.Address, ad
 }
 
 // UpdateStakingMetaData updates the validator's and the delegator's meta data according to staking transaction
-func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction) error {
+func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root common.Hash) error {
 	// TODO: simply the logic here in staking/types/transaction.go
 	payload, err := tx.RLPEncodeStakeMsg()
 	if err != nil {
@@ -2509,50 +2514,59 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction) erro
 			err = bc.WriteValidatorList(list)
 		}
 
-		// TODO: combine this code with the one for Delegate.
-		validators, err := bc.ReadValidatorListByDelegator(createValidator.ValidatorAddress)
+		// Add self delegation into the index
+		delegations, err := bc.ReadDelegationsByDelegator(createValidator.ValidatorAddress)
 		if err != nil {
 			return err
 		}
-		found := false
-		for _, validator := range validators {
-			if bytes.Compare(validator.Bytes(), createValidator.ValidatorAddress.Bytes()) == 0 {
-				found = true
-				break
-			}
-		}
-		if !found {
-			validators = append(validators, createValidator.ValidatorAddress)
-		}
-		err = bc.WriteValidatorListByDelegator(createValidator.ValidatorAddress, validators)
-		return err
 
-	// following cases are placeholder for now
+		delegations = append(delegations, staking.DelegationIndex{
+			createValidator.ValidatorAddress,
+			0,
+		})
+
+		err = bc.WriteDelegationsByDelegator(createValidator.ValidatorAddress, delegations)
+		return err
 	case staking.DirectiveEditValidator:
 	case staking.DirectiveDelegate:
 		delegate := decodePayload.(*staking.Delegate)
-		validators, err := bc.ReadValidatorListByDelegator(delegate.DelegatorAddress)
-		if err != nil {
-			return err
-		}
-		found := false
-		for _, validator := range validators {
-			if bytes.Compare(validator.Bytes(), delegate.ValidatorAddress.Bytes()) == 0 {
-				found = true
-				break
-			}
-		}
-		if !found {
-			validators = append(validators, delegate.ValidatorAddress)
-		}
-		err = bc.WriteValidatorListByDelegator(delegate.DelegatorAddress, validators)
-		return err
+
+		return bc.addDelegationIndex(delegate.DelegatorAddress, delegate.ValidatorAddress, root)
 	case staking.DirectiveUndelegate:
 	case staking.DirectiveCollectRewards:
 		// TODO: Check whether the delegation reward can be cleared after reward is collected
 	default:
 	}
 	return nil
+}
+
+func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress common.Address, root common.Hash) error {
+	delegations, err := bc.ReadDelegationsByDelegator(delegatorAddress)
+	if err != nil {
+		return err
+	}
+	found := false
+	for _, delegation := range delegations {
+		if bytes.Compare(delegation.ValidatorAddress.Bytes(), validatorAddress.Bytes()) == 0 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		wrapper, err := bc.ReadValidatorDataAt(validatorAddress, root) // Note this is already reading from the state of current block in concern
+		if err != nil {
+			return err
+		}
+		for i := range wrapper.Delegations {
+			if bytes.Compare(wrapper.Delegations[i].DelegatorAddress.Bytes(), delegatorAddress.Bytes()) == 0 {
+				delegations = append(delegations, staking.DelegationIndex{
+					validatorAddress,
+					uint64(i),
+				})
+			}
+		}
+	}
+	return bc.WriteDelegationsByDelegator(delegatorAddress, delegations)
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch

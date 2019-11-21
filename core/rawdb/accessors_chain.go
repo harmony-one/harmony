@@ -716,28 +716,28 @@ func WriteValidatorList(db DatabaseWriter, addrs []common.Address, activeOnly bo
 	return err
 }
 
-// ReadValidatorListByDelegator retrieves the list of validators delegated by a delegator
-func ReadValidatorListByDelegator(db DatabaseReader, delegator common.Address) ([]common.Address, error) {
+// ReadDelegationsByDelegator retrieves the list of validators delegated by a delegator
+func ReadDelegationsByDelegator(db DatabaseReader, delegator common.Address) ([]staking.DelegationIndex, error) {
 	data, err := db.Get(delegatorValidatorListKey(delegator))
 	if err != nil || len(data) == 0 {
-		return []common.Address{}, nil
+		return []staking.DelegationIndex{}, nil
 	}
-	addrs := []common.Address{}
+	addrs := []staking.DelegationIndex{}
 	if err := rlp.DecodeBytes(data, &addrs); err != nil {
-		utils.Logger().Error().Err(err).Msg("Unable to Decode validator List from database")
+		utils.Logger().Error().Err(err).Msg("Unable to Decode delegations from database")
 		return nil, err
 	}
 	return addrs, nil
 }
 
-// WriteValidatorListByDelegator stores the list of validators delegated by a delegator
-func WriteValidatorListByDelegator(db DatabaseWriter, delegator common.Address, addrs []common.Address) error {
-	bytes, err := rlp.EncodeToBytes(addrs)
+// WriteDelegationsByDelegator stores the list of validators delegated by a delegator
+func WriteDelegationsByDelegator(db DatabaseWriter, delegator common.Address, indices []staking.DelegationIndex) error {
+	bytes, err := rlp.EncodeToBytes(indices)
 	if err != nil {
-		utils.Logger().Error().Msg("[WriteValidatorListByDelegator] Failed to encode")
+		utils.Logger().Error().Msg("[WriteDelegationsByDelegator] Failed to encode")
 	}
 	if err := db.Put(delegatorValidatorListKey(delegator), bytes); err != nil {
-		utils.Logger().Error().Msg("[WriteValidatorListByDelegator] Failed to store to database")
+		utils.Logger().Error().Msg("[WriteDelegationsByDelegator] Failed to store to database")
 	}
 	return err
 }
