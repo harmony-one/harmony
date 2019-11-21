@@ -34,6 +34,12 @@ type Undelegation struct {
 	Epoch  *big.Int
 }
 
+// DelegationIndex stored the index of a delegation in the validator's delegation list
+type DelegationIndex struct {
+	ValidatorAddress common.Address
+	Index            uint64
+}
+
 // NewDelegation creates a new delegation object
 func NewDelegation(delegatorAddr common.Address,
 	amount *big.Int) Delegation {

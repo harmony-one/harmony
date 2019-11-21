@@ -1,7 +1,6 @@
 package hmy
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"math/big"
@@ -323,32 +322,25 @@ func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*stak
 
 // GetDelegationsByDelegator returns all delegation information of a delegator
 func (b *APIBackend) GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation) {
+	addresses := []common.Address{}
 	delegations := []*staking.Delegation{}
-	addresses, err := b.hmy.BlockChain().ReadValidatorListByDelegator(delegator)
+	delegationIndexes, err := b.hmy.BlockChain().ReadDelegationsByDelegator(delegator)
 	if err != nil {
 		return nil, nil
 	}
 
-	for i := range addresses {
-		wrapper, err := b.hmy.BlockChain().ReadValidatorData(addresses[i])
+	for i := range delegationIndexes {
+		wrapper, err := b.hmy.BlockChain().ReadValidatorData(delegationIndexes[i].ValidatorAddress)
 		if err != nil || wrapper == nil {
 			return nil, nil
 		}
 
-		// TODO: add the index of the validator-delegation position in the ReadValidatorListByDelegator record to avoid looping
-		found := -1
-		for j := range wrapper.Delegations {
-			delegation := wrapper.Delegations[j]
-			if bytes.Equal(delegation.DelegatorAddress.Bytes(), delegator.Bytes()) {
-				found = j
-				break
-			}
-		}
-		if found != -1 {
-			delegations = append(delegations, &wrapper.Delegations[found])
+		if uint64(len(wrapper.Delegations)) > delegationIndexes[i].Index {
+			delegations = append(delegations, &wrapper.Delegations[delegationIndexes[i].Index])
 		} else {
 			delegations = append(delegations, nil)
 		}
+		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
 	}
 	return addresses, delegations
 }
