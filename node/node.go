@@ -131,13 +131,9 @@ type Node struct {
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
 	BeaconNeighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 
-	TxPool *core.TxPool // TODO migrate to TxPool from pendingTransactions list below
+	TxPool *core.TxPool
 
 	CxPool *core.CxPool // pool for missing cross shard receipts resend
-
-	pendingTransactions map[common.Hash]*types.Transaction // All the transactions received but not yet processed for Consensus
-	pendingTxMutex      sync.Mutex
-	recentTxsStats      types.RecentTxsStats
 
 	pendingStakingTransactions map[common.Hash]*staking.StakingTransaction // All the staking transactions received but not yet processed for Consensus
 	pendingStakingTxMutex      sync.Mutex
@@ -274,11 +270,7 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	node.pendingTxMutex.Lock()
-
 	node.TxPool.AddRemotes(newTxs)
-
-	node.pendingTxMutex.Unlock()
 
 	pendingCount, queueCount := node.TxPool.Stats()
 	utils.Logger().Info().Int("length of newTxs", len(newTxs)).Int("totalPending", pendingCount).Int("totalQueued", queueCount).Msg("Got more transactions")
@@ -296,8 +288,8 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 			break
 		}
 	}
-	node.pendingStakingTxMutex.Unlock()
 	utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingStakingTransactions)).Msg("Got more staking transactions")
+	node.pendingStakingTxMutex.Unlock()
 }
 
 // AddPendingStakingTransaction staking transactions
@@ -433,7 +425,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.recentTxsStats = make(types.RecentTxsStats)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
@@ -443,7 +434,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		}
 
 		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
-		node.pendingTransactions = make(map[common.Hash]*types.Transaction)
 		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
