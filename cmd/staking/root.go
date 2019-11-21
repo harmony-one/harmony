@@ -183,7 +183,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 		os.Exit(-1)
 	}
 
-	fmt.Println("balance", convertBalanceIntoReadableFormat(bln), "\n")
+	fmt.Println("balance", convertBalanceIntoReadableFormat(bln))
 
 	result, reqOops := baseRequest(stakingRPC, "http://localhost:9500", param)
 	fmt.Println(string(result))
