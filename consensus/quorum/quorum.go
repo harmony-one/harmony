@@ -297,7 +297,7 @@ func NewDecider(p Policy) Decider {
 			c.DependencyInjectionWriter,
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
 			c.SignatureReader.(slash.ThresholdDecider),
-			map[[shard.PublicKeySizeInBytes]byte]stakedVoter{},
+			map[shard.BlsPublicKey]stakedVoter{},
 			numeric.ZeroDec(),
 		}
 	default:

@@ -28,7 +28,7 @@ type stakedVoteWeight struct {
 	DependencyInjectionWriter
 	DependencyInjectionReader
 	slash.ThresholdDecider
-	validatorStakes map[[shard.PublicKeySizeInBytes]byte]stakedVoter
+	validatorStakes map[shard.BlsPublicKey]stakedVoter
 	total           numeric.Dec
 }
 
@@ -48,7 +48,7 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 		w.FromLibBLSPublicKey(members[i])
 		// isHMY := v.validatorStakes[w].isHarmonyNode
 		if v.ReadSignature(p, members[i]) == nil {
-			//
+			// TODO TODO finish this logic
 		}
 	}
 
@@ -104,7 +104,7 @@ func (v *stakedVoteWeight) Award(
 func (v *stakedVoteWeight) UpdateVotingPower(staked shard.SlotList) {
 	s, _ := v.ShardIDProvider()()
 
-	v.validatorStakes = map[[shard.PublicKeySizeInBytes]byte]stakedVoter{}
+	v.validatorStakes = map[shard.BlsPublicKey]stakedVoter{}
 	v.Reset([]Phase{Prepare, Commit, ViewChange})
 
 	for i := range staked {
