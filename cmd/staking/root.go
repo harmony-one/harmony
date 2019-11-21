@@ -170,6 +170,21 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	rlp.DecodeBytes(enc, tx)
 	hexSignature := hexutil.Encode(enc)
 	param := []interface{}{hexSignature}
+
+	// Check Double check if have enough balance for gas fees
+	balanceR, _ := baseRequest("hmy_getBalance", "http://localhost:9500", []interface{}{testAccounts[index], "latest"})
+	m := map[string]interface{}{}
+	json.Unmarshal(balanceR, &m)
+	balance, _ := m["result"].(string)
+	bln, _ := big.NewInt(0).SetString(balance[2:], 16)
+
+	if bln.Cmp(big.NewInt(0)) == 0 {
+		fmt.Println("Balance for ", testAccounts[index], "is zero, tx will be rejected b/c not enough for gas fee, exiting")
+		os.Exit(-1)
+	}
+
+	fmt.Println("balance", convertBalanceIntoReadableFormat(bln), "\n")
+
 	result, reqOops := baseRequest(stakingRPC, "http://localhost:9500", param)
 	fmt.Println(string(result))
 	return reqOops
@@ -245,3 +260,43 @@ var (
 		},
 	}
 )
+
+func convertBalanceIntoReadableFormat(balance *big.Int) string {
+	balance = balance.Div(balance, big.NewInt(denominations.Nano))
+	strBalance := fmt.Sprintf("%d", balance.Uint64())
+
+	bytes := []byte(strBalance)
+	hasDecimal := false
+	for i := 0; i < 11; i++ {
+		if len(bytes)-1-i < 0 {
+			bytes = append([]byte{'0'}, bytes...)
+		}
+		if bytes[len(bytes)-1-i] != '0' && i < 9 {
+			hasDecimal = true
+		}
+		if i == 9 {
+			newBytes := append([]byte{'.'}, bytes[len(bytes)-i:]...)
+			bytes = append(bytes[:len(bytes)-i], newBytes...)
+		}
+	}
+	zerosToRemove := 0
+	for i := 0; i < len(bytes); i++ {
+		if hasDecimal {
+			if bytes[len(bytes)-1-i] == '0' {
+				bytes = bytes[:len(bytes)-1-i]
+				i--
+			} else {
+				break
+			}
+		} else {
+			if zerosToRemove < 5 {
+				bytes = bytes[:len(bytes)-1-i]
+				i--
+				zerosToRemove++
+			} else {
+				break
+			}
+		}
+	}
+	return string(bytes)
+}
