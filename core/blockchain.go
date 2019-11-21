@@ -2541,29 +2541,31 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 }
 
 func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress common.Address, root common.Hash) error {
+	// Get existing delegations
 	delegations, err := bc.ReadDelegationsByDelegator(delegatorAddress)
 	if err != nil {
 		return err
 	}
-	found := false
+
+	// If there is an existing delegation, just return
 	for _, delegation := range delegations {
 		if bytes.Compare(delegation.ValidatorAddress.Bytes(), validatorAddress.Bytes()) == 0 {
-			found = true
-			break
+			return nil
 		}
 	}
-	if !found {
-		wrapper, err := bc.ReadValidatorDataAt(validatorAddress, root) // Note this is already reading from the state of current block in concern
-		if err != nil {
-			return err
-		}
-		for i := range wrapper.Delegations {
-			if bytes.Compare(wrapper.Delegations[i].DelegatorAddress.Bytes(), delegatorAddress.Bytes()) == 0 {
-				delegations = append(delegations, staking.DelegationIndex{
-					validatorAddress,
-					uint64(i),
-				})
-			}
+
+	// Found the delegation from state and add the delegation index
+	// Note this should read from the state of current block in concern
+	wrapper, err := bc.ReadValidatorDataAt(validatorAddress, root)
+	if err != nil {
+		return err
+	}
+	for i := range wrapper.Delegations {
+		if bytes.Compare(wrapper.Delegations[i].DelegatorAddress.Bytes(), delegatorAddress.Bytes()) == 0 {
+			delegations = append(delegations, staking.DelegationIndex{
+				validatorAddress,
+				uint64(i),
+			})
 		}
 	}
 	return bc.WriteDelegationsByDelegator(delegatorAddress, delegations)
