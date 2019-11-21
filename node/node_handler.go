@@ -8,18 +8,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
-
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-
 	"github.com/harmony-one/harmony/api/proto"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -27,7 +26,9 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
@@ -377,10 +378,36 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			}
 		}
 	}
-
+	next := new(big.Int).Add(newBlock.Epoch(), common.Big1)
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
+
+		if node.chainConfig.StakingEpoch.Cmp(next) == 0 &&
+			node.Consensus.Decider.Policy() != quorum.SuperMajorityStake {
+			node.Consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
+			node.Consensus.Decider.SetShardIDProvider(func() (uint32, error) {
+				return node.Consensus.ShardID, nil
+			})
+			s, _ := committee.WithStakingEnabled.Compute(
+				next, node.chainConfig, node.Consensus.ChainReader,
+			)
+			node.Consensus.Decider.UpdateVotingPower(
+				s.FindCommitteeByID(node.Consensus.ShardID).Slots,
+			)
+		}
+
 		node.Consensus.UpdateConsensusInformation()
+
+		if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
+			if node.chainConfig.StakingEpoch.Cmp(next) == 0 {
+				// Hit this case again, need after UpdateConsensus
+				curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
+					next, node.Consensus.ChainReader,
+				)[int(node.Consensus.ShardID)]
+				node.Consensus.Decider.UpdateParticipants(curPubKeys)
+			}
+		}
+
 	}
 
 	// TODO chao: uncomment this after beacon syncing is stable
