@@ -212,7 +212,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 done < $config
 
 if [ "$DOTEST" == "true" ]; then
-   debug_staking
+   # debug_staking
    echo "waiting for some block rewards"
    sleep 60
    i=1
