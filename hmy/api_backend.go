@@ -303,13 +303,46 @@ func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
 
 // GetValidatorInformation returns the information of validator
 func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Validator {
-	val, _ := b.hmy.BlockChain().ValidatorInformation(addr)
-	return val
+	val, _ := b.hmy.BlockChain().ReadValidatorData(addr)
+	return &val.Validator
 }
 
-// GetDelegatorsInformation returns up to date information of delegators of a given validator address
-func (b *APIBackend) GetDelegatorsInformation(addr common.Address) []*staking.Delegation {
-	return b.hmy.BlockChain().DelegatorsInformation(addr)
+// GetDelegationsByValidator returns all delegation information of a validator
+func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*staking.Delegation {
+	wrapper, err := b.hmy.BlockChain().ReadValidatorData(validator)
+	if err != nil || wrapper == nil {
+		return nil
+	}
+	delegations := []*staking.Delegation{}
+	for i := range wrapper.Delegations {
+		delegations = append(delegations, &wrapper.Delegations[i])
+	}
+	return delegations
+}
+
+// GetDelegationsByDelegator returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation) {
+	addresses := []common.Address{}
+	delegations := []*staking.Delegation{}
+	delegationIndexes, err := b.hmy.BlockChain().ReadDelegationsByDelegator(delegator)
+	if err != nil {
+		return nil, nil
+	}
+
+	for i := range delegationIndexes {
+		wrapper, err := b.hmy.BlockChain().ReadValidatorData(delegationIndexes[i].ValidatorAddress)
+		if err != nil || wrapper == nil {
+			return nil, nil
+		}
+
+		if uint64(len(wrapper.Delegations)) > delegationIndexes[i].Index {
+			delegations = append(delegations, &wrapper.Delegations[delegationIndexes[i].Index])
+		} else {
+			delegations = append(delegations, nil)
+		}
+		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
+	}
+	return addresses, delegations
 }
 
 // GetValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes

@@ -14,6 +14,12 @@ import (
 // Directive says what kind of payload follows
 type Directive byte
 
+// StakeMsg defines the interface of Stake Message
+type StakeMsg interface {
+	Type() Directive
+	Copy() StakeMsg
+}
+
 const (
 	// DirectiveCreateValidator ...
 	DirectiveCreateValidator Directive = iota
@@ -60,8 +66,8 @@ type CreateValidator struct {
 // EditValidator - type for edit existing validator
 type EditValidator struct {
 	ValidatorAddress   common.Address      `json:"validator_address" yaml:"validator_address" rlp:"nil"`
-	Description        *Description        `json:"description" yaml:"description"`
-	CommissionRate     *numeric.Dec        `json:"commission_rate" yaml:"commission_rate" rlp:"nil"  rlp:"nil"`
+	Description        *Description        `json:"description" yaml:"description" rlp:"nil"`
+	CommissionRate     *numeric.Dec        `json:"commission_rate" yaml:"commission_rate" rlp:"nil"`
 	MinSelfDelegation  *big.Int            `json:"min_self_delegation" yaml:"min_self_delegation" rlp:"nil"`
 	MaxTotalDelegation *big.Int            `json:"max_total_delegation" yaml:"max_total_delegation" rlp:"nil"`
 	SlotKeyToRemove    *shard.BlsPublicKey `json:"slot_key_to_remove" yaml:"slot_key_to_remove" rlp:"nil"`
@@ -85,4 +91,63 @@ type Undelegate struct {
 // CollectRewards - type for collecting token rewards
 type CollectRewards struct {
 	DelegatorAddress common.Address `json:"delegator_address" yaml:"delegator_address"`
+}
+
+// Type of CreateValidator
+func (v CreateValidator) Type() Directive {
+	return DirectiveCreateValidator
+}
+
+// Type of EditValidator
+func (v EditValidator) Type() Directive {
+	return DirectiveEditValidator
+}
+
+// Type of Delegate
+func (v Delegate) Type() Directive {
+	return DirectiveDelegate
+}
+
+// Type of Undelegate
+func (v Undelegate) Type() Directive {
+	return DirectiveUndelegate
+}
+
+// Type of CollectRewards
+func (v CollectRewards) Type() Directive {
+	return DirectiveCollectRewards
+}
+
+// Copy deep copy of the interface
+func (v CreateValidator) Copy() StakeMsg {
+	v1 := v
+	desc := *v.Description
+	v1.Description = &desc
+	return v1
+}
+
+// Copy deep copy of the interface
+func (v EditValidator) Copy() StakeMsg {
+	v1 := v
+	desc := *v.Description
+	v1.Description = &desc
+	return v1
+}
+
+// Copy deep copy of the interface
+func (v Delegate) Copy() StakeMsg {
+	v1 := v
+	return v1
+}
+
+// Copy deep copy of the interface
+func (v Undelegate) Copy() StakeMsg {
+	v1 := v
+	return v1
+}
+
+// Copy deep copy of the interface
+func (v CollectRewards) Copy() StakeMsg {
+	v1 := v
+	return v1
 }

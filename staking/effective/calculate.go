@@ -6,6 +6,8 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -43,9 +45,23 @@ type Slots []SlotPurchase
 // JSON is a plain JSON dump
 func (s Slots) JSON() string {
 	type t struct {
-		Slots []SlotPurchase `json:"slots"`
+		Address string `json:"slot-owner"`
+		Key     string `json:"bls-public-key"`
+		Stake   string `json:"actual-stake"`
 	}
-	b, _ := json.Marshal(t{s})
+	type v struct {
+		Slots []t `json:"slots"`
+	}
+	data := v{}
+	for i := range s {
+		newData := t{
+			common2.MustAddressToBech32(s[i].Address),
+			s[i].BlsPublicKey.Hex(),
+			s[i].Dec.String(),
+		}
+		data.Slots = append(data.Slots, newData)
+	}
+	b, _ := json.Marshal(data)
 	return string(b)
 }
 
@@ -57,8 +73,12 @@ func median(stakes []SlotPurchase) numeric.Dec {
 	const isEven = 0
 	switch l := len(stakes); l % 2 {
 	case isEven:
-		return stakes[(l/2)-1].Dec.Add(stakes[(l / 2)].Dec).Quo(two)
+		left := (l / 2) - 1
+		right := (l / 2)
+		utils.Logger().Info().Int("left", left).Int("right", right)
+		return stakes[left].Dec.Add(stakes[right].Dec).Quo(two)
 	default:
+		utils.Logger().Info().Int("median index", l/2)
 		return stakes[l/2].Dec
 	}
 }

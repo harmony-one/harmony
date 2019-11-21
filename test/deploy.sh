@@ -63,6 +63,15 @@ function debug_staking() {
    hmy_one_dir="$(go env GOPATH)/src/github.com/harmony-one"
    hmy_bin="${hmy_one_dir}/go-sdk/hmy"
    keystore="${hmy_one_dir}/harmony-ops/test-automation/api-tests/LocalnetValidatorKeys"
+   if [ ! -d "${hmy_one_dir}/harmony-ops/" ]; then
+     git clone https://github.com/harmony-one/harmony-ops.git "${hmy_one_dir}/harmony-ops"
+   fi
+   if [ ! -d "${hmy_one_dir}/go-sdk/" ]; then
+     git clone https://github.com/harmony-one/go-sdk.git "${hmy_one_dir}/go-sdk"
+   fi
+   if [ ! -f "${hmy_bin}" ]; then
+     make -C "${hmy_one_dir}/go-sdk/"
+   fi
    python3 -m pip install pyhmy
    python3 -m pip install requests
    python3 "${hmy_one_dir}/harmony-ops/test-automation/api-tests/test.py" --keystore ${keystore} \

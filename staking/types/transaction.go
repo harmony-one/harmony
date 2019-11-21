@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"math/big"
-	"reflect"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -31,11 +30,16 @@ type txdata struct {
 }
 
 func (d *txdata) CopyFrom(d2 *txdata) {
-	d.Directive = d2.Directive
 	d.AccountNonce = d2.AccountNonce
 	d.Price = new(big.Int).Set(d2.Price)
 	d.GasLimit = d2.GasLimit
-	d.StakeMsg = reflect.New(reflect.ValueOf(d2.StakeMsg).Elem().Type()).Interface()
+	// TODO: add code to protect crashing
+	// This is workaround, direct RLP encoding/decoding not work
+	payload, _ := rlp.EncodeToBytes(d2.StakeMsg)
+	restored, _ := RLPDecodeStakeMsg(
+		payload, d2.Directive,
+	)
+	d.StakeMsg = restored.(StakeMsg).Copy()
 	d.V = new(big.Int).Set(d2.V)
 	d.R = new(big.Int).Set(d2.R)
 	d.S = new(big.Int).Set(d2.S)
