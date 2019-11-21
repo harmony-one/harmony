@@ -76,6 +76,7 @@ var (
 
 	validatorPrefix         = []byte("validator-")            // prefix for staking validator information
 	validatorSnapshotPrefix = []byte("validator-snapshot-")   // prefix for staking validator's snapshot information
+	validatorStatsPrefix    = []byte("validator-stats-")      // prefix for staking validator's stats information
 	validatorListKey        = []byte("validator-list")        // key for all validators list
 	activeValidatorListKey  = []byte("active-validator-list") // key for active validators list
 
@@ -247,5 +248,10 @@ func validatorKey(addr common.Address) []byte {
 
 func validatorSnapshotKey(addr common.Address) []byte {
 	prefix := validatorSnapshotPrefix
+	return append(prefix, addr.Bytes()...)
+}
+
+func validatorStatsKey(addr common.Address) []byte {
+	prefix := validatorStatsPrefix
 	return append(prefix, addr.Bytes()...)
 }

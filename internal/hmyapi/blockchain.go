@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"math/big"
 	"time"
 
@@ -505,7 +507,15 @@ func (s *PublicBlockChainAPI) GetValidatorInfo(ctx context.Context, address comm
 	if validator == nil {
 		return nil, fmt.Errorf("validator not found: %s", address.Hex())
 	}
-	return newRPCValidator(validator), nil
+
+	rpcValidator := newRPCValidator(validator)
+
+	stats := s.b.GetValidatorStats(address)
+
+	if stats != nil {
+		rpcValidator.Uptime = numeric.NewDecFromBigInt(stats.NumBlocksSigned).Quo(numeric.NewDecFromBigInt(stats.NumBlocksToSign)).String()
+	}
+	return rpcValidator, nil
 }
 
 // GetDelegationsByDelegator returns information about a validator.
