@@ -304,7 +304,7 @@ func createWalletNode() *node.Node {
 		panic(err)
 	}
 	chainDBFactory := &shardchain.MemDBFactory{}
-	w := node.New(host, nil, chainDBFactory, false, "")
+	w := node.New(host, nil, chainDBFactory, false)
 	w.Client = client.NewClient(w.GetHost(), uint32(shardID))
 
 	w.NodeConfig.SetRole(nodeconfig.ClientNode)

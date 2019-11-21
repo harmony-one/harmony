@@ -156,7 +156,7 @@ func (s *cIdentities) Participants() []*bls.PublicKey {
 }
 
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
-	// TODO - might need to put this in separate method
+	// TODO - might need to put reset of seen counter in separate method
 	s.seenCounter = make(map[[shard.PublicKeySizeInBytes]byte]int, len(pubKeys))
 	for i := range pubKeys {
 		k := shard.BlsPublicKey{}
@@ -168,9 +168,7 @@ func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 
 func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
 	s.seenCounter[key]++
-	fmt.Println("Slash Map", s.seenCounter)
 	return s.seenCounter[key] == slash.UnavailabilityInConsecutiveBlockSigning
-
 }
 
 func (s *cIdentities) DumpParticipants() []string {

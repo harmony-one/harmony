@@ -77,7 +77,6 @@ func (v *uniformVoteWeight) Award(
 
 func (v *uniformVoteWeight) ShouldSlash(k shard.BlsPublicKey) bool {
 	// No-op, no semantic meaning in one-slot-one-vote
-	// fmt.Println("Called here for key:", k.Hex())
 	return false
 }
 

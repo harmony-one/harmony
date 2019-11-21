@@ -2,7 +2,6 @@ package quorum
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -40,8 +39,7 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
-	// TODO Implement this logic
-	// fmt.Println("is quorum achieved")
+	// TODO Implement this logic w/Chao
 	// soFar := numeric.ZeroDec()
 	w := shard.BlsPublicKey{}
 	members := v.Participants()
@@ -59,14 +57,12 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 
 // QuorumThreshold ..
 func (v *stakedVoteWeight) QuorumThreshold() *big.Int {
-	// fmt.Println("check quorum threshold")
 	return v.total.Mul(twoThirds).Int
 }
 
 // RewardThreshold ..
 func (v *stakedVoteWeight) IsRewardThresholdAchieved() bool {
 	// TODO Implement
-	// fmt.Println("check threshold")
 	return true
 }
 
@@ -77,9 +73,7 @@ func (v *stakedVoteWeight) Award(
 	payout := big.NewInt(0)
 	last := big.NewInt(0)
 	count := big.NewInt(int64(len(earners)))
-
-	s, _ := v.ShardIDProvider()()
-	fmt.Println("Award called on shard as staked vote", s)
+	// TODO Finish implementing this logic
 	proportional := map[common.Address]numeric.Dec{}
 
 	for _, details := range v.validatorStakes {

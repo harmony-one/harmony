@@ -44,8 +44,6 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 		big.NewInt(core.GenesisEpoch), gi.node.chainConfig, nil,
 	)
 
-	// fmt.Println("initial-shard-state", shardState.JSON())
-
 	if shardID != shard.BeaconChainShardID {
 		// store only the local shard for shard chains
 		c := shardState.FindCommitteeByID(shardID)

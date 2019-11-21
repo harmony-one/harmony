@@ -200,7 +200,6 @@ func (e *engineImpl) Finalize(
 		}
 		for _, validator := range validators {
 			wrapper := state.GetStakingInfo(validator)
-			// fmt.Println("In finalize", validator.String(), "wrapper:", wrapper, "on-epoch", header.Epoch(), "on-shard", header.ShardID())
 			if wrapper != nil {
 				for i := range wrapper.Delegations {
 					delegation := wrapper.Delegations[i]

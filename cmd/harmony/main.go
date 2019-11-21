@@ -309,9 +309,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(
-		myHost, currentConsensus, chainDBFactory, *isArchival, *port,
-	)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, *isArchival)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
@@ -496,7 +494,6 @@ func main() {
 	currentNode.ServiceManagerSetup()
 
 	currentNode.RunServices()
-	// fmt.Println("CurrentRPC-port", *port)
 
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {

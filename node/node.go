@@ -103,7 +103,6 @@ type syncConfig struct {
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	myPort                string
 	Consensus             *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
 	BlockChannel          chan *types.Block    // The channel to send newly proposed blocks
 	ConfirmedBlockChannel chan *types.Block    // The channel to send confirmed blocks
@@ -375,11 +374,8 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus,
-	chainDBFactory shardchain.DBFactory, isArchival bool, port string) *Node {
+	chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
-
-	node.myPort = port
-	// fmt.Println("as node, my port is", node.myPort)
 
 	node.syncFreq = SyncFrequency
 	node.beaconSyncFreq = SyncFrequency

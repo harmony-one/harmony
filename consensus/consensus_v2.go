@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -316,54 +315,12 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	senderKey, err := consensus.verifySenderKey(msg)
-	// fmt.Println("prepare-sender-key", senderKey.SerializeToHexStr())
-
-	// for _, v := range consensus.Decider.DumpParticipants() {
-	// 	fmt.Println("in-committee-", consensus.ShardID, v)
-	// }
-
-	type t struct {
-		Participants  []string `json:"committee-members"`
-		ShardID       uint32   `json:"shard-id"`
-		MissingID     string   `json"missing-key"`
-		CurrentEpoch  uint64   `json:"current-epoch"`
-		CurrentObject uint64   `json:"current-epoch-from-obj"`
-		PossibleError string   `json:"possible-error"`
-	}
-
-	// e := ""
-
-	// if err != nil {
-	// 	e = err.Error()
-	// }
-
-	// b, _ := json.Marshal(t{
-	// 	consensus.Decider.DumpParticipants(),
-	// 	consensus.ShardID,
-	// 	senderKey.SerializeToHexStr(),
-	// 	consensus.ChainReader.CurrentHeader().Epoch().Uint64(),
-	// 	consensus.epoch,
-	// 	e,
-	// })
-	// fmt.Println(string(b))
-
 	if err != nil {
-		// fmt.Println("On Prepare is busted =/", err, "on shard-", consensus.ShardID)
 		utils.Logger().Error().Err(err).Msg("[OnPrepare] VerifySenderKey failed")
 		return
 	}
 
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		fmt.Println("unable to verify message sig")
-
-		// p := consensus.Decider.DumpParticipants()
-		// for _, k := range p {
-		// 	if senderKey.SerializeToHexStr() == k {
-		// 		fmt.Println("Sender is in my committee quorum", consensus.PubKey.SerializeToHexStr())
-		// 		break
-		// 	}
-		// }
-		// fmt.Println("Bad sender?", senderKey.SerializeToHexStr())
 		utils.Logger().Error().Err(err).Msg("[OnPrepare] Failed to verify sender's signature")
 		return
 	}

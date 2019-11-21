@@ -1,7 +1,6 @@
 package node
 
 import (
-	"math/big"
 	"sort"
 	"time"
 
@@ -123,14 +122,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	shardState, err := node.Worker.SuperCommitteeForNextEpoch(
 		node.Consensus.ShardID, node.Beaconchain(),
 	)
-
-	// fmt.Println("Update my keys, right", "on port", node.NodeConfig.Port)
-
-	if node.Beaconchain().CurrentHeader().Epoch().Cmp(big.NewInt(1)) == 0 {
-		// fmt.Println("Update my keys, right", "on port", node.NodeConfig.Port)
-		// node.NodeConfig.ConsensusPriKey
-		// node.NodeConfig.ConsensusPubKey
-	}
 
 	// fmt.Println("super-comm", shardState.JSON())
 	if err != nil {

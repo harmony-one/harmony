@@ -128,7 +128,6 @@ func eposStakedCommittee(
 		if err != nil {
 			return nil, err
 		}
-
 		essentials[validator.Address] = effective.SlotOrder{
 			validator.Stake,
 			validator.SlotPubKeys,
@@ -173,6 +172,7 @@ func eposStakedCommittee(
 			&slot.Dec,
 		})
 	}
+
 	return superComm, nil
 }
 
