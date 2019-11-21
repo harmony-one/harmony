@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -358,6 +360,23 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
+
+	// Writing validator stats (for uptime recording)
+	// TODO: only record for open staking validators
+	prevBlock := node.Blockchain().GetBlockByHash(newBlock.ParentHash())
+	if prevBlock != nil {
+		shardState, err := node.Blockchain().ReadShardState(prevBlock.Epoch())
+		if err == nil {
+			members := node.Consensus.Decider.Participants()
+			mask, _ := bls2.NewMask(members, nil)
+			mask.SetMask(commitSigAndBitmap[96:])
+			err = node.Blockchain().WriteValidatorStats(shardState.FindCommitteeByID(newBlock.ShardID()).Slots, mask)
+
+			if err != nil {
+				utils.Logger().Err(err)
+			}
+		}
+	}
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {

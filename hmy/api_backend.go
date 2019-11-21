@@ -307,6 +307,12 @@ func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Valid
 	return &val.Validator
 }
 
+// GetValidatorStats returns the stats of validator
+func (b *APIBackend) GetValidatorStats(addr common.Address) *staking.ValidatorStats {
+	val, _ := b.hmy.BlockChain().ReadValidatorStats(addr)
+	return val
+}
+
 // GetDelegationsByValidator returns all delegation information of a validator
 func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*staking.Delegation {
 	wrapper, err := b.hmy.BlockChain().ReadValidatorData(validator)

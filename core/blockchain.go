@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -71,6 +73,7 @@ const (
 	epochCacheLimit                    = 10
 	randomnessCacheLimit               = 10
 	validatorCacheLimit                = 1024
+	validatorStatsCacheLimit           = 1024
 	validatorListCacheLimit            = 10
 	validatorListByDelegatorCacheLimit = 1024
 
@@ -135,7 +138,8 @@ type BlockChain struct {
 	lastCommitsCache              *lru.Cache
 	epochCache                    *lru.Cache // Cache epoch number → first block number
 	randomnessCache               *lru.Cache // Cache for vrf/vdf
-	validatorCache                *lru.Cache // Cache for staking validator
+	validatorCache                *lru.Cache // Cache for validator info
+	validatorStatsCache           *lru.Cache // Cache for validator stats
 	validatorListCache            *lru.Cache // Cache of validator list
 	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
 
@@ -174,7 +178,8 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	commitsCache, _ := lru.New(commitsCacheLimit)
 	epochCache, _ := lru.New(epochCacheLimit)
 	randomnessCache, _ := lru.New(randomnessCacheLimit)
-	stakingCache, _ := lru.New(validatorCacheLimit)
+	validatorCache, _ := lru.New(validatorCacheLimit)
+	validatorStatsCache, _ := lru.New(validatorStatsCacheLimit)
 	validatorListCache, _ := lru.New(validatorListCacheLimit)
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 
@@ -195,7 +200,8 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		lastCommitsCache:              commitsCache,
 		epochCache:                    epochCache,
 		randomnessCache:               randomnessCache,
-		validatorCache:                stakingCache,
+		validatorCache:                validatorCache,
+		validatorStatsCache:           validatorStatsCache,
 		validatorListCache:            validatorListCache,
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		engine:                        engine,
@@ -2371,6 +2377,59 @@ func (bc *BlockChain) WriteValidatorSnapshots(addrs []common.Address) error {
 			bc.validatorCache.Add("validator-snapshot-"+string(validators[i].Address.Bytes()), by)
 		}
 	}
+	return nil
+}
+
+// ReadValidatorStats reads the stats of a validator
+func (bc *BlockChain) ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error) {
+	return rawdb.ReadValidatorStats(bc.db, addr)
+}
+
+// WriteValidatorStats writes the stats for the committee
+func (bc *BlockChain) WriteValidatorStats(slots shard.SlotList, mask *bls.Mask) error {
+	blsToAddress := make(map[shard.BlsPublicKey]common.Address)
+	for _, slot := range slots {
+		blsToAddress[slot.BlsPublicKey] = slot.EcdsaAddress
+	}
+
+	batch := bc.db.NewBatch()
+	blsKeyBytes := shard.BlsPublicKey{}
+	for i, blsPubKey := range mask.Publics {
+		err := blsKeyBytes.FromLibBLSPublicKey(blsPubKey)
+		if err != nil {
+			return err
+		}
+		if addr, ok := blsToAddress[blsKeyBytes]; ok {
+			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
+			if stats == nil {
+				stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0)}
+			}
+			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, big.NewInt(1))
+
+			enabled, err := mask.IndexEnabled(i)
+			if err != nil {
+				return err
+			}
+
+			if enabled {
+				stats.NumBlocksSigned.Add(stats.NumBlocksSigned, big.NewInt(1))
+			}
+			// TODO: record time being jailed.
+
+			fmt.Println(stats)
+			err = rawdb.WriteValidatorStats(batch, addr, stats)
+			fmt.Println(err)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("Bls public key not found in committee: %x", blsKeyBytes)
+		}
+	}
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	// TODO: Update cache
 	return nil
 }
 

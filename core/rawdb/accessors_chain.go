@@ -652,7 +652,7 @@ func ReadValidatorSnapshot(db DatabaseReader, addr common.Address) (*staking.Val
 	}
 	v := staking.ValidatorWrapper{}
 	if err := rlp.DecodeBytes(data, &v); err != nil {
-		utils.Logger().Error().Err(err).Str("address", addr.Hex()).Msg("Unable to Decode staking validator from database")
+		utils.Logger().Error().Err(err).Str("address", addr.Hex()).Msg("Unable to decode validator snapshot from database")
 		return nil, err
 	}
 	return &v, nil
@@ -667,6 +667,35 @@ func WriteValidatorSnapshot(db DatabaseWriter, v *staking.ValidatorWrapper) erro
 	}
 	if err := db.Put(validatorSnapshotKey(v.Address), bytes); err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorSnapshot] Failed to store to database")
+		return err
+	}
+	return err
+}
+
+// ReadValidatorStats retrieves validator's stats by its address
+func ReadValidatorStats(db DatabaseReader, addr common.Address) (*staking.ValidatorStats, error) {
+	data, err := db.Get(validatorStatsKey(addr))
+	if err != nil || len(data) == 0 {
+		utils.Logger().Info().Err(err).Msg("ReadValidatorStats")
+		return nil, err
+	}
+	stats := staking.ValidatorStats{}
+	if err := rlp.DecodeBytes(data, &stats); err != nil {
+		utils.Logger().Error().Err(err).Str("address", addr.Hex()).Msg("Unable to decode validator stats from database")
+		return nil, err
+	}
+	return &stats, nil
+}
+
+// WriteValidatorStats stores validator's stats by its address
+func WriteValidatorStats(db DatabaseWriter, addr common.Address, stats *staking.ValidatorStats) error {
+	bytes, err := rlp.EncodeToBytes(stats)
+	if err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorStats] Failed to encode")
+		return err
+	}
+	if err := db.Put(validatorStatsKey(addr), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorStats] Failed to store to database")
 		return err
 	}
 	return err

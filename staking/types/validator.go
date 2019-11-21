@@ -40,6 +40,16 @@ type ValidatorWrapper struct {
 	Delegations []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
 }
 
+// ValidatorStats to record validator's performance and history records
+type ValidatorStats struct {
+	// The number of blocks the validator should've signed when in active mode (selected in committee)
+	NumBlocksToSign *big.Int
+	// The number of blocks the validator actually signed
+	NumBlocksSigned *big.Int
+	// The number of times they validator is jailed due to extensive downtime
+	NumJailed *big.Int
+}
+
 // Validator - data fields for a validator
 type Validator struct {
 	// ECDSA address of the validator

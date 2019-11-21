@@ -487,7 +487,6 @@ func (st *StateTransition) applyUndelegateTx(undelegate *staking.Undelegate) err
 	if !delegatorExist {
 		return errNoDelegationToUndelegate
 	}
-	// TODO: do undelegated token distribution after locking period. (in leader block proposal phase)
 	return nil
 }
 

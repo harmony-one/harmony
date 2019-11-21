@@ -76,6 +76,7 @@ type RPCValidator struct {
 	Commission         types2.Commission    `json:"commission"`
 	Description        types2.Description   `json:"description"`
 	CreationHeight     *big.Int             `json:"creation_height"`
+	Uptime             string               `json:"uptime"`
 }
 
 // RPCDelegation represents a particular delegation to a validator
@@ -163,6 +164,7 @@ func newRPCValidator(validator *types2.Validator) *RPCValidator {
 		validator.Commission,
 		validator.Description,
 		validator.CreationHeight,
+		"",
 	}
 }
 
