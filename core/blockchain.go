@@ -2548,8 +2548,9 @@ func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress comm
 	}
 
 	// If there is an existing delegation, just return
+	validatorAddressBytes := validatorAddress.Bytes()
 	for _, delegation := range delegations {
-		if bytes.Compare(delegation.ValidatorAddress.Bytes(), validatorAddress.Bytes()) == 0 {
+		if bytes.Compare(delegation.ValidatorAddress.Bytes(), validatorAddressBytes) == 0 {
 			return nil
 		}
 	}
