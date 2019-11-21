@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -46,6 +47,7 @@ type Validator struct {
 	Address common.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
 	SlotPubKeys []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
+	// TODO Need to remove this .Stake Field
 	// The stake put by the validator itself
 	Stake *big.Int `json:"stake" yaml:"stake"`
 	// if unbonding, height at which this validator has begun unbonding
@@ -108,6 +110,13 @@ func (w *ValidatorWrapper) SanityCheck() error {
 
 	hundredPercent := numeric.NewDec(1)
 	zeroPercent := numeric.NewDec(0)
+
+	utils.Logger().Info().
+		Str("rate", w.Validator.Rate.String()).
+		Str("max-rate", w.Validator.MaxRate.String()).
+		Str("max-change-rate", w.Validator.MaxChangeRate.String()).
+		Msg("Sanity check on validator commission rates, should all be in [0, 1]")
+
 	if w.Validator.Rate.LT(zeroPercent) || w.Validator.Rate.GT(hundredPercent) {
 		return errInvalidComissionRate
 	}

@@ -43,6 +43,10 @@ type ChainReader interface {
 
 	// ReadActiveValidatorList retrieves the list of active validators
 	ReadActiveValidatorList() ([]common.Address, error)
+
+	ValidatorCandidates() []common.Address
+	ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error)
+	ValidatorStakingWithDelegation(addr common.Address) *big.Int
 }
 
 // Engine is an algorithm agnostic consensus engine.

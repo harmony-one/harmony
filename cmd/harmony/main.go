@@ -224,7 +224,6 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 		os.Exit(100)
 	}
 	pubKey := consensusPriKey.GetPublicKey()
-
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
 	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
 	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
@@ -236,7 +235,6 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 
 func createGlobalConfig() *nodeconfig.ConfigType {
 	var err error
-
 	nodeConfig := nodeconfig.GetShardConfig(initialAccount.ShardID)
 	if *nodeType == "validator" {
 		// Set up consensus keys.
@@ -310,7 +308,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
-	// fmt.Println("What is my port at this moment", *port)
 
 	currentNode := node.New(
 		myHost, currentConsensus, chainDBFactory, *isArchival, *port,

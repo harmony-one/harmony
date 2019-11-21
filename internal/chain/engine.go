@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -199,6 +200,7 @@ func (e *engineImpl) Finalize(
 		}
 		for _, validator := range validators {
 			wrapper := state.GetStakingInfo(validator)
+			// fmt.Println("In finalize", validator.String(), "wrapper:", wrapper, "on-epoch", header.Epoch(), "on-shard", header.ShardID())
 			if wrapper != nil {
 				for i := range wrapper.Delegations {
 					delegation := wrapper.Delegations[i]
@@ -209,6 +211,7 @@ func (e *engineImpl) Finalize(
 					return nil, ctxerror.New("failed update validator info").WithCause(err)
 				}
 			} else {
+				err = errors.New("validator came back empty" + common2.MustAddressToBech32(validator))
 				return nil, ctxerror.New("failed getting validator info").WithCause(err)
 			}
 		}
@@ -223,7 +226,7 @@ func QuorumForBlock(
 ) (quorum int, err error) {
 	var ss shard.State
 	if reCalculate {
-		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), *chain.Config(), nil)
+		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), *chain.Config(), chain)
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -282,7 +285,7 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 	var shardState shard.State
 	var err error
 	if reCalculate {
-		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), *chain.Config(), nil)
+		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), *chain.Config(), chain)
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {

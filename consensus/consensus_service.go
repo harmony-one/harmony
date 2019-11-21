@@ -119,7 +119,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	for i := range pubKeys {
 		utils.Logger().Info().Int("index", i).Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).Msg("Member")
 	}
-
 	consensus.LeaderPubKey = pubKeys[0]
 	utils.Logger().Info().
 		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
@@ -263,7 +262,7 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey
 	}
 
 	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, fmt.Errorf("Validator %s is not in committee on shard: %d", senderKey.SerializeToHexStr(), consensus.ShardID)
+		return nil, fmt.Errorf("Validator %s is not in committee", senderKey.SerializeToHexStr())
 	}
 	return senderKey, nil
 }

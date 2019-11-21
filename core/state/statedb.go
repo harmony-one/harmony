@@ -30,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/staking"
 	stk "github.com/harmony-one/harmony/staking/types"

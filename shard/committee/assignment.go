@@ -10,6 +10,7 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -118,6 +119,7 @@ func eposStakedCommittee(
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
+	utils.Logger().Info().Int("candidates-count", len(candidates)).Msg("Preparing EPoS Staked Committee")
 
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
@@ -126,6 +128,7 @@ func eposStakedCommittee(
 		if err != nil {
 			return nil, err
 		}
+
 		essentials[validator.Address] = effective.SlotOrder{
 			validator.Stake,
 			validator.SlotPubKeys,
@@ -170,7 +173,6 @@ func eposStakedCommittee(
 			&slot.Dec,
 		})
 	}
-	// fmt.Println("epos-comm", superComm.JSON())
 	return superComm, nil
 }
 
@@ -183,10 +185,7 @@ func (def partialStakingEnabled) ComputePublicKeys(
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	superComm := shard.State{}
 	if config.IsStaking(epoch) {
-		stakedSlots :=
-			(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
-				int(instance.NumShards())
-		superComm, _ = eposStakedCommittee(instance, d, stakedSlots)
+		superComm, _ = eposStakedCommittee(instance, d, 320)
 	} else {
 		superComm = preStakingEnabledCommittee(instance)
 	}
