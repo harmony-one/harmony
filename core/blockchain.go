@@ -2400,6 +2400,7 @@ func (bc *BlockChain) WriteValidatorStats(slots shard.SlotList, mask *bls.Mask) 
 			return err
 		}
 		if addr, ok := blsToAddress[blsKeyBytes]; ok {
+			// Retrieve the stats and add new counts
 			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
 			if stats == nil {
 				stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0)}
@@ -2416,9 +2417,7 @@ func (bc *BlockChain) WriteValidatorStats(slots shard.SlotList, mask *bls.Mask) 
 			}
 			// TODO: record time being jailed.
 
-			fmt.Println(stats)
 			err = rawdb.WriteValidatorStats(batch, addr, stats)
-			fmt.Println(err)
 			if err != nil {
 				return err
 			}
