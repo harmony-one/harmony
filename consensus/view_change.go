@@ -317,6 +317,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		}
 		utils.Logger().Debug().
 			Str("validatorPubKey", senderKey.SerializeToHexStr()).
+			Uint64("recvMsg.ViewID", recvMsg.ViewID).
 			Msg("[onViewChange] Add M1 (prepared) type message")
 		consensus.bhpSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()] = recvMsg.ViewchangeSig
 		consensus.bhpBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
@@ -339,6 +340,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 	utils.Logger().Debug().
 		Str("validatorPubKey", senderKey.SerializeToHexStr()).
+		Uint64("recvMsg.ViewID", recvMsg.ViewID).
 		Msg("[onViewChange] Add M3 (ViewID) type message")
 
 	consensus.viewIDSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()] = recvMsg.ViewidSig
@@ -347,6 +349,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	utils.Logger().Debug().
 		Int("numSigs", len(consensus.viewIDSigs[recvMsg.ViewID])).
 		Int64("needed", consensus.Decider.QuorumThreshold()).
+		Uint64("recvMsg.ViewID", recvMsg.ViewID).
 		Msg("[onViewChange]")
 
 	// received enough view change messages, change state to normal consensus
@@ -396,6 +399,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		utils.Logger().Warn().
 			Int("payloadSize", len(consensus.m1Payload)).
 			Hex("M1Payload", consensus.m1Payload).
+			Uint64("recvMsg.ViewID", recvMsg.ViewID).
 			Msg("[onViewChange] Sent NewView Message")
 		consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_NEWVIEW, []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
 
@@ -404,7 +408,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		utils.Logger().Debug().
-			Uint64("viewChangingID", consensus.current.ViewID()).
+			Uint64("my current viewID", consensus.current.ViewID()).
+			Uint64("recvMsg.ViewID", recvMsg.ViewID).
 			Msg("[onViewChange] New Leader Start Consensus Timer and Stop View Change Timer")
 		utils.Logger().Debug().
 			Str("myKey", consensus.PubKey.SerializeToHexStr()).
@@ -456,7 +461,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		utils.Logger().Warn().
 			Str("m3Sig", m3Sig.SerializeToHexStr()).
 			Hex("m3Mask", m3Mask.Bitmap).
-			Uint64("MsgViewID", recvMsg.ViewID).
+			Uint64("recvMsg.ViewID", recvMsg.ViewID).
 			Msg("[onNewView] Unable to Verify Aggregated Signature of M3 (ViewID) payload")
 		return
 	}
