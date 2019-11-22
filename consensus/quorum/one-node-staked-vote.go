@@ -21,6 +21,9 @@ var (
 	totalShare    = numeric.MustNewDecFromStr("1.00")
 )
 
+// TODO Test the case where we have 33 nodes, 68/33 will give precision hell and it should trigger
+// the 100% mismatch err.
+
 // TallyResult is the result of when we calculate voting power,
 // recall that it happens to us at epoch change
 type TallyResult struct {
