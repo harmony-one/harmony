@@ -128,6 +128,8 @@ func (v *stakedVoteWeight) UpdateVotingPower(staked shard.SlotList) {
 
 	v.validatorStakes = map[shard.BlsPublicKey]stakedVoter{}
 	v.Reset([]Phase{Prepare, Commit, ViewChange})
+	v.hmySlotCount = 0
+	v.stakedTotal = numeric.ZeroDec()
 
 	for i := range staked {
 		// Real Staker
