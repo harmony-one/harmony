@@ -60,22 +60,32 @@ function cleanup_and_result() {
 }
 
 function debug_staking() {
-   hmy_one_dir="$(go env GOPATH)/src/github.com/harmony-one"
-   hmy_bin="${hmy_one_dir}/go-sdk/hmy"
-   keystore="${hmy_one_dir}/harmony-ops/test-automation/api-tests/LocalnetValidatorKeys"
-   if [ ! -d "${hmy_one_dir}/harmony-ops/" ]; then
-     git clone https://github.com/harmony-one/harmony-ops.git "${hmy_one_dir}/harmony-ops"
-   fi
-   if [ ! -d "${hmy_one_dir}/go-sdk/" ]; then
-     git clone https://github.com/harmony-one/go-sdk.git "${hmy_one_dir}/go-sdk"
+   source "$(go env GOPATH)/src/github.com/harmony-one/harmony/scripts/setup_bls_build_flags.sh"
+   hmy_gosdk="$(go env GOPATH)/src/github.com/harmony-one/go-sdk"
+   hmy_bin="${hmy_gosdk}/hmy"
+   hmy_ops="/tmp/harmony-ops"
+   keystore="${hmy_ops}/test-automation/api-tests/LocalnetValidatorKeys"
+
+   rm -rf $hmy_ops
+   git clone https://github.com/harmony-one/harmony-ops.git $hmy_ops
+
+   if [ ! -d "${hmy_gosdk}" ]; then
+     git clone https://github.com/harmony-one/go-sdk.git $hmy_gosdk
    fi
    if [ ! -f "${hmy_bin}" ]; then
-     make -C "${hmy_one_dir}/go-sdk/"
+     make -C $hmy_gosdk
    fi
+
+   hmy_version=$($hmy_bin version 2>&1 >/dev/null)
+   if [[ "${hmy_version:32:3}" -lt "135" ]]; then
+     echo "Aborting staking tests since CLI version is out of date."
+     return
+   fi
+
    python3 -m pip install pyhmy
    python3 -m pip install requests
-   python3 "${hmy_one_dir}/harmony-ops/test-automation/api-tests/test.py" --keystore ${keystore} \
-            --cli_path ${hmy_bin} --test_dir "${hmy_one_dir}/harmony-ops/test-automation/api-tests/tests/"  \
+   python3 "${hmy_ops}/test-automation/api-tests/test.py" --keystore $keystore \
+            --cli_path $hmy_bin --test_dir "${hmy_ops}/test-automation/api-tests/tests/"  \
             --rpc_endpoint_src="http://localhost:9500/" --rpc_endpoint_dst="http://localhost:9501/" --ignore_regression_test
 }
 
