@@ -5,7 +5,6 @@ import (
 
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/consensus/quorum"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -75,7 +74,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 }
 
 // new leader construct newview message
-func (consensus *Consensus) constructNewViewMessage() []byte {
+func (consensus *Consensus) constructNewViewMessage(viewID uint64) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_NEWVIEW,
@@ -92,21 +91,21 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
 	vcMsg.Payload = consensus.m1Payload
 
-	sig2arr := consensus.GetNilSigsArray()
+	sig2arr := consensus.GetNilSigsArray(viewID)
 	utils.Logger().Debug().Int("len", len(sig2arr)).Msg("[constructNewViewMessage] M2 (NIL) type signatures")
 	if len(sig2arr) > 0 {
 		m2Sig := bls_cosi.AggregateSig(sig2arr)
 		vcMsg.M2Aggsigs = m2Sig.Serialize()
-		vcMsg.M2Bitmap = consensus.nilBitmap.Bitmap
+		vcMsg.M2Bitmap = consensus.nilBitmap[viewID].Bitmap
 	}
 
-	sig3arr := consensus.Decider.ReadAllSignatures(quorum.ViewChange)
-	utils.Logger().Debug().Int("len", len(sig3arr)).Msg("[constructNewViewMessage] M3 (ViewID) type signatures")
+	sig3arr := consensus.GetViewIDSigsArray(viewID)
+	consensus.getLogger().Debug().Int("len", len(sig3arr)).Msg("[constructNewViewMessage] M3 (ViewID) type signatures")
 	// even we check here for safty, m3 type signatures must >= 2f+1
 	if len(sig3arr) > 0 {
 		m3Sig := bls_cosi.AggregateSig(sig3arr)
 		vcMsg.M3Aggsigs = m3Sig.Serialize()
-		vcMsg.M3Bitmap = consensus.viewIDBitmap.Bitmap
+		vcMsg.M3Bitmap = consensus.viewIDBitmap[viewID].Bitmap
 	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
