@@ -34,7 +34,7 @@ const (
 	SyncLoopBatchSize        uint32 = 1000 // maximum size for one query of block hashes
 	verifyHeaderBatchSize    uint64 = 100  // block chain header verification batch size
 	SyncLoopFrequency               = 1    // unit in second
-	LastMileBlocksSize              = 10
+	LastMileBlocksSize              = 50
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -530,8 +530,9 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 	return nil
 }
 
-func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) error {
-	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] updateBlockAndStatus: Current Block")
+// UpdateBlockAndStatus ...
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) error {
+	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] UpdateBlockAndStatus: Current Block")
 
 	// Verify block signatures
 	if block.NumberU64() > 1 {
@@ -539,9 +540,9 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		verifySig := block.NumberU64()%verifyHeaderBatchSize == 0
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySig)
 		if err != nil {
-			utils.Logger().Error().Err(err).Msgf("[SYNC] updateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
+			utils.Logger().Error().Err(err).Msgf("[SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
 
-			utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] updateBlockAndStatus: Rolling back last 99 blocks!")
+			utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
 			var hashes []common.Hash
 			for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
 				hashes = append(hashes, bc.CurrentBlock().Hash())
@@ -553,16 +554,16 @@ func (ss *StateSync) updateBlockAndStatus(block *types.Block, bc *core.BlockChai
 
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msgf("[SYNC] updateBlockAndStatus: Error adding new block to blockchain %d %d", block.NumberU64(), block.ShardID())
+		utils.Logger().Error().Err(err).Msgf("[SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d", block.NumberU64(), block.ShardID())
 
-		utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] updateBlockAndStatus: Rolling back current block!")
+		utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back current block!")
 		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 		return err
 	}
 	utils.Logger().Info().
 		Uint64("blockHeight", bc.CurrentBlock().NumberU64()).
 		Str("blockHex", bc.CurrentBlock().Hash().Hex()).
-		Msg("[SYNC] updateBlockAndStatus: new block added to blockchain")
+		Msg("[SYNC] UpdateBlockAndStatus: new block added to blockchain")
 	return nil
 }
 
@@ -577,7 +578,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.updateBlockAndStatus(block, bc, worker)
+		err = ss.UpdateBlockAndStatus(block, bc, worker)
 		if err != nil {
 			break
 		}
@@ -594,7 +595,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.updateBlockAndStatus(block, bc, worker)
+		err = ss.UpdateBlockAndStatus(block, bc, worker)
 		if err != nil {
 			break
 		}
@@ -615,7 +616,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.updateBlockAndStatus(block, bc, worker)
+		err = ss.UpdateBlockAndStatus(block, bc, worker)
 		if err != nil {
 			break
 		}
