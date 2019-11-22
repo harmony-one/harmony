@@ -10,6 +10,7 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -119,6 +120,8 @@ func eposStakedCommittee(
 	candidates := stakerReader.ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
 
+	utils.Logger().Info().Int("staked-candidates", len(candidates)).Msg("preparing epos staked committee")
+
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		// TODO Should be using .ValidatorStakingWithDelegation, not implemented yet
@@ -170,7 +173,11 @@ func eposStakedCommittee(
 			&slot.Dec,
 		})
 	}
-
+	if c := len(candidates); c != 0 {
+		utils.Logger().Info().Int("staked-candidates", c).
+			RawJSON("staked-super-committee", []byte(superComm.JSON())).
+			Msg("EPoS based super-committe")
+	}
 	return superComm, nil
 }
 

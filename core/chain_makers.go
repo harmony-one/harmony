@@ -271,3 +271,9 @@ func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Hea
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
 func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (shard.State, error)      { return nil, nil }
 func (cr *fakeChainReader) ReadActiveValidatorList() ([]common.Address, error)      { return nil, nil }
+
+func (cr *fakeChainReader) ValidatorCandidates() []common.Address { return nil }
+func (cr *fakeChainReader) ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) *big.Int { return nil }

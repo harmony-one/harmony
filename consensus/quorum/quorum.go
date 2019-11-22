@@ -5,7 +5,9 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	// "github.com/harmony-one/harmony/staking/effective"
 )
 
@@ -44,6 +46,19 @@ const (
 	SuperMajorityStake
 )
 
+var policyNames = map[Policy]string{
+	SuperMajorityStake: "SuperMajorityStake",
+	SuperMajorityVote:  "SuperMajorityVote",
+}
+
+func (p Policy) String() string {
+	if name, ok := policyNames[p]; ok {
+		return name
+	}
+	return fmt.Sprintf("Unknown Quorum Policy %+v", byte(p))
+
+}
+
 // ParticipantTracker ..
 type ParticipantTracker interface {
 	Participants() []*bls.PublicKey
@@ -75,12 +90,24 @@ type DependencyInjectionWriter interface {
 	SetShardIDProvider(func() (uint32, error))
 }
 
+// DependencyInjectionReader ..
+type DependencyInjectionReader interface {
+	ShardIDProvider() func() (uint32, error)
+}
+
+//WithJSONDump representation dump
+type WithJSONDump interface {
+	JSON() string
+}
+
 // Decider ..
 type Decider interface {
 	SignatureReader
 	DependencyInjectionWriter
+	slash.Slasher
+	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
-	// UpdateVotingPower(keeper effective.StakeKeeper)
+	UpdateVotingPower(shard.SlotList)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
 	QuorumThreshold() *big.Int
@@ -96,15 +123,12 @@ type cIdentities struct {
 	commit     map[string]*bls.Sign
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
-	viewID map[string]*bls.Sign
+	viewID      map[string]*bls.Sign
+	seenCounter map[[shard.PublicKeySizeInBytes]byte]int
 }
 
 type depInject struct {
 	shardIDProvider func() (uint32, error)
-}
-
-func (d *depInject) SetShardIDProvider(p func() (uint32, error)) {
-	d.shardIDProvider = p
 }
 
 func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
@@ -132,12 +156,24 @@ func (s *cIdentities) Participants() []*bls.PublicKey {
 }
 
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
+	// TODO - might need to put reset of seen counter in separate method
+	s.seenCounter = make(map[[shard.PublicKeySizeInBytes]byte]int, len(pubKeys))
+	for i := range pubKeys {
+		k := shard.BlsPublicKey{}
+		k.FromLibBLSPublicKey(pubKeys[i])
+		s.seenCounter[k] = 0
+	}
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
+}
+
+func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
+	s.seenCounter[key]++
+	return s.seenCounter[key] == slash.UnavailabilityInConsecutiveBlockSigning
 }
 
 func (s *cIdentities) DumpParticipants() []string {
 	keys := make([]string, len(s.publicKeys))
-	for i := 0; i < len(s.publicKeys); i++ {
+	for i := range s.publicKeys {
 		keys[i] = s.publicKeys[i].SerializeToHexStr()
 	}
 	return keys
@@ -174,8 +210,8 @@ func (s *cIdentities) AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign
 }
 
 func (s *cIdentities) Reset(ps []Phase) {
-	for _, p := range ps {
-		switch m := map[string]*bls.Sign{}; p {
+	for i := range ps {
+		switch m := map[string]*bls.Sign{}; ps[i] {
 		case Prepare:
 			s.prepare = m
 		case Commit:
@@ -223,26 +259,46 @@ func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
 	return sigs
 }
 
-func newMapBackedSignatureReader() SignatureReader {
+func newMapBackedSignatureReader() *cIdentities {
 	return &cIdentities{
 		[]*bls.PublicKey{}, map[string]*bls.Sign{},
 		map[string]*bls.Sign{}, map[string]*bls.Sign{},
+		map[[shard.PublicKeySizeInBytes]byte]int{},
 	}
+}
+
+type composite struct {
+	DependencyInjectionWriter
+	DependencyInjectionReader
+	SignatureReader
+}
+
+func (d *depInject) SetShardIDProvider(p func() (uint32, error)) {
+	d.shardIDProvider = p
+}
+
+func (d *depInject) ShardIDProvider() func() (uint32, error) {
+	return d.shardIDProvider
 }
 
 // NewDecider ..
 func NewDecider(p Policy) Decider {
 	signatureStore := newMapBackedSignatureReader()
-	dependencies := &depInject{}
+	deps := &depInject{}
+	c := &composite{deps, deps, signatureStore}
 	switch p {
 	case SuperMajorityVote:
-		return &uniformVoteWeight{signatureStore, dependencies}
+		return &uniformVoteWeight{
+			c.DependencyInjectionWriter, c.DependencyInjectionReader, c,
+		}
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
-			signatureStore,
-			dependencies,
-			map[[shard.PublicKeySizeInBytes]byte]stakedVoter{},
-			big.NewInt(0),
+			c.SignatureReader,
+			c.DependencyInjectionWriter,
+			c.DependencyInjectionWriter.(DependencyInjectionReader),
+			c.SignatureReader.(slash.ThresholdDecider),
+			map[shard.BlsPublicKey]stakedVoter{},
+			numeric.ZeroDec(),
 		}
 	default:
 		// Should not be possible

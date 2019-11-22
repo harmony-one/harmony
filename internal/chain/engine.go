@@ -11,10 +11,12 @@ import (
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
@@ -22,10 +24,11 @@ import (
 
 type engineImpl struct {
 	d reward.Distributor
+	s slash.Slasher
 }
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{nil}
+var Engine = &engineImpl{nil, nil}
 
 // Rewarder handles the distribution of block rewards
 func (e *engineImpl) Rewarder() reward.Distributor {
@@ -35,6 +38,16 @@ func (e *engineImpl) Rewarder() reward.Distributor {
 // SetRewarder ..
 func (e *engineImpl) SetRewarder(d reward.Distributor) {
 	e.d = d
+}
+
+// Slasher handles slashing accounts due to inavailibility or double-signing
+func (e *engineImpl) Slasher() slash.Slasher {
+	return e.s
+}
+
+// SetSlasher assigns the slasher used
+func (e *engineImpl) SetSlasher(s slash.Slasher) {
+	e.s = s
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -164,13 +177,16 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 // Finalize implements Engine, accumulating the block rewards,
 // setting the final state and assembling the block.
 func (e *engineImpl) Finalize(
-	chain engine.ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
+	chain engine.ChainReader, header *block.Header,
+	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
-	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error) {
+	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+) (*types.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	// TODO: Block rewards should be done only in beacon chain based on cross-links
-	if err := AccumulateRewards(chain, state, header, e.Rewarder()); err != nil {
+	if err := AccumulateRewards(
+		chain, state, header, e.Rewarder(), e.Slasher(),
+	); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 
@@ -194,6 +210,7 @@ func (e *engineImpl) Finalize(
 					return nil, ctxerror.New("failed update validator info").WithCause(err)
 				}
 			} else {
+				err = errors.New("validator came back empty" + common2.MustAddressToBech32(validator))
 				return nil, ctxerror.New("failed getting validator info").WithCause(err)
 			}
 		}
@@ -203,10 +220,12 @@ func (e *engineImpl) Finalize(
 }
 
 // QuorumForBlock returns the quorum for the given block header.
-func QuorumForBlock(chain engine.ChainReader, h *block.Header, reCalculate bool) (quorum int, err error) {
+func QuorumForBlock(
+	chain engine.ChainReader, h *block.Header, reCalculate bool,
+) (quorum int, err error) {
 	var ss shard.State
 	if reCalculate {
-		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), *chain.Config(), nil)
+		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), *chain.Config(), chain)
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -265,7 +284,7 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 	var shardState shard.State
 	var err error
 	if reCalculate {
-		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), *chain.Config(), nil)
+		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), *chain.Config(), chain)
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {

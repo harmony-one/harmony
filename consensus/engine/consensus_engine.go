@@ -10,6 +10,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -42,6 +44,9 @@ type ChainReader interface {
 
 	// ReadActiveValidatorList retrieves the list of active validators
 	ReadActiveValidatorList() ([]common.Address, error)
+
+	// Methods needed for EPoS committee assignment calculation
+	committee.StakingCandidatesReader
 }
 
 // Engine is an algorithm agnostic consensus engine.
@@ -82,6 +87,12 @@ type Engine interface {
 
 	// SetRewarder assigns the Distributor used in block reward
 	SetRewarder(reward.Distributor)
+
+	// Slasher handles slashing accounts due to inavailibility or double-signing
+	Slasher() slash.Slasher
+
+	// SetSlasher assigns the slasher used
+	SetSlasher(slash.Slasher)
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.

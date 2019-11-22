@@ -38,7 +38,7 @@ type BlsPublicKey [PublicKeySizeInBytes]byte
 type Slot struct {
 	EcdsaAddress common.Address `json:"ecdsa-address"`
 	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
-	// nil means not active, 0 means our node, >= 0 means staked node
+	// nil means our node, 0 means not active, >= 0 means staked node
 	StakeWithDelegationApplied *numeric.Dec `json:"staked-validator" rlp:"nil"`
 }
 
@@ -55,7 +55,7 @@ type Committee struct {
 func (ss State) JSON() string {
 	type t struct {
 		Slot
-		EcdsaAddress string `json:"one-address"`
+		EcdsaAddress string `json:"ecdsa-address"`
 	}
 	type v struct {
 		Committee

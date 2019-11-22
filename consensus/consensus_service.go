@@ -460,7 +460,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
 		epoch, consensus.ChainReader,
 	)[int(header.ShardID())]
-
 	consensus.numPrevPubKeys = len(curPubKeys)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
 	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {

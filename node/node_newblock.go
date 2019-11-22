@@ -120,7 +120,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare shard state
 	shardState, err := node.Worker.SuperCommitteeForNextEpoch(
-		node.Consensus.ShardID, node.Beaconchain(),
+		node.Consensus.ShardID, node.Blockchain(),
 	)
 
 	if err != nil {
@@ -136,6 +136,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
 }
 
+// TODO is this still needed?
 func (node *Node) proposeLocalShardState(block *types.Block) {
 	logger := block.Logger(utils.Logger())
 	// TODO ek – read this from beaconchain once BC sync is fixed

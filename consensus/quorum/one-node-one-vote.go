@@ -1,17 +1,20 @@
 package quorum
 
 import (
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 	// "github.com/harmony-one/harmony/staking/effective"
 )
 
 type uniformVoteWeight struct {
-	SignatureReader
 	DependencyInjectionWriter
+	DependencyInjectionReader
+	SignatureReader
 }
 
 // Policy ..
@@ -40,9 +43,9 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 	return v.SignersCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }
 
-// func (v *uniformVoteWeight) UpdateVotingPower(effective.StakeKeeper) {
-// NO-OP do not add anything here
-// }
+func (v *uniformVoteWeight) UpdateVotingPower(shard.SlotList) {
+	// NO-OP do not add anything here
+}
 
 // ToggleActive for uniform vote is a no-op, always says that voter is active
 func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
@@ -70,4 +73,24 @@ func (v *uniformVoteWeight) Award(
 	}
 
 	return payout
+}
+
+func (v *uniformVoteWeight) ShouldSlash(k shard.BlsPublicKey) bool {
+	// No-op, no semantic meaning in one-slot-one-vote
+	return false
+}
+
+func (v *uniformVoteWeight) JSON() string {
+	s, _ := v.ShardIDProvider()()
+
+	type t struct {
+		Policy       string   `json"policy"`
+		ShardID      uint32   `json:"shard-id"`
+		Count        int      `json:"count"`
+		Participants []string `json:"committee-members"`
+	}
+
+	members := v.DumpParticipants()
+	b1, _ := json.Marshal(t{v.Policy().String(), s, len(members), members})
+	return string(b1)
 }
