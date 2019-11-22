@@ -299,6 +299,7 @@ func NewDecider(p Policy) Decider {
 			c.SignatureReader.(slash.ThresholdDecider),
 			map[shard.BlsPublicKey]stakedVoter{},
 			numeric.ZeroDec(),
+			0,
 		}
 	default:
 		// Should not be possible
