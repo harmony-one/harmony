@@ -14,10 +14,12 @@ import (
 )
 
 var (
-	ninetyPercent   = numeric.MustNewDecFromStr("0.90")
-	quorumThreshold = numeric.MustNewDecFromStr("0.67")
-	stakersShare    = numeric.MustNewDecFromStr("0.33")
-	totalShare      = numeric.MustNewDecFromStr("1.00")
+	twoThird      = numeric.NewDec(2).Quo(numeric.NewDec(3))
+	oneHundred    = numeric.NewDec(100)
+	ninetyPercent = numeric.MustNewDecFromStr("0.90")
+	harmonysShare = numeric.MustNewDecFromStr("0.68")
+	stakersShare  = numeric.MustNewDecFromStr("0.32")
+	totalShare    = numeric.MustNewDecFromStr("1.00")
 )
 
 // TallyResult is the result of when we calculate voting power,
@@ -53,7 +55,7 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
-	t := numeric.NewDecFromBigInt(v.QuorumThreshold())
+	t := numeric.NewDecFromBigInt(v.QuorumThreshold()).Quo(oneHundred)
 	currentTotalPower := v.computeCurrentTotalPower(p)
 
 	utils.Logger().Info().
@@ -84,7 +86,7 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) numeric.Dec {
 
 // QuorumThreshold ..
 func (v *stakedVoteWeight) QuorumThreshold() *big.Int {
-	return quorumThreshold.RoundInt()
+	return twoThird.Mul(oneHundred).RoundInt()
 }
 
 // RewardThreshold ..
@@ -172,9 +174,7 @@ func (v *stakedVoteWeight) SetVoters(
 				Mul(stakersShare)
 			theirPercentage = theirPercentage.Add(member.effectivePercent)
 		} else { // Our node
-			member.effectivePercent = numeric.NewDecFromBigInt(
-				v.QuorumThreshold(),
-			).Quo(ourCount)
+			member.effectivePercent = harmonysShare.Quo(ourCount)
 			ourPercentage = ourPercentage.Add(member.effectivePercent)
 		}
 
