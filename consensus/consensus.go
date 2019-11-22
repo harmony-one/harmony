@@ -58,14 +58,19 @@ type Consensus struct {
 	commitBitmap         *bls_cosi.Mask
 
 	// Commits collected from view change
+	// for each viewID, we need keep track of corresponding sigs and bitmap
+	// until one of the viewID has enough votes (>=2f+1)
+	// after one of viewID has enough votes, we can reset and clean the map
+	// honest nodes will never double votes on different viewID
 	// bhpSigs: blockHashPreparedSigs is the signature on m1 type message
-	bhpSigs map[string]*bls.Sign
+	bhpSigs map[uint64]map[string]*bls.Sign
 	// nilSigs: there is no prepared message when view change,
 	// it's signature on m2 type (i.e. nil) messages
-	nilSigs      map[string]*bls.Sign
-	bhpBitmap    *bls_cosi.Mask
-	nilBitmap    *bls_cosi.Mask
-	viewIDBitmap *bls_cosi.Mask
+	nilSigs      map[uint64]map[string]*bls.Sign
+	viewIDSigs   map[uint64]map[string]*bls.Sign
+	bhpBitmap    map[uint64]*bls_cosi.Mask
+	nilBitmap    map[uint64]*bls_cosi.Mask
+	viewIDBitmap map[uint64]*bls_cosi.Mask
 	m1Payload    []byte     // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 	vcLock       sync.Mutex // mutex for view change
 
