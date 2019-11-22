@@ -82,6 +82,7 @@ type SignatureReader interface {
 	SignatoryTracker
 	ReadAllSignatures(Phase) []*bls.Sign
 	ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign
+	TwoThirdsSignersCount() int64
 }
 
 // DependencyInjectionWriter ..
@@ -219,6 +220,10 @@ func (s *cIdentities) Reset(ps []Phase) {
 			s.viewID = m
 		}
 	}
+}
+
+func (s *cIdentities) TwoThirdsSignersCount() int64 {
+	return s.ParticipantsCount()*2/3 + 1
 }
 
 func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {

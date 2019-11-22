@@ -35,9 +35,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 
 // QuorumThreshold ..
 func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
-	return numeric.NewDecFromBigInt(
-		big.NewInt(v.ParticipantsCount()*2/3 + 1),
-	)
+	return numeric.NewDec(v.TwoThirdsSignersCount())
 }
 
 // RewardThreshold ..
