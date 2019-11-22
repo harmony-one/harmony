@@ -35,17 +35,22 @@ func (m *Mockpubsub) EXPECT() *MockpubsubMockRecorder {
 }
 
 // Publish mocks base method
-func (m *Mockpubsub) Publish(topic string, data []byte) error {
+func (m *Mockpubsub) Publish(topic string, data []byte, opts ...go_libp2p_pubsub.PubOpt) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Publish", topic, data)
+	varargs := []interface{}{topic, data}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Publish", varargs...)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Publish indicates an expected call of Publish
-func (mr *MockpubsubMockRecorder) Publish(topic, data interface{}) *gomock.Call {
+func (mr *MockpubsubMockRecorder) Publish(topic, data interface{}, opts ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*Mockpubsub)(nil).Publish), topic, data)
+	varargs := append([]interface{}{topic, data}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*Mockpubsub)(nil).Publish), varargs...)
 }
 
 // Subscribe mocks base method

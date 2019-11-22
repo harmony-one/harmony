@@ -35,7 +35,7 @@ const (
 
 // pubsub captures the pubsub interface we expect from libp2p.
 type pubsub interface {
-	Publish(topic string, data []byte) error
+	Publish(topic string, data []byte, opts ...libp2p_pubsub.PubOpt) error
 	Subscribe(topic string, opts ...libp2p_pubsub.SubOpt) (*libp2p_pubsub.Subscription, error)
 }
 
