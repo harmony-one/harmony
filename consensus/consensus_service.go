@@ -85,17 +85,6 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 	return marshaledMessage, nil
 }
 
-// SetLeaderPubKey deserialize the public key of consensus leader
-func (consensus *Consensus) SetLeaderPubKey(k []byte) error {
-	consensus.leader.ConsensusPubKey = &bls.PublicKey{}
-	return consensus.leader.ConsensusPubKey.Deserialize(k)
-}
-
-// GetLeaderPubKey returns the public key of consensus leader
-func (consensus *Consensus) GetLeaderPubKey() *bls.PublicKey {
-	return consensus.leader.ConsensusPubKey
-}
-
 // GetNodeIDs returns Node IDs of all nodes in the same shard
 func (consensus *Consensus) GetNodeIDs() []libp2p_peer.ID {
 	nodes := make([]libp2p_peer.ID, 0)
@@ -131,8 +120,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 		utils.Logger().Info().Int("index", i).Str("BlsPubKey", pubKey).Msg("Member")
 		consensus.CommitteePublicKeys[pubKey] = true
 	}
-	// TODO: use pubkey to identify leader rather than p2p.Peer.
-	consensus.leader = p2p.Peer{ConsensusPubKey: pubKeys[0]}
+
 	consensus.LeaderPubKey = pubKeys[0]
 	utils.Logger().Info().
 		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
@@ -498,6 +486,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	// update public keys committee
+	oldLeader := consensus.LeaderPubKey
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
@@ -524,6 +513,18 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		if key.IsEqual(consensus.PubKey) {
 			if hasError {
 				return Syncing
+			}
+
+			// If the leader changed and I myself become the leader
+			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.LeaderPubKey.IsEqual(consensus.PubKey) {
+				go func() {
+					utils.Logger().Debug().
+						Str("myKey", consensus.PubKey.SerializeToHexStr()).
+						Uint64("viewID", consensus.viewID).
+						Uint64("block", consensus.blockNum).
+						Msg("[onEpochChange] I am the New Leader")
+					consensus.ReadySignal <- struct{}{}
+				}()
 			}
 			return Normal
 		}

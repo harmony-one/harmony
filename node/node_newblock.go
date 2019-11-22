@@ -42,7 +42,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 					Msg("Consensus new block proposal: STOPPED!")
 				return
 			case <-readySignal:
-				for {
+				for node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(PeriodicBlock)
 					if time.Now().Before(deadline) {
 						continue
