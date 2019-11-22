@@ -43,8 +43,11 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 	return v.SignersCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }
 
-func (v *uniformVoteWeight) UpdateVotingPower(shard.SlotList) {
+func (v *uniformVoteWeight) SetVoters(
+	shard.SlotList,
+) (*TallyResult, error) {
 	// NO-OP do not add anything here
+	return nil, nil
 }
 
 // ToggleActive for uniform vote is a no-op, always says that voter is active

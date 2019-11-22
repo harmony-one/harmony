@@ -390,9 +390,26 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			s, _ := committee.WithStakingEnabled.Compute(
 				next, node.chainConfig, node.Consensus.ChainReader,
 			)
-			node.Consensus.Decider.UpdateVotingPower(
+
+			prevSubCommitteeDump := node.Consensus.Decider.JSON()
+
+			if _, err := node.Consensus.Decider.SetVoters(
 				s.FindCommitteeByID(node.Consensus.ShardID).Slots,
-			)
+			); err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Uint32("shard", node.Consensus.ShardID).
+					Msg("Error when updating voting power")
+				return
+			}
+
+			utils.Logger().Info().
+				Uint64("block-number", newBlock.Number().Uint64()).
+				Uint64("epoch", newBlock.Epoch().Uint64()).
+				Uint32("shard-id", node.Consensus.ShardID).
+				RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
+				RawJSON("current-subcommittee", []byte(node.Consensus.Decider.JSON())).
+				Msg("changing committee")
 		}
 		// TODO Need to refactor UpdateConsensusInformation so can fold the following logic
 		// into UCI - todo because UCI mutates state & called in overloaded contexts
