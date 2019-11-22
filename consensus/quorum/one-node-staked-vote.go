@@ -57,7 +57,7 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 
 // QuorumThreshold ..
 func (v *stakedVoteWeight) QuorumThreshold() *big.Int {
-	return v.total.Mul(twoThirds).RoundInt()
+	return v.total.Mul(twoThirds).Ceil().RoundInt()
 }
 
 // RewardThreshold ..
@@ -73,7 +73,6 @@ func (v *stakedVoteWeight) Award(
 	payout := big.NewInt(0)
 	last := big.NewInt(0)
 	count := big.NewInt(int64(len(earners)))
-	// TODO Finish implementing this logic
 	proportional := map[common.Address]numeric.Dec{}
 
 	for _, details := range v.validatorStakes {
@@ -83,6 +82,7 @@ func (v *stakedVoteWeight) Award(
 			)
 		}
 	}
+	// TODO Finish implementing this logic w/Chao
 
 	for i := range earners {
 		cur := big.NewInt(0)

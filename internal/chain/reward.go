@@ -104,7 +104,7 @@ func AccumulateRewards(
 	for i := range missing {
 		w.Add(1)
 		go func(member int) {
-			defer w.Add(-1)
+			defer w.Done()
 			// Slash if missing block was long enough
 			if slasher.ShouldSlash(missing[member].BlsPublicKey) {
 				// TODO Logic

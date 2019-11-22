@@ -378,10 +378,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			}
 		}
 	}
-	next := new(big.Int).Add(newBlock.Epoch(), common.Big1)
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
-
+		next := new(big.Int).Add(newBlock.Epoch(), common.Big1)
 		if node.chainConfig.StakingEpoch.Cmp(next) == 0 &&
 			node.Consensus.Decider.Policy() != quorum.SuperMajorityStake {
 			node.Consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
@@ -395,7 +394,8 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 				s.FindCommitteeByID(node.Consensus.ShardID).Slots,
 			)
 		}
-
+		// TODO Need to refactor UpdateConsensusInformation so can fold the following logic
+		// into UCI - todo because UCI mutates state & called in overloaded contexts
 		node.Consensus.UpdateConsensusInformation()
 
 		if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
