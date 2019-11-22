@@ -15,7 +15,6 @@ import (
 
 var (
 	twoThird      = numeric.NewDec(2).Quo(numeric.NewDec(3))
-	oneHundred    = numeric.NewDec(100)
 	ninetyPercent = numeric.MustNewDecFromStr("0.90")
 	harmonysShare = numeric.MustNewDecFromStr("0.68")
 	stakersShare  = numeric.MustNewDecFromStr("0.32")
@@ -55,7 +54,7 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
-	t := numeric.NewDecFromBigInt(v.QuorumThreshold()).Quo(oneHundred)
+	t := v.QuorumThreshold()
 	currentTotalPower := v.computeCurrentTotalPower(p)
 
 	utils.Logger().Info().
@@ -85,8 +84,8 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) numeric.Dec {
 }
 
 // QuorumThreshold ..
-func (v *stakedVoteWeight) QuorumThreshold() *big.Int {
-	return twoThird.Mul(oneHundred).RoundInt()
+func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
+	return twoThird
 }
 
 // RewardThreshold ..

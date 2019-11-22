@@ -2,7 +2,6 @@ package quorum
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
@@ -110,7 +109,7 @@ type Decider interface {
 	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	QuorumThreshold() *big.Int
+	QuorumThreshold() numeric.Dec
 	IsRewardThresholdAchieved() bool
 }
 
