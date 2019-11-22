@@ -107,7 +107,7 @@ type Decider interface {
 	slash.Slasher
 	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
-	UpdateVotingPower(shard.SlotList)
+	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
 	QuorumThreshold() *big.Int
@@ -299,6 +299,9 @@ func NewDecider(p Policy) Decider {
 			c.SignatureReader.(slash.ThresholdDecider),
 			map[shard.BlsPublicKey]stakedVoter{},
 			numeric.ZeroDec(),
+			numeric.ZeroDec(),
+			numeric.ZeroDec(),
+			0,
 		}
 	default:
 		// Should not be possible
