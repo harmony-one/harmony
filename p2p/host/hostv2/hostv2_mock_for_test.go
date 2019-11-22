@@ -11,61 +11,94 @@ import (
 	reflect "reflect"
 )
 
-// Mockpubsub is a mock of pubsub interface
-type Mockpubsub struct {
+// MocktopicHandle is a mock of topicHandle interface
+type MocktopicHandle struct {
 	ctrl     *gomock.Controller
-	recorder *MockpubsubMockRecorder
+	recorder *MocktopicHandleMockRecorder
 }
 
-// MockpubsubMockRecorder is the mock recorder for Mockpubsub
-type MockpubsubMockRecorder struct {
-	mock *Mockpubsub
+// MocktopicHandleMockRecorder is the mock recorder for MocktopicHandle
+type MocktopicHandleMockRecorder struct {
+	mock *MocktopicHandle
 }
 
-// NewMockpubsub creates a new mock instance
-func NewMockpubsub(ctrl *gomock.Controller) *Mockpubsub {
-	mock := &Mockpubsub{ctrl: ctrl}
-	mock.recorder = &MockpubsubMockRecorder{mock}
+// NewMocktopicHandle creates a new mock instance
+func NewMocktopicHandle(ctrl *gomock.Controller) *MocktopicHandle {
+	mock := &MocktopicHandle{ctrl: ctrl}
+	mock.recorder = &MocktopicHandleMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *Mockpubsub) EXPECT() *MockpubsubMockRecorder {
+func (m *MocktopicHandle) EXPECT() *MocktopicHandleMockRecorder {
 	return m.recorder
 }
 
 // Publish mocks base method
-func (m *Mockpubsub) Publish(topic string, data []byte) error {
+func (m *MocktopicHandle) Publish(ctx context.Context, data []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Publish", topic, data)
+	ret := m.ctrl.Call(m, "Publish", ctx, data)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Publish indicates an expected call of Publish
-func (mr *MockpubsubMockRecorder) Publish(topic, data interface{}) *gomock.Call {
+func (mr *MocktopicHandleMockRecorder) Publish(ctx, data interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*Mockpubsub)(nil).Publish), topic, data)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MocktopicHandle)(nil).Publish), ctx, data)
 }
 
 // Subscribe mocks base method
-func (m *Mockpubsub) Subscribe(topic string, opts ...go_libp2p_pubsub.SubOpt) (*go_libp2p_pubsub.Subscription, error) {
+func (m *MocktopicHandle) Subscribe() (subscription, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{topic}
-	for _, a := range opts {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Subscribe", varargs...)
-	ret0, _ := ret[0].(*go_libp2p_pubsub.Subscription)
+	ret := m.ctrl.Call(m, "Subscribe")
+	ret0, _ := ret[0].(subscription)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Subscribe indicates an expected call of Subscribe
-func (mr *MockpubsubMockRecorder) Subscribe(topic interface{}, opts ...interface{}) *gomock.Call {
+func (mr *MocktopicHandleMockRecorder) Subscribe() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{topic}, opts...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Subscribe", reflect.TypeOf((*Mockpubsub)(nil).Subscribe), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Subscribe", reflect.TypeOf((*MocktopicHandle)(nil).Subscribe))
+}
+
+// MocktopicJoiner is a mock of topicJoiner interface
+type MocktopicJoiner struct {
+	ctrl     *gomock.Controller
+	recorder *MocktopicJoinerMockRecorder
+}
+
+// MocktopicJoinerMockRecorder is the mock recorder for MocktopicJoiner
+type MocktopicJoinerMockRecorder struct {
+	mock *MocktopicJoiner
+}
+
+// NewMocktopicJoiner creates a new mock instance
+func NewMocktopicJoiner(ctrl *gomock.Controller) *MocktopicJoiner {
+	mock := &MocktopicJoiner{ctrl: ctrl}
+	mock.recorder = &MocktopicJoinerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MocktopicJoiner) EXPECT() *MocktopicJoinerMockRecorder {
+	return m.recorder
+}
+
+// JoinTopic mocks base method
+func (m *MocktopicJoiner) JoinTopic(topic string) (topicHandle, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "JoinTopic", topic)
+	ret0, _ := ret[0].(topicHandle)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// JoinTopic indicates an expected call of JoinTopic
+func (mr *MocktopicJoinerMockRecorder) JoinTopic(topic interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JoinTopic", reflect.TypeOf((*MocktopicJoiner)(nil).JoinTopic), topic)
 }
 
 // Mocksubscription is a mock of subscription interface

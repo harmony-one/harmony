@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2p_pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
@@ -18,31 +18,76 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 	t.Run("Basic", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
-		groups := []nodeconfig.GroupID{"ABC", "DEF"}
+
+		okTopic := NewMocktopicHandle(mc)
+		newTopic := NewMocktopicHandle(mc)
+		groups := []nodeconfig.GroupID{"OK", "New"}
 		data := []byte{1, 2, 3}
-		pubsub := NewMockpubsub(mc)
+		joined := map[string]topicHandle{"OK": okTopic}
+		joiner := NewMocktopicJoiner(mc)
+		host := &HostV2{joiner: joiner, joined: joined}
+
 		gomock.InOrder(
-			pubsub.EXPECT().Publish("ABC", data),
-			pubsub.EXPECT().Publish("DEF", data),
+			// okTopic is already in joined map, JoinTopic shouldn't be called
+			joiner.EXPECT().JoinTopic("OK").Times(0),
+			okTopic.EXPECT().Publish(context.TODO(), data).Return(nil),
+			// newTopic is not in joined map, JoinTopic should be called
+			joiner.EXPECT().JoinTopic("New").Return(newTopic, nil),
+			newTopic.EXPECT().Publish(context.TODO(), data).Return(nil),
 		)
-		host := &HostV2{pubsub: pubsub}
-		if err := host.SendMessageToGroups(groups, data); err != nil {
+
+		err := host.SendMessageToGroups(groups, data)
+
+		if err != nil {
 			t.Errorf("expected no error; got %v", err)
 		}
 	})
-	t.Run("Error", func(t *testing.T) {
+	t.Run("JoinError", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
-		groups := []nodeconfig.GroupID{"ABC", "DEF"}
+
+		okTopic := NewMocktopicHandle(mc)
+		groups := []nodeconfig.GroupID{"Error", "OK"}
 		data := []byte{1, 2, 3}
-		pubsub := NewMockpubsub(mc)
+		joiner := NewMocktopicJoiner(mc)
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+
 		gomock.InOrder(
-			pubsub.EXPECT().Publish("ABC", data).Return(errors.New("FIAL")),
-			pubsub.EXPECT().Publish("DEF", data), // Should not early-return
+			// Make first join return an error
+			joiner.EXPECT().JoinTopic("Error").Return(nil, errors.New("join error")),
+			// Subsequent topics should still be processed after an error
+			joiner.EXPECT().JoinTopic("OK").Return(okTopic, nil),
+			okTopic.EXPECT().Publish(context.TODO(), data).Return(nil),
 		)
-		host := &HostV2{pubsub: pubsub}
+
+		err := host.SendMessageToGroups(groups, data)
+
+		if err == nil {
+			t.Error("expected an error; got nil")
+		}
+	})
+	t.Run("PublishError", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		okTopic := NewMocktopicHandle(mc)
+		erringTopic := NewMocktopicHandle(mc)
+		groups := []nodeconfig.GroupID{"Error", "OK"}
+		data := []byte{1, 2, 3}
+		joiner := NewMocktopicJoiner(mc)
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+
+		gomock.InOrder(
+			// Make first publish return an error
+			joiner.EXPECT().JoinTopic("Error").Return(erringTopic, nil),
+			erringTopic.EXPECT().Publish(context.TODO(), data).Return(errors.New("publish error")),
+			// Subsequent topics should still be processed after an error
+			joiner.EXPECT().JoinTopic("OK").Return(okTopic, nil),
+			okTopic.EXPECT().Publish(context.TODO(), data).Return(nil),
+		)
+
 		if err := host.SendMessageToGroups(groups, data); err == nil {
-			t.Error("expected an error but got none")
+			t.Error("expected an error; got nil")
 		}
 	})
 }
@@ -50,10 +95,14 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 func TestGroupReceiver_Close(t *testing.T) {
 	mc := gomock.NewController(t)
 	defer mc.Finish()
+
 	sub := NewMocksubscription(mc)
 	sub.EXPECT().Cancel()
 	receiver := GroupReceiverImpl{sub: sub}
-	if err := receiver.Close(); err != nil {
+
+	err := receiver.Close()
+
+	if err != nil {
 		t.Errorf("expected no error but got %v", err)
 	}
 }
@@ -64,46 +113,71 @@ func pubsubMessage(from libp2p_peer.ID, data []byte) *libp2p_pubsub.Message {
 }
 
 func TestGroupReceiver_Receive(t *testing.T) {
-	mc := gomock.NewController(t)
-	defer mc.Finish()
-	sub := NewMocksubscription(mc)
-	ctx := context.Background()
-	gomock.InOrder(
-		sub.EXPECT().Next(ctx).Return(pubsubMessage("ABC", []byte{1, 2, 3}), nil),
-		sub.EXPECT().Next(ctx).Return(pubsubMessage("DEF", []byte{4, 5, 6}), nil),
-		sub.EXPECT().Next(ctx).Return(nil, errors.New("FIAL")),
-	)
-	receiver := GroupReceiverImpl{sub: sub}
-	verify := func(sender libp2p_peer.ID, msg []byte, shouldError bool) {
+	t.Run("OK", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		ctx := context.Background()
+		sub := NewMocksubscription(mc)
+		receiver := GroupReceiverImpl{sub: sub}
+		wantSender := libp2p_peer.ID("OK")
+		wantMsg := []byte{1, 2, 3}
+
+		sub.EXPECT().Next(ctx).Return(pubsubMessage(wantSender, wantMsg), nil)
+
 		gotMsg, gotSender, err := receiver.Receive(ctx)
-		if (err != nil) != shouldError {
-			if shouldError {
-				t.Error("expected an error but got none")
-			} else {
-				t.Errorf("expected no error but got %v", err)
-			}
+
+		if err != nil {
+			t.Errorf("expected no error; got %v", err)
 		}
-		if gotSender != sender {
-			t.Errorf("expected sender %v but got %v", sender, gotSender)
+		if gotSender != wantSender {
+			t.Errorf("expected sender %v; got %v", wantSender, gotSender)
 		}
-		if !reflect.DeepEqual(gotMsg, msg) {
-			t.Errorf("expected message %v but got %v", msg, gotMsg)
+		if !reflect.DeepEqual(gotMsg, wantMsg) {
+			t.Errorf("expected message %v; got %v", wantMsg, gotMsg)
 		}
-	}
-	verify("ABC", []byte{1, 2, 3}, false)
-	verify("DEF", []byte{4, 5, 6}, false)
-	verify("", nil, true)
+	})
+	t.Run("Error", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		ctx := context.Background()
+		sub := NewMocksubscription(mc)
+		receiver := GroupReceiverImpl{sub: sub}
+
+		sub.EXPECT().Next(ctx).Return(nil, errors.New("receive error"))
+
+		msg, sender, err := receiver.Receive(ctx)
+
+		if err == nil {
+			t.Error("expected an error; got nil")
+		}
+		if sender != "" {
+			t.Errorf("expected empty sender; got %v", sender)
+		}
+		if len(msg) > 0 {
+			t.Errorf("expected empty message; got %v", msg)
+		}
+	})
 }
 
 func TestHostV2_GroupReceiver(t *testing.T) {
-	t.Run("Basic", func(t *testing.T) {
+	t.Run("New", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
+
 		sub := &libp2p_pubsub.Subscription{}
-		pubsub := NewMockpubsub(mc)
-		pubsub.EXPECT().Subscribe("ABC").Return(sub, nil)
-		host := &HostV2{pubsub: pubsub}
+		topic := NewMocktopicHandle(mc)
+		joiner := NewMocktopicJoiner(mc)
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+
+		gomock.InOrder(
+			joiner.EXPECT().JoinTopic("ABC").Return(topic, nil),
+			topic.EXPECT().Subscribe().Return(sub, nil),
+		)
+
 		gotReceiver, err := host.GroupReceiver("ABC")
+
 		if r, ok := gotReceiver.(*GroupReceiverImpl); !ok {
 			t.Errorf("expected a hostv2 GroupReceiverImpl; got %v", gotReceiver)
 		} else if r.sub != sub {
@@ -113,13 +187,39 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 			t.Errorf("expected no error; got %v", err)
 		}
 	})
-	t.Run("Error", func(t *testing.T) {
+	t.Run("JoinError", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
-		pubsub := NewMockpubsub(mc)
-		pubsub.EXPECT().Subscribe("ABC").Return(nil, errors.New("FIAL"))
-		host := &HostV2{pubsub: pubsub}
+
+		joiner := NewMocktopicJoiner(mc)
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+
+		joiner.EXPECT().JoinTopic("ABC").Return(nil, errors.New("join error"))
+
 		gotReceiver, err := host.GroupReceiver("ABC")
+
+		if gotReceiver != nil {
+			t.Errorf("expected a nil hostv2 GroupReceiverImpl; got %v", gotReceiver)
+		}
+		if err == nil {
+			t.Error("expected an error; got none")
+		}
+	})
+	t.Run("SubscribeError", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		topic := NewMocktopicHandle(mc)
+		joiner := NewMocktopicJoiner(mc)
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+
+		gomock.InOrder(
+			joiner.EXPECT().JoinTopic("ABC").Return(topic, nil),
+			topic.EXPECT().Subscribe().Return(nil, errors.New("subscription error")),
+		)
+
+		gotReceiver, err := host.GroupReceiver("ABC")
+
 		if gotReceiver != nil {
 			t.Errorf("expected a nil hostv2 GroupReceiverImpl; got %v", gotReceiver)
 		}
@@ -132,6 +232,68 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 		_, _, err := emptyReceiver.Receive(context.Background())
 		if err == nil {
 			t.Errorf("Receive() from nil/closed receiver did not return error")
+		}
+	})
+}
+
+func TestHostV2_getTopic(t *testing.T) {
+	t.Run("NewOK", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		joiner := NewMocktopicJoiner(mc)
+		want := NewMocktopicHandle(mc)
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+
+		joiner.EXPECT().JoinTopic("ABC").Return(want, nil)
+
+		got, err := host.getTopic("ABC")
+
+		if err != nil {
+			t.Errorf("want nil error; got %v", err)
+		}
+		if got != want {
+			t.Errorf("want topic handle %v; got %v", want, got)
+		}
+		if _, ok := host.joined["ABC"]; !ok {
+			t.Error("topic not found in joined map")
+		}
+	})
+	t.Run("NewError", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		joiner := NewMocktopicJoiner(mc)
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+
+		joiner.EXPECT().JoinTopic("ABC").Return(nil, errors.New("OMG"))
+
+		got, err := host.getTopic("ABC")
+
+		if err == nil {
+			t.Error("want non-nil error; got nil")
+		}
+		if got != nil {
+			t.Errorf("want nil handle; got %v", got)
+		}
+	})
+	t.Run("Existing", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		joiner := NewMocktopicJoiner(mc)
+		want := NewMocktopicHandle(mc)
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{"ABC": want}}
+
+		joiner.EXPECT().JoinTopic("ABC").Times(0)
+
+		got, err := host.getTopic("ABC")
+
+		if err != nil {
+			t.Errorf("want nil error; got %v", err)
+		}
+		if got != want {
+			t.Errorf("want topic handle %v; got %v", want, got)
 		}
 	})
 }
