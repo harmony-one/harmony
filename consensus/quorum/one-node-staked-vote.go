@@ -17,9 +17,9 @@ var (
 	two   = numeric.NewDec(2)
 	three = numeric.NewDec(3)
 
-	twoThirds = two.Quo(three)
-	// ninetyPercent = numeric.NewDecFromStr("0.90")
-	hSentinel = numeric.ZeroDec()
+	twoThirds        = two.Quo(three)
+	ninetyPercent, _ = numeric.NewDecFromStr("0.90")
+	hSentinel        = numeric.ZeroDec()
 )
 
 type stakedVoter struct {
@@ -45,6 +45,20 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
+	t := numeric.NewDecFromBigInt(v.QuorumThreshold())
+	currentTotalPower := v.computeCurrentTotalPower(p)
+
+	utils.Logger().Info().
+		Str("policy", v.Policy().String()).
+		Str("phase", p.String()).
+		Str("threshold", t.String()).
+		Str("total-power-of-signers", currentTotalPower.String()).
+		Msg("Attempt to reach quorum")
+
+	return currentTotalPower.GT(t)
+}
+
+func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) numeric.Dec {
 	w := shard.BlsPublicKey{}
 	members := v.Participants()
 	currentTotalPower := numeric.ZeroDec()
@@ -65,16 +79,7 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 		}
 	}
 
-	t := numeric.NewDecFromBigInt(v.QuorumThreshold())
-
-	utils.Logger().Info().
-		Str("policy", v.Policy().String()).
-		Str("phase", p.String()).
-		Str("threshold", t.String()).
-		Str("total-power-of-signers", currentTotalPower.String()).
-		Msg("Attempt to reach quorum")
-
-	return currentTotalPower.GT(t)
+	return currentTotalPower
 }
 
 // QuorumThreshold ..
@@ -84,8 +89,8 @@ func (v *stakedVoteWeight) QuorumThreshold() *big.Int {
 
 // RewardThreshold ..
 func (v *stakedVoteWeight) IsRewardThresholdAchieved() bool {
-	// TODO Implement
-	return true
+	threshold := three.Mul(v.stakedTotal).Add(one).Mul(ninetyPercent)
+	return v.computeCurrentTotalPower(Commit).GTE(threshold)
 }
 
 // Award ..
