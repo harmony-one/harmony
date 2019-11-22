@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	// "github.com/harmony-one/harmony/staking/effective"
 )
 
 type uniformVoteWeight struct {
@@ -24,7 +24,7 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
-	r := v.SignersCount(p) >= v.QuorumThreshold().Int64()
+	r := v.SignersCount(p) >= v.TwoThirdsSignersCount()
 	utils.Logger().Info().Str("phase", p.String()).
 		Int64("signers-count", v.SignersCount(p)).
 		Int64("threshold", v.QuorumThreshold().Int64()).
@@ -34,8 +34,8 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // QuorumThreshold ..
-func (v *uniformVoteWeight) QuorumThreshold() *big.Int {
-	return big.NewInt(v.ParticipantsCount()*2/3 + 1)
+func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
+	return numeric.NewDec(v.TwoThirdsSignersCount())
 }
 
 // RewardThreshold ..

@@ -884,7 +884,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	switch consensus.Decider.Policy() {
 	case quorum.SuperMajorityVote:
-		threshold := consensus.Decider.QuorumThreshold().Int64()
+		threshold := consensus.Decider.TwoThirdsSignersCount()
 		if count := utils.CountOneBits(mask.Bitmap); int64(count) < threshold {
 			utils.Logger().Warn().
 				Int64("need", threshold).

@@ -14,11 +14,15 @@ import (
 )
 
 var (
-	ninetyPercent   = numeric.MustNewDecFromStr("0.90")
-	quorumThreshold = numeric.MustNewDecFromStr("0.67")
-	stakersShare    = numeric.MustNewDecFromStr("0.33")
-	totalShare      = numeric.MustNewDecFromStr("1.00")
+	twoThird      = numeric.NewDec(2).Quo(numeric.NewDec(3))
+	ninetyPercent = numeric.MustNewDecFromStr("0.90")
+	harmonysShare = numeric.MustNewDecFromStr("0.68")
+	stakersShare  = numeric.MustNewDecFromStr("0.32")
+	totalShare    = numeric.MustNewDecFromStr("1.00")
 )
+
+// TODO Test the case where we have 33 nodes, 68/33 will give precision hell and it should trigger
+// the 100% mismatch err.
 
 // TallyResult is the result of when we calculate voting power,
 // recall that it happens to us at epoch change
@@ -53,7 +57,7 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
-	t := numeric.NewDecFromBigInt(v.QuorumThreshold())
+	t := v.QuorumThreshold()
 	currentTotalPower := v.computeCurrentTotalPower(p)
 
 	utils.Logger().Info().
@@ -83,8 +87,8 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) numeric.Dec {
 }
 
 // QuorumThreshold ..
-func (v *stakedVoteWeight) QuorumThreshold() *big.Int {
-	return quorumThreshold.RoundInt()
+func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
+	return twoThird
 }
 
 // RewardThreshold ..
@@ -172,9 +176,7 @@ func (v *stakedVoteWeight) SetVoters(
 				Mul(stakersShare)
 			theirPercentage = theirPercentage.Add(member.effectivePercent)
 		} else { // Our node
-			member.effectivePercent = numeric.NewDecFromBigInt(
-				v.QuorumThreshold(),
-			).Quo(ourCount)
+			member.effectivePercent = harmonysShare.Quo(ourCount)
 			ourPercentage = ourPercentage.Add(member.effectivePercent)
 		}
 

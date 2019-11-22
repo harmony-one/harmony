@@ -2,7 +2,6 @@ package quorum
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
@@ -83,6 +82,7 @@ type SignatureReader interface {
 	SignatoryTracker
 	ReadAllSignatures(Phase) []*bls.Sign
 	ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign
+	TwoThirdsSignersCount() int64
 }
 
 // DependencyInjectionWriter ..
@@ -110,7 +110,7 @@ type Decider interface {
 	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	QuorumThreshold() *big.Int
+	QuorumThreshold() numeric.Dec
 	IsRewardThresholdAchieved() bool
 }
 
@@ -220,6 +220,10 @@ func (s *cIdentities) Reset(ps []Phase) {
 			s.viewID = m
 		}
 	}
+}
+
+func (s *cIdentities) TwoThirdsSignersCount() int64 {
+	return s.ParticipantsCount()*2/3 + 1
 }
 
 func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
