@@ -12,7 +12,6 @@ import (
 	libp2p_pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	mock "github.com/harmony-one/harmony/p2p/host/hostv2/mock"
 )
 
 func TestHostV2_SendMessageToGroups(t *testing.T) {
@@ -21,7 +20,7 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 		defer mc.Finish()
 		groups := []nodeconfig.GroupID{"ABC", "DEF"}
 		data := []byte{1, 2, 3}
-		pubsub := mock.NewMockpubsub(mc)
+		pubsub := NewMockpubsub(mc)
 		gomock.InOrder(
 			pubsub.EXPECT().Publish("ABC", data),
 			pubsub.EXPECT().Publish("DEF", data),
@@ -36,7 +35,7 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 		defer mc.Finish()
 		groups := []nodeconfig.GroupID{"ABC", "DEF"}
 		data := []byte{1, 2, 3}
-		pubsub := mock.NewMockpubsub(mc)
+		pubsub := NewMockpubsub(mc)
 		gomock.InOrder(
 			pubsub.EXPECT().Publish("ABC", data).Return(errors.New("FIAL")),
 			pubsub.EXPECT().Publish("DEF", data), // Should not early-return
@@ -51,7 +50,7 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 func TestGroupReceiver_Close(t *testing.T) {
 	mc := gomock.NewController(t)
 	defer mc.Finish()
-	sub := mock.NewMocksubscription(mc)
+	sub := NewMocksubscription(mc)
 	sub.EXPECT().Cancel()
 	receiver := GroupReceiverImpl{sub: sub}
 	if err := receiver.Close(); err != nil {
@@ -67,7 +66,7 @@ func pubsubMessage(from libp2p_peer.ID, data []byte) *libp2p_pubsub.Message {
 func TestGroupReceiver_Receive(t *testing.T) {
 	mc := gomock.NewController(t)
 	defer mc.Finish()
-	sub := mock.NewMocksubscription(mc)
+	sub := NewMocksubscription(mc)
 	ctx := context.Background()
 	gomock.InOrder(
 		sub.EXPECT().Next(ctx).Return(pubsubMessage("ABC", []byte{1, 2, 3}), nil),
@@ -101,7 +100,7 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
 		sub := &libp2p_pubsub.Subscription{}
-		pubsub := mock.NewMockpubsub(mc)
+		pubsub := NewMockpubsub(mc)
 		pubsub.EXPECT().Subscribe("ABC").Return(sub, nil)
 		host := &HostV2{pubsub: pubsub}
 		gotReceiver, err := host.GroupReceiver("ABC")
@@ -117,7 +116,7 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
-		pubsub := mock.NewMockpubsub(mc)
+		pubsub := NewMockpubsub(mc)
 		pubsub.EXPECT().Subscribe("ABC").Return(nil, errors.New("FIAL"))
 		host := &HostV2{pubsub: pubsub}
 		gotReceiver, err := host.GroupReceiver("ABC")
