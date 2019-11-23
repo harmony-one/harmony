@@ -41,7 +41,7 @@ type genesisInitializer struct {
 // InitChainDB sets up a new genesis block in the database for the given shard.
 func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) error {
 	shardState, _ := committee.WithStakingEnabled.Compute(
-		big.NewInt(core.GenesisEpoch), gi.node.chainConfig, nil,
+		big.NewInt(core.GenesisEpoch), &gi.node.chainConfig, nil,
 	)
 	if shardID != shard.BeaconChainShardID {
 		// store only the local shard for shard chains

@@ -132,9 +132,9 @@ func (v *stakedVoteWeight) Award(
 }
 
 var (
-	errSumOfVotingPowerNotOne   = errors.New("sum of total votes do not sum to 100%")
+	errSumOfVotingPowerNotOne   = errors.New("sum of total votes do not sum to 100 percent")
 	errSumOfOursAndTheirsNotOne = errors.New(
-		"sum of hmy nodes and stakers do not sum to 100%",
+		"sum of hmy nodes and stakers do not sum to 100 percent",
 	)
 )
 
@@ -191,12 +191,12 @@ func (v *stakedVoteWeight) SetVoters(
 		Str("Raw-Staked", v.stakedTotal.String()).
 		Msg("Total staked")
 
-	switch {
-	case totalStakedPercent.Equal(totalShare) == false:
-		return nil, errSumOfVotingPowerNotOne
-	case ourPercentage.Add(theirPercentage).Equal(totalShare) == false:
-		return nil, errSumOfOursAndTheirsNotOne
-	}
+	//switch {
+	//case totalStakedPercent.Equal(totalShare) == false:
+	//	return nil, errSumOfVotingPowerNotOne
+	//case ourPercentage.Add(theirPercentage).Equal(totalShare) == false:
+	//	return nil, errSumOfOursAndTheirsNotOne
+	//}
 
 	// Hold onto this calculation
 	v.ourVotingPowerTotal = ourPercentage

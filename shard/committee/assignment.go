@@ -19,7 +19,7 @@ import (
 // ValidatorListProvider ..
 type ValidatorListProvider interface {
 	Compute(
-		epoch *big.Int, config params.ChainConfig, reader DataProvider,
+		epoch *big.Int, config *params.ChainConfig, reader DataProvider,
 	) (shard.State, error)
 	ReadFromDB(epoch *big.Int, reader DataProvider) (shard.State, error)
 }
@@ -185,15 +185,8 @@ func eposStakedCommittee(
 func (def partialStakingEnabled) ComputePublicKeys(
 	epoch *big.Int, d DataProvider,
 ) [][]*bls.PublicKey {
-
 	config := d.Config()
-	instance := shard.Schedule.InstanceForEpoch(epoch)
-	superComm := shard.State{}
-	if config.IsStaking(epoch) {
-		superComm, _ = eposStakedCommittee(instance, d, 320)
-	} else {
-		superComm = preStakingEnabledCommittee(instance)
-	}
+	superComm, _ := def.Compute(epoch, config, d)
 
 	allIdentities := make([][]*bls.PublicKey, len(superComm))
 
@@ -249,7 +242,7 @@ func (def partialStakingEnabled) ReadFromDB(
 
 // ReadFromComputation is single entry point for reading the State of the network
 func (def partialStakingEnabled) Compute(
-	epoch *big.Int, config params.ChainConfig, stakerReader DataProvider,
+	epoch *big.Int, config *params.ChainConfig, stakerReader DataProvider,
 ) (newSuperComm shard.State, err error) {
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	if !config.IsStaking(epoch) {
