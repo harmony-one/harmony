@@ -305,7 +305,7 @@ func (s *PublicBlockChainAPI) GetValidatorSelfDelegation(ctx context.Context, ad
 	return hexutil.Uint64(s.b.GetValidatorSelfDelegation(internal_common.ParseAddr(address)).Uint64())
 }
 
-// GetValidatorSelfDelegation returns total balace stacking for validator with delegation.
+// GetValidatorTotalDelegation returns total balace stacking for validator with delegation.
 func (s *PublicBlockChainAPI) GetValidatorTotalDelegation(ctx context.Context, address string) hexutil.Uint64 {
 	delegations := s.b.GetDelegationsByValidator(internal_common.ParseAddr(address))
 	totalStake := big.NewInt(0)
