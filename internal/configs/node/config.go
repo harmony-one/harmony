@@ -224,6 +224,7 @@ func (conf *ConfigType) Role() Role {
 
 // SetNetworkType set the networkType
 func SetNetworkType(networkType NetworkType) {
+	defaultConfig.networkType = networkType
 	for i := range shardConfigs {
 		shardConfigs[i].networkType = networkType
 	}
