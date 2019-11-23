@@ -191,12 +191,12 @@ func (v *stakedVoteWeight) SetVoters(
 		Str("Raw-Staked", v.stakedTotal.String()).
 		Msg("Total staked")
 
-	//switch {
-	//case totalStakedPercent.Equal(totalShare) == false:
-	//	return nil, errSumOfVotingPowerNotOne
-	//case ourPercentage.Add(theirPercentage).Equal(totalShare) == false:
-	//	return nil, errSumOfOursAndTheirsNotOne
-	//}
+	switch {
+	case totalStakedPercent.Equal(totalShare) == false:
+		return nil, errSumOfVotingPowerNotOne
+	case ourPercentage.Add(theirPercentage).Equal(totalShare) == false:
+		return nil, errSumOfOursAndTheirsNotOne
+	}
 
 	// Hold onto this calculation
 	v.ourVotingPowerTotal = ourPercentage
