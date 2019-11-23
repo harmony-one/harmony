@@ -2641,8 +2641,3 @@ func (bc *BlockChain) ValidatorCandidates() []common.Address {
 func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Delegation {
 	return make([]*staking.Delegation, 0)
 }
-
-// ValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
-func (bc *BlockChain) ValidatorStakingWithDelegation(addr common.Address) *big.Int {
-	return big.NewInt(0)
-}

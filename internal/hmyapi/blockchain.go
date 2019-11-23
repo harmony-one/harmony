@@ -300,8 +300,13 @@ func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 	return s.LatestHeader(ctx).Leader
 }
 
-// GetStake returns validator stake.
-func (s *PublicBlockChainAPI) GetStake(ctx context.Context, address string) hexutil.Uint64 {
+// GetValidatorSelfDelegation returns validator stake.
+func (s *PublicBlockChainAPI) GetValidatorSelfDelegation(ctx context.Context, address string) hexutil.Uint64 {
+	return hexutil.Uint64(s.b.GetValidatorSelfDelegation(internal_common.ParseAddr(address)).Uint64())
+}
+
+// GetValidatorSelfDelegation returns total balace stacking for validator with delegation.
+func (s *PublicBlockChainAPI) GetValidatorTotalDelegation(ctx context.Context, address string) hexutil.Uint64 {
 	delegations := s.b.GetDelegationsByValidator(internal_common.ParseAddr(address))
 	totalStake := big.NewInt(0)
 	for _, delegation := range delegations {
@@ -309,17 +314,6 @@ func (s *PublicBlockChainAPI) GetStake(ctx context.Context, address string) hexu
 	}
 	// TODO: return more than uint64
 	return hexutil.Uint64(totalStake.Uint64())
-}
-
-// GetValidatorStakingAddress stacking address returns validator stacking address.
-func (s *PublicBlockChainAPI) GetValidatorStakingAddress(ctx context.Context, address string) string {
-	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
-	return validator.Address.String()
-}
-
-// GetValidatorStakingWithDelegation returns total balace stacking for validator with delegation.
-func (s *PublicBlockChainAPI) GetValidatorStakingWithDelegation(ctx context.Context, address string) hexutil.Uint64 {
-	return hexutil.Uint64(s.b.GetValidatorStakingWithDelegation(internal_common.ParseAddr(address)).Uint64())
 }
 
 // GetShardingStructure returns an array of sharding structures.
