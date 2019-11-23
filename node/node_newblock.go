@@ -123,9 +123,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		node.Consensus.ShardID, node.Blockchain(),
 	)
 
-	utils.Logger().Print("TESTTEST")
-	utils.Logger().Print(shardState.JSON())
-
 	if err != nil {
 		return nil, err
 	}

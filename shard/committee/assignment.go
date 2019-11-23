@@ -7,7 +7,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -126,11 +126,15 @@ func eposStakedCommittee(
 	for i := range candidates {
 		// TODO Should be using .ValidatorStakingWithDelegation, not implemented yet
 		validator, err := stakerReader.ReadValidatorData(candidates[i])
+		validatorStake := big.NewInt(0)
+		for _, delegation := range validator.Delegations {
+			validatorStake.Add(validatorStake, delegation.Amount)
+		}
 		if err != nil {
 			return nil, err
 		}
 		essentials[validator.Address] = effective.SlotOrder{
-			validator.Stake,
+			validatorStake,
 			validator.SlotPubKeys,
 		}
 	}

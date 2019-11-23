@@ -57,9 +57,6 @@ type Validator struct {
 	Address common.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
 	SlotPubKeys []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
-	// TODO Need to remove this .Stake Field
-	// The stake put by the validator itself
-	Stake *big.Int `json:"stake" yaml:"stake"`
 	// if unbonding, height at which this validator has begun unbonding
 	UnbondingHeight *big.Int `json:"unbonding_height" yaml:"unbonding_height"`
 	// validator's self declared minimum self delegation
@@ -218,9 +215,6 @@ func (v *Validator) GetAddress() common.Address { return v.Address }
 // GetName returns the name of validator in the description
 func (v *Validator) GetName() string { return v.Description.Name }
 
-// GetStake returns the total staking amount
-func (v *Validator) GetStake() *big.Int { return v.Stake }
-
 // GetCommissionRate returns the commission rate of the validator
 func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 
@@ -239,7 +233,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	// TODO: a new validator should have a minimum of 1 token as self delegation, and that should be added as a delegation entry here.
 	v := Validator{
 		val.ValidatorAddress, pubKeys,
-		val.Amount, new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
+		new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
 		commission, desc, blockNum,
 	}
 	return &v, nil
@@ -304,14 +298,13 @@ func (v *Validator) String() string {
 	return fmt.Sprintf(`Validator
   Address:                    %s
   SlotPubKeys:                %s
-  Stake:                      %s
   Unbonding Height:           %v
   Minimum Self Delegation:     %v
   Maximum Total Delegation:     %v
   Description:                %v
   Commission:                 %v`,
 		common2.MustAddressToBech32(v.Address), printSlotPubKeys(v.SlotPubKeys),
-		v.Stake, v.UnbondingHeight,
+		v.UnbondingHeight,
 		v.MinSelfDelegation, v.MaxTotalDelegation, v.Description, v.Commission,
 	)
 }

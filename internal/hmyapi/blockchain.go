@@ -302,8 +302,13 @@ func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 
 // GetStake returns validator stake.
 func (s *PublicBlockChainAPI) GetStake(ctx context.Context, address string) hexutil.Uint64 {
-	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
-	return hexutil.Uint64(validator.Stake.Uint64())
+	delegations := s.b.GetDelegationsByValidator(internal_common.ParseAddr(address))
+	totalStake := big.NewInt(0)
+	for _, delegation := range delegations {
+		totalStake.Add(totalStake, delegation.Amount)
+	}
+	// TODO: return more than uint64
+	return hexutil.Uint64(totalStake.Uint64())
 }
 
 // GetValidatorStakingAddress stacking address returns validator stacking address.

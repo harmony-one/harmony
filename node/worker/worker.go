@@ -303,17 +303,11 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 		// WARN When we first enable staking, this condition may not be robust by itself.
 
 		if w.config.IsStaking(w.current.header.Epoch()) {
-			utils.Logger().Print("CURRRRRRRRRR")
-			utils.Logger().Print(beacon.CurrentHeader().Number())
-			utils.Logger().Print(beacon.CurrentHeader().Epoch())
-			utils.Logger().Print(w.current.header.Epoch())
 			switch beacon.CurrentHeader().Epoch().Cmp(w.current.header.Epoch()) {
 			case 1:
-				utils.Logger().Print("TTTTTTTT")
 				nextCommittee, oops = committee.WithStakingEnabled.ReadFromDB(
 					beacon.CurrentHeader().Epoch(), beacon,
 				)
-				utils.Logger().Print(nextCommittee)
 			}
 		} else {
 			if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {

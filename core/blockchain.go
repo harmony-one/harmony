@@ -1177,15 +1177,13 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	}
 
 	// Do bookkeeping for new staking txns
-	if bc.chainConfig.IsStaking(block.Epoch()) {
-		for _, tx := range block.StakingTransactions() {
-			err = bc.UpdateStakingMetaData(tx, root)
-			// keep offchain database consistency with onchain we need revert
-			// but it should not happend unless local database corrupted
-			if err != nil {
-				utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
-				return NonStatTy, err
-			}
+	for _, tx := range block.StakingTransactions() {
+		err = bc.UpdateStakingMetaData(tx, root)
+		// keep offchain database consistency with onchain we need revert
+		// but it should not happend unless local database corrupted
+		if err != nil {
+			utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
+			return NonStatTy, err
 		}
 	}
 

@@ -156,7 +156,7 @@ func newRPCValidator(validator *types2.Validator) *RPCValidator {
 	return &RPCValidator{
 		validator.Address,
 		validator.SlotPubKeys,
-		validator.Stake,
+		big.NewInt(0), // TODO: add using the delegations
 		validator.UnbondingHeight,
 		validator.MinSelfDelegation,
 		validator.MaxTotalDelegation,

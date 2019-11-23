@@ -228,9 +228,6 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
-
-	utils.Logger().Print("XXXXXXXX")
-	utils.Logger().Print(consensus.Decider.JSON())
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
