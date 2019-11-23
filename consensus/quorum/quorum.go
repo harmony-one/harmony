@@ -2,7 +2,6 @@ package quorum
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
@@ -83,6 +82,7 @@ type SignatureReader interface {
 	SignatoryTracker
 	ReadAllSignatures(Phase) []*bls.Sign
 	ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign
+	TwoThirdsSignersCount() int64
 }
 
 // DependencyInjectionWriter ..
@@ -107,10 +107,10 @@ type Decider interface {
 	slash.Slasher
 	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
-	UpdateVotingPower(shard.SlotList)
+	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	QuorumThreshold() *big.Int
+	QuorumThreshold() numeric.Dec
 	IsRewardThresholdAchieved() bool
 }
 
@@ -222,6 +222,10 @@ func (s *cIdentities) Reset(ps []Phase) {
 	}
 }
 
+func (s *cIdentities) TwoThirdsSignersCount() int64 {
+	return s.ParticipantsCount()*2/3 + 1
+}
+
 func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
 	m := map[string]*bls.Sign{}
 	hex := PubKey.SerializeToHexStr()
@@ -299,6 +303,9 @@ func NewDecider(p Policy) Decider {
 			c.SignatureReader.(slash.ThresholdDecider),
 			map[shard.BlsPublicKey]stakedVoter{},
 			numeric.ZeroDec(),
+			numeric.ZeroDec(),
+			numeric.ZeroDec(),
+			0,
 		}
 	default:
 		// Should not be possible
