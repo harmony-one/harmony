@@ -27,7 +27,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 	r := v.SignersCount(p) >= v.TwoThirdsSignersCount()
 	utils.Logger().Info().Str("phase", p.String()).
 		Int64("signers-count", v.SignersCount(p)).
-		Int64("threshold", v.QuorumThreshold().Int64()).
+		Int64("threshold", v.TwoThirdsSignersCount()).
 		Int64("participants", v.ParticipantsCount()).
 		Msg("Quorum details")
 	return r
