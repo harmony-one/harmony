@@ -141,17 +141,20 @@ func AccumulateRewards(
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 
-		// Take care of my own beacon chain committee
+		// Take care of my own beacon chain committee, _ is missing, for slashing
 		members, payable, _, err := ballotResultBeaconchain(bc, header)
 		if err != nil {
 			return err
 		}
+
 		votingPower := votepower.Compute(members)
 
 		for beaconMember := range payable {
 			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
-			due := BlockRewardStakedCase.Mul(voter.EffectivePercent)
-			state.AddBalance(voter.EarningAccount, due.RoundInt())
+			if !voter.IsHarmonyNode {
+				due := BlockRewardStakedCase.Mul(voter.EffectivePercent)
+				state.AddBalance(voter.EarningAccount, due.RoundInt())
+			}
 		}
 
 		// Handle rewards for shardchain
