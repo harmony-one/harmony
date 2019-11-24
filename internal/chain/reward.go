@@ -186,7 +186,8 @@ func AccumulateRewards(
 			type slotPayable struct {
 				effective numeric.Dec
 				payee     common.Address
-				nonce     int
+				bucket    int
+				index     int
 				oops      error
 			}
 
@@ -233,7 +234,8 @@ func AccumulateRewards(
 								payable <- slotPayable{
 									effective: signersDue,
 									payee:     addr,
-									nonce:     (i + 1) * (i + j),
+									bucket:    i,
+									index:     j,
 									oops:      nil,
 								}
 							}(due, to, member)
@@ -243,31 +245,39 @@ func AccumulateRewards(
 			}
 
 			w.Wait()
-			resultsHandle := []slotPayable{}
+			resultsHandle := make([][]slotPayable, len(crossLinks))
+			for i := range resultsHandle {
+				resultsHandle[i] = []slotPayable{}
+			}
 
 			for payThem := range payable {
-				resultsHandle = append(resultsHandle, payThem)
+				bucket := payThem.bucket
+				resultsHandle[bucket] = append(resultsHandle[bucket], payThem)
 			}
 
-			// Check if any errors
-			for payThem := range resultsHandle {
-				if err := resultsHandle[payThem].oops; err != nil {
-					return err
+			// Check if any errors and sort each bucket to enforce order
+			for bucket := range resultsHandle {
+				for payThem := range resultsHandle[bucket] {
+					if err := resultsHandle[bucket][payThem].oops; err != nil {
+						return err
+					}
 				}
+
+				sort.SliceStable(resultsHandle[bucket],
+					func(i, j int) bool {
+						return resultsHandle[bucket][i].index < resultsHandle[bucket][j].index
+					},
+				)
 			}
-			// Enforce order
-			sort.SliceStable(resultsHandle,
-				func(i, j int) bool {
-					return resultsHandle[i].nonce < resultsHandle[j].nonce
-				},
-			)
 
 			// Finally do the pay
-			for payThem := range resultsHandle {
-				state.AddBalance(
-					resultsHandle[payThem].payee,
-					resultsHandle[payThem].effective.TruncateInt(),
-				)
+			for bucket := range resultsHandle {
+				for payThem := range resultsHandle[bucket] {
+					state.AddBalance(
+						resultsHandle[bucket][payThem].payee,
+						resultsHandle[bucket][payThem].effective.TruncateInt(),
+					)
+				}
 			}
 		}
 		return nil
