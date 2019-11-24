@@ -543,12 +543,10 @@ func WriteShardLastCrossLink(db DatabaseWriter, shardID uint32, data []byte) err
 func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash, temp bool) (types.CXReceipts, error) {
 	data, err := db.Get(cxReceiptKey(shardID, number, hash, temp))
 	if err != nil || len(data) == 0 {
-		utils.Logger().Info().Err(err).Uint64("number", number).Int("dataLen", len(data)).Msg("ReadCXReceipts")
 		return nil, err
 	}
 	cxReceipts := types.CXReceipts{}
 	if err := rlp.DecodeBytes(data, &cxReceipts); err != nil {
-		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid cross-shard tx receipt array RLP")
 		return nil, err
 	}
 	return cxReceipts, nil

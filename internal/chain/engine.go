@@ -247,6 +247,10 @@ func QuorumForBlock(
 // i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
 // for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.
 func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte, reCalculate bool) error {
+	if chain.Config().IsStaking(header.Epoch()) {
+		// Never recalculate after staking is enabled
+		reCalculate = false
+	}
 	publicKeys, err := GetPublicKeys(chain, header, reCalculate)
 	if err != nil {
 		return ctxerror.New("[VerifyHeaderWithSignature] Cannot get publickeys for block header").WithCause(err)

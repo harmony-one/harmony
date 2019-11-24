@@ -480,27 +480,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.Decider.SetShardIDProvider(func() (uint32, error) {
 			return consensus.ShardID, nil
 		})
-		s, err := committee.WithStakingEnabled.ReadFromDB(
-			nextEpoch, consensus.ChainReader,
-		)
-
-		if err != nil {
-			utils.Logger().Error().
-				Err(err).
-				Uint32("shard", consensus.ShardID).
-				Msg("Error when reading staking committee")
-			return Syncing
-		}
-
-		if _, err := consensus.Decider.SetVoters(
-			s.FindCommitteeByID(consensus.ShardID).Slots,
-		); err != nil {
-			utils.Logger().Error().
-				Err(err).
-				Uint32("shard", consensus.ShardID).
-				Msg("Error when updating voting power")
-			return Syncing
-		}
 
 		utils.Logger().Info().
 			Uint64("block-number", curHeader.Number().Uint64()).
@@ -511,7 +490,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			Msg("changing committee")
 	}
 
-	pubKeys := []*bls.PublicKey{}
+	committeeToSet := &shard.Committee{}
 	hasError := false
 
 	// TODO: change GetCommitteePublicKeys to read from DB
@@ -526,11 +505,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		return Syncing
 	}
 
-	curCommittee := curShardState.FindCommitteeByID(curHeader.ShardID())
-	curPubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
-		curCommittee,
-	)
-	consensus.numPrevPubKeys = len(curPubKeys)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
 	if len(curHeader.ShardState()) > 0 {
 		// increase curEpoch by one if it's the last block
@@ -549,27 +523,39 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			return Syncing
 		}
 
-		nextCommittee := nextShardState.FindCommitteeByID(curHeader.ShardID())
-		pubKeys = committee.WithStakingEnabled.GetCommitteePublicKeys(
-			nextCommittee,
-		)
+		committeeToSet = nextShardState.FindCommitteeByID(curHeader.ShardID())
+
 	} else {
 		consensus.SetEpochNum(curEpoch.Uint64())
-		pubKeys = curPubKeys
+		committeeToSet = curShardState.FindCommitteeByID(curHeader.ShardID())
 	}
 
-	if len(pubKeys) == 0 {
+	if len(committeeToSet.Slots) == 0 {
 		consensus.getLogger().Warn().
-			Msg("[UpdateConsensusInformation] PublicKeys is Nil")
+			Msg("[UpdateConsensusInformation] No members in the committee to update")
 		hasError = true
 	}
 
-	// update public keys committee
+	// update public keys in the committee
 	oldLeader := consensus.LeaderPubKey
+	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
+		committeeToSet,
+	)
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
 	consensus.UpdatePublicKeys(pubKeys)
+
+	// Update voters in the committee
+	if _, err := consensus.Decider.SetVoters(
+		committeeToSet.Slots,
+	); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint32("shard", consensus.ShardID).
+			Msg("Error when updating voters")
+		return Syncing
+	}
 
 	// take care of possible leader change during the curEpoch
 	if !shard.Schedule.IsLastBlock(curHeader.Number().Uint64()) &&
