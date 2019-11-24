@@ -308,7 +308,10 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
 					beaconEpoch, beacon,
 				)
-				blockEpoch := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1)) // Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
+
+				// Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
+				// This shouldn't be exactly beaconEpoch because the next block will have beaconEpoch + 1
+				blockEpoch := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1))
 				utils.Logger().Debug().
 					Uint64("blockNum", w.current.header.Number().Uint64()).
 					Uint64("myPrevEpoch", w.current.header.Epoch().Uint64()).
@@ -322,20 +325,24 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 				// If beacon chain is behind, shard chain should wait for the beacon chain by not changing epochs.
 			}
 		} else {
-			if w.config.IsStaking(beaconEpoch) {
-				// If beacon is already in staking, but I am not, I should just catch up with beacon chain's epoch
+			beaconEpochSubOne := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1))
+			if w.config.IsStaking(beaconEpochSubOne) {
+				// If I am not in staking epoch yet and beacon chain already proposed a staking-based shard state,
+				// which means beacon chain's epoch is greater than stakingEpoch, I should just catch up with beacon chain's epoch
 				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
 					beaconEpoch, beacon,
 				)
-				blockEpoch := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1)) // Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
+
 				utils.Logger().Debug().
 					Uint64("blockNum", w.current.header.Number().Uint64()).
 					Uint64("myPrevEpoch", w.current.header.Epoch().Uint64()).
-					Uint64("myNewEpoch", blockEpoch.Uint64()).
+					Uint64("myNewEpoch", beaconEpochSubOne.Uint64()).
 					Msg("Propose one-time catch up with beacon chain's epoch")
-				w.current.header.SetEpoch(blockEpoch)
+				// Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
+				w.current.header.SetEpoch(beaconEpochSubOne)
 			} else {
-				// If both beacon and I are not in staking, do pre-staking committee calculation
+				// If I are not in staking nor has beacon chain proposed a staking-based shard state,
+				// do pre-staking committee calculation
 				if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
 					nextCommittee, err = committee.WithStakingEnabled.Compute(
 						new(big.Int).Add(w.current.header.Epoch(), common.Big1),
