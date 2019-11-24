@@ -116,13 +116,9 @@ func eposStakedCommittee(
 	for i := range candidates {
 		validator, err := stakerReader.ReadValidatorData(candidates[i])
 		validatorStake := big.NewInt(0)
-		utils.Logger().Print("TEST-VALIDATOR")
-		utils.Logger().Print(validator)
 		for _, delegation := range validator.Delegations {
 			validatorStake.Add(validatorStake, delegation.Amount)
 		}
-		utils.Logger().Print("TEST-VALIDATOR2")
-		utils.Logger().Print(validatorStake)
 		if err != nil {
 			return nil, err
 		}

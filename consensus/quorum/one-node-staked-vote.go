@@ -16,8 +16,8 @@ import (
 var (
 	twoThird      = numeric.NewDec(2).Quo(numeric.NewDec(3))
 	ninetyPercent = numeric.MustNewDecFromStr("0.90")
-	harmonysShare = numeric.MustNewDecFromStr("0.90") // Change back to 0.68
-	stakersShare  = numeric.MustNewDecFromStr("0.10") // Change back to 0.32
+	harmonysShare = numeric.MustNewDecFromStr("0.68")
+	stakersShare  = numeric.MustNewDecFromStr("0.32")
 	totalShare    = numeric.MustNewDecFromStr("1.00")
 )
 
