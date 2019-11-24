@@ -500,16 +500,17 @@ func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]common.Address, e
 	return s.b.GetActiveValidatorAddresses(), nil
 }
 
-// GetValidatorInfo returns information about a validator.
-func (s *PublicBlockChainAPI) GetValidatorInfo(ctx context.Context, address common.Address) (*RPCValidator, error) {
-	validator := s.b.GetValidatorInformation(address)
+// GetValidatorInformation returns information about a validator.
+func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (*RPCValidator, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	validator := s.b.GetValidatorInformation(validatorAddress)
 	if validator == nil {
-		return nil, fmt.Errorf("validator not found: %s", address.Hex())
+		return nil, fmt.Errorf("validator not found: %s", validatorAddress.Hex())
 	}
 
 	rpcValidator := newRPCValidator(validator)
 
-	stats := s.b.GetValidatorStats(address)
+	stats := s.b.GetValidatorStats(validatorAddress)
 
 	if stats != nil {
 		rpcValidator.Uptime = numeric.NewDecFromBigInt(stats.NumBlocksSigned).Quo(numeric.NewDecFromBigInt(stats.NumBlocksToSign)).String()
@@ -518,8 +519,9 @@ func (s *PublicBlockChainAPI) GetValidatorInfo(ctx context.Context, address comm
 }
 
 // GetDelegationsByDelegator returns information about a validator.
-func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, address common.Address) ([]*RPCDelegation, error) {
-	validators, delegations := s.b.GetDelegationsByDelegator(address)
+func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, address string) ([]*RPCDelegation, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	validators, delegations := s.b.GetDelegationsByDelegator(validatorAddress)
 	result := []*RPCDelegation{}
 	for i := range delegations {
 		delegation := delegations[i]
@@ -534,13 +536,12 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, add
 		}
 		result = append(result, &RPCDelegation{
 			validators[i],
-			address,
+			validatorAddress,
 			delegation.Amount,
 			delegation.Reward,
 			undelegations,
 		})
 	}
-
 	return result, nil
 }
 
