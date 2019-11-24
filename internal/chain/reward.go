@@ -116,6 +116,12 @@ func ballotResult(
 		)
 	}
 	payable, missing, err := blockSigners(parentHeader, parentCommittee)
+	fmt.Println(
+		header.Epoch(),
+		header.Number(),
+		shardID,
+		parentShardState.JSON(),
+	)
 	return parentCommittee.Slots, payable, missing, err
 }
 
@@ -227,7 +233,7 @@ func AccumulateRewards(
 								payable <- slotPayable{
 									effective: signersDue,
 									payee:     addr,
-									nonce:     i * (i + j),
+									nonce:     (i + 1) * (i + j),
 									oops:      nil,
 								}
 							}(due, to, member)
@@ -274,6 +280,8 @@ func AccumulateRewards(
 	}{}
 
 	_, signers, _, err := ballotResult(bc, header, header.ShardID())
+
+	fmt.Println(len(signers))
 
 	if err != nil {
 		return err
