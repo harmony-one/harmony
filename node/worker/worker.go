@@ -326,6 +326,7 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 
 	// Cross Links
 	if crossLinks != nil && len(crossLinks) != 0 {
+		crossLinks.Sort()
 		crossLinkData, err := rlp.EncodeToBytes(crossLinks)
 		if err == nil {
 			utils.Logger().Debug().

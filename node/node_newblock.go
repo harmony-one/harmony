@@ -112,10 +112,11 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Prepare cross links
 	var crossLinks types.CrossLinks
 	if node.NodeConfig.ShardID == 0 {
-		crossLinksToPropose, localErr := node.ProposeCrossLinkDataForBeaconchain()
-		if localErr == nil {
-			crossLinks = crossLinksToPropose
-		}
+		crossLinks = node.pendingCrossLinks
+		node.pendingCLMutex.Lock()
+		node.pendingCrossLinks = []types.CrossLink{}
+		node.pendingCLMutex.Unlock()
+		utils.Logger().Debug().Msgf("Number of crosslinks to propose: %d", len(crossLinks))
 	}
 
 	// Prepare shard state

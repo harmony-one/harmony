@@ -1,14 +1,13 @@
 package node
 
 import (
+	"bytes"
 	"encoding/binary"
-	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -54,7 +53,7 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 	myShardID := node.Consensus.ShardID
 	utils.Logger().Info().Uint32("toShardID", toShardID).Uint32("myShardID", myShardID).Uint64("blockNum", block.NumberU64()).Msg("[BroadcastCXReceiptsWithShardID]")
 
-	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash(), false)
+	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash())
 	if err != nil || len(cxReceipts) == 0 {
 		utils.Logger().Info().Err(err).Uint32("ToShardID", toShardID).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceiptsWithShardID] No ReadCXReceipts found")
 		return
@@ -120,124 +119,75 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 		)
 	}
 
-	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
-
-	for i, crossLink := range *crossLinks {
-		lastLink := &types.CrossLink{}
-		if i == 0 {
-			if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
-				lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
-				if err != nil {
-					return ctxerror.New("[CrossLinkVerification] no last cross link found 1",
-						"blockHash", block.Hash(),
-						"crossLink", lastLink,
-					).WithCause(err)
-				}
-			}
-		} else {
-			if (*crossLinks)[i-1].Header().ShardID() != crossLink.Header().ShardID() {
-				if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
-					lastLink, err = node.Blockchain().ReadShardLastCrossLink(crossLink.ShardID())
-					if err != nil {
-						return ctxerror.New("[CrossLinkVerification] no last cross link found 2",
-							"blockHash", block.Hash(),
-							"crossLink", lastLink,
-						).WithCause(err)
-					}
-				}
-			} else {
-				lastLink = &(*crossLinks)[i-1]
-			}
-		}
-
-		if crossLink.BlockNum().Cmp(firstCrossLinkBlock) > 0 { // TODO: verify genesis block
-			err = node.VerifyCrosslinkHeader(lastLink.Header(), crossLink.Header())
-			if err != nil {
-				return ctxerror.New("cannot ValidateNewBlock",
+	for _, crossLink := range *crossLinks {
+		cl, err := node.Blockchain().ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
+		if err == nil && cl != nil {
+			if !bytes.Equal(cl.Serialize(), crossLink.Serialize()) {
+				return ctxerror.New("[CrossLinkVerification] Double signed crossLink",
 					"blockHash", block.Hash(),
-					"numTx", len(block.Transactions()),
-				).WithCause(err)
+					"Previous committed crossLink", cl,
+					"crossLink", crossLink,
+				)
 			}
+			continue
+		}
+		if err = node.VerifyCrossLink(crossLink); err != nil {
+			return ctxerror.New("cannot VerifyBlockCrossLinks",
+				"blockHash", block.Hash(),
+				"blockNum", block.Number(),
+				"crossLinkShard", crossLink.ShardID(),
+				"crossLinkBlock", crossLink.BlockNum(),
+				"numTx", len(block.Transactions()),
+			).WithCause(err)
 		}
 	}
 	return nil
 }
 
-// ProcessHeaderMessage verify and process Node/Header message into crosslink when it's valid
-func (node *Node) ProcessHeaderMessage(msgPayload []byte) {
+// ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
+func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 	if node.NodeConfig.ShardID == 0 {
-
-		var headers []*block.Header
-		err := rlp.DecodeBytes(msgPayload, &headers)
+		var crosslinks []types.CrossLink
+		err := rlp.DecodeBytes(msgPayload, &crosslinks)
 		if err != nil {
 			utils.Logger().Error().
 				Err(err).
-				Msg("[ProcessingHeader] Crosslink Headers Broadcast Unable to Decode")
+				Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
 			return
 		}
-
-		// Try to reprocess all the pending cross links
-		node.pendingClMutex.Lock()
-		crossLinkHeadersToProcess := node.pendingCrossLinks
-		node.pendingCrossLinks = []*block.Header{}
-		node.pendingClMutex.Unlock()
-
 		firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
-		for _, header := range headers {
-			if header.Number().Cmp(firstCrossLinkBlock) >= 0 {
-				// Only process cross link starting from FirstCrossLinkBlock
-				utils.Logger().Debug().Msgf("[ProcessHeaderMessage] Add Pending CrossLink, shardID %d, blockNum %d", header.ShardID(), header.Number())
-				crossLinkHeadersToProcess = append(crossLinkHeadersToProcess, header)
-			}
-		}
+
+		candidates := []types.CrossLink{}
 		utils.Logger().Debug().
-			Msgf("[ProcessingHeader] number of crosslink headers to propose %d, firstCrossLinkBlock %d", len(crossLinkHeadersToProcess), firstCrossLinkBlock)
+			Msgf("[ProcessingCrossLink] Crosslink going to propose: %d", len(crosslinks))
 
-		headersToQuque := []*block.Header{}
-
-		for _, header := range crossLinkHeadersToProcess {
-			if len(headersToQuque) > crossLinkBatchSize {
-				break
+		for i, cl := range crosslinks {
+			if cl.Number() == nil || cl.Number().Cmp(firstCrossLinkBlock) < 0 {
+				utils.Logger().Debug().
+					Msgf("[ProcessingCrossLink] Crosslink %d skipped: %v", i, cl)
+				continue
 			}
-			exist, err := node.Blockchain().ReadCrossLink(header.ShardID(), header.Number().Uint64(), false)
+			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
 				utils.Logger().Debug().
-					Msgf("[ProcessingHeader] Cross Link already exists, pass. Block num: %d, shardID %d", header.Number(), header.ShardID())
+					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Block num: %d, shardID %d", cl.Number(), cl.ShardID())
 				continue
 			}
 
-			if header.Number().Cmp(firstCrossLinkBlock) > 0 { // Directly trust the first cross-link
-				// Sanity check on the previous link with the new link
-				previousLink, err := node.Blockchain().ReadCrossLink(header.ShardID(), header.Number().Uint64()-1, false)
-				if err != nil {
-					previousLink, err = node.Blockchain().ReadCrossLink(header.ShardID(), header.Number().Uint64()-1, true)
-					if err != nil {
-						headersToQuque = append(headersToQuque, header)
-						utils.Logger().Error().Err(err).
-							Msgf("[ProcessingHeader] ReadCrossLink cannot read previousLink with number %d, shardID %d", header.Number().Uint64()-1, header.ShardID())
-						continue
-					}
-				}
-
-				err = node.VerifyCrosslinkHeader(previousLink.Header(), header)
-				if err != nil {
-					utils.Logger().Error().
-						Err(err).
-						Msgf("[ProcessingHeader] Failed to verify new cross link header for shardID %d, blockNum %d", header.ShardID(), header.Number())
-					continue
-				}
+			err = node.VerifyCrossLink(cl)
+			if err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Msgf("[ProcessingCrossLink] Failed to verify new cross link for shardID %d, blockNum %d", cl.ShardID(), cl.Number())
+				continue
 			}
-
-			crossLink := types.NewCrossLink(header)
+			candidates = append(candidates, cl)
 			utils.Logger().Debug().
-				Msgf("[ProcessingHeader] committing for shardID %d, blockNum %d", header.ShardID(), header.Number().Uint64())
-			node.Blockchain().WriteCrossLinks(types.CrossLinks{crossLink}, true)
+				Msgf("[ProcessingCrossLink] committing for shardID %d, blockNum %d", cl.ShardID(), cl.Number().Uint64())
 		}
-
-		// Queue up the cross links that's in the future
-		node.pendingClMutex.Lock()
-		node.pendingCrossLinks = append(node.pendingCrossLinks, headersToQuque...)
-		node.pendingClMutex.Unlock()
+		node.pendingCLMutex.Lock()
+		node.pendingCrossLinks = append(node.pendingCrossLinks, candidates...)
+		node.pendingCLMutex.Unlock()
 	}
 }
 
@@ -278,22 +228,18 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	return nil
 }
 
-// VerifyCrosslinkHeader verifies the header is valid against the prevHeader.
-func (node *Node) VerifyCrosslinkHeader(prevHeader, header *block.Header) error {
+// VerifyCrossLink verifies the header is valid against the prevHeader.
+func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 
 	// TODO: add fork choice rule
-	parentHash := header.ParentHash()
-	if prevHeader.Hash() != parentHash {
-		return ctxerror.New("[CrossLink] Invalid cross link header - parent hash mismatch", "shardID", header.ShardID(), "blockNum", header.Number())
-	}
 
 	// Verify signature of the new cross link header
 	// TODO: check whether to recalculate shard state
-	shardState, err := node.Blockchain().ReadShardState(prevHeader.Epoch())
-	committee := shardState.FindCommitteeByID(prevHeader.ShardID())
+	shardState, err := node.Blockchain().ReadShardState(cl.Epoch())
+	committee := shardState.FindCommitteeByID(cl.ShardID())
 
 	if err != nil || committee == nil {
-		return ctxerror.New("[CrossLink] Failed to read shard state for cross link header", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+		return ctxerror.New("[CrossLink] Failed to read shard state for cross link", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
 	}
 	var committerKeys []*bls.PublicKey
 
@@ -308,96 +254,34 @@ func (node *Node) VerifyCrosslinkHeader(prevHeader, header *block.Header) error 
 		committerKeys = append(committerKeys, committerKey)
 	}
 	if !parseKeysSuccess {
-		return ctxerror.New("[CrossLink] cannot convert BLS public key", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+		return ctxerror.New("[CrossLink] cannot convert BLS public key", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
 	}
 
-	if header.Number().Uint64() > 1 { // First block doesn't have last sig
+	if cl.BlockNum() > 1 { // First block doesn't have last sig
 		mask, err := bls_cosi.NewMask(committerKeys, nil)
 		if err != nil {
-			return ctxerror.New("cannot create group sig mask", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+			return ctxerror.New("cannot create group sig mask", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
 		}
-		if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
-			return ctxerror.New("cannot set group sig mask bits", "shardID", header.ShardID(), "blockNum", header.Number()).WithCause(err)
+		if err := mask.SetMask(cl.Bitmap()); err != nil {
+			return ctxerror.New("cannot set group sig mask bits", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
 		}
 
 		aggSig := bls.Sign{}
-		sig := header.LastCommitSignature()
+		sig := cl.Signature()
 		err = aggSig.Deserialize(sig[:])
 		if err != nil {
 			return ctxerror.New("unable to deserialize multi-signature from payload").WithCause(err)
 		}
 
+		parentHash := cl.ParentHash()
 		blockNumBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(blockNumBytes, header.Number().Uint64()-1)
+		binary.LittleEndian.PutUint64(blockNumBytes, cl.BlockNum())
 		commitPayload := append(blockNumBytes, parentHash[:]...)
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-			return ctxerror.New("Failed to verify the signature for cross link header ", "shardID", header.ShardID(), "blockNum", header.Number())
+			return ctxerror.New("Failed to verify the signature for cross link", "shardID", cl.ShardID(), "blockNum", cl.BlockNum())
 		}
 	}
 	return nil
-}
-
-// ProposeCrossLinkDataForBeaconchain propose cross links for beacon chain new block
-func (node *Node) ProposeCrossLinkDataForBeaconchain() (types.CrossLinks, error) {
-	utils.Logger().Info().
-		Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
-		Msg("Proposing cross links ...")
-	curBlock := node.Blockchain().CurrentBlock()
-	numShards := shard.Schedule.InstanceForEpoch(curBlock.Header().Epoch()).NumShards()
-
-	shardCrossLinks := make([]types.CrossLinks, numShards)
-
-	firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
-
-	for i := 0; i < int(numShards); i++ {
-		curShardID := uint32(i)
-		lastLink, err := node.Blockchain().ReadShardLastCrossLink(curShardID)
-
-		lastLinkblockNum := firstCrossLinkBlock
-		blockNumoffset := 0
-		if err == nil && lastLink != nil {
-			blockNumoffset = 1
-			lastLinkblockNum = lastLink.BlockNum()
-		}
-
-		for true {
-			link, err := node.Blockchain().ReadCrossLink(curShardID, lastLinkblockNum.Uint64()+uint64(blockNumoffset), true)
-			if err != nil || link == nil {
-				break
-			}
-
-			if link.BlockNum().Cmp(firstCrossLinkBlock) > 0 {
-				if lastLink == nil {
-					utils.Logger().Error().
-						Err(err).
-						Msgf("[CrossLink] Haven't received the first cross link %d", link.BlockNum().Uint64())
-					break
-				} else {
-					err := node.VerifyCrosslinkHeader(lastLink.Header(), link.Header())
-					if err != nil {
-						utils.Logger().Error().
-							Err(err).
-							Msgf("[CrossLink] Failed verifying temp cross link %d", link.BlockNum().Uint64())
-						break
-					}
-				}
-			}
-			shardCrossLinks[i] = append(shardCrossLinks[i], *link)
-			lastLink = link
-			blockNumoffset++
-		}
-	}
-
-	crossLinksToPropose := types.CrossLinks{}
-	for _, crossLinks := range shardCrossLinks {
-		crossLinksToPropose = append(crossLinksToPropose, crossLinks...)
-	}
-	if len(crossLinksToPropose) != 0 {
-		crossLinksToPropose.Sort()
-
-		return crossLinksToPropose, nil
-	}
-	return types.CrossLinks{}, errors.New("No cross link to propose")
 }
 
 // ProcessReceiptMessage store the receipts and merkle proof in local data store

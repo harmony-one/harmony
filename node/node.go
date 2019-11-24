@@ -15,7 +15,6 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
@@ -108,11 +107,12 @@ type Node struct {
 	ConfirmedBlockChannel chan *types.Block    // The channel to send confirmed blocks
 	BeaconBlockChannel    chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
 	DRand                 *drand.DRand         // The instance for distributed randomness protocol
-	pendingCrossLinks     []*block.Header
-	pendingClMutex        sync.Mutex
 
 	pendingCXReceipts map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex    sync.Mutex
+
+	pendingCrossLinks []types.CrossLink
+	pendingCLMutex    sync.Mutex
 
 	// Shard databases
 	shardChains shardchain.Collection
