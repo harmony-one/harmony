@@ -274,6 +274,7 @@ func AccumulateRewards(
 	}{}
 
 	_, signers, _, err := ballotResult(bc, header, header.ShardID())
+
 	if err != nil {
 		return err
 	}
@@ -291,8 +292,8 @@ func AccumulateRewards(
 
 	if totalAmount.Equal(BlockReward) == false {
 		utils.Logger().Error().
-			Int64("block-reward", BlockReward.Int64()).
-			Int64("total-amount-paid-out", totalAmount.Int64()).
+			Int64("block-reward", BlockReward.RoundInt64()).
+			Int64("total-amount-paid-out", totalAmount.RoundInt64()).
 			Msg("Total paid out was not equal to block-reward")
 		return errors.Wrapf(
 			errPayoutNotEqualBlockReward, "payout "+totalAmount.String(),
