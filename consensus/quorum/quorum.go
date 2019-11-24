@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -301,11 +302,7 @@ func NewDecider(p Policy) Decider {
 			c.DependencyInjectionWriter,
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
 			c.SignatureReader.(slash.ThresholdDecider),
-			map[shard.BlsPublicKey]stakedVoter{},
-			numeric.ZeroDec(),
-			numeric.ZeroDec(),
-			numeric.ZeroDec(),
-			0,
+			votepower.Roster{},
 		}
 	default:
 		// Should not be possible

@@ -3,8 +3,8 @@ package quorum
 import (
 	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -15,8 +15,6 @@ import (
 var (
 	twoThird      = numeric.NewDec(2).Quo(numeric.NewDec(3))
 	ninetyPercent = numeric.MustNewDecFromStr("0.90")
-	harmonysShare = numeric.MustNewDecFromStr("0.68")
-	stakersShare  = numeric.MustNewDecFromStr("0.32")
 	totalShare    = numeric.MustNewDecFromStr("1.00")
 )
 
@@ -30,23 +28,12 @@ type TallyResult struct {
 	theirPercent numeric.Dec
 }
 
-type stakedVoter struct {
-	isActive, isHarmonyNode bool
-	earningAccount          common.Address
-	effectivePercent        numeric.Dec
-	rawStake                numeric.Dec
-}
-
 type stakedVoteWeight struct {
 	SignatureReader
 	DependencyInjectionWriter
 	DependencyInjectionReader
 	slash.ThresholdDecider
-	voters                map[shard.BlsPublicKey]stakedVoter
-	ourVotingPowerTotal   numeric.Dec
-	theirVotingPowerTotal numeric.Dec
-	stakedTotal           numeric.Dec
-	hmySlotCount          int64
+	roster votepower.Roster
 }
 
 // Policy ..
@@ -57,7 +44,14 @@ func (v *stakedVoteWeight) Policy() Policy {
 // IsQuorumAchieved ..
 func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 	t := v.QuorumThreshold()
-	currentTotalPower := v.computeCurrentTotalPower(p)
+	currentTotalPower, err := v.computeCurrentTotalPower(p)
+
+	if err != nil {
+		utils.Logger().Error().
+			AnErr("bls error", err).
+			Msg("Failure in attempt bls-key reading")
+		return false
+	}
 
 	utils.Logger().Info().
 		Str("policy", v.Policy().String()).
@@ -68,21 +62,24 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 	return currentTotalPower.GT(t)
 }
 
-func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) numeric.Dec {
+func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, error) {
 	w := shard.BlsPublicKey{}
 	members := v.Participants()
 	currentTotalPower := numeric.ZeroDec()
 
 	for i := range members {
 		if v.ReadSignature(p, members[i]) != nil {
-			w.FromLibBLSPublicKey(members[i])
+			err := w.FromLibBLSPublicKey(members[i])
+			if err != nil {
+				return nil, err
+			}
 			currentTotalPower = currentTotalPower.Add(
-				v.voters[w].effectivePercent,
+				v.roster.Voters[w].EffectivePercent,
 			)
 		}
 	}
 
-	return currentTotalPower
+	return &currentTotalPower, nil
 }
 
 // QuorumThreshold ..
@@ -92,7 +89,14 @@ func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 
 // RewardThreshold ..
 func (v *stakedVoteWeight) IsRewardThresholdAchieved() bool {
-	return v.computeCurrentTotalPower(Commit).GTE(ninetyPercent)
+	reached, err := v.computeCurrentTotalPower(Commit)
+	if err != nil {
+		utils.Logger().Error().
+			AnErr("bls error", err).
+			Msg("Failure in attempt bls-key reading")
+		return false
+	}
+	return reached.GTE(ninetyPercent)
 }
 
 // Award ..
@@ -143,76 +147,38 @@ func (v *stakedVoteWeight) SetVoters(
 	staked shard.SlotList,
 ) (*TallyResult, error) {
 	s, _ := v.ShardIDProvider()()
-	v.voters = map[shard.BlsPublicKey]stakedVoter{}
 	v.Reset([]Phase{Prepare, Commit, ViewChange})
-	v.hmySlotCount = 0
-	v.stakedTotal = numeric.ZeroDec()
 
-	for i := range staked {
-		if staked[i].StakeWithDelegationApplied == nil {
-			v.hmySlotCount++
-		} else {
-			v.stakedTotal = v.stakedTotal.Add(*staked[i].StakeWithDelegationApplied)
-		}
-	}
-
-	ourCount := numeric.NewDec(v.hmySlotCount)
-	ourPercentage := numeric.ZeroDec()
-	theirPercentage := numeric.ZeroDec()
-	totalStakedPercent := numeric.ZeroDec()
-
-	for i := range staked {
-		member := stakedVoter{
-			isActive:         true,
-			isHarmonyNode:    true,
-			earningAccount:   staked[i].EcdsaAddress,
-			effectivePercent: numeric.ZeroDec(),
-		}
-
-		// Real Staker
-		if staked[i].StakeWithDelegationApplied != nil {
-			member.isHarmonyNode = false
-			member.effectivePercent = staked[i].StakeWithDelegationApplied.
-				Quo(v.stakedTotal).
-				Mul(stakersShare)
-			theirPercentage = theirPercentage.Add(member.effectivePercent)
-		} else { // Our node
-			member.effectivePercent = harmonysShare.Quo(ourCount)
-			ourPercentage = ourPercentage.Add(member.effectivePercent)
-		}
-
-		totalStakedPercent = totalStakedPercent.Add(member.effectivePercent)
-		v.voters[staked[i].BlsPublicKey] = member
-	}
+	roster := votepower.Compute(staked)
 
 	utils.Logger().Info().
-		Str("our-percentage", ourPercentage.String()).
-		Str("their-percentage", theirPercentage.String()).
+		Str("our-percentage", roster.OurVotingPowerTotalPercentage.String()).
+		Str("their-percentage", roster.TheirVotingPowerTotalPercentage.String()).
 		Uint32("on-shard", s).
-		Str("Raw-Staked", v.stakedTotal.String()).
+		Str("Raw-Staked", roster.RawStakedTotal.String()).
 		Msg("Total staked")
 
 	//switch {
-	//case totalStakedPercent.Equal(totalShare) == false:
+	//case roster.totalStakedPercent.Equal(totalShare) == false:
 	//	return nil, errSumOfVotingPowerNotOne
-	//case ourPercentage.Add(theirPercentage).Equal(totalShare) == false:
+	//case roster.ourPercentage.Add(theirPercentage).Equal(totalShare) == false:
 	//	return nil, errSumOfOursAndTheirsNotOne
 	//}
 
 	// Hold onto this calculation
-	v.ourVotingPowerTotal = ourPercentage
-	v.theirVotingPowerTotal = theirPercentage
-
-	return &TallyResult{ourPercentage, theirPercentage}, nil
+	v.roster = *roster
+	return &TallyResult{
+		roster.OurVotingPowerTotalPercentage, roster.TheirVotingPowerTotalPercentage,
+	}, nil
 }
 
 func (v *stakedVoteWeight) ToggleActive(k *bls.PublicKey) bool {
 	w := shard.BlsPublicKey{}
 	w.FromLibBLSPublicKey(k)
-	g := v.voters[w]
-	g.isActive = !g.isActive
-	v.voters[w] = g
-	return v.voters[w].isActive
+	g := v.roster.Voters[w]
+	g.IsActive = !g.IsActive
+	v.roster.Voters[w] = g
+	return v.roster.Voters[w].IsActive
 }
 
 func (v *stakedVoteWeight) ShouldSlash(key shard.BlsPublicKey) bool {
@@ -227,6 +193,7 @@ func (v *stakedVoteWeight) ShouldSlash(key shard.BlsPublicKey) bool {
 
 func (v *stakedVoteWeight) JSON() string {
 	s, _ := v.ShardIDProvider()()
+	voterCount := len(v.roster.Voters)
 
 	type u struct {
 		IsHarmony   bool   `json:"is-harmony-slot"`
@@ -245,18 +212,18 @@ func (v *stakedVoteWeight) JSON() string {
 		TotalStaked       string `json:"total-raw-staked"`
 	}
 
-	parts := make([]u, len(v.voters))
+	parts := make([]u, voterCount)
 	i := 0
 
-	for identity, voter := range v.voters {
+	for identity, voter := range v.roster.Voters {
 		member := u{
-			voter.isHarmonyNode,
+			voter.IsHarmonyNode,
 			identity.Hex(),
-			voter.effectivePercent.String(),
+			voter.EffectivePercent.String(),
 			"",
 		}
-		if !voter.isHarmonyNode {
-			member.RawStake = voter.rawStake.String()
+		if !voter.IsHarmonyNode {
+			member.RawStake = voter.RawStake.String()
 		}
 		parts[i] = member
 		i++
@@ -265,11 +232,11 @@ func (v *stakedVoteWeight) JSON() string {
 	b1, _ := json.Marshal(t{
 		v.Policy().String(),
 		s,
-		len(v.voters),
+		voterCount,
 		parts,
-		v.ourVotingPowerTotal.String(),
-		v.theirVotingPowerTotal.String(),
-		v.stakedTotal.String(),
+		v.roster.OurVotingPowerTotalPercentage.String(),
+		v.roster.TheirVotingPowerTotalPercentage.String(),
+		v.roster.RawStakedTotal.String(),
 	})
 	return string(b1)
 }
