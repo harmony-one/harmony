@@ -28,9 +28,7 @@ import (
 
 var (
 	// BlockReward is the block reward, to be split evenly among block signers.
-	BlockReward = numeric.NewDecFromBigInt(
-		new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One)),
-	)
+	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
 	// BlockRewardStakedCase is the baseline block reward in staked case -
 	BlockRewardStakedCase = numeric.NewDecFromBigInt(new(big.Int).Mul(
 		big.NewInt(18), big.NewInt(denominations.One),
@@ -138,7 +136,7 @@ func AccumulateRewards(
 
 	blockNum := header.Number().Uint64()
 	if blockNum == 0 {
-		// Epoch block has no parent to reward.
+		// genesis block has no parent to reward.
 		return nil
 	}
 
@@ -159,6 +157,8 @@ func AccumulateRewards(
 		votingPower := votepower.Compute(members)
 
 		for beaconMember := range payable {
+			// TODO Give out whatever leftover to the last voter/handle
+			// what to do about share of those that didn't sign
 			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
 			if !voter.IsHarmonyNode {
 				due := BlockRewardStakedCase.Mul(voter.EffectivePercent)
@@ -290,10 +290,10 @@ func AccumulateRewards(
 		},
 	)
 
-	if totalAmount.Equal(BlockReward) == false {
+	if totalAmount.Cmp(BlockReward) != 0 {
 		utils.Logger().Error().
-			Int64("block-reward", BlockReward.RoundInt64()).
-			Int64("total-amount-paid-out", totalAmount.RoundInt64()).
+			Int64("block-reward", BlockReward.Int64()).
+			Int64("total-amount-paid-out", totalAmount.Int64()).
 			Msg("Total paid out was not equal to block-reward")
 		return errors.Wrapf(
 			errPayoutNotEqualBlockReward, "payout "+totalAmount.String(),
