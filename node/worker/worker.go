@@ -295,13 +295,13 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 		if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
 			nextCommittee, oops = committee.WithStakingEnabled.Compute(
 				new(big.Int).Add(w.current.header.Epoch(), common.Big1),
-				w.config,
 				beacon,
 			)
 		}
 	default:
 		// WARN When we first enable staking, this condition may not be robust by itself.
 
+		// TODO: needs to make sure beacon chain sync works.
 		if w.config.IsStaking(w.current.header.Epoch()) {
 			switch beacon.CurrentHeader().Epoch().Cmp(w.current.header.Epoch()) {
 			case 1:
@@ -313,7 +313,6 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 			if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
 				nextCommittee, oops = committee.WithStakingEnabled.Compute(
 					new(big.Int).Add(w.current.header.Epoch(), common.Big1),
-					w.config,
 					beacon,
 				)
 			}

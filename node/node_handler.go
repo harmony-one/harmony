@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -16,7 +15,6 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -26,7 +24,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
@@ -377,51 +374,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
-		next := new(big.Int).Add(newBlock.Epoch(), common.Big1)
-		if node.chainConfig.StakingEpoch.Cmp(next) == 0 &&
-			node.Consensus.Decider.Policy() != quorum.SuperMajorityStake {
-			node.Consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
-			node.Consensus.Decider.SetShardIDProvider(func() (uint32, error) {
-				return node.Consensus.ShardID, nil
-			})
-			s, _ := committee.WithStakingEnabled.Compute(
-				next, &node.chainConfig, node.Consensus.ChainReader,
-			)
-
-			prevSubCommitteeDump := node.Consensus.Decider.JSON()
-
-			if _, err := node.Consensus.Decider.SetVoters(
-				s.FindCommitteeByID(node.Consensus.ShardID).Slots,
-			); err != nil {
-				utils.Logger().Error().
-					Err(err).
-					Uint32("shard", node.Consensus.ShardID).
-					Msg("Error when updating voting power")
-				return
-			}
-
-			utils.Logger().Info().
-				Uint64("block-number", newBlock.Number().Uint64()).
-				Uint64("epoch", newBlock.Epoch().Uint64()).
-				Uint32("shard-id", node.Consensus.ShardID).
-				RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
-				RawJSON("current-subcommittee", []byte(node.Consensus.Decider.JSON())).
-				Msg("changing committee")
-		}
-		// TODO Need to refactor UpdateConsensusInformation so can fold the following logic
-		// into UCI - todo because UCI mutates state & called in overloaded contexts
 		node.Consensus.UpdateConsensusInformation()
-
-		if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
-			if node.chainConfig.StakingEpoch.Cmp(next) == 0 {
-				// Hit this case again, need after UpdateConsensus
-				curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
-					next, node.Consensus.ChainReader,
-				)[int(node.Consensus.ShardID)]
-				node.Consensus.Decider.UpdateParticipants(curPubKeys)
-			}
-		}
-
 	}
 
 	// TODO chao: uncomment this after beacon syncing is stable

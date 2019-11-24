@@ -16,8 +16,8 @@ import (
 var (
 	twoThird      = numeric.NewDec(2).Quo(numeric.NewDec(3))
 	ninetyPercent = numeric.MustNewDecFromStr("0.90")
-	harmonysShare = numeric.MustNewDecFromStr("0.68")
-	stakersShare  = numeric.MustNewDecFromStr("0.32")
+	harmonysShare = numeric.MustNewDecFromStr("0.90") // Change back to 0.68
+	stakersShare  = numeric.MustNewDecFromStr("0.10") // Change back to 0.32
 	totalShare    = numeric.MustNewDecFromStr("1.00")
 )
 
@@ -148,10 +148,10 @@ func (v *stakedVoteWeight) SetVoters(
 	v.stakedTotal = numeric.ZeroDec()
 
 	for i := range staked {
-		if staked[i].StakeWithDelegationApplied == nil {
+		if staked[i].TotalStake == nil {
 			v.hmySlotCount++
 		} else {
-			v.stakedTotal = v.stakedTotal.Add(*staked[i].StakeWithDelegationApplied)
+			v.stakedTotal = v.stakedTotal.Add(*staked[i].TotalStake)
 		}
 	}
 
@@ -169,9 +169,9 @@ func (v *stakedVoteWeight) SetVoters(
 		}
 
 		// Real Staker
-		if staked[i].StakeWithDelegationApplied != nil {
+		if staked[i].TotalStake != nil {
 			member.isHarmonyNode = false
-			member.effectivePercent = staked[i].StakeWithDelegationApplied.
+			member.effectivePercent = staked[i].TotalStake.
 				Quo(v.stakedTotal).
 				Mul(stakersShare)
 			theirPercentage = theirPercentage.Add(member.effectivePercent)

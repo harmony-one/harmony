@@ -56,11 +56,15 @@ var (
 	rate    = "0.15"
 
 	testAccounts = []string{
-		"one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy",
-		"one12fuf7x9rgtdgqg7vgq0962c556m3p7afsxgvll"}
+		"one103q7qe5t2505lypvltkqtddaef5tzfxwsse4z7",
+		"one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg",
+		"one1r4zyyjqrulf935a479sgqlpa78kz7zlcg2jfen",
+		"one1p7ht2d4kl8ve7a8jxw746yfnx4wnfxtp8jqxwe"}
 	testBLSPubKeys = []string{
-		"65f55eb3052f9e9f632b2923be594ba77c55543f5c58ee1454b9cfd658d25e06373b0f7d42a19c84768139ea294f6204",
-		"02c8ff0b88f313717bc3a627d2f8bb172ba3ad3bb9ba3ecb8eed4b7c878653d3d4faf769876c528b73f343967f74a917"}
+		"678ec9670899bf6af85b877058bea4fc1301a5a3a376987e826e3ca150b80e3eaadffedad0fedfa111576fa76ded980c",
+		"a547a9bf6fdde4f4934cde21473748861a3cc0fe8bbb5e57225a29f483b05b72531f002f8187675743d819c955a86100",
+		"fc4b9c535ee91f015efff3f32fbb9d32cdd9bfc8a837bb3eee89b8fff653c7af2050a4e147ebe5c7233dc2d5df06ee0a",
+		"ca86e551ee42adaaa6477322d7db869d3e203c00d7b86c82ebee629ad79cb6d57b8f3db28336778ec2180e56a8e07296"}
 )
 
 func (s *staker) run(cmd *cobra.Command, args []string) error {

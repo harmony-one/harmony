@@ -1156,7 +1156,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			shard := (*shardState)[i]
 			for j := range shard.Slots {
 				slot := shard.Slots[j]
-				if slot.StakeWithDelegationApplied != nil { // For external validator
+				if slot.TotalStake != nil { // For external validator
 					_, ok := processed[slot.EcdsaAddress]
 					if !ok {
 						processed[slot.EcdsaAddress] = struct{}{}
@@ -1963,6 +1963,7 @@ func (bc *BlockChain) GetVrfByNumber(number uint64) []byte {
 
 // GetShardState returns the shard state for the given epoch,
 // creating one if needed.
+// TODO: [STAKING]
 func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.State, error) {
 	shardState, err := bc.ReadShardState(epoch)
 	if err == nil { // TODO ek – distinguish ErrNotFound
@@ -1971,7 +1972,7 @@ func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.State, error) {
 
 	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
 		shardState, err = committee.WithStakingEnabled.Compute(
-			big.NewInt(GenesisEpoch), bc.Config(), nil,
+			big.NewInt(GenesisEpoch), nil,
 		)
 	} else {
 		prevEpoch := new(big.Int).Sub(epoch, common.Big1)

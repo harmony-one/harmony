@@ -453,12 +453,69 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
+	curHeader := consensus.ChainReader.CurrentHeader()
+
+	next := new(big.Int).Add(curHeader.Epoch(), common.Big1)
+	if consensus.ChainReader.Config().IsStaking(next) &&
+		consensus.Decider.Policy() != quorum.SuperMajorityStake {
+
+		prevSubCommitteeDump := consensus.Decider.JSON()
+
+		consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
+		consensus.Decider.SetShardIDProvider(func() (uint32, error) {
+			return consensus.ShardID, nil
+		})
+		s, err := committee.WithStakingEnabled.Compute(
+			next, consensus.ChainReader,
+		)
+
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error when computing committee with staking")
+			return Syncing
+		}
+
+		utils.Logger().Print("XXXXXXXX")
+		utils.Logger().Print(s.FindCommitteeByID(consensus.ShardID).Slots)
+		if _, err := consensus.Decider.SetVoters(
+			s.FindCommitteeByID(consensus.ShardID).Slots,
+		); err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error when updating voting power")
+			return Syncing
+		}
+
+		utils.Logger().Info().
+			Uint64("block-number", curHeader.Number().Uint64()).
+			Uint64("epoch", curHeader.Epoch().Uint64()).
+			Uint32("shard-id", consensus.ShardID).
+			RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
+			RawJSON("current-subcommittee", []byte(consensus.Decider.JSON())).
+			Msg("changing committee")
+	}
+
 	pubKeys := []*bls.PublicKey{}
 	hasError := false
 	header := consensus.ChainReader.CurrentHeader()
 	epoch := header.Epoch()
-	curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
+
+	// TODO: change GetCommitteePublicKeys to read from DB
+	curShardState, err := committee.WithStakingEnabled.Compute(
 		epoch, consensus.ChainReader,
+	)
+	if err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint32("shard", consensus.ShardID).
+			Msg("Error retrieving current shard state")
+		return Syncing
+	}
+	curPubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
+		curShardState,
 	)[int(header.ShardID())]
 	consensus.numPrevPubKeys = len(curPubKeys)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
@@ -467,8 +524,20 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(epoch.Uint64() + 1)
 		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
 			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		pubKeys = committee.WithStakingEnabled.ComputePublicKeys(
+
+		nextShardState, err := committee.WithStakingEnabled.Compute(
 			new(big.Int).Add(epoch, common.Big1), consensus.ChainReader,
+		)
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error retrieving next shard state")
+			return Syncing
+		}
+
+		pubKeys = committee.WithStakingEnabled.GetCommitteePublicKeys(
+			nextShardState,
 		)[int(header.ShardID())]
 	} else {
 		consensus.SetEpochNum(epoch.Uint64())

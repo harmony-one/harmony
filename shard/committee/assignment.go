@@ -19,14 +19,14 @@ import (
 // ValidatorListProvider ..
 type ValidatorListProvider interface {
 	Compute(
-		epoch *big.Int, config *params.ChainConfig, reader DataProvider,
+		epoch *big.Int, reader DataProvider,
 	) (shard.State, error)
 	ReadFromDB(epoch *big.Int, reader DataProvider) (shard.State, error)
 }
 
 // PublicKeysProvider per epoch
 type PublicKeysProvider interface {
-	ComputePublicKeys(epoch *big.Int, reader DataProvider) [][]*bls.PublicKey
+	GetCommitteePublicKeys(superComm shard.State) [][]*bls.PublicKey
 	ReadPublicKeysFromDB(
 		hash common.Hash, reader DataProvider,
 	) ([]*bls.PublicKey, error)
@@ -123,12 +123,15 @@ func eposStakedCommittee(
 
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
-		// TODO Should be using .ValidatorStakingWithDelegation, not implemented yet
 		validator, err := stakerReader.ReadValidatorData(candidates[i])
 		validatorStake := big.NewInt(0)
+		utils.Logger().Print("TEST-VALIDATOR")
+		utils.Logger().Print(validator)
 		for _, delegation := range validator.Delegations {
 			validatorStake.Add(validatorStake, delegation.Amount)
 		}
+		utils.Logger().Print("TEST-VALIDATOR2")
+		utils.Logger().Print(validatorStake)
 		if err != nil {
 			return nil, err
 		}
@@ -184,13 +187,8 @@ func eposStakedCommittee(
 	return superComm, nil
 }
 
-// ComputePublicKeys produces publicKeys of entire supercommittee per epoch
-func (def partialStakingEnabled) ComputePublicKeys(
-	epoch *big.Int, d DataProvider,
-) [][]*bls.PublicKey {
-	config := d.Config()
-	superComm, _ := def.Compute(epoch, config, d)
-
+// GetCommitteePublicKeys produces publicKeys of entire supercommittee per epoch
+func (def partialStakingEnabled) GetCommitteePublicKeys(superComm shard.State) [][]*bls.PublicKey {
 	allIdentities := make([][]*bls.PublicKey, len(superComm))
 
 	for i := range superComm {
@@ -245,10 +243,18 @@ func (def partialStakingEnabled) ReadFromDB(
 
 // ReadFromComputation is single entry point for reading the State of the network
 func (def partialStakingEnabled) Compute(
-	epoch *big.Int, config *params.ChainConfig, stakerReader DataProvider,
+	epoch *big.Int, stakerReader DataProvider,
 ) (newSuperComm shard.State, err error) {
+	preStaking := true
+	if stakerReader != nil {
+		config := stakerReader.Config()
+		if config.IsStaking(epoch) {
+			preStaking = false
+		}
+	}
+
 	instance := shard.Schedule.InstanceForEpoch(epoch)
-	if !config.IsStaking(epoch) {
+	if preStaking {
 		return preStakingEnabledCommittee(instance), nil
 	}
 	stakedSlots :=

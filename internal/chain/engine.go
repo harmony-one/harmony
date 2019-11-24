@@ -225,7 +225,7 @@ func QuorumForBlock(
 ) (quorum int, err error) {
 	var ss shard.State
 	if reCalculate {
-		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), chain.Config(), chain)
+		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), chain)
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -284,7 +284,7 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 	var shardState shard.State
 	var err error
 	if reCalculate {
-		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), chain.Config(), chain)
+		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), chain)
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {

@@ -39,7 +39,7 @@ type Slot struct {
 	EcdsaAddress common.Address `json:"ecdsa-address"`
 	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
 	// nil means our node, 0 means not active, > 0 means staked node
-	StakeWithDelegationApplied *numeric.Dec `json:"staked-validator" rlp:"nil"`
+	TotalStake *numeric.Dec `json:"total-stake" rlp:"nil"`
 }
 
 // SlotList is a list of SlotList.
@@ -71,7 +71,7 @@ func (ss State) JSON() string {
 		for j := range ss[i].Slots {
 			n := ss[i].Slots[j]
 			dump[i].NodeList[j].BlsPublicKey = n.BlsPublicKey
-			dump[i].NodeList[j].StakeWithDelegationApplied = n.StakeWithDelegationApplied
+			dump[i].NodeList[j].TotalStake = n.TotalStake
 			dump[i].NodeList[j].EcdsaAddress = common2.MustAddressToBech32(n.EcdsaAddress)
 		}
 	}
@@ -266,5 +266,9 @@ func (n Slot) Serialize() []byte {
 }
 
 func (n Slot) String() string {
-	return "ECDSA: " + common2.MustAddressToBech32(n.EcdsaAddress) + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:])
+	total := "nil"
+	if n.TotalStake != nil {
+		total = n.TotalStake.String()
+	}
+	return "ECDSA: " + common2.MustAddressToBech32(n.EcdsaAddress) + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:]) + ", TotalStake: " + total
 }

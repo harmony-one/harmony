@@ -486,8 +486,11 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
-	pubKeys := committee.WithStakingEnabled.ComputePublicKeys(
+	shardState, err := committee.WithStakingEnabled.Compute(
 		epoch, node.Consensus.ChainReader,
+	)
+	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
+		shardState,
 	)[int(shardID)]
 	if len(pubKeys) == 0 {
 		utils.Logger().Error().
