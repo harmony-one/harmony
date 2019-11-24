@@ -17,7 +17,9 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -262,57 +264,49 @@ func AccumulateRewards(
 				)
 			}
 		}
+		return nil
 	}
 
-	// wholePie := BlockRewardStakedCase
-	// totalAmount := numeric.ZeroDec()
+	payable := []struct {
+		string
+		common.Address
+		*big.Int
+	}{}
 
-	// // Legacy logic
-	// if bc.Config().IsStaking(header.Epoch()) == false {
-	// 	wholePie = BlockReward
-	// 	payable := []struct {
-	// 		string
-	// 		common.Address
-	// 		*big.Int
-	// 	}{}
+	_, signers, _, err := ballotResult(bc, header, header.ShardID())
+	if err != nil {
+		return err
+	}
 
-	// totalAmount = rewarder.Award(
-	// 	wholePie, accounts, func(receipient common.Address, amount *big.Int) {
-	// 		payable = append(payable, struct {
-	// 			string
-	// 			common.Address
-	// 			*big.Int
-	// 		}{common2.MustAddressToBech32(receipient), receipient, amount},
-	// 		)
-	// 	},
-	// )
+	totalAmount := rewarder.Award(
+		BlockReward, signers, func(receipient common.Address, amount *big.Int) {
+			payable = append(payable, struct {
+				string
+				common.Address
+				*big.Int
+			}{common2.MustAddressToBech32(receipient), receipient, amount},
+			)
+		},
+	)
 
-	// if totalAmount.Equal(BlockReward) == false {
-	// 	utils.Logger().Error().
-	// 		Int64("block-reward", BlockReward.Int64()).
-	// 		Int64("total-amount-paid-out", totalAmount.Int64()).
-	// 		Msg("Total paid out was not equal to block-reward")
-	// 	return errors.Wrapf(
-	// 		errPayoutNotEqualBlockReward, "payout "+totalAmount.String(),
-	// 	)
-	// }
-	// signers := make([]string, len(payable))
+	if totalAmount.Equal(BlockReward) == false {
+		utils.Logger().Error().
+			Int64("block-reward", BlockReward.Int64()).
+			Int64("total-amount-paid-out", totalAmount.Int64()).
+			Msg("Total paid out was not equal to block-reward")
+		return errors.Wrapf(
+			errPayoutNotEqualBlockReward, "payout "+totalAmount.String(),
+		)
+	}
 
-	// for i := range payable {
-	// 	signers[i] = payable[i].string
-	// 	state.AddBalance(payable[i].Address, payable[i].Int)
-	// }
+	for i := range payable {
+		state.AddBalance(payable[i].Address, payable[i].Int)
+	}
 
-	// header.Logger(utils.Logger()).Debug().
-	// 	Int("NumAccounts", len(accounts)).
-	// 	Str("TotalAmount", totalAmount.String()).
-	// 	Strs("Signers", signers).
-	// 	Msg("[Block Reward] Successfully paid out block reward")
-	// } else {
-	// 	// TODO Beaconchain is still a shard, so need take care of my own committee (same logic %staked
-	// 	// vote payout)
-
-	// }
+	header.Logger(utils.Logger()).Debug().
+		Int("NumAccounts", len(payable)).
+		Str("TotalAmount", totalAmount.String()).
+		Msg("[Block Reward] Successfully paid out block reward")
 
 	return nil
 }
