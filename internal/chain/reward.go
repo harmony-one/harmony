@@ -32,7 +32,8 @@ var (
 	BlockRewardStakedCase = numeric.NewDecFromBigInt(new(big.Int).Mul(
 		big.NewInt(18), big.NewInt(denominations.One),
 	))
-
+	totalTokens                  = numeric.NewDec(12600000000)
+	targetStakedPercentage       = numeric.MustNewDecFromStr("0.35")
 	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
 )
 
@@ -119,6 +120,28 @@ func ballotResultBeaconchain(
 	bc engine.ChainReader, header *block.Header,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
 	return ballotResult(bc, header, shard.BeaconChainShardID)
+}
+
+func whatPercentStakedNow(
+	beaconchain engine.ChainReader,
+) (*numeric.Dec, error) {
+	stakedNow := numeric.ZeroDec()
+	active, err := beaconchain.ReadActiveValidatorList()
+
+	if err != nil {
+		return nil, err
+	}
+	for i := range active {
+		wrapper, err := beaconchain.ReadValidatorData(active[i])
+		if err != nil {
+			return nil, err
+		}
+		stakedNow = stakedNow.Add(
+			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
+		)
+	}
+	percentage := stakedNow.Quo(totalTokens)
+	return &percentage, nil
 }
 
 // AccumulateRewards credits the coinbase of the given block with the mining
