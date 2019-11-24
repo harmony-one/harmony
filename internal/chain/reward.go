@@ -37,6 +37,52 @@ var (
 	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
 )
 
+func blockSigners(
+	header *block.Header, parentCommittee *shard.Committee,
+) (shard.SlotList, shard.SlotList, error) {
+	committerKeys := []*bls.PublicKey{}
+
+	for _, member := range parentCommittee.Slots {
+		committerKey := new(bls.PublicKey)
+		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+		if err != nil {
+			return nil, nil, ctxerror.New(
+				"cannot convert BLS public key",
+				"blsPublicKey",
+				member.BlsPublicKey,
+			).WithCause(err)
+		}
+		committerKeys = append(committerKeys, committerKey)
+	}
+	mask, err := bls2.NewMask(committerKeys, nil)
+	if err != nil {
+		return nil, nil, ctxerror.New(
+			"cannot create group sig mask",
+		).WithCause(err)
+	}
+	if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
+		return nil, nil, ctxerror.New(
+			"cannot set group sig mask bits",
+		).WithCause(err)
+	}
+
+	payable, missing := shard.SlotList{}, shard.SlotList{}
+
+	for idx, member := range parentCommittee.Slots {
+		switch signed, err := mask.IndexEnabled(idx); true {
+		case err != nil:
+			return nil, nil, ctxerror.New("cannot check for committer bit",
+				"committerIndex", idx,
+			).WithCause(err)
+		case signed:
+			payable = append(payable, member)
+		default:
+			missing = append(missing, member)
+		}
+	}
+	return payable, missing, nil
+}
+
 func ballotResult(
 	bc engine.ChainReader, header *block.Header, shardID uint32,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
@@ -69,47 +115,8 @@ func ballotResult(
 			"shardID", parentHeader.ShardID(),
 		)
 	}
-
-	committerKeys := []*bls.PublicKey{}
-	for _, member := range parentCommittee.Slots {
-		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, nil, nil, ctxerror.New(
-				"cannot convert BLS public key",
-				"blsPublicKey",
-				member.BlsPublicKey,
-			).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	mask, err := bls2.NewMask(committerKeys, nil)
-	if err != nil {
-		return nil, nil, nil, ctxerror.New(
-			"cannot create group sig mask",
-		).WithCause(err)
-	}
-	if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
-		return nil, nil, nil, ctxerror.New(
-			"cannot set group sig mask bits",
-		).WithCause(err)
-	}
-
-	payable, missing := shard.SlotList{}, shard.SlotList{}
-
-	for idx, member := range parentCommittee.Slots {
-		switch signed, err := mask.IndexEnabled(idx); true {
-		case err != nil:
-			return nil, nil, nil, ctxerror.New("cannot check for committer bit",
-				"committerIndex", idx,
-			).WithCause(err)
-		case signed:
-			payable = append(payable, member)
-		default:
-			missing = append(missing, member)
-		}
-	}
-	return parentCommittee.Slots, payable, missing, nil
+	payable, missing, err := blockSigners(parentHeader, parentCommittee)
+	return parentCommittee.Slots, payable, missing, err
 }
 
 func ballotResultBeaconchain(
@@ -205,6 +212,9 @@ func AccumulateRewards(
 						fmt.Println("oops", cxLink.ShardID(), subCommittee.JSON())
 					}
 
+					// signers, missing, err := blockSigners(cxLink.Header(), subComm)
+					// votingPower := votepower.Compute(subComm.Slots)
+
 					// Assume index is 1-1 for these []s
 					stakers, publicKeys := subComm.Slots.OnlyStaked()
 					mask, err := bls2.NewMask(publicKeys, nil)
@@ -265,13 +275,16 @@ func AccumulateRewards(
 			}
 			// Enforce order
 			sort.SliceStable(resultsHandle,
-				func(i, j int) bool { return resultsHandle[i].nonce < resultsHandle[j].nonce },
+				func(i, j int) bool {
+					return resultsHandle[i].nonce < resultsHandle[j].nonce
+				},
 			)
 
 			// Finally do the pay
 			for payThem := range resultsHandle {
 				state.AddBalance(
-					resultsHandle[payThem].payee, resultsHandle[payThem].effective.TruncateInt(),
+					resultsHandle[payThem].payee,
+					resultsHandle[payThem].effective.TruncateInt(),
 				)
 			}
 		}
