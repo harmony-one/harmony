@@ -1,20 +1,24 @@
 package chain
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/types"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
@@ -22,7 +26,12 @@ import (
 
 var (
 	// BlockReward is the block reward, to be split evenly among block signers.
-	BlockReward                  = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
+	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
+	// BlockRewardStakedCase is the baseline block reward in staked case -
+	BlockRewardStakedCase = numeric.NewDecFromBigInt(new(big.Int).Mul(
+		big.NewInt(18), big.NewInt(denominations.One),
+	))
+
 	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
 )
 
@@ -30,10 +39,86 @@ var (
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
 func AccumulateRewards(
-	bc engine.ChainReader, state *state.DB,
-	header *block.Header, rewarder reward.Distributor,
-	slasher slash.Slasher,
+	bc engine.ChainReader, state *state.DB, header *block.Header,
+	rewarder reward.Distributor, slasher slash.Slasher,
+	beaconChain engine.ChainReader,
 ) error {
+
+	// Handle rewards for shardchain
+	if cxLinks := header.CrossLinks(); len(cxLinks) != 0 {
+		crossLinks := types.CrossLinks{}
+		err := rlp.DecodeBytes(cxLinks, &crossLinks)
+		if err != nil {
+			fmt.Println("cross-link-error", err)
+			return err
+		}
+
+		w := sync.WaitGroup{}
+
+		type slotPayable struct {
+			common.Address
+			numeric.Dec
+		}
+
+		payable := make(chan slotPayable)
+
+		for i := range crossLinks {
+			w.Add(1)
+
+			go func(i int) {
+				defer w.Done()
+				cxLink := crossLinks[i]
+				subCommittee := shard.State{}
+				if err := rlp.DecodeBytes(
+					cxLink.ChainHeader.ShardState(), &subCommittee,
+				); err != nil {
+					//
+					// return err
+				}
+
+				subComm := subCommittee.FindCommitteeByID(cxLink.ShardID())
+				// Assume index is 1-1 for these []s
+				stakers, publicKeys := subComm.Slots.OnlyStaked()
+				mask, err := bls2.NewMask(publicKeys, nil)
+				if err != nil {
+					// return err
+				}
+				commitBitmap := cxLink.Header().LastCommitBitmap()
+
+				if err := mask.SetMask(commitBitmap); err != nil {
+					// return ctxerror.New("cannot set group sig mask bits").WithCause(err)
+				}
+
+				totalAmount := numeric.ZeroDec()
+
+				for j := range stakers {
+					totalAmount = totalAmount.Add(*stakers[j].StakeWithDelegationApplied)
+				}
+
+				for j := range stakers {
+					switch signed, err := mask.IndexEnabled(j); true {
+					case err != nil:
+						// return ctxerror.New(
+						// 	"cannot check for committer bit", "committerIndex", j,
+						// ).WithCause(err)
+					case signed:
+						go func(signersDue numeric.Dec, addr common.Address) {
+							payable <- slotPayable{addr, signersDue}
+						}((*stakers[j].StakeWithDelegationApplied).Quo(
+							totalAmount,
+						).Mul(BlockRewardStakedCase), stakers[j].EcdsaAddress)
+					}
+				}
+			}(i)
+		}
+
+		w.Wait()
+		for payThem := range payable {
+			state.AddBalance(payThem.Address, payThem.TruncateInt())
+		}
+
+	}
+
 	blockNum := header.Number().Uint64()
 	if blockNum == 0 {
 		// Epoch block has no parent to reward.

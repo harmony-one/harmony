@@ -181,6 +181,22 @@ func (l SlotList) DeepCopy() SlotList {
 	return append(l[:0:0], l...)
 }
 
+// OnlyStaked returns non-harmony node
+func (l SlotList) OnlyStaked() (SlotList, []*bls.PublicKey) {
+	staked := SlotList{}
+	pKeys := []*bls.PublicKey{}
+
+	for i := range l {
+		if mem := l[i]; mem.StakeWithDelegationApplied != nil {
+			key := new(bls.PublicKey)
+			mem.BlsPublicKey.ToLibBLSPublicKey(key)
+			staked = append(staked, mem)
+			pKeys = append(pKeys, key)
+		}
+	}
+	return staked, pKeys
+}
+
 // CompareNodeIDList compares two node ID lists.
 func CompareNodeIDList(l1, l2 SlotList) int {
 	commonLen := len(l1)
