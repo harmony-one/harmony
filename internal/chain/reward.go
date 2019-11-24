@@ -207,44 +207,20 @@ func AccumulateRewards(
 					}
 
 					subComm := subCommittee.FindCommitteeByID(cxLink.ShardID())
+					// _ are the missing signers, later for slashing
+					payableSigners, _, err := blockSigners(cxLink.Header(), subComm)
+					votingPower := votepower.Compute(subComm.Slots)
 
-					if subComm == nil {
-						fmt.Println("oops", cxLink.ShardID(), subCommittee.JSON())
-					}
-
-					// signers, missing, err := blockSigners(cxLink.Header(), subComm)
-					// votingPower := votepower.Compute(subComm.Slots)
-
-					// Assume index is 1-1 for these []s
-					stakers, publicKeys := subComm.Slots.OnlyStaked()
-					mask, err := bls2.NewMask(publicKeys, nil)
 					if err != nil {
 						slotError(err, payable)
 						return
 					}
-					commitBitmap := cxLink.Header().LastCommitBitmap()
 
-					if err := mask.SetMask(commitBitmap); err != nil {
-						slotError(ctxerror.New(
-							"cannot set group sig mask bits",
-						).WithCause(err), payable)
-						return
-					}
-
-					totalAmount := numeric.ZeroDec()
-
-					for j := range stakers {
-						totalAmount = totalAmount.Add(*stakers[j].TotalStake)
-					}
-
-					for j := range stakers {
-						switch signed, err := mask.IndexEnabled(j); true {
-						case err != nil:
-							slotError(ctxerror.New(
-								"cannot check for committer bit", "committerIndex", j,
-							).WithCause(err), payable)
-							return
-						case signed:
+					for member := range payableSigners {
+						voter := votingPower.Voters[payableSigners[member].BlsPublicKey]
+						if !voter.IsHarmonyNode {
+							due := BlockRewardStakedCase.Mul(voter.EffectivePercent)
+							to := voter.EarningAccount
 							go func(signersDue numeric.Dec, addr common.Address, j int) {
 								payable <- slotPayable{
 									effective: signersDue,
@@ -252,9 +228,7 @@ func AccumulateRewards(
 									nonce:     i * (i + j),
 									oops:      nil,
 								}
-							}((*stakers[j].TotalStake).Quo(
-								totalAmount,
-							).Mul(BlockRewardStakedCase), stakers[j].EcdsaAddress, j)
+							}(due, to, member)
 						}
 					}
 				}(i)
