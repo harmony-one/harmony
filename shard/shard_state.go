@@ -187,7 +187,7 @@ func (l SlotList) OnlyStaked() (SlotList, []*bls.PublicKey) {
 	pKeys := []*bls.PublicKey{}
 
 	for i := range l {
-		if mem := l[i]; mem.StakeWithDelegationApplied != nil {
+		if mem := l[i]; mem.TotalStake != nil {
 			key := new(bls.PublicKey)
 			mem.BlsPublicKey.ToLibBLSPublicKey(key)
 			staked = append(staked, mem)

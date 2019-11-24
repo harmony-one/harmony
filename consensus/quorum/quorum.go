@@ -297,12 +297,13 @@ func NewDecider(p Policy) Decider {
 			c.DependencyInjectionWriter, c.DependencyInjectionReader, c,
 		}
 	case SuperMajorityStake:
+		roster := votepower.NewRoster()
 		return &stakedVoteWeight{
 			c.SignatureReader,
 			c.DependencyInjectionWriter,
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
 			c.SignatureReader.(slash.ThresholdDecider),
-			votepower.Roster{},
+			*roster,
 		}
 	default:
 		// Should not be possible

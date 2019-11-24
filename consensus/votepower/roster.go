@@ -31,13 +31,13 @@ type Roster struct {
 
 // Compute ..
 func Compute(staked shard.SlotList) *Roster {
-	roster := &Roster{}
+	roster := NewRoster()
 	for i := range staked {
-		if staked[i].StakeWithDelegationApplied == nil {
+		if staked[i].TotalStake == nil {
 			roster.HmySlotCount++
 		} else {
 			roster.RawStakedTotal = roster.RawStakedTotal.Add(
-				*staked[i].StakeWithDelegationApplied,
+				*staked[i].TotalStake,
 			)
 		}
 	}
@@ -56,9 +56,9 @@ func Compute(staked shard.SlotList) *Roster {
 		}
 
 		// Real Staker
-		if staked[i].StakeWithDelegationApplied != nil {
+		if staked[i].TotalStake != nil {
 			member.IsHarmonyNode = false
-			member.EffectivePercent = staked[i].StakeWithDelegationApplied.
+			member.EffectivePercent = staked[i].TotalStake.
 				Quo(roster.RawStakedTotal).
 				Mul(StakersShare)
 			theirPercentage = theirPercentage.Add(member.EffectivePercent)
@@ -76,4 +76,15 @@ func Compute(staked shard.SlotList) *Roster {
 
 	return roster
 
+}
+
+// NewRoster ..
+func NewRoster() *Roster {
+	return &Roster{
+		map[shard.BlsPublicKey]stakedVoter{},
+		numeric.ZeroDec(),
+		numeric.ZeroDec(),
+		numeric.ZeroDec(),
+		0,
+	}
 }

@@ -234,7 +234,7 @@ func AccumulateRewards(
 					totalAmount := numeric.ZeroDec()
 
 					for j := range stakers {
-						totalAmount = totalAmount.Add(*stakers[j].StakeWithDelegationApplied)
+						totalAmount = totalAmount.Add(*stakers[j].TotalStake)
 					}
 
 					for j := range stakers {
@@ -252,7 +252,7 @@ func AccumulateRewards(
 									nonce:     i * (i + j),
 									oops:      nil,
 								}
-							}((*stakers[j].StakeWithDelegationApplied).Quo(
+							}((*stakers[j].TotalStake).Quo(
 								totalAmount,
 							).Mul(BlockRewardStakedCase), stakers[j].EcdsaAddress, j)
 						}
