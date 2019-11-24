@@ -95,14 +95,7 @@ func ballotResult(
 			"parentHash", header.ParentHash(),
 		)
 	}
-
-	if parentHeader.Number().Cmp(common.Big0) == 0 {
-		// Parent is an epoch block,
-		// which is not signed in the usual manner therefore rewards nothing.
-		return shard.SlotList{}, shard.SlotList{}, shard.SlotList{}, nil
-	}
 	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
-
 	if err != nil {
 		return nil, nil, nil, ctxerror.New(
 			"cannot read shard state", "epoch", parentHeader.Epoch(),
