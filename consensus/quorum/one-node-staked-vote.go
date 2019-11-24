@@ -2,7 +2,6 @@ package quorum
 
 import (
 	"encoding/json"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -97,39 +96,41 @@ func (v *stakedVoteWeight) IsRewardThresholdAchieved() bool {
 }
 
 // Award ..
-func (v *stakedVoteWeight) Award(
-	Pie *big.Int, earners []common.Address, hook func(earner common.Address, due *big.Int),
-) *big.Int {
-	payout := big.NewInt(0)
-	last := big.NewInt(0)
-	count := big.NewInt(int64(len(earners)))
-	// proportional := map[common.Address]numeric.Dec{}
+// func (v *stakedVoteWeight) Award(
+// 	Pie numeric.Dec,
+// 	earners []common.Address,
+// 	hook func(earner common.Address, due *big.Int),
+// ) numeric.Dec {
+// 	payout := big.NewInt(0)
+// 	last := big.NewInt(0)
+// 	count := big.NewInt(int64(len(earners)))
+// 	// proportional := map[common.Address]numeric.Dec{}
 
-	for _, voter := range v.voters {
-		if voter.isHarmonyNode == false {
-			// proportional[details.earningAccount] = details.effective.QuoTruncate(
-			// 	v.stakedTotal,
-			// )
-		}
-	}
-	// TODO Finish implementing this logic w/Chao
+// 	for _, voter := range v.voters {
+// 		if voter.isHarmonyNode == false {
+// 			// proportional[details.earningAccount] = details.effective.QuoTruncate(
+// 			// 	v.stakedTotal,
+// 			// )
+// 		}
+// 	}
+// 	// TODO Finish implementing this logic w/Chao
 
-	for i := range earners {
-		cur := big.NewInt(0)
+// 	for i := range earners {
+// 		cur := big.NewInt(0)
 
-		cur.Mul(Pie, big.NewInt(int64(i+1))).Div(cur, count)
+// 		cur.Mul(Pie, big.NewInt(int64(i+1))).Div(cur, count)
 
-		diff := big.NewInt(0).Sub(cur, last)
+// 		diff := big.NewInt(0).Sub(cur, last)
 
-		// hook(common.Address(account), diff)
+// 		// hook(common.Address(account), diff)
 
-		payout = big.NewInt(0).Add(payout, diff)
+// 		payout = big.NewInt(0).Add(payout, diff)
 
-		last = cur
-	}
+// 		last = cur
+// 	}
 
-	return payout
-}
+// 	return payout
+// }
 
 var (
 	errSumOfVotingPowerNotOne   = errors.New("sum of total votes do not sum to 100 percent")

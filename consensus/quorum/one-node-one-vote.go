@@ -60,22 +60,25 @@ func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
 func (v *uniformVoteWeight) Award(
 	// Here hook is the callback which gets the amount the earner is due in just reward
 	// up to the hook to do side-effects like write the statedb
-	Pie *big.Int, earners []common.Address, hook func(earner common.Address, due *big.Int),
-) *big.Int {
+	Pie numeric.Dec,
+	earners []common.Address,
+	hook func(earner common.Address, due *big.Int),
+) numeric.Dec {
 	payout := big.NewInt(0)
 	last := big.NewInt(0)
 	count := big.NewInt(int64(len(earners)))
+	pie := Pie.TruncateInt()
 
 	for i, account := range earners {
 		cur := big.NewInt(0)
-		cur.Mul(Pie, big.NewInt(int64(i+1))).Div(cur, count)
+		cur.Mul(pie, big.NewInt(int64(i+1))).Div(cur, count)
 		diff := big.NewInt(0).Sub(cur, last)
 		hook(common.Address(account), diff)
 		payout = big.NewInt(0).Add(payout, diff)
 		last = cur
 	}
 
-	return payout
+	return numeric.NewDecFromBigInt(payout)
 }
 
 func (v *uniformVoteWeight) ShouldSlash(k shard.BlsPublicKey) bool {

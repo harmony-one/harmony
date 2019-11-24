@@ -26,7 +26,9 @@ import (
 
 var (
 	// BlockReward is the block reward, to be split evenly among block signers.
-	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
+	BlockReward = numeric.NewDecFromBigInt(
+		new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One)),
+	)
 	// BlockRewardStakedCase is the baseline block reward in staked case -
 	BlockRewardStakedCase = numeric.NewDecFromBigInt(new(big.Int).Mul(
 		big.NewInt(18), big.NewInt(denominations.One),
@@ -44,79 +46,93 @@ func AccumulateRewards(
 	beaconChain engine.ChainReader,
 ) error {
 
-	// Handle rewards for shardchain
-	if cxLinks := header.CrossLinks(); len(cxLinks) != 0 {
-		crossLinks := types.CrossLinks{}
-		err := rlp.DecodeBytes(cxLinks, &crossLinks)
-		if err != nil {
-			fmt.Println("cross-link-error", err)
-			return err
-		}
+	if bc.Config().IsStaking(header.Epoch()) &&
+		bc.CurrentHeader().ShardID() != shard.BeaconChainShardID {
+		return nil
+	}
 
-		w := sync.WaitGroup{}
+	if bc.Config().IsStaking(header.Epoch()) &&
+		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 
-		type slotPayable struct {
-			common.Address
-			numeric.Dec
-		}
+		// Handle rewards for shardchain
+		if cxLinks := header.CrossLinks(); len(cxLinks) != 0 {
+			crossLinks := types.CrossLinks{}
+			err := rlp.DecodeBytes(cxLinks, &crossLinks)
+			if err != nil {
+				fmt.Println("cross-link-error", err)
+				return err
+			}
 
-		payable := make(chan slotPayable)
+			w := sync.WaitGroup{}
 
-		for i := range crossLinks {
-			w.Add(1)
+			type slotPayable struct {
+				common.Address
+				numeric.Dec
+			}
 
-			go func(i int) {
-				defer w.Done()
-				cxLink := crossLinks[i]
-				subCommittee := shard.State{}
-				if err := rlp.DecodeBytes(
-					cxLink.ChainHeader.ShardState(), &subCommittee,
-				); err != nil {
-					//
-					// return err
-				}
+			payable := make(chan slotPayable)
 
-				subComm := subCommittee.FindCommitteeByID(cxLink.ShardID())
-				// Assume index is 1-1 for these []s
-				stakers, publicKeys := subComm.Slots.OnlyStaked()
-				mask, err := bls2.NewMask(publicKeys, nil)
-				if err != nil {
-					// return err
-				}
-				commitBitmap := cxLink.Header().LastCommitBitmap()
+			for i := range crossLinks {
+				w.Add(1)
 
-				if err := mask.SetMask(commitBitmap); err != nil {
-					// return ctxerror.New("cannot set group sig mask bits").WithCause(err)
-				}
-
-				totalAmount := numeric.ZeroDec()
-
-				for j := range stakers {
-					totalAmount = totalAmount.Add(*stakers[j].StakeWithDelegationApplied)
-				}
-
-				for j := range stakers {
-					switch signed, err := mask.IndexEnabled(j); true {
-					case err != nil:
-						// return ctxerror.New(
-						// 	"cannot check for committer bit", "committerIndex", j,
-						// ).WithCause(err)
-					case signed:
-						go func(signersDue numeric.Dec, addr common.Address) {
-							payable <- slotPayable{addr, signersDue}
-						}((*stakers[j].StakeWithDelegationApplied).Quo(
-							totalAmount,
-						).Mul(BlockRewardStakedCase), stakers[j].EcdsaAddress)
+				go func(i int) {
+					defer w.Done()
+					cxLink := crossLinks[i]
+					subCommittee := shard.State{}
+					if err := rlp.DecodeBytes(
+						cxLink.ChainHeader.ShardState(), &subCommittee,
+					); err != nil {
+						//
+						// return err
 					}
-				}
-			}(i)
-		}
 
-		w.Wait()
-		for payThem := range payable {
-			state.AddBalance(payThem.Address, payThem.TruncateInt())
-		}
+					subComm := subCommittee.FindCommitteeByID(cxLink.ShardID())
 
+					if subComm == nil {
+						fmt.Println("oops", cxLink.ShardID(), subCommittee.JSON())
+					}
+
+					// Assume index is 1-1 for these []s
+					stakers, publicKeys := subComm.Slots.OnlyStaked()
+					mask, err := bls2.NewMask(publicKeys, nil)
+					if err != nil {
+						// return err
+					}
+					commitBitmap := cxLink.Header().LastCommitBitmap()
+
+					if err := mask.SetMask(commitBitmap); err != nil {
+						// return ctxerror.New("cannot set group sig mask bits").WithCause(err)
+					}
+
+					totalAmount := numeric.ZeroDec()
+
+					for j := range stakers {
+						totalAmount = totalAmount.Add(*stakers[j].StakeWithDelegationApplied)
+					}
+
+					for j := range stakers {
+						switch signed, err := mask.IndexEnabled(j); true {
+						case err != nil:
+							// return ctxerror.New(
+							// 	"cannot check for committer bit", "committerIndex", j,
+							// ).WithCause(err)
+						case signed:
+							go func(signersDue numeric.Dec, addr common.Address) {
+								payable <- slotPayable{addr, signersDue}
+							}((*stakers[j].StakeWithDelegationApplied).Quo(
+								totalAmount,
+							).Mul(BlockRewardStakedCase), stakers[j].EcdsaAddress)
+						}
+					}
+				}(i)
+			}
+
+			w.Wait()
+			for payThem := range payable {
+				state.AddBalance(payThem.Address, payThem.TruncateInt())
+			}
+
+		}
 	}
 
 	blockNum := header.Number().Uint64()
@@ -184,59 +200,70 @@ func AccumulateRewards(
 		}
 	}
 
-	// do it quickly
-	w := sync.WaitGroup{}
-	for i := range missing {
-		w.Add(1)
-		go func(member int) {
-			defer w.Done()
-			// Slash if missing block was long enough
-			if slasher.ShouldSlash(missing[member].BlsPublicKey) {
-				// TODO Logic
-			}
-		}(i)
-	}
+	// do it quickly, // TODO come back to this(slashing)
+	// w := sync.WaitGroup{}
+	// for i := range missing {
+	// 	w.Add(1)
+	// 	go func(member int) {
+	// 		defer w.Done()
+	// 		// Slash if missing block was long enough
+	// 		if slasher.ShouldSlash(missing[member].BlsPublicKey) {
+	// 			// TODO Logic
+	// 		}
+	// 	}(i)
+	// }
 
-	w.Wait()
+	// w.Wait()
 
-	payable := []struct {
-		string
-		common.Address
-		*big.Int
-	}{}
+	wholePie := BlockRewardStakedCase
+	totalAmount := numeric.ZeroDec()
 
-	totalAmount := rewarder.Award(
-		BlockReward, accounts, func(receipient common.Address, amount *big.Int) {
-			payable = append(payable, struct {
-				string
-				common.Address
-				*big.Int
-			}{
-				common2.MustAddressToBech32(receipient), receipient, amount,
+	// Legacy logic
+	if bc.Config().IsStaking(header.Epoch()) == false {
+		wholePie = BlockReward
+		payable := []struct {
+			string
+			common.Address
+			*big.Int
+		}{}
+
+		totalAmount = rewarder.Award(
+			wholePie, accounts, func(receipient common.Address, amount *big.Int) {
+				payable = append(payable, struct {
+					string
+					common.Address
+					*big.Int
+				}{common2.MustAddressToBech32(receipient), receipient, amount},
+				)
 			},
+		)
+
+		if totalAmount.Equal(BlockReward) == false {
+			utils.Logger().Error().
+				Int64("block-reward", BlockReward.Int64()).
+				Int64("total-amount-paid-out", totalAmount.Int64()).
+				Msg("Total paid out was not equal to block-reward")
+			return errors.Wrapf(
+				errPayoutNotEqualBlockReward, "payout "+totalAmount.String(),
 			)
-		},
-	)
+		}
+		signers := make([]string, len(payable))
 
-	if totalAmount.Cmp(BlockReward) != 0 {
-		utils.Logger().Error().
-			Int64("block-reward", BlockReward.Int64()).
-			Int64("total-amount-paid-out", totalAmount.Int64()).
-			Msg("Total paid out was not equal to block-reward")
-		return errors.Wrapf(errPayoutNotEqualBlockReward, "payout "+totalAmount.String())
+		for i := range payable {
+			signers[i] = payable[i].string
+			state.AddBalance(payable[i].Address, payable[i].Int)
+		}
+
+		header.Logger(utils.Logger()).Debug().
+			Int("NumAccounts", len(accounts)).
+			Str("TotalAmount", totalAmount.String()).
+			Strs("Signers", signers).
+			Msg("[Block Reward] Successfully paid out block reward")
+	} else {
+		// TODO Beaconchain is still a shard, so need take care of my own committee (same logic %staked
+		// vote payout)
+
 	}
 
-	signers := make([]string, len(payable))
-
-	for i := range payable {
-		signers[i] = payable[i].string
-		state.AddBalance(payable[i].Address, payable[i].Int)
-	}
-
-	header.Logger(utils.Logger()).Debug().
-		Int("NumAccounts", len(accounts)).
-		Str("TotalAmount", totalAmount.String()).
-		Strs("Signers", signers).
-		Msg("[Block Reward] Successfully paid out block reward")
 	return nil
 }
