@@ -290,26 +290,36 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 		nextCommittee shard.State
 		oops          error
 	)
-	// WARN This currently not working and breaks around 15 block
-	// switch shardID {
-	// case shard.BeaconChainShardID:
-	if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
-		nextCommittee, oops = committee.WithStakingEnabled.Compute(
-			new(big.Int).Add(w.current.header.Epoch(), common.Big1),
-			*w.config,
-			beacon,
-		)
-	}
-	// default:
-	// WARN When we first enable staking, this condition may not be robust by itself.
-	// 	switch beacon.CurrentHeader().Epoch().Cmp(w.current.header.Epoch()) {
-	// 	case 1:
-	// 		nextCommittee, oops = committee.WithStakingEnabled.ReadFromDB(
-	// 			beacon.CurrentHeader().Epoch(), beacon,
-	// 		)
-	// 	}
+	switch shardID {
+	case shard.BeaconChainShardID:
+		if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
+			nextCommittee, oops = committee.WithStakingEnabled.Compute(
+				new(big.Int).Add(w.current.header.Epoch(), common.Big1),
+				w.config,
+				beacon,
+			)
+		}
+	default:
+		// WARN When we first enable staking, this condition may not be robust by itself.
 
-	// }
+		if w.config.IsStaking(w.current.header.Epoch()) {
+			switch beacon.CurrentHeader().Epoch().Cmp(w.current.header.Epoch()) {
+			case 1:
+				nextCommittee, oops = committee.WithStakingEnabled.ReadFromDB(
+					beacon.CurrentHeader().Epoch(), beacon,
+				)
+			}
+		} else {
+			if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
+				nextCommittee, oops = committee.WithStakingEnabled.Compute(
+					new(big.Int).Add(w.current.header.Epoch(), common.Big1),
+					w.config,
+					beacon,
+				)
+			}
+		}
+
+	}
 	return nextCommittee, oops
 }
 

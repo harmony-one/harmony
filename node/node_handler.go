@@ -133,7 +133,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
 									Uint64("block", blocks[0].NumberU64()).
-									Msgf("Block being handled by block channel %d %d", block.NumberU64(), block.ShardID())
+									Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
 								node.BeaconBlockChannel <- block
 							}
 						}
@@ -159,10 +159,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			}
 		case proto_node.PING:
 			node.pingMessageHandler(msgPayload, sender)
-		case proto_node.ShardState:
-			if err := node.epochShardStateMessageHandler(msgPayload); err != nil {
-				utils.Logger().Warn().Err(err)
-			}
 		}
 	default:
 		utils.Logger().Error().
@@ -378,8 +374,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			}
 		}
 	}
+
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
-	if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
+	if len(newBlock.Header().ShardState()) > 0 {
 		next := new(big.Int).Add(newBlock.Epoch(), common.Big1)
 		if node.chainConfig.StakingEpoch.Cmp(next) == 0 &&
 			node.Consensus.Decider.Policy() != quorum.SuperMajorityStake {
@@ -388,7 +385,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 				return node.Consensus.ShardID, nil
 			})
 			s, _ := committee.WithStakingEnabled.Compute(
-				next, node.chainConfig, node.Consensus.ChainReader,
+				next, &node.chainConfig, node.Consensus.ChainReader,
 			)
 
 			prevSubCommitteeDump := node.Consensus.Decider.JSON()

@@ -14,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -25,9 +24,9 @@ const (
 	Transaction MessageType = iota
 	Block
 	Client
-	_    // used to be Control
-	PING // node send ip/pki to register with leader
-	ShardState
+	_          // used to be Control
+	PING       // node send ip/pki to register with leader
+	ShardState // Deprecated
 	Staking
 )
 
@@ -158,36 +157,6 @@ func ConstructCrossLinkHeadersMessage(headers []*block.Header) []byte {
 	headersData, _ := rlp.EncodeToBytes(headers)
 	byteBuffer.Write(headersData)
 	return byteBuffer.Bytes()
-}
-
-// ConstructEpochShardStateMessage contructs epoch shard state message
-func ConstructEpochShardStateMessage(epochShardState shard.EpochShardState) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(ShardState))
-
-	encoder := gob.NewEncoder(byteBuffer)
-	err := encoder.Encode(epochShardState)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[ConstructEpochShardStateMessage] Encode")
-		return nil
-	}
-	return byteBuffer.Bytes()
-}
-
-// DeserializeEpochShardStateFromMessage deserializes the shard state Message from bytes payload
-func DeserializeEpochShardStateFromMessage(payload []byte) (*shard.EpochShardState, error) {
-	epochShardState := new(shard.EpochShardState)
-
-	r := bytes.NewBuffer(payload)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(epochShardState)
-
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[GetEpochShardStateFromMessage] Decode")
-		return nil, fmt.Errorf("Decode epoch shard state Error")
-	}
-
-	return epochShardState, nil
 }
 
 // ConstructCXReceiptsProof constructs cross shard receipts and related proof including

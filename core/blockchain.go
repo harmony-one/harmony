@@ -1177,15 +1177,13 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	}
 
 	// Do bookkeeping for new staking txns
-	if bc.chainConfig.IsStaking(block.Epoch()) {
-		for _, tx := range block.StakingTransactions() {
-			err = bc.UpdateStakingMetaData(tx, root)
-			// keep offchain database consistency with onchain we need revert
-			// but it should not happend unless local database corrupted
-			if err != nil {
-				utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
-				return NonStatTy, err
-			}
+	for _, tx := range block.StakingTransactions() {
+		err = bc.UpdateStakingMetaData(tx, root)
+		// keep offchain database consistency with onchain we need revert
+		// but it should not happend unless local database corrupted
+		if err != nil {
+			utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
+			return NonStatTy, err
 		}
 	}
 
@@ -1973,7 +1971,7 @@ func (bc *BlockChain) GetShardState(epoch *big.Int) (shard.State, error) {
 
 	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
 		shardState, err = committee.WithStakingEnabled.Compute(
-			big.NewInt(GenesisEpoch), *bc.Config(), nil,
+			big.NewInt(GenesisEpoch), bc.Config(), nil,
 		)
 	} else {
 		prevEpoch := new(big.Int).Sub(epoch, common.Big1)
@@ -2642,9 +2640,4 @@ func (bc *BlockChain) ValidatorCandidates() []common.Address {
 // DelegatorsInformation returns up to date information of delegators of a given validator address
 func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Delegation {
 	return make([]*staking.Delegation, 0)
-}
-
-// ValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
-func (bc *BlockChain) ValidatorStakingWithDelegation(addr common.Address) *big.Int {
-	return big.NewInt(0)
 }

@@ -79,7 +79,7 @@ type Backend interface {
 	GetValidatorStats(addr common.Address) *staking.ValidatorStats
 	GetDelegationsByValidator(validator common.Address) []*staking.Delegation
 	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)
-	GetValidatorStakingWithDelegation(addr common.Address) *big.Int
+	GetValidatorSelfDelegation(addr common.Address) *big.Int
 }
 
 // GetAPIs returns all the APIs.
