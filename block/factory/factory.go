@@ -30,11 +30,11 @@ func NewFactory(chainConfig *params.ChainConfig) Factory {
 func (f *factory) NewHeader(epoch *big.Int) *block.Header {
 	var impl blockif.Header
 	switch {
-	case epoch.Cmp(f.chainConfig.StakingEpoch) >= 0:
+	case f.chainConfig.IsPreStaking(epoch):
 		impl = v3.NewHeader()
-	case epoch.Cmp(f.chainConfig.CrossLinkEpoch) >= 0:
+	case f.chainConfig.IsCrossLink(epoch):
 		impl = v2.NewHeader()
-	case epoch.Cmp(f.chainConfig.CrossTxEpoch) >= 0:
+	case f.chainConfig.IsCrossTx(epoch):
 		impl = v1.NewHeader()
 	default:
 		impl = v0.NewHeader()

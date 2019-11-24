@@ -219,7 +219,7 @@ syncLoop:
 							Msg("Error when adding new block")
 					}
 					stateMutex.Lock()
-					if err := txGen.Worker.UpdateCurrent(block.Coinbase()); err != nil {
+					if err := txGen.Worker.UpdateCurrent(); err != nil {
 						utils.Logger().Warn().Err(err).Msg("(*Worker).UpdateCurrent failed")
 					}
 					stateMutex.Unlock()

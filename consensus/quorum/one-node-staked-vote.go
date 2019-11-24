@@ -150,7 +150,6 @@ func (v *stakedVoteWeight) SetVoters(
 	v.Reset([]Phase{Prepare, Commit, ViewChange})
 
 	roster := votepower.Compute(staked)
-
 	utils.Logger().Info().
 		Str("our-percentage", roster.OurVotingPowerTotalPercentage.String()).
 		Str("their-percentage", roster.TheirVotingPowerTotalPercentage.String()).
