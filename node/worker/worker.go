@@ -288,38 +288,65 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 ) (shard.State, error) {
 	var (
 		nextCommittee shard.State
-		oops          error
+		err           error
 	)
 	switch shardID {
 	case shard.BeaconChainShardID:
 		if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
-			nextCommittee, oops = committee.WithStakingEnabled.Compute(
+			nextCommittee, err = committee.WithStakingEnabled.Compute(
 				new(big.Int).Add(w.current.header.Epoch(), common.Big1),
 				beacon,
 			)
 		}
 	default:
-		// WARN When we first enable staking, this condition may not be robust by itself.
-
 		// TODO: needs to make sure beacon chain sync works.
+		beaconEpoch := beacon.CurrentHeader().Epoch()
 		if w.config.IsStaking(w.current.header.Epoch()) {
-			switch beacon.CurrentHeader().Epoch().Cmp(w.current.header.Epoch()) {
+			switch beaconEpoch.Cmp(w.current.header.Epoch()) {
 			case 1:
-				nextCommittee, oops = committee.WithStakingEnabled.ReadFromDB(
-					beacon.CurrentHeader().Epoch(), beacon,
+				// If beacon chain is bigger than shard chain in epoch, it means I should catch up with beacon chain now
+				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
+					beaconEpoch, beacon,
 				)
+				blockEpoch := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1)) // Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
+				utils.Logger().Debug().
+					Uint64("blockNum", w.current.header.Number().Uint64()).
+					Uint64("myPrevEpoch", w.current.header.Epoch().Uint64()).
+					Uint64("myNewEpoch", blockEpoch.Uint64()).
+					Msg("Propose new epoch as beacon chain's epoch")
+				w.current.header.SetEpoch(blockEpoch)
+
+			case 0:
+				// If it's same epoch, no need to propose new shard state (new epoch change)
+			case -1:
+				// If beacon chain is behind, shard chain should wait for the beacon chain by not changing epochs.
 			}
 		} else {
-			if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
-				nextCommittee, oops = committee.WithStakingEnabled.Compute(
-					new(big.Int).Add(w.current.header.Epoch(), common.Big1),
-					beacon,
+			if w.config.IsStaking(beaconEpoch) {
+				// If beacon is already in staking, but I am not, I should just catch up with beacon chain's epoch
+				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
+					beaconEpoch, beacon,
 				)
+				blockEpoch := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1)) // Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
+				utils.Logger().Debug().
+					Uint64("blockNum", w.current.header.Number().Uint64()).
+					Uint64("myPrevEpoch", w.current.header.Epoch().Uint64()).
+					Uint64("myNewEpoch", blockEpoch.Uint64()).
+					Msg("Propose one-time catch up with beacon chain's epoch")
+				w.current.header.SetEpoch(blockEpoch)
+			} else {
+				// If both beacon and I are not in staking, do pre-staking committee calculation
+				if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
+					nextCommittee, err = committee.WithStakingEnabled.Compute(
+						new(big.Int).Add(w.current.header.Epoch(), common.Big1),
+						w.chain,
+					)
+				}
 			}
 		}
 
 	}
-	return nextCommittee, oops
+	return nextCommittee, err
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.

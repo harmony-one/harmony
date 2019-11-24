@@ -278,17 +278,20 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
 	txPoolLimit := 1000 // TODO: incorporate staking txn into TxPool
-	node.pendingStakingTxMutex.Lock()
-	for _, tx := range newStakingTxs {
-		if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
-			node.pendingStakingTransactions[tx.Hash()] = tx
+
+	if node.Blockchain().Config().IsPreStaking(node.Worker.GetNewEpoch()) {
+		node.pendingStakingTxMutex.Lock()
+		for _, tx := range newStakingTxs {
+			if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
+				node.pendingStakingTransactions[tx.Hash()] = tx
+			}
+			if len(node.pendingStakingTransactions) > txPoolLimit {
+				break
+			}
 		}
-		if len(node.pendingStakingTransactions) > txPoolLimit {
-			break
-		}
+		utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingStakingTransactions)).Msg("Got more staking transactions")
+		node.pendingStakingTxMutex.Unlock()
 	}
-	utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingStakingTransactions)).Msg("Got more staking transactions")
-	node.pendingStakingTxMutex.Unlock()
 }
 
 // AddPendingStakingTransaction staking transactions
@@ -490,8 +493,8 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		epoch, node.Consensus.ChainReader,
 	)
 	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
-		shardState,
-	)[int(shardID)]
+		shardState.FindCommitteeByID(shardID),
+	)
 	if len(pubKeys) == 0 {
 		utils.Logger().Error().
 			Uint32("shardID", shardID).

@@ -342,7 +342,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
 		utils.Logger().Info().
-			Uint64("BlockNum", newBlock.NumberU64()).
+			Uint64("blockNum", newBlock.NumberU64()).
+			Uint64("epochNum", newBlock.Epoch().Uint64()).
+			Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
+			Str("blockHash", newBlock.Hash().String()).
+			Int("numTxns", len(newBlock.Transactions())).
+			Int("numStakingTxns", len(newBlock.StakingTransactions())).
 			Msg("BINGO !!! Reached Consensus")
 		// 15% of the validator also need to do broadcasting
 		rand.Seed(time.Now().UTC().UnixNano())

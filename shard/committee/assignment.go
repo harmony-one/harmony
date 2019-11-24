@@ -8,7 +8,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -22,19 +21,11 @@ type ValidatorListProvider interface {
 		epoch *big.Int, reader DataProvider,
 	) (shard.State, error)
 	ReadFromDB(epoch *big.Int, reader DataProvider) (shard.State, error)
-}
-
-// PublicKeysProvider per epoch
-type PublicKeysProvider interface {
-	GetCommitteePublicKeys(superComm shard.State) [][]*bls.PublicKey
-	ReadPublicKeysFromDB(
-		hash common.Hash, reader DataProvider,
-	) ([]*bls.PublicKey, error)
+	GetCommitteePublicKeys(committee *shard.Committee) []*bls.PublicKey
 }
 
 // Reader is committee.Reader and it is the API that committee membership assignment needs
 type Reader interface {
-	PublicKeysProvider
 	ValidatorListProvider
 }
 
@@ -187,52 +178,17 @@ func eposStakedCommittee(
 	return superComm, nil
 }
 
-// GetCommitteePublicKeys produces publicKeys of entire supercommittee per epoch
-func (def partialStakingEnabled) GetCommitteePublicKeys(superComm shard.State) [][]*bls.PublicKey {
-	allIdentities := make([][]*bls.PublicKey, len(superComm))
+// GetCommitteePublicKeys returns the public keys of a shard
+func (def partialStakingEnabled) GetCommitteePublicKeys(committee *shard.Committee) []*bls.PublicKey {
+	allIdentities := make([]*bls.PublicKey, len(committee.Slots))
 
-	for i := range superComm {
-		allIdentities[i] = make([]*bls.PublicKey, len(superComm[i].Slots))
-		for j := range superComm[i].Slots {
-			identity := &bls.PublicKey{}
-			superComm[i].Slots[j].BlsPublicKey.ToLibBLSPublicKey(identity)
-			allIdentities[i][j] = identity
-		}
+	for i := range committee.Slots {
+		identity := &bls.PublicKey{}
+		committee.Slots[i].BlsPublicKey.ToLibBLSPublicKey(identity)
+		allIdentities[i] = identity
 	}
 
 	return allIdentities
-}
-
-func (def partialStakingEnabled) ReadPublicKeysFromDB(
-	h common.Hash, reader DataProvider,
-) ([]*bls.PublicKey, error) {
-	header := reader.GetHeaderByHash(h)
-	shardID := header.ShardID()
-	superCommittee, err := reader.ReadShardState(header.Epoch())
-	if err != nil {
-		return nil, err
-	}
-	subCommittee := superCommittee.FindCommitteeByID(shardID)
-	if subCommittee == nil {
-		return nil, ctxerror.New("cannot find shard in the shard state",
-			"blockNumber", header.Number(),
-			"shardID", header.ShardID(),
-		)
-	}
-	committerKeys := []*bls.PublicKey{}
-
-	for i := range subCommittee.Slots {
-		committerKey := new(bls.PublicKey)
-		err := subCommittee.Slots[i].BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", subCommittee.Slots[i].BlsPublicKey).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	return committerKeys, nil
-
-	return nil, nil
 }
 
 func (def partialStakingEnabled) ReadFromDB(

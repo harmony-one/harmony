@@ -78,6 +78,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	coinbase := node.Consensus.SelfAddress
+	node.Worker.UpdateCurrent(coinbase)
 
 	// Prepare transactions including staking transactions
 	pending, err := node.TxPool.Pending()
@@ -88,14 +89,16 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// TODO: integrate staking transaction into tx pool
 	pendingStakingTransactions := types2.StakingTransactions{}
-	node.pendingStakingTxMutex.Lock()
-	for _, tx := range node.pendingStakingTransactions {
-		pendingStakingTransactions = append(pendingStakingTransactions, tx)
+	// Only process staking transactions after pre-staking epoch happened.
+	if node.Blockchain().Config().IsPreStaking(node.Worker.GetNewEpoch()) {
+		node.pendingStakingTxMutex.Lock()
+		for _, tx := range node.pendingStakingTransactions {
+			pendingStakingTransactions = append(pendingStakingTransactions, tx)
+		}
+		node.pendingStakingTransactions = make(map[common.Hash]*types2.StakingTransaction)
+		node.pendingStakingTxMutex.Unlock()
 	}
-	node.pendingStakingTransactions = make(map[common.Hash]*types2.StakingTransaction)
-	node.pendingStakingTxMutex.Unlock()
 
-	node.Worker.UpdateCurrent(coinbase)
 	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase); err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 		return nil, err
@@ -119,8 +122,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare shard state
+	// NOTE: this will potentially override shard chain's epoch to beacon chain's epoch during staking migration period.
 	shardState, err := node.Worker.SuperCommitteeForNextEpoch(
-		node.Consensus.ShardID, node.Blockchain(),
+		node.Consensus.ShardID, node.Beaconchain(),
 	)
 
 	if err != nil {

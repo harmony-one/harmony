@@ -830,6 +830,7 @@ func (consensus *Consensus) finalizeCommits() {
 
 	utils.Logger().Info().
 		Uint64("blockNum", block.NumberU64()).
+		Uint64("epochNum", block.Epoch().Uint64()).
 		Uint64("ViewId", block.Header().ViewID().Uint64()).
 		Str("blockHash", block.Hash().String()).
 		Int("index", consensus.Decider.IndexOf(consensus.PubKey)).
