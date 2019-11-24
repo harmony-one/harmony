@@ -1,7 +1,6 @@
 package chain
 
 import (
-	"fmt"
 	"math/big"
 	"sort"
 	"sync"
@@ -96,18 +95,21 @@ func ballotResult(
 			"parentHash", header.ParentHash(),
 		)
 	}
+
 	if parentHeader.Number().Cmp(common.Big0) == 0 {
 		// Parent is an epoch block,
 		// which is not signed in the usual manner therefore rewards nothing.
 		return shard.SlotList{}, shard.SlotList{}, shard.SlotList{}, nil
 	}
 	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
+
 	if err != nil {
 		return nil, nil, nil, ctxerror.New(
 			"cannot read shard state", "epoch", parentHeader.Epoch(),
 		).WithCause(err)
 	}
 	parentCommittee := parentShardState.FindCommitteeByID(shardID)
+
 	if parentCommittee == nil {
 		return nil, nil, nil, ctxerror.New(
 			"cannot find shard in the shard state",
@@ -115,13 +117,8 @@ func ballotResult(
 			"shardID", parentHeader.ShardID(),
 		)
 	}
-	payable, missing, err := blockSigners(parentHeader, parentCommittee)
-	fmt.Println(
-		header.Epoch(),
-		header.Number(),
-		shardID,
-		parentShardState.JSON(),
-	)
+
+	payable, missing, err := blockSigners(header, parentCommittee)
 	return parentCommittee.Slots, payable, missing, err
 }
 
@@ -155,7 +152,7 @@ func AccumulateRewards(
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 
 		// Take care of my own beacon chain committee, _ is missing, for slashing
-		members, payable, _, err := ballotResultBeaconchain(bc, header)
+		members, payable, _, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
 			return err
 		}
@@ -177,7 +174,6 @@ func AccumulateRewards(
 			crossLinks := types.CrossLinks{}
 			err := rlp.DecodeBytes(cxLinks, &crossLinks)
 			if err != nil {
-				fmt.Println("cross-link-error", err)
 				return err
 			}
 
@@ -289,9 +285,14 @@ func AccumulateRewards(
 		*big.Int
 	}{}
 
-	_, signers, _, err := ballotResult(bc, header, header.ShardID())
+	parentHeader := bc.GetHeaderByHash(header.ParentHash())
+	if parentHeader.Number().Cmp(common.Big0) == 0 {
+		// Parent is an epoch block,
+		// which is not signed in the usual manner therefore rewards nothing.
+		return nil
+	}
 
-	fmt.Println(len(signers))
+	_, signers, _, err := ballotResult(bc, header, header.ShardID())
 
 	if err != nil {
 		return err
