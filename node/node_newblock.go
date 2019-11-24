@@ -78,7 +78,16 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	coinbase := node.Consensus.SelfAddress
-	node.Worker.UpdateCurrent(coinbase)
+
+	// After staking, all coinbase will be the address of bls pub key
+	if node.Blockchain().Config().IsStaking(node.Worker.GetNewEpoch()) {
+		addr := common.Address{}
+		blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
+		addr.SetBytes(blsPubKeyBytes[:])
+		coinbase = addr
+	}
+
+	node.Worker.UpdateCurrent()
 
 	// Prepare transactions including staking transactions
 	pending, err := node.TxPool.Pending()

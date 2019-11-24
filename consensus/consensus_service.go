@@ -428,15 +428,29 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 		)
 	}
 	committerKey := new(bls.PublicKey)
+	isStaking := consensus.ChainReader.Config().IsStaking(header.Epoch())
 	for _, member := range committee.Slots {
-		if member.EcdsaAddress == header.Coinbase() {
-			err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-			if err != nil {
-				return nil, ctxerror.New("cannot convert BLS public key",
-					"blsPublicKey", member.BlsPublicKey,
-					"coinbaseAddr", header.Coinbase()).WithCause(err)
+		if isStaking {
+			// After staking the coinbase address will be the address of bls public key
+			if utils.GetAddressFromBlsPubKeyBytes(member.BlsPublicKey[:]) == header.Coinbase() {
+				err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+				if err != nil {
+					return nil, ctxerror.New("cannot convert BLS public key",
+						"blsPublicKey", member.BlsPublicKey,
+						"coinbaseAddr", header.Coinbase()).WithCause(err)
+				}
+				return committerKey, nil
 			}
-			return committerKey, nil
+		} else {
+			if member.EcdsaAddress == header.Coinbase() {
+				err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+				if err != nil {
+					return nil, ctxerror.New("cannot convert BLS public key",
+						"blsPublicKey", member.BlsPublicKey,
+						"coinbaseAddr", header.Coinbase()).WithCause(err)
+				}
+				return committerKey, nil
+			}
 		}
 	}
 	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase())
@@ -455,9 +469,10 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	curHeader := consensus.ChainReader.CurrentHeader()
 
-	next := new(big.Int).Add(curHeader.Epoch(), common.Big1)
-	if consensus.ChainReader.Config().IsStaking(next) &&
-		consensus.Decider.Policy() != quorum.SuperMajorityStake {
+	curEpoch := curHeader.Epoch()
+	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
+	if (consensus.ChainReader.Config().IsStaking(nextEpoch) && len(curHeader.ShardState()) > 0 && !consensus.ChainReader.Config().IsStaking(curEpoch)) ||
+		(consensus.ChainReader.Config().IsStaking(curEpoch) && consensus.Decider.Policy() != quorum.SuperMajorityStake) {
 
 		prevSubCommitteeDump := consensus.Decider.JSON()
 
@@ -466,7 +481,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			return consensus.ShardID, nil
 		})
 		s, err := committee.WithStakingEnabled.ReadFromDB(
-			next, consensus.ChainReader,
+			nextEpoch, consensus.ChainReader,
 		)
 
 		if err != nil {
@@ -489,7 +504,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 		utils.Logger().Info().
 			Uint64("block-number", curHeader.Number().Uint64()).
-			Uint64("epoch", curHeader.Epoch().Uint64()).
+			Uint64("curEpoch", curHeader.Epoch().Uint64()).
 			Uint32("shard-id", consensus.ShardID).
 			RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
 			RawJSON("current-subcommittee", []byte(consensus.Decider.JSON())).
@@ -498,12 +513,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	pubKeys := []*bls.PublicKey{}
 	hasError := false
-	header := consensus.ChainReader.CurrentHeader()
-	epoch := header.Epoch()
 
 	// TODO: change GetCommitteePublicKeys to read from DB
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
-		epoch, consensus.ChainReader,
+		curEpoch, consensus.ChainReader,
 	)
 	if err != nil {
 		utils.Logger().Error().
@@ -513,35 +526,35 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		return Syncing
 	}
 
-	curCommittee := curShardState.FindCommitteeByID(header.ShardID())
+	curCommittee := curShardState.FindCommitteeByID(curHeader.ShardID())
 	curPubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
 		curCommittee,
 	)
 	consensus.numPrevPubKeys = len(curPubKeys)
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
-	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
-		// increase epoch by one if it's the last block
-		consensus.SetEpochNum(epoch.Uint64() + 1)
-		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
-			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
+	if len(curHeader.ShardState()) > 0 {
+		// increase curEpoch by one if it's the last block
+		consensus.SetEpochNum(curEpoch.Uint64() + 1)
+		consensus.getLogger().Info().Uint64("headerNum", curHeader.Number().Uint64()).
+			Msg("[UpdateConsensusInformation] Epoch updated for nextEpoch curEpoch")
 
 		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
-			new(big.Int).Add(epoch, common.Big1), consensus.ChainReader,
+			nextEpoch, consensus.ChainReader,
 		)
 		if err != nil {
 			utils.Logger().Error().
 				Err(err).
 				Uint32("shard", consensus.ShardID).
-				Msg("Error retrieving next shard state")
+				Msg("Error retrieving nextEpoch shard state")
 			return Syncing
 		}
 
-		nextCommittee := nextShardState.FindCommitteeByID(header.ShardID())
+		nextCommittee := nextShardState.FindCommitteeByID(curHeader.ShardID())
 		pubKeys = committee.WithStakingEnabled.GetCommitteePublicKeys(
 			nextCommittee,
 		)
 	} else {
-		consensus.SetEpochNum(epoch.Uint64())
+		consensus.SetEpochNum(curEpoch.Uint64())
 		pubKeys = curPubKeys
 	}
 
@@ -558,10 +571,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
 	consensus.UpdatePublicKeys(pubKeys)
 
-	// take care of possible leader change during the epoch
-	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) &&
-		header.Number().Uint64() != 0 {
-		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
+	// take care of possible leader change during the curEpoch
+	if !shard.Schedule.IsLastBlock(curHeader.Number().Uint64()) &&
+		curHeader.Number().Uint64() != 0 {
+		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).
 				Msg("[SYNC] Unable to get leaderPubKey from coinbase")
