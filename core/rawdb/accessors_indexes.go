@@ -22,6 +22,7 @@ import (
 
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
@@ -56,6 +57,20 @@ func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 			utils.Logger().Error().Err(err).Msg("Failed to store transaction lookup entry")
 		}
 	}
+	for i, tx := range block.StakingTransactions() {
+		entry := TxLookupEntry{
+			BlockHash:  block.Hash(),
+			BlockIndex: block.NumberU64(),
+			Index:      uint64(len(block.Transactions()) + i),
+		}
+		data, err := rlp.EncodeToBytes(entry)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("Failed to encode staking transaction lookup entry")
+		}
+		if err := db.Put(txLookupKey(tx.Hash()), data); err != nil {
+			utils.Logger().Error().Err(err).Msg("Failed to store staking transaction lookup entry")
+		}
+	}
 }
 
 // DeleteTxLookupEntry removes all transaction data associated with a hash.
@@ -86,6 +101,34 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 			Str("hash", blockHash.Hex()).
 			Uint64("index", txIndex).
 			Msg("Transaction referenced missing")
+		return nil, common.Hash{}, 0, 0
+	}
+	return tx, blockHash, blockNumber, txIndex
+}
+
+// ReadStakingTransaction retrieves a specific staking transaction from the database, along with
+// its added positional metadata.
+func ReadStakingTransaction(db DatabaseReader, hash common.Hash) (*staking.StakingTransaction, common.Hash, uint64, uint64) {
+	blockHash, blockNumber, txIndex := ReadTxLookupEntry(db, hash)
+	if blockHash == (common.Hash{}) {
+		return nil, common.Hash{}, 0, 0
+	}
+	body := ReadBody(db, blockHash, blockNumber)
+	if body == nil {
+		utils.Logger().Error().
+			Uint64("number", blockNumber).
+			Str("hash", blockHash.Hex()).
+			Uint64("index", txIndex).
+			Msg("block Body referenced missing")
+		return nil, common.Hash{}, 0, 0
+	}
+	tx := body.StakingTransactionAt(int(txIndex))
+	if tx == nil {
+		utils.Logger().Error().
+			Uint64("number", blockNumber).
+			Str("hash", blockHash.Hex()).
+			Uint64("index", txIndex).
+			Msg("StakingTransaction referenced missing")
 		return nil, common.Hash{}, 0, 0
 	}
 	return tx, blockHash, blockNumber, txIndex

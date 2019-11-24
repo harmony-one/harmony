@@ -204,11 +204,54 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	return SubmitTransaction(ctx, s.b, tx)
 }
 
+func (s *PublicTransactionPoolAPI) fillTransactionFields(tx *types.Transaction, fields map[string]interface{}) error {
+	var err error
+	fields["shardID"] = tx.ShardID()
+	var signer types.Signer = types.FrontierSigner{}
+	if tx.Protected() {
+		signer = types.NewEIP155Signer(tx.ChainID())
+	}
+	from, _ := types.Sender(signer, tx)
+	fields["from"] = from
+	fields["to"] = ""
+	if tx.To() != nil {
+		fields["to"], err = internal_common.AddressToBech32(*tx.To())
+		if err != nil {
+			return err
+		}
+		fields["from"], err = internal_common.AddressToBech32(from)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *PublicTransactionPoolAPI) fillStakingTransactionFields(stx *staking.StakingTransaction, fields map[string]interface{}) error {
+	from, err := stx.SenderAddress()
+	if err != nil {
+		return err
+	}
+	fields["sender"], err = internal_common.AddressToBech32(from)
+	if err != nil {
+		return err
+	}
+	fields["type"] = stx.StakingType()
+	return nil
+}
+
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
 func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
-	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash)
+	var tx *types.Transaction
+	var stx *staking.StakingTransaction
+	var blockHash common.Hash
+	var blockNumber, index uint64
+	tx, blockHash, blockNumber, index = rawdb.ReadTransaction(s.b.ChainDb(), hash)
 	if tx == nil {
-		return nil, nil
+		stx, blockHash, blockNumber, index = rawdb.ReadStakingTransaction(s.b.ChainDb(), hash)
+		if stx == nil {
+			return nil, nil
+		}
 	}
 	receipts, err := s.b.GetReceipts(ctx, blockHash)
 	if err != nil {
@@ -218,33 +261,23 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		return nil, nil
 	}
 	receipt := receipts[index]
-
-	var signer types.Signer = types.FrontierSigner{}
-	if tx.Protected() {
-		signer = types.NewEIP155Signer(tx.ChainID())
-	}
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
 		"blockNumber":       hexutil.Uint64(blockNumber),
 		"transactionHash":   hash,
 		"transactionIndex":  hexutil.Uint64(index),
-		"shardID":           tx.ShardID(),
 		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
 		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
 		"contractAddress":   nil,
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
 	}
-	from, _ := types.Sender(signer, tx)
-	fields["from"] = from
-	fields["to"] = ""
-	if tx.To() != nil {
-		fields["to"], err = internal_common.AddressToBech32(*tx.To())
-		if err != nil {
+	if tx != nil {
+		if err = s.fillTransactionFields(tx, fields); err != nil {
 			return nil, err
 		}
-		fields["from"], err = internal_common.AddressToBech32(from)
-		if err != nil {
+	} else { // stx not nil
+		if err = s.fillStakingTransactionFields(stx, fields); err != nil {
 			return nil, err
 		}
 	}
