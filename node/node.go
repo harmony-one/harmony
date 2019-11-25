@@ -429,7 +429,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
 		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
+			node.BeaconWorker = worker.New(
+				node.Beaconchain().Config(), beaconChain, chain.Engine,
+			)
 		}
 
 		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
@@ -437,8 +439,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 		chain.Engine.SetSlasher(node.Consensus.Decider.(slash.Slasher))
+		chain.Engine.SetBeaconchain(beaconChain)
 
-		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
+		// the sequence number is the next block number to be added in consensus protocol, which is
+		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer

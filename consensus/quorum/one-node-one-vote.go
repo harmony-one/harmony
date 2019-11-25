@@ -27,7 +27,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 	r := v.SignersCount(p) >= v.TwoThirdsSignersCount()
 	utils.Logger().Info().Str("phase", p.String()).
 		Int64("signers-count", v.SignersCount(p)).
-		Int64("threshold", v.QuorumThreshold().Int64()).
+		Int64("threshold", v.TwoThirdsSignersCount()).
 		Int64("participants", v.ParticipantsCount()).
 		Msg("Quorum details")
 	return r
@@ -60,7 +60,9 @@ func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
 func (v *uniformVoteWeight) Award(
 	// Here hook is the callback which gets the amount the earner is due in just reward
 	// up to the hook to do side-effects like write the statedb
-	Pie *big.Int, earners []common.Address, hook func(earner common.Address, due *big.Int),
+	Pie *big.Int,
+	earners shard.SlotList,
+	hook func(earner common.Address, due *big.Int),
 ) *big.Int {
 	payout := big.NewInt(0)
 	last := big.NewInt(0)
@@ -70,7 +72,7 @@ func (v *uniformVoteWeight) Award(
 		cur := big.NewInt(0)
 		cur.Mul(Pie, big.NewInt(int64(i+1))).Div(cur, count)
 		diff := big.NewInt(0).Sub(cur, last)
-		hook(common.Address(account), diff)
+		hook(common.Address(account.EcdsaAddress), diff)
 		payout = big.NewInt(0).Add(payout, diff)
 		last = cur
 	}

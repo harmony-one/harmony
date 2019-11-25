@@ -23,12 +23,13 @@ import (
 )
 
 type engineImpl struct {
-	d reward.Distributor
-	s slash.Slasher
+	d      reward.Distributor
+	s      slash.Slasher
+	beacon engine.ChainReader
 }
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{nil, nil}
+var Engine = &engineImpl{nil, nil, nil}
 
 // Rewarder handles the distribution of block rewards
 func (e *engineImpl) Rewarder() reward.Distributor {
@@ -48,6 +49,15 @@ func (e *engineImpl) Slasher() slash.Slasher {
 // SetSlasher assigns the slasher used
 func (e *engineImpl) SetSlasher(s slash.Slasher) {
 	e.s = s
+}
+
+func (e *engineImpl) Beaconchain() engine.ChainReader {
+	return e.beacon
+}
+
+// SetSlasher assigns the slasher used
+func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
+	e.beacon = beaconchain
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -182,14 +192,16 @@ func (e *engineImpl) Finalize(
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
 ) (*types.Block, error) {
+
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	if err := AccumulateRewards(
-		chain, state, header, e.Rewarder(), e.Slasher(),
+		chain, state, header, e.Rewarder(), e.Slasher(), e.Beaconchain(),
 	); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 
+	// TODO Shouldnt this logic only apply to beaconchain, right?
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
 	if len(header.ShardState()) > 0 {
