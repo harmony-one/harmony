@@ -293,7 +293,7 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {
 			return nil, ctxerror.New("failed to read shard state of epoch",
-				"epoch", header.Epoch().Uint64())
+				"epoch", header.Epoch().Uint64()).WithCause(err)
 		}
 	}
 

@@ -211,17 +211,6 @@ type Node struct {
 
 	accountManager *accounts.Manager
 
-	// Next shard state
-	nextShardState struct {
-		// The received master shard state
-		master *shard.EpochShardState
-
-		// When for a leader to propose the next shard state,
-		// or for a validator to wait for a proposal before view change.
-		// TODO ek – replace with retry-based logic instead of delay
-		proposeTime time.Time
-	}
-
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
