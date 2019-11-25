@@ -89,9 +89,6 @@ type Consensus struct {
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 
-	// number of publickeys of previous epoch
-	numPrevPubKeys int
-
 	viewID uint64
 
 	// Blockhash - 32 byte

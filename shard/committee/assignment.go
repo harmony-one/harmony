@@ -148,7 +148,6 @@ func eposStakedCommittee(
 			nil,
 		})
 	}
-
 	staked := effective.Apply(essentials, stakedSlotsCount)
 	shardBig := big.NewInt(int64(shardCount))
 

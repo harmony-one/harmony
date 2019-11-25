@@ -77,8 +77,14 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) numeric.Dec {
 	for i := range members {
 		if v.ReadSignature(p, members[i]) != nil {
 			w.FromLibBLSPublicKey(members[i])
+
+			voter, ok := v.voters[w]
+			if !ok {
+				utils.Logger().Error().Bytes("BlsPubKey", w[:]).Msg("No voter found")
+				return numeric.ZeroDec()
+			}
 			currentTotalPower = currentTotalPower.Add(
-				v.voters[w].effectivePercent,
+				voter.effectivePercent,
 			)
 		}
 	}
