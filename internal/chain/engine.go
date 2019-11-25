@@ -204,7 +204,7 @@ func (e *engineImpl) Finalize(
 	// TODO Shouldnt this logic only apply to beaconchain, right?
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
-	if len(header.ShardState()) > 0 {
+	if header.ShardID() == shard.BeaconChainShardID && len(header.ShardState()) > 0 {
 		// TODO: make sure we are using the correct validator list
 		validators, err := chain.ReadActiveValidatorList()
 		if err != nil {
@@ -222,7 +222,7 @@ func (e *engineImpl) Finalize(
 					return nil, ctxerror.New("failed update validator info").WithCause(err)
 				}
 			} else {
-				err = errors.New("validator came back empty" + common2.MustAddressToBech32(validator))
+				err = errors.New("validator came back empty " + common2.MustAddressToBech32(validator))
 				return nil, ctxerror.New("failed getting validator info").WithCause(err)
 			}
 		}

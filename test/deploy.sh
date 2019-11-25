@@ -234,7 +234,7 @@ if [ "$DOTEST" == "true" ]; then
       i=$((i+1))
    done
    echo "waiting for the result"
-   sleep 20
+   sleep 16
    check_result
    [ -e $RESULT_FILE ] && cat $RESULT_FILE
 fi

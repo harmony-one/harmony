@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 	lru "github.com/hashicorp/golang-lru"
 
@@ -1139,20 +1141,42 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 	//// Shard State and Validator Update
 	header := block.Header()
-	if header.ShardStateHash() != (common.Hash{}) {
+	if len(header.ShardState()) > 0 {
 		// Write shard state for the new epoch
 		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
-		shardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
+		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
 		if err != nil {
 			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
 			return NonStatTy, err
 		}
 
+		parentHeader := bc.GetHeaderByHash(header.ParentHash())
+		if parentHeader != nil && parentHeader.Epoch().Cmp(header.Epoch()) != 0 {
+			// Normally the last block of an epoch should have the same epoch as this block
+			// In the case beacon chain catch up, it may have a epoch larger than the current epoch
+			// We need to write the same shard state for this one-off epoch so other readers doesn't break
+
+			curShardState, err := bc.ReadShardState(parentHeader.Epoch())
+			if err != nil {
+				header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot read current shard state")
+				return NonStatTy, err
+			}
+			data, err := rlp.EncodeToBytes(curShardState)
+			if err != nil {
+				return NonStatTy, err
+			}
+			_, err = bc.WriteShardStateBytes(batch, header.Epoch(), data)
+			if err != nil {
+				header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
+				return NonStatTy, err
+			}
+		}
+
 		// Find all the active validator addresses and store them in db
 		allActiveValidators := []common.Address{}
 		processed := make(map[common.Address]struct{})
-		for i := range *shardState {
-			shard := (*shardState)[i]
+		for i := range *newShardState {
+			shard := (*newShardState)[i]
 			for j := range shard.Slots {
 				slot := shard.Slots[j]
 				if slot.TotalStake != nil { // For external validator
@@ -2352,8 +2376,8 @@ func (bc *BlockChain) ReadValidatorStats(addr common.Address) (*staking.Validato
 	return rawdb.ReadValidatorStats(bc.db, addr)
 }
 
-// WriteValidatorStats writes the stats for the committee
-func (bc *BlockChain) WriteValidatorStats(slots shard.SlotList, mask *bls.Mask) error {
+// UpdateValidatorUptime writes the stats for the committee
+func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask) error {
 	blsToAddress := make(map[shard.BlsPublicKey]common.Address)
 	for _, slot := range slots {
 		blsToAddress[slot.BlsPublicKey] = slot.EcdsaAddress
@@ -2370,7 +2394,7 @@ func (bc *BlockChain) WriteValidatorStats(slots shard.SlotList, mask *bls.Mask) 
 			// Retrieve the stats and add new counts
 			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
 			if stats == nil {
-				stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0)}
+				stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0), numeric.NewDec(0)}
 			}
 			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, big.NewInt(1))
 
@@ -2390,6 +2414,59 @@ func (bc *BlockChain) WriteValidatorStats(slots shard.SlotList, mask *bls.Mask) 
 			}
 		} else {
 			return fmt.Errorf("Bls public key not found in committee: %x", blsKeyBytes)
+		}
+	}
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	// TODO: Update cache
+	return nil
+}
+
+// UpdateValidatorVotingPower writes the voting power for the committees
+func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
+	totalEffectiveStake := make(map[uint32]numeric.Dec)
+	addrToEffectiveStakes := make(map[common.Address]map[uint32]numeric.Dec)
+
+	for _, committee := range state {
+		for _, slot := range committee.Slots {
+			if slot.TotalStake != nil {
+				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress]; !ok {
+					addrToEffectiveStakes[slot.EcdsaAddress] = map[uint32]numeric.Dec{}
+				}
+				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID]; !ok {
+					addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID] = numeric.NewDec(0)
+				}
+				addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID] = addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID].Add(*slot.TotalStake)
+
+				if _, ok := totalEffectiveStake[committee.ShardID]; !ok {
+					totalEffectiveStake[committee.ShardID] = numeric.NewDec(0)
+				}
+				totalEffectiveStake[committee.ShardID] = totalEffectiveStake[committee.ShardID].Add(*slot.TotalStake)
+			}
+		}
+	}
+
+	batch := bc.db.NewBatch()
+	for addr, votingPowers := range addrToEffectiveStakes {
+		addrTotalVotingPower := numeric.NewDec(0) // Total voting power is the average voting power across all shards
+		addrTotalEffectiveStake := numeric.NewDec(0)
+		for shardID, eStake := range votingPowers {
+			addrTotalVotingPower = addrTotalVotingPower.Add(eStake.Quo(totalEffectiveStake[shardID]))
+			addrTotalEffectiveStake = addrTotalEffectiveStake.Add(eStake)
+		}
+		// Retrieve the stats and update
+		stats, err := rawdb.ReadValidatorStats(bc.db, addr)
+		if stats == nil {
+			stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0), numeric.NewDec(0)}
+		}
+
+		stats.AvgVotingPower = addrTotalVotingPower.Quo(numeric.NewDec(int64(len(state))))
+		stats.TotalEffectiveStake = addrTotalEffectiveStake
+
+		err = rawdb.WriteValidatorStats(batch, addr, stats)
+		if err != nil {
+			return err
 		}
 	}
 	if err := batch.Write(); err != nil {

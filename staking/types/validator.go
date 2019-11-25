@@ -44,11 +44,15 @@ type ValidatorWrapper struct {
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// The number of blocks the validator should've signed when in active mode (selected in committee)
-	NumBlocksToSign *big.Int
+	NumBlocksToSign *big.Int `json:"num_blocks_to_sign" rlp:"nil"`
 	// The number of blocks the validator actually signed
-	NumBlocksSigned *big.Int
+	NumBlocksSigned *big.Int `json:"num_blocks_signed" rlp:"nil"`
 	// The number of times they validator is jailed due to extensive downtime
-	NumJailed *big.Int
+	NumJailed *big.Int `json:"num_jailed" rlp:"nil"`
+	// AvgVotingPower is the average percent of voting power this validator has over all shards
+	AvgVotingPower numeric.Dec `json:"avg_voting_power" rlp:"nil"`
+	// TotalEffectiveStake is the total effective stake this validator has
+	TotalEffectiveStake numeric.Dec `json:"total_effective_stake" rlp:"nil"`
 }
 
 // Validator - data fields for a validator

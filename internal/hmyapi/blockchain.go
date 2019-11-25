@@ -514,7 +514,10 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 
 	if stats != nil {
 		rpcValidator.Uptime = numeric.NewDecFromBigInt(stats.NumBlocksSigned).Quo(numeric.NewDecFromBigInt(stats.NumBlocksToSign)).String()
+		rpcValidator.AvgVotingPower = stats.AvgVotingPower.String()
+		rpcValidator.TotalEffectiveStake = stats.TotalEffectiveStake.String()
 	}
+
 	return rpcValidator, nil
 }
 
@@ -552,12 +555,20 @@ func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, add
 	result := make([]*RPCDelegation, 0)
 	for _, delegation := range delegations {
 
+		undelegations := []RPCUndelegation{}
+
+		for j := range delegation.Undelegations {
+			undelegations = append(undelegations, RPCUndelegation{
+				delegation.Undelegations[j].Amount,
+				delegation.Undelegations[j].Epoch,
+			})
+		}
 		result = append(result, &RPCDelegation{
 			validatorAddress,
 			delegation.DelegatorAddress,
 			delegation.Amount,
 			delegation.Reward,
-			nil,
+			undelegations,
 		})
 	}
 	return result, nil
