@@ -1,15 +1,16 @@
 package main
 
 import (
-	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -221,21 +222,56 @@ func setupStakingNodeAccount() error {
 	return nil
 }
 
-func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
-	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
+func readMultiBlsKeys(nodeConfig *nodeconfig.ConfigType) error {
+	multiKeyFolder := "./hmy/multikeys"
+	fileList, err := ioutil.ReadDir(multiKeyFolder)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
-		os.Exit(100)
+		return err
 	}
-	pubKey := consensusPriKey.GetPublicKey()
 
-	// Consensus keys are the BLS12-381 keys used to sign consensus messages
-	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
-	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-		fmt.Println("error to get consensus keys.")
-		os.Exit(100)
+	for _, fileInfo := range fileList {
+		if strings.HasSuffix(fileInfo.Name(), ".key") {
+			pass := fileInfo.Name()[:len(fileInfo.Name())-4] + ".txt"
+			passphrase, err := utils.GetPassphraseFromSource("file:" + multiKeyFolder + "/" + pass)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
+				os.Exit(100)
+			}
+			consensusPriKey, err1 := blsgen.LoadBlsKeyWithPassPhrase(multiKeyFolder+"/"+fileInfo.Name(), passphrase)
+			if err1 != nil {
+				return err1
+			}
+			nodeConfig.ConsensusPriKey = nodeconfig.AppendPriKey(nodeConfig.ConsensusPriKey, consensusPriKey)
+			nodeConfig.ConsensusPubKey = nodeconfig.AppendPubKey(nodeConfig.ConsensusPubKey, consensusPriKey.GetPublicKey())
+		}
 	}
-	return pubKey
+
+	return nil
+}
+
+func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
+	if stat, err := os.Stat("./hmy/multikeys"); err == nil && stat.IsDir() {
+		if err := readMultiBlsKeys(nodeConfig); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
+			os.Exit(100)
+		}
+	} else {
+		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
+			os.Exit(100)
+		}
+
+		// Consensus keys are the BLS12-381 keys used to sign consensus messages
+		nodeConfig.ConsensusPriKey = nodeconfig.AppendPriKey(nodeConfig.ConsensusPriKey, consensusPriKey)
+		nodeConfig.ConsensusPubKey = nodeconfig.AppendPubKey(nodeConfig.ConsensusPubKey, consensusPriKey.GetPublicKey())
+		if len(nodeConfig.ConsensusPriKey.PrivateKey) == 0 || len(nodeConfig.ConsensusPubKey.PublicKey) == 0 {
+			fmt.Println("error to get consensus keys.")
+			os.Exit(100)
+		}
+	}
+
+	return nodeConfig.ConsensusPubKey.PublicKey[0]
 }
 
 func createGlobalConfig() (*nodeconfig.ConfigType, error) {
@@ -246,7 +282,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 		// Set up consensus keys.
 		setupConsensusKey(nodeConfig)
 	} else {
-		nodeConfig.ConsensusPriKey = &bls.SecretKey{} // set dummy bls key for consensus object
+		nodeConfig.ConsensusPriKey = nodeconfig.ToMultiPriKey(&bls.SecretKey{}) // set dummy bls key for consensus object
 	}
 
 	// Set network type
@@ -263,7 +299,12 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 			*keyFile)
 	}
 
-	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
+	var selfPeer p2p.Peer
+	if nodeConfig.ConsensusPubKey != nil {
+		selfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0]}
+	} else {
+		selfPeer = p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nil}
+	}
 
 	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
 	if err != nil {
@@ -525,7 +566,7 @@ func main() {
 	}
 
 	utils.Logger().Info().
-		Str("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
+		Str("BlsPubKey", "").
 		Uint32("ShardID", nodeConfig.ShardID).
 		Str("ShardGroupID", nodeConfig.GetShardGroupID().String()).
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).

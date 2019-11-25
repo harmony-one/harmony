@@ -34,7 +34,8 @@ func (node *Node) setupForValidator() {
 	}
 	// Register new metrics service
 	if node.NodeConfig.GetMetricsFlag() {
-		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort()))
+		// TODO: Manish check impact
+		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.PublicKey[0].SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort()))
 	}
 
 	// Register randomness service
@@ -55,7 +56,8 @@ func (node *Node) setupForNewNode() {
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, node.NodeConfig.GetBeaconGroupID(), chanPeer, nil, node.networkInfoDHTPath()))
 	// Register new metrics service
 	if node.NodeConfig.GetMetricsFlag() {
-		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort()))
+		// TODO: Manish check impact
+		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.PublicKey[0].SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort()))
 	}
 }
 

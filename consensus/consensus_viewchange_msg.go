@@ -3,6 +3,7 @@ package consensus
 import (
 	"encoding/binary"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -11,7 +12,7 @@ import (
 )
 
 // construct the view change message
-func (consensus *Consensus) constructViewChangeMessage() []byte {
+func (consensus *Consensus) constructViewChangeMessage(priKey *bls.SecretKey, pubKey *bls.PublicKey) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_VIEWCHANGE,
@@ -25,7 +26,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 	vcMsg.BlockNum = consensus.blockNum
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
-	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
+	vcMsg.SenderPubkey = pubKey.Serialize()
 
 	// next leader key already updated
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
@@ -47,10 +48,10 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 
 	utils.Logger().Debug().
 		Hex("m1Payload", vcMsg.Payload).
-		Str("pubKey", consensus.PubKey.SerializeToHexStr()).
+		Str("pubKey", pubKey.SerializeToHexStr()).
 		Msg("[constructViewChangeMessage]")
 
-	sign := consensus.priKey.SignHash(msgToSign)
+	sign := priKey.SignHash(msgToSign)
 	if sign != nil {
 		vcMsg.ViewchangeSig = sign.Serialize()
 	} else {
@@ -59,14 +60,14 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, consensus.current.ViewID())
-	sign1 := consensus.priKey.SignHash(viewIDBytes)
+	sign1 := priKey.SignHash(viewIDBytes)
 	if sign1 != nil {
 		vcMsg.ViewidSig = sign1.Serialize()
 	} else {
 		utils.Logger().Error().Msg("unable to serialize viewID signature")
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey)
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Msg("[constructViewChangeMessage] failed to sign and marshal the viewchange message")
@@ -75,7 +76,7 @@ func (consensus *Consensus) constructViewChangeMessage() []byte {
 }
 
 // new leader construct newview message
-func (consensus *Consensus) constructNewViewMessage() []byte {
+func (consensus *Consensus) constructNewViewMessage(pubKey *bls.PublicKey, priKey *bls.SecretKey) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_NEWVIEW,
@@ -89,7 +90,7 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 	vcMsg.BlockNum = consensus.blockNum
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
-	vcMsg.SenderPubkey = consensus.PubKey.Serialize()
+	vcMsg.SenderPubkey = pubKey.Serialize()
 	vcMsg.Payload = consensus.m1Payload
 
 	sig2arr := consensus.GetNilSigsArray()
@@ -109,7 +110,7 @@ func (consensus *Consensus) constructNewViewMessage() []byte {
 		vcMsg.M3Bitmap = consensus.viewIDBitmap.Bitmap
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey)
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Msg("[constructNewViewMessage] failed to sign and marshal the new view message")

@@ -517,7 +517,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	}
 
 	for i := range pubKeys {
-		if pubKeys[i].IsEqual(node.Consensus.PubKey) {
+		if node.Consensus.PubKey.Contains(pubKeys[i]) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
