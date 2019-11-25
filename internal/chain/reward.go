@@ -34,6 +34,7 @@ var (
 	))
 	totalTokens                  = numeric.NewDec(12600000000)
 	targetStakedPercentage       = numeric.MustNewDecFromStr("0.35")
+	dynamicAdjust                = numeric.MustNewDecFromStr("0.4")
 	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
 )
 
@@ -167,6 +168,19 @@ func AccumulateRewards(
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 
+		defaultReward := BlockRewardStakedCase
+
+		if shard.Schedule.IsLastBlock(blockNum) {
+			// TODO Use cached result in off-chain db instead of full computation
+			percentageStaked, err := whatPercentStakedNow(beaconChain)
+			if err != nil {
+				return err
+			}
+			howMuchOff := targetStakedPercentage.Sub(*percentageStaked)
+			adjustBy := howMuchOff.MulTruncate(numeric.NewDec(100)).Mul(dynamicAdjust)
+			defaultReward = defaultReward.Add(adjustBy)
+		}
+
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		members, payable, _, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
@@ -180,7 +194,7 @@ func AccumulateRewards(
 			// what to do about share of those that didn't sign
 			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
 			if !voter.IsHarmonyNode {
-				due := BlockRewardStakedCase.Mul(
+				due := defaultReward.Mul(
 					voter.EffectivePercent.Quo(votepower.StakersShare),
 				)
 				state.AddBalance(voter.EarningAccount, due.RoundInt())
@@ -242,7 +256,7 @@ func AccumulateRewards(
 					for member := range payableSigners {
 						voter := votingPower.Voters[payableSigners[member].BlsPublicKey]
 						if !voter.IsHarmonyNode {
-							due := BlockRewardStakedCase.Mul(
+							due := defaultReward.Mul(
 								voter.EffectivePercent.Quo(votepower.StakersShare),
 							)
 							to := voter.EarningAccount
