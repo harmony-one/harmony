@@ -2,14 +2,16 @@ package node
 
 import (
 	"sort"
+	"strings"
 	"time"
+
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	types2 "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants of proposing a new block
@@ -149,40 +151,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
 }
 
-// TODO is this still needed?
-func (node *Node) proposeLocalShardState(block *types.Block) {
-	logger := block.Logger(utils.Logger())
-	// TODO ek – read this from beaconchain once BC sync is fixed
-	if node.nextShardState.master == nil {
-		logger.Debug().Msg("yet to receive master proposal from beaconchain")
-		return
-	}
-
-	nlogger := logger.With().
-		Uint64("nextEpoch", node.nextShardState.master.Epoch).
-		Time("proposeTime", node.nextShardState.proposeTime).
-		Logger()
-	logger = &nlogger
-	if time.Now().Before(node.nextShardState.proposeTime) {
-		logger.Debug().Msg("still waiting for shard state to propagate")
-		return
-	}
-	masterShardState := node.nextShardState.master.ShardState
-	var localShardState shard.State
-	committee := masterShardState.FindCommitteeByID(block.ShardID())
-	if committee != nil {
-		logger.Info().Msg("found local shard info; proposing it")
-		localShardState = append(localShardState, *committee)
-	} else {
-		logger.Info().Msg("beacon committee disowned us; proposing nothing")
-		// Leave local proposal empty to signal the end of shard (disbanding).
-	}
-	err := block.AddShardState(localShardState)
-	if err != nil {
-		logger.Error().Err(err).Msg("Failed proposin local shard state")
-	}
-}
-
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 	if !node.Blockchain().Config().IsCrossTx(node.Worker.GetNewEpoch()) {
 		return []*types.CXReceiptsProof{}
@@ -233,7 +201,11 @@ Loop:
 		}
 
 		if err := node.Blockchain().Validator().ValidateCXReceiptsProof(cxp); err != nil {
-			utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			if strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
+				pendingReceiptsList = append(pendingReceiptsList, cxp)
+			} else {
+				utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			}
 			continue
 		}
 

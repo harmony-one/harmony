@@ -22,12 +22,6 @@ var (
 // PublicKeySizeInBytes ..
 const PublicKeySizeInBytes = 48
 
-// EpochShardState is the shard state of an epoch
-type EpochShardState struct {
-	Epoch      uint64
-	ShardState State
-}
-
 // State is the collection of all committees
 type State []Committee
 

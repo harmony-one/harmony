@@ -32,6 +32,9 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+// MsgNoShardStateFromDB error message for shard state reading failure
+var MsgNoShardStateFromDB = "failed to read shard state from DB"
+
 // Indicate whether the receipts corresponding to a blockHash is spent or not
 const (
 	SpentByte byte = iota
@@ -418,7 +421,7 @@ func ReadShardState(
 	var data []byte
 	data, err = db.Get(shardStateKey(epoch))
 	if err != nil {
-		return nil, ctxerror.New("cannot read sharding state from rawdb",
+		return nil, ctxerror.New(MsgNoShardStateFromDB,
 			"epoch", epoch,
 		).WithCause(err)
 	}
