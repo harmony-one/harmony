@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 	lru "github.com/hashicorp/golang-lru"
 
@@ -2352,8 +2354,8 @@ func (bc *BlockChain) ReadValidatorStats(addr common.Address) (*staking.Validato
 	return rawdb.ReadValidatorStats(bc.db, addr)
 }
 
-// WriteValidatorStats writes the stats for the committee
-func (bc *BlockChain) WriteValidatorStats(slots shard.SlotList, mask *bls.Mask) error {
+// UpdateValidatorUptime writes the stats for the committee
+func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask) error {
 	blsToAddress := make(map[shard.BlsPublicKey]common.Address)
 	for _, slot := range slots {
 		blsToAddress[slot.BlsPublicKey] = slot.EcdsaAddress
@@ -2370,7 +2372,7 @@ func (bc *BlockChain) WriteValidatorStats(slots shard.SlotList, mask *bls.Mask) 
 			// Retrieve the stats and add new counts
 			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
 			if stats == nil {
-				stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0)}
+				stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0), numeric.NewDec(0)}
 			}
 			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, big.NewInt(1))
 
@@ -2390,6 +2392,69 @@ func (bc *BlockChain) WriteValidatorStats(slots shard.SlotList, mask *bls.Mask) 
 			}
 		} else {
 			return fmt.Errorf("Bls public key not found in committee: %x", blsKeyBytes)
+		}
+	}
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	// TODO: Update cache
+	return nil
+}
+
+// UpdateValidatorUptime writes the voting power for the committees
+func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
+	totalEffectiveStake := make(map[uint32]numeric.Dec)
+	addrToEffectiveStakes := make(map[common.Address]map[uint32]numeric.Dec)
+
+	for _, committee := range state {
+		for _, slot := range committee.Slots {
+			utils.Logger().Print("TTTTTTT")
+			utils.Logger().Print(committee.ShardID)
+			if slot.TotalStake != nil {
+				utils.Logger().Print("AAAAAA")
+				utils.Logger().Print(slot.TotalStake)
+				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress]; !ok {
+					addrToEffectiveStakes[slot.EcdsaAddress] = map[uint32]numeric.Dec{}
+				}
+				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID]; !ok {
+					addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID] = numeric.NewDec(0)
+				}
+				addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID] = addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID].Add(*slot.TotalStake)
+
+				if _, ok := totalEffectiveStake[committee.ShardID]; !ok {
+					totalEffectiveStake[committee.ShardID] = numeric.NewDec(0)
+				}
+				totalEffectiveStake[committee.ShardID] = totalEffectiveStake[committee.ShardID].Add(*slot.TotalStake)
+				utils.Logger().Print("BBBBBB")
+				utils.Logger().Print(totalEffectiveStake[committee.ShardID])
+				utils.Logger().Print(addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID])
+			}
+		}
+	}
+
+	batch := bc.db.NewBatch()
+	for addr, votingPowers := range addrToEffectiveStakes {
+		addrTotalVotingPower := numeric.NewDec(0) // Total voting power is the average voting power across all shards
+		addrTotalEffectiveStake := numeric.NewDec(0)
+		for shardID, eStake := range votingPowers {
+			addrTotalVotingPower = addrTotalVotingPower.Add(eStake.Quo(totalEffectiveStake[shardID]))
+			addrTotalEffectiveStake = addrTotalEffectiveStake.Add(eStake)
+		}
+		utils.Logger().Print("CCCCCCC")
+		utils.Logger().Print(addrTotalVotingPower)
+		utils.Logger().Print(addrTotalEffectiveStake)
+		// Retrieve the stats and update
+		stats, err := rawdb.ReadValidatorStats(bc.db, addr)
+		if stats == nil {
+			stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0), numeric.NewDec(0)}
+		}
+
+		stats.AvgVotingPower = addrTotalVotingPower.Quo(numeric.NewDec(int64(len(state))))
+		stats.TotalEffectiveStake = addrTotalEffectiveStake
+
+		err = rawdb.WriteValidatorStats(batch, addr, stats)
+		if err != nil {
+			return err
 		}
 	}
 	if err := batch.Write(); err != nil {

@@ -360,6 +360,11 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
 
+	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
+	if len(newBlock.Header().ShardState()) > 0 {
+		node.Consensus.UpdateConsensusInformation()
+	}
+
 	// Writing validator stats (for uptime recording)
 	// TODO: only record for open staking validators
 	prevBlock := node.Blockchain().GetBlockByHash(newBlock.ParentHash())
@@ -369,17 +374,29 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			members := node.Consensus.Decider.Participants()
 			mask, _ := bls2.NewMask(members, nil)
 			mask.SetMask(commitSigAndBitmap[96:])
-			err = node.Blockchain().WriteValidatorStats(shardState.FindCommitteeByID(newBlock.ShardID()).Slots, mask)
+			err = node.Blockchain().UpdateValidatorUptime(shardState.FindCommitteeByID(newBlock.ShardID()).Slots, mask)
 
 			if err != nil {
 				utils.Logger().Err(err)
 			}
 		}
+
 	}
 
-	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
+	// Update voting power of validators for all shards
 	if len(newBlock.Header().ShardState()) > 0 {
-		node.Consensus.UpdateConsensusInformation()
+		shardState := shard.State{}
+		utils.Logger().Print("XXXXXXXX")
+		utils.Logger().Print(shardState.JSON())
+		if err := rlp.DecodeBytes(newBlock.Header().ShardState(), &shardState); err == nil {
+			if err = node.Blockchain().UpdateValidatorVotingPower(shardState); err != nil {
+				utils.Logger().Err(err)
+			}
+		} else {
+			utils.Logger().Err(err)
+		}
+
+		// TODO: deal with pre-staking voting power accounting
 	}
 
 	// TODO chao: uncomment this after beacon syncing is stable

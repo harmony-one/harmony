@@ -66,17 +66,18 @@ type HeaderInformation struct {
 
 // RPCValidator represents a validator
 type RPCValidator struct {
-	Address            common.Address       `json:"address"`
-	SlotPubKeys        []shard.BlsPublicKey `json:"slot_pub_keys"`
-	Stake              *big.Int             `json:"stake" yaml:"stake"`
-	UnbondingHeight    *big.Int             `json:"unbonding_height"`
-	MinSelfDelegation  *big.Int             `json:"min_self_delegation"`
-	MaxTotalDelegation *big.Int             `json:"max_total_delegation"`
-	Active             bool                 `json:"active"`
-	Commission         types2.Commission    `json:"commission"`
-	Description        types2.Description   `json:"description"`
-	CreationHeight     *big.Int             `json:"creation_height"`
-	Uptime             string               `json:"uptime"`
+	Address             common.Address       `json:"address"`
+	SlotPubKeys         []shard.BlsPublicKey `json:"slot_pub_keys"`
+	UnbondingHeight     *big.Int             `json:"unbonding_height"`
+	MinSelfDelegation   *big.Int             `json:"min_self_delegation"`
+	MaxTotalDelegation  *big.Int             `json:"max_total_delegation"`
+	Active              bool                 `json:"active"`
+	Commission          types2.Commission    `json:"commission"`
+	Description         types2.Description   `json:"description"`
+	CreationHeight      *big.Int             `json:"creation_height"`
+	Uptime              string               `json:"uptime"`
+	AvgVotingPower      string               `json:"avg_voting_power"`
+	TotalEffectiveStake string               `json:"total_effective_stake"`
 }
 
 // RPCDelegation represents a particular delegation to a validator
@@ -156,7 +157,6 @@ func newRPCValidator(validator *types2.Validator) *RPCValidator {
 	return &RPCValidator{
 		validator.Address,
 		validator.SlotPubKeys,
-		big.NewInt(0), // TODO: add using the delegations
 		validator.UnbondingHeight,
 		validator.MinSelfDelegation,
 		validator.MaxTotalDelegation,
@@ -164,6 +164,8 @@ func newRPCValidator(validator *types2.Validator) *RPCValidator {
 		validator.Commission,
 		validator.Description,
 		validator.CreationHeight,
+		"",
+		"",
 		"",
 	}
 }

@@ -685,15 +685,15 @@ func ReadValidatorStats(db DatabaseReader, addr common.Address) (*staking.Valida
 	return &stats, nil
 }
 
-// WriteValidatorStats stores validator's stats by its address
+// UpdateValidatorUptime stores validator's stats by its address
 func WriteValidatorStats(db DatabaseWriter, addr common.Address, stats *staking.ValidatorStats) error {
 	bytes, err := rlp.EncodeToBytes(stats)
 	if err != nil {
-		utils.Logger().Error().Msg("[WriteValidatorStats] Failed to encode")
+		utils.Logger().Error().Msg("[UpdateValidatorUptime] Failed to encode")
 		return err
 	}
 	if err := db.Put(validatorStatsKey(addr), bytes); err != nil {
-		utils.Logger().Error().Msg("[WriteValidatorStats] Failed to store to database")
+		utils.Logger().Error().Msg("[UpdateValidatorUptime] Failed to store to database")
 		return err
 	}
 	return err
