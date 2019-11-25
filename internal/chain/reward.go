@@ -170,7 +170,7 @@ func AccumulateRewards(
 
 		defaultReward := BlockRewardStakedCase
 
-		if shard.Schedule.IsLastBlock(blockNum) {
+		if len(header.ShardState()) > 0 {
 			// TODO Use cached result in off-chain db instead of full computation
 			percentageStaked, err := whatPercentStakedNow(beaconChain)
 			if err != nil {
