@@ -64,7 +64,7 @@ func (node *Node) UpdateLastConsensusTimeForMetrics(prevLastConsensusTime int64)
 
 // UpdateIsLeaderForMetrics updates if node is a leader now for metrics serivce.
 func (node *Node) UpdateIsLeaderForMetrics() {
-	if node.Consensus.LeaderPubKey.SerializeToHexStr() == node.Consensus.PubKey.SerializeToHexStr() {
+	if node.Consensus.PubKey.Contains(node.Consensus.LeaderPubKey) {
 		utils.Logger().Info().Msgf("Node %s is a leader now", node.Consensus.PubKey.SerializeToHexStr())
 		metrics.UpdateIsLeader(true)
 	} else {

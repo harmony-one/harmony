@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -89,8 +90,8 @@ type Consensus struct {
 	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
-	priKey *bls.SecretKey
-	PubKey *bls.PublicKey
+	priKey *nodeconfig.MultiBlsPrivateKey
+	PubKey *nodeconfig.MultiBlsPublicKey
 
 	SelfAddress common.Address
 	// the publickey of leader
@@ -207,7 +208,7 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey,
+	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *nodeconfig.MultiBlsPrivateKey,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 	consensus := Consensus{}
@@ -222,13 +223,14 @@ func New(
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
 	consensus.CommitteePublicKeys = make(map[string]bool)
+	//TODO: Manish
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if blsPriKey != nil {
 		consensus.priKey = blsPriKey
 		consensus.PubKey = blsPriKey.GetPublicKey()
 		utils.Logger().Info().
-			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
+			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Keys")
 	} else {
 		utils.Logger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")

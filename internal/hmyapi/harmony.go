@@ -57,7 +57,7 @@ type NodeMetadata struct {
 func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 	cfg := nodeconfig.GetDefaultConfig()
 	return NodeMetadata{
-		cfg.ConsensusPubKey.SerializeToHexStr(),
+		cfg.ConsensusPubKey.SerializeToHexStr(), // TODO: Manish check the impact
 		nodeconfig.GetVersion(),
 		string(cfg.GetNetworkType()),
 		s.b.ChainConfig().ChainID.String(),

@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -62,6 +63,69 @@ const (
 var version string
 var publicRPC bool // enable public RPC access
 
+// MultiBlsPrivateKey support
+type MultiBlsPrivateKey struct {
+	PrivateKey []*bls.SecretKey
+}
+
+// MultiBlsPublicKey support
+type MultiBlsPublicKey struct {
+	PublicKey []*bls.PublicKey
+}
+
+// SerializeToHexStr wrapper
+func (multiKey MultiBlsPublicKey) SerializeToHexStr() string {
+	stringArray := make([]string, len(multiKey.PublicKey))
+	for i, key := range multiKey.PublicKey {
+		stringArray[i] = (key.SerializeToHexStr())
+	}
+	return "[" + strings.Join(stringArray, ",") + "]"
+}
+
+// Contains wrapper
+func (multiKey MultiBlsPublicKey) Contains(pubKey *bls.PublicKey) bool {
+	for _, key := range multiKey.PublicKey {
+		if key.IsEqual(pubKey) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetPublicKey wrapper
+func (multiKey MultiBlsPrivateKey) GetPublicKey() *MultiBlsPublicKey {
+	rval := make([]*bls.PublicKey, len(multiKey.PrivateKey))
+	for i, key := range multiKey.PrivateKey {
+		rval[i] = key.GetPublicKey()
+	}
+	return &MultiBlsPublicKey{PublicKey: rval}
+}
+
+// ToMultiPriKey wrapper
+func ToMultiPriKey(key *bls.SecretKey) *MultiBlsPrivateKey {
+	return &MultiBlsPrivateKey{PrivateKey: []*bls.SecretKey{key}}
+}
+
+// AppendPriKey wrapper
+func AppendPriKey(multiPriKey *MultiBlsPrivateKey, key *bls.SecretKey) *MultiBlsPrivateKey {
+	if multiPriKey == nil {
+		multiPriKey = &MultiBlsPrivateKey{PrivateKey: []*bls.SecretKey{key}}
+	} else {
+		multiPriKey.PrivateKey = append(multiPriKey.PrivateKey, key)
+	}
+	return multiPriKey
+}
+
+// AppendPubKey wrapper
+func AppendPubKey(multiPubKey *MultiBlsPublicKey, key *bls.PublicKey) *MultiBlsPublicKey {
+	if multiPubKey == nil {
+		multiPubKey = &MultiBlsPublicKey{PublicKey: []*bls.PublicKey{key}}
+	} else {
+		multiPubKey.PublicKey = append(multiPubKey.PublicKey, key)
+	}
+	return multiPubKey
+}
+
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
@@ -81,8 +145,8 @@ type ConfigType struct {
 	StringRole      string
 	StakingPriKey   *ecdsa.PrivateKey
 	P2pPriKey       p2p_crypto.PrivKey
-	ConsensusPriKey *bls.SecretKey
-	ConsensusPubKey *bls.PublicKey
+	ConsensusPriKey *MultiBlsPrivateKey
+	ConsensusPubKey *MultiBlsPublicKey
 
 	// Database directory
 	DBDir string
