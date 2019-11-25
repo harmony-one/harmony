@@ -179,6 +179,17 @@ func AccumulateRewards(
 			howMuchOff := targetStakedPercentage.Sub(*percentageStaked)
 			adjustBy := howMuchOff.MulTruncate(numeric.NewDec(100)).Mul(dynamicAdjust)
 			defaultReward = defaultReward.Add(adjustBy)
+			utils.Logger().Info().
+				Str("percentage-token-staked", percentageStaked.String()).
+				Str("how-much-off", howMuchOff.String()).
+				Str("adjusting-by", adjustBy.String()).
+				Str("block-reward", defaultReward.String()).
+				Msg("dynamic adjustment of block-reward ")
+			// If too much is staked, then possible to have negative reward,
+			// not an error, just a possible economic situation, hence we return
+			if defaultReward.IsNegative() {
+				return nil
+			}
 		}
 
 		// Take care of my own beacon chain committee, _ is missing, for slashing
