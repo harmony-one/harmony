@@ -1141,20 +1141,42 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 	//// Shard State and Validator Update
 	header := block.Header()
-	if header.ShardStateHash() != (common.Hash{}) {
+	if len(header.ShardState()) > 0 {
 		// Write shard state for the new epoch
 		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
-		shardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
+		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
 		if err != nil {
 			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
 			return NonStatTy, err
 		}
 
+		parentHeader := bc.GetHeaderByHash(header.ParentHash())
+		if parentHeader != nil && parentHeader.Epoch().Cmp(header.Epoch()) != 0 {
+			// Normally the last block of an epoch should have the same epoch as this block
+			// In the case beacon chain catch up, it may have a epoch larger than the current epoch
+			// We need to write the same shard state for this one-off epoch so other readers doesn't break
+
+			curShardState, err := bc.ReadShardState(parentHeader.Epoch())
+			if err != nil {
+				header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot read current shard state")
+				return NonStatTy, err
+			}
+			data, err := rlp.EncodeToBytes(curShardState)
+			if err != nil {
+				return NonStatTy, err
+			}
+			_, err = bc.WriteShardStateBytes(batch, header.Epoch(), data)
+			if err != nil {
+				header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
+				return NonStatTy, err
+			}
+		}
+
 		// Find all the active validator addresses and store them in db
 		allActiveValidators := []common.Address{}
 		processed := make(map[common.Address]struct{})
-		for i := range *shardState {
-			shard := (*shardState)[i]
+		for i := range *newShardState {
+			shard := (*newShardState)[i]
 			for j := range shard.Slots {
 				slot := shard.Slots[j]
 				if slot.TotalStake != nil { // For external validator
