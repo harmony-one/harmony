@@ -2401,7 +2401,7 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 	return nil
 }
 
-// UpdateValidatorUptime writes the voting power for the committees
+// UpdateValidatorVotingPower writes the voting power for the committees
 func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
 	totalEffectiveStake := make(map[uint32]numeric.Dec)
 	addrToEffectiveStakes := make(map[common.Address]map[uint32]numeric.Dec)
