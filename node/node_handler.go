@@ -386,8 +386,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	// Update voting power of validators for all shards
 	if len(newBlock.Header().ShardState()) > 0 {
 		shardState := shard.State{}
-		utils.Logger().Print("XXXXXXXX")
-		utils.Logger().Print(shardState.JSON())
 		if err := rlp.DecodeBytes(newBlock.Header().ShardState(), &shardState); err == nil {
 			if err = node.Blockchain().UpdateValidatorVotingPower(shardState); err != nil {
 				utils.Logger().Err(err)

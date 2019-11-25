@@ -2408,11 +2408,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
 
 	for _, committee := range state {
 		for _, slot := range committee.Slots {
-			utils.Logger().Print("TTTTTTT")
-			utils.Logger().Print(committee.ShardID)
 			if slot.TotalStake != nil {
-				utils.Logger().Print("AAAAAA")
-				utils.Logger().Print(slot.TotalStake)
 				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress]; !ok {
 					addrToEffectiveStakes[slot.EcdsaAddress] = map[uint32]numeric.Dec{}
 				}
@@ -2425,9 +2421,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
 					totalEffectiveStake[committee.ShardID] = numeric.NewDec(0)
 				}
 				totalEffectiveStake[committee.ShardID] = totalEffectiveStake[committee.ShardID].Add(*slot.TotalStake)
-				utils.Logger().Print("BBBBBB")
-				utils.Logger().Print(totalEffectiveStake[committee.ShardID])
-				utils.Logger().Print(addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID])
 			}
 		}
 	}
@@ -2440,9 +2433,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
 			addrTotalVotingPower = addrTotalVotingPower.Add(eStake.Quo(totalEffectiveStake[shardID]))
 			addrTotalEffectiveStake = addrTotalEffectiveStake.Add(eStake)
 		}
-		utils.Logger().Print("CCCCCCC")
-		utils.Logger().Print(addrTotalVotingPower)
-		utils.Logger().Print(addrTotalEffectiveStake)
 		// Retrieve the stats and update
 		stats, err := rawdb.ReadValidatorStats(bc.db, addr)
 		if stats == nil {
