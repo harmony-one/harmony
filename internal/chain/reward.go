@@ -32,7 +32,9 @@ var (
 	BlockRewardStakedCase = numeric.NewDecFromBigInt(new(big.Int).Mul(
 		big.NewInt(18), big.NewInt(denominations.One),
 	))
-
+	totalTokens                  = numeric.NewDec(12600000000)
+	targetStakedPercentage       = numeric.MustNewDecFromStr("0.35")
+	dynamicAdjust                = numeric.MustNewDecFromStr("0.4")
 	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
 )
 
@@ -121,6 +123,28 @@ func ballotResultBeaconchain(
 	return ballotResult(bc, header, shard.BeaconChainShardID)
 }
 
+func whatPercentStakedNow(
+	beaconchain engine.ChainReader,
+) (*numeric.Dec, error) {
+	stakedNow := numeric.ZeroDec()
+	active, err := beaconchain.ReadActiveValidatorList()
+
+	if err != nil {
+		return nil, err
+	}
+	for i := range active {
+		wrapper, err := beaconchain.ReadValidatorData(active[i])
+		if err != nil {
+			return nil, err
+		}
+		stakedNow = stakedNow.Add(
+			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
+		)
+	}
+	percentage := stakedNow.Quo(totalTokens)
+	return &percentage, nil
+}
+
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
@@ -144,6 +168,30 @@ func AccumulateRewards(
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 
+		defaultReward := BlockRewardStakedCase
+
+		if len(header.ShardState()) > 0 {
+			// TODO Use cached result in off-chain db instead of full computation
+			percentageStaked, err := whatPercentStakedNow(beaconChain)
+			if err != nil {
+				return err
+			}
+			howMuchOff := targetStakedPercentage.Sub(*percentageStaked)
+			adjustBy := howMuchOff.MulTruncate(numeric.NewDec(100)).Mul(dynamicAdjust)
+			defaultReward = defaultReward.Add(adjustBy)
+			utils.Logger().Info().
+				Str("percentage-token-staked", percentageStaked.String()).
+				Str("how-much-off", howMuchOff.String()).
+				Str("adjusting-by", adjustBy.String()).
+				Str("block-reward", defaultReward.String()).
+				Msg("dynamic adjustment of block-reward ")
+			// If too much is staked, then possible to have negative reward,
+			// not an error, just a possible economic situation, hence we return
+			if defaultReward.IsNegative() {
+				return nil
+			}
+		}
+
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		members, payable, _, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
@@ -157,7 +205,7 @@ func AccumulateRewards(
 			// what to do about share of those that didn't sign
 			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
 			if !voter.IsHarmonyNode {
-				due := BlockRewardStakedCase.Mul(
+				due := defaultReward.Mul(
 					voter.EffectivePercent.Quo(votepower.StakersShare),
 				)
 				state.AddBalance(voter.EarningAccount, due.RoundInt())
@@ -219,7 +267,7 @@ func AccumulateRewards(
 					for member := range payableSigners {
 						voter := votingPower.Voters[payableSigners[member].BlsPublicKey]
 						if !voter.IsHarmonyNode {
-							due := BlockRewardStakedCase.Mul(
+							due := defaultReward.Mul(
 								voter.EffectivePercent.Quo(votepower.StakersShare),
 							)
 							to := voter.EarningAccount
