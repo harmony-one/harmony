@@ -63,6 +63,9 @@ func Compute(staked shard.SlotList) *Roster {
 				Mul(StakersShare)
 			theirPercentage = theirPercentage.Add(member.EffectivePercent)
 		} else { // Our node
+			// TODO See the todo on where this called in one-node-staked-vote,
+			// need to have these two values of our
+			// percentage and hmy percentage sum to 1
 			member.EffectivePercent = HarmonysShare.Quo(ourCount)
 			ourPercentage = ourPercentage.Add(member.EffectivePercent)
 		}

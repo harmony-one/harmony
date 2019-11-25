@@ -157,7 +157,9 @@ func AccumulateRewards(
 			// what to do about share of those that didn't sign
 			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
 			if !voter.IsHarmonyNode {
-				due := BlockRewardStakedCase.Mul(voter.EffectivePercent)
+				due := BlockRewardStakedCase.Mul(
+					voter.EffectivePercent.Quo(votepower.StakersShare),
+				)
 				state.AddBalance(voter.EarningAccount, due.RoundInt())
 			}
 		}
@@ -217,7 +219,9 @@ func AccumulateRewards(
 					for member := range payableSigners {
 						voter := votingPower.Voters[payableSigners[member].BlsPublicKey]
 						if !voter.IsHarmonyNode {
-							due := BlockRewardStakedCase.Mul(voter.EffectivePercent)
+							due := BlockRewardStakedCase.Mul(
+								voter.EffectivePercent.Quo(votepower.StakersShare),
+							)
 							to := voter.EarningAccount
 							go func(signersDue numeric.Dec, addr common.Address, j int) {
 								payable <- slotPayable{
