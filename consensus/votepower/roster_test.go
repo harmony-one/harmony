@@ -59,10 +59,36 @@ func TestCompute(t *testing.T) {
   expectedRoster.HmySlotCount = int64(harmonyNodes)
   // Calculated when generated
   expectedRoster.RawStakedTotal = totalStake
+  for i, slot := range slotList {
+    newMember = stakedVoter{
+      IsActive:         true,
+      IsHarmonyNode:    false,
+      EarningAccount:   slot.EcdsaAddress,
+      EffectivePercent: numeric.ZeroDec(),
+      RawStake:         numeric.ZeroDec(),
+    }
+    // Not Harmony node
+    if newMember.TotalStake != nil {
+      member.RawStake = *slot.TotalStake
+      member.EffectivePercent = slot.TotalStake.Quo(roster.RawStakedTotal).Mul(StakersShare)
+      expectedRoster.TheirVotingPowerTotalPercentage = expectedRoster.TheirVotingPowerTotalPercentage.Add(member.EffectivePercent)
+    } else {
+      // Harmony node
+      member.IsHarmonyNode = true
+      member.RawStake = numeric.ZeroDec()
+      member.EffectivePercent = HarmonysShare.Quo(numeric.NewDec(expectedRoster.HmySlotCount))
+      expectedRoster.OurVotingPowerTotalPercentage = expectedRoster.OurVotingPowerTotalPercentage.Add(member.EffectivePercent)
+    }
+  }
+
   computedRoster := Compute(slotList)
   // Check that voting percents sum to 100
   if !computedRoster.OurVotingPowerTotalPercentage.Add(computedRoster.TheirVotingPowerTotalPercentage).Equal(numeric.OneDec()) {
     t.Errorf("Total voting power does not equal 1. Harmony voting power: %s, Staked voting power: %s",
       computedRoster.OurVotingPowerTotalPercentage, computedRoster.TheirVotingPowerTotalPercentage)
   }
+}
+
+func compareRosters(a, b Roster) bool {
+
 }
