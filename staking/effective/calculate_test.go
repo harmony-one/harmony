@@ -87,7 +87,7 @@ func TestMedian(t *testing.T) {
 func TestEffectiveStake(t *testing.T) {
 	for _, val := range testingPurchases {
 		expectedStake := numeric.MaxDec(numeric.MinDec(numeric.OneDec().Add(c).Mul(expectedMedian), val.Dec),
-		  numeric.OneDec().Sub(c).Mul(expectedMedian))
+			numeric.OneDec().Sub(c).Mul(expectedMedian))
 		calculatedStake := effectiveStake(expectedMedian, val.Dec)
 		if !expectedStake.Equal(calculatedStake) {
 			t.Errorf("Expected: %s, Got: %s", expectedStake.String(), calculatedStake.String())
