@@ -18,6 +18,7 @@ import (
 const eposTestingFile = "epos.json"
 
 var (
+	testingNumber    = 20
 	testingSlots     slotsData
 	testingPurchases Slots
 	expectedMedian   numeric.Dec
@@ -49,7 +50,7 @@ func init() {
 		fmt.Println(oops.Error())
 		panic("Could not unmarshal slots data into memory")
 	}
-	testingPurchases = generateRandomSlots(20)
+	testingPurchases = generateRandomSlots(testingNumber)
 }
 
 func generateRandomSlots(num int) Slots {
