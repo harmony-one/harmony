@@ -53,11 +53,13 @@ func Compute(staked shard.SlotList) *Roster {
 			IsHarmonyNode:    true,
 			EarningAccount:   staked[i].EcdsaAddress,
 			EffectivePercent: numeric.ZeroDec(),
+			RawStake:         numeric.ZeroDec(),
 		}
 
 		// Real Staker
 		if staked[i].TotalStake != nil {
 			member.IsHarmonyNode = false
+			member.RawStake = member.RawStake.Add(*staked[i].TotalStake)
 			member.EffectivePercent = staked[i].TotalStake.
 				Quo(roster.RawStakedTotal).
 				Mul(StakersShare)
