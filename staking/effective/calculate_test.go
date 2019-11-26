@@ -16,11 +16,12 @@ import (
 )
 
 const eposTestingFile = "epos.json"
-const slotTestingFile = "slots.json"
 
 var (
+	testingNumber    = 20
 	testingSlots     slotsData
 	testingPurchases Slots
+	expectedMedian   numeric.Dec
 	maxAccountGen    = int64(98765654323123134)
 	accountGen       = rand.New(rand.NewSource(1337))
 	maxKeyGen        = int64(98765654323123134)
@@ -49,7 +50,7 @@ func init() {
 		fmt.Println(oops.Error())
 		panic("Could not unmarshal slots data into memory")
 	}
-	testingPurchases = generateRandomSlots(20)
+	testingPurchases = generateRandomSlots(testingNumber)
 }
 
 func generateRandomSlots(num int) Slots {
@@ -72,20 +73,26 @@ func TestMedian(t *testing.T) {
 	sort.SliceStable(copyPurchases,
 		func(i, j int) bool { return copyPurchases[i].Dec.LTE(copyPurchases[j].Dec) })
 	numPurchases := len(copyPurchases) / 2
-	expectedResult := numeric.ZeroDec()
 	if len(copyPurchases)%2 == 0 {
-		expectedResult = copyPurchases[numPurchases-1].Dec.Add(copyPurchases[numPurchases].Dec).Quo(two)
+		expectedMedian = copyPurchases[numPurchases-1].Dec.Add(copyPurchases[numPurchases].Dec).Quo(two)
 	} else {
-		expectedResult = copyPurchases[numPurchases].Dec
+		expectedMedian = copyPurchases[numPurchases].Dec
 	}
 	med := median(testingPurchases)
-	if !med.Equal(expectedResult) {
-		t.Errorf("Expected: %s, Got: %s", expectedResult.String(), med.String())
+	if !med.Equal(expectedMedian) {
+		t.Errorf("Expected: %s, Got: %s", expectedMedian.String(), med.String())
 	}
 }
 
 func TestEffectiveStake(t *testing.T) {
-	//
+	for _, val := range testingPurchases {
+		expectedStake := numeric.MaxDec(numeric.MinDec(numeric.OneDec().Add(c).Mul(expectedMedian), val.Dec),
+			numeric.OneDec().Sub(c).Mul(expectedMedian))
+		calculatedStake := effectiveStake(expectedMedian, val.Dec)
+		if !expectedStake.Equal(calculatedStake) {
+			t.Errorf("Expected: %s, Got: %s", expectedStake.String(), calculatedStake.String())
+		}
+	}
 }
 
 func TestApply(t *testing.T) {
