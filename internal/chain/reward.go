@@ -180,26 +180,24 @@ func AccumulateRewards(
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		defaultReward := BlockRewardStakedCase
 
-		if len(header.ShardState()) > 0 {
-			// TODO Use cached result in off-chain db instead of full computation
-			percentageStaked, err := whatPercentStakedNow(beaconChain)
-			if err != nil {
-				return err
-			}
-			howMuchOff := targetStakedPercentage.Sub(*percentageStaked)
-			adjustBy := howMuchOff.MulTruncate(numeric.NewDec(100)).Mul(dynamicAdjust)
-			defaultReward = defaultReward.Add(adjustBy)
-			utils.Logger().Info().
-				Str("percentage-token-staked", percentageStaked.String()).
-				Str("how-much-off", howMuchOff.String()).
-				Str("adjusting-by", adjustBy.String()).
-				Str("block-reward", defaultReward.String()).
-				Msg("dynamic adjustment of block-reward ")
-			// If too much is staked, then possible to have negative reward,
-			// not an error, just a possible economic situation, hence we return
-			if defaultReward.IsNegative() {
-				return nil
-			}
+		// TODO Use cached result in off-chain db instead of full computation
+		percentageStaked, err := whatPercentStakedNow(beaconChain)
+		if err != nil {
+			return err
+		}
+		howMuchOff := targetStakedPercentage.Sub(*percentageStaked)
+		adjustBy := howMuchOff.MulTruncate(numeric.NewDec(100)).Mul(dynamicAdjust)
+		defaultReward = defaultReward.Add(adjustBy)
+		utils.Logger().Info().
+			Str("percentage-token-staked", percentageStaked.String()).
+			Str("how-much-off", howMuchOff.String()).
+			Str("adjusting-by", adjustBy.String()).
+			Str("block-reward", defaultReward.String()).
+			Msg("dynamic adjustment of block-reward ")
+		// If too much is staked, then possible to have negative reward,
+		// not an error, just a possible economic situation, hence we return
+		if defaultReward.IsNegative() {
+			return nil
 		}
 
 		newRewards := big.NewInt(0)
@@ -238,10 +236,10 @@ func AccumulateRewards(
 			}
 
 			type slotPayable struct {
-				effective numeric.Dec
-				payee     common.Address
-				bucket    int
-				index     int
+				payout numeric.Dec
+				payee  common.Address
+				bucket int
+				index  int
 			}
 
 			allPayables := []slotPayable{}
@@ -284,10 +282,10 @@ func AccumulateRewards(
 						)
 						to := voter.EarningAccount
 						allPayables = append(allPayables, slotPayable{
-							effective: due,
-							payee:     to,
-							bucket:    i,
-							index:     j,
+							payout: due,
+							payee:  to,
+							bucket: i,
+							index:  j,
 						})
 					}
 				}
@@ -320,7 +318,7 @@ func AccumulateRewards(
 					if err != nil {
 						return err
 					}
-					due := resultsHandle[bucket][payThem].effective.TruncateInt()
+					due := resultsHandle[bucket][payThem].payout.TruncateInt()
 					newRewards = new(big.Int).Add(newRewards, due)
 					state.AddReward(snapshot, due)
 				}
