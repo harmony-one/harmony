@@ -479,10 +479,15 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		!consensus.ChainReader.Config().IsStaking(curEpoch)) ||
 		(consensus.ChainReader.Config().IsStaking(curEpoch) &&
 			consensus.Decider.Policy() != quorum.SuperMajorityStake) {
+
 		consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
 		consensus.Decider.SetShardIDProvider(func() (uint32, error) {
 			return consensus.ShardID, nil
 		})
+
+		if consensus.ShardID == shard.BeaconChainShardID {
+			consensus.ChainReader.UpdateBlockRewardAccumulator(big.NewInt(0))
+		}
 	}
 
 	committeeToSet := &shard.Committee{}

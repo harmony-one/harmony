@@ -27,11 +27,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/numeric"
-
-	"github.com/harmony-one/harmony/crypto/bls"
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -47,11 +42,15 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
+	lru "github.com/hashicorp/golang-lru"
+	db_error "github.com/syndtr/goleveldb/leveldb/errors"
 )
 
 var (
@@ -2651,7 +2650,10 @@ func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
 //UpdateBlockRewardAccumulator ..
 func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int) error {
 	current, err := bc.BlockRewardAccumulator()
-	if err != nil {
+	if err == db_error.ErrNotFound {
+		return rawdb.WriteBlockRewardAccumulator(bc.db, big.NewInt(0))
+	}
+	if err != nil && err != db_error.ErrNotFound {
 		return err
 	}
 	return rawdb.WriteBlockRewardAccumulator(bc.db, new(big.Int).Add(current, diff))
