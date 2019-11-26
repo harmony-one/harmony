@@ -45,7 +45,6 @@ func Compute(staked shard.SlotList) *Roster {
 	ourCount := numeric.NewDec(roster.HmySlotCount)
 	ourPercentage := numeric.ZeroDec()
 	theirPercentage := numeric.ZeroDec()
-	totalStakedPercent := numeric.ZeroDec()
 
 	for i := range staked {
 		member := stakedVoter{
@@ -72,7 +71,6 @@ func Compute(staked shard.SlotList) *Roster {
 			ourPercentage = ourPercentage.Add(member.EffectivePercent)
 		}
 
-		totalStakedPercent = totalStakedPercent.Add(member.EffectivePercent)
 		roster.Voters[staked[i].BlsPublicKey] = member
 	}
 

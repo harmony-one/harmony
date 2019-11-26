@@ -36,7 +36,7 @@ type Slot struct {
 	TotalStake *numeric.Dec `json:"total-stake" rlp:"nil"`
 }
 
-// SlotList is a list of SlotList.
+// SlotList is a list of Slot.
 type SlotList []Slot
 
 // Committee contains the active nodes in one shard
