@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // CrossLink is only used on beacon chain to store the hash links from other shards
@@ -16,12 +15,11 @@ import (
 // Here we replace header to signatures only, the basic assumption is the committee will not be
 // corrupted during one epoch, which is the same as consensus assumption
 type CrossLink struct {
-	ParentHashF  common.Hash
+	HashF        common.Hash
 	BlockNumberF *big.Int
 	SignatureF   [96]byte //aggregated signature
 	BitmapF      []byte   //corresponding bitmap mask for agg signature
 	ShardIDF     uint32   //will be verified with signature on |blockNumber|blockHash| is correct
-	ParentEpochF *big.Int //will be verified with signature on |blockNumber|blockHash| is correct
 }
 
 // NewCrossLink returns a new cross link object
@@ -29,26 +27,14 @@ func NewCrossLink(header *block.Header) CrossLink {
 	if header.Number().Uint64() == 0 {
 		return CrossLink{}
 	}
-	epoch := big.NewInt(0)
 	parentBlockNum := big.NewInt(0)
-	// check if previous header is the last block of an epoch
-	if shard.Schedule.IsLastBlock(header.Number().Uint64() - 1) {
-		epoch.Sub(header.Epoch(), big.NewInt(1))
-	} else {
-		epoch = header.Epoch()
-	}
 	parentBlockNum.Sub(header.Number(), big.NewInt(1))
-	return CrossLink{header.ParentHash(), parentBlockNum, header.LastCommitSignature(), header.LastCommitBitmap(), header.ShardID(), epoch}
+	return CrossLink{header.ParentHash(), parentBlockNum, header.LastCommitSignature(), header.LastCommitBitmap(), header.ShardID()}
 }
 
 // ShardID returns shardID
 func (cl CrossLink) ShardID() uint32 {
 	return cl.ShardIDF
-}
-
-// ShardID returns shardID
-func (cl CrossLink) Epoch() *big.Int {
-	return cl.ParentEpochF
 }
 
 // Number returns blockNum with big.Int format
@@ -62,8 +48,8 @@ func (cl CrossLink) BlockNum() uint64 {
 }
 
 // Hash returns hash
-func (cl CrossLink) ParentHash() common.Hash {
-	return cl.ParentHashF
+func (cl CrossLink) Hash() common.Hash {
+	return cl.HashF
 }
 
 // Bitmap returns bitmap

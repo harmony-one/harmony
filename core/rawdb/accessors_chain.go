@@ -539,18 +539,18 @@ func WriteShardLastCrossLink(db DatabaseWriter, shardID uint32, data []byte) err
 	return db.Put(shardLastCrosslinkKey(shardID), data)
 }
 
-// ReadLastPendingCrossLinks retrieves last pending crosslinks.
-func ReadLastPendingCrossLinks(db DatabaseReader) ([]byte, error) {
+// ReadPendingCrossLinks retrieves last pending crosslinks.
+func ReadPendingCrossLinks(db DatabaseReader) ([]byte, error) {
 	return db.Get(lastPendingCrosslinkKey)
 }
 
-// WriteLastPendingCrossLinks stores last pending crosslinks into database.
-func WriteLastPendingCrossLinks(db DatabaseWriter, bytes []byte) error {
+// WritePendingCrossLinks stores last pending crosslinks into database.
+func WritePendingCrossLinks(db DatabaseWriter, bytes []byte) error {
 	return db.Put(lastPendingCrosslinkKey, bytes)
 }
 
-// DeleteLastPendingCrossLinks stores last pending crosslinks into database.
-func DeleteLastPendingCrossLinks(db DatabaseDeleter) error {
+// DeletePendingCrossLinks stores last pending crosslinks into database.
+func DeletePendingCrossLinks(db DatabaseDeleter) error {
 	return db.Delete(lastPendingCrosslinkKey)
 }
 

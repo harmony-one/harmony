@@ -124,11 +124,8 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 		cl, err := node.Blockchain().ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
 		if err == nil && cl != nil {
 			if !bytes.Equal(cl.Serialize(), crossLink.Serialize()) {
-				return ctxerror.New("[CrossLinkVerification] Double signed crossLink",
-					"blockHash", block.Hash(),
-					"Previous committed crossLink", cl,
-					"crossLink", crossLink,
-				)
+				// Add logic to slash double sign
+				utils.Logger().Warn().Msgf("[CrossLinkVerification] Double signed crossLink, previous crossLink %+v, crosslink %+v", cl, crossLink)
 			}
 			continue
 		}
@@ -164,7 +161,8 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			Msgf("[ProcessingCrossLink] Crosslink going to propose: %d", len(crosslinks))
 
 		for i, cl := range crosslinks {
-			if cl.Number() == nil || cl.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) < 0 {
+			epoch := node.Blockchain().GetBlockByNumber(cl.BlockNum()).Epoch()
+			if cl.Number() == nil || epoch.Cmp(node.Blockchain().Config().CrossLinkEpoch) < 0 {
 				utils.Logger().Debug().
 					Msgf("[ProcessingCrossLink] Crosslink %d skipped: %v", i, cl)
 				continue
@@ -188,7 +186,9 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			utils.Logger().Debug().
 				Msgf("[ProcessingCrossLink] committing for shardID %d, blockNum %d", cl.ShardID(), cl.Number().Uint64())
 		}
-		Len, err := node.Blockchain().AddLastPendingCrossLinks(candidates)
+		node.pendingCLMutex.Lock()
+		Len, err := node.Blockchain().AddPendingCrossLinks(candidates)
+		node.pendingCLMutex.Unlock()
 		utils.Logger().Error().Err(err).
 			Msgf("[ProcessingCrossLink] add pending crosslinks,  total pending: %d", Len)
 	}
@@ -238,7 +238,8 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 
 	// Verify signature of the new cross link header
 	// TODO: check whether to recalculate shard state
-	shardState, err := node.Blockchain().ReadShardState(cl.Epoch())
+	epoch := node.Blockchain().GetBlockByNumber(cl.BlockNum()).Epoch()
+	shardState, err := node.Blockchain().ReadShardState(epoch)
 	committee := shardState.FindCommitteeByID(cl.ShardID())
 
 	if err != nil || committee == nil {
@@ -276,10 +277,10 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 			return ctxerror.New("unable to deserialize multi-signature from payload").WithCause(err)
 		}
 
-		parentHash := cl.ParentHash()
+		hash := cl.Hash()
 		blockNumBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumBytes, cl.BlockNum())
-		commitPayload := append(blockNumBytes, parentHash[:]...)
+		commitPayload := append(blockNumBytes, hash[:]...)
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 			return ctxerror.New("Failed to verify the signature for cross link", "shardID", cl.ShardID(), "blockNum", cl.BlockNum())
 		}
