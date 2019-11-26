@@ -46,7 +46,10 @@ type Committee struct {
 	Slots   SlotList `json:"subcommittee"`
 }
 
-/* Legacy */
+/* Legacy
+These are the pre-staking used data-structures, needed to maintain
+compatibilty for RLP decode/encode
+*/
 
 // StateLegacy ..
 type StateLegacy []CommitteeLegacy
