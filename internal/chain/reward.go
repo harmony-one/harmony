@@ -1,9 +1,10 @@
 package chain
 
 import (
-	"github.com/harmony-one/harmony/shard/committee"
 	"math/big"
 	"sort"
+
+	"github.com/harmony-one/harmony/shard/committee"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -257,7 +258,7 @@ func AccumulateRewards(
 				votingPower := votepower.Compute(payableSigners)
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
-					if !voter.IsHarmonyNode && !voter.EffectivePercent.IsZero(){
+					if !voter.IsHarmonyNode && !voter.EffectivePercent.IsZero() {
 						due := defaultReward.Mul(
 							voter.EffectivePercent.Quo(votepower.StakersShare),
 						)
