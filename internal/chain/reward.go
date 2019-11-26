@@ -30,14 +30,17 @@ var (
 	// BlockReward is the block reward, to be split evenly among block signers.
 	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
 	// BlockRewardStakedCase is the baseline block reward in staked case -
-	BlockRewardStakedCase = numeric.NewDecFromBigInt(new(big.Int).Mul(
-		big.NewInt(18), big.NewInt(denominations.One),
-	))
 	totalTokens                  = numeric.NewDec(12600000000)
 	targetStakedPercentage       = numeric.MustNewDecFromStr("0.35")
 	dynamicAdjust                = numeric.MustNewDecFromStr("0.4")
 	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
 )
+
+func baseStakedBlockReward() numeric.Dec {
+	return numeric.NewDecFromBigInt(new(big.Int).Mul(
+		big.NewInt(18), big.NewInt(denominations.One),
+	))
+}
 
 func blockSigners(
 	header *block.Header, parentCommittee *shard.Committee,
@@ -178,7 +181,7 @@ func AccumulateRewards(
 	//// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		defaultReward := BlockRewardStakedCase
+		defaultReward := baseStakedBlockReward()
 
 		// TODO Use cached result in off-chain db instead of full computation
 		percentageStaked, err := whatPercentStakedNow(beaconChain)
