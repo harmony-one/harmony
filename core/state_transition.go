@@ -303,50 +303,50 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	switch msg.Type() {
 	case types.StakeNewVal:
 		stkMsg := &staking.CreateValidator{}
-		if msg.From() != stkMsg.ValidatorAddress {
-			return 0, errInvalidSigner
-		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
+		}
+		if msg.From() != stkMsg.ValidatorAddress {
+			return 0, errInvalidSigner
 		}
 		err = st.applyCreateValidatorTx(stkMsg, msg.BlockNum())
 
 	case types.StakeEditVal:
 		stkMsg := &staking.EditValidator{}
-		if msg.From() != stkMsg.ValidatorAddress {
-			return 0, errInvalidSigner
-		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
+		}
+		if msg.From() != stkMsg.ValidatorAddress {
+			return 0, errInvalidSigner
 		}
 		err = st.applyEditValidatorTx(stkMsg, msg.BlockNum())
 
 	case types.Delegate:
 		stkMsg := &staking.Delegate{}
-		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
-		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
+		}
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
 		}
 		err = st.applyDelegateTx(stkMsg)
 
 	case types.Undelegate:
 		stkMsg := &staking.Undelegate{}
-		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
-		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
+		}
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
 		}
 		err = st.applyUndelegateTx(stkMsg)
 	case types.CollectRewards:
 		stkMsg := &staking.CollectRewards{}
-		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
-		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
+		}
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
 		}
 		err = st.applyCollectRewards(stkMsg)
 	default:
