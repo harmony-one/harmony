@@ -86,9 +86,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	coinbase := node.Consensus.SelfAddress
 
 	// After staking, all coinbase will be the address of bls pub key
-	if node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) {
+	if node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) && node.Consensus.PubKey.Contains(node.Consensus.LeaderPubKey) {
 		addr := common.Address{}
-		blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
+		blsPubKeyBytes := node.Consensus.LeaderPubKey.GetAddress()
 		addr.SetBytes(blsPubKeyBytes[:])
 		coinbase = addr
 	}
