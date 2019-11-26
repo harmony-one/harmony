@@ -435,12 +435,10 @@ func ReadShardState(
 
 // WriteShardState stores sharding state into database.
 func WriteShardState(
-	db DatabaseWriter, epoch *big.Int, shardState shard.State,
-) (err error) {
-
-	// TODO hook here and WriteShardState, use db.Config.IsStaking
-	// var data []byte
-	data, err := rlp.EncodeToBytes(shardState)
+	db DatabaseWriter, epoch *big.Int,
+	shardState shard.State, isStaking bool,
+) error {
+	data, err := shard.EncodeWrapper(shardState, isStaking)
 	if err != nil {
 		return ctxerror.New("cannot encode sharding state",
 			"epoch", epoch,
@@ -450,9 +448,7 @@ func WriteShardState(
 }
 
 // WriteShardStateBytes stores sharding state into database.
-func WriteShardStateBytes(
-	db DatabaseWriter, epoch *big.Int, data []byte,
-) (err error) {
+func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) (err error) {
 	if err = db.Put(shardStateKey(epoch), data); err != nil {
 		return ctxerror.New("cannot write sharding state",
 			"epoch", epoch,

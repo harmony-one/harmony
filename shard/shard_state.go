@@ -94,6 +94,33 @@ func DecodeWrapper(shardState []byte) (State, error) {
 	return nil, err2
 }
 
+// EncodeWrapper ..
+func EncodeWrapper(shardState State, isStaking bool) ([]byte, error) {
+	var (
+		data []byte
+		err  error
+	)
+	if isStaking {
+		data, err = rlp.EncodeToBytes(shardState)
+	} else {
+		shardStateLegacy := make(StateLegacy, len(shardState))
+		for i := range shardState {
+			shardStateLegacy[i] = CommitteeLegacy{
+				ShardID: shardState[i].ShardID, Slots: SlotListLegacy{},
+			}
+			for _, slot := range shardState[i].Slots {
+				shardStateLegacy[i].Slots = append(shardStateLegacy[i].Slots, SlotLegacy{
+					slot.EcdsaAddress, slot.BlsPublicKey,
+				})
+			}
+		}
+
+		data, err = rlp.EncodeToBytes(shardStateLegacy)
+	}
+
+	return data, err
+}
+
 // JSON produces a non-pretty printed JSON string of the SuperCommittee
 func (ss State) JSON() string {
 	type t struct {
