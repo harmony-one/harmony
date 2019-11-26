@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	peer "github.com/libp2p/go-libp2p-peer"
@@ -126,6 +128,21 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 func ConstructTransactionListMessageAccount(transactions types.Transactions) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Transaction))
+	byteBuffer.WriteByte(byte(Send))
+
+	txs, err := rlp.EncodeToBytes(transactions)
+	if err != nil {
+		log.Fatal(err)
+		return []byte{} // TODO(RJ): better handle of the error
+	}
+	byteBuffer.Write(txs)
+	return byteBuffer.Bytes()
+}
+
+// ConstructStakingTransactionListMessageAccount constructs serialized staking transactions in account model
+func ConstructStakingTransactionListMessageAccount(transactions types2.StakingTransactions) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(Staking))
 	byteBuffer.WriteByte(byte(Send))
 
 	txs, err := rlp.EncodeToBytes(transactions)

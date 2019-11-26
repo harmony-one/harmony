@@ -241,6 +241,7 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	return bc
 }
 
+// TODO: make this batch more transactions
 func (node *Node) tryBroadcast(tx *types.Transaction) {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 
@@ -250,6 +251,21 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
 		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
+		} else {
+			break
+		}
+	}
+}
+
+func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
+	msg := proto_node.ConstructStakingTransactionListMessageAccount(staking.StakingTransactions{stakingTx})
+
+	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(0)) // broadcast to beacon chain
+	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcastStaking")
+
+	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
+		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
+			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
 		} else {
 			break
 		}
@@ -286,12 +302,19 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 // AddPendingStakingTransaction staking transactions
 func (node *Node) AddPendingStakingTransaction(
 	newStakingTx *staking.StakingTransaction) {
-	node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+	// TODO: everyone should record staking txns, not just leader
+	if node.Consensus.IsLeader() && node.NodeConfig.ShardID == 0 {
+		node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+	} else {
+		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
+		node.tryBroadcastStaking(newStakingTx)
+	}
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 // This is only called from SDK.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
+	// TODO: everyone should record txns, not just leader
 	if node.Consensus.IsLeader() && newTx.ShardID() == node.NodeConfig.ShardID {
 		node.addPendingTransactions(types.Transactions{newTx})
 	} else {
