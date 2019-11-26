@@ -27,6 +27,13 @@ import (
 
 // handleMessageUpdate will update the consensus state according to received message
 func (consensus *Consensus) handleMessageUpdate(payload []byte) {
+	if !consensus.Decider.AmIMemberOfCommitee() {
+		utils.Logger().Debug().
+			Str("PublicKey", consensus.PubKey.SerializeToHexStr()).
+			Msg("Current node not in committee, early exit, ignore the incoming message")
+		return
+	}
+
 	if len(payload) == 0 {
 		return
 	}
