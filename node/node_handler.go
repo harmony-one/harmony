@@ -181,15 +181,20 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
-	txs := staking.StakingTransactions{}
-	err := rlp.Decode(bytes.NewReader(msgPayload[:]), &txs)
-	if err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("Failed to deserialize staking transaction list")
-		return
+	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
+
+	switch txMessageType {
+	case proto_node.Send:
+		txs := staking.StakingTransactions{}
+		err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send messge type
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Msg("Failed to deserialize staking transaction list")
+			return
+		}
+		node.addPendingStakingTransactions(txs)
 	}
-	node.addPendingStakingTransactions(txs)
 }
 
 // BroadcastNewBlock is called by consensus leader to sync new blocks with other clients/nodes.
