@@ -614,11 +614,11 @@ func WriteCXReceiptsProofUnspentCheckpoint(db DatabaseWriter, shardID uint32, bl
 	return db.Put(cxReceiptUnspentCheckpointKey(shardID), by)
 }
 
-// ReadValidatorData retrieves staking validator by its address
-func ReadValidatorData(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
+// ReadValidatorInformation retrieves staking validator by its address
+func ReadValidatorInformation(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
 	data, err := db.Get(validatorKey(addr))
 	if err != nil || len(data) == 0 {
-		utils.Logger().Info().Err(err).Msg("ReadValidatorData")
+		utils.Logger().Info().Err(err).Msg("ReadValidatorInformation")
 		return nil, err
 	}
 	v := staking.ValidatorWrapper{}

@@ -134,7 +134,7 @@ func whatPercentStakedNow(
 		return nil, err
 	}
 	for i := range active {
-		wrapper, err := beaconchain.ReadValidatorData(active[i])
+		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
 		if err != nil {
 			return nil, err
 		}
@@ -166,6 +166,7 @@ func AccumulateRewards(
 		return nil
 	}
 
+	//// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 
@@ -209,7 +210,11 @@ func AccumulateRewards(
 				due := defaultReward.Mul(
 					voter.EffectivePercent.Quo(votepower.StakersShare),
 				)
-				state.AddBalance(voter.EarningAccount, due.RoundInt())
+				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
+				if err != nil {
+					return err
+				}
+				state.AddReward(snapshot, due.RoundInt())
 			}
 		}
 
@@ -296,8 +301,12 @@ func AccumulateRewards(
 			// Finally do the pay
 			for bucket := range resultsHandle {
 				for payThem := range resultsHandle[bucket] {
-					state.AddBalance(
-						resultsHandle[bucket][payThem].payee,
+					snapshot, err := bc.ReadValidatorSnapshot(resultsHandle[bucket][payThem].payee)
+					if err != nil {
+						return err
+					}
+					state.AddReward(
+						snapshot,
 						resultsHandle[bucket][payThem].effective.TruncateInt(),
 					)
 				}
@@ -306,6 +315,7 @@ func AccumulateRewards(
 		return nil
 	}
 
+	//// Before staking
 	payable := []struct {
 		string
 		common.Address

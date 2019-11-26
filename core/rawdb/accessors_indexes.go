@@ -61,7 +61,7 @@ func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 		entry := TxLookupEntry{
 			BlockHash:  block.Hash(),
 			BlockIndex: block.NumberU64(),
-			Index:      uint64(len(block.Transactions()) + i),
+			Index:      uint64(i),
 		}
 		data, err := rlp.EncodeToBytes(entry)
 		if err != nil {

@@ -2306,8 +2306,8 @@ func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, 
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }
 
-// ReadValidatorDataAt reads staking information of given validatorWrapper at a specific state root
-func (bc *BlockChain) ReadValidatorDataAt(addr common.Address, root common.Hash) (*staking.ValidatorWrapper, error) {
+// ReadValidatorInformationAt reads staking information of given validatorWrapper at a specific state root
+func (bc *BlockChain) ReadValidatorInformationAt(addr common.Address, root common.Hash) (*staking.ValidatorWrapper, error) {
 	state, err := bc.StateAt(root)
 	if err != nil || state == nil {
 		return nil, err
@@ -2319,13 +2319,12 @@ func (bc *BlockChain) ReadValidatorDataAt(addr common.Address, root common.Hash)
 	return wrapper, nil
 }
 
-// ReadValidatorData reads staking information of given validatorWrapper
-func (bc *BlockChain) ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error) {
-	return bc.ReadValidatorDataAt(addr, bc.CurrentBlock().Root())
+// ReadValidatorInformation reads staking information of given validator address
+func (bc *BlockChain) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
+	return bc.ReadValidatorInformationAt(addr, bc.CurrentBlock().Root())
 }
 
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
-// TODO: put epoch number in to snapshot too.
 func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
 	if cached, ok := bc.validatorCache.Get("validator-snapshot-" + string(addr.Bytes())); ok {
 		by := cached.([]byte)
@@ -2344,7 +2343,7 @@ func (bc *BlockChain) WriteValidatorSnapshots(addrs []common.Address) error {
 	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
 	for _, addr := range addrs {
-		validator, err := bc.ReadValidatorData(addr)
+		validator, err := bc.ReadValidatorInformation(addr)
 		if err != nil {
 			return err
 		}
@@ -2661,7 +2660,7 @@ func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress comm
 
 	// Found the delegation from state and add the delegation index
 	// Note this should read from the state of current block in concern
-	wrapper, err := bc.ReadValidatorDataAt(validatorAddress, root)
+	wrapper, err := bc.ReadValidatorInformationAt(validatorAddress, root)
 	if err != nil {
 		return err
 	}

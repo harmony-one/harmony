@@ -273,7 +273,10 @@ func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (shard.State, error)  
 func (cr *fakeChainReader) ReadActiveValidatorList() ([]common.Address, error)      { return nil, nil }
 
 func (cr *fakeChainReader) ValidatorCandidates() []common.Address { return nil }
-func (cr *fakeChainReader) ReadValidatorData(addr common.Address) (*staking.ValidatorWrapper, error) {
+func (cr *fakeChainReader) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+func (cr *fakeChainReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
 func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) *big.Int { return nil }
