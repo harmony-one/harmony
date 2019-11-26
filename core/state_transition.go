@@ -32,6 +32,7 @@ import (
 )
 
 var (
+	errInvalidSigner               = errors.New("invalid signer for staking transaction")
 	errInsufficientBalanceForGas   = errors.New("insufficient balance to pay for gas")
 	errInsufficientBalanceForStake = errors.New("insufficient balance to stake")
 	errValidatorExist              = errors.New("staking validator already exists")
@@ -302,6 +303,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	switch msg.Type() {
 	case types.StakeNewVal:
 		stkMsg := &staking.CreateValidator{}
+		if msg.From() != stkMsg.ValidatorAddress {
+			return 0, errInvalidSigner
+		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
@@ -309,6 +313,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	case types.StakeEditVal:
 		stkMsg := &staking.EditValidator{}
+		if msg.From() != stkMsg.ValidatorAddress {
+			return 0, errInvalidSigner
+		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
@@ -316,6 +323,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	case types.Delegate:
 		stkMsg := &staking.Delegate{}
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
+		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
@@ -323,12 +333,18 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	case types.Undelegate:
 		stkMsg := &staking.Undelegate{}
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
+		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
 		err = st.applyUndelegateTx(stkMsg)
 	case types.CollectRewards:
 		stkMsg := &staking.CollectRewards{}
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
+		}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}

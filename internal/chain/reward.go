@@ -3,7 +3,8 @@ package chain
 import (
 	"math/big"
 	"sort"
-	"sync"
+
+	"github.com/harmony-one/harmony/shard/committee"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -220,90 +221,71 @@ func AccumulateRewards(
 				return err
 			}
 
-			w := sync.WaitGroup{}
-
 			type slotPayable struct {
 				effective numeric.Dec
 				payee     common.Address
 				bucket    int
 				index     int
-				oops      error
 			}
 
-			payable := make(chan slotPayable)
-
-			slotError := func(err error, receive chan slotPayable) {
-				s := slotPayable{}
-				s.oops = err
-				go func() {
-					receive <- s
-				}()
-			}
+			allPayables := []slotPayable{}
 
 			for i := range crossLinks {
-				w.Add(1)
 
-				go func(i int) {
-					defer w.Done()
-					cxLink := crossLinks[i]
-					subCommittee := shard.State{}
-					if err := rlp.DecodeBytes(
-						cxLink.ChainHeader.ShardState(), &subCommittee,
-					); err != nil {
-						slotError(err, payable)
-						return
+				cxLink := crossLinks[i]
+
+				shardState, err := bc.ReadShardState(cxLink.ChainHeader.Epoch())
+				if !bc.Config().IsStaking(cxLink.Header().Epoch()) {
+					shardState, err = committee.WithStakingEnabled.Compute(cxLink.ChainHeader.Epoch(), bc)
+				}
+
+				if err != nil {
+					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
+					// TODO: FIX THIS WITH NEW CROSSLINK FORMAT
+					continue
+				}
+
+				subComm := shardState.FindCommitteeByID(cxLink.ShardID())
+				// _ are the missing signers, later for slashing
+				payableSigners, _, err := blockSigners(cxLink.Header(), subComm)
+
+				if err != nil {
+					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
+					// TODO: FIX THIS WITH NEW CROSSLINK FORMAT
+					continue
+				}
+
+				votingPower := votepower.Compute(payableSigners)
+				for j := range payableSigners {
+					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
+					if !voter.IsHarmonyNode && !voter.EffectivePercent.IsZero() {
+						due := defaultReward.Mul(
+							voter.EffectivePercent.Quo(votepower.StakersShare),
+						)
+						to := voter.EarningAccount
+						allPayables = append(allPayables, slotPayable{
+							effective: due,
+							payee:     to,
+							bucket:    i,
+							index:     j,
+						})
 					}
+				}
 
-					subComm := subCommittee.FindCommitteeByID(cxLink.ShardID())
-					// _ are the missing signers, later for slashing
-					payableSigners, _, err := blockSigners(cxLink.Header(), subComm)
-					votingPower := votepower.Compute(subComm.Slots)
-
-					if err != nil {
-						slotError(err, payable)
-						return
-					}
-
-					for member := range payableSigners {
-						voter := votingPower.Voters[payableSigners[member].BlsPublicKey]
-						if !voter.IsHarmonyNode {
-							due := defaultReward.Mul(
-								voter.EffectivePercent.Quo(votepower.StakersShare),
-							)
-							to := voter.EarningAccount
-							go func(signersDue numeric.Dec, addr common.Address, j int) {
-								payable <- slotPayable{
-									effective: signersDue,
-									payee:     addr,
-									bucket:    i,
-									index:     j,
-									oops:      nil,
-								}
-							}(due, to, member)
-						}
-					}
-				}(i)
 			}
 
-			w.Wait()
 			resultsHandle := make([][]slotPayable, len(crossLinks))
 			for i := range resultsHandle {
 				resultsHandle[i] = []slotPayable{}
 			}
 
-			for payThem := range payable {
+			for _, payThem := range allPayables {
 				bucket := payThem.bucket
 				resultsHandle[bucket] = append(resultsHandle[bucket], payThem)
 			}
 
 			// Check if any errors and sort each bucket to enforce order
 			for bucket := range resultsHandle {
-				for payThem := range resultsHandle[bucket] {
-					if err := resultsHandle[bucket][payThem].oops; err != nil {
-						return err
-					}
-				}
-
 				sort.SliceStable(resultsHandle[bucket],
 					func(i, j int) bool {
 						return resultsHandle[bucket][i].index < resultsHandle[bucket][j].index
