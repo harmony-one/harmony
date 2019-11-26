@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // CrossLink is only used on beacon chain to store the hash links from other shards
@@ -19,14 +20,25 @@ type CrossLink struct {
 	BlockNumberF *big.Int
 	SignatureF   [96]byte //aggregated signature
 	BitmapF      []byte   //corresponding bitmap mask for agg signature
-	ShardIDF     uint32   //need first verify signature on |blockNumber|blockHash| is correct
-	EpochF       *big.Int //need first verify signature on |blockNumber|blockHash| is correct
+	ShardIDF     uint32   //will be verified with signature on |blockNumber|blockHash| is correct
+	ParentEpochF *big.Int //will be verified with signature on |blockNumber|blockHash| is correct
 }
 
 // NewCrossLink returns a new cross link object
 func NewCrossLink(header *block.Header) CrossLink {
-	parentBlockNum := header.Number().Sub(header.Number(), big.NewInt(1))
-	return CrossLink{header.ParentHash(), parentBlockNum, header.LastCommitSignature(), header.LastCommitBitmap(), header.ShardID(), header.Epoch()}
+	if header.Number().Uint64() == 0 {
+		return CrossLink{}
+	}
+	epoch := big.NewInt(0)
+	parentBlockNum := big.NewInt(0)
+	// check if previous header is the last block of an epoch
+	if shard.Schedule.IsLastBlock(header.Number().Uint64() - 1) {
+		epoch.Sub(header.Epoch(), big.NewInt(1))
+	} else {
+		epoch = header.Epoch()
+	}
+	parentBlockNum.Sub(header.Number(), big.NewInt(1))
+	return CrossLink{header.ParentHash(), parentBlockNum, header.LastCommitSignature(), header.LastCommitBitmap(), header.ShardID(), epoch}
 }
 
 // ShardID returns shardID
@@ -36,7 +48,7 @@ func (cl CrossLink) ShardID() uint32 {
 
 // ShardID returns shardID
 func (cl CrossLink) Epoch() *big.Int {
-	return cl.EpochF
+	return cl.ParentEpochF
 }
 
 // Number returns blockNum with big.Int format

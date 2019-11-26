@@ -158,14 +158,13 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
 			return
 		}
-		firstCrossLinkBlock := core.EpochFirstBlock(node.Blockchain().Config().CrossLinkEpoch)
 
 		candidates := []types.CrossLink{}
 		utils.Logger().Debug().
 			Msgf("[ProcessingCrossLink] Crosslink going to propose: %d", len(crosslinks))
 
 		for i, cl := range crosslinks {
-			if cl.Number() == nil || cl.Number().Cmp(firstCrossLinkBlock) < 0 {
+			if cl.Number() == nil || cl.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) < 0 {
 				utils.Logger().Debug().
 					Msgf("[ProcessingCrossLink] Crosslink %d skipped: %v", i, cl)
 				continue
