@@ -471,23 +471,18 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
-	if (consensus.ChainReader.Config().IsStaking(nextEpoch) && len(curHeader.ShardState()) > 0 && !consensus.ChainReader.Config().IsStaking(curEpoch)) ||
-		(consensus.ChainReader.Config().IsStaking(curEpoch) && consensus.Decider.Policy() != quorum.SuperMajorityStake) {
+	prevSubCommitteeDump := consensus.Decider.JSON()
 
-		prevSubCommitteeDump := consensus.Decider.JSON()
-
+	// Only happens once, the flip-over to a new Decider policy
+	if (consensus.ChainReader.Config().IsStaking(nextEpoch) &&
+		len(curHeader.ShardState()) > 0 &&
+		!consensus.ChainReader.Config().IsStaking(curEpoch)) ||
+		(consensus.ChainReader.Config().IsStaking(curEpoch) &&
+			consensus.Decider.Policy() != quorum.SuperMajorityStake) {
 		consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
 		consensus.Decider.SetShardIDProvider(func() (uint32, error) {
 			return consensus.ShardID, nil
 		})
-
-		utils.Logger().Info().
-			Uint64("block-number", curHeader.Number().Uint64()).
-			Uint64("curEpoch", curHeader.Epoch().Uint64()).
-			Uint32("shard-id", consensus.ShardID).
-			RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
-			RawJSON("current-subcommittee", []byte(consensus.Decider.JSON())).
-			Msg("changing committee")
 	}
 
 	committeeToSet := &shard.Committee{}
@@ -556,6 +551,14 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			Msg("Error when updating voters")
 		return Syncing
 	}
+
+	utils.Logger().Info().
+		Uint64("block-number", curHeader.Number().Uint64()).
+		Uint64("curEpoch", curHeader.Epoch().Uint64()).
+		Uint32("shard-id", consensus.ShardID).
+		RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
+		RawJSON("current-subcommittee", []byte(consensus.Decider.JSON())).
+		Msg("changing committee")
 
 	// take care of possible leader change during the curEpoch
 	if !shard.Schedule.IsLastBlock(curHeader.Number().Uint64()) &&
