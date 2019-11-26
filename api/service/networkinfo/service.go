@@ -189,6 +189,7 @@ func (s *Service) Run() {
 // DoService does network info.
 func (s *Service) DoService() {
 	tick := time.NewTicker(dhtTicker)
+	defer tick.Stop()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for {
