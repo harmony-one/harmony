@@ -65,7 +65,7 @@ type Validator struct {
 	UnbondingHeight *big.Int `json:"unbonding_height" yaml:"unbonding_height"`
 	// validator's self declared minimum self delegation
 	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
-	// maximum total delgation allowed
+	// maximum total delegation allowed
 	MaxTotalDelegation *big.Int `json:"max_total_delegation" yaml:"max_total_delegation"`
 	// Is the validator active in the validating process or not
 	Active bool `json:"active" yaml:"active"`
@@ -102,21 +102,24 @@ func (w *ValidatorWrapper) SanityCheck() error {
 		return errMinSelfDelegationTooSmall
 	}
 
-	// MaxTotalDelegation must not be less than MinSelfDelegation
-	if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
-		return errInvalidMaxTotalDelegation
-	}
-
 	selfDelegation := w.Delegations[0].Amount
 	// Self delegation must be >= MinSelfDelegation
 	if selfDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
 		return errInvalidSelfDelegation
 	}
 
-	totalDelegation := w.TotalDelegation()
-	// Total delegation must be <= MaxTotalDelegation
-	if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
-		return errInvalidTotalDelegation
+	// Only enforce rules on MaxTotalDelegation is it's > 0; 0 means no limit for max total delegation
+	if w.Validator.MaxTotalDelegation != nil && w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) > 0 {
+		// MaxTotalDelegation must not be less than MinSelfDelegation
+		if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
+			return errInvalidMaxTotalDelegation
+		}
+
+		totalDelegation := w.TotalDelegation()
+		// Total delegation must be <= MaxTotalDelegation
+		if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
+			return errInvalidTotalDelegation
+		}
 	}
 
 	hundredPercent := numeric.NewDec(1)
