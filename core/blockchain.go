@@ -1916,7 +1916,9 @@ func (bc *BlockChain) WriteShardState(
 	epoch *big.Int, shardState shard.State,
 ) error {
 	shardState = shardState.DeepCopy()
-	err := rawdb.WriteShardState(bc.db, epoch, shardState)
+	err := rawdb.WriteShardState(
+		bc.db, epoch, shardState, bc.Config().IsStaking(epoch),
+	)
 	if err != nil {
 		return err
 	}
@@ -1929,11 +1931,11 @@ func (bc *BlockChain) WriteShardState(
 func (bc *BlockChain) WriteShardStateBytes(db rawdb.DatabaseWriter,
 	epoch *big.Int, shardState []byte,
 ) (*shard.State, error) {
-	decodeShardState := shard.State{}
-	if err := rlp.DecodeBytes(shardState, &decodeShardState); err != nil {
+	decodeShardState, err := shard.DecodeWrapper(shardState)
+	if err != nil {
 		return nil, err
 	}
-	err := rawdb.WriteShardStateBytes(db, epoch, shardState)
+	err = rawdb.WriteShardStateBytes(db, epoch, shardState)
 	if err != nil {
 		return nil, err
 	}

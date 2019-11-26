@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -43,6 +44,84 @@ type SlotList []Slot
 type Committee struct {
 	ShardID uint32   `json:"shard-id"`
 	Slots   SlotList `json:"subcommittee"`
+}
+
+/* Legacy
+These are the pre-staking used data-structures, needed to maintain
+compatibilty for RLP decode/encode
+*/
+
+// StateLegacy ..
+type StateLegacy []CommitteeLegacy
+
+// SlotLegacy represents node id (BLS address)
+type SlotLegacy struct {
+	EcdsaAddress common.Address `json:"ecdsa-address"`
+	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
+}
+
+// SlotListLegacy is a list of SlotList.
+type SlotListLegacy []SlotLegacy
+
+// CommitteeLegacy contains the active nodes in one shard
+type CommitteeLegacy struct {
+	ShardID uint32         `json:"shard-id"`
+	Slots   SlotListLegacy `json:"subcommittee"`
+}
+
+// DecodeWrapper ..
+func DecodeWrapper(shardState []byte) (State, error) {
+	oldSS := StateLegacy{}
+	newSS := State{}
+	var (
+		err1 error
+		err2 error
+	)
+	err1 = rlp.DecodeBytes(shardState, &newSS)
+	if err1 == nil {
+		return newSS, nil
+	}
+	err2 = rlp.DecodeBytes(shardState, &oldSS)
+	if err2 == nil {
+		newSS = make(State, len(oldSS))
+		for i := range oldSS {
+			newSS[i] = Committee{ShardID: oldSS[i].ShardID, Slots: SlotList{}}
+			for _, slot := range oldSS[i].Slots {
+				newSS[i].Slots = append(newSS[i].Slots, Slot{
+					slot.EcdsaAddress, slot.BlsPublicKey, nil,
+				})
+			}
+		}
+		return newSS, nil
+	}
+	return nil, err2
+}
+
+// EncodeWrapper ..
+func EncodeWrapper(shardState State, isStaking bool) ([]byte, error) {
+	var (
+		data []byte
+		err  error
+	)
+	if isStaking {
+		data, err = rlp.EncodeToBytes(shardState)
+	} else {
+		shardStateLegacy := make(StateLegacy, len(shardState))
+		for i := range shardState {
+			shardStateLegacy[i] = CommitteeLegacy{
+				ShardID: shardState[i].ShardID, Slots: SlotListLegacy{},
+			}
+			for _, slot := range shardState[i].Slots {
+				shardStateLegacy[i].Slots = append(shardStateLegacy[i].Slots, SlotLegacy{
+					slot.EcdsaAddress, slot.BlsPublicKey,
+				})
+			}
+		}
+
+		data, err = rlp.EncodeToBytes(shardStateLegacy)
+	}
+
+	return data, err
 }
 
 // JSON produces a non-pretty printed JSON string of the SuperCommittee
