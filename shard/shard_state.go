@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -43,6 +44,54 @@ type SlotList []Slot
 type Committee struct {
 	ShardID uint32   `json:"shard-id"`
 	Slots   SlotList `json:"subcommittee"`
+}
+
+/* Legacy */
+
+// StateLegacy ..
+type StateLegacy []CommitteeLegacy
+
+// SlotLegacy represents node id (BLS address)
+type SlotLegacy struct {
+	EcdsaAddress common.Address `json:"ecdsa-address"`
+	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
+}
+
+// SlotListLegacy is a list of SlotList.
+type SlotListLegacy []SlotLegacy
+
+// CommitteeLegacy contains the active nodes in one shard
+type CommitteeLegacy struct {
+	ShardID uint32         `json:"shard-id"`
+	Slots   SlotListLegacy `json:"subcommittee"`
+}
+
+// DecodeWrapper ..
+func DecodeWrapper(shardState []byte) (State, error) {
+	oldSS := StateLegacy{}
+	newSS := State{}
+	var (
+		err1 error
+		err2 error
+	)
+	err1 = rlp.DecodeBytes(shardState, &newSS)
+	if err1 == nil {
+		return newSS, nil
+	}
+	err2 = rlp.DecodeBytes(shardState, &oldSS)
+	if err2 == nil {
+		newSS = make(State, len(oldSS))
+		for i := range oldSS {
+			newSS[i] = Committee{ShardID: oldSS[i].ShardID, Slots: SlotList{}}
+			for _, slot := range oldSS[i].Slots {
+				newSS[i].Slots = append(newSS[i].Slots, Slot{
+					slot.EcdsaAddress, slot.BlsPublicKey, nil,
+				})
+			}
+		}
+		return newSS, nil
+	}
+	return nil, err2
 }
 
 // JSON produces a non-pretty printed JSON string of the SuperCommittee
