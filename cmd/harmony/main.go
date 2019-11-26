@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -223,7 +224,11 @@ func setupStakingNodeAccount() error {
 }
 
 func readMultiBlsKeys(nodeConfig *nodeconfig.ConfigType) error {
+<<<<<<< HEAD
 	multiKeyFolder := "./hmy/multikeys"
+=======
+	multiKeyFolder := "./MultiKeys"
+>>>>>>> handled leader key in node_newblock.go
 	fileList, err := ioutil.ReadDir(multiKeyFolder)
 	if err != nil {
 		return err
