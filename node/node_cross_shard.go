@@ -145,7 +145,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 // ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
 func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 	// TODO: non-leader in beaconchain doesn't need process crosslink message, but still need to monitor leader's behavior
-	if node.NodeConfig.ShardID == 0 && node.Consensus.IsLeader() {
+	if node.NodeConfig.ShardID == 0 {
 		utils.Logger().Debug().Msgf("[ProcessingCrossLink] leader is processing...")
 		var crosslinks []types.CrossLink
 		err := rlp.DecodeBytes(msgPayload, &crosslinks)
