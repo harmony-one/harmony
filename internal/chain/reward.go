@@ -128,11 +128,18 @@ func whatPercentStakedNow(
 	beaconchain engine.ChainReader,
 ) (*numeric.Dec, error) {
 	stakedNow := numeric.ZeroDec()
+	// TODO What about the non-active validators? What happens to their stake?
 	active, err := beaconchain.ReadActiveValidatorList()
+	if err != nil {
+		return nil, err
+	}
+
+	soFarDoledOut, err := beaconchain.BlockRewardAccumulator()
 
 	if err != nil {
 		return nil, err
 	}
+
 	for i := range active {
 		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
 		if err != nil {
@@ -142,7 +149,9 @@ func whatPercentStakedNow(
 			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
 		)
 	}
-	percentage := stakedNow.Quo(totalTokens)
+	percentage := stakedNow.Quo(totalTokens.Add(
+		numeric.NewDecFromBigInt(soFarDoledOut)),
+	)
 	return &percentage, nil
 }
 
@@ -169,7 +178,6 @@ func AccumulateRewards(
 	//// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-
 		defaultReward := BlockRewardStakedCase
 
 		if len(header.ShardState()) > 0 {
@@ -194,6 +202,8 @@ func AccumulateRewards(
 			}
 		}
 
+		newRewards := big.NewInt(0)
+
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		members, payable, _, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
@@ -207,14 +217,15 @@ func AccumulateRewards(
 			// what to do about share of those that didn't sign
 			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
 			if !voter.IsHarmonyNode {
-				due := defaultReward.Mul(
-					voter.EffectivePercent.Quo(votepower.StakersShare),
-				)
 				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
 				if err != nil {
 					return err
 				}
-				state.AddReward(snapshot, due.RoundInt())
+				due := defaultReward.Mul(
+					voter.EffectivePercent.Quo(votepower.StakersShare),
+				).RoundInt()
+				newRewards = new(big.Int).Add(newRewards, due)
+				state.AddReward(snapshot, due)
 			}
 		}
 
@@ -241,11 +252,14 @@ func AccumulateRewards(
 
 				shardState, err := bc.ReadShardState(cxLink.ChainHeader.Epoch())
 				if !bc.Config().IsStaking(cxLink.Header().Epoch()) {
-					shardState, err = committee.WithStakingEnabled.Compute(cxLink.ChainHeader.Epoch(), bc)
+					shardState, err = committee.WithStakingEnabled.Compute(
+						cxLink.ChainHeader.Epoch(), bc,
+					)
 				}
 
 				if err != nil {
-					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
+					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF
+					// SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
 					// TODO: FIX THIS WITH NEW CROSSLINK FORMAT
 					continue
 				}
@@ -255,7 +269,8 @@ func AccumulateRewards(
 				payableSigners, _, err := blockSigners(cxLink.Header(), subComm)
 
 				if err != nil {
-					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
+					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF
+					// SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
 					// TODO: FIX THIS WITH NEW CROSSLINK FORMAT
 					continue
 				}
@@ -305,12 +320,13 @@ func AccumulateRewards(
 					if err != nil {
 						return err
 					}
-					state.AddReward(
-						snapshot,
-						resultsHandle[bucket][payThem].effective.TruncateInt(),
-					)
+					due := resultsHandle[bucket][payThem].effective.TruncateInt()
+					newRewards = new(big.Int).Add(newRewards, due)
+					state.AddReward(snapshot, due)
 				}
 			}
+
+			return bc.UpdateBlockRewardAccumulator(newRewards)
 		}
 		return nil
 	}

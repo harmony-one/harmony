@@ -47,6 +47,11 @@ type ChainReader interface {
 
 	// Methods needed for EPoS committee assignment calculation
 	committee.StakingCandidatesReader
+
+	//BlockRewardAccumulator is the current accumulator
+	BlockRewardAccumulator() (*big.Int, error)
+	// UpdateBlockRewardAccumulator => accumulator = accumulator + diff
+	UpdateBlockRewardAccumulator(diff *big.Int) error
 }
 
 // Engine is an algorithm agnostic consensus engine.
