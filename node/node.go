@@ -111,9 +111,6 @@ type Node struct {
 	pendingCXReceipts map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex    sync.Mutex
 
-	pendingCrossLinks []types.CrossLink
-	pendingCLMutex    sync.Mutex
-
 	// Shard databases
 	shardChains shardchain.Collection
 

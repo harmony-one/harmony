@@ -58,6 +58,8 @@ var (
 	shardStatePrefix = []byte("ss") // shardStatePrefix + num (uint64 big endian) + hash -> shardState
 	lastCommitsKey   = []byte("LastCommits")
 
+	lastPendingCrosslinkKey = []byte("lastPendingCL") // prefix for shard last pending crosslink
+
 	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-") // config prefix for the db
 

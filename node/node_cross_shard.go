@@ -101,6 +101,7 @@ func (node *Node) BroadcastMissingCXReceipts() {
 // VerifyBlockCrossLinks verifies the cross links of the block
 func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 	if len(block.Header().CrossLinks()) == 0 {
+		utils.Logger().Debug().Msgf("[CrossLinkVerification] Zero CrossLinks in the header")
 		return nil
 	}
 	crossLinks := &types.CrossLinks{}
@@ -146,7 +147,9 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 
 // ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
 func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
-	if node.NodeConfig.ShardID == 0 {
+	// TODO: non-leader in beaconchain doesn't need process crosslink message, but still need to monitor leader's behavior
+	if node.NodeConfig.ShardID == 0 && node.Consensus.IsLeader() {
+		utils.Logger().Debug().Msgf("[ProcessingCrossLink] leader is processing...")
 		var crosslinks []types.CrossLink
 		err := rlp.DecodeBytes(msgPayload, &crosslinks)
 		if err != nil {
@@ -169,6 +172,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			}
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
+				// TODO: leader add double sign checking
 				utils.Logger().Debug().
 					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Block num: %d, shardID %d", cl.Number(), cl.ShardID())
 				continue
@@ -185,9 +189,9 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			utils.Logger().Debug().
 				Msgf("[ProcessingCrossLink] committing for shardID %d, blockNum %d", cl.ShardID(), cl.Number().Uint64())
 		}
-		node.pendingCLMutex.Lock()
-		node.pendingCrossLinks = append(node.pendingCrossLinks, candidates...)
-		node.pendingCLMutex.Unlock()
+		Len, err := node.Blockchain().AddLastPendingCrossLinks(candidates)
+		utils.Logger().Error().Err(err).
+			Msgf("[ProcessingCrossLink] add pending crosslinks,  total pending: %d", Len)
 	}
 }
 

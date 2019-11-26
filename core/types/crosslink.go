@@ -12,6 +12,8 @@ import (
 // CrossLink is only used on beacon chain to store the hash links from other shards
 // signature and bitmap correspond to |blockNumber|parentHash| byte array
 // Captial to enable rlp encoding
+// Here we replace header to signatures only, the basic assumption is the committee will not be
+// corrupted during one epoch, which is the same as consensus assumption
 type CrossLink struct {
 	ParentHashF  common.Hash
 	BlockNumberF *big.Int

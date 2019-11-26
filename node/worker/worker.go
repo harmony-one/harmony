@@ -338,6 +338,8 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed cross links")
 			return nil, err
 		}
+	} else {
+		utils.Logger().Debug().Msg("Zero crosslinks to finalize")
 	}
 
 	// Shard State

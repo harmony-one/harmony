@@ -112,11 +112,15 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Prepare cross links
 	var crossLinks types.CrossLinks
 	if node.NodeConfig.ShardID == 0 {
-		crossLinks = node.pendingCrossLinks
-		node.pendingCLMutex.Lock()
-		node.pendingCrossLinks = []types.CrossLink{}
-		node.pendingCLMutex.Unlock()
-		utils.Logger().Debug().Msgf("Number of crosslinks to propose: %d", len(crossLinks))
+		crossLinks, err = node.Blockchain().ReadLastPendingCrossLinks()
+		if err != nil {
+			utils.Logger().Error().Err(err).Msgf("Unable to Read PendingCrossLinks, number of crosslinks: %d", len(crossLinks))
+		}
+		utils.Logger().Debug().Msgf("Read PendingCrossLinks, number of crosslinks: %d", len(crossLinks))
+		err = node.Blockchain().DeleteLastPendingCrossLinks()
+		if err != nil {
+			utils.Logger().Error().Err(err).Msgf("Unable to Delete PendingCrossLinks, number of crosslinks: %d", len(crossLinks))
+		}
 	}
 
 	// Prepare shard state

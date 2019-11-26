@@ -539,6 +539,21 @@ func WriteShardLastCrossLink(db DatabaseWriter, shardID uint32, data []byte) err
 	return db.Put(shardLastCrosslinkKey(shardID), data)
 }
 
+// ReadLastPendingCrossLinks retrieves last pending crosslinks.
+func ReadLastPendingCrossLinks(db DatabaseReader) ([]byte, error) {
+	return db.Get(lastPendingCrosslinkKey)
+}
+
+// WriteLastPendingCrossLinks stores last pending crosslinks into database.
+func WriteLastPendingCrossLinks(db DatabaseWriter, bytes []byte) error {
+	return db.Put(lastPendingCrosslinkKey, bytes)
+}
+
+// DeleteLastPendingCrossLinks stores last pending crosslinks into database.
+func DeleteLastPendingCrossLinks(db DatabaseDeleter) error {
+	return db.Delete(lastPendingCrosslinkKey)
+}
+
 // ReadCXReceipts retrieves all the transactions of receipts given destination shardID, number and blockHash
 func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash) (types.CXReceipts, error) {
 	data, err := db.Get(cxReceiptKey(shardID, number, hash))
