@@ -428,15 +428,29 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 		)
 	}
 	committerKey := new(bls.PublicKey)
+	isStaking := consensus.ChainReader.Config().IsStaking(header.Epoch())
 	for _, member := range committee.Slots {
-		if member.EcdsaAddress == header.Coinbase() {
-			err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-			if err != nil {
-				return nil, ctxerror.New("cannot convert BLS public key",
-					"blsPublicKey", member.BlsPublicKey,
-					"coinbaseAddr", header.Coinbase()).WithCause(err)
+		if isStaking {
+			// After staking the coinbase address will be the address of bls public key
+			if utils.GetAddressFromBlsPubKeyBytes(member.BlsPublicKey[:]) == header.Coinbase() {
+				err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+				if err != nil {
+					return nil, ctxerror.New("cannot convert BLS public key",
+						"blsPublicKey", member.BlsPublicKey,
+						"coinbaseAddr", header.Coinbase()).WithCause(err)
+				}
+				return committerKey, nil
 			}
-			return committerKey, nil
+		} else {
+			if member.EcdsaAddress == header.Coinbase() {
+				err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+				if err != nil {
+					return nil, ctxerror.New("cannot convert BLS public key",
+						"blsPublicKey", member.BlsPublicKey,
+						"coinbaseAddr", header.Coinbase()).WithCause(err)
+				}
+				return committerKey, nil
+			}
 		}
 	}
 	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase())
@@ -453,45 +467,100 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
-	pubKeys := []*bls.PublicKey{}
-	hasError := false
-	header := consensus.ChainReader.CurrentHeader()
-	epoch := header.Epoch()
-	curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
-		epoch, consensus.ChainReader,
-	)[int(header.ShardID())]
-	consensus.numPrevPubKeys = len(curPubKeys)
-	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
-	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
-		// increase epoch by one if it's the last block
-		consensus.SetEpochNum(epoch.Uint64() + 1)
-		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
-			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		pubKeys = committee.WithStakingEnabled.ComputePublicKeys(
-			new(big.Int).Add(epoch, common.Big1), consensus.ChainReader,
-		)[int(header.ShardID())]
-	} else {
-		consensus.SetEpochNum(epoch.Uint64())
-		pubKeys = curPubKeys
+	curHeader := consensus.ChainReader.CurrentHeader()
+
+	curEpoch := curHeader.Epoch()
+	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
+	if (consensus.ChainReader.Config().IsStaking(nextEpoch) && len(curHeader.ShardState()) > 0 && !consensus.ChainReader.Config().IsStaking(curEpoch)) ||
+		(consensus.ChainReader.Config().IsStaking(curEpoch) && consensus.Decider.Policy() != quorum.SuperMajorityStake) {
+
+		prevSubCommitteeDump := consensus.Decider.JSON()
+
+		consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
+		consensus.Decider.SetShardIDProvider(func() (uint32, error) {
+			return consensus.ShardID, nil
+		})
+
+		utils.Logger().Info().
+			Uint64("block-number", curHeader.Number().Uint64()).
+			Uint64("curEpoch", curHeader.Epoch().Uint64()).
+			Uint32("shard-id", consensus.ShardID).
+			RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
+			RawJSON("current-subcommittee", []byte(consensus.Decider.JSON())).
+			Msg("changing committee")
 	}
 
-	if len(pubKeys) == 0 {
+	committeeToSet := &shard.Committee{}
+	hasError := false
+
+	// TODO: change GetCommitteePublicKeys to read from DB
+	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
+		curEpoch, consensus.ChainReader,
+	)
+	if err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint32("shard", consensus.ShardID).
+			Msg("Error retrieving current shard state")
+		return Syncing
+	}
+
+	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
+	if len(curHeader.ShardState()) > 0 {
+		// increase curEpoch by one if it's the last block
+		consensus.SetEpochNum(curEpoch.Uint64() + 1)
+		consensus.getLogger().Info().Uint64("headerNum", curHeader.Number().Uint64()).
+			Msg("[UpdateConsensusInformation] Epoch updated for nextEpoch curEpoch")
+
+		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
+			nextEpoch, consensus.ChainReader,
+		)
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error retrieving nextEpoch shard state")
+			return Syncing
+		}
+
+		committeeToSet = nextShardState.FindCommitteeByID(curHeader.ShardID())
+
+	} else {
+		consensus.SetEpochNum(curEpoch.Uint64())
+		committeeToSet = curShardState.FindCommitteeByID(curHeader.ShardID())
+	}
+
+	if len(committeeToSet.Slots) == 0 {
 		consensus.getLogger().Warn().
-			Msg("[UpdateConsensusInformation] PublicKeys is Nil")
+			Msg("[UpdateConsensusInformation] No members in the committee to update")
 		hasError = true
 	}
 
-	// update public keys committee
+	// update public keys in the committee
 	oldLeader := consensus.LeaderPubKey
+	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
+		committeeToSet,
+	)
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
 	consensus.UpdatePublicKeys(pubKeys)
 
-	// take care of possible leader change during the epoch
-	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) &&
-		header.Number().Uint64() != 0 {
-		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
+	// Update voters in the committee
+	if _, err := consensus.Decider.SetVoters(
+		committeeToSet.Slots,
+	); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint32("shard", consensus.ShardID).
+			Msg("Error when updating voters")
+		return Syncing
+	}
+
+	// take care of possible leader change during the curEpoch
+	if !shard.Schedule.IsLastBlock(curHeader.Number().Uint64()) &&
+		curHeader.Number().Uint64() != 0 {
+		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).
 				Msg("[SYNC] Unable to get leaderPubKey from coinbase")

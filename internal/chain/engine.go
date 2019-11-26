@@ -23,12 +23,13 @@ import (
 )
 
 type engineImpl struct {
-	d reward.Distributor
-	s slash.Slasher
+	d      reward.Distributor
+	s      slash.Slasher
+	beacon engine.ChainReader
 }
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{nil, nil}
+var Engine = &engineImpl{nil, nil, nil}
 
 // Rewarder handles the distribution of block rewards
 func (e *engineImpl) Rewarder() reward.Distributor {
@@ -48,6 +49,15 @@ func (e *engineImpl) Slasher() slash.Slasher {
 // SetSlasher assigns the slasher used
 func (e *engineImpl) SetSlasher(s slash.Slasher) {
 	e.s = s
+}
+
+func (e *engineImpl) Beaconchain() engine.ChainReader {
+	return e.beacon
+}
+
+// SetSlasher assigns the slasher used
+func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
+	e.beacon = beaconchain
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -182,17 +192,19 @@ func (e *engineImpl) Finalize(
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
 ) (*types.Block, error) {
+
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	if err := AccumulateRewards(
-		chain, state, header, e.Rewarder(), e.Slasher(),
+		chain, state, header, e.Rewarder(), e.Slasher(), e.Beaconchain(),
 	); err != nil {
 		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 
+	// TODO Shouldnt this logic only apply to beaconchain, right?
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
-	if len(header.ShardState()) > 0 {
+	if header.ShardID() == shard.BeaconChainShardID && len(header.ShardState()) > 0 {
 		// TODO: make sure we are using the correct validator list
 		validators, err := chain.ReadActiveValidatorList()
 		if err != nil {
@@ -210,7 +222,7 @@ func (e *engineImpl) Finalize(
 					return nil, ctxerror.New("failed update validator info").WithCause(err)
 				}
 			} else {
-				err = errors.New("validator came back empty" + common2.MustAddressToBech32(validator))
+				err = errors.New("validator came back empty " + common2.MustAddressToBech32(validator))
 				return nil, ctxerror.New("failed getting validator info").WithCause(err)
 			}
 		}
@@ -225,7 +237,7 @@ func QuorumForBlock(
 ) (quorum int, err error) {
 	var ss shard.State
 	if reCalculate {
-		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), *chain.Config(), chain)
+		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), chain)
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
@@ -247,6 +259,10 @@ func QuorumForBlock(
 // i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
 // for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.
 func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header *block.Header, commitSig []byte, commitBitmap []byte, reCalculate bool) error {
+	if chain.Config().IsStaking(header.Epoch()) {
+		// Never recalculate after staking is enabled
+		reCalculate = false
+	}
 	publicKeys, err := GetPublicKeys(chain, header, reCalculate)
 	if err != nil {
 		return ctxerror.New("[VerifyHeaderWithSignature] Cannot get publickeys for block header").WithCause(err)
@@ -284,12 +300,12 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 	var shardState shard.State
 	var err error
 	if reCalculate {
-		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), *chain.Config(), chain)
+		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), chain)
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {
 			return nil, ctxerror.New("failed to read shard state of epoch",
-				"epoch", header.Epoch().Uint64())
+				"epoch", header.Epoch().Uint64()).WithCause(err)
 		}
 	}
 
@@ -301,6 +317,8 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 		)
 	}
 	var committerKeys []*bls.PublicKey
+
+	utils.Logger().Print(committee.Slots)
 	for _, member := range committee.Slots {
 		committerKey := new(bls.PublicKey)
 		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)

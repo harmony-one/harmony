@@ -303,7 +303,7 @@ func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
 
 // GetValidatorInformation returns the information of validator
 func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Validator {
-	val, _ := b.hmy.BlockChain().ReadValidatorData(addr)
+	val, _ := b.hmy.BlockChain().ReadValidatorInformation(addr)
 	return &val.Validator
 }
 
@@ -315,7 +315,7 @@ func (b *APIBackend) GetValidatorStats(addr common.Address) *staking.ValidatorSt
 
 // GetDelegationsByValidator returns all delegation information of a validator
 func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*staking.Delegation {
-	wrapper, err := b.hmy.BlockChain().ReadValidatorData(validator)
+	wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(validator)
 	if err != nil || wrapper == nil {
 		return nil
 	}
@@ -336,7 +336,7 @@ func (b *APIBackend) GetDelegationsByDelegator(delegator common.Address) ([]comm
 	}
 
 	for i := range delegationIndexes {
-		wrapper, err := b.hmy.BlockChain().ReadValidatorData(delegationIndexes[i].ValidatorAddress)
+		wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(delegationIndexes[i].ValidatorAddress)
 		if err != nil || wrapper == nil {
 			return nil, nil
 		}
@@ -351,7 +351,14 @@ func (b *APIBackend) GetDelegationsByDelegator(delegator common.Address) ([]comm
 	return addresses, delegations
 }
 
-// GetValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
-func (b *APIBackend) GetValidatorStakingWithDelegation(addr common.Address) *big.Int {
-	return b.hmy.BlockChain().ValidatorStakingWithDelegation(addr)
+// GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
+func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
+	wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(addr)
+	if err != nil || wrapper == nil {
+		return nil
+	}
+	if len(wrapper.Delegations) == 0 {
+		return nil
+	}
+	return wrapper.Delegations[0].Amount
 }

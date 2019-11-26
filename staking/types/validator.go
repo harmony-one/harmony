@@ -44,11 +44,15 @@ type ValidatorWrapper struct {
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// The number of blocks the validator should've signed when in active mode (selected in committee)
-	NumBlocksToSign *big.Int
+	NumBlocksToSign *big.Int `json:"num_blocks_to_sign" rlp:"nil"`
 	// The number of blocks the validator actually signed
-	NumBlocksSigned *big.Int
+	NumBlocksSigned *big.Int `json:"num_blocks_signed" rlp:"nil"`
 	// The number of times they validator is jailed due to extensive downtime
-	NumJailed *big.Int
+	NumJailed *big.Int `json:"num_jailed" rlp:"nil"`
+	// AvgVotingPower is the average percent of voting power this validator has over all shards
+	AvgVotingPower numeric.Dec `json:"avg_voting_power" rlp:"nil"`
+	// TotalEffectiveStake is the total effective stake this validator has
+	TotalEffectiveStake numeric.Dec `json:"total_effective_stake" rlp:"nil"`
 }
 
 // Validator - data fields for a validator
@@ -57,14 +61,11 @@ type Validator struct {
 	Address common.Address `json:"address" yaml:"address"`
 	// The BLS public key of the validator for consensus
 	SlotPubKeys []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
-	// TODO Need to remove this .Stake Field
-	// The stake put by the validator itself
-	Stake *big.Int `json:"stake" yaml:"stake"`
 	// if unbonding, height at which this validator has begun unbonding
 	UnbondingHeight *big.Int `json:"unbonding_height" yaml:"unbonding_height"`
 	// validator's self declared minimum self delegation
 	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
-	// maximum total delgation allowed
+	// maximum total delegation allowed
 	MaxTotalDelegation *big.Int `json:"max_total_delegation" yaml:"max_total_delegation"`
 	// Is the validator active in the validating process or not
 	Active bool `json:"active" yaml:"active"`
@@ -101,21 +102,24 @@ func (w *ValidatorWrapper) SanityCheck() error {
 		return errMinSelfDelegationTooSmall
 	}
 
-	// MaxTotalDelegation must not be less than MinSelfDelegation
-	if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
-		return errInvalidMaxTotalDelegation
-	}
-
 	selfDelegation := w.Delegations[0].Amount
 	// Self delegation must be >= MinSelfDelegation
 	if selfDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
 		return errInvalidSelfDelegation
 	}
 
-	totalDelegation := w.TotalDelegation()
-	// Total delegation must be <= MaxTotalDelegation
-	if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
-		return errInvalidTotalDelegation
+	// Only enforce rules on MaxTotalDelegation is it's > 0; 0 means no limit for max total delegation
+	if w.Validator.MaxTotalDelegation != nil && w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) > 0 {
+		// MaxTotalDelegation must not be less than MinSelfDelegation
+		if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
+			return errInvalidMaxTotalDelegation
+		}
+
+		totalDelegation := w.TotalDelegation()
+		// Total delegation must be <= MaxTotalDelegation
+		if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
+			return errInvalidTotalDelegation
+		}
 	}
 
 	hundredPercent := numeric.NewDec(1)
@@ -218,9 +222,6 @@ func (v *Validator) GetAddress() common.Address { return v.Address }
 // GetName returns the name of validator in the description
 func (v *Validator) GetName() string { return v.Description.Name }
 
-// GetStake returns the total staking amount
-func (v *Validator) GetStake() *big.Int { return v.Stake }
-
 // GetCommissionRate returns the commission rate of the validator
 func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 
@@ -239,7 +240,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	// TODO: a new validator should have a minimum of 1 token as self delegation, and that should be added as a delegation entry here.
 	v := Validator{
 		val.ValidatorAddress, pubKeys,
-		val.Amount, new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
+		new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
 		commission, desc, blockNum,
 	}
 	return &v, nil
@@ -304,14 +305,13 @@ func (v *Validator) String() string {
 	return fmt.Sprintf(`Validator
   Address:                    %s
   SlotPubKeys:                %s
-  Stake:                      %s
   Unbonding Height:           %v
   Minimum Self Delegation:     %v
   Maximum Total Delegation:     %v
   Description:                %v
   Commission:                 %v`,
 		common2.MustAddressToBech32(v.Address), printSlotPubKeys(v.SlotPubKeys),
-		v.Stake, v.UnbondingHeight,
+		v.UnbondingHeight,
 		v.MinSelfDelegation, v.MaxTotalDelegation, v.Description, v.Commission,
 	)
 }

@@ -215,7 +215,7 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 }
 
 // UpdateCurrent updates the current environment with the current state and header.
-func (w *Worker) UpdateCurrent(coinbase common.Address) error {
+func (w *Worker) UpdateCurrent() error {
 	parent := w.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
@@ -227,7 +227,6 @@ func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 		GasLimit(core.CalcGasLimit(parent, w.gasFloor, w.gasCeil)).
 		Time(big.NewInt(timestamp)).
 		ShardID(w.chain.ShardID()).
-		Coinbase(coinbase).
 		Header()
 	return w.makeCurrent(parent, header)
 }
@@ -288,29 +287,73 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 ) (shard.State, error) {
 	var (
 		nextCommittee shard.State
-		oops          error
+		err           error
 	)
-	// WARN This currently not working and breaks around 15 block
-	// switch shardID {
-	// case shard.BeaconChainShardID:
-	if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
-		nextCommittee, oops = committee.WithStakingEnabled.Compute(
-			new(big.Int).Add(w.current.header.Epoch(), common.Big1),
-			*w.config,
-			beacon,
-		)
-	}
-	// default:
-	// WARN When we first enable staking, this condition may not be robust by itself.
-	// 	switch beacon.CurrentHeader().Epoch().Cmp(w.current.header.Epoch()) {
-	// 	case 1:
-	// 		nextCommittee, oops = committee.WithStakingEnabled.ReadFromDB(
-	// 			beacon.CurrentHeader().Epoch(), beacon,
-	// 		)
-	// 	}
+	switch shardID {
+	case shard.BeaconChainShardID:
+		if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
+			nextCommittee, err = committee.WithStakingEnabled.Compute(
+				new(big.Int).Add(w.current.header.Epoch(), common.Big1),
+				beacon,
+			)
+		}
+	default:
+		// TODO: needs to make sure beacon chain sync works.
+		beaconEpoch := beacon.CurrentHeader().Epoch()
+		nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
+		if w.config.IsStaking(nextEpoch) {
+			// If next epoch is staking epoch, I should wait and listen for beacon chain for epoch changes
+			switch beaconEpoch.Cmp(w.current.header.Epoch()) {
+			case 1:
+				// If beacon chain is bigger than shard chain in epoch, it means I should catch up with beacon chain now
+				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
+					beaconEpoch, beacon,
+				)
 
-	// }
-	return nextCommittee, oops
+				// Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
+				// This shouldn't be exactly beaconEpoch because the next block will have beaconEpoch + 1
+				blockEpoch := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1))
+				utils.Logger().Debug().
+					Uint64("blockNum", w.current.header.Number().Uint64()).
+					Uint64("myPrevEpoch", w.current.header.Epoch().Uint64()).
+					Uint64("myCurEpoch", blockEpoch.Uint64()).
+					Msg("Propose new epoch as beacon chain's epoch")
+				w.current.header.SetEpoch(blockEpoch)
+			case 0:
+				// If it's same epoch, no need to propose new shard state (new epoch change)
+			case -1:
+				// If beacon chain is behind, shard chain should wait for the beacon chain by not changing epochs.
+			}
+		} else {
+			if w.config.IsStaking(beaconEpoch) {
+				// If I am not even in the last epoch before staking epoch and beacon chain is already in staking epoch,
+				// I should just catch up with beacon chain's epoch
+				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
+					beaconEpoch, beacon,
+				)
+
+				blockEpoch := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1))
+				utils.Logger().Debug().
+					Uint64("blockNum", w.current.header.Number().Uint64()).
+					Uint64("myPrevEpoch", w.current.header.Epoch().Uint64()).
+					Uint64("myCurEpoch", blockEpoch.Uint64()).
+					Msg("Propose one-time catch up with beacon chain's epoch")
+				// Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
+				w.current.header.SetEpoch(blockEpoch)
+			} else {
+				// If I are not in staking nor has beacon chain proposed a staking-based shard state,
+				// do pre-staking committee calculation
+				if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
+					nextCommittee, err = committee.WithStakingEnabled.Compute(
+						new(big.Int).Add(w.current.header.Epoch(), common.Big1),
+						w.chain,
+					)
+				}
+			}
+		}
+
+	}
+	return nextCommittee, err
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
@@ -357,6 +400,7 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 	s := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
+	// TODO: feed coinbase into here so the proposer gets extra rewards.
 	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stakingTxs)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)

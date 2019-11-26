@@ -210,17 +210,6 @@ type Node struct {
 
 	accountManager *accounts.Manager
 
-	// Next shard state
-	nextShardState struct {
-		// The received master shard state
-		master *shard.EpochShardState
-
-		// When for a leader to propose the next shard state,
-		// or for a validator to wait for a proposal before view change.
-		// TODO ek – replace with retry-based logic instead of delay
-		proposeTime time.Time
-	}
-
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
@@ -277,17 +266,20 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
 	txPoolLimit := 1000 // TODO: incorporate staking txn into TxPool
-	node.pendingStakingTxMutex.Lock()
-	for _, tx := range newStakingTxs {
-		if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
-			node.pendingStakingTransactions[tx.Hash()] = tx
+
+	if node.Blockchain().Config().IsPreStaking(node.Worker.GetNewEpoch()) {
+		node.pendingStakingTxMutex.Lock()
+		for _, tx := range newStakingTxs {
+			if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
+				node.pendingStakingTransactions[tx.Hash()] = tx
+			}
+			if len(node.pendingStakingTransactions) > txPoolLimit {
+				break
+			}
 		}
-		if len(node.pendingStakingTransactions) > txPoolLimit {
-			break
-		}
+		utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingStakingTransactions)).Msg("Got more staking transactions")
+		node.pendingStakingTxMutex.Unlock()
 	}
-	utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingStakingTransactions)).Msg("Got more staking transactions")
-	node.pendingStakingTxMutex.Unlock()
 }
 
 // AddPendingStakingTransaction staking transactions
@@ -425,7 +417,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
 		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
+			node.BeaconWorker = worker.New(
+				node.Beaconchain().Config(), beaconChain, chain.Engine,
+			)
 		}
 
 		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
@@ -433,8 +427,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 		chain.Engine.SetSlasher(node.Consensus.Decider.(slash.Slasher))
+		chain.Engine.SetBeaconchain(beaconChain)
 
-		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
+		// the sequence number is the next block number to be added in consensus protocol, which is
+		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
@@ -485,9 +481,12 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
-	pubKeys := committee.WithStakingEnabled.ComputePublicKeys(
+	shardState, err := committee.WithStakingEnabled.Compute(
 		epoch, node.Consensus.ChainReader,
-	)[int(shardID)]
+	)
+	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
+		shardState.FindCommitteeByID(shardID),
+	)
 	if len(pubKeys) == 0 {
 		utils.Logger().Error().
 			Uint32("shardID", shardID).

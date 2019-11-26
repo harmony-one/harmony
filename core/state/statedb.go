@@ -734,42 +734,38 @@ func (db *DB) IsValidator(addr common.Address) bool {
 }
 
 // AddReward distributes the reward to all the delegators based on stake percentage.
-func (db *DB) AddReward(validator common.Address, reward *big.Int) error {
+func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 	rewardPool := big.NewInt(0).Set(reward)
 
-	wrapper := db.GetStakingInfo(validator)
-	if wrapper == nil {
+	curValidator := db.GetStakingInfo(snapshot.Validator.Address)
+	if curValidator == nil {
 		return errors.New("failed to distribute rewards: validator does not exist")
 	}
 
 	// Payout commission
-	commissionInt := wrapper.Validator.CommissionRates.Rate.MulInt(reward).RoundInt()
-	wrapper.Delegations[0].Reward.Add(wrapper.Delegations[0].Reward, commissionInt)
+	commissionInt := snapshot.Validator.CommissionRates.Rate.MulInt(reward).RoundInt()
+
+	curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, commissionInt)
 	rewardPool.Sub(rewardPool, commissionInt)
 
 	totalRewardForDelegators := big.NewInt(0).Set(rewardPool)
 
 	// Payout each delegator's reward pro-rata
-	totalDelegationDec := numeric.NewDecFromBigInt(wrapper.TotalDelegation())
-	for i := range wrapper.Delegations {
-		delegation := wrapper.Delegations[i]
+	totalDelegationDec := numeric.NewDecFromBigInt(snapshot.TotalDelegation())
+	for i := range snapshot.Delegations {
+		delegation := snapshot.Delegations[i]
 		percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec) // percentage = <this_delegator_amount>/<total_delegation>
 		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
 
-		delegation.Reward.Add(delegation.Reward, rewardInt)
+		curDelegation := curValidator.Delegations[i]
+		curDelegation.Reward.Add(curDelegation.Reward, rewardInt)
 		rewardPool.Sub(rewardPool, rewardInt)
 	}
 
 	// The last remaining bit belongs to the validator (remember the validator's self delegation is always at index 0)
 	if rewardPool.Cmp(big.NewInt(0)) > 0 {
-		wrapper.Delegations[0].Reward.Add(wrapper.Delegations[0].Reward, rewardPool)
+		curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, rewardPool)
 	}
 
-	return db.UpdateStakingInfo(validator, wrapper)
-}
-
-// CollectReward moves the rewards into the delegator's normal balance.
-func (db *DB) CollectReward(delegator common.Address) {
-	// The reward will be withdrawn to the delegator's address balance as a whole.
-
+	return db.UpdateStakingInfo(curValidator.Validator.Address, curValidator)
 }

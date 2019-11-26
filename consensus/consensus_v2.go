@@ -830,6 +830,7 @@ func (consensus *Consensus) finalizeCommits() {
 
 	utils.Logger().Info().
 		Uint64("blockNum", block.NumberU64()).
+		Uint64("epochNum", block.Epoch().Uint64()).
 		Uint64("ViewId", block.Header().ViewID().Uint64()).
 		Str("blockHash", block.Hash().String()).
 		Int("index", consensus.Decider.IndexOf(consensus.PubKey)).
@@ -884,7 +885,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	switch consensus.Decider.Policy() {
 	case quorum.SuperMajorityVote:
-		threshold := consensus.Decider.QuorumThreshold().Int64()
+		threshold := consensus.Decider.TwoThirdsSignersCount()
 		if count := utils.CountOneBits(mask.Bitmap); int64(count) < threshold {
 			utils.Logger().Warn().
 				Int64("need", threshold).

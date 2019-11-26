@@ -2,9 +2,9 @@ package quorum
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -83,6 +83,7 @@ type SignatureReader interface {
 	SignatoryTracker
 	ReadAllSignatures(Phase) []*bls.Sign
 	ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign
+	TwoThirdsSignersCount() int64
 }
 
 // DependencyInjectionWriter ..
@@ -110,7 +111,7 @@ type Decider interface {
 	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	QuorumThreshold() *big.Int
+	QuorumThreshold() numeric.Dec
 	IsRewardThresholdAchieved() bool
 }
 
@@ -222,6 +223,10 @@ func (s *cIdentities) Reset(ps []Phase) {
 	}
 }
 
+func (s *cIdentities) TwoThirdsSignersCount() int64 {
+	return s.ParticipantsCount()*2/3 + 1
+}
+
 func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
 	m := map[string]*bls.Sign{}
 	hex := PubKey.SerializeToHexStr()
@@ -292,16 +297,13 @@ func NewDecider(p Policy) Decider {
 			c.DependencyInjectionWriter, c.DependencyInjectionReader, c,
 		}
 	case SuperMajorityStake:
+		roster := votepower.NewRoster()
 		return &stakedVoteWeight{
 			c.SignatureReader,
 			c.DependencyInjectionWriter,
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
 			c.SignatureReader.(slash.ThresholdDecider),
-			map[shard.BlsPublicKey]stakedVoter{},
-			numeric.ZeroDec(),
-			numeric.ZeroDec(),
-			numeric.ZeroDec(),
-			0,
+			*roster,
 		}
 	default:
 		// Should not be possible

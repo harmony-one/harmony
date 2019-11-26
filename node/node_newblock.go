@@ -2,14 +2,16 @@ package node
 
 import (
 	"sort"
+	"strings"
 	"time"
+
+	"github.com/harmony-one/harmony/core/rawdb"
 
 	types2 "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants of proposing a new block
@@ -79,6 +81,16 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	coinbase := node.Consensus.SelfAddress
 
+	// After staking, all coinbase will be the address of bls pub key
+	if node.Blockchain().Config().IsStaking(node.Worker.GetNewEpoch()) {
+		addr := common.Address{}
+		blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
+		addr.SetBytes(blsPubKeyBytes[:])
+		coinbase = addr
+	}
+
+	node.Worker.UpdateCurrent()
+
 	// Prepare transactions including staking transactions
 	pending, err := node.TxPool.Pending()
 	if err != nil {
@@ -88,14 +100,16 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// TODO: integrate staking transaction into tx pool
 	pendingStakingTransactions := types2.StakingTransactions{}
-	node.pendingStakingTxMutex.Lock()
-	for _, tx := range node.pendingStakingTransactions {
-		pendingStakingTransactions = append(pendingStakingTransactions, tx)
+	// Only process staking transactions after pre-staking epoch happened.
+	if node.Blockchain().Config().IsPreStaking(node.Worker.GetNewEpoch()) {
+		node.pendingStakingTxMutex.Lock()
+		for _, tx := range node.pendingStakingTransactions {
+			pendingStakingTransactions = append(pendingStakingTransactions, tx)
+		}
+		node.pendingStakingTransactions = make(map[common.Hash]*types2.StakingTransaction)
+		node.pendingStakingTxMutex.Unlock()
 	}
-	node.pendingStakingTransactions = make(map[common.Hash]*types2.StakingTransaction)
-	node.pendingStakingTxMutex.Unlock()
 
-	node.Worker.UpdateCurrent(coinbase)
 	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase); err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 		return nil, err
@@ -122,8 +136,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare shard state
+	// NOTE: this will potentially override shard chain's epoch to beacon chain's epoch during staking migration period.
 	shardState, err := node.Worker.SuperCommitteeForNextEpoch(
-		node.Consensus.ShardID, node.Blockchain(),
+		node.Consensus.ShardID, node.Beaconchain(),
 	)
 
 	if err != nil {
@@ -137,40 +152,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
-}
-
-// TODO is this still needed?
-func (node *Node) proposeLocalShardState(block *types.Block) {
-	logger := block.Logger(utils.Logger())
-	// TODO ek – read this from beaconchain once BC sync is fixed
-	if node.nextShardState.master == nil {
-		logger.Debug().Msg("yet to receive master proposal from beaconchain")
-		return
-	}
-
-	nlogger := logger.With().
-		Uint64("nextEpoch", node.nextShardState.master.Epoch).
-		Time("proposeTime", node.nextShardState.proposeTime).
-		Logger()
-	logger = &nlogger
-	if time.Now().Before(node.nextShardState.proposeTime) {
-		logger.Debug().Msg("still waiting for shard state to propagate")
-		return
-	}
-	masterShardState := node.nextShardState.master.ShardState
-	var localShardState shard.State
-	committee := masterShardState.FindCommitteeByID(block.ShardID())
-	if committee != nil {
-		logger.Info().Msg("found local shard info; proposing it")
-		localShardState = append(localShardState, *committee)
-	} else {
-		logger.Info().Msg("beacon committee disowned us; proposing nothing")
-		// Leave local proposal empty to signal the end of shard (disbanding).
-	}
-	err := block.AddShardState(localShardState)
-	if err != nil {
-		logger.Error().Err(err).Msg("Failed proposin local shard state")
-	}
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
@@ -223,7 +204,11 @@ Loop:
 		}
 
 		if err := node.Blockchain().Validator().ValidateCXReceiptsProof(cxp); err != nil {
-			utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			if strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
+				pendingReceiptsList = append(pendingReceiptsList, cxp)
+			} else {
+				utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			}
 			continue
 		}
 

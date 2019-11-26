@@ -195,6 +195,7 @@ func setupInitialAccount() (isLeader bool) {
 	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
+	// TODO: after staking, what if the FN validator uses the old bls pub keys?
 	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
@@ -208,11 +209,13 @@ func setupInitialAccount() (isLeader bool) {
 	}
 
 	if initialAccount == nil {
-		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
-		os.Exit(100)
+		initialAccount.ShardID = uint32(*shardID)
+		initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
+		blsAddressBytes := pubKey.GetAddress()
+		initialAccount.Address = hex.EncodeToString(blsAddressBytes[:])
+	} else {
+		fmt.Printf("My Genesis Account: %v\n", *initialAccount)
 	}
-
-	fmt.Printf("My Genesis Account: %v\n", *initialAccount)
 
 	return isLeader
 }

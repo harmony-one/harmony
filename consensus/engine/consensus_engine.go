@@ -94,13 +94,21 @@ type Engine interface {
 	// SetSlasher assigns the slasher used
 	SetSlasher(slash.Slasher)
 
+	// Beaconchain provides the handle for Beaconchain
+	Beaconchain() ChainReader
+
+	// SetBeaconchain sets the beaconchain handler on engine
+	SetBeaconchain(ChainReader)
+
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	Finalize(chain ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
+	Finalize(chain ChainReader, header *block.Header,
+		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
-		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error)
+		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+	) (*types.Block, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.

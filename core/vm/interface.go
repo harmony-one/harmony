@@ -45,8 +45,7 @@ type StateDB interface {
 	SetValidatorFlag(common.Address)
 	UnsetValidatorFlag(common.Address)
 	IsValidator(common.Address) bool
-	AddReward(common.Address, *big.Int) error
-	CollectReward(common.Address)
+	AddReward(*staking.ValidatorWrapper, *big.Int) error
 
 	AddRefund(uint64)
 	SubRefund(uint64)

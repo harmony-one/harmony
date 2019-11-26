@@ -23,33 +23,36 @@ var EpochTBD = big.NewInt(10000000)
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:        MainnetChainID,
-		CrossTxEpoch:   big.NewInt(28),
-		CrossLinkEpoch: EpochTBD,
-		StakingEpoch:   EpochTBD,
-		EIP155Epoch:    big.NewInt(28),
-		S3Epoch:        big.NewInt(28),
+		ChainID:         MainnetChainID,
+		CrossTxEpoch:    big.NewInt(28),
+		CrossLinkEpoch:  EpochTBD,
+		StakingEpoch:    EpochTBD,
+		PreStakingEpoch: EpochTBD,
+		EIP155Epoch:     big.NewInt(28),
+		S3Epoch:         big.NewInt(28),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:        TestnetChainID,
-		CrossTxEpoch:   big.NewInt(0),
-		CrossLinkEpoch: big.NewInt(0),
-		StakingEpoch:   EpochTBD,
-		EIP155Epoch:    big.NewInt(0),
-		S3Epoch:        big.NewInt(0),
+		ChainID:         TestnetChainID,
+		CrossTxEpoch:    big.NewInt(0),
+		CrossLinkEpoch:  big.NewInt(2),
+		StakingEpoch:    big.NewInt(3),
+		PreStakingEpoch: big.NewInt(0),
+		EIP155Epoch:     big.NewInt(0),
+		S3Epoch:         big.NewInt(0),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
-		ChainID:        PangaeaChainID,
-		CrossTxEpoch:   big.NewInt(0),
-		CrossLinkEpoch: EpochTBD,
-		StakingEpoch:   EpochTBD,
-		EIP155Epoch:    big.NewInt(0),
-		S3Epoch:        big.NewInt(0),
+		ChainID:         PangaeaChainID,
+		CrossTxEpoch:    big.NewInt(0),
+		CrossLinkEpoch:  big.NewInt(2),
+		StakingEpoch:    big.NewInt(3),
+		PreStakingEpoch: big.NewInt(0),
+		EIP155Epoch:     big.NewInt(0),
+		S3Epoch:         big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -60,6 +63,7 @@ var (
 		big.NewInt(0),             // CrossTxEpoch
 		big.NewInt(0),             // CrossLinkEpoch
 		big.NewInt(0),             // StakingEpoch
+		big.NewInt(0),             // PreStakingEpoch
 		big.NewInt(0),             // EIP155Epoch
 		big.NewInt(0),             // S3Epoch
 	}
@@ -72,6 +76,7 @@ var (
 		big.NewInt(0), // CrossTxEpoch
 		big.NewInt(0), // CrossLinkEpoch
 		big.NewInt(0), // StakingEpoch
+		big.NewInt(0), // PreStakingEpoch
 		big.NewInt(0), // EIP155Epoch
 		big.NewInt(0), // S3Epoch
 	}
@@ -108,8 +113,11 @@ type ChainConfig struct {
 	// cross-shard links.
 	CrossLinkEpoch *big.Int `json:"crossLinkEpoch,omitempty"`
 
-	// StakingEpoch is the epoch we allow staking transactions
+	// StakingEpoch is the epoch when shard assign takes staking into account
 	StakingEpoch *big.Int `json:"stakingEpoch,omitempty"`
+
+	// PreStakingEpoch is the epoch we allow staking transactions
+	PreStakingEpoch *big.Int `json:"preStakingEpoch,omitempty"`
 
 	EIP155Epoch *big.Int `json:"eip155Epoch,omitempty"` // EIP155 hard fork epoch (include EIP158 too)
 	S3Epoch     *big.Int `json:"s3Epoch,omitempty"`     // S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
@@ -149,6 +157,11 @@ func (c *ChainConfig) IsCrossTx(epoch *big.Int) bool {
 // IsStaking determines whether it is staking epoch
 func (c *ChainConfig) IsStaking(epoch *big.Int) bool {
 	return isForked(c.StakingEpoch, epoch)
+}
+
+// IsPreStaking determines whether staking transactions are allowed
+func (c *ChainConfig) IsPreStaking(epoch *big.Int) bool {
+	return isForked(c.PreStakingEpoch, epoch)
 }
 
 // IsCrossLink returns whether epoch is either equal to the CrossLink fork epoch or greater.

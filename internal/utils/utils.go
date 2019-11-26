@@ -86,6 +86,18 @@ func GetAddressFromBlsPubKey(pubKey *bls.PublicKey) common.Address {
 	return addr
 }
 
+// GetAddressFromBlsPubKeyBytes return the address object from bls pub key.
+func GetAddressFromBlsPubKeyBytes(pubKeyBytes []byte) common.Address {
+	pubKey := &bls.PublicKey{}
+	err := pubKey.Deserialize(pubKeyBytes[:])
+	addr := common.Address{}
+	if err != nil {
+		addrBytes := pubKey.GetAddress()
+		addr.SetBytes(addrBytes[:])
+	}
+	return addr
+}
+
 // GenKeyP2P generates a pair of RSA keys used in libp2p host
 func GenKeyP2P(ip, port string) (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
 	r := mrand.New(mrand.NewSource(int64(GetUniqueIDFromIPPort(ip, port))))

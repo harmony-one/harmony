@@ -138,10 +138,12 @@ func (ss *StateSync) purgeOldBlocksFromCache() {
 func (ss *StateSync) AddLastMileBlock(block *types.Block) {
 	ss.lastMileMux.Lock()
 	defer ss.lastMileMux.Unlock()
-	if len(ss.lastMileBlocks) >= LastMileBlocksSize {
-		ss.lastMileBlocks = ss.lastMileBlocks[1:]
+	if ss.lastMileBlocks != nil {
+		if len(ss.lastMileBlocks) >= LastMileBlocksSize {
+			ss.lastMileBlocks = ss.lastMileBlocks[1:]
+		}
+		ss.lastMileBlocks = append(ss.lastMileBlocks, block)
 	}
-	ss.lastMileBlocks = append(ss.lastMileBlocks, block)
 }
 
 // CloseConnections close grpc  connections for state sync clients

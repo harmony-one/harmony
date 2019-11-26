@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -16,7 +15,6 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -26,7 +24,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
@@ -133,7 +130,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
 									Uint64("block", blocks[0].NumberU64()).
-									Msgf("Block being handled by block channel %d %d", block.NumberU64(), block.ShardID())
+									Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
 								node.BeaconBlockChannel <- block
 							}
 						}
@@ -159,10 +156,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			}
 		case proto_node.PING:
 			node.pingMessageHandler(msgPayload, sender)
-		case proto_node.ShardState:
-			if err := node.epochShardStateMessageHandler(msgPayload); err != nil {
-				utils.Logger().Warn().Err(err)
-			}
 		}
 	default:
 		utils.Logger().Error().
@@ -350,7 +343,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
 		utils.Logger().Info().
-			Uint64("BlockNum", newBlock.NumberU64()).
+			Uint64("blockNum", newBlock.NumberU64()).
+			Uint64("epochNum", newBlock.Epoch().Uint64()).
+			Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
+			Str("blockHash", newBlock.Hash().String()).
+			Int("numTxns", len(newBlock.Transactions())).
+			Int("numStakingTxns", len(newBlock.StakingTransactions())).
 			Msg("BINGO !!! Reached Consensus")
 		// 15% of the validator also need to do broadcasting
 		rand.Seed(time.Now().UTC().UnixNano())
@@ -363,6 +361,11 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
 
+	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
+	if len(newBlock.Header().ShardState()) > 0 {
+		node.Consensus.UpdateConsensusInformation()
+	}
+
 	// Writing validator stats (for uptime recording)
 	// TODO: only record for open staking validators
 	prevBlock := node.Blockchain().GetBlockByHash(newBlock.ParentHash())
@@ -372,60 +375,27 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			members := node.Consensus.Decider.Participants()
 			mask, _ := bls2.NewMask(members, nil)
 			mask.SetMask(commitSigAndBitmap[96:])
-			err = node.Blockchain().WriteValidatorStats(shardState.FindCommitteeByID(newBlock.ShardID()).Slots, mask)
+			err = node.Blockchain().UpdateValidatorUptime(shardState.FindCommitteeByID(newBlock.ShardID()).Slots, mask)
 
 			if err != nil {
 				utils.Logger().Err(err)
 			}
 		}
+
 	}
-	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
-	if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
-		next := new(big.Int).Add(newBlock.Epoch(), common.Big1)
-		if node.chainConfig.StakingEpoch.Cmp(next) == 0 &&
-			node.Consensus.Decider.Policy() != quorum.SuperMajorityStake {
-			node.Consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
-			node.Consensus.Decider.SetShardIDProvider(func() (uint32, error) {
-				return node.Consensus.ShardID, nil
-			})
-			s, _ := committee.WithStakingEnabled.Compute(
-				next, node.chainConfig, node.Consensus.ChainReader,
-			)
 
-			prevSubCommitteeDump := node.Consensus.Decider.JSON()
-
-			if _, err := node.Consensus.Decider.SetVoters(
-				s.FindCommitteeByID(node.Consensus.ShardID).Slots,
-			); err != nil {
-				utils.Logger().Error().
-					Err(err).
-					Uint32("shard", node.Consensus.ShardID).
-					Msg("Error when updating voting power")
-				return
+	// Update voting power of validators for all shards
+	if len(newBlock.Header().ShardState()) > 0 {
+		shardState := shard.State{}
+		if err := rlp.DecodeBytes(newBlock.Header().ShardState(), &shardState); err == nil {
+			if err = node.Blockchain().UpdateValidatorVotingPower(shardState); err != nil {
+				utils.Logger().Err(err)
 			}
-
-			utils.Logger().Info().
-				Uint64("block-number", newBlock.Number().Uint64()).
-				Uint64("epoch", newBlock.Epoch().Uint64()).
-				Uint32("shard-id", node.Consensus.ShardID).
-				RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
-				RawJSON("current-subcommittee", []byte(node.Consensus.Decider.JSON())).
-				Msg("changing committee")
-		}
-		// TODO Need to refactor UpdateConsensusInformation so can fold the following logic
-		// into UCI - todo because UCI mutates state & called in overloaded contexts
-		node.Consensus.UpdateConsensusInformation()
-
-		if shard.Schedule.IsLastBlock(newBlock.Number().Uint64()) {
-			if node.chainConfig.StakingEpoch.Cmp(next) == 0 {
-				// Hit this case again, need after UpdateConsensus
-				curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
-					next, node.Consensus.ChainReader,
-				)[int(node.Consensus.ShardID)]
-				node.Consensus.Decider.UpdateParticipants(curPubKeys)
-			}
+		} else {
+			utils.Logger().Err(err)
 		}
 
+		// TODO: deal with pre-staking voting power accounting
 	}
 
 	// TODO chao: uncomment this after beacon syncing is stable

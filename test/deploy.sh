@@ -230,7 +230,7 @@ if [ "$DOTEST" == "true" ]; then
    while [ $i -le $NUM_TEST ]; do
       "${ROOT}/bin/wallet" -p local transfer --from $ACC1 --to $ACC3 --shardID 0 --toShardID 1 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
       "${ROOT}/bin/wallet" -p local transfer --from $ACC2 --to $ACC3 --shardID 1 --toShardID 0 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
-      sleep 20
+      sleep 25
       i=$((i+1))
    done
    echo "waiting for the result"

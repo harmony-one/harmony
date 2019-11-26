@@ -32,6 +32,7 @@ import (
 )
 
 var (
+	errInvalidSigner               = errors.New("invalid signer for staking transaction")
 	errInsufficientBalanceForGas   = errors.New("insufficient balance to pay for gas")
 	errInsufficientBalanceForStake = errors.New("insufficient balance to stake")
 	errValidatorExist              = errors.New("staking validator already exists")
@@ -243,6 +244,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		}
 	}
 	st.refundGas()
+	// TODO: need to move the gas fee to the general block rewards
 	st.state.AddBalance(st.evm.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
 
 	return ret, st.gasUsed(), vmerr != nil, err
@@ -304,12 +306,18 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
+		if msg.From() != stkMsg.ValidatorAddress {
+			return 0, errInvalidSigner
+		}
 		err = st.applyCreateValidatorTx(stkMsg, msg.BlockNum())
 
 	case types.StakeEditVal:
 		stkMsg := &staking.EditValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
+		}
+		if msg.From() != stkMsg.ValidatorAddress {
+			return 0, errInvalidSigner
 		}
 		err = st.applyEditValidatorTx(stkMsg, msg.BlockNum())
 
@@ -318,6 +326,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
+		}
 		err = st.applyDelegateTx(stkMsg)
 
 	case types.Undelegate:
@@ -325,11 +336,17 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
+		}
 		err = st.applyUndelegateTx(stkMsg)
 	case types.CollectRewards:
 		stkMsg := &staking.CollectRewards{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
+		}
+		if msg.From() != stkMsg.DelegatorAddress {
+			return 0, errInvalidSigner
 		}
 		err = st.applyCollectRewards(stkMsg)
 	default:
