@@ -2643,6 +2643,20 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	return nil
 }
 
+// BlockRewardAccumulator ..
+func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
+	return rawdb.ReadBlockRewardAccumulator(bc.db)
+}
+
+//UpdateBlockRewardAccumulator ..
+func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int) error {
+	current, err := bc.BlockRewardAccumulator()
+	if err != nil {
+		return err
+	}
+	return rawdb.WriteBlockRewardAccumulator(bc.db, new(big.Int).Add(current, diff))
+}
+
 func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress common.Address, root common.Hash) error {
 	// Get existing delegations
 	delegations, err := bc.ReadDelegationsByDelegator(delegatorAddress)
