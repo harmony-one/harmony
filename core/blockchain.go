@@ -2646,6 +2646,7 @@ func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
 	return rawdb.ReadBlockRewardAccumulator(bc.db)
 }
 
+// WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int) error {
 	return rawdb.WriteBlockRewardAccumulator(bc.db, reward)
 }
