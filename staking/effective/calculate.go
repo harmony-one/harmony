@@ -66,6 +66,12 @@ func (s Slots) JSON() string {
 }
 
 func median(stakes []SlotPurchase) numeric.Dec {
+
+	if len(stakes) == 0 {
+		utils.Logger().Error().Int("non-zero", len(stakes)).
+			Msg("Input to median has len 0, check caller")
+	}
+
 	sort.SliceStable(
 		stakes,
 		func(i, j int) bool { return stakes[i].Dec.LTE(stakes[j].Dec) },
@@ -115,6 +121,11 @@ func Apply(shortHand map[common.Address]SlotOrder, pull int) Slots {
 		pull = l
 	}
 	picks := eposedSlots[:pull]
+
+	if len(picks) == 0 {
+		return Slots{}
+	}
+
 	median := median(picks)
 
 	for i := range picks {
