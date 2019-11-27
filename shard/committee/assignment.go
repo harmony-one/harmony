@@ -68,6 +68,7 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.State {
 	hmyAccounts := s.HmyAccounts()
 	fnAccounts := s.FnAccounts()
 	shardState := shard.State{}
+	// Shard state needs to be sorted by shard ID
 	for i := 0; i < shardNum; i++ {
 		com := shard.Committee{ShardID: uint32(i)}
 		for j := 0; j < shardHarmonyNodes; j++ {
@@ -133,6 +134,7 @@ func eposStakedCommittee(
 	superComm := make(shard.State, shardCount)
 	hAccounts := s.HmyAccounts()
 
+	// Shard state needs to be sorted by shard ID
 	for i := 0; i < shardCount; i++ {
 		superComm[i] = shard.Committee{uint32(i), shard.SlotList{}}
 	}

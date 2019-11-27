@@ -68,6 +68,7 @@ type HeaderInformation struct {
 type RPCValidator struct {
 	Address             common.Address       `json:"address"`
 	SlotPubKeys         []shard.BlsPublicKey `json:"slot_pub_keys"`
+	SlotShardIDs        []int                `json:"slot_shard_ids"`
 	UnbondingHeight     *big.Int             `json:"unbonding_height"`
 	MinSelfDelegation   *big.Int             `json:"min_self_delegation"`
 	MaxTotalDelegation  *big.Int             `json:"max_total_delegation"`
@@ -157,6 +158,7 @@ func newRPCValidator(validator *types2.Validator) *RPCValidator {
 	return &RPCValidator{
 		validator.Address,
 		validator.SlotPubKeys,
+		nil,
 		validator.UnbondingHeight,
 		validator.MinSelfDelegation,
 		validator.MaxTotalDelegation,

@@ -209,6 +209,7 @@ func setupInitialAccount() (isLeader bool) {
 	}
 
 	if initialAccount == nil {
+		initialAccount = &genesis.DeployAccount{}
 		initialAccount.ShardID = uint32(*shardID)
 		initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
 		blsAddressBytes := pubKey.GetAddress()
@@ -463,7 +464,7 @@ func main() {
 		setupInitialAccount()
 	}
 
-	if *shardID >= 0 {
+	if *nodeType != "validator" && *shardID >= 0 {
 		utils.Logger().Info().
 			Uint32("original", initialAccount.ShardID).
 			Int("override", *shardID).
