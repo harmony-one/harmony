@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/numeric"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -1214,8 +1216,57 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		}
 	}
 
+	// Update voting power of validators for all shards
+	if len(block.Header().ShardState()) > 0 {
+		shardState := shard.State{}
+		if err := rlp.DecodeBytes(block.Header().ShardState(), &shardState); err == nil {
+			if err = bc.UpdateValidatorVotingPower(shardState); err != nil {
+				utils.Logger().Err(err)
+			}
+		} else {
+			utils.Logger().Err(err)
+		}
+		// TODO: deal with pre-staking voting power accounting
+	}
+
+	// Writing validator stats (for uptime recording) for shard 0
+	if block.ShardID() == 0 && bc.chainConfig.IsStaking(block.Epoch()) {
+		parentHeader := bc.GetHeaderByHash(block.ParentHash())
+		if parentHeader == nil {
+			return NonStatTy, errors.New("no parent found for uptime accounting")
+		}
+		shardState, err := bc.ReadShardState(parentHeader.Epoch())
+		if err == nil {
+			committee := shardState.FindCommitteeByID(block.Header().ShardID())
+			if committee == nil {
+				return NonStatTy, errors.New("no shard found for cross-link")
+			}
+
+			members := []*bls2.PublicKey{}
+			for _, slot := range committee.Slots {
+				if slot.TotalStake != nil {
+					pubKey := &bls2.PublicKey{}
+					err := pubKey.Deserialize(slot.BlsPublicKey[:])
+					if err != nil {
+						return NonStatTy, err
+					}
+					members = append(members, pubKey)
+				}
+			}
+
+			mask, _ := bls.NewMask(members, nil)
+			mask.SetMask(block.Header().LastCommitBitmap())
+
+			if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
+				utils.Logger().Err(err)
+			}
+		} else {
+			return NonStatTy, errors.New("failed reading shard state for uptime accounting")
+		}
+	}
+
 	//// Cross-links
-	if len(header.CrossLinks()) > 0 {
+	if header.ShardID() == 0 && len(header.CrossLinks()) > 0 {
 		header.Logger(utils.Logger()).Debug().Msg("[insertChain/crosslinks] writing crosslinks into blockchain...")
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
@@ -1228,6 +1279,39 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			return NonStatTy, errors.New("proposed cross links are not sorted")
 		}
 		for _, crossLink := range *crossLinks {
+			// Writing validator stats (for uptime recording) for other shards
+			if bc.chainConfig.IsStaking(crossLink.Epoch()) {
+				shardState, err := bc.ReadShardState(crossLink.Epoch())
+				if err == nil {
+					committee := shardState.FindCommitteeByID(crossLink.ShardID())
+					if committee == nil {
+						return NonStatTy, errors.New("no shard found for cross-link")
+					}
+
+					members := []*bls2.PublicKey{}
+					for _, slot := range committee.Slots {
+						if slot.TotalStake != nil {
+							pubKey := &bls2.PublicKey{}
+							err := pubKey.Deserialize(slot.BlsPublicKey[:])
+							if err != nil {
+								return NonStatTy, err
+							}
+							members = append(members, pubKey)
+						}
+					}
+
+					mask, _ := bls.NewMask(members, nil)
+					mask.SetMask(crossLink.Bitmap())
+
+					if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
+						utils.Logger().Err(err)
+					}
+				} else {
+					return NonStatTy, errors.New("failed reading shard state for uptime accounting")
+				}
+			}
+
+			// Process crosslink
 			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
 				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
 			}

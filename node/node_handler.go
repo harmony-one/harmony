@@ -16,7 +16,6 @@ import (
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -369,38 +368,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
 		node.Consensus.UpdateConsensusInformation()
-	}
-
-	// Writing validator stats (for uptime recording)
-	// TODO: only record for open staking validators
-	prevBlock := node.Blockchain().GetBlockByHash(newBlock.ParentHash())
-	if prevBlock != nil {
-		shardState, err := node.Blockchain().ReadShardState(prevBlock.Epoch())
-		if err == nil {
-			members := node.Consensus.Decider.Participants()
-			mask, _ := bls2.NewMask(members, nil)
-			mask.SetMask(commitSigAndBitmap[96:])
-			err = node.Blockchain().UpdateValidatorUptime(shardState.FindCommitteeByID(newBlock.ShardID()).Slots, mask)
-
-			if err != nil {
-				utils.Logger().Err(err)
-			}
-		}
-
-	}
-
-	// Update voting power of validators for all shards
-	if len(newBlock.Header().ShardState()) > 0 {
-		shardState := shard.State{}
-		if err := rlp.DecodeBytes(newBlock.Header().ShardState(), &shardState); err == nil {
-			if err = node.Blockchain().UpdateValidatorVotingPower(shardState); err != nil {
-				utils.Logger().Err(err)
-			}
-		} else {
-			utils.Logger().Err(err)
-		}
-
-		// TODO: deal with pre-staking voting power accounting
 	}
 
 	// TODO chao: uncomment this after beacon syncing is stable
