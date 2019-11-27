@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	types2 "github.com/harmony-one/harmony/staking/types"
 	"math/big"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -121,7 +122,9 @@ func (c *Client) getBlock(ctx context.Context, method string, args ...interface{
 		}
 		txs[i] = tx.tx
 	}
-	return types.NewBlockWithHeader(head).WithBody(txs, []*block.Header{}, nil), nil
+	stakingTxs := make([]*types2.StakingTransaction, len(body.StakingTransactions))
+	// TODO: add staking txns
+	return types.NewBlockWithHeader(head).WithBody(txs, stakingTxs, []*block.Header{}, nil), nil
 }
 
 func toBlockNumArg(number *big.Int) string {
