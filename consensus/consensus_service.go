@@ -486,6 +486,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.Decider.SetShardIDProvider(func() (uint32, error) {
 			return consensus.ShardID, nil
 		})
+		consensus.Decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+			return consensus.PubKey, nil
+		})
 	}
 
 	committeeToSet := &shard.Committee{}

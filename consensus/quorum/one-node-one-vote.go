@@ -99,3 +99,15 @@ func (v *uniformVoteWeight) JSON() string {
 	b1, _ := json.Marshal(t{v.Policy().String(), s, len(members), members})
 	return string(b1)
 }
+
+func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
+	identity, _ := v.MyPublicKey()()
+	everyone := v.DumpParticipants()
+	myVoterID := identity.SerializeToHexStr()
+	for i := range everyone {
+		if everyone[i] == myVoterID {
+			return true
+		}
+	}
+	return false
+}

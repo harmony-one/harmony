@@ -89,11 +89,13 @@ type SignatureReader interface {
 // DependencyInjectionWriter ..
 type DependencyInjectionWriter interface {
 	SetShardIDProvider(func() (uint32, error))
+	SetMyPublicKeyProvider(func() (*bls.PublicKey, error))
 }
 
 // DependencyInjectionReader ..
 type DependencyInjectionReader interface {
 	ShardIDProvider() func() (uint32, error)
+	MyPublicKey() func() (*bls.PublicKey, error)
 }
 
 //WithJSONDump representation dump
@@ -112,6 +114,7 @@ type Decider interface {
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
 	QuorumThreshold() numeric.Dec
+	AmIMemberOfCommitee() bool
 	IsRewardThresholdAchieved() bool
 }
 
@@ -129,7 +132,8 @@ type cIdentities struct {
 }
 
 type depInject struct {
-	shardIDProvider func() (uint32, error)
+	shardIDProvider   func() (uint32, error)
+	publicKeyProvider func() (*bls.PublicKey, error)
 }
 
 func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
@@ -284,6 +288,14 @@ func (d *depInject) SetShardIDProvider(p func() (uint32, error)) {
 
 func (d *depInject) ShardIDProvider() func() (uint32, error) {
 	return d.shardIDProvider
+}
+
+func (d *depInject) SetMyPublicKeyProvider(p func() (*bls.PublicKey, error)) {
+	d.publicKeyProvider = p
+}
+
+func (d *depInject) MyPublicKey() func() (*bls.PublicKey, error) {
+	return d.publicKeyProvider
 }
 
 // NewDecider ..

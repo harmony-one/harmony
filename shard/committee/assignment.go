@@ -149,6 +149,13 @@ func eposStakedCommittee(
 			nil,
 		})
 	}
+
+	if stakedSlotsCount == 0 {
+		utils.Logger().Info().Int("slots-for-epos", stakedSlotsCount).
+			Msg("committe composed only of harmony node")
+		return superComm, nil
+	}
+
 	staked := effective.Apply(essentials, stakedSlotsCount)
 	shardBig := big.NewInt(int64(shardCount))
 
