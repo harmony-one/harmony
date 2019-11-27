@@ -1234,7 +1234,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			bc.LastContinuousCrossLink(crossLink.ShardID(), crossLink)
 		}
 		//clean/update local database cache after crosslink inserted into blockchain
-		num, err := bc.DeleteCommittedFromPendingCrossLinks()
+		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
 		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
 	/////////////////////////// END
@@ -2143,11 +2143,10 @@ func (bc *BlockChain) LastContinuousCrossLink(shardID uint32, cl types.CrossLink
 	}
 	newCheckpoint := uint64(0)
 	for i := cl0.BlockNum() + 1; i < cl.BlockNum(); i++ {
-		tmp, err := bc.ReadShardLastCrossLink(shardID)
+		tmp, err := bc.ReadCrossLink(shardID, i)
 		if err != nil || tmp == nil {
-			if i > cl0.BlockNum() {
-				newCheckpoint = i - 1
-			}
+			newCheckpoint = i - 1
+			break
 		}
 		if i == cl.BlockNum()-1 {
 			newCheckpoint = cl.BlockNum()
@@ -2225,17 +2224,28 @@ func (bc *BlockChain) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, e
 	return len(cls), err
 }
 
-// DeleteCommittedFromPendingCrossLinks delete pending crosslinks that already committed
-func (bc *BlockChain) DeleteCommittedFromPendingCrossLinks() (int, error) {
+// DeleteCommittedFromPendingCrossLinks delete pending crosslinks that already committed (i.e. passed in the params)
+func (bc *BlockChain) DeleteCommittedFromPendingCrossLinks(crossLinks []types.CrossLink) (int, error) {
 	cls, err := bc.ReadPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		return 0, err
 	}
+
+	m := map[uint32]map[uint64](struct{}){}
+	for _, cl := range crossLinks {
+		if _, ok := m[cl.ShardID()]; !ok {
+			m[cl.ShardID()] = map[uint64](struct{}){}
+		}
+		m[cl.ShardID()][cl.BlockNum()] = struct{}{}
+	}
+
 	pendingCLs := []types.CrossLink{}
+Loop:
 	for _, cl := range cls {
-		cl0, err := bc.ReadCrossLink(cl.ShardID(), cl.BlockNum())
-		if err == nil && cl0 != nil {
-			continue
+		if _, ok := m[cl.ShardID()]; ok {
+			if _, ok1 := m[cl.ShardID()][cl.BlockNum()]; ok1 {
+				continue Loop
+			}
 		}
 		pendingCLs = append(pendingCLs, cl)
 	}
