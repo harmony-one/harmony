@@ -12,6 +12,7 @@ import (
 
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -149,14 +150,19 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 }
 
 // ConstructCrossLinkMessage constructs cross link message to send to beacon chain
-func ConstructCrossLinkMessage(headers []*block.Header) []byte {
+func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
 	byteBuffer.WriteByte(byte(CrossLink))
 
 	crosslinks := []types.CrossLink{}
 	for _, header := range headers {
-		crosslinks = append(crosslinks, types.NewCrossLink(header))
+		parentHeader := bc.GetHeaderByHash(header.ParentHash())
+		if parentHeader == nil {
+			continue
+		}
+		epoch := parentHeader.Epoch()
+		crosslinks = append(crosslinks, types.NewCrossLink(header, epoch))
 	}
 	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
 	byteBuffer.Write(crosslinksData)

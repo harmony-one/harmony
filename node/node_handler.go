@@ -241,7 +241,7 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 	for _, header := range headers {
 		utils.Logger().Debug().Msgf("[BroadcastCrossLink] Broadcasting %d", header.Number().Uint64())
 	}
-	node.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(0)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkMessage(headers)))
+	node.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(0)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkMessage(node.Consensus.ChainReader, headers)))
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on

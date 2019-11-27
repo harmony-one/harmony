@@ -239,16 +239,13 @@ func AccumulateRewards(
 
 				cxLink := crossLinks[i]
 
-				epoch := bc.GetHeaderByNumber(cxLink.BlockNum()).Epoch()
-				shardState, err := bc.ReadShardState(epoch)
-				if !bc.Config().IsStaking(epoch) {
-					shardState, err = committee.WithStakingEnabled.Compute(epoch, bc)
+				shardState, err := bc.ReadShardState(cxLink.Epoch())
+				if !bc.Config().IsStaking(cxLink.Epoch()) {
+					shardState, err = committee.WithStakingEnabled.Compute(cxLink.Epoch(), bc)
 				}
 
 				if err != nil {
-					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
-					// TODO: FIX THIS WITH NEW CROSSLINK FORMAT
-					continue
+					return err
 				}
 
 				subComm := shardState.FindCommitteeByID(cxLink.ShardID())
@@ -256,9 +253,7 @@ func AccumulateRewards(
 				payableSigners, _, err := blockSigners(cxLink.Bitmap(), subComm)
 
 				if err != nil {
-					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
-					// TODO: FIX THIS WITH NEW CROSSLINK FORMAT
-					continue
+					return err
 				}
 
 				votingPower := votepower.Compute(payableSigners)

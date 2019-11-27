@@ -20,16 +20,18 @@ type CrossLink struct {
 	SignatureF   [96]byte //aggregated signature
 	BitmapF      []byte   //corresponding bitmap mask for agg signature
 	ShardIDF     uint32   //will be verified with signature on |blockNumber|blockHash| is correct
+	EpochF       *big.Int
 }
 
 // NewCrossLink returns a new cross link object
-func NewCrossLink(header *block.Header) CrossLink {
-	if header.Number().Uint64() == 0 {
-		return CrossLink{}
-	}
+// epoch is the parentHeader's epoch
+func NewCrossLink(header *block.Header, epoch *big.Int) CrossLink {
 	parentBlockNum := big.NewInt(0)
+	if header.Number().Uint64() == 0 { // should not happend, just to be defensive
+		return CrossLink{header.ParentHash(), parentBlockNum, header.LastCommitSignature(), header.LastCommitBitmap(), header.ShardID(), epoch}
+	}
 	parentBlockNum.Sub(header.Number(), big.NewInt(1))
-	return CrossLink{header.ParentHash(), parentBlockNum, header.LastCommitSignature(), header.LastCommitBitmap(), header.ShardID()}
+	return CrossLink{header.ParentHash(), parentBlockNum, header.LastCommitSignature(), header.LastCommitBitmap(), header.ShardID(), epoch}
 }
 
 // ShardID returns shardID
@@ -40,6 +42,11 @@ func (cl CrossLink) ShardID() uint32 {
 // Number returns blockNum with big.Int format
 func (cl CrossLink) Number() *big.Int {
 	return cl.BlockNumberF
+}
+
+// Epoch returns epoch with big.Int format
+func (cl CrossLink) Epoch() *big.Int {
+	return cl.EpochF
 }
 
 // BlockNum returns blockNum

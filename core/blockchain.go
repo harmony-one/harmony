@@ -144,7 +144,7 @@ type BlockChain struct {
 	validatorStatsCache           *lru.Cache // Cache for validator stats
 	validatorListCache            *lru.Cache // Cache of validator list
 	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
-	lastPendingCrossLinksCache    *lru.Cache // Cache of last pending crosslinks
+	pendingCrossLinksCache        *lru.Cache // Cache of last pending crosslinks
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -185,7 +185,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	validatorStatsCache, _ := lru.New(validatorStatsCacheLimit)
 	validatorListCache, _ := lru.New(validatorListCacheLimit)
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
-	lastPendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
+	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:                   chainConfig,
@@ -208,7 +208,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		validatorStatsCache:           validatorStatsCache,
 		validatorListCache:            validatorListCache,
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
-		lastPendingCrossLinksCache:    lastPendingCrossLinksCache,
+		pendingCrossLinksCache:        pendingCrossLinksCache,
 		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
@@ -1231,13 +1231,11 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
 				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
 			}
-			bc.UpdateShardLastCrossLink(crossLink.ShardID(), crossLink)
+			bc.LastContinuousCrossLink(crossLink.ShardID(), crossLink)
 		}
-		//clean local database cache after crosslink inserted into blockchain
-		err = bc.DeletePendingCrossLinks()
-		if err != nil {
-			utils.Logger().Error().Err(err).Msgf("Unable to Delete PendingCrossLinks, number of crosslinks: %d", len(header.CrossLinks()))
-		}
+		//clean/update local database cache after crosslink inserted into blockchain
+		num, err := bc.DeleteCommittedFromPendingCrossLinks()
+		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
 	/////////////////////////// END
 
@@ -2130,11 +2128,11 @@ func (bc *BlockChain) WriteShardLastCrossLink(shardID uint32, cl types.CrossLink
 	return rawdb.WriteShardLastCrossLink(bc.db, cl.ShardID(), cl.Serialize())
 }
 
-// UpdateShardLastCrossLink saves the last crosslink of a shard
+// LastContinuousCrossLink saves the last crosslink of a shard
 // This function will update the latest crosslink in the sense that
 // any previous block's crosslink is received up to this point
 // there is no missing hole between genesis to this crosslink of given shardID
-func (bc *BlockChain) UpdateShardLastCrossLink(shardID uint32, cl types.CrossLink) error {
+func (bc *BlockChain) LastContinuousCrossLink(shardID uint32, cl types.CrossLink) error {
 	cl0, err := bc.ReadShardLastCrossLink(shardID)
 	if cl0 == nil {
 		bc.WriteShardLastCrossLink(shardID, cl)
@@ -2157,7 +2155,7 @@ func (bc *BlockChain) UpdateShardLastCrossLink(shardID uint32, cl types.CrossLin
 	}
 
 	if newCheckpoint > 0 {
-		utils.Logger().Debug().Msgf("UpdateShardLastCrossLink: latest checkpoint blockNum %d", newCheckpoint)
+		utils.Logger().Debug().Msgf("LastContinuousCrossLink: latest checkpoint blockNum %d", newCheckpoint)
 		cln, err := bc.ReadCrossLink(shardID, newCheckpoint)
 		if err != nil {
 			return err
@@ -2181,7 +2179,7 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 // ReadPendingCrossLinks retrieves pending crosslinks
 func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 	bytes := []byte{}
-	if cached, ok := bc.lastPendingCrossLinksCache.Get("lastPendingCLs"); ok {
+	if cached, ok := bc.pendingCrossLinksCache.Get("pendingCLs"); ok {
 		bytes = cached.([]byte)
 	} else {
 		bytes, err := rawdb.ReadPendingCrossLinks(bc.db)
@@ -2210,7 +2208,7 @@ func (bc *BlockChain) WritePendingCrossLinks(cls []types.CrossLink) error {
 	}
 	by, err := rlp.EncodeToBytes(cls)
 	if err == nil {
-		bc.lastPendingCrossLinksCache.Add("lastPendingCLs", by)
+		bc.pendingCrossLinksCache.Add("pendingCLs", by)
 	}
 	return nil
 }
@@ -2227,10 +2225,22 @@ func (bc *BlockChain) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, e
 	return len(cls), err
 }
 
-// DeletePendingCrossLinks appends pending crosslinks
-func (bc *BlockChain) DeletePendingCrossLinks() error {
-	bc.lastPendingCrossLinksCache.Remove("lastPendingCLs")
-	return rawdb.DeletePendingCrossLinks(bc.db)
+// DeleteCommittedFromPendingCrossLinks delete pending crosslinks that already committed
+func (bc *BlockChain) DeleteCommittedFromPendingCrossLinks() (int, error) {
+	cls, err := bc.ReadPendingCrossLinks()
+	if err != nil || len(cls) == 0 {
+		return 0, err
+	}
+	pendingCLs := []types.CrossLink{}
+	for _, cl := range cls {
+		cl0, err := bc.ReadCrossLink(cl.ShardID(), cl.BlockNum())
+		if err == nil && cl0 != nil {
+			continue
+		}
+		pendingCLs = append(pendingCLs, cl)
+	}
+	err = bc.WritePendingCrossLinks(pendingCLs)
+	return len(pendingCLs), err
 }
 
 // IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
