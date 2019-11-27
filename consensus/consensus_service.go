@@ -473,21 +473,26 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
 	prevSubCommitteeDump := consensus.Decider.JSON()
 
-	// Only happens once, the flip-over to a new Decider policy
-	if (consensus.ChainReader.Config().IsStaking(nextEpoch) &&
+	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
 		len(curHeader.ShardState()) > 0 &&
-		!consensus.ChainReader.Config().IsStaking(curEpoch)) ||
-		(consensus.ChainReader.Config().IsStaking(curEpoch) &&
-			consensus.Decider.Policy() != quorum.SuperMajorityStake) {
+		!consensus.ChainReader.Config().IsStaking(curEpoch)
 
+	haventUpdatedDecider := consensus.ChainReader.Config().IsStaking(curEpoch) &&
+		consensus.Decider.Policy() != quorum.SuperMajorityStake
+
+	// Only happens once
+	if isFirstTimeStaking {
+		if consensus.ShardID == shard.BeaconChainShardID {
+			consensus.ChainReader.WriteBlockRewardAccumulator(big.NewInt(0))
+		}
+	}
+
+	// Only happens once, the flip-over to a new Decider policy
+	if isFirstTimeStaking || haventUpdatedDecider {
 		consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
 		consensus.Decider.SetShardIDProvider(func() (uint32, error) {
 			return consensus.ShardID, nil
 		})
-
-		if consensus.ShardID == shard.BeaconChainShardID {
-			consensus.ChainReader.UpdateBlockRewardAccumulator(big.NewInt(0))
-		}
 	}
 
 	committeeToSet := &shard.Committee{}

@@ -50,7 +50,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
-	db_error "github.com/syndtr/goleveldb/leveldb/errors"
 )
 
 var (
@@ -2647,16 +2646,17 @@ func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
 	return rawdb.ReadBlockRewardAccumulator(bc.db)
 }
 
+func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int) error {
+	return rawdb.WriteBlockRewardAccumulator(bc.db, reward)
+}
+
 //UpdateBlockRewardAccumulator ..
 func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int) error {
 	current, err := bc.BlockRewardAccumulator()
-	if err == db_error.ErrNotFound {
-		return rawdb.WriteBlockRewardAccumulator(bc.db, big.NewInt(0))
-	}
-	if err != nil && err != db_error.ErrNotFound {
+	if err != nil {
 		return err
 	}
-	return rawdb.WriteBlockRewardAccumulator(bc.db, new(big.Int).Add(current, diff))
+	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff))
 }
 
 func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress common.Address, root common.Hash) error {
