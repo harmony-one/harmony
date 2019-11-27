@@ -518,11 +518,11 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 		rpcValidator.TotalEffectiveStake = stats.TotalEffectiveStake.String()
 	}
 
-	shardState := s.b.GetShardState()
-	if shardState != nil {
+	shardState, err := s.b.GetShardState()
+	if err == nil {
 		blsKeyToShardID := make(map[shard.BlsPublicKey]uint32)
 
-		for _, committee := range *shardState {
+		for _, committee := range shardState {
 			for _, slot := range committee.Slots {
 				blsKeyToShardID[slot.BlsPublicKey] = committee.ShardID
 			}
