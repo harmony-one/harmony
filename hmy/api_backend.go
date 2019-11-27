@@ -364,10 +364,10 @@ func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
 }
 
 // GetShardState ...
-func (b *APIBackend) GetShardState() *shard.State {
+func (b *APIBackend) GetShardState() (shard.State, error) {
 	state, err := b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentHeader().Epoch())
 	if err != nil {
-		return &shard.State{}
+		return nil, errors.Wrapf(err, "cannot read from DB")
 	}
-	return &state
+	return state, nil
 }
