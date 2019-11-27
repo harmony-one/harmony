@@ -362,3 +362,12 @@ func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
 	}
 	return wrapper.Delegations[0].Amount
 }
+
+// GetShardState ...
+func (b *APIBackend) GetShardState() *shard.State {
+	state, err := b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentHeader().Epoch())
+	if err != nil {
+		return &shard.State{}
+	}
+	return &state
+}

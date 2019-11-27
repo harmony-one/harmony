@@ -518,6 +518,26 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 		rpcValidator.TotalEffectiveStake = stats.TotalEffectiveStake.String()
 	}
 
+	shardState := s.b.GetShardState()
+	if shardState != nil {
+		blsKeyToShardID := make(map[shard.BlsPublicKey]uint32)
+
+		for _, committee := range *shardState {
+			for _, slot := range committee.Slots {
+				blsKeyToShardID[slot.BlsPublicKey] = committee.ShardID
+			}
+		}
+
+		shardIDs := make([]int, len(rpcValidator.SlotPubKeys))
+
+		for i, slotKey := range rpcValidator.SlotPubKeys {
+			shardID, ok := blsKeyToShardID[slotKey]
+			if !ok {
+				shardIDs[i] = int(shardID)
+			}
+		}
+		rpcValidator.SlotShardIDs = shardIDs
+	}
 	return rpcValidator, nil
 }
 
