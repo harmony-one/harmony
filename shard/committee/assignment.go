@@ -117,6 +117,9 @@ func eposStakedCommittee(
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		validator, err := stakerReader.ReadValidatorInformation(candidates[i])
+		if err := validator.SanityCheck(); err != nil {
+			continue
+		}
 		validatorStake := big.NewInt(0)
 		for _, delegation := range validator.Delegations {
 			validatorStake.Add(validatorStake, delegation.Amount)
