@@ -77,6 +77,7 @@ const (
 	validatorStatsCacheLimit           = 1024
 	validatorListCacheLimit            = 10
 	validatorListByDelegatorCacheLimit = 1024
+	pendingCrossLinksCacheLimit        = 2
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -143,6 +144,7 @@ type BlockChain struct {
 	validatorStatsCache           *lru.Cache // Cache for validator stats
 	validatorListCache            *lru.Cache // Cache of validator list
 	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
+	pendingCrossLinksCache        *lru.Cache // Cache of last pending crosslinks
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -183,6 +185,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	validatorStatsCache, _ := lru.New(validatorStatsCacheLimit)
 	validatorListCache, _ := lru.New(validatorListCacheLimit)
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
+	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:                   chainConfig,
@@ -205,6 +208,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		validatorStatsCache:           validatorStatsCache,
 		validatorListCache:            validatorListCache,
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
+		pendingCrossLinksCache:        pendingCrossLinksCache,
 		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
@@ -1095,7 +1099,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 				continue
 			}
 			shardReceipts := GetToShardReceipts(cxReceipts, uint32(i))
-			err := rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts, false)
+			err := rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts)
 			if err != nil {
 				utils.Logger().Debug().Err(err).Interface("shardReceipts", shardReceipts).Int("toShardID", i).Msg("WriteCXReceipts cannot write into database")
 				return NonStatTy, err
@@ -1212,23 +1216,26 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 	//// Cross-links
 	if len(header.CrossLinks()) > 0 {
+		header.Logger(utils.Logger()).Debug().Msg("[insertChain/crosslinks] writing crosslinks into blockchain...")
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
 		if err != nil {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cannot parse cross links")
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cannot parse cross links")
 			return NonStatTy, err
 		}
 		if !crossLinks.IsSorted() {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain] cross links are not sorted")
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cross links are not sorted")
 			return NonStatTy, errors.New("proposed cross links are not sorted")
 		}
 		for _, crossLink := range *crossLinks {
-			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}, false); err == nil {
-				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum().Uint64()).Uint32("shardID", crossLink.ShardID()).Msg("[InsertChain] Cross Link Added to Beaconchain")
+			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
+				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
 			}
-			bc.DeleteCrossLinks(types.CrossLinks{crossLink}, true)
-			bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
+			bc.LastContinuousCrossLink(crossLink.ShardID(), crossLink)
 		}
+		//clean/update local database cache after crosslink inserted into blockchain
+		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
+		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
 	/////////////////////////// END
 
@@ -2086,31 +2093,28 @@ func (bc *BlockChain) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) e
 }
 
 // WriteCrossLinks saves the hashes of crosslinks by shardID and blockNum combination key
-// temp=true is to write the just received cross link that's not committed into blockchain with consensus
-func (bc *BlockChain) WriteCrossLinks(cls []types.CrossLink, temp bool) error {
+func (bc *BlockChain) WriteCrossLinks(cls []types.CrossLink) error {
 	var err error
 	for i := 0; i < len(cls); i++ {
 		cl := cls[i]
-		err = rawdb.WriteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum().Uint64(), cl.Serialize(), temp)
+		err = rawdb.WriteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum(), cl.Serialize())
 	}
 	return err
 }
 
 // DeleteCrossLinks removes the hashes of crosslinks by shardID and blockNum combination key
-// temp=true is to write the just received cross link that's not committed into blockchain with consensus
-func (bc *BlockChain) DeleteCrossLinks(cls []types.CrossLink, temp bool) error {
+func (bc *BlockChain) DeleteCrossLinks(cls []types.CrossLink) error {
 	var err error
 	for i := 0; i < len(cls); i++ {
 		cl := cls[i]
-		err = rawdb.DeleteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum().Uint64(), temp)
+		err = rawdb.DeleteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum())
 	}
 	return err
 }
 
 // ReadCrossLink retrieves crosslink given shardID and blockNum.
-// temp=true is to retrieve the just received cross link that's not committed into blockchain with consensus
-func (bc *BlockChain) ReadCrossLink(shardID uint32, blockNum uint64, temp bool) (*types.CrossLink, error) {
-	bytes, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum, temp)
+func (bc *BlockChain) ReadCrossLink(shardID uint32, blockNum uint64) (*types.CrossLink, error) {
+	bytes, err := rawdb.ReadCrossLinkShardBlock(bc.db, shardID, blockNum)
 	if err != nil {
 		return nil, err
 	}
@@ -2124,6 +2128,42 @@ func (bc *BlockChain) WriteShardLastCrossLink(shardID uint32, cl types.CrossLink
 	return rawdb.WriteShardLastCrossLink(bc.db, cl.ShardID(), cl.Serialize())
 }
 
+// LastContinuousCrossLink saves the last crosslink of a shard
+// This function will update the latest crosslink in the sense that
+// any previous block's crosslink is received up to this point
+// there is no missing hole between genesis to this crosslink of given shardID
+func (bc *BlockChain) LastContinuousCrossLink(shardID uint32, cl types.CrossLink) error {
+	cl0, err := bc.ReadShardLastCrossLink(shardID)
+	if cl0 == nil {
+		bc.WriteShardLastCrossLink(shardID, cl)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	newCheckpoint := uint64(0)
+	for i := cl0.BlockNum() + 1; i < cl.BlockNum(); i++ {
+		tmp, err := bc.ReadCrossLink(shardID, i)
+		if err != nil || tmp == nil {
+			newCheckpoint = i - 1
+			break
+		}
+		if i == cl.BlockNum()-1 {
+			newCheckpoint = cl.BlockNum()
+		}
+	}
+
+	if newCheckpoint > 0 {
+		utils.Logger().Debug().Msgf("LastContinuousCrossLink: latest checkpoint blockNum %d", newCheckpoint)
+		cln, err := bc.ReadCrossLink(shardID, newCheckpoint)
+		if err != nil {
+			return err
+		}
+		return rawdb.WriteShardLastCrossLink(bc.db, cln.ShardID(), cln.Serialize())
+	}
+	return nil
+}
+
 // ReadShardLastCrossLink retrieves the last crosslink of a shard.
 func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error) {
 	bytes, err := rawdb.ReadShardLastCrossLink(bc.db, shardID)
@@ -2133,6 +2173,84 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 	crossLink, err := types.DeserializeCrossLink(bytes)
 
 	return crossLink, err
+}
+
+// ReadPendingCrossLinks retrieves pending crosslinks
+func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
+	bytes := []byte{}
+	if cached, ok := bc.pendingCrossLinksCache.Get("pendingCLs"); ok {
+		bytes = cached.([]byte)
+	} else {
+		bytes, err := rawdb.ReadPendingCrossLinks(bc.db)
+		if err != nil || len(bytes) == 0 {
+			utils.Logger().Info().Err(err).Int("dataLen", len(bytes)).Msg("ReadPendingCrossLinks")
+			return nil, err
+		}
+	}
+	cls := []types.CrossLink{}
+	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
+		utils.Logger().Error().Err(err).Msg("Invalid pending crosslink RLP decoding")
+		return nil, err
+	}
+	return cls, nil
+}
+
+// WritePendingCrossLinks saves the pending crosslinks
+func (bc *BlockChain) WritePendingCrossLinks(cls []types.CrossLink) error {
+	bytes, err := rlp.EncodeToBytes(cls)
+	if err != nil {
+		utils.Logger().Error().Msg("[WritePendingCrossLinks] Failed to encode pending crosslinks")
+		return err
+	}
+	if err := rawdb.WritePendingCrossLinks(bc.db, bytes); err != nil {
+		return err
+	}
+	by, err := rlp.EncodeToBytes(cls)
+	if err == nil {
+		bc.pendingCrossLinksCache.Add("pendingCLs", by)
+	}
+	return nil
+}
+
+// AddPendingCrossLinks appends pending crosslinks
+func (bc *BlockChain) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error) {
+	cls, err := bc.ReadPendingCrossLinks()
+	if err != nil || len(cls) == 0 {
+		err := bc.WritePendingCrossLinks(pendingCLs)
+		return len(pendingCLs), err
+	}
+	cls = append(cls, pendingCLs...)
+	err = bc.WritePendingCrossLinks(cls)
+	return len(cls), err
+}
+
+// DeleteCommittedFromPendingCrossLinks delete pending crosslinks that already committed (i.e. passed in the params)
+func (bc *BlockChain) DeleteCommittedFromPendingCrossLinks(crossLinks []types.CrossLink) (int, error) {
+	cls, err := bc.ReadPendingCrossLinks()
+	if err != nil || len(cls) == 0 {
+		return 0, err
+	}
+
+	m := map[uint32]map[uint64](struct{}){}
+	for _, cl := range crossLinks {
+		if _, ok := m[cl.ShardID()]; !ok {
+			m[cl.ShardID()] = map[uint64](struct{}){}
+		}
+		m[cl.ShardID()][cl.BlockNum()] = struct{}{}
+	}
+
+	pendingCLs := []types.CrossLink{}
+Loop:
+	for _, cl := range cls {
+		if _, ok := m[cl.ShardID()]; ok {
+			if _, ok1 := m[cl.ShardID()][cl.BlockNum()]; ok1 {
+				continue Loop
+			}
+		}
+		pendingCLs = append(pendingCLs, cl)
+	}
+	err = bc.WritePendingCrossLinks(pendingCLs)
+	return len(pendingCLs), err
 }
 
 // IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
@@ -2170,9 +2288,8 @@ func GetToShardReceipts(cxReceipts types.CXReceipts, shardID uint32) types.CXRec
 }
 
 // ReadCXReceipts retrieves the cross shard transaction receipts of a given shard
-// temp=true is to retrieve the just received receipts that's not committed into blockchain with consensus
-func (bc *BlockChain) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, temp bool) (types.CXReceipts, error) {
-	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, blockNum, blockHash, temp)
+func (bc *BlockChain) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error) {
+	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, blockNum, blockHash)
 	if err != nil || len(cxs) == 0 {
 		return nil, err
 	}
@@ -2180,15 +2297,14 @@ func (bc *BlockChain) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash 
 }
 
 // WriteCXReceipts saves the cross shard transaction receipts of a given shard
-// temp=true is to store the just received receipts that's not committed into blockchain with consensus
-func (bc *BlockChain) WriteCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, receipts types.CXReceipts, temp bool) error {
-	return rawdb.WriteCXReceipts(bc.db, shardID, blockNum, blockHash, receipts, temp)
+func (bc *BlockChain) WriteCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, receipts types.CXReceipts) error {
+	return rawdb.WriteCXReceipts(bc.db, shardID, blockNum, blockHash, receipts)
 }
 
 // CXMerkleProof calculates the cross shard transaction merkle proof of a given destination shard
 func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
 	proof := &types.CXMerkleProof{BlockNum: block.Number(), BlockHash: block.Hash(), ShardID: block.ShardID(), CXReceiptHash: block.Header().OutgoingReceiptHash(), CXShardHashes: []common.Hash{}, ShardIDs: []uint32{}}
-	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, block.NumberU64(), block.Hash(), false)
+	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, block.NumberU64(), block.Hash())
 
 	if err != nil || cxs == nil {
 		return nil, err
@@ -2199,7 +2315,7 @@ func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.
 	shardNum := int(shardingConfig.NumShards())
 
 	for i := 0; i < shardNum; i++ {
-		receipts, err := bc.ReadCXReceipts(uint32(i), block.NumberU64(), block.Hash(), false)
+		receipts, err := bc.ReadCXReceipts(uint32(i), block.NumberU64(), block.Hash())
 		if err != nil || len(receipts) == 0 {
 			continue
 		} else {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -98,8 +99,8 @@ type BlockMessageType int
 const (
 	Sync BlockMessageType = iota
 
-	Header  // used for crosslink from beacon chain to shard chain
-	Receipt // cross-shard transaction receipts
+	CrossLink // used for crosslink from beacon chain to shard chain
+	Receipt   // cross-shard transaction receipts
 )
 
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
@@ -165,14 +166,23 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 	return byteBuffer.Bytes()
 }
 
-// ConstructCrossLinkHeadersMessage constructs cross link header message to send to beacon chain
-func ConstructCrossLinkHeadersMessage(headers []*block.Header) []byte {
+// ConstructCrossLinkMessage constructs cross link message to send to beacon chain
+func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(Header))
+	byteBuffer.WriteByte(byte(CrossLink))
 
-	headersData, _ := rlp.EncodeToBytes(headers)
-	byteBuffer.Write(headersData)
+	crosslinks := []types.CrossLink{}
+	for _, header := range headers {
+		parentHeader := bc.GetHeaderByHash(header.ParentHash())
+		if parentHeader == nil {
+			continue
+		}
+		epoch := parentHeader.Epoch()
+		crosslinks = append(crosslinks, types.NewCrossLink(header, epoch))
+	}
+	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
+	byteBuffer.Write(crosslinksData)
 	return byteBuffer.Bytes()
 }
 
