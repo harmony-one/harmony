@@ -1228,6 +1228,16 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			bc.WriteShardLastCrossLink(crossLink.ShardID(), crossLink)
 		}
 	}
+
+	isFirstTimeStaking := bc.chainConfig.IsStaking(new(big.Int).Add(block.Epoch(), big.NewInt(1))) &&
+		len(block.Header().ShardState()) > 0 &&
+		!bc.chainConfig.IsStaking(block.Epoch())
+
+	if curHeader := bc.CurrentHeader(); isFirstTimeStaking &&
+		curHeader.ShardID() == shard.BeaconChainShardID {
+		bc.WriteBlockRewardAccumulator(big.NewInt(0))
+	}
+
 	/////////////////////////// END
 
 	// If the total difficulty is higher than our known, add it to the canonical chain

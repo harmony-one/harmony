@@ -480,13 +480,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	haventUpdatedDecider := consensus.ChainReader.Config().IsStaking(curEpoch) &&
 		consensus.Decider.Policy() != quorum.SuperMajorityStake
 
-	// Only happens once
-	if isFirstTimeStaking {
-		if consensus.ShardID == shard.BeaconChainShardID {
-			consensus.ChainReader.WriteBlockRewardAccumulator(big.NewInt(0))
-		}
-	}
-
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
 		consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
