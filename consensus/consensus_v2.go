@@ -66,6 +66,14 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		}
 	}
 
+	notMemberButStillCatchup := !consensus.Decider.AmIMemberOfCommitee() &&
+		msg.Type == msg_pb.MessageType_COMMITTED
+
+	if notMemberButStillCatchup {
+		consensus.onCommitted(msg)
+		return
+	}
+
 	switch msg.Type {
 	case msg_pb.MessageType_ANNOUNCE:
 		consensus.onAnnounce(msg)

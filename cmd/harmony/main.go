@@ -293,6 +293,11 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.Decider.SetShardIDProvider(func() (uint32, error) {
 		return currentConsensus.ShardID, nil
 	})
+
+	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		return currentConsensus.PubKey, nil
+	})
+
 	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 
 	if err != nil {
