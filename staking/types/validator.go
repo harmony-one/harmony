@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -33,6 +32,7 @@ var (
 	errInvalidMaxTotalDelegation = errors.New("max_total_delegation can not be less than min_self_delegation")
 	errCommissionRateTooLarge    = errors.New("commission rate and change rate can not be larger than max commission rate")
 	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
+	errNeedAtLeastOneSlotKey     = errors.New("need at least one slot key")
 )
 
 // ValidatorWrapper contains validator and its delegation information
@@ -97,14 +97,17 @@ func (w *ValidatorWrapper) TotalDelegation() *big.Int {
 
 // SanityCheck checks the basic requirements
 func (w *ValidatorWrapper) SanityCheck() error {
+	if len(w.SlotPubKeys) == 0 {
+		return errNeedAtLeastOneSlotKey
+	}
+
 	// MinSelfDelegation must be >= 1 ONE
-	if w.Validator.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+	if w.Validator.MinSelfDelegation == nil || w.Validator.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
 		return errMinSelfDelegationTooSmall
 	}
 
-	selfDelegation := w.Delegations[0].Amount
 	// Self delegation must be >= MinSelfDelegation
-	if selfDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
+	if len(w.Delegations) == 0 || w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 		return errInvalidSelfDelegation
 	}
 
@@ -125,12 +128,6 @@ func (w *ValidatorWrapper) SanityCheck() error {
 	hundredPercent := numeric.NewDec(1)
 	zeroPercent := numeric.NewDec(0)
 
-	utils.Logger().Info().
-		Str("rate", w.Validator.Rate.String()).
-		Str("max-rate", w.Validator.MaxRate.String()).
-		Str("max-change-rate", w.Validator.MaxChangeRate.String()).
-		Msg("Sanity check on validator commission rates, should all be in [0, 1]")
-
 	if w.Validator.Rate.LT(zeroPercent) || w.Validator.Rate.GT(hundredPercent) {
 		return errInvalidComissionRate
 	}
@@ -144,6 +141,7 @@ func (w *ValidatorWrapper) SanityCheck() error {
 	if w.Validator.Rate.GT(w.Validator.MaxRate) {
 		return errCommissionRateTooLarge
 	}
+
 	if w.Validator.MaxChangeRate.GT(w.Validator.MaxRate) {
 		return errCommissionRateTooLarge
 	}
