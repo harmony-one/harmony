@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	types2 "github.com/harmony-one/harmony/staking/types"
 	"math/big"
+
+	types2 "github.com/harmony-one/harmony/staking/types"
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
