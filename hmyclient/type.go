@@ -7,10 +7,10 @@ import (
 )
 
 type rpcBlock struct {
-	Hash         common.Hash      `json:"hash"`
-	Transactions []rpcTransaction `json:"transactions"`
+	Hash                common.Hash             `json:"hash"`
+	Transactions        []rpcTransaction        `json:"transactions"`
 	StakingTransactions []rpcStakingTransaction `json:"staking_transactions"`
-	UncleHashes  []common.Hash    `json:"uncles"`
+	UncleHashes         []common.Hash           `json:"uncles"`
 }
 
 type rpcTransaction struct {

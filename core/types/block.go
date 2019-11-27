@@ -513,11 +513,11 @@ func (b *Block) WithSeal(header *block.Header) *Block {
 // WithBody returns a new block with the given transaction and uncle contents.
 func (b *Block) WithBody(transactions []*Transaction, stakingTxns []*staking.StakingTransaction, uncles []*block.Header, incomingReceipts CXReceiptsProofs) *Block {
 	block := &Block{
-		header:           CopyHeader(b.header),
-		transactions:     make([]*Transaction, len(transactions)),
+		header:              CopyHeader(b.header),
+		transactions:        make([]*Transaction, len(transactions)),
 		stakingTransactions: make([]*staking.StakingTransaction, len(stakingTxns)),
-		uncles:           make([]*block.Header, len(uncles)),
-		incomingReceipts: make([]*CXReceiptsProof, len(incomingReceipts)),
+		uncles:              make([]*block.Header, len(uncles)),
+		incomingReceipts:    make([]*CXReceiptsProof, len(incomingReceipts)),
 	}
 	copy(block.transactions, transactions)
 	copy(block.stakingTransactions, stakingTxns)
