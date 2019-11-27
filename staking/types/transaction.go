@@ -39,7 +39,11 @@ func (d *txdata) CopyFrom(d2 *txdata) {
 	restored, _ := RLPDecodeStakeMsg(
 		payload, d2.Directive,
 	)
-	d.StakeMsg = restored.(StakeMsg).Copy()
+	if restored == nil {
+		d.StakeMsg = d2.StakeMsg
+	} else {
+		d.StakeMsg = restored.(StakeMsg).Copy()
+	}
 	d.V = new(big.Int).Set(d2.V)
 	d.R = new(big.Int).Set(d2.R)
 	d.S = new(big.Int).Set(d2.S)
