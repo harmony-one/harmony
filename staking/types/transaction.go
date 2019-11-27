@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 var (
@@ -35,11 +36,15 @@ func (d *txdata) CopyFrom(d2 *txdata) {
 	d.GasLimit = d2.GasLimit
 	// TODO: add code to protect crashing
 	// This is workaround, direct RLP encoding/decoding not work
+	if d2.StakeMsg == nil {
+		utils.Logger().Debug().Msg("[CopyFrom] d2.StakeMsg is nil")
+	}
 	payload, _ := rlp.EncodeToBytes(d2.StakeMsg)
-	restored, _ := RLPDecodeStakeMsg(
+	restored, err := RLPDecodeStakeMsg(
 		payload, d2.Directive,
 	)
-	if restored == nil {
+	if restored == nil || err != nil {
+		utils.Logger().Error().Err(err).Msg("[CopyFrom] RLPDeocdeStakeMsg returns nil/err")
 		d.StakeMsg = d2.StakeMsg
 	} else {
 		d.StakeMsg = restored.(StakeMsg).Copy()
