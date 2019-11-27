@@ -24,7 +24,7 @@ func (ps pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (ps pangaeaSchedule) BlocksPerEpoch() uint64 {
-	return 2700 // 6 hours with 8 seconds/block
+	return 450 // 1 hour with 8 seconds/block
 }
 
 func (ps pangaeaSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
@@ -51,7 +51,7 @@ func (ps pangaeaSchedule) ConsensusRatio() float64 {
 var pangaeaReshardingEpoch = []*big.Int{common.Big0}
 
 var pangaeaV0 = MustNewInstance(
-	2, 40, 40, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
+	2, 50, 40, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
 
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
