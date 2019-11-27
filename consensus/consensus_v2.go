@@ -27,13 +27,6 @@ import (
 
 // handleMessageUpdate will update the consensus state according to received message
 func (consensus *Consensus) handleMessageUpdate(payload []byte) {
-	if !consensus.Decider.AmIMemberOfCommitee() {
-		utils.Logger().Debug().
-			Str("PublicKey", consensus.PubKey.SerializeToHexStr()).
-			Msg("Current node not in committee, early exit, ignore the incoming message")
-		return
-	}
-
 	if len(payload) == 0 {
 		return
 	}
@@ -71,6 +64,14 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 				Msg("Received consensus message from different shard")
 			return
 		}
+	}
+
+	notMemberButStillCatchup := !consensus.Decider.AmIMemberOfCommitee() &&
+		msg.Type == msg_pb.MessageType_COMMITTED
+
+	if notMemberButStillCatchup {
+		consensus.onCommitted(msg)
+		return
 	}
 
 	switch msg.Type {
