@@ -250,12 +250,14 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 	if validator.Address != edit.ValidatorAddress {
 		return errAddressNotMatch
 	}
-	desc, err := UpdateDescription(edit.Description)
-	if err != nil {
-		return err
-	}
+	if edit.Description != nil {
+		desc, err := UpdateDescription(edit.Description)
+		if err != nil {
+			return err
+		}
 
-	validator.Description = desc
+		validator.Description = desc
+	}
 
 	if edit.CommissionRate != nil {
 		validator.Rate = *edit.CommissionRate
