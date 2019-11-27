@@ -42,6 +42,12 @@ func baseStakedBlockReward() numeric.Dec {
 	))
 }
 
+func adjust(amount numeric.Dec) numeric.Dec {
+	return amount.MulTruncate(
+		numeric.NewDecFromBigInt(big.NewInt(denominations.One)),
+	)
+}
+
 func blockSigners(
 	header *block.Header, parentCommittee *shard.Committee,
 ) (shard.SlotList, shard.SlotList, error) {
@@ -181,6 +187,7 @@ func AccumulateRewards(
 	//// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
+
 		defaultReward := baseStakedBlockReward()
 
 		// TODO Use cached result in off-chain db instead of full computation
@@ -189,7 +196,9 @@ func AccumulateRewards(
 			return err
 		}
 		howMuchOff := targetStakedPercentage.Sub(*percentageStaked)
-		adjustBy := howMuchOff.MulTruncate(numeric.NewDec(100)).Mul(dynamicAdjust)
+		adjustBy := adjust(
+			howMuchOff.MulTruncate(numeric.NewDec(100)).Mul(dynamicAdjust),
+		)
 		defaultReward = defaultReward.Add(adjustBy)
 		utils.Logger().Info().
 			Str("percentage-token-staked", percentageStaked.String()).
