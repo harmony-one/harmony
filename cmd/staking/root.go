@@ -20,7 +20,7 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/accounts/keystore"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	numeric "github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/spf13/cobra"
@@ -36,7 +36,9 @@ type staker struct{}
 var (
 	queryID       = 0
 	s             = &staker{}
-	localNetChain = big.NewInt(2)
+	localTest     = true
+	localNetChain = big.NewInt(2) // pangaea 3
+	devNetChain   = big.NewInt(3) // pangaea 3
 )
 
 const (
@@ -148,7 +150,11 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	signed, oops := ks.SignStakingTx(account, stakingTx, localNetChain)
+	chainID := localNetChain
+	if !localTest {
+		chainID = devNetChain
+	}
+	signed, oops := ks.SignStakingTx(account, stakingTx, chainID)
 	if oops != nil {
 		return oops
 	}
@@ -175,8 +181,14 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	hexSignature := hexutil.Encode(enc)
 	param := []interface{}{hexSignature}
 
+	local := "http://localhost:9500"
+	dev := "https://api.s0.pga.hmny.io/" //"http://34.221.51.210:9500" // "https://api.s0.pga.hmny.io/"
+	net := local
+	if !localTest {
+		net = dev
+	}
 	// Check Double check if have enough balance for gas fees
-	balanceR, _ := baseRequest("hmy_getBalance", "http://localhost:9500", []interface{}{testAccounts[index], "latest"})
+	balanceR, _ := baseRequest("hmy_getBalance", net, []interface{}{testAccounts[index], "latest"})
 	m := map[string]interface{}{}
 	json.Unmarshal(balanceR, &m)
 	balance, _ := m["result"].(string)
@@ -189,7 +201,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("balance", convertBalanceIntoReadableFormat(bln))
 
-	result, reqOops := baseRequest(stakingRPC, "http://localhost:9500", param)
+	result, reqOops := baseRequest(stakingRPC, net, param)
 	fmt.Println(string(result))
 	return reqOops
 }
@@ -235,6 +247,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&name, "name", "m", "ANewName", "Name of Validator")
 	rootCmd.PersistentFlags().IntVarP(&minDele, "minDele", "d", 666, "MinSelfDelegation Fee")
 	rootCmd.PersistentFlags().StringVarP(&rate, "rate", "r", "22.22", "Commision Rate")
+	rootCmd.PersistentFlags().BoolVarP(&localTest, "local", "l", true, "local test")
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:               "staking-iterate",
