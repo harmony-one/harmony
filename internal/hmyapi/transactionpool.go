@@ -109,14 +109,41 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context
 // GetTransactionByHash returns the transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, hash common.Hash) *RPCTransaction {
 	// Try to return an already finalized transaction
-	if tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash); tx != nil {
+	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash)
+	if tx != nil {
 		return newRPCTransaction(tx, blockHash, blockNumber, index)
 	}
 	// No finalized transaction, try to retrieve it from the pool
-	if tx := s.b.GetPoolTransaction(hash); tx != nil {
+	if tx = s.b.GetPoolTransaction(hash); tx != nil {
 		return newRPCPendingTransaction(tx)
 	}
 	// Transaction unknown, return as such
+	return nil
+}
+
+// GetStakingTransactionByHash returns the transaction for the given hash
+func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Context, hash common.Hash) *RPCStakingTransaction {
+	// Try to return an already finalized transaction
+	stx, blockHash, blockNumber, index := rawdb.ReadStakingTransaction(s.b.ChainDb(), hash)
+	if stx != nil {
+		return newRPCStakingTransaction(stx, blockHash, blockNumber, index)
+	}
+	return nil
+}
+
+// GetStakingTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
+func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index hexutil.Uint) *RPCStakingTransaction {
+	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+		return newRPCStakingTransactionFromBlockIndex(block, uint64(index))
+	}
+	return nil
+}
+
+// GetStakingTransactionByBlockHashAndIndex returns the transaction for the given block hash and index.
+func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index hexutil.Uint) *RPCStakingTransaction {
+	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
+		return newRPCStakingTransactionFromBlockIndex(block, uint64(index))
+	}
 	return nil
 }
 
