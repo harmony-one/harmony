@@ -30,14 +30,23 @@ var (
 	// BlockReward is the block reward, to be split evenly among block signers.
 	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
 	// BlockRewardStakedCase is the baseline block reward in staked case -
-	BlockRewardStakedCase = numeric.NewDecFromBigInt(new(big.Int).Mul(
-		big.NewInt(18), big.NewInt(denominations.One),
-	))
 	totalTokens                  = numeric.NewDec(12600000000)
 	targetStakedPercentage       = numeric.MustNewDecFromStr("0.35")
 	dynamicAdjust                = numeric.MustNewDecFromStr("0.4")
 	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
 )
+
+func baseStakedBlockReward() numeric.Dec {
+	return numeric.NewDecFromBigInt(new(big.Int).Mul(
+		big.NewInt(18), big.NewInt(denominations.One),
+	))
+}
+
+func adjust(amount numeric.Dec) numeric.Dec {
+	return amount.MulTruncate(
+		numeric.NewDecFromBigInt(big.NewInt(denominations.One)),
+	)
+}
 
 func blockSigners(
 	bitmap []byte, parentCommittee *shard.Committee,
@@ -128,11 +137,18 @@ func whatPercentStakedNow(
 	beaconchain engine.ChainReader,
 ) (*numeric.Dec, error) {
 	stakedNow := numeric.ZeroDec()
+	// TODO What about the non-active validators? What happens to their stake?
 	active, err := beaconchain.ReadActiveValidatorList()
+	if err != nil {
+		return nil, err
+	}
+
+	soFarDoledOut, err := beaconchain.BlockRewardAccumulator()
 
 	if err != nil {
 		return nil, err
 	}
+
 	for i := range active {
 		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
 		if err != nil {
@@ -142,7 +158,9 @@ func whatPercentStakedNow(
 			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
 		)
 	}
-	percentage := stakedNow.Quo(totalTokens)
+	percentage := stakedNow.Quo(totalTokens.Add(
+		numeric.NewDecFromBigInt(soFarDoledOut)),
+	)
 	return &percentage, nil
 }
 
@@ -170,29 +188,31 @@ func AccumulateRewards(
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 
-		defaultReward := BlockRewardStakedCase
+		defaultReward := baseStakedBlockReward()
 
-		if len(header.ShardState()) > 0 {
-			// TODO Use cached result in off-chain db instead of full computation
-			percentageStaked, err := whatPercentStakedNow(beaconChain)
-			if err != nil {
-				return err
-			}
-			howMuchOff := targetStakedPercentage.Sub(*percentageStaked)
-			adjustBy := howMuchOff.MulTruncate(numeric.NewDec(100)).Mul(dynamicAdjust)
-			defaultReward = defaultReward.Add(adjustBy)
-			utils.Logger().Info().
-				Str("percentage-token-staked", percentageStaked.String()).
-				Str("how-much-off", howMuchOff.String()).
-				Str("adjusting-by", adjustBy.String()).
-				Str("block-reward", defaultReward.String()).
-				Msg("dynamic adjustment of block-reward ")
-			// If too much is staked, then possible to have negative reward,
-			// not an error, just a possible economic situation, hence we return
-			if defaultReward.IsNegative() {
-				return nil
-			}
+		// TODO Use cached result in off-chain db instead of full computation
+		percentageStaked, err := whatPercentStakedNow(beaconChain)
+		if err != nil {
+			return err
 		}
+		howMuchOff := targetStakedPercentage.Sub(*percentageStaked)
+		adjustBy := adjust(
+			howMuchOff.MulTruncate(numeric.NewDec(100)).Mul(dynamicAdjust),
+		)
+		defaultReward = defaultReward.Add(adjustBy)
+		utils.Logger().Info().
+			Str("percentage-token-staked", percentageStaked.String()).
+			Str("how-much-off", howMuchOff.String()).
+			Str("adjusting-by", adjustBy.String()).
+			Str("block-reward", defaultReward.String()).
+			Msg("dynamic adjustment of block-reward ")
+		// If too much is staked, then possible to have negative reward,
+		// not an error, just a possible economic situation, hence we return
+		if defaultReward.IsNegative() {
+			return nil
+		}
+
+		newRewards := big.NewInt(0)
 
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		members, payable, _, err := ballotResultBeaconchain(beaconChain, header)
@@ -207,14 +227,15 @@ func AccumulateRewards(
 			// what to do about share of those that didn't sign
 			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
 			if !voter.IsHarmonyNode {
-				due := defaultReward.Mul(
-					voter.EffectivePercent.Quo(votepower.StakersShare),
-				)
 				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
 				if err != nil {
 					return err
 				}
-				state.AddReward(snapshot, due.RoundInt())
+				due := defaultReward.Mul(
+					voter.EffectivePercent.Quo(votepower.StakersShare),
+				).RoundInt()
+				newRewards = new(big.Int).Add(newRewards, due)
+				state.AddReward(snapshot, due)
 			}
 		}
 
@@ -227,18 +248,16 @@ func AccumulateRewards(
 			}
 
 			type slotPayable struct {
-				effective numeric.Dec
-				payee     common.Address
-				bucket    int
-				index     int
+				payout numeric.Dec
+				payee  common.Address
+				bucket int
+				index  int
 			}
 
 			allPayables := []slotPayable{}
 
 			for i := range crossLinks {
-
 				cxLink := crossLinks[i]
-
 				shardState, err := bc.ReadShardState(cxLink.Epoch())
 				if !bc.Config().IsStaking(cxLink.Epoch()) {
 					shardState, err = committee.WithStakingEnabled.Compute(cxLink.Epoch(), bc)
@@ -265,10 +284,10 @@ func AccumulateRewards(
 						)
 						to := voter.EarningAccount
 						allPayables = append(allPayables, slotPayable{
-							effective: due,
-							payee:     to,
-							bucket:    i,
-							index:     j,
+							payout: due,
+							payee:  to,
+							bucket: i,
+							index:  j,
 						})
 					}
 				}
@@ -301,12 +320,13 @@ func AccumulateRewards(
 					if err != nil {
 						return err
 					}
-					state.AddReward(
-						snapshot,
-						resultsHandle[bucket][payThem].effective.TruncateInt(),
-					)
+					due := resultsHandle[bucket][payThem].payout.TruncateInt()
+					newRewards = new(big.Int).Add(newRewards, due)
+					state.AddReward(snapshot, due)
 				}
 			}
+
+			return bc.UpdateBlockRewardAccumulator(newRewards)
 		}
 		return nil
 	}

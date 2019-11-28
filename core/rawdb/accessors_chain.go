@@ -778,3 +778,17 @@ func WriteDelegationsByDelegator(db DatabaseWriter, delegator common.Address, in
 	}
 	return err
 }
+
+// ReadBlockRewardAccumulator ..
+func ReadBlockRewardAccumulator(db DatabaseReader) (*big.Int, error) {
+	data, err := db.Get(CurrentRewardGivenOut)
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(data), nil
+}
+
+// WriteBlockRewardAccumulator ..
+func WriteBlockRewardAccumulator(db DatabaseWriter, newAccum *big.Int) error {
+	return db.Put(CurrentRewardGivenOut, newAccum.Bytes())
+}

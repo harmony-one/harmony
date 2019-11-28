@@ -27,13 +27,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	bls2 "github.com/harmony-one/bls/ffi/go/bls"
-
-	"github.com/harmony-one/harmony/numeric"
-
-	"github.com/harmony-one/harmony/crypto/bls"
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -43,17 +36,21 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 var (
@@ -1321,6 +1318,16 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
 		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
+
+	isFirstTimeStaking := bc.chainConfig.IsStaking(new(big.Int).Add(block.Epoch(), big.NewInt(1))) &&
+		len(block.Header().ShardState()) > 0 &&
+		!bc.chainConfig.IsStaking(block.Epoch())
+
+	if curHeader := bc.CurrentHeader(); isFirstTimeStaking &&
+		curHeader.ShardID() == shard.BeaconChainShardID {
+		bc.WriteBlockRewardAccumulator(big.NewInt(0))
+	}
+
 	/////////////////////////// END
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
@@ -2841,6 +2848,25 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	default:
 	}
 	return nil
+}
+
+// BlockRewardAccumulator ..
+func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
+	return rawdb.ReadBlockRewardAccumulator(bc.db)
+}
+
+// WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
+func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int) error {
+	return rawdb.WriteBlockRewardAccumulator(bc.db, reward)
+}
+
+//UpdateBlockRewardAccumulator ..
+func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int) error {
+	current, err := bc.BlockRewardAccumulator()
+	if err != nil {
+		return err
+	}
+	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff))
 }
 
 func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress common.Address, root common.Hash) error {
