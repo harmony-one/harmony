@@ -209,6 +209,11 @@ func RLPDecodeStakeMsg(payload []byte, d Directive) (interface{}, error) {
 	return ds, nil
 }
 
+// RawSignatureValues return raw signature values.
+func (tx *StakingTransaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
+	return tx.data.V, tx.data.R, tx.data.S
+}
+
 // StakingType returns the type of staking transaction
 func (tx *StakingTransaction) StakingType() Directive {
 	return tx.data.Directive

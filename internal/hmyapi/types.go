@@ -38,6 +38,23 @@ type RPCTransaction struct {
 	S                *hexutil.Big   `json:"s"`
 }
 
+// RPCStakingTransaction represents a transaction that will serialize to the RPC representation of a staking transaction
+type RPCStakingTransaction struct {
+	BlockHash        common.Hash            `json:"blockHash"`
+	BlockNumber      *hexutil.Big           `json:"blockNumber"`
+	From             string                 `json:"from"`
+	Gas              hexutil.Uint64         `json:"gas"`
+	GasPrice         *hexutil.Big           `json:"gasPrice"`
+	Hash             common.Hash            `json:"hash"`
+	Nonce            hexutil.Uint64         `json:"nonce"`
+	TransactionIndex hexutil.Uint           `json:"transactionIndex"`
+	V                *hexutil.Big           `json:"v"`
+	R                *hexutil.Big           `json:"r"`
+	S                *hexutil.Big           `json:"s"`
+	Type             string                 `json:"type"`
+	Msg              map[string]interface{} `json:"msg"`
+}
+
 // RPCCXReceipt represents a CXReceipt that will serialize to the RPC representation of a CXReceipt
 type RPCCXReceipt struct {
 	BlockHash   common.Hash  `json:"blockHash"`
@@ -186,7 +203,6 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		Gas:       hexutil.Uint64(tx.Gas()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
-		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
 		Value:     (*hexutil.Big)(tx.Value()),
 		ShardID:   tx.ShardID(),
@@ -220,6 +236,96 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	return result
 }
 
+// newRPCStakingTransaction returns a transaction that will serialize to the RPC
+// representation, with the given location metadata set (if available).
+func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Hash, blockNumber uint64, index uint64) *RPCStakingTransaction {
+	from, _ := tx.SenderAddress()
+	v, r, s := tx.RawSignatureValues()
+
+	stakingTxType := tx.StakingType().String()
+	message := tx.StakingMessage()
+	fields := make(map[string]interface{}, 0)
+
+	switch stakingTxType {
+	case "CreateValidator":
+		msg := message.(types2.CreateValidator)
+		fields = map[string]interface{}{
+			"validatorAddress":   msg.ValidatorAddress,
+			"name":               msg.Description.Name,
+			"commissionRate":     (*hexutil.Big)(msg.CommissionRates.Rate.Int),
+			"maxCommissionRate":  (*hexutil.Big)(msg.CommissionRates.MaxRate.Int),
+			"maxChangeRate":      (*hexutil.Big)(msg.CommissionRates.MaxChangeRate.Int),
+			"minSelfDelegation":  (*hexutil.Big)(msg.MinSelfDelegation),
+			"maxTotalDelegation": (*hexutil.Big)(msg.MaxTotalDelegation),
+			"amount":             (*hexutil.Big)(msg.Amount),
+			"website":            msg.Description.Website,
+			"identity":           msg.Description.Identity,
+			"securityContact":    msg.Description.SecurityContact,
+			"details":            msg.Description.Details,
+			"slotPubKeys":        msg.SlotPubKeys,
+		}
+	case "EditValidator":
+		msg := message.(types2.EditValidator)
+		fields = map[string]interface{}{
+			"validatorAddress":   msg.ValidatorAddress,
+			"commisionRate":      (*hexutil.Big)(msg.CommissionRate.Int),
+			"name":               msg.Description.Name,
+			"minSelfDelegation":  (*hexutil.Big)(msg.MinSelfDelegation),
+			"maxTotalDelegation": (*hexutil.Big)(msg.MaxTotalDelegation),
+			"website":            msg.Description.Website,
+			"identity":           msg.Description.Identity,
+			"securityContact":    msg.Description.SecurityContact,
+			"details":            msg.Description.Details,
+			"slotPubKeyToAdd":    msg.SlotKeyToAdd,
+			"slotPubKeyToRemove": msg.SlotKeyToRemove,
+		}
+	case "CollectRewards":
+		msg := message.(types2.CollectRewards)
+		fields = map[string]interface{}{
+			"delegatorAddress": msg.DelegatorAddress,
+		}
+	case "Delegate":
+		msg := message.(types2.Delegate)
+		fields = map[string]interface{}{
+			"delegatorAddress": msg.DelegatorAddress,
+			"validatorAddress": msg.ValidatorAddress,
+			"amount":           (*hexutil.Big)(msg.Amount),
+		}
+	case "Undelegate":
+		msg := message.(types2.Undelegate)
+		fields = map[string]interface{}{
+			"delegatorAddress": msg.DelegatorAddress,
+			"validatorAddress": msg.ValidatorAddress,
+			"amount":           (*hexutil.Big)(msg.Amount),
+		}
+	}
+
+	result := &RPCStakingTransaction{
+		Gas:      hexutil.Uint64(tx.Gas()),
+		GasPrice: (*hexutil.Big)(tx.Price()),
+		Hash:     tx.Hash(),
+		Nonce:    hexutil.Uint64(tx.Nonce()),
+		V:        (*hexutil.Big)(v),
+		R:        (*hexutil.Big)(r),
+		S:        (*hexutil.Big)(s),
+		Type:     stakingTxType,
+		Msg:      fields,
+	}
+	if blockHash != (common.Hash{}) {
+		result.BlockHash = blockHash
+		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
+		result.TransactionIndex = hexutil.Uint(index)
+	}
+
+	fromAddr, err := internal_common.AddressToBech32(from)
+	if err != nil {
+		return nil
+	}
+	result.From = fromAddr
+
+	return result
+}
+
 // newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
 func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
 	return newRPCTransaction(tx, common.Hash{}, 0, 0)
@@ -244,6 +350,7 @@ type RPCBlock struct {
 	TransactionsRoot common.Hash      `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash      `json:"receiptsRoot"`
 	Transactions     []interface{}    `json:"transactions"`
+	StakingTxs       []interface{}    `json:"stakingTxs`
 	Uncles           []common.Hash    `json:"uncles"`
 	TotalDifficulty  *big.Int         `json:"totalDifficulty"`
 	Signers          []string         `json:"signers"`
@@ -282,6 +389,14 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 				return newRPCTransactionFromBlockHash(b, tx.Hash()), nil
 			}
 		}
+		formatStakingTx := func(tx *types2.StakingTransaction) (interface{}, error) {
+			return tx.Hash(), nil
+		}
+		if blockArgs.FullTx {
+			formatStakingTx = func(tx *types2.StakingTransaction) (interface{}, error) {
+				return newRPCStakingTransactionFromBlockHash(b, tx.Hash()), nil
+			}
+		}
 		txs := b.Transactions()
 		transactions := make([]interface{}, len(txs))
 		var err error
@@ -291,6 +406,15 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 			}
 		}
 		fields["transactions"] = transactions
+
+		stakingTxs := b.StakingTransactions()
+		stakingTransactions := make([]interface{}, len(stakingTxs))
+		for i, tx := range stakingTxs {
+			if stakingTransactions[i], err = formatStakingTx(tx); err != nil {
+				return nil, err
+			}
+		}
+		fields["stakingTransactions"] = stakingTransactions
 	}
 
 	uncles := b.Uncles()
@@ -322,6 +446,25 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64) *RPCTransacti
 		return nil
 	}
 	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), index)
+}
+
+// newRPCStakingTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.
+func newRPCStakingTransactionFromBlockHash(b *types.Block, hash common.Hash) *RPCStakingTransaction {
+	for idx, tx := range b.StakingTransactions() {
+		if tx.Hash() == hash {
+			return newRPCStakingTransactionFromBlockIndex(b, uint64(idx))
+		}
+	}
+	return nil
+}
+
+// newRPCStakingTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
+func newRPCStakingTransactionFromBlockIndex(b *types.Block, index uint64) *RPCStakingTransaction {
+	txs := b.StakingTransactions()
+	if index >= uint64(len(txs)) {
+		return nil
+	}
+	return newRPCStakingTransaction(txs[index], b.Hash(), b.NumberU64(), index)
 }
 
 // CallArgs represents the arguments for a call.

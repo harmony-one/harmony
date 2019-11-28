@@ -541,10 +541,10 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 	return rpcValidator, nil
 }
 
-// GetDelegationsByDelegator returns information about a validator.
+// GetDelegationsByDelegator returns list of delegations for a delegator address.
 func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, address string) ([]*RPCDelegation, error) {
-	validatorAddress := internal_common.ParseAddr(address)
-	validators, delegations := s.b.GetDelegationsByDelegator(validatorAddress)
+	delegatorAddress := internal_common.ParseAddr(address)
+	validators, delegations := s.b.GetDelegationsByDelegator(delegatorAddress)
 	result := []*RPCDelegation{}
 	for i := range delegations {
 		delegation := delegations[i]
@@ -559,7 +559,7 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, add
 		}
 		result = append(result, &RPCDelegation{
 			validators[i],
-			validatorAddress,
+			delegatorAddress,
 			delegation.Amount,
 			delegation.Reward,
 			undelegations,
@@ -592,4 +592,34 @@ func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, add
 		})
 	}
 	return result, nil
+}
+
+// GetDelegationByDelegatorAndValidator returns a delegation for delegator and validator.
+func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.Context, address string, validator string) (*RPCDelegation, error) {
+	delegatorAddress := internal_common.ParseAddr(address)
+	validatorAddress := internal_common.ParseAddr(validator)
+	validators, delegations := s.b.GetDelegationsByDelegator(delegatorAddress)
+	for i := range delegations {
+		if validators[i] != validatorAddress {
+			continue
+		}
+		delegation := delegations[i]
+
+		undelegations := []RPCUndelegation{}
+
+		for j := range delegation.Undelegations {
+			undelegations = append(undelegations, RPCUndelegation{
+				delegation.Undelegations[j].Amount,
+				delegation.Undelegations[j].Epoch,
+			})
+		}
+		return &RPCDelegation{
+			validatorAddress,
+			delegatorAddress,
+			delegation.Amount,
+			delegation.Reward,
+			undelegations,
+		}, nil
+	}
+	return nil, nil
 }
