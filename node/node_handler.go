@@ -16,7 +16,6 @@ import (
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -141,13 +140,13 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 					}
 				}
 
-			case proto_node.Header:
+			case proto_node.CrossLink:
 				// only beacon chain will accept the header from other shards
-				utils.Logger().Debug().Uint32("shardID", node.NodeConfig.ShardID).Msg("NET: received message: Node/Header")
+				utils.Logger().Debug().Uint32("shardID", node.NodeConfig.ShardID).Msg("NET: received message: Node/CrossLink")
 				if node.NodeConfig.ShardID != 0 {
 					return
 				}
-				node.ProcessHeaderMessage(msgPayload[1:]) // skip first byte which is blockMsgType
+				node.ProcessCrossLinkMessage(msgPayload[1:]) // skip first byte which is blockMsgType
 
 			case proto_node.Receipt:
 				utils.Logger().Debug().Msg("NET: received message: Node/Receipt")
@@ -209,16 +208,17 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	}
 }
 
-// BroadcastCrossLinkHeader is called by consensus leader to send the new header as cross link to beacon chain.
-func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
-	utils.Logger().Info().Msgf("Broadcasting new header to beacon chain groupID %s", nodeconfig.NewGroupIDByShardID(0))
+// BroadcastCrossLink is called by consensus leader to send the new header as cross link to beacon chain.
+func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
+	utils.Logger().Info().Msgf("Construct and Broadcasting new crosslink to beacon chain groupID %s", nodeconfig.NewGroupIDByShardID(0))
 	headers := []*block.Header{}
 	lastLink, err := node.Beaconchain().ReadShardLastCrossLink(newBlock.ShardID())
 	var latestBlockNum uint64
 
-	// if cannot find latest crosslink header, broadcast latest 3 block headers
+	// TODO chao: record the missing crosslink in local database instead of using latest crosslink
+	// if cannot find latest crosslink, broadcast latest 3 block headers
 	if err != nil {
-		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLinkHeader] ReadShardLastCrossLink Failed")
+		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLink] ReadShardLastCrossLink Failed")
 		header := node.Blockchain().GetHeaderByNumber(newBlock.NumberU64() - 2)
 		if header != nil {
 			headers = append(headers, header)
@@ -229,7 +229,7 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 		}
 		headers = append(headers, newBlock.Header())
 	} else {
-		latestBlockNum = lastLink.BlockNum().Uint64()
+		latestBlockNum = lastLink.BlockNum()
 		for blockNum := latestBlockNum + 1; blockNum <= newBlock.NumberU64(); blockNum++ {
 			if blockNum > latestBlockNum+crossLinkBatchSize {
 				break
@@ -241,11 +241,11 @@ func (node *Node) BroadcastCrossLinkHeader(newBlock *types.Block) {
 		}
 	}
 
-	utils.Logger().Info().Msgf("[BroadcastCrossLinkHeader] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, newBlock.NumberU64(), len(headers))
+	utils.Logger().Info().Msgf("[BroadcastCrossLink] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, newBlock.NumberU64(), len(headers))
 	for _, header := range headers {
-		utils.Logger().Debug().Msgf("[BroadcastCrossLinkHeader] Broadcasting %d", header.Number().Uint64())
+		utils.Logger().Debug().Msgf("[BroadcastCrossLink] Broadcasting %d", header.Number().Uint64())
 	}
-	node.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(0)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkHeadersMessage(headers)))
+	node.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(0)}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCrossLinkMessage(node.Consensus.ChainReader, headers)))
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
@@ -342,7 +342,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			node.BroadcastNewBlock(newBlock)
 		}
 		if node.NodeConfig.ShardID != shard.BeaconChainShardID && newBlock.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) >= 0 {
-			node.BroadcastCrossLinkHeader(newBlock)
+			node.BroadcastCrossLink(newBlock)
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
@@ -368,38 +368,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
 		node.Consensus.UpdateConsensusInformation()
-	}
-
-	// Writing validator stats (for uptime recording)
-	// TODO: only record for open staking validators
-	prevBlock := node.Blockchain().GetBlockByHash(newBlock.ParentHash())
-	if prevBlock != nil {
-		shardState, err := node.Blockchain().ReadShardState(prevBlock.Epoch())
-		if err == nil {
-			members := node.Consensus.Decider.Participants()
-			mask, _ := bls2.NewMask(members, nil)
-			mask.SetMask(commitSigAndBitmap[96:])
-			err = node.Blockchain().UpdateValidatorUptime(shardState.FindCommitteeByID(newBlock.ShardID()).Slots, mask)
-
-			if err != nil {
-				utils.Logger().Err(err)
-			}
-		}
-
-	}
-
-	// Update voting power of validators for all shards
-	if len(newBlock.Header().ShardState()) > 0 {
-		shardState := shard.State{}
-		if err := rlp.DecodeBytes(newBlock.Header().ShardState(), &shardState); err == nil {
-			if err = node.Blockchain().UpdateValidatorVotingPower(shardState); err != nil {
-				utils.Logger().Err(err)
-			}
-		} else {
-			utils.Logger().Err(err)
-		}
-
-		// TODO: deal with pre-staking voting power accounting
 	}
 
 	// TODO chao: uncomment this after beacon syncing is stable

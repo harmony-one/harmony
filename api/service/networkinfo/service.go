@@ -43,9 +43,6 @@ type Service struct {
 var (
 	// retry for 30s and give up then
 	ConnectionRetry = 15
-
-	// context
-	ctx context.Context
 )
 
 const (
@@ -65,8 +62,7 @@ func New(
 	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
 	bootnodes utils.AddrList, dataStorePath string,
 ) (*Service, error) {
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(context.Background(), connectionTimeout)
+	ctx, cancel := context.WithCancel(context.Background())
 	var dhtOpts []libp2pdhtopts.Option
 	if dataStorePath != "" {
 		dataStore, err := badger.NewDatastore(dataStorePath, nil)
@@ -124,6 +120,8 @@ func (s *Service) StartService() {
 
 // Init initializes role conversion service.
 func (s *Service) Init() error {
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	defer cancel()
 	utils.Logger().Info().Msg("Init networkinfo service")
 
 	// Bootstrap the DHT. In the default configuration, this spawns a Background
@@ -191,6 +189,9 @@ func (s *Service) Run() {
 // DoService does network info.
 func (s *Service) DoService() {
 	tick := time.NewTicker(dhtTicker)
+	defer tick.Stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for {
 		select {
 		case <-s.stopChan:
@@ -208,13 +209,13 @@ func (s *Service) DoService() {
 				return
 			}
 
-			s.findPeers()
+			s.findPeers(ctx)
 			time.Sleep(findPeerInterval)
 		}
 	}
 }
 
-func (s *Service) findPeers() {
+func (s *Service) findPeers(ctx context.Context) {
 	_, cgnPrefix, err := net.ParseCIDR("100.64.0.0/10")
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("can't parse CIDR")

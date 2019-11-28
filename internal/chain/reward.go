@@ -49,7 +49,7 @@ func adjust(amount numeric.Dec) numeric.Dec {
 }
 
 func blockSigners(
-	header *block.Header, parentCommittee *shard.Committee,
+	bitmap []byte, parentCommittee *shard.Committee,
 ) (shard.SlotList, shard.SlotList, error) {
 	committerKeys := []*bls.PublicKey{}
 
@@ -71,7 +71,7 @@ func blockSigners(
 			"cannot create group sig mask",
 		).WithCause(err)
 	}
-	if err := mask.SetMask(header.LastCommitBitmap()); err != nil {
+	if err := mask.SetMask(bitmap); err != nil {
 		return nil, nil, ctxerror.New(
 			"cannot set group sig mask bits",
 		).WithCause(err)
@@ -123,7 +123,7 @@ func ballotResult(
 		)
 	}
 
-	payable, missing, err := blockSigners(header, parentCommittee)
+	payable, missing, err := blockSigners(header.LastCommitBitmap(), parentCommittee)
 	return parentCommittee.Slots, payable, missing, err
 }
 
@@ -257,32 +257,22 @@ func AccumulateRewards(
 			allPayables := []slotPayable{}
 
 			for i := range crossLinks {
-
 				cxLink := crossLinks[i]
-
-				shardState, err := bc.ReadShardState(cxLink.ChainHeader.Epoch())
-				if !bc.Config().IsStaking(cxLink.Header().Epoch()) {
-					shardState, err = committee.WithStakingEnabled.Compute(
-						cxLink.ChainHeader.Epoch(), bc,
-					)
+				shardState, err := bc.ReadShardState(cxLink.Epoch())
+				if !bc.Config().IsStaking(cxLink.Epoch()) {
+					shardState, err = committee.WithStakingEnabled.Compute(cxLink.Epoch(), bc)
 				}
 
 				if err != nil {
-					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF
-					// SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
-					// TODO: FIX THIS WITH NEW CROSSLINK FORMAT
-					continue
+					return err
 				}
 
 				subComm := shardState.FindCommitteeByID(cxLink.ShardID())
 				// _ are the missing signers, later for slashing
-				payableSigners, _, err := blockSigners(cxLink.Header(), subComm)
+				payableSigners, _, err := blockSigners(cxLink.Bitmap(), subComm)
 
 				if err != nil {
-					// TEMP HACK: IGNORE THE ERROR as THERE IS NO WAY TO VERIFY THE SIG OF FIRST BLOCK OF
-					// SHARD FIRST TIME ENTERING STAKING, NO WAY TO FIND THE LAST COMMITEE AS THERE IS GAP
-					// TODO: FIX THIS WITH NEW CROSSLINK FORMAT
-					continue
+					return err
 				}
 
 				votingPower := votepower.Compute(payableSigners)

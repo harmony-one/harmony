@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 var (
@@ -35,11 +36,19 @@ func (d *txdata) CopyFrom(d2 *txdata) {
 	d.GasLimit = d2.GasLimit
 	// TODO: add code to protect crashing
 	// This is workaround, direct RLP encoding/decoding not work
+	if d2.StakeMsg == nil {
+		utils.Logger().Debug().Msg("[CopyFrom] d2.StakeMsg is nil")
+	}
 	payload, _ := rlp.EncodeToBytes(d2.StakeMsg)
-	restored, _ := RLPDecodeStakeMsg(
+	restored, err := RLPDecodeStakeMsg(
 		payload, d2.Directive,
 	)
-	d.StakeMsg = restored.(StakeMsg).Copy()
+	if restored == nil || err != nil {
+		utils.Logger().Error().Err(err).Msg("[CopyFrom] RLPDeocdeStakeMsg returns nil/err")
+		d.StakeMsg = d2.StakeMsg
+	} else {
+		d.StakeMsg = restored.(StakeMsg).Copy()
+	}
 	d.V = new(big.Int).Set(d2.V)
 	d.R = new(big.Int).Set(d2.R)
 	d.S = new(big.Int).Set(d2.S)
@@ -198,6 +207,11 @@ func RLPDecodeStakeMsg(payload []byte, d Directive) (interface{}, error) {
 	}
 
 	return ds, nil
+}
+
+// RawSignatureValues return raw signature values.
+func (tx *StakingTransaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
+	return tx.data.V, tx.data.R, tx.data.S
 }
 
 // StakingType returns the type of staking transaction

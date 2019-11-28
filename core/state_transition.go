@@ -40,6 +40,7 @@ var (
 	errNoDelegationToUndelegate    = errors.New("no delegation to undelegate")
 	errCommissionRateChangeTooFast = errors.New("commission rate can not be changed more than MaxChangeRate within the same epoch")
 	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than MaxCommissionRate")
+	errNoRewardsToCollect          = errors.New("no rewards to collect")
 )
 
 /*
@@ -541,6 +542,9 @@ func (st *StateTransition) applyCollectRewards(collectRewards *staking.CollectRe
 		if err != nil {
 			return err
 		}
+	}
+	if totalRewards.Int64() == 0 {
+		return errNoRewardsToCollect
 	}
 	st.state.AddBalance(collectRewards.DelegatorAddress, totalRewards)
 	return nil

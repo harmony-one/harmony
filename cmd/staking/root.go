@@ -121,13 +121,13 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 			return staking.DirectiveDelegate, staking.Delegate{
 				dAddr,
 				dAddr2,
-				big.NewInt(1000),
+				big.NewInt(0).Mul(big.NewInt(denominations.One), big.NewInt(10)),
 			}
 		} else if cmdType == "undelegate" {
 			return staking.DirectiveUndelegate, staking.Undelegate{
 				dAddr,
 				dAddr2,
-				big.NewInt(1000),
+				big.NewInt(0).Mul(big.NewInt(denominations.One), big.NewInt(10)),
 			}
 		}
 		return staking.DirectiveCollectRewards, staking.CollectRewards{
@@ -182,7 +182,7 @@ func (s *staker) run(cmd *cobra.Command, args []string) error {
 	param := []interface{}{hexSignature}
 
 	local := "http://localhost:9500"
-	dev := "https://api.s0.pga.hmny.io/" //"http://34.221.51.210:9500" // "https://api.s0.pga.hmny.io/"
+	dev := "https://api.s0.pga.hmny.io/" // "http://34.209.25.152:9500"
 	net := local
 	if !localTest {
 		net = dev

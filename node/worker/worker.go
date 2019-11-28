@@ -369,6 +369,7 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 
 	// Cross Links
 	if crossLinks != nil && len(crossLinks) != 0 {
+		crossLinks.Sort()
 		crossLinkData, err := rlp.EncodeToBytes(crossLinks)
 		if err == nil {
 			utils.Logger().Debug().
@@ -380,6 +381,8 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed cross links")
 			return nil, err
 		}
+	} else {
+		utils.Logger().Debug().Msg("Zero crosslinks to finalize")
 	}
 
 	// Shard State
