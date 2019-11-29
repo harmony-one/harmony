@@ -399,7 +399,7 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 		}
 		fields["transactions"] = transactions
 
-		if blockArgs.InclStaking {	
+		if blockArgs.InclStaking {
 			formatStakingTx := func(tx *types2.StakingTransaction) (interface{}, error) {
 				return tx.Hash(), nil
 			}
