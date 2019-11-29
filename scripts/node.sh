@@ -656,10 +656,10 @@ do
    validator)
       case "${shard_id}" in
       ?*)
-	 args+=(
-	    -shard_id="${shard_id}"
-	 )
-	 ;;
+         args+=(
+            -shard_id="${shard_id}"
+         )
+         ;;
       esac
       ;;
    explorer)
