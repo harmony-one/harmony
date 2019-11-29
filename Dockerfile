@@ -59,34 +59,6 @@ ENV GO111MODULE="on"
 
 WORKDIR /root/workspace/harmony
 
-RUN git remote add fork https://github.com/fxfactorial/harmony.git && git fetch fork && git fetch origin
-
-RUN echo $'\n\
-[user] \n\
-# Please adapt and uncomment the following lines: \n\
-	name = Edgar Aroutiounian \n\
-	email = edgar.factorial@gmail.com \n\
-[push] \n\
-	default = simple \n\
-[alias] \n\
-	cp = cherry-pick \n\
-	s = status \n\
-	b = branch \n\
-	d = diff \n\
-	co = checkout \n\
-	r = reset --hard \n\
-[filter "lfs"] \n\
-	clean = git-lfs clean -- %f \n\
-	smudge = git-lfs smudge -- %f \n\
-	required = true \n\
-	process = git-lfs filter-process \n\
-[color] \n\
-	ui = auto \n\
-[tig] \n\
-	diff-view = line-number:yes,interval=5 text \n\
-[submodule] \n\
-	recurse = true' > /root/.gitconfig 
-
 RUN eval "$(~/bin/gimme 1.12.9)" ; scripts/install_build_tools.sh
 
 RUN eval "$(~/bin/gimme 1.12.9)" ; scripts/go_executable_build.sh
