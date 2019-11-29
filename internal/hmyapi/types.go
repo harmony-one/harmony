@@ -389,14 +389,6 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 				return newRPCTransactionFromBlockHash(b, tx.Hash()), nil
 			}
 		}
-		formatStakingTx := func(tx *types2.StakingTransaction) (interface{}, error) {
-			return tx.Hash(), nil
-		}
-		if blockArgs.FullTx {
-			formatStakingTx = func(tx *types2.StakingTransaction) (interface{}, error) {
-				return newRPCStakingTransactionFromBlockHash(b, tx.Hash()), nil
-			}
-		}
 		txs := b.Transactions()
 		transactions := make([]interface{}, len(txs))
 		var err error
@@ -407,14 +399,24 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 		}
 		fields["transactions"] = transactions
 
-		stakingTxs := b.StakingTransactions()
-		stakingTransactions := make([]interface{}, len(stakingTxs))
-		for i, tx := range stakingTxs {
-			if stakingTransactions[i], err = formatStakingTx(tx); err != nil {
-				return nil, err
+		if blockArgs.InclStaking {	
+			formatStakingTx := func(tx *types2.StakingTransaction) (interface{}, error) {
+				return tx.Hash(), nil
 			}
+			if blockArgs.FullTx {
+				formatStakingTx = func(tx *types2.StakingTransaction) (interface{}, error) {
+					return newRPCStakingTransactionFromBlockHash(b, tx.Hash()), nil
+				}
+			}
+			stakingTxs := b.StakingTransactions()
+			stakingTransactions := make([]interface{}, len(stakingTxs))
+			for i, tx := range stakingTxs {
+				if stakingTransactions[i], err = formatStakingTx(tx); err != nil {
+					return nil, err
+				}
+			}
+			fields["stakingTransactions"] = stakingTransactions
 		}
-		fields["stakingTransactions"] = stakingTransactions
 	}
 
 	uncles := b.Uncles()
