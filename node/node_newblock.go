@@ -124,15 +124,24 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare cross links
-	var crossLinks types.CrossLinks
+	var crossLinksToPropose types.CrossLinks
 	if node.NodeConfig.ShardID == 0 {
 		node.pendingCLMutex.Lock()
-		crossLinks, err = node.Blockchain().ReadPendingCrossLinks()
+		allPending, err := node.Blockchain().ReadPendingCrossLinks()
 		node.pendingCLMutex.Unlock()
-		if err != nil {
-			utils.Logger().Error().Err(err).Msgf("Unable to Read PendingCrossLinks, number of crosslinks: %d", len(crossLinks))
+
+		if err == nil {
+			for _, pending := range allPending {
+				exist, err := node.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
+				if err == nil || exist != nil {
+					continue
+				}
+				crossLinksToPropose = append(crossLinksToPropose, pending)
+			}
+			utils.Logger().Debug().Msgf("Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
+		} else {
+			utils.Logger().Error().Err(err).Msgf("Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
 		}
-		utils.Logger().Debug().Msgf("Read PendingCrossLinks, number of crosslinks: %d", len(crossLinks))
 	}
 
 	// Prepare shard state
@@ -151,7 +160,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		utils.Logger().Error().Err(err).Msg("Cannot get commit signatures from last block")
 		return nil, err
 	}
-	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinks, shardState)
+	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState)
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
