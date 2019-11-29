@@ -653,6 +653,15 @@ do
    fi
 # backward compatible with older harmony node software
    case "${node_type}" in
+   validator)
+      case "${shard_id}" in
+      ?*)
+	 args+=(
+	    -shard_id="${shard_id}"
+	 )
+	 ;;
+      esac
+      ;;
    explorer)
       args+=(
       -node_type="${node_type}"
