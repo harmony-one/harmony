@@ -538,8 +538,8 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker, verifyAllSig bool) error {
 	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Uint64("blockNum", block.NumberU64()).Msg("[SYNC] UpdateBlockAndStatus: Current Block")
 
-	if block.NumberU64() != bc.CurrentHeader().Number().Uint64()+1 {
-		utils.Logger().Info().Uint64("curBlockNum", bc.CurrentHeader().Number().Uint64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
+	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
+		utils.Logger().Info().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
 	}
 
