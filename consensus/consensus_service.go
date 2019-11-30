@@ -468,7 +468,6 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	curHeader := consensus.ChainReader.CurrentHeader()
-
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
 	prevSubCommitteeDump := consensus.Decider.JSON()
@@ -482,19 +481,19 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
-		consensus.Decider = quorum.NewDecider(quorum.SuperMajorityStake)
-		consensus.Decider.SetShardIDProvider(func() (uint32, error) {
+		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		decider.SetShardIDProvider(func() (uint32, error) {
 			return consensus.ShardID, nil
 		})
-		consensus.Decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
 			return consensus.PubKey, nil
 		})
+		consensus.Decider = decider
 	}
 
 	committeeToSet := &shard.Committee{}
 	hasError := false
 
-	// TODO: change GetCommitteePublicKeys to read from DB
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
 		curEpoch, consensus.ChainReader,
 	)

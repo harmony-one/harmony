@@ -23,14 +23,19 @@ import (
 )
 
 const (
-	// GenesisFund is the initial total fund in the genesis block for mainnet.
-	GenesisFund = 12600000000
+	// GenesisONEToken is the initial total number of ONE in the genesis block for mainnet.
+	GenesisONEToken = 12600000000
 	// TestAccountNumber is the number of test accounts for testnet/devnet/
 	TestAccountNumber = 100
 	// ContractDeployerInitFund is the initial fund for the contract deployer account in testnet/devnet.
 	ContractDeployerInitFund = 100000000
 	// InitFreeFund is the initial fund for permissioned accounts for testnet/devnet/
 	InitFreeFund = 100
+)
+
+var (
+	// GenesisFund is the initial total number of ONE (in Nano) in the genesis block for mainnet.
+	GenesisFund = new(big.Int).Mul(big.NewInt(GenesisONEToken), big.NewInt(denominations.One))
 )
 
 // genesisInitializer is a shardchain.DBInitializer adapter.
@@ -72,9 +77,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		chainConfig = *params.MainnetChainConfig
 		if shardID == 0 {
 			foundationAddress := common.HexToAddress("0xE25ABC3f7C3d5fB7FB81EAFd421FF1621A61107c")
-			genesisFunds := big.NewInt(GenesisFund)
-			genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))
-			genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
+			genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: GenesisFund}
 		}
 	case nodeconfig.Pangaea:
 		chainConfig = *params.PangaeaChainConfig

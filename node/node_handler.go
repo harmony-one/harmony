@@ -5,10 +5,8 @@ import (
 	"context"
 	"math/big"
 	"math/rand"
-	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
@@ -326,12 +324,19 @@ var BigMaxUint64 = new(big.Int).SetBytes([]byte{
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBitmap []byte) {
-	if err := node.AddNewBlock(newBlock); err != nil {
+	if _, err := node.Blockchain().InsertChain([]*types.Block{newBlock}, true); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msg("Error when adding new block")
+			Uint64("blockNum", newBlock.NumberU64()).
+			Str("parentHash", newBlock.Header().ParentHash().Hex()).
+			Str("hash", newBlock.Header().Hash().Hex()).
+			Msg("Error Adding new block to blockchain")
 		return
 	}
+	utils.Logger().Info().
+		Uint64("blockNum", newBlock.NumberU64()).
+		Str("hash", newBlock.Header().Hash().Hex()).
+		Msg("Added New Block to Blockchain!!!")
 
 	// Update last consensus time for metrics
 	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
@@ -358,6 +363,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		rand.Seed(time.Now().UTC().UnixNano())
 		rnd := rand.Intn(100)
 		if rnd < 15 {
+			// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
+			if node.NodeConfig.ShardID == 0 {
+				node.BroadcastNewBlock(newBlock)
+			}
 			node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 		}
 	}
@@ -372,70 +381,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 
 	// TODO chao: uncomment this after beacon syncing is stable
 	// node.Blockchain().UpdateCXReceiptsCheckpointsByBlock(newBlock)
-
-	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		// Update contract deployer's nonce so default contract like faucet can issue transaction with current nonce
-		nonce := node.GetNonceOfAddress(crypto.PubkeyToAddress(node.ContractDeployerKey.PublicKey))
-		atomic.StoreUint64(&node.ContractDeployerCurrentNonce, nonce)
-
-		for _, tx := range newBlock.Transactions() {
-			msg, err := tx.AsMessage(types.HomesteadSigner{})
-			if err != nil {
-				utils.Logger().Error().Msg("Error when parsing tx into message")
-			}
-			if _, ok := node.AddressNonce.Load(msg.From()); ok {
-				nonce := node.GetNonceOfAddress(msg.From())
-				node.AddressNonce.Store(msg.From(), nonce)
-			}
-		}
-
-		// TODO: Enable the following after v0
-		if node.Consensus.ShardID == 0 {
-			// TODO: enable drand only for beacon chain
-			// ConfirmedBlockChannel which is listened by drand leader who will initiate DRG if its a epoch block (first block of a epoch)
-			//if node.DRand != nil {
-			//	go func() {
-			//		node.ConfirmedBlockChannel <- newBlock
-			//	}()
-			//}
-		}
-	}
-}
-
-// AddNewBlock is usedd to add new block into the blockchain.
-func (node *Node) AddNewBlock(newBlock *types.Block) error {
-	_, err := node.Blockchain().InsertChain([]*types.Block{newBlock}, true /* verifyHeaders */)
-
-	// Debug only
-	//addrs, err := node.Blockchain().ReadValidatorList()
-	//utils.Logger().Debug().Msgf("validator list updated, err=%v, len(addrs)=%v", err, len(addrs))
-	//for i, addr := range addrs {
-	//	val, err := node.Blockchain().ValidatorInformation(addr)
-	//	if err != nil {
-	//		utils.Logger().Debug().Msgf("ValidatorInformation Error %v: err %v", i, err)
-	//	}
-	//	utils.Logger().Debug().Msgf("ValidatorInformation %v: %v", i, val)
-	//}
-	//currAddrs, err := node.Blockchain().ReadActiveValidatorList()
-	//utils.Logger().Debug().Msgf("CurrentValidators : %v", currAddrs)
-	//candidates := node.Blockchain().ValidatorCandidates()
-	//utils.Logger().Debug().Msgf("CandidateValidators : %v", candidates)
-	// Finish debug
-
-	if err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Uint64("blockNum", newBlock.NumberU64()).
-			Str("parentHash", newBlock.Header().ParentHash().Hex()).
-			Str("hash", newBlock.Header().Hash().Hex()).
-			Msg("Error Adding new block to blockchain")
-	} else {
-		utils.Logger().Info().
-			Uint64("blockNum", newBlock.NumberU64()).
-			Str("hash", newBlock.Header().Hash().Hex()).
-			Msg("Added New Block to Blockchain!!!")
-	}
-	return err
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {

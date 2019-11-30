@@ -13,7 +13,6 @@ import (
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/service/syncing"
@@ -47,23 +46,6 @@ var (
 var (
 	myHost p2p.Host
 )
-
-// InitLDBDatabase initializes a LDBDatabase. isGenesis=true will return the beacon chain database for normal shard nodes
-func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethdb.LDBDatabase, error) {
-	var dbFileName string
-	if isBeacon {
-		dbFileName = fmt.Sprintf("./db/harmony_beacon_%s_%s", ip, port)
-	} else {
-		dbFileName = fmt.Sprintf("./db/harmony_%s_%s", ip, port)
-	}
-	if freshDB {
-		var err = os.RemoveAll(dbFileName)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}
-	return ethdb.NewLDBDatabase(dbFileName, 0, 0)
-}
 
 func printVersion() {
 	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
@@ -129,6 +111,9 @@ var (
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
 	publicRPC       = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+	// Bad block revert
+	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
+	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
 )
 
 func initSetup() {
@@ -288,13 +273,13 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
 	)
 	currentConsensus.Decider.SetShardIDProvider(func() (uint32, error) {
 		return currentConsensus.ShardID, nil
 	})
-
 	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
 		return currentConsensus.PubKey, nil
 	})
@@ -481,6 +466,22 @@ func main() {
 	if nodeConfig.ShardID != shard.BeaconChainShardID && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 		utils.Logger().Info().Uint32("shardID", currentNode.Blockchain().ShardID()).Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
 		go currentNode.SupportBeaconSyncing()
+	}
+
+	if uint64(*doRevertBefore) != 0 && uint64(*revertTo) != 0 {
+		chain := currentNode.Blockchain()
+		curNum := chain.CurrentBlock().NumberU64()
+		if curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
+			// Remove invalid blocks
+			for chain.CurrentBlock().NumberU64() >= uint64(*revertTo) {
+				curBlock := chain.CurrentBlock()
+				rollbacks := []ethCommon.Hash{curBlock.Hash()}
+				chain.Rollback(rollbacks)
+				lastSig := curBlock.Header().LastCommitSignature()
+				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
+				chain.WriteLastCommits(sigAndBitMap)
+			}
+		}
 	}
 
 	startMsg := "==== New Harmony Node ===="

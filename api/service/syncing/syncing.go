@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/engine"
+
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -533,20 +535,32 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker) error {
-	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Msg("[SYNC] UpdateBlockAndStatus: Current Block")
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker, verifyAllSig bool) error {
+	utils.Logger().Info().Str("blockHex", bc.CurrentBlock().Hash().Hex()).Uint64("blockNum", block.NumberU64()).Msg("[SYNC] UpdateBlockAndStatus: Current Block")
+
+	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
+		utils.Logger().Info().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
+		return nil
+	}
 
 	// Verify block signatures
 	if block.NumberU64() > 1 {
 		// Verify signature every 100 blocks
 		verifySig := block.NumberU64()%verifyHeaderBatchSize == 0
+		if verifyAllSig {
+			verifySig = true
+		}
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySig)
-		if err != nil {
+		if err == engine.ErrUnknownAncestor {
+			return err
+		} else if err != nil {
 			utils.Logger().Error().Err(err).Msgf("[SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
 
-			utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
-			for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
-				bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
+			if !verifyAllSig {
+				utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
+				for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
+					bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
+				}
 			}
 			return err
 		}
@@ -561,9 +575,13 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		return err
 	}
 	utils.Logger().Info().
-		Uint64("blockHeight", bc.CurrentBlock().NumberU64()).
-		Str("blockHex", bc.CurrentBlock().Hash().Hex()).
+		Uint64("blockHeight", block.NumberU64()).
+		Uint64("blockEpoch", block.Epoch().Uint64()).
+		Str("blockHex", block.Hash().Hex()).
 		Msg("[SYNC] UpdateBlockAndStatus: new block added to blockchain")
+	for i, tx := range block.StakingTransactions() {
+		utils.Logger().Error().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
+	}
 	return nil
 }
 
@@ -578,7 +596,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker)
+		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
 		if err != nil {
 			break
 		}
@@ -595,7 +613,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker)
+		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
 		if err != nil {
 			break
 		}
@@ -616,7 +634,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker)
+		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
 		if err != nil {
 			break
 		}

@@ -213,7 +213,7 @@ syncLoop:
 					Uint64("incoming block", block.NumberU64()).
 					Msg("Got block from leader")
 				if block.NumberU64()-txGen.Blockchain().CurrentBlock().NumberU64() == 1 {
-					if err := txGen.AddNewBlock(block); err != nil {
+					if _, err := txGen.Blockchain().InsertChain([]*types.Block{block}, true); err != nil {
 						utils.Logger().Error().
 							Err(err).
 							Msg("Error when adding new block")

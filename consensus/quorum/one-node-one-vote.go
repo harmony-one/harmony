@@ -101,7 +101,11 @@ func (v *uniformVoteWeight) JSON() string {
 }
 
 func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
-	identity, _ := v.MyPublicKey()()
+	pubKeyFunc := v.MyPublicKey()
+	if pubKeyFunc == nil {
+		return false
+	}
+	identity, _ := pubKeyFunc()
 	everyone := v.DumpParticipants()
 	myVoterID := identity.SerializeToHexStr()
 	for i := range everyone {
