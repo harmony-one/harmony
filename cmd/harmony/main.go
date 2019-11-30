@@ -130,8 +130,8 @@ var (
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
 	publicRPC       = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
 	// Bad block revert
-	doRevertBefore = flag.Int("do_revert_before", 1150, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
-	revertTo       = flag.Int("revert_to", 1130, "The revert will rollback all blocks until and including block number revert_to")
+	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
+	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
 )
 
 func initSetup() {
@@ -291,13 +291,13 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
 	)
 	currentConsensus.Decider.SetShardIDProvider(func() (uint32, error) {
 		return currentConsensus.ShardID, nil
 	})
-
 	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
 		return currentConsensus.PubKey, nil
 	})
@@ -486,21 +486,21 @@ func main() {
 		go currentNode.SupportBeaconSyncing()
 	}
 
-	////// Temporary fix for 8-6 incident /////////
-	chain := currentNode.Blockchain()
-	curNum := chain.CurrentBlock().NumberU64()
-	if curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
-		// Remove invalid blocks
-		for chain.CurrentBlock().NumberU64() >= uint64(*revertTo) {
-			curBlock := chain.CurrentBlock()
-			rollbacks := []ethCommon.Hash{curBlock.Hash()}
-			chain.Rollback(rollbacks)
-			lastSig := curBlock.Header().LastCommitSignature()
-			sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
-			chain.WriteLastCommits(sigAndBitMap)
+	if uint64(*doRevertBefore) != 0 && uint64(*revertTo) != 0 {
+		chain := currentNode.Blockchain()
+		curNum := chain.CurrentBlock().NumberU64()
+		if curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
+			// Remove invalid blocks
+			for chain.CurrentBlock().NumberU64() >= uint64(*revertTo) {
+				curBlock := chain.CurrentBlock()
+				rollbacks := []ethCommon.Hash{curBlock.Hash()}
+				chain.Rollback(rollbacks)
+				lastSig := curBlock.Header().LastCommitSignature()
+				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
+				chain.WriteLastCommits(sigAndBitMap)
+			}
 		}
 	}
-	///////////////////////////////////////////////
 
 	startMsg := "==== New Harmony Node ===="
 	if *nodeType == "explorer" {

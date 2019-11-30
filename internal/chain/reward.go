@@ -135,7 +135,7 @@ func whatPercentStakedNow(
 	beaconchain engine.ChainReader,
 ) (*numeric.Dec, error) {
 	stakedNow := numeric.ZeroDec()
-	// Only active validators' stake is counted in stake ratio because their
+	// Only active validators' stake is counted in stake ratio because only their stake is under slashing risk
 	active, err := beaconchain.ReadActiveValidatorList()
 	if err != nil {
 		return nil, err
