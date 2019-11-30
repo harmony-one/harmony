@@ -2299,7 +2299,24 @@ func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 }
 
 // WritePendingCrossLinks saves the pending crosslinks
-func (bc *BlockChain) WritePendingCrossLinks(cls []types.CrossLink) error {
+func (bc *BlockChain) WritePendingCrossLinks(crossLinks []types.CrossLink) error {
+	// deduplicate crosslinks if any
+	m := map[uint32]map[uint64](types.CrossLink){}
+	for _, cl := range crossLinks {
+		if _, ok := m[cl.ShardID()]; !ok {
+			m[cl.ShardID()] = map[uint64](types.CrossLink){}
+		}
+		m[cl.ShardID()][cl.BlockNum()] = cl
+	}
+
+	cls := []types.CrossLink{}
+	for _, m1 := range m {
+		for _, cl := range m1 {
+			cls = append(cls, cl)
+		}
+	}
+	utils.Logger().Debug().Msgf("[WritePendingCrossLinks] Before Dedup has %d cls, after Dedup has %d cls", len(crossLinks), len(cls))
+
 	bytes, err := rlp.EncodeToBytes(cls)
 	if err != nil {
 		utils.Logger().Error().Msg("[WritePendingCrossLinks] Failed to encode pending crosslinks")
