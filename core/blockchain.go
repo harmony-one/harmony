@@ -68,7 +68,7 @@ const (
 	maxTimeFutureBlocks                = 30
 	badBlockLimit                      = 10
 	triesInMemory                      = 128
-	shardCacheLimit                    = 4
+	shardCacheLimit                    = 10
 	commitsCacheLimit                  = 10
 	epochCacheLimit                    = 10
 	randomnessCacheLimit               = 10
@@ -76,7 +76,7 @@ const (
 	validatorStatsCacheLimit           = 1024
 	validatorListCacheLimit            = 10
 	validatorListByDelegatorCacheLimit = 1024
-	pendingCrossLinksCacheLimit        = 10
+	pendingCrossLinksCacheLimit        = 2
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -2557,9 +2557,8 @@ func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.Valid
 	return rawdb.ReadValidatorSnapshot(bc.db, addr)
 }
 
-// WriteValidatorSnapshots writes the snapshot of provided list of validators
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) WriteValidatorSnapshots(addrs []common.Address) error {
+// writeValidatorSnapshots writes the snapshot of provided list of validators
+func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
 	for _, addr := range addrs {
@@ -2697,9 +2696,8 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
 	return nil
 }
 
-// DeleteValidatorSnapshots deletes the snapshot staking information of given validator address
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) DeleteValidatorSnapshots(addrs []common.Address) error {
+// deleteValidatorSnapshots deletes the snapshot staking information of given validator address
+func (bc *BlockChain) deleteValidatorSnapshots(addrs []common.Address) error {
 	batch := bc.db.NewBatch()
 	for i := range addrs {
 		rawdb.DeleteValidatorSnapshot(batch, addrs[i])
@@ -2722,12 +2720,12 @@ func (bc *BlockChain) UpdateValidatorSnapshots() error {
 	}
 
 	// TODO: enable this once we allow validator to delete itself.
-	//err = bc.DeleteValidatorSnapshots(allValidators)
+	//err = bc.deleteValidatorSnapshots(allValidators)
 	//if err != nil {
 	//	return err
 	//}
 
-	if err := bc.WriteValidatorSnapshots(allValidators); err != nil {
+	if err := bc.writeValidatorSnapshots(allValidators); err != nil {
 		return err
 	}
 	return nil
@@ -2800,9 +2798,8 @@ func (bc *BlockChain) ReadDelegationsByDelegator(delegator common.Address) ([]st
 	return rawdb.ReadDelegationsByDelegator(bc.db, delegator)
 }
 
-// WriteDelegationsByDelegator writes the list of validator addresses to database
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) WriteDelegationsByDelegator(delegator common.Address, indices []staking.DelegationIndex) error {
+// writeDelegationsByDelegator writes the list of validator addresses to database
+func (bc *BlockChain) writeDelegationsByDelegator(delegator common.Address, indices []staking.DelegationIndex) error {
 	err := rawdb.WriteDelegationsByDelegator(bc.db, delegator, indices)
 	if err != nil {
 		return err
@@ -2876,7 +2873,7 @@ func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
 }
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
-// Note: this should only be called within the blockchain insertBlock process.
+// Note: this should only be called once during staking launch.
 func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int) error {
 	return rawdb.WriteBlockRewardAccumulator(bc.db, reward)
 }
@@ -2921,7 +2918,7 @@ func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress comm
 			})
 		}
 	}
-	return bc.WriteDelegationsByDelegator(delegatorAddress, delegations)
+	return bc.writeDelegationsByDelegator(delegatorAddress, delegations)
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch

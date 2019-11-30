@@ -767,14 +767,14 @@ func ReadDelegationsByDelegator(db DatabaseReader, delegator common.Address) ([]
 	return addrs, nil
 }
 
-// WriteDelegationsByDelegator stores the list of validators delegated by a delegator
+// writeDelegationsByDelegator stores the list of validators delegated by a delegator
 func WriteDelegationsByDelegator(db DatabaseWriter, delegator common.Address, indices []staking.DelegationIndex) error {
 	bytes, err := rlp.EncodeToBytes(indices)
 	if err != nil {
-		utils.Logger().Error().Msg("[WriteDelegationsByDelegator] Failed to encode")
+		utils.Logger().Error().Msg("[writeDelegationsByDelegator] Failed to encode")
 	}
 	if err := db.Put(delegatorValidatorListKey(delegator), bytes); err != nil {
-		utils.Logger().Error().Msg("[WriteDelegationsByDelegator] Failed to store to database")
+		utils.Logger().Error().Msg("[writeDelegationsByDelegator] Failed to store to database")
 	}
 	return err
 }
