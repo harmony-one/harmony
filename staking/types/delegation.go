@@ -15,7 +15,7 @@ var (
 
 const (
 	// LockPeriodInEpoch is the number of epochs a undelegated token needs to be before it's released to the delegator's balance
-	LockPeriodInEpoch = 14
+	LockPeriodInEpoch = 7
 )
 
 // Delegation represents the bond with tokens held by an account. It is
@@ -110,7 +110,7 @@ func (d *Delegation) RemoveUnlockedUndelegations(curEpoch *big.Int) *big.Int {
 	totalWithdraw := big.NewInt(0)
 	count := 0
 	for j := range d.Undelegations {
-		if big.NewInt(0).Sub(curEpoch, d.Undelegations[j].Epoch).Int64() > LockPeriodInEpoch { // need to wait at least 14 epochs to withdraw;
+		if big.NewInt(0).Sub(curEpoch, d.Undelegations[j].Epoch).Int64() > LockPeriodInEpoch { // need to wait at least 7 epochs to withdraw;
 			totalWithdraw.Add(totalWithdraw, d.Undelegations[j].Amount)
 			count++
 		} else {

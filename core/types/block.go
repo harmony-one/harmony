@@ -282,13 +282,21 @@ func init() {
 func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof, stks []*staking.StakingTransaction) *Block {
 	b := &Block{header: CopyHeader(header)}
 
-	// TODO: panic if len(txs) != len(receipts)
-	if len(txs) == 0 {
+	if len(receipts) != len(txs)+len(stks) {
+		return nil
+	}
+
+	if len(txs) == 0 && len(stks) == 0 {
 		b.header.SetTxHash(EmptyRootHash)
 	} else {
-		b.header.SetTxHash(DeriveSha(Transactions(txs)))
 		b.transactions = make(Transactions, len(txs))
 		copy(b.transactions, txs)
+
+		b.stakingTransactions = make(staking.StakingTransactions, len(stks))
+		copy(b.stakingTransactions, stks)
+
+		// TODO: Add staking transactions into txns root
+		b.header.SetTxHash(DeriveSha(Transactions(txs)))
 	}
 
 	if len(receipts) == 0 {
@@ -306,11 +314,6 @@ func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, out
 		b.header.SetIncomingReceiptHash(DeriveSha(CXReceiptsProofs(incxs)))
 		b.incomingReceipts = make(CXReceiptsProofs, len(incxs))
 		copy(b.incomingReceipts, incxs)
-	}
-
-	if len(stks) > 0 {
-		b.stakingTransactions = make(staking.StakingTransactions, len(stks))
-		copy(b.stakingTransactions, stks)
 	}
 
 	return b

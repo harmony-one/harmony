@@ -29,18 +29,16 @@ import (
 var (
 	// BlockReward is the block reward, to be split evenly among block signers.
 	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
+	// BaseStakedReward is the base block reward for epos.
+	BaseStakedReward = numeric.NewDecFromBigInt(new(big.Int).Mul(
+		big.NewInt(18), big.NewInt(denominations.One),
+	))
 	// BlockRewardStakedCase is the baseline block reward in staked case -
-	totalTokens                  = numeric.NewDec(12600000000)
+	totalTokens                  = numeric.NewDecFromBigInt(new(big.Int).Mul(big.NewInt(12600000000), big.NewInt(denominations.One)))
 	targetStakedPercentage       = numeric.MustNewDecFromStr("0.35")
 	dynamicAdjust                = numeric.MustNewDecFromStr("0.4")
 	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
 )
-
-func baseStakedBlockReward() numeric.Dec {
-	return numeric.NewDecFromBigInt(new(big.Int).Mul(
-		big.NewInt(18), big.NewInt(denominations.One),
-	))
-}
 
 func adjust(amount numeric.Dec) numeric.Dec {
 	return amount.MulTruncate(
@@ -137,7 +135,7 @@ func whatPercentStakedNow(
 	beaconchain engine.ChainReader,
 ) (*numeric.Dec, error) {
 	stakedNow := numeric.ZeroDec()
-	// TODO What about the non-active validators? What happens to their stake?
+	// Only active validators' stake is counted in stake ratio because their
 	active, err := beaconchain.ReadActiveValidatorList()
 	if err != nil {
 		return nil, err
@@ -158,6 +156,7 @@ func whatPercentStakedNow(
 			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
 		)
 	}
+
 	percentage := stakedNow.Quo(totalTokens.Add(
 		numeric.NewDecFromBigInt(soFarDoledOut)),
 	)
@@ -188,7 +187,7 @@ func AccumulateRewards(
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 
-		defaultReward := baseStakedBlockReward()
+		defaultReward := BaseStakedReward
 
 		// TODO Use cached result in off-chain db instead of full computation
 		percentageStaked, err := whatPercentStakedNow(beaconChain)

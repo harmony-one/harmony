@@ -24,7 +24,7 @@ func (ps pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (ps pangaeaSchedule) BlocksPerEpoch() uint64 {
-	return 450 // 1 hour with 8 seconds/block
+	return 150 // 1/3 hour with 8 seconds/block
 }
 
 func (ps pangaeaSchedule) CalcEpochNumber(blockNum uint64) *big.Int {

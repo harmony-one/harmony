@@ -107,7 +107,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	utils.Logger().Debug().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
-	if err := node.AddNewBlock(block); err == nil {
+	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, true); err == nil {
 		if shard.Schedule.IsLastBlock(block.Number().Uint64()) {
 			node.Consensus.UpdateConsensusInformation()
 		}

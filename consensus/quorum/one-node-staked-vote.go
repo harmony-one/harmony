@@ -241,7 +241,11 @@ func (v *stakedVoteWeight) JSON() string {
 }
 
 func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
-	identity, _ := v.MyPublicKey()()
+	pubKeyFunc := v.MyPublicKey()
+	if pubKeyFunc == nil {
+		return false
+	}
+	identity, _ := pubKeyFunc()
 	w := shard.BlsPublicKey{}
 	w.FromLibBLSPublicKey(identity)
 	_, ok := v.roster.Voters[w]

@@ -283,7 +283,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
 	txPoolLimit := 1000 // TODO: incorporate staking txn into TxPool
 
-	if node.Blockchain().Config().IsPreStaking(node.Worker.GetNewEpoch()) {
+	if node.NodeConfig.ShardID == 0 && node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
 		node.pendingStakingTxMutex.Lock()
 		for _, tx := range newStakingTxs {
 			if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {

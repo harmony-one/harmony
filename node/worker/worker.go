@@ -231,6 +231,11 @@ func (w *Worker) UpdateCurrent() error {
 	return w.makeCurrent(parent, header)
 }
 
+// GetCurrentHeader returns the current header to propose
+func (w *Worker) GetCurrentHeader() *block.Header {
+	return w.current.header
+}
+
 // makeCurrent creates a new environment for the current cycle.
 func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 	state, err := w.chain.StateAt(parent.Root())
@@ -397,11 +402,11 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 		}
 	}
 
-	s := w.current.state.Copy()
+	state := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
 	// TODO: feed coinbase into here so the proposer gets extra rewards.
-	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stakingTxs)
+	block, err := w.engine.Finalize(w.chain, copyHeader, state, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stakingTxs)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
