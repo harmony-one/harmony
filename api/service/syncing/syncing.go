@@ -575,9 +575,16 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		return err
 	}
 	utils.Logger().Info().
-		Uint64("blockHeight", bc.CurrentBlock().NumberU64()).
-		Str("blockHex", bc.CurrentBlock().Hash().Hex()).
+		Uint64("blockHeight", block.NumberU64()).
+		Uint64("blockEpoch", block.Epoch().Uint64()).
+		Str("blockHex", block.Hash().Hex()).
 		Msg("[SYNC] UpdateBlockAndStatus: new block added to blockchain")
+	for i, tx := range block.Transactions() {
+		utils.Logger().Error().Msgf("Txn %d: %v", i, tx)
+	}
+	for i, tx := range block.StakingTransactions() {
+		utils.Logger().Error().Msgf("StakingTxn %d: %v", i, tx)
+	}
 	return nil
 }
 

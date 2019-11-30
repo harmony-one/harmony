@@ -1858,6 +1858,12 @@ Hash: 0x%x
 Error: %v
 ##############################
 `, bc.chainConfig, block.Number(), block.Epoch(), len(block.Transactions()), len(block.StakingTransactions()), block.Hash(), receiptString, err)
+	for i, tx := range block.Transactions() {
+		utils.Logger().Error().Msgf("Txn %d: %v", i, tx)
+	}
+	for i, tx := range block.StakingTransactions() {
+		utils.Logger().Error().Msgf("StakingTxn %d: %v", i, tx)
+	}
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local
