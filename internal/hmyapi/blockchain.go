@@ -48,6 +48,7 @@ type BlockArgs struct {
 	InclTx      bool     `json:"inclTx"`
 	FullTx      bool     `json:"fullTx"`
 	Signers     []string `json:"signers"`
+	InclStaking bool     `json:"inclStaking"`
 }
 
 // GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
@@ -55,7 +56,7 @@ type BlockArgs struct {
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if block != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx}
+		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: false}
 		response, err := RPCMarshalBlock(block, blockArgs)
 		if err == nil && blockNr == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
@@ -73,7 +74,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.GetBlock(ctx, blockHash)
 	if block != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx}
+		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: false}
 		return RPCMarshalBlock(block, blockArgs)
 	}
 	return nil, err
