@@ -1858,9 +1858,6 @@ Hash: 0x%x
 Error: %v
 ##############################
 `, bc.chainConfig, block.Number(), block.Epoch(), len(block.Transactions()), len(block.StakingTransactions()), block.Hash(), receiptString, err)
-	for i, tx := range block.Transactions() {
-		utils.Logger().Error().Msgf("Txn %d: %v", i, tx)
-	}
 	for i, tx := range block.StakingTransactions() {
 		utils.Logger().Error().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
 	}
