@@ -1862,7 +1862,7 @@ Error: %v
 		utils.Logger().Error().Msgf("Txn %d: %v", i, tx)
 	}
 	for i, tx := range block.StakingTransactions() {
-		utils.Logger().Error().Msgf("StakingTxn %d: %v", i, tx)
+		utils.Logger().Error().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
 	}
 }
 
