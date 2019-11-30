@@ -584,7 +584,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		utils.Logger().Error().Msgf("Txn %d: %s", i, bytes)
 	}
 	for i, tx := range block.StakingTransactions() {
-		utils.Logger().Error().Msgf("StakingTxn %d: %v, %v", i, tx.StakingType(), tx.StakingMessage())
+		utils.Logger().Error().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
 	}
 	return nil
 }
