@@ -1849,12 +1849,15 @@ func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, e
 Chain config: %v
 
 Number: %v
+Epoch: %v
+NumTxn: %v
+NumStkTxn: %v
 Hash: 0x%x
 %v
 
 Error: %v
 ##############################
-`, bc.chainConfig, block.Number(), block.Hash(), receiptString, err)
+`, bc.chainConfig, block.Number(), block.Epoch(), len(block.Transactions()), len(block.StakingTransactions()), block.Hash(), receiptString, err)
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local
