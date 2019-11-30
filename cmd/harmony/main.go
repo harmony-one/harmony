@@ -13,7 +13,6 @@ import (
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/service/syncing"
@@ -47,23 +46,6 @@ var (
 var (
 	myHost p2p.Host
 )
-
-// InitLDBDatabase initializes a LDBDatabase. isGenesis=true will return the beacon chain database for normal shard nodes
-func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethdb.LDBDatabase, error) {
-	var dbFileName string
-	if isBeacon {
-		dbFileName = fmt.Sprintf("./db/harmony_beacon_%s_%s", ip, port)
-	} else {
-		dbFileName = fmt.Sprintf("./db/harmony_%s_%s", ip, port)
-	}
-	if freshDB {
-		var err = os.RemoveAll(dbFileName)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}
-	return ethdb.NewLDBDatabase(dbFileName, 0, 0)
-}
 
 func printVersion() {
 	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())

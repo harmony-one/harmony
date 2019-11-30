@@ -166,7 +166,7 @@ func (node *Node) DoBeaconSyncing() {
 			select {
 			case beaconBlock := <-node.BeaconBlockChannel:
 				if node.beaconSync != nil {
-					err := node.beaconSync.UpdateBlockAndStatus(beaconBlock, node.Beaconchain(), node.BeaconWorker)
+					err := node.beaconSync.UpdateBlockAndStatus(beaconBlock, node.Beaconchain(), node.BeaconWorker, true)
 					if err != nil {
 						node.beaconSync.AddLastMileBlock(beaconBlock)
 					}
