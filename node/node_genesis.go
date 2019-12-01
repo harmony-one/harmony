@@ -48,20 +48,24 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 	shardState, _ := committee.WithStakingEnabled.Compute(
 		big.NewInt(core.GenesisEpoch), nil,
 	)
+	if shardState == nil {
+		return errors.New("failed to create genesis shard state")
+	}
+
 	if shardID != shard.BeaconChainShardID {
 		// store only the local shard for shard chains
 		c := shardState.FindCommitteeByID(shardID)
 		if c == nil {
 			return errors.New("cannot find local shard in genesis")
 		}
-		shardState = shard.State{*c}
+		shardState = &shard.State{nil, []shard.Committee{*c}}
 	}
 	gi.node.SetupGenesisBlock(db, shardID, shardState)
 	return nil
 }
 
 // SetupGenesisBlock sets up a genesis blockchain.
-func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState shard.State) {
+func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState *shard.State) {
 	utils.Logger().Info().Interface("shardID", shardID).Msg("setting up a brand new chain database")
 	if shardID == node.NodeConfig.ShardID {
 		node.isFirstTime = true
@@ -102,7 +106,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		ShardID:        shardID,
 		GasLimit:       params.GenesisGasLimit,
 		ShardStateHash: myShardState.Hash(),
-		ShardState:     myShardState.DeepCopy(),
+		ShardState:     *myShardState.DeepCopy(),
 		Timestamp:      1561734000, // GMT: Friday, June 28, 2019 3:00:00 PM. PST: Friday, June 28, 2019 8:00:00 AM
 		ExtraData:      []byte("Harmony for One and All. Open Consensus for 10B."),
 	}

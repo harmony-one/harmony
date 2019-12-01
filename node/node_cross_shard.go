@@ -156,12 +156,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 		utils.Logger().Debug().
 			Msgf("[ProcessingCrossLink] Crosslink going to propose: %d", len(crosslinks))
 
-		for i, cl := range crosslinks {
-			if cl.Number() == nil || cl.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) < 0 {
-				utils.Logger().Debug().
-					Msgf("[ProcessingCrossLink] Crosslink %d skipped: %v", i, cl)
-				continue
-			}
+		for _, cl := range crosslinks {
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
 				// TODO: leader add double sign checking
@@ -170,13 +165,12 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				continue
 			}
 
-			err = node.VerifyCrossLink(cl)
-			if err != nil {
-				utils.Logger().Error().
-					Err(err).
-					Msgf("[ProcessingCrossLink] Failed to verify new cross link for shardID %d, blockNum %d", cl.ShardID(), cl.Number())
+			if err = node.VerifyCrossLink(cl); err != nil {
+				utils.Logger().Debug().
+					Msgf("[ProcessingCrossLink] Failed to verify new cross link for blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
 				continue
 			}
+
 			candidates = append(candidates, cl)
 			utils.Logger().Debug().
 				Msgf("[ProcessingCrossLink] committing for shardID %d, blockNum %d", cl.ShardID(), cl.Number().Uint64())
@@ -228,8 +222,17 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 
 // VerifyCrossLink verifies the header is valid
 func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
+	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
+		return ctxerror.New("Shard chains should not verify cross links")
+	}
 
-	// TODO: add fork choice rule
+	if cl.BlockNum() <= 1 {
+		return ctxerror.New("CrossLink BlockNumber should greater than 1")
+	}
+
+	if node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
+		return ctxerror.New("CrossLink Epoch should >= crosslink epoch", "crossLinkEpoch", node.Blockchain().Config().CrossLinkEpoch)
+	}
 
 	// Verify signature of the new cross link header
 	// TODO: check whether to recalculate shard state
@@ -253,10 +256,6 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	}
 	if !parseKeysSuccess {
 		return ctxerror.New("[CrossLink] cannot convert BLS public key", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
-	}
-
-	if cl.BlockNum() <= 1 {
-		return ctxerror.New("CrossLink BlockNumber should greater than 1")
 	}
 
 	mask, err := bls_cosi.NewMask(committerKeys, nil)

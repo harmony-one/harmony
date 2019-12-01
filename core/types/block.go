@@ -38,7 +38,6 @@ import (
 	v3 "github.com/harmony-one/harmony/block/v3"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/taggedrlp"
 	"github.com/pkg/errors"
@@ -591,20 +590,6 @@ func (b *Block) AddVrf(vrf []byte) {
 // AddVdf add vdf into block header
 func (b *Block) AddVdf(vdf []byte) {
 	b.header.SetVdf(vdf)
-}
-
-// AddShardState add shardState into block header
-func (b *Block) AddShardState(shardState shard.State) error {
-	// Make a copy because State.Hash() internally sorts entries.
-	// Store the sorted copy.
-	shardState = append(shardState[:0:0], shardState...)
-	b.header.SetShardStateHash(shardState.Hash())
-	data, err := rlp.EncodeToBytes(shardState)
-	if err != nil {
-		return err
-	}
-	b.header.SetShardState(data)
-	return nil
 }
 
 // Logger returns a sub-logger with block contexts added.

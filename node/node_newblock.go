@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/harmony-one/harmony/core/rawdb"
 
 	types2 "github.com/harmony-one/harmony/staking/types"
@@ -80,13 +82,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 func (node *Node) proposeNewBlock() (*types.Block, error) {
 	node.Worker.UpdateCurrent()
 
-	// Prepare shard state
-	// NOTE: this will potentially override shard chain's epoch to beacon chain's epoch during staking migration period.
-	// So this needs to be executed early on.
-	shardState, err := node.Worker.SuperCommitteeForNextEpoch(
-		node.Consensus.ShardID, node.Beaconchain(),
-	)
-
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	coinbase := node.Consensus.SelfAddress
 
@@ -139,6 +134,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 		if err == nil {
 			for _, pending := range allPending {
+				if err = node.VerifyCrossLink(pending); err != nil {
+					continue
+				}
 				exist, err := node.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
 				if err == nil || exist != nil {
 					continue
@@ -151,7 +149,11 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
-	if err != nil {
+	// Prepare shard state
+	shardState := new(shard.State)
+	if shardState, err = node.Worker.SuperCommitteeForNextEpoch(
+		node.Consensus.ShardID, node.Beaconchain(),
+	); err != nil {
 		return nil, err
 	}
 

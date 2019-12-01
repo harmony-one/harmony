@@ -419,7 +419,7 @@ func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValid
 		return errCommissionRateChangeTooHigh
 	}
 
-	if err := st.state.UpdateStakingInfo(editValidator.ValidatorAddress, wrapper); err != nil {
+	if err := st.state.UpdateStakingInfo(wrapper.Address, wrapper); err != nil {
 		return err
 	}
 	return nil

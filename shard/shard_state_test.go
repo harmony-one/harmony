@@ -73,7 +73,7 @@ func TestHash(t *testing.T) {
 			{common.Address{0x66}, blsPubKey6, nil},
 		},
 	}
-	shardState1 := State{com1, com2}
+	shardState1 := State{nil, []Committee{com1, com2}}
 	h1 := shardState1.Hash()
 
 	com3 := Committee{
@@ -93,7 +93,7 @@ func TestHash(t *testing.T) {
 		},
 	}
 
-	shardState2 := State{com3, com4}
+	shardState2 := State{nil, []Committee{com3, com4}}
 	h2 := shardState2.Hash()
 
 	if bytes.Compare(h1[:], h2[:]) != 0 {
@@ -120,7 +120,7 @@ func TestCompatibilityOldShardStateIntoNew(t *testing.T) {
 		}},
 	}
 
-	postStakingState := State{
+	postStakingState := State{nil, []Committee{
 		Committee{ShardID: 0, Slots: SlotList{
 			Slot{junkA, blsPubKey1, nil},
 			Slot{junkA, blsPubKey2, nil},
@@ -134,7 +134,7 @@ func TestCompatibilityOldShardStateIntoNew(t *testing.T) {
 			Slot{junkA, blsPubKey4, nil},
 			Slot{junkA, blsPubKey5, &stake2},
 		}},
-	}
+	}}
 
 	preStakingStateBytes, _ := rlp.EncodeToBytes(preStakingState)
 	postStakingStateBytes, _ := rlp.EncodeToBytes(postStakingState)

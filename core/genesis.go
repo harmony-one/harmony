@@ -29,8 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/rlp"
-
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/internal/params"
 
@@ -249,7 +247,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		}
 	}
 	root := statedb.IntermediateRoot(false)
-	shardStateBytes, err := rlp.EncodeToBytes(g.ShardState)
+	shardStateBytes, err := shard.EncodeWrapper(g.ShardState, false)
 	if err != nil {
 		utils.Logger().Error().Msg("failed to rlp-serialize genesis shard state")
 		os.Exit(1)

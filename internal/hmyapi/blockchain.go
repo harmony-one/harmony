@@ -523,7 +523,7 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 	if err == nil {
 		blsKeyToShardID := make(map[shard.BlsPublicKey]uint32)
 
-		for _, committee := range shardState {
+		for _, committee := range shardState.Shards {
 			for _, slot := range committee.Slots {
 				blsKeyToShardID[slot.BlsPublicKey] = committee.ShardID
 			}

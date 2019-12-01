@@ -114,10 +114,14 @@ type StateSync struct {
 }
 
 func (ss *StateSync) purgeAllBlocksFromCache() {
+	ss.lastMileMux.Lock()
+	ss.lastMileBlocks = nil
+	ss.lastMileMux.Unlock()
+
 	ss.syncMux.Lock()
 	defer ss.syncMux.Unlock()
 	ss.commonBlocks = make(map[int]*types.Block)
-	ss.lastMileBlocks = nil
+
 	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		configPeer.blockHashes = nil
 		configPeer.newBlocks = nil

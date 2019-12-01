@@ -262,10 +262,15 @@ func (w *Worker) GetNewEpoch() *big.Int {
 	parent := w.chain.CurrentBlock()
 	epoch := new(big.Int).Set(parent.Header().Epoch())
 
-	// TODO: Don't depend on sharding state for epoch change.
-	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
-		// ... except if parent has a resharding assignment it increases by 1.
-		epoch = epoch.Add(epoch, common.Big1)
+	shardState, err := parent.Header().GetShardState()
+	if err == nil && shardState.Epoch != nil {
+		// For shard state of staking epochs, the shard state will have an epoch and it will decide the next epoch for following blocks
+		epoch = new(big.Int).Set(shardState.Epoch)
+	} else {
+		if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
+			// if parent has proposed a new shard state it increases by 1, except for genesis block.
+			epoch = epoch.Add(epoch, common.Big1)
+		}
 	}
 	return epoch
 }
@@ -289,9 +294,9 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 func (w *Worker) SuperCommitteeForNextEpoch(
 	shardID uint32,
 	beacon *core.BlockChain,
-) (shard.State, error) {
+) (*shard.State, error) {
 	var (
-		nextCommittee shard.State
+		nextCommittee = new(shard.State)
 		err           error
 	)
 	switch shardID {
@@ -315,15 +320,11 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 					beaconEpoch, beacon,
 				)
 
-				// Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
-				// This shouldn't be exactly beaconEpoch because the next block will have beaconEpoch + 1
-				blockEpoch := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1))
 				utils.Logger().Debug().
 					Uint64("blockNum", w.current.header.Number().Uint64()).
-					Uint64("myPrevEpoch", w.current.header.Epoch().Uint64()).
-					Uint64("myCurEpoch", blockEpoch.Uint64()).
+					Uint64("myCurEpoch", w.current.header.Epoch().Uint64()).
+					Uint64("beaconEpoch", beaconEpoch.Uint64()).
 					Msg("Propose new epoch as beacon chain's epoch")
-				w.current.header.SetEpoch(blockEpoch)
 			case 0:
 				// If it's same epoch, no need to propose new shard state (new epoch change)
 			case -1:
@@ -337,20 +338,17 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 					beaconEpoch, beacon,
 				)
 
-				blockEpoch := big.NewInt(0).Set(beaconEpoch).Sub(beaconEpoch, big.NewInt(1))
 				utils.Logger().Debug().
 					Uint64("blockNum", w.current.header.Number().Uint64()).
-					Uint64("myPrevEpoch", w.current.header.Epoch().Uint64()).
-					Uint64("myCurEpoch", blockEpoch.Uint64()).
-					Msg("Propose one-time catch up with beacon chain's epoch")
-				// Set this block's epoch to be beaconEpoch - 1, so the next block will have beaconEpoch
-				w.current.header.SetEpoch(blockEpoch)
+					Uint64("myCurEpoch", w.current.header.Epoch().Uint64()).
+					Uint64("beaconEpoch", beaconEpoch.Uint64()).
+					Msg("Propose entering staking along with beacon chain's epoch")
 			} else {
 				// If I are not in staking nor has beacon chain proposed a staking-based shard state,
 				// do pre-staking committee calculation
 				if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
 					nextCommittee, err = committee.WithStakingEnabled.Compute(
-						new(big.Int).Add(w.current.header.Epoch(), common.Big1),
+						nextEpoch,
 						w.chain,
 					)
 				}
@@ -362,7 +360,7 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
-func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks types.CrossLinks, shardState shard.State) (*types.Block, error) {
+func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks types.CrossLinks, shardState *shard.State) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		sig2 := w.current.header.LastCommitSignature()
 		copy(sig2[:], sig[:])
@@ -391,9 +389,14 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 	}
 
 	// Shard State
-	if shardState != nil && len(shardState) != 0 {
+	if shardState != nil && len(shardState.Shards) != 0 {
 		w.current.header.SetShardStateHash(shardState.Hash())
-		shardStateData, err := rlp.EncodeToBytes(shardState)
+		isStaking := false
+		if shardState.Epoch != nil && w.config.IsStaking(shardState.Epoch) {
+			isStaking = true
+		}
+		// NOTE: Besides genesis, this is the only place where the shard state is encoded.
+		shardStateData, err := shard.EncodeWrapper(*shardState, isStaking)
 		if err == nil {
 			w.current.header.SetShardState(shardStateData)
 		} else {

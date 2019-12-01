@@ -417,7 +417,7 @@ func FindCommonAncestor(db DatabaseReader, a, b *block.Header) *block.Header {
 // ReadShardState retrieves sharding state.
 func ReadShardState(
 	db DatabaseReader, epoch *big.Int,
-) (shard.State, error) {
+) (*shard.State, error) {
 	data, err := db.Get(shardStateKey(epoch))
 	if err != nil {
 		return nil, ctxerror.New(MsgNoShardStateFromDB,
@@ -431,20 +431,6 @@ func ReadShardState(
 		).WithCause(err)
 	}
 	return ss, nil
-}
-
-// WriteShardState stores sharding state into database.
-func WriteShardState(
-	db DatabaseWriter, epoch *big.Int,
-	shardState shard.State, isStaking bool,
-) error {
-	data, err := shard.EncodeWrapper(shardState, isStaking)
-	if err != nil {
-		return ctxerror.New("cannot encode sharding state",
-			"epoch", epoch,
-		).WithCause(err)
-	}
-	return WriteShardStateBytes(db, epoch, data)
 }
 
 // WriteShardStateBytes stores sharding state into database.
@@ -771,10 +757,10 @@ func ReadDelegationsByDelegator(db DatabaseReader, delegator common.Address) ([]
 func WriteDelegationsByDelegator(db DatabaseWriter, delegator common.Address, indices []staking.DelegationIndex) error {
 	bytes, err := rlp.EncodeToBytes(indices)
 	if err != nil {
-		utils.Logger().Error().Msg("[WriteDelegationsByDelegator] Failed to encode")
+		utils.Logger().Error().Msg("[writeDelegationsByDelegator] Failed to encode")
 	}
 	if err := db.Put(delegatorValidatorListKey(delegator), bytes); err != nil {
-		utils.Logger().Error().Msg("[WriteDelegationsByDelegator] Failed to store to database")
+		utils.Logger().Error().Msg("[writeDelegationsByDelegator] Failed to store to database")
 	}
 	return err
 }

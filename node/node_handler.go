@@ -346,7 +346,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		if node.NodeConfig.ShardID == 0 {
 			node.BroadcastNewBlock(newBlock)
 		}
-		if node.NodeConfig.ShardID != shard.BeaconChainShardID && newBlock.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) >= 0 {
+		if node.NodeConfig.ShardID != shard.BeaconChainShardID && node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
 			node.BroadcastCrossLink(newBlock)
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)

@@ -192,7 +192,7 @@ func (node *Node) CommitCommittee() {
 			utils.Logger().Error().Err(err).Msg("[Explorer] Error reading shard state")
 			continue
 		}
-		for _, committee := range state {
+		for _, committee := range state.Shards {
 			if committee.ShardID == curBlock.ShardID() {
 				utils.Logger().Debug().Msg("[Explorer] Dumping committee")
 				err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).DumpCommittee(curBlock.ShardID(), curBlock.Epoch().Uint64(), committee)

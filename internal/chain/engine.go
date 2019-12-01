@@ -235,7 +235,7 @@ func (e *engineImpl) Finalize(
 func QuorumForBlock(
 	chain engine.ChainReader, h *block.Header, reCalculate bool,
 ) (quorum int, err error) {
-	var ss shard.State
+	ss := new(shard.State)
 	if reCalculate {
 		ss, _ = committee.WithStakingEnabled.Compute(h.Epoch(), chain)
 	} else {
@@ -297,7 +297,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 
 // GetPublicKeys finds the public keys of the committee that signed the block header
 func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate bool) ([]*bls.PublicKey, error) {
-	var shardState shard.State
+	shardState := new(shard.State)
 	var err error
 	if reCalculate {
 		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), chain)

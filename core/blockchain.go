@@ -68,7 +68,7 @@ const (
 	maxTimeFutureBlocks                = 30
 	badBlockLimit                      = 10
 	triesInMemory                      = 128
-	shardCacheLimit                    = 4
+	shardCacheLimit                    = 10
 	commitsCacheLimit                  = 10
 	epochCacheLimit                    = 10
 	randomnessCacheLimit               = 10
@@ -76,7 +76,7 @@ const (
 	validatorStatsCacheLimit           = 1024
 	validatorListCacheLimit            = 10
 	validatorListByDelegatorCacheLimit = 1024
-	pendingCrossLinksCacheLimit        = 10
+	pendingCrossLinksCacheLimit        = 2
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -1156,33 +1156,11 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			return NonStatTy, err
 		}
 
-		// Staking epoch migration. Only Execute once:
-		// Normally the last block of an epoch should have the same epoch as this block
-		// In the case beacon chain catch up, it may have a epoch larger than the current epoch
-		// We need to write the same shard state for this one-off epoch so other readers doesn't break
-		parentHeader := bc.GetHeaderByHash(header.ParentHash())
-		if parentHeader != nil && parentHeader.Epoch().Cmp(header.Epoch()) != 0 {
-			curShardState, err := bc.ReadShardState(parentHeader.Epoch())
-			if err != nil {
-				header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot read current shard state")
-				return NonStatTy, err
-			}
-			data, err := rlp.EncodeToBytes(curShardState)
-			if err != nil {
-				return NonStatTy, err
-			}
-			_, err = bc.WriteShardStateBytes(batch, header.Epoch(), data)
-			if err != nil {
-				header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
-				return NonStatTy, err
-			}
-		}
-
 		// Find all the active validator addresses and store them in db
 		allActiveValidators := []common.Address{}
 		processed := make(map[common.Address]struct{})
-		for i := range *newShardState {
-			shard := (*newShardState)[i]
+		for i := range newShardState.Shards {
+			shard := newShardState.Shards[i]
 			for j := range shard.Slots {
 				slot := shard.Slots[j]
 				if slot.TotalStake != nil { // For external validator
@@ -1219,13 +1197,14 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 	// Update voting power of validators for all shards
 	if block.ShardID() == 0 && len(block.Header().ShardState()) > 0 {
-		shardState := shard.State{}
-		if err := rlp.DecodeBytes(block.Header().ShardState(), &shardState); err == nil {
+		shardState := new(shard.State)
+
+		if shardState, err = shard.DecodeWrapper(block.Header().ShardState()); err == nil {
 			if err = bc.UpdateValidatorVotingPower(shardState); err != nil {
-				utils.Logger().Err(err)
+				utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to update voting power")
 			}
 		} else {
-			utils.Logger().Err(err)
+			utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
 		}
 	}
 
@@ -2007,10 +1986,10 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscript
 }
 
 // ReadShardState retrieves sharding state given the epoch number.
-func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.State, error) {
+func (bc *BlockChain) ReadShardState(epoch *big.Int) (*shard.State, error) {
 	cacheKey := string(epoch.Bytes())
 	if cached, ok := bc.shardStateCache.Get(cacheKey); ok {
-		shardState := cached.(shard.State)
+		shardState := cached.(*shard.State)
 		return shardState, nil
 	}
 	shardState, err := rawdb.ReadShardState(bc.db, epoch)
@@ -2019,22 +1998,6 @@ func (bc *BlockChain) ReadShardState(epoch *big.Int) (shard.State, error) {
 	}
 	bc.shardStateCache.Add(cacheKey, shardState)
 	return shardState, nil
-}
-
-// WriteShardState saves the given sharding state under the given epoch number.
-func (bc *BlockChain) WriteShardState(
-	epoch *big.Int, shardState shard.State,
-) error {
-	shardState = shardState.DeepCopy()
-	err := rawdb.WriteShardState(
-		bc.db, epoch, shardState, bc.Config().IsStaking(epoch),
-	)
-	if err != nil {
-		return err
-	}
-	cacheKey := string(epoch.Bytes())
-	bc.shardStateCache.Add(cacheKey, shardState)
-	return nil
 }
 
 // WriteShardStateBytes saves the given sharding state under the given epoch number.
@@ -2051,7 +2014,7 @@ func (bc *BlockChain) WriteShardStateBytes(db rawdb.DatabaseWriter,
 	}
 	cacheKey := string(epoch.Bytes())
 	bc.shardStateCache.Add(cacheKey, decodeShardState)
-	return &decodeShardState, nil
+	return decodeShardState, nil
 }
 
 // ReadLastCommits retrieves last commits.
@@ -2574,9 +2537,8 @@ func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.Valid
 	return rawdb.ReadValidatorSnapshot(bc.db, addr)
 }
 
-// WriteValidatorSnapshots writes the snapshot of provided list of validators
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) WriteValidatorSnapshots(addrs []common.Address) error {
+// writeValidatorSnapshots writes the snapshot of provided list of validators
+func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
 	for _, addr := range addrs {
@@ -2662,11 +2624,15 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 }
 
 // UpdateValidatorVotingPower writes the voting power for the committees
-func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
+func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
+	if state == nil {
+		return errors.New("[UpdateValidatorVotingPower] Nil shard state")
+	}
+
 	totalEffectiveStake := make(map[uint32]numeric.Dec)
 	addrToEffectiveStakes := make(map[common.Address]map[uint32]numeric.Dec)
 
-	for _, committee := range state {
+	for _, committee := range state.Shards {
 		for _, slot := range committee.Slots {
 			if slot.TotalStake != nil {
 				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress]; !ok {
@@ -2699,7 +2665,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
 			stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0), numeric.NewDec(0)}
 		}
 
-		stats.AvgVotingPower = addrTotalVotingPower.Quo(numeric.NewDec(int64(len(state))))
+		stats.AvgVotingPower = addrTotalVotingPower.Quo(numeric.NewDec(int64(len(state.Shards))))
 		stats.TotalEffectiveStake = addrTotalEffectiveStake
 
 		err = rawdb.WriteValidatorStats(batch, addr, stats)
@@ -2714,9 +2680,8 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state shard.State) error {
 	return nil
 }
 
-// DeleteValidatorSnapshots deletes the snapshot staking information of given validator address
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) DeleteValidatorSnapshots(addrs []common.Address) error {
+// deleteValidatorSnapshots deletes the snapshot staking information of given validator address
+func (bc *BlockChain) deleteValidatorSnapshots(addrs []common.Address) error {
 	batch := bc.db.NewBatch()
 	for i := range addrs {
 		rawdb.DeleteValidatorSnapshot(batch, addrs[i])
@@ -2739,12 +2704,12 @@ func (bc *BlockChain) UpdateValidatorSnapshots() error {
 	}
 
 	// TODO: enable this once we allow validator to delete itself.
-	//err = bc.DeleteValidatorSnapshots(allValidators)
+	//err = bc.deleteValidatorSnapshots(allValidators)
 	//if err != nil {
 	//	return err
 	//}
 
-	if err := bc.WriteValidatorSnapshots(allValidators); err != nil {
+	if err := bc.writeValidatorSnapshots(allValidators); err != nil {
 		return err
 	}
 	return nil
@@ -2817,9 +2782,8 @@ func (bc *BlockChain) ReadDelegationsByDelegator(delegator common.Address) ([]st
 	return rawdb.ReadDelegationsByDelegator(bc.db, delegator)
 }
 
-// WriteDelegationsByDelegator writes the list of validator addresses to database
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) WriteDelegationsByDelegator(delegator common.Address, indices []staking.DelegationIndex) error {
+// writeDelegationsByDelegator writes the list of validator addresses to database
+func (bc *BlockChain) writeDelegationsByDelegator(delegator common.Address, indices []staking.DelegationIndex) error {
 	err := rawdb.WriteDelegationsByDelegator(bc.db, delegator, indices)
 	if err != nil {
 		return err
@@ -2893,7 +2857,7 @@ func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
 }
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
-// Note: this should only be called within the blockchain insertBlock process.
+// Note: this should only be called once during staking launch.
 func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int) error {
 	return rawdb.WriteBlockRewardAccumulator(bc.db, reward)
 }
@@ -2938,7 +2902,7 @@ func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress comm
 			})
 		}
 	}
-	return bc.WriteDelegationsByDelegator(delegatorAddress, delegations)
+	return bc.writeDelegationsByDelegator(delegatorAddress, delegations)
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch

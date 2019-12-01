@@ -4,8 +4,6 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/harmony-one/harmony/shard/committee"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -258,9 +256,6 @@ func AccumulateRewards(
 			for i := range crossLinks {
 				cxLink := crossLinks[i]
 				shardState, err := bc.ReadShardState(cxLink.Epoch())
-				if !bc.Config().IsStaking(cxLink.Epoch()) {
-					shardState, err = committee.WithStakingEnabled.Compute(cxLink.Epoch(), bc)
-				}
 
 				if err != nil {
 					return err
