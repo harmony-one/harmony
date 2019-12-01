@@ -1156,28 +1156,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			return NonStatTy, err
 		}
 
-		// Staking epoch migration. Only Execute once:
-		// Normally the last block of an epoch should have the same epoch as this block
-		// In the case beacon chain catch up, it may have a epoch larger than the current epoch
-		// We need to write the same shard state for this one-off epoch so other readers doesn't break
-		parentHeader := bc.GetHeaderByHash(header.ParentHash())
-		if parentHeader != nil && parentHeader.Epoch().Cmp(header.Epoch()) != 0 {
-			curShardState, err := bc.ReadShardState(parentHeader.Epoch())
-			if err != nil {
-				header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot read current shard state")
-				return NonStatTy, err
-			}
-			data, err := rlp.EncodeToBytes(curShardState)
-			if err != nil {
-				return NonStatTy, err
-			}
-			_, err = bc.WriteShardStateBytes(batch, header.Epoch(), data)
-			if err != nil {
-				header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
-				return NonStatTy, err
-			}
-		}
-
 		// Find all the active validator addresses and store them in db
 		allActiveValidators := []common.Address{}
 		processed := make(map[common.Address]struct{})
@@ -1223,10 +1201,10 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 
 		if shardState, err = shard.DecodeWrapper(block.Header().ShardState()); err == nil {
 			if err = bc.UpdateValidatorVotingPower(shardState); err != nil {
-				utils.Logger().Err(err)
+				utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to update voting power")
 			}
 		} else {
-			utils.Logger().Err(err)
+			utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
 		}
 	}
 

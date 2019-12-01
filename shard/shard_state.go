@@ -96,6 +96,7 @@ func DecodeWrapper(shardState []byte) (*State, error) {
 				})
 			}
 		}
+		newSS.Epoch = nil // Make sure for legacy state, the epoch is nil
 		return &newSS, nil
 	}
 	return nil, err2

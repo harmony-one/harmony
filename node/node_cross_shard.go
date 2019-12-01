@@ -157,11 +157,6 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			Msgf("[ProcessingCrossLink] Crosslink going to propose: %d", len(crosslinks))
 
 		for _, cl := range crosslinks {
-			if cl.Number() == nil || cl.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) < 0 {
-				utils.Logger().Debug().
-					Msgf("[ProcessingCrossLink] Crosslink blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
-				continue
-			}
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
 				// TODO: leader add double sign checking
@@ -170,7 +165,12 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				continue
 			}
 
-			err = node.VerifyCrossLink(cl)
+			if err = node.VerifyCrossLink(cl); err != nil {
+				utils.Logger().Debug().
+					Msgf("[ProcessingCrossLink] Crosslink blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
+				continue
+			}
+
 			if err != nil {
 				utils.Logger().Error().
 					Err(err).
@@ -228,6 +228,10 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 
 // VerifyCrossLink verifies the header is valid
 func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
+	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
+		return ctxerror.New("Shard chains should not verify cross links")
+	}
+
 	if cl.BlockNum() <= 1 {
 		return ctxerror.New("CrossLink BlockNumber should greater than 1")
 	}

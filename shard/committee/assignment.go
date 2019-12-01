@@ -117,15 +117,17 @@ func eposStakedCommittee(
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		validator, err := stakerReader.ReadValidatorInformation(candidates[i])
+
+		if err != nil {
+			return nil, err
+		}
+
 		if err := validator.SanityCheck(); err != nil {
 			continue
 		}
 		validatorStake := big.NewInt(0)
 		for _, delegation := range validator.Delegations {
 			validatorStake.Add(validatorStake, delegation.Amount)
-		}
-		if err != nil {
-			return nil, err
 		}
 		essentials[validator.Address] = effective.SlotOrder{
 			validatorStake,
@@ -221,10 +223,18 @@ func (def partialStakingEnabled) Compute(
 
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	if preStaking {
+		// Pre-staking shard state doesn't need to set epoch (backward compatible)
 		return preStakingEnabledCommittee(instance), nil
 	}
 	stakedSlots :=
 		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
 			int(instance.NumShards())
-	return eposStakedCommittee(instance, stakerReader, stakedSlots)
+	shardState, err := eposStakedCommittee(instance, stakerReader, stakedSlots)
+
+	if err != nil {
+		return nil, err
+	}
+	// Set the epoch of shard state
+	shardState.Epoch = big.NewInt(0).Set(epoch)
+	return shardState, nil
 }
