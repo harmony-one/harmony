@@ -505,14 +505,22 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		utils.Logger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!!")
 		return
 	}
-	prepareCount := consensus.Decider.SignersCount(quorum.Prepare)
-	if count := utils.CountOneBits(mask.Bitmap); count < prepareCount {
-		utils.Logger().Debug().
-			Int64("Need", prepareCount).
-			Int64("Got", count).
-			Msg("Not enough signatures in the Prepared msg")
+
+	threshold := consensus.Decider.QuorumThreshold()
+	currentTotalPower := consensus.Decider.ComputeTotalPowerByMask(mask)
+	if currentTotalPower == nil {
+		utils.Logger().Warn().
+			Msgf("[OnPrepared] currentTotalPower is NIL")
 		return
 	}
+	if (*currentTotalPower).LT(threshold) {
+		utils.Logger().Warn().
+			Msgf("[OnPrepared] Not enough voting power in prepared msg: need %+v, have %+v", threshold, currentTotalPower)
+		return
+	}
+	utils.Logger().Debug().
+		Msgf("[onPrepared] prepared totalvoting power exceed threshold: need %+v, have %+v", threshold, currentTotalPower)
+
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
@@ -891,19 +899,21 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	switch consensus.Decider.Policy() {
-	case quorum.SuperMajorityVote:
-		threshold := consensus.Decider.TwoThirdsSignersCount()
-		if count := utils.CountOneBits(mask.Bitmap); int64(count) < threshold {
-			utils.Logger().Warn().
-				Int64("need", threshold).
-				Int64("got", count).
-				Msg("[OnCommitted] Not enough signature in committed msg")
-			return
-		}
-	case quorum.SuperMajorityStake:
-		// Come back to thinking about this situation for Bitmap
+	threshold := consensus.Decider.QuorumThreshold()
+	currentTotalPower := consensus.Decider.ComputeTotalPowerByMask(mask)
+	if currentTotalPower == nil {
+		utils.Logger().Warn().
+			Msgf("[OnCommitted] currentTotalPower is NIL")
+		return
 	}
+
+	if (*currentTotalPower).LT(threshold) {
+		utils.Logger().Warn().
+			Msgf("[OnCommitted] Not enough voting power in committed msg: need %+v, have %+v", threshold, currentTotalPower)
+		return
+	}
+	utils.Logger().Debug().
+		Msgf("[OnCommitted] committed totalvoting power exceed threshold: need %+v, have %+v", threshold, currentTotalPower)
 
 	// check has 2f+1 signatures
 

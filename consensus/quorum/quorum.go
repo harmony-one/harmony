@@ -5,6 +5,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -113,6 +114,7 @@ type Decider interface {
 	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
+	ComputeTotalPowerByMask(*bls_cosi.Mask) *numeric.Dec
 	QuorumThreshold() numeric.Dec
 	AmIMemberOfCommitee() bool
 	IsRewardThresholdAchieved() bool

@@ -5,6 +5,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -80,6 +81,23 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 	}
 
 	return &currentTotalPower, nil
+}
+
+// ComputeTotalPowerByMask computes the total power indicated by bitmap mask
+func (v *stakedVoteWeight) ComputeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
+	currentTotalPower := numeric.ZeroDec()
+	pubKeys := mask.GetPubKeyFromMask(true)
+	for _, key := range pubKeys {
+		w := shard.BlsPublicKey{}
+		err := w.FromLibBLSPublicKey(key)
+		if err != nil {
+			return nil
+		}
+		currentTotalPower = currentTotalPower.Add(
+			v.roster.Voters[w].EffectivePercent,
+		)
+	}
+	return &currentTotalPower
 }
 
 // QuorumThreshold ..

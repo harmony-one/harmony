@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -41,6 +42,13 @@ func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
 // RewardThreshold ..
 func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 	return v.SignersCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
+}
+
+// ComputeTotalPowerByMask computes the total power indicated by bitmap mask
+func (v *uniformVoteWeight) ComputeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
+	counts := utils.CountOneBits(mask.Bitmap)
+	dec := numeric.NewDec(counts)
+	return &dec
 }
 
 func (v *uniformVoteWeight) SetVoters(

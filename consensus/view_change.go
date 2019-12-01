@@ -281,11 +281,18 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				utils.Logger().Error().Err(err).Msg("[onViewChange] M1 RecvMsg Payload Read Error")
 				return
 			}
-			// check has 2f+1 signature in m1 type message
-			need := consensus.Decider.TwoThirdsSignersCount()
-			if count := utils.CountOneBits(mask.Bitmap); count < need {
-				utils.Logger().Debug().Int64("need", need).Int64("have", count).
-					Msg("[onViewChange] M1 Payload Not Have Enough Signature")
+
+			threshold := consensus.Decider.QuorumThreshold()
+			currentTotalPower := consensus.Decider.ComputeTotalPowerByMask(mask)
+			if currentTotalPower == nil {
+				utils.Logger().Warn().
+					Msgf("[onViewChange] currentTotalPower is NIL")
+				return
+			}
+
+			if (*currentTotalPower).LT(threshold) {
+				utils.Logger().Warn().
+					Msgf("[onViewChange] Not enough voting power in committed msg: need %+v, have %+v", threshold, currentTotalPower)
 				return
 			}
 
@@ -445,11 +452,17 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
-	// check total number of sigs >= 2f+1
-	need := consensus.Decider.TwoThirdsSignersCount()
-	if count := utils.CountOneBits(m3Mask.Bitmap); count < need {
-		utils.Logger().Debug().Int64("need", need).Int64("have", count).
-			Msg("[onNewView] Not Have Enough M3 (ViewID) Signature")
+
+	threshold := consensus.Decider.QuorumThreshold()
+	currentTotalPower := consensus.Decider.ComputeTotalPowerByMask(m3Mask)
+	if currentTotalPower == nil {
+		utils.Logger().Warn().
+			Msgf("[onNewView] currentTotalPower is NIL")
+		return
+	}
+	if (*currentTotalPower).LT(threshold) {
+		utils.Logger().Warn().
+			Msgf("[onNewView] Not enough voting power in M3 (ViewID) msg: need %+v, have %+v", threshold, currentTotalPower)
 		return
 	}
 
