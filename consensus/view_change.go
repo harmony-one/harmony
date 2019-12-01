@@ -281,11 +281,10 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				utils.Logger().Error().Err(err).Msg("[onViewChange] M1 RecvMsg Payload Read Error")
 				return
 			}
-			// check has 2f+1 signature in m1 type message
-			need := consensus.Decider.TwoThirdsSignersCount()
-			if count := utils.CountOneBits(mask.Bitmap); count < need {
-				utils.Logger().Debug().Int64("need", need).Int64("have", count).
-					Msg("[onViewChange] M1 Payload Not Have Enough Signature")
+
+			if !consensus.Decider.IsQuorumAchievedByMask(mask) {
+				utils.Logger().Warn().
+					Msgf("[onViewChange] Quorum Not achieved")
 				return
 			}
 
@@ -445,11 +444,10 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
-	// check total number of sigs >= 2f+1
-	need := consensus.Decider.TwoThirdsSignersCount()
-	if count := utils.CountOneBits(m3Mask.Bitmap); count < need {
-		utils.Logger().Debug().Int64("need", need).Int64("have", count).
-			Msg("[onNewView] Not Have Enough M3 (ViewID) Signature")
+
+	if !consensus.Decider.IsQuorumAchievedByMask(m3Mask) {
+		utils.Logger().Warn().
+			Msgf("[onNewView] Quorum Not achieved")
 		return
 	}
 

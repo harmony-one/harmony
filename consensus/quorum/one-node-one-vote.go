@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -31,6 +32,20 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 		Int64("participants", v.ParticipantsCount()).
 		Msg("Quorum details")
 	return r
+}
+
+// IsQuorumAchivedByMask ..
+func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
+	threshold := v.TwoThirdsSignersCount()
+	currentTotalPower := utils.CountOneBits(mask.Bitmap)
+	if currentTotalPower < threshold {
+		utils.Logger().Warn().
+			Msgf("[IsQuorumAchievedByMask] Not enough voting power: need %+v, have %+v", threshold, currentTotalPower)
+		return false
+	}
+	utils.Logger().Debug().
+		Msgf("[IsQuorumAchievedByMask] have enough voting power: need %+v, have %+v", threshold, currentTotalPower)
+	return true
 }
 
 // QuorumThreshold ..

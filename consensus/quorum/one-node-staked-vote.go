@@ -5,6 +5,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -62,6 +63,25 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 	return currentTotalPower.GT(t)
 }
 
+// IsQuorumAchivedByMask ..
+func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
+	threshold := v.QuorumThreshold()
+	currentTotalPower := v.computeTotalPowerByMask(mask)
+	if currentTotalPower == nil {
+		utils.Logger().Warn().
+			Msgf("[IsQuorumAchievedByMask] currentTotalPower is nil")
+		return false
+	}
+	if (*currentTotalPower).LT(threshold) {
+		utils.Logger().Warn().
+			Msgf("[IsQuorumAchievedByMask] Not enough voting power: need %+v, have %+v", threshold, currentTotalPower)
+		return false
+	}
+	utils.Logger().Debug().
+		Msgf("[IsQuorumAchievedByMask] have enough voting power: need %+v, have %+v", threshold, currentTotalPower)
+	return true
+}
+
 func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, error) {
 	w := shard.BlsPublicKey{}
 	members := v.Participants()
@@ -78,8 +98,24 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 			)
 		}
 	}
-
 	return &currentTotalPower, nil
+}
+
+// ComputeTotalPowerByMask computes the total power indicated by bitmap mask
+func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
+	currentTotalPower := numeric.ZeroDec()
+	pubKeys := mask.GetPubKeyFromMask(true)
+	for _, key := range pubKeys {
+		w := shard.BlsPublicKey{}
+		err := w.FromLibBLSPublicKey(key)
+		if err != nil {
+			return nil
+		}
+		currentTotalPower = currentTotalPower.Add(
+			v.roster.Voters[w].EffectivePercent,
+		)
+	}
+	return &currentTotalPower
 }
 
 // QuorumThreshold ..
