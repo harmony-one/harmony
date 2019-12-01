@@ -80,7 +80,7 @@ type Backend interface {
 	GetDelegationsByValidator(validator common.Address) []*staking.Delegation
 	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)
 	GetValidatorSelfDelegation(addr common.Address) *big.Int
-	GetShardState() (shard.State, error)
+	GetShardState() (*shard.State, error)
 }
 
 // GetAPIs returns all the APIs.

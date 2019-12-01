@@ -289,9 +289,9 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 func (w *Worker) SuperCommitteeForNextEpoch(
 	shardID uint32,
 	beacon *core.BlockChain,
-) (shard.State, error) {
+) (*shard.State, error) {
 	var (
-		nextCommittee shard.State
+		nextCommittee = new(shard.State)
 		err           error
 	)
 	switch shardID {
@@ -362,7 +362,7 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
-func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks types.CrossLinks, shardState shard.State) (*types.Block, error) {
+func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks types.CrossLinks, shardState *shard.State) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		sig2 := w.current.header.LastCommitSignature()
 		copy(sig2[:], sig[:])
@@ -391,9 +391,14 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 	}
 
 	// Shard State
-	if shardState != nil && len(shardState) != 0 {
+	if shardState != nil && len(shardState.Shards) != 0 {
 		w.current.header.SetShardStateHash(shardState.Hash())
-		shardStateData, err := rlp.EncodeToBytes(shardState)
+		isStaking := false
+		if shardState.Epoch != nil && w.config.IsStaking(shardState.Epoch) {
+			isStaking = true
+		}
+		// NOTE: Besides genesis, this is the only place where the shard state is encoded.
+		shardStateData, err := shard.EncodeWrapper(*shardState, isStaking)
 		if err == nil {
 			w.current.header.SetShardState(shardStateData)
 		} else {

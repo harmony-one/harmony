@@ -40,7 +40,7 @@ type ChainReader interface {
 	// ReadShardState retrieves sharding state given the epoch number.
 	// This api reads the shard state cached or saved on the chaindb.
 	// Thus, only should be used to read the shard state of the current chain.
-	ReadShardState(epoch *big.Int) (shard.State, error)
+	ReadShardState(epoch *big.Int) (*shard.State, error)
 
 	// ReadActiveValidatorList retrieves the list of active validators
 	ReadActiveValidatorList() ([]common.Address, error)

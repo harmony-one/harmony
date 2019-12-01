@@ -271,19 +271,6 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		validator.MaxTotalDelegation = edit.MaxTotalDelegation
 	}
 
-	if edit.SlotKeyToAdd != nil {
-		found := false
-		for _, key := range validator.SlotPubKeys {
-			if key == *edit.SlotKeyToAdd {
-				found = true
-				break
-			}
-		}
-		if !found {
-			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
-		}
-	}
-
 	if edit.SlotKeyToRemove != nil {
 		index := -1
 		for i, key := range validator.SlotPubKeys {
@@ -295,6 +282,19 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		// we found key to be removed
 		if index >= 0 {
 			validator.SlotPubKeys = append(validator.SlotPubKeys[:index], validator.SlotPubKeys[index+1:]...)
+		}
+	}
+
+	if edit.SlotKeyToAdd != nil {
+		found := false
+		for _, key := range validator.SlotPubKeys {
+			if key == *edit.SlotKeyToAdd {
+				found = true
+				break
+			}
+		}
+		if !found {
+			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
 		}
 	}
 	return nil

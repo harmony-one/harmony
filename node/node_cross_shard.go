@@ -156,10 +156,10 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 		utils.Logger().Debug().
 			Msgf("[ProcessingCrossLink] Crosslink going to propose: %d", len(crosslinks))
 
-		for i, cl := range crosslinks {
+		for _, cl := range crosslinks {
 			if cl.Number() == nil || cl.Epoch().Cmp(node.Blockchain().Config().CrossLinkEpoch) < 0 {
 				utils.Logger().Debug().
-					Msgf("[ProcessingCrossLink] Crosslink %d skipped: %v", i, cl)
+					Msgf("[ProcessingCrossLink] Crosslink blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
 				continue
 			}
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
@@ -228,8 +228,13 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 
 // VerifyCrossLink verifies the header is valid
 func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
+	if cl.BlockNum() <= 1 {
+		return ctxerror.New("CrossLink BlockNumber should greater than 1")
+	}
 
-	// TODO: add fork choice rule
+	if node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
+		return ctxerror.New("CrossLink Epoch should >= crosslink epoch", "crossLinkEpoch", node.Blockchain().Config().CrossLinkEpoch)
+	}
 
 	// Verify signature of the new cross link header
 	// TODO: check whether to recalculate shard state
@@ -253,10 +258,6 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	}
 	if !parseKeysSuccess {
 		return ctxerror.New("[CrossLink] cannot convert BLS public key", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
-	}
-
-	if cl.BlockNum() <= 1 {
-		return ctxerror.New("CrossLink BlockNumber should greater than 1")
 	}
 
 	mask, err := bls_cosi.NewMask(committerKeys, nil)

@@ -269,7 +269,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 			if accountBlocks[id-1] != nil {
 				state, err := accountBlocks[id-1].Header().GetShardState()
 				if err == nil {
-					for _, shardCommittee := range state {
+					for _, shardCommittee := range state.Shards {
 						if shardCommittee.ShardID == accountBlock.ShardID() {
 							committee = &shardCommittee
 							break
@@ -392,7 +392,7 @@ func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offs
 			if accountBlocks[id-1] != nil {
 				state, err := accountBlocks[id-1].Header().GetShardState()
 				if err == nil {
-					for _, shardCommittee := range state {
+					for _, shardCommittee := range state.Shards {
 						if shardCommittee.ShardID == accountBlock.ShardID() {
 							committee = &shardCommittee
 							break

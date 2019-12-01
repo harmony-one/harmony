@@ -247,7 +247,7 @@ func (b *APIBackend) GetValidators(epoch *big.Int) (*shard.Committee, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, committee := range state {
+	for _, committee := range state.Shards {
 		if committee.ShardID == b.GetShardID() {
 			return &committee, nil
 		}
@@ -364,10 +364,6 @@ func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
 }
 
 // GetShardState ...
-func (b *APIBackend) GetShardState() (shard.State, error) {
-	state, err := b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentHeader().Epoch())
-	if err != nil {
-		return nil, err
-	}
-	return state, nil
+func (b *APIBackend) GetShardState() (*shard.State, error) {
+	return b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentHeader().Epoch())
 }

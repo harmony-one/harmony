@@ -215,8 +215,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if recvMsg.BlockNum < consensus.blockNum || recvMsg.BlockNum != header.Number().Uint64() {
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
 			Uint64("hdrBlockNum", header.Number().Uint64()).
+			Uint64("consensuBlockNum", consensus.blockNum).
 			Msg("[OnAnnounce] BlockNum does not match")
 		return
 	}
@@ -790,10 +790,11 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.ChainReader.WriteLastCommits(pbftMsg.Payload)
 
 	// find correct block content
-	block := consensus.FBFTLog.GetBlockByHash(consensus.blockHash)
+	curBlockHash := consensus.blockHash
+	block := consensus.FBFTLog.GetBlockByHash(curBlockHash)
 	if block == nil {
 		utils.Logger().Warn().
-			Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
+			Str("blockHash", hex.EncodeToString(curBlockHash[:])).
 			Msg("[FinalizeCommits] Cannot find block by hash")
 		return
 	}
@@ -815,7 +816,7 @@ func (consensus *Consensus) finalizeCommits() {
 		utils.Logger().Warn().Err(err).Msg("[Finalizing] Cannot send committed message")
 	} else {
 		utils.Logger().Info().
-			Hex("blockHash", consensus.blockHash[:]).
+			Hex("blockHash", curBlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[Finalizing] Sent Committed Message")
 	}
