@@ -506,20 +506,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
-	threshold := consensus.Decider.QuorumThreshold()
-	currentTotalPower := consensus.Decider.ComputeTotalPowerByMask(mask)
-	if currentTotalPower == nil {
+	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 		utils.Logger().Warn().
-			Msgf("[OnPrepared] currentTotalPower is NIL")
+			Msgf("[OnPrepared] Quorum Not achieved")
 		return
 	}
-	if (*currentTotalPower).LT(threshold) {
-		utils.Logger().Warn().
-			Msgf("[OnPrepared] Not enough voting power in prepared msg: need %+v, have %+v", threshold, currentTotalPower)
-		return
-	}
-	utils.Logger().Debug().
-		Msgf("[onPrepared] prepared totalvoting power exceed threshold: need %+v, have %+v", threshold, currentTotalPower)
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
@@ -899,23 +890,11 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	threshold := consensus.Decider.QuorumThreshold()
-	currentTotalPower := consensus.Decider.ComputeTotalPowerByMask(mask)
-	if currentTotalPower == nil {
+	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 		utils.Logger().Warn().
-			Msgf("[OnCommitted] currentTotalPower is NIL")
+			Msgf("[OnCommitted] Quorum Not achieved")
 		return
 	}
-
-	if (*currentTotalPower).LT(threshold) {
-		utils.Logger().Warn().
-			Msgf("[OnCommitted] Not enough voting power in committed msg: need %+v, have %+v", threshold, currentTotalPower)
-		return
-	}
-	utils.Logger().Debug().
-		Msgf("[OnCommitted] committed totalvoting power exceed threshold: need %+v, have %+v", threshold, currentTotalPower)
-
-	// check has 2f+1 signatures
 
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, recvMsg.BlockNum)

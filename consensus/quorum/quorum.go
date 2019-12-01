@@ -114,7 +114,7 @@ type Decider interface {
 	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	ComputeTotalPowerByMask(*bls_cosi.Mask) *numeric.Dec
+	IsQuorumAchievedByMask(*bls_cosi.Mask) bool
 	QuorumThreshold() numeric.Dec
 	AmIMemberOfCommitee() bool
 	IsRewardThresholdAchieved() bool

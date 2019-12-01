@@ -34,6 +34,25 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 	return r
 }
 
+// IsQuorumAchivedByMask ..
+func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
+	threshold := v.QuorumThreshold()
+	currentTotalPower := v.computeTotalPowerByMask(mask)
+	if currentTotalPower == nil {
+		utils.Logger().Warn().
+			Msgf("[IsQuorumAchievedByMask] currentTotalPower is nil")
+		return false
+	}
+	if (*currentTotalPower).LT(threshold) {
+		utils.Logger().Warn().
+			Msgf("[IsQuorumAchievedByMask] Not enough voting power: need %+v, have %+v", threshold, currentTotalPower)
+		return false
+	}
+	utils.Logger().Debug().
+		Msgf("[IsQuorumAchievedByMask] have enough voting power: need %+v, have %+v", threshold, currentTotalPower)
+	return true
+}
+
 // QuorumThreshold ..
 func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
 	return numeric.NewDec(v.TwoThirdsSignersCount())
@@ -45,7 +64,7 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 }
 
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
-func (v *uniformVoteWeight) ComputeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
+func (v *uniformVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	counts := utils.CountOneBits(mask.Bitmap)
 	dec := numeric.NewDec(counts)
 	return &dec

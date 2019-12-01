@@ -282,17 +282,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				return
 			}
 
-			threshold := consensus.Decider.QuorumThreshold()
-			currentTotalPower := consensus.Decider.ComputeTotalPowerByMask(mask)
-			if currentTotalPower == nil {
+			if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 				utils.Logger().Warn().
-					Msgf("[onViewChange] currentTotalPower is NIL")
-				return
-			}
-
-			if (*currentTotalPower).LT(threshold) {
-				utils.Logger().Warn().
-					Msgf("[onViewChange] Not enough voting power in committed msg: need %+v, have %+v", threshold, currentTotalPower)
+					Msgf("[onViewChange] Quorum Not achieved")
 				return
 			}
 
@@ -453,16 +445,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 
-	threshold := consensus.Decider.QuorumThreshold()
-	currentTotalPower := consensus.Decider.ComputeTotalPowerByMask(m3Mask)
-	if currentTotalPower == nil {
+	if !consensus.Decider.IsQuorumAchievedByMask(m3Mask) {
 		utils.Logger().Warn().
-			Msgf("[onNewView] currentTotalPower is NIL")
-		return
-	}
-	if (*currentTotalPower).LT(threshold) {
-		utils.Logger().Warn().
-			Msgf("[onNewView] Not enough voting power in M3 (ViewID) msg: need %+v, have %+v", threshold, currentTotalPower)
+			Msgf("[onNewView] Quorum Not achieved")
 		return
 	}
 
