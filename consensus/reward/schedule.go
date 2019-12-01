@@ -1,0 +1,91 @@
+package reward
+
+import "github.com/harmony-one/harmony/numeric"
+
+var (
+	// Schedule is the Token Release Schedule of Harmony
+	Schedule = map[int]numeric.Dec{
+		0:   numeric.ZeroDec(),
+		1:   numeric.MustNewDecFromStr("24.29"),
+		2:   numeric.MustNewDecFromStr("24.88"),
+		3:   numeric.MustNewDecFromStr("25.47"),
+		4:   numeric.MustNewDecFromStr("26.07"),
+		5:   numeric.MustNewDecFromStr("26.66"),
+		6:   numeric.MustNewDecFromStr("27.26"),
+		7:   numeric.MustNewDecFromStr("37.85"),
+		8:   numeric.MustNewDecFromStr("38.44"),
+		9:   numeric.MustNewDecFromStr("39.51"),
+		10:  numeric.MustNewDecFromStr("40.47"),
+		11:  numeric.MustNewDecFromStr("41.43"),
+		12:  numeric.MustNewDecFromStr("42.39"),
+		14:  numeric.MustNewDecFromStr("53.35"),
+		15:  numeric.MustNewDecFromStr("54.31"),
+		100: numeric.MustNewDecFromStr("55.27"),
+		100: numeric.MustNewDecFromStr("56.23"),
+		100: numeric.MustNewDecFromStr("57.19"),
+		100: numeric.MustNewDecFromStr("58.15"),
+		100: numeric.MustNewDecFromStr("68.82"),
+		100: numeric.MustNewDecFromStr("69.48"),
+		100: numeric.MustNewDecFromStr("70.15"),
+		100: numeric.MustNewDecFromStr("70.82"),
+		100: numeric.MustNewDecFromStr("71.48"),
+		100: numeric.MustNewDecFromStr("72.15"),
+		100: numeric.MustNewDecFromStr("77.21"),
+		100: numeric.MustNewDecFromStr("77.88"),
+		100: numeric.MustNewDecFromStr("78.55"),
+		100: numeric.MustNewDecFromStr("79.22"),
+		100: numeric.MustNewDecFromStr("79.88"),
+		100: numeric.MustNewDecFromStr("80.55"),
+		100: numeric.MustNewDecFromStr("85.61"),
+		100: numeric.MustNewDecFromStr("86.28"),
+		100: numeric.MustNewDecFromStr("86.95"),
+		100: numeric.MustNewDecFromStr("87.61"),
+		100: numeric.MustNewDecFromStr("88.28"),
+		100: numeric.MustNewDecFromStr("88.95"),
+		100: numeric.MustNewDecFromStr("89.62"),
+		100: numeric.MustNewDecFromStr("90.28"),
+		100: numeric.MustNewDecFromStr("90.95"),
+		100: numeric.MustNewDecFromStr("91.62"),
+		100: numeric.MustNewDecFromStr("92.28"),
+		100: numeric.MustNewDecFromStr("92.95"),
+		100: numeric.MustNewDecFromStr("93.62"),
+		100: numeric.MustNewDecFromStr("94.29"),
+		100: numeric.MustNewDecFromStr("94.48"),
+		100: numeric.MustNewDecFromStr("94.68"),
+		100: numeric.MustNewDecFromStr("94.88"),
+		100: numeric.MustNewDecFromStr("95.07"),
+		100: numeric.MustNewDecFromStr("95.27"),
+		100: numeric.MustNewDecFromStr("95.47"),
+		100: numeric.MustNewDecFromStr("95.67"),
+		100: numeric.MustNewDecFromStr("95.86"),
+		100: numeric.MustNewDecFromStr("96.06"),
+		100: numeric.MustNewDecFromStr("96.26"),
+		100: numeric.MustNewDecFromStr("96.45"),
+		100: numeric.MustNewDecFromStr("96.65"),
+		100: numeric.MustNewDecFromStr("96.85"),
+		100: numeric.MustNewDecFromStr("97.04"),
+		100: numeric.MustNewDecFromStr("97.24"),
+		100: numeric.MustNewDecFromStr("97.44"),
+		100: numeric.MustNewDecFromStr("97.64"),
+		100: numeric.MustNewDecFromStr("97.83"),
+		100: numeric.MustNewDecFromStr("98.03"),
+		100: numeric.MustNewDecFromStr("98.23"),
+		100: numeric.MustNewDecFromStr("98.42"),
+		100: numeric.MustNewDecFromStr("98.62"),
+		100: numeric.MustNewDecFromStr("98.82"),
+		100: numeric.MustNewDecFromStr("99.01"),
+		100: numeric.MustNewDecFromStr("99.21"),
+		100: numeric.MustNewDecFromStr("99.41"),
+		100: numeric.MustNewDecFromStr("99.61"),
+		100: numeric.MustNewDecFromStr("99.80"),
+		100: numeric.MustNewDecFromStr("100.00"),
+	}
+)
+
+// PercentageForTimeStamp ..
+func PercentageForTimeStamp(uint32 timestamp) numeric.Dec {
+	for key, _ := range Schedule {
+		//
+	}
+	return Schedule[0]
+}
