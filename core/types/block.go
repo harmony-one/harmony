@@ -278,7 +278,10 @@ func init() {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs,
 // and receipts.
-func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof, stks []*staking.StakingTransaction) *Block {
+func NewBlock(
+	header *block.Header, txs []*Transaction,
+	receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof,
+	stks []*staking.StakingTransaction) *Block {
 	b := &Block{header: CopyHeader(header)}
 
 	if len(receipts) != len(txs)+len(stks) {
@@ -294,8 +297,10 @@ func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, out
 		b.stakingTransactions = make(staking.StakingTransactions, len(stks))
 		copy(b.stakingTransactions, stks)
 
-		// TODO: Add staking transactions into txns root
-		b.header.SetTxHash(DeriveSha(Transactions(txs)))
+		b.header.SetTxHash(DeriveSha(
+			Transactions(txs),
+			staking.StakingTransactions(stks),
+		))
 	}
 
 	if len(receipts) == 0 {
