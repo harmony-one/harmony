@@ -2,6 +2,7 @@ package votepower
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -16,6 +17,7 @@ var (
 type stakedVoter struct {
 	IsActive, IsHarmonyNode bool
 	EarningAccount          common.Address
+	Identity                shard.BlsPublicKey
 	EffectivePercent        numeric.Dec
 	RawStake                numeric.Dec
 }
@@ -29,7 +31,7 @@ type Roster struct {
 	HmySlotCount                    int64
 }
 
-// Compute ..
+// Compute creates a new roster based off the shard.SlotList
 func Compute(staked shard.SlotList) *Roster {
 	roster := NewRoster()
 	for i := range staked {
@@ -45,12 +47,14 @@ func Compute(staked shard.SlotList) *Roster {
 	ourCount := numeric.NewDec(roster.HmySlotCount)
 	ourPercentage := numeric.ZeroDec()
 	theirPercentage := numeric.ZeroDec()
+	var lastStakedVoter *stakedVoter = nil
 
 	for i := range staked {
 		member := stakedVoter{
 			IsActive:         true,
 			IsHarmonyNode:    true,
 			EarningAccount:   staked[i].EcdsaAddress,
+			Identity:         staked[i].BlsPublicKey,
 			EffectivePercent: numeric.ZeroDec(),
 			RawStake:         numeric.ZeroDec(),
 		}
@@ -63,6 +67,7 @@ func Compute(staked shard.SlotList) *Roster {
 				Quo(roster.RawStakedTotal).
 				Mul(StakersShare)
 			theirPercentage = theirPercentage.Add(member.EffectivePercent)
+			lastStakedVoter = &member
 		} else { // Our node
 			// TODO See the todo on where this called in one-node-staked-vote,
 			// need to have these two values of our
@@ -72,6 +77,18 @@ func Compute(staked shard.SlotList) *Roster {
 		}
 
 		roster.Voters[staked[i].BlsPublicKey] = member
+	}
+
+	// NOTE Enforce voting power sums to one, give diff (expect tiny amt) to last staked voter
+	if diff := numeric.OneDec().Sub(
+		ourPercentage.Add(theirPercentage),
+	); diff.GT(numeric.ZeroDec()) && lastStakedVoter != nil {
+		lastStakedVoter.EffectivePercent = lastStakedVoter.EffectivePercent.Add(diff)
+		theirPercentage = theirPercentage.Add(diff)
+		utils.Logger().Info().
+			Str("diff", diff.String()).
+			Str("bls-public-key-of-receipent", lastStakedVoter.Identity.Hex()).
+			Msg("sum of voting power of hmy & staked slots not equal to 1, gave diff to staked slot")
 	}
 
 	roster.OurVotingPowerTotalPercentage = ourPercentage
