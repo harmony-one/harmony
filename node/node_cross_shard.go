@@ -167,16 +167,10 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 
 			if err = node.VerifyCrossLink(cl); err != nil {
 				utils.Logger().Debug().
-					Msgf("[ProcessingCrossLink] Crosslink blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
+					Msgf("[ProcessingCrossLink] Failed to verify new cross link for blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
 				continue
 			}
 
-			if err != nil {
-				utils.Logger().Error().
-					Err(err).
-					Msgf("[ProcessingCrossLink] Failed to verify new cross link for shardID %d, blockNum %d", cl.ShardID(), cl.Number())
-				continue
-			}
 			candidates = append(candidates, cl)
 			utils.Logger().Debug().
 				Msgf("[ProcessingCrossLink] committing for shardID %d, blockNum %d", cl.ShardID(), cl.Number().Uint64())
