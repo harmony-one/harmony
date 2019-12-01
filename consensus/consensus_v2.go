@@ -505,14 +505,13 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		utils.Logger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!!")
 		return
 	}
-	prepareCount := consensus.Decider.SignersCount(quorum.Prepare)
-	if count := utils.CountOneBits(mask.Bitmap); count < prepareCount {
-		utils.Logger().Debug().
-			Int64("Need", prepareCount).
-			Int64("Got", count).
-			Msg("Not enough signatures in the Prepared msg")
+
+	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
+		utils.Logger().Warn().
+			Msgf("[OnPrepared] Quorum Not achieved")
 		return
 	}
+
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
@@ -891,21 +890,11 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	switch consensus.Decider.Policy() {
-	case quorum.SuperMajorityVote:
-		threshold := consensus.Decider.TwoThirdsSignersCount()
-		if count := utils.CountOneBits(mask.Bitmap); int64(count) < threshold {
-			utils.Logger().Warn().
-				Int64("need", threshold).
-				Int64("got", count).
-				Msg("[OnCommitted] Not enough signature in committed msg")
-			return
-		}
-	case quorum.SuperMajorityStake:
-		// Come back to thinking about this situation for Bitmap
+	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
+		utils.Logger().Warn().
+			Msgf("[OnCommitted] Quorum Not achieved")
+		return
 	}
-
-	// check has 2f+1 signatures
 
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, recvMsg.BlockNum)
