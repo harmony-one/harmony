@@ -5,7 +5,6 @@ package nodeconfig
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -109,18 +108,6 @@ func GetShardConfig(shardID uint32) *ConfigType {
 		return nil
 	}
 	return &shardConfigs[shardID]
-}
-
-// SetConfigs set ConfigType in the right index.
-func SetConfigs(config ConfigType, shardID uint32) error {
-	onceForConfigs.Do(func() {
-		shardConfigs = make([]ConfigType, MaxShards)
-	})
-	if int(shardID) >= cap(shardConfigs) {
-		return errors.New("Failed to set ConfigType")
-	}
-	shardConfigs[int(shardID)] = config
-	return nil
 }
 
 // GetDefaultConfig returns default config.
