@@ -185,20 +185,16 @@ func (v *stakedVoteWeight) SetVoters(
 	s, _ := v.ShardIDProvider()()
 	v.Reset([]Phase{Prepare, Commit, ViewChange})
 
-	roster := votepower.Compute(staked)
+	roster, err := votepower.Compute(staked)
+	if err != nil {
+		return nil, err
+	}
 	utils.Logger().Info().
 		Str("our-percentage", roster.OurVotingPowerTotalPercentage.String()).
 		Str("their-percentage", roster.TheirVotingPowerTotalPercentage.String()).
 		Uint32("on-shard", s).
 		Str("Raw-Staked", roster.RawStakedTotal.String()).
 		Msg("Total staked")
-
-	//switch {
-	//case roster.totalStakedPercent.Equal(totalShare) == false:
-	//	return nil, errSumOfVotingPowerNotOne
-	//case roster.ourPercentage.Add(theirPercentage).Equal(totalShare) == false:
-	//	return nil, errSumOfOursAndTheirsNotOne
-	//}
 
 	// Hold onto this calculation
 	v.roster = *roster

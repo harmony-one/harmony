@@ -103,6 +103,15 @@ var (
 // StakingTransactions is a stake slice type for basic sorting.
 type StakingTransactions []*StakingTransaction
 
+// Len ..
+func (s StakingTransactions) Len() int { return len(s) }
+
+// GetRlp implements Rlpable and returns the i'th element of s in rlp.
+func (s StakingTransactions) GetRlp(i int) []byte {
+	enc, _ := rlp.EncodeToBytes(s[i])
+	return enc
+}
+
 // Hash hashes the RLP encoding of tx.
 // It uniquely identifies the transaction.
 func (tx *StakingTransaction) Hash() common.Hash {
