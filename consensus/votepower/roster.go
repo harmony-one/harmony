@@ -98,7 +98,7 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 		utils.Logger().Error().
 			Str("theirs", theirPercentage.String()).
 			Str("ours", ourPercentage.String()).
-			Msg("Voting power not equal in percentage")
+			Msg("Total voting power not equal 100 percent")
 		return nil, ErrVotingPowerNotEqualOne
 	}
 
