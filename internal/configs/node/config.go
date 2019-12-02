@@ -244,6 +244,7 @@ func GetPublicRPC() bool {
 	return publicRPC
 }
 
+// ChainConfig returns the chain configuration for the network type.
 func (t NetworkType) ChainConfig() params.ChainConfig {
 	switch t {
 	case Mainnet:
