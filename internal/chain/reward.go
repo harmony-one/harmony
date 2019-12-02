@@ -131,6 +131,7 @@ func ballotResultBeaconchain(
 
 func whatPercentStakedNow(
 	beaconchain engine.ChainReader,
+	timestamp int64,
 ) (*numeric.Dec, error) {
 	stakedNow := numeric.ZeroDec()
 	// Only active validators' stake is counted in stake ratio because only their stake is under slashing risk
@@ -154,8 +155,9 @@ func whatPercentStakedNow(
 			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
 		)
 	}
-
-	percentage := stakedNow.Quo(totalTokens.Add(
+	percentage := stakedNow.Quo(totalTokens.Mul(
+		reward.PercentageForTimeStamp(timestamp),
+	).Add(
 		numeric.NewDecFromBigInt(soFarDoledOut)),
 	)
 	return &percentage, nil
@@ -169,8 +171,8 @@ func AccumulateRewards(
 	rewarder reward.Distributor, slasher slash.Slasher,
 	beaconChain engine.ChainReader,
 ) error {
-
 	blockNum := header.Number().Uint64()
+
 	if blockNum == 0 {
 		// genesis block has no parent to reward.
 		return nil
@@ -188,7 +190,7 @@ func AccumulateRewards(
 		defaultReward := BaseStakedReward
 
 		// TODO Use cached result in off-chain db instead of full computation
-		percentageStaked, err := whatPercentStakedNow(beaconChain)
+		percentageStaked, err := whatPercentStakedNow(beaconChain, header.Time().Int64())
 		if err != nil {
 			return err
 		}
