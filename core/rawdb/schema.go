@@ -97,6 +97,8 @@ var (
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 	// CurrentRewardGivenOut ..
 	CurrentRewardGivenOut = []byte("total-reward-given-out")
+	// VotingpowerSnapshot ..
+	VotingpowerSnapshot = []byte("voting-power-snapshot")
 )
 
 // TxLookupEntry is a positional metadata to help looking up the data content of

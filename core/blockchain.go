@@ -49,6 +49,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -1196,7 +1197,8 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	}
 
 	// Update voting power of validators for all shards
-	if block.ShardID() == 0 && len(block.Header().ShardState()) > 0 {
+	if block.ShardID() == shard.BeaconChainShardID &&
+		len(block.Header().ShardState()) > 0 {
 		shardState := new(shard.State)
 
 		if shardState, err = shard.DecodeWrapper(block.Header().ShardState()); err == nil {
@@ -1209,7 +1211,8 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	}
 
 	// Writing validator stats (for uptime recording) for shard 0
-	if block.ShardID() == 0 && bc.chainConfig.IsStaking(block.Epoch()) {
+	if block.ShardID() == shard.BeaconChainShardID &&
+		bc.chainConfig.IsStaking(block.Epoch()) {
 		parentHeader := bc.GetHeaderByHash(block.ParentHash())
 		if parentHeader == nil {
 			return NonStatTy, errors.New("no parent found for uptime accounting")
@@ -1245,7 +1248,9 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	}
 
 	//// Writing validator stats (for uptime recording) for for other shards
-	if header.ShardID() == 0 && bc.chainConfig.IsStaking(block.Epoch()) && len(header.CrossLinks()) > 0 {
+	if header.ShardID() == shard.BeaconChainShardID &&
+		bc.chainConfig.IsStaking(block.Epoch()) &&
+		len(header.CrossLinks()) > 0 {
 		header.Logger(utils.Logger()).Debug().Msg("[insertChain/crosslinks] writing crosslinks into blockchain...")
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
@@ -1344,6 +1349,12 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		bc.insert(block)
 	}
 	bc.futureBlocks.Remove(block.Hash())
+
+	if header.ShardID() == shard.BeaconChainShardID {
+		r, _ := committee.EPOSStakedCommittee(shard.Schedule.InstanceForEpoch(header.Epoch()), bc, 320)
+		bc.WriteVotingPowerSnapshot([]byte(r.JSON()))
+	}
+
 	return status, nil
 }
 
@@ -2949,4 +2960,18 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 		}
 	}
 	return common.Address{}, ctxerror.New("cannot find corresponding ECDSA Address", "coinbaseAddr", header.Coinbase())
+}
+
+// ReadVotingPowerSnapshot ..
+func (bc *BlockChain) ReadVotingPowerSnapshot() []byte {
+	payload, err := bc.db.Get(rawdb.VotingpowerSnapshot)
+	if err != nil {
+		return []byte{}
+	}
+	return payload
+}
+
+// WriteVotingPowerSnapshot ..
+func (bc *BlockChain) WriteVotingPowerSnapshot(dump []byte) error {
+	return bc.db.Put(rawdb.VotingpowerSnapshot, dump)
 }

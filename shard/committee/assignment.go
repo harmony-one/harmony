@@ -105,7 +105,8 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 	return shardState
 }
 
-func eposStakedCommittee(
+// EPOSStakedCommittee ..
+func EPOSStakedCommittee(
 	s shardingconfig.Instance, stakerReader DataProvider, stakedSlotsCount int,
 ) (*shard.State, error) {
 	// TODO Nervous about this because overtime the list will become quite large
@@ -229,7 +230,7 @@ func (def partialStakingEnabled) Compute(
 	stakedSlots :=
 		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
 			int(instance.NumShards())
-	shardState, err := eposStakedCommittee(instance, stakerReader, stakedSlots)
+	shardState, err := EPOSStakedCommittee(instance, stakerReader, stakedSlots)
 
 	if err != nil {
 		return nil, err

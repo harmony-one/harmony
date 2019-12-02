@@ -20,6 +20,7 @@ type Harmony struct {
 	shutdownChan  chan bool                      // Channel for shutting down the Harmony
 	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
 
+	beaconchain    *core.BlockChain
 	blockchain     *core.BlockChain
 	txPool         *core.TxPool
 	cxPool         *core.CxPool
@@ -47,6 +48,7 @@ type NodeAPI interface {
 	AddPendingStakingTransaction(*staking.StakingTransaction)
 	AddPendingTransaction(newTx *types.Transaction)
 	Blockchain() *core.BlockChain
+	Beaconchain() *core.BlockChain
 	AccountManager() *accounts.Manager
 	GetBalanceOfAddress(address common.Address) (*big.Int, error)
 	GetNonceOfAddress(address common.Address) uint64
@@ -56,11 +58,15 @@ type NodeAPI interface {
 
 // New creates a new Harmony object (including the
 // initialisation of the common Harmony object)
-func New(nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool, eventMux *event.TypeMux, shardID uint32) (*Harmony, error) {
+func New(
+	nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool,
+	eventMux *event.TypeMux, shardID uint32,
+) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	hmy := &Harmony{
 		shutdownChan:   make(chan bool),
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
+		beaconchain:    nodeAPI.Beaconchain(),
 		blockchain:     nodeAPI.Blockchain(),
 		txPool:         txPool,
 		cxPool:         cxPool,
@@ -83,6 +89,9 @@ func (s *Harmony) TxPool() *core.TxPool { return s.txPool }
 
 // CxPool is used to store the blockHashes, where the corresponding block contains the cross shard receipts to be sent
 func (s *Harmony) CxPool() *core.CxPool { return s.cxPool }
+
+// Beaconchain returns a handle to beaconchain
+func (s *Harmony) Beaconchain() *core.BlockChain { return s.beaconchain }
 
 // BlockChain ...
 func (s *Harmony) BlockChain() *core.BlockChain { return s.blockchain }

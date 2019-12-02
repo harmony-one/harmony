@@ -367,3 +367,8 @@ func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
 func (b *APIBackend) GetShardState() (*shard.State, error) {
 	return b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentHeader().Epoch())
 }
+
+// GetEPOSEDVotingPower ..
+func (b *APIBackend) GetEPOSEDVotingPower() []byte {
+	return b.hmy.Beaconchain().ReadVotingPowerSnapshot()
+}
