@@ -74,7 +74,7 @@ func (s *Service) Run() {
 }
 
 func (s *Service) contactP2pPeers() {
-	pingInterval := 5
+	pingInterval := 1
 
 	nodeConfig := nodeconfig.GetShardConfig(s.config.ShardID)
 	// Don't send ping message for Explorer Node
@@ -104,6 +104,7 @@ func (s *Service) contactP2pPeers() {
 			return
 		}
 
+		utils.Logger().Debug().Msg("[DISCOVERY] Sending Ping Message")
 		s.sentPingMessage(s.config.ShardGroupID, msgBuf)
 
 		// the longest sleep is 3600 seconds
