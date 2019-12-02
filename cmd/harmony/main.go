@@ -459,7 +459,7 @@ func main() {
 				os.Exit(1)
 			}
 			// Use the number of shards as of staking epoch.
-			chainConfig := node.ChainConfigForNetworkType(nodeconfig.NetworkType(*networkType))
+			chainConfig := nodeconfig.NetworkType(*networkType).ChainConfig()
 			stakingEpochShardConfig := shard.Schedule.InstanceForEpoch(chainConfig.StakingEpoch)
 			numShardsBig := big.NewInt(int64(stakingEpochShardConfig.NumShards()))
 			shardIDBig := new(big.Int).Mod(blsPubKey.Big(), numShardsBig)

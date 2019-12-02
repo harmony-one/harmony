@@ -10,6 +10,8 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
+
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 // Role defines a role of a node.
@@ -240,4 +242,15 @@ func SetPublicRPC(v bool) {
 // GetPublicRPC get the boolean value of public RPC access
 func GetPublicRPC() bool {
 	return publicRPC
+}
+
+func (t NetworkType) ChainConfig() params.ChainConfig {
+	switch t {
+	case Mainnet:
+		return *params.MainnetChainConfig
+	case Pangaea:
+		return *params.PangaeaChainConfig
+	default:
+		return *params.TestnetChainConfig
+	}
 }

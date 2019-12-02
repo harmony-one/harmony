@@ -408,7 +408,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 	}
 
 	networkType := node.NodeConfig.GetNetworkType()
-	chainConfig := ChainConfigForNetworkType(networkType)
+	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
 
 	collection := shardchain.NewCollection(
@@ -481,17 +481,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 	node.startConsensus = make(chan struct{})
 	go node.bootstrapConsensus()
 	return &node
-}
-
-func ChainConfigForNetworkType(t nodeconfig.NetworkType) params.ChainConfig {
-	switch t {
-	case nodeconfig.Mainnet:
-		return *params.MainnetChainConfig
-	case nodeconfig.Pangaea:
-		return *params.PangaeaChainConfig
-	default:
-		return *params.TestnetChainConfig
-	}
 }
 
 // InitConsensusWithValidators initialize shard state from latest epoch and update committee pub
