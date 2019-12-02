@@ -69,7 +69,7 @@ type ConfigType struct {
 	client   GroupID // the client group ID of the shard
 	isClient bool    // whether this node is a client node, such as wallet
 	isBeacon bool    // whether this node is beacon node doing consensus or not
-	ShardID  uint32  // ShardID of this node; TODO ek – reviisit when resharding
+	ShardID  uint32  // ShardID of this node; TODO ek – revisit when resharding
 	role     Role    // Role of the node
 	Port     string  // Port of the node.
 	IP       string  // IP of the node.
