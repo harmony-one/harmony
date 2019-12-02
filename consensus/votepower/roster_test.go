@@ -81,7 +81,11 @@ func TestCompute(t *testing.T) {
 		expectedRoster.Voters[slot.BlsPublicKey] = newMember
 	}
 
-	computedRoster := Compute(slotList)
+	computedRoster, err := Compute(slotList)
+	if err != nil {
+		t.Error("Computed Roster failed on vote summation to one")
+	}
+
 	if !compareRosters(expectedRoster, computedRoster, t) {
 		t.Errorf("Compute Roster mismatch with expected Roster")
 	}

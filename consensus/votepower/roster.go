@@ -5,6 +5,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -12,6 +13,8 @@ var (
 	HarmonysShare = numeric.MustNewDecFromStr("0.68")
 	// StakersShare ..
 	StakersShare = numeric.MustNewDecFromStr("0.32")
+	// ErrVotingPowerNotEqualOne ..
+	ErrVotingPowerNotEqualOne = errors.New("voting power not equal to one")
 )
 
 type stakedVoter struct {
@@ -32,7 +35,7 @@ type Roster struct {
 }
 
 // Compute creates a new roster based off the shard.SlotList
-func Compute(staked shard.SlotList) *Roster {
+func Compute(staked shard.SlotList) (*Roster, error) {
 	roster := NewRoster()
 	for i := range staked {
 		if staked[i].TotalStake == nil {
@@ -82,7 +85,7 @@ func Compute(staked shard.SlotList) *Roster {
 	// NOTE Enforce voting power sums to one, give diff (expect tiny amt) to last staked voter
 	if diff := numeric.OneDec().Sub(
 		ourPercentage.Add(theirPercentage),
-	); diff.GT(numeric.ZeroDec()) && lastStakedVoter != nil {
+	); lastStakedVoter != nil {
 		lastStakedVoter.EffectivePercent = lastStakedVoter.EffectivePercent.Add(diff)
 		theirPercentage = theirPercentage.Add(diff)
 		utils.Logger().Info().
@@ -91,10 +94,19 @@ func Compute(staked shard.SlotList) *Roster {
 			Msg("sum of voting power of hmy & staked slots not equal to 1, gave diff to staked slot")
 	}
 
+	if lastStakedVoter != nil &&
+		!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
+		utils.Logger().Error().
+			Str("theirs", theirPercentage.String()).
+			Str("ours", ourPercentage.String()).
+			Msg("Total voting power not equal 100 percent")
+		return nil, ErrVotingPowerNotEqualOne
+	}
+
 	roster.OurVotingPowerTotalPercentage = ourPercentage
 	roster.TheirVotingPowerTotalPercentage = theirPercentage
 
-	return roster
+	return roster, nil
 
 }
 

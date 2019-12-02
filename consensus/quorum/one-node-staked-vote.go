@@ -185,7 +185,10 @@ func (v *stakedVoteWeight) SetVoters(
 	s, _ := v.ShardIDProvider()()
 	v.Reset([]Phase{Prepare, Commit, ViewChange})
 
-	roster := votepower.Compute(staked)
+	roster, err := votepower.Compute(staked)
+	if err != nil {
+		return nil, err
+	}
 	utils.Logger().Info().
 		Str("our-percentage", roster.OurVotingPowerTotalPercentage.String()).
 		Str("their-percentage", roster.TheirVotingPowerTotalPercentage.String()).

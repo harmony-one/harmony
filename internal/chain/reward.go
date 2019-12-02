@@ -219,7 +219,10 @@ func AccumulateRewards(
 			return err
 		}
 
-		votingPower := votepower.Compute(members)
+		votingPower, err := votepower.Compute(members)
+		if err != nil {
+			return err
+		}
 
 		for beaconMember := range payable {
 			// TODO Give out whatever leftover to the last voter/handle
@@ -271,7 +274,10 @@ func AccumulateRewards(
 					return err
 				}
 
-				votingPower := votepower.Compute(payableSigners)
+				votingPower, err := votepower.Compute(payableSigners)
+				if err != nil {
+					return err
+				}
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
 					if !voter.IsHarmonyNode && !voter.EffectivePercent.IsZero() {
