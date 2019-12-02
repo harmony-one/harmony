@@ -50,7 +50,7 @@ var (
 )
 
 func printVersion() {
-	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
+	_, _ = fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
 	os.Exit(0)
 }
 
@@ -171,7 +171,7 @@ func passphraseForBls() {
 	}
 	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
 		os.Exit(100)
 	}
 	blsPassphrase = passphrase
@@ -211,7 +211,7 @@ func setupInitialAccount() (isLeader bool) {
 func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
 		os.Exit(100)
 	}
 	pubKey := consensusPriKey.GetPublicKey()
@@ -284,7 +284,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
 	commitDelay, err := time.ParseDuration(*delayCommit)
@@ -401,7 +401,7 @@ func main() {
 	case "explorer":
 		break
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
+		_, _ = fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
 		os.Exit(1)
 	}
 
