@@ -9,8 +9,8 @@ import (
 )
 
 type pair struct {
-	int64
-	numeric.Dec
+	ts    int64
+	share numeric.Dec
 }
 
 var (
@@ -105,7 +105,7 @@ var (
 		}
 		sort.SliceStable(
 			s,
-			func(i, j int) bool { return s[i].int64 < s[j].int64 },
+			func(i, j int) bool { return s[i].ts < s[j].ts },
 		)
 		return s
 	}()
@@ -117,26 +117,31 @@ func mustParse(ts string) int64 {
 	if err != nil {
 		panic("could not parse timestamp")
 	}
-	return t.UnixNano()
+	return t.Unix()
 }
 
 // PercentageForTimeStamp ..
 func PercentageForTimeStamp(ts int64) numeric.Dec {
-	bucket := numeric.ZeroDec()
+	bucket := pair{}
+	i, j := 0, 1
 
-	for i := range sorted {
-		if value := time.Unix(
-			sorted[i].int64, 0,
-		); value.After(time.Unix(ts, 0)) {
-			bucket = sorted[i].Dec
+	for range sorted {
+		if i == len(sorted) {
+			bucket = sorted[i-1]
 			break
 		}
+		if ts >= sorted[i].ts && ts < sorted[j].ts {
+			bucket = sorted[i]
+			break
+		}
+		i++
+		j++
 	}
 
 	utils.Logger().Info().
-		Str("total-supply", bucket.Mul(numeric.NewDec(100)).String()).
-		Str("time", time.Unix(ts, 0).String()).
-		Msg("Picked Percentage for timestmap")
+		Str("percent of total-supply used", bucket.share.Mul(numeric.NewDec(100)).String()).
+		Str("for-time", time.Unix(ts, 0).String()).
+		Msg("Picked Percentage for timestamp")
 
-	return bucket
+	return bucket.share
 }
