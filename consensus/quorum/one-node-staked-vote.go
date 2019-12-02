@@ -72,14 +72,12 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 			Msgf("[IsQuorumAchievedByMask] currentTotalPower is nil")
 		return false
 	}
-	if (*currentTotalPower).LT(threshold) {
-		utils.Logger().Warn().
-			Msgf("[IsQuorumAchievedByMask] Not enough voting power: need %+v, have %+v", threshold, currentTotalPower)
-		return false
-	}
-	utils.Logger().Debug().
-		Msgf("[IsQuorumAchievedByMask] have enough voting power: need %+v, have %+v", threshold, currentTotalPower)
-	return true
+	utils.Logger().Info().
+		Str("policy", v.Policy().String()).
+		Str("threshold", threshold.String()).
+		Str("total-power-of-signers", currentTotalPower.String()).
+		Msg("[IsQuorumAchievedByMask] Checking quorum")
+	return (*currentTotalPower).GT(threshold)
 }
 
 func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, error) {
@@ -104,16 +102,18 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	currentTotalPower := numeric.ZeroDec()
-	pubKeys := mask.GetPubKeyFromMask(true)
+	pubKeys := mask.Publics
 	for _, key := range pubKeys {
 		w := shard.BlsPublicKey{}
 		err := w.FromLibBLSPublicKey(key)
 		if err != nil {
 			return nil
 		}
-		currentTotalPower = currentTotalPower.Add(
-			v.roster.Voters[w].EffectivePercent,
-		)
+		if enabled, err := mask.KeyEnabled(key); err == nil && enabled {
+			currentTotalPower = currentTotalPower.Add(
+				v.roster.Voters[w].EffectivePercent,
+			)
+		}
 	}
 	return &currentTotalPower
 }
