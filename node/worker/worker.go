@@ -263,7 +263,7 @@ func (w *Worker) GetNewEpoch() *big.Int {
 	epoch := new(big.Int).Set(parent.Header().Epoch())
 
 	shardState, err := parent.Header().GetShardState()
-	if err == nil && shardState.Epoch != nil {
+	if err == nil && shardState.Epoch != nil && w.config.IsStaking(shardState.Epoch) {
 		// For shard state of staking epochs, the shard state will have an epoch and it will decide the next epoch for following blocks
 		epoch = new(big.Int).Set(shardState.Epoch)
 	} else {

@@ -160,6 +160,9 @@ func (ss *State) JSON() string {
 // FindCommitteeByID returns the committee configuration for the given shard,
 // or nil if the given shard is not found.
 func (ss *State) FindCommitteeByID(shardID uint32) *Committee {
+	if ss == nil {
+		return nil
+	}
 	for committee := range ss.Shards {
 		if ss.Shards[committee].ShardID == shardID {
 			return &ss.Shards[committee]

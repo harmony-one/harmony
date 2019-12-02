@@ -366,16 +366,18 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	defer consensus.mutex.Unlock()
 	logger := utils.Logger().With().
 		Str("validatorPubKey", validatorPubKey.SerializeToHexStr()).Logger()
-	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
-		// already have enough signatures
-		logger.Debug().Msg("[OnPrepare] Received Additional Prepare Message")
-		return
-	}
+
 	// proceed only when the message is not received before
 	signed := consensus.Decider.ReadSignature(quorum.Prepare, validatorPubKey)
 	if signed != nil {
 		logger.Debug().
 			Msg("[OnPrepare] Already Received prepare message from the validator")
+		return
+	}
+
+	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
+		// already have enough signatures
+		logger.Debug().Msg("[OnPrepare] Received Additional Prepare Message")
 		return
 	}
 
