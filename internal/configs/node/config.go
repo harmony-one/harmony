@@ -98,14 +98,18 @@ var shardConfigs []ConfigType
 var defaultConfig ConfigType
 var onceForConfigs sync.Once
 
-// GetShardConfig return the shard's ConfigType variable
-func GetShardConfig(shardID uint32) *ConfigType {
+func ensureShardConfigs() {
 	onceForConfigs.Do(func() {
 		shardConfigs = make([]ConfigType, MaxShards)
 		for i := range shardConfigs {
 			shardConfigs[i].ShardID = uint32(i)
 		}
 	})
+}
+
+// GetShardConfig return the shard's ConfigType variable
+func GetShardConfig(shardID uint32) *ConfigType {
+	ensureShardConfigs()
 	if int(shardID) >= cap(shardConfigs) {
 		return nil
 	}
@@ -213,6 +217,7 @@ func (conf *ConfigType) Role() Role {
 
 // SetNetworkType set the networkType
 func SetNetworkType(networkType NetworkType) {
+	ensureShardConfigs()
 	defaultConfig.networkType = networkType
 	for i := range shardConfigs {
 		shardConfigs[i].networkType = networkType
