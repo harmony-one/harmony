@@ -6,13 +6,16 @@ package nodeconfig
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
+	"github.com/pkg/errors"
 
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Role defines a role of a node.
@@ -269,6 +272,21 @@ func SetShardingSchedule(schedule shardingconfig.Schedule) {
 	for _, config := range shardConfigs {
 		config.SetShardingSchedule(schedule)
 	}
+}
+
+// ShardIDFromConsensusKey returns the shard ID statically determined from the
+// consensus key.
+func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
+	var pubKey shard.BlsPublicKey
+	if err := pubKey.FromLibBLSPublicKey(conf.ConsensusPubKey); err != nil {
+		return 0, errors.Wrapf(err,
+			"cannot convert libbls public key %s to internal form",
+			conf.ConsensusPubKey.SerializeToHexStr())
+	}
+	epoch := conf.networkType.ChainConfig().StakingEpoch
+	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
+	shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
+	return uint32(shardID.Uint64()), nil
 }
 
 // ChainConfig returns the chain configuration for the network type.

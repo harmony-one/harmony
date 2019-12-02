@@ -453,20 +453,13 @@ func main() {
 	if *nodeType == "validator" {
 		setupInitialAccount()
 		if *stakingFlag {
-			var blsPubKey shard.BlsPublicKey
-			pubKey := nodeconfig.GetDefaultConfig().ConsensusPubKey
-			if err := blsPubKey.FromLibBLSPublicKey(pubKey); err != nil {
-				_, _ = fmt.Fprint(os.Stderr,
-					"ERROR cannot convert libbls pubkey to internal form: %s",
-					err)
+			shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr,
+					"ERROR cannot determine shard to join: %s", err)
 				os.Exit(1)
 			}
-			// Use the number of shards as of staking epoch.
-			chainConfig := nodeconfig.NetworkType(*networkType).ChainConfig()
-			stakingEpochShardConfig := shard.Schedule.InstanceForEpoch(chainConfig.StakingEpoch)
-			numShardsBig := big.NewInt(int64(stakingEpochShardConfig.NumShards()))
-			shardIDBig := new(big.Int).Mod(blsPubKey.Big(), numShardsBig)
-			initialAccount.ShardID = uint32(shardIDBig.Uint64())
+			initialAccount.ShardID = shardID
 		}
 	}
 	fmt.Printf("%s mode; node key %s -> shard %d\n",
