@@ -236,13 +236,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	// Set network type
 	netType := nodeconfig.NetworkType(*networkType)
-	switch netType {
-	case nodeconfig.Mainnet, nodeconfig.Testnet, nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
-		nodeconfig.SetNetworkType(netType)
-	default:
-		panic(fmt.Sprintf("invalid network type: %s", *networkType))
-	}
-
+	nodeconfig.SetNetworkType(netType) // sets for both global and shard configs
 	nodeConfig.SetPushgatewayIP(*pushgatewayIP)
 	nodeConfig.SetPushgatewayPort(*pushgatewayPort)
 	nodeConfig.SetMetricsFlag(*metricsFlag)
@@ -436,6 +430,9 @@ func main() {
 			os.Exit(1)
 		}
 		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
+	default:
+		_, _ = fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
+		os.Exit(2)
 	}
 
 	initSetup()
