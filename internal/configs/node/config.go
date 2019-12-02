@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 )
 
@@ -89,6 +90,8 @@ type ConfigType struct {
 	DBDir string
 
 	networkType NetworkType
+
+	shardingSchedule shardingconfig.Schedule
 }
 
 // configs is a list of node configuration.
@@ -247,6 +250,25 @@ func SetPublicRPC(v bool) {
 // GetPublicRPC get the boolean value of public RPC access
 func GetPublicRPC() bool {
 	return publicRPC
+}
+
+// ShardingSchedule returns the sharding schedule for this node config.
+func (conf *ConfigType) ShardingSchedule() shardingconfig.Schedule {
+	return conf.shardingSchedule
+}
+
+// SetShardingSchedule sets the sharding schedule for this node config.
+func (conf *ConfigType) SetShardingSchedule(schedule shardingconfig.Schedule) {
+	conf.shardingSchedule = schedule
+}
+
+// SetShardingSchedule sets the sharding schedule for all config instances.
+func SetShardingSchedule(schedule shardingconfig.Schedule) {
+	ensureShardConfigs()
+	defaultConfig.SetShardingSchedule(schedule)
+	for _, config := range shardConfigs {
+		config.SetShardingSchedule(schedule)
+	}
 }
 
 // ChainConfig returns the chain configuration for the network type.

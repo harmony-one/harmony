@@ -142,6 +142,9 @@ func initSetup() {
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
 
+	// Set sharding schedule
+	nodeconfig.SetShardingSchedule(shard.Schedule)
+
 	// Setup mem profiling.
 	memprofiling.GetMemProfiling().Config()
 
