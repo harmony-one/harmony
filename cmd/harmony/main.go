@@ -15,6 +15,8 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/pkg/errors"
+
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -223,7 +225,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	return pubKey
 }
 
-func createGlobalConfig() *nodeconfig.ConfigType {
+func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	var err error
 
 	nodeConfig := nodeconfig.GetShardConfig(initialAccount.ShardID)
@@ -244,22 +246,23 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrapf(err, "cannot load or create P2P key at %#v",
+			*keyFile)
 	}
 
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
 	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create P2P network host")
+	}
 	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogger()))
-	}
-	if err != nil {
-		panic("unable to new host in harmony")
 	}
 
 	nodeConfig.DBDir = *dbDir
 
-	return nodeConfig
+	return nodeConfig, nil
 }
 
 func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
@@ -454,7 +457,11 @@ func main() {
 		initialAccount.ShardID = uint32(*shardID)
 	}
 
-	nodeConfig := createGlobalConfig()
+	nodeConfig, err := createGlobalConfig()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
+		os.Exit(1)
+	}
 	currentNode := setupConsensusAndNode(nodeConfig)
 	//setup state syncing and beacon syncing frequency
 	currentNode.SetSyncFreq(*syncFreq)
