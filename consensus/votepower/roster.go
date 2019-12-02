@@ -94,7 +94,8 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 			Msg("sum of voting power of hmy & staked slots not equal to 1, gave diff to staked slot")
 	}
 
-	if !ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
+	if lastStakedVoter != nil &&
+		!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
 		utils.Logger().Error().
 			Str("theirs", theirPercentage.String()).
 			Str("ours", ourPercentage.String()).
