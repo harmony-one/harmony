@@ -87,6 +87,8 @@ var (
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
+	// staking indicates whether the node is operating in staking mode.
+	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
 	// shardID indicates the shard ID of this node
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
@@ -447,6 +449,22 @@ func main() {
 
 	if *nodeType == "validator" {
 		setupInitialAccount()
+		if *stakingFlag {
+			var blsPubKey shard.BlsPublicKey
+			pubKey := nodeconfig.GetDefaultConfig().ConsensusPubKey
+			if err := blsPubKey.FromLibBLSPublicKey(pubKey); err != nil {
+				_, _ = fmt.Fprint(os.Stderr,
+					"ERROR cannot convert libbls pubkey to internal form: %s",
+					err)
+				os.Exit(1)
+			}
+			// Use the number of shards as of staking epoch.
+			chainConfig := node.ChainConfigForNetworkType(nodeconfig.NetworkType(*networkType))
+			stakingEpochShardConfig := shard.Schedule.InstanceForEpoch(chainConfig.StakingEpoch)
+			numShardsBig := big.NewInt(int64(stakingEpochShardConfig.NumShards()))
+			shardIDBig := new(big.Int).Mod(blsPubKey.Big(), numShardsBig)
+			initialAccount.ShardID = uint32(shardIDBig.Uint64())
+		}
 	}
 
 	if *nodeType != "validator" && *shardID >= 0 {
