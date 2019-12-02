@@ -1294,7 +1294,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
 				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
 			}
-			bc.LastContinuousCrossLink(crossLink.ShardID(), crossLink)
+			bc.LastContinuousCrossLink(crossLink)
 		}
 		//clean/update local database cache after crosslink inserted into blockchain
 		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
@@ -2189,19 +2189,18 @@ func (bc *BlockChain) ReadCrossLink(shardID uint32, blockNum uint64) (*types.Cro
 	return crossLink, err
 }
 
-// WriteShardLastCrossLink saves the last crosslink of a shard
-func (bc *BlockChain) WriteShardLastCrossLink(shardID uint32, cl types.CrossLink) error {
-	return rawdb.WriteShardLastCrossLink(bc.db, cl.ShardID(), cl.Serialize())
-}
-
 // LastContinuousCrossLink saves the last crosslink of a shard
 // This function will update the latest crosslink in the sense that
 // any previous block's crosslink is received up to this point
 // there is no missing hole between genesis to this crosslink of given shardID
-func (bc *BlockChain) LastContinuousCrossLink(shardID uint32, cl types.CrossLink) error {
-	cl0, err := bc.ReadShardLastCrossLink(shardID)
+func (bc *BlockChain) LastContinuousCrossLink(cl types.CrossLink) error {
+	if !bc.Config().IsCrossLink(cl.Epoch()) {
+		return errors.New("Trying to write last continuous cross link with epoch before cross link starting epoch")
+	}
+
+	cl0, err := bc.ReadShardLastCrossLink(cl.ShardID())
 	if cl0 == nil {
-		bc.WriteShardLastCrossLink(shardID, cl)
+		rawdb.WriteShardLastCrossLink(bc.db, cl.ShardID(), cl.Serialize())
 		return nil
 	}
 	if err != nil {
@@ -2209,7 +2208,7 @@ func (bc *BlockChain) LastContinuousCrossLink(shardID uint32, cl types.CrossLink
 	}
 	newCheckpoint := uint64(0)
 	for i := cl0.BlockNum() + 1; i < cl.BlockNum(); i++ {
-		tmp, err := bc.ReadCrossLink(shardID, i)
+		tmp, err := bc.ReadCrossLink(cl.ShardID(), i)
 		if err != nil || tmp == nil {
 			newCheckpoint = i - 1
 			break
@@ -2221,7 +2220,7 @@ func (bc *BlockChain) LastContinuousCrossLink(shardID uint32, cl types.CrossLink
 
 	if newCheckpoint > 0 {
 		utils.Logger().Debug().Msgf("LastContinuousCrossLink: latest checkpoint blockNum %d", newCheckpoint)
-		cln, err := bc.ReadCrossLink(shardID, newCheckpoint)
+		cln, err := bc.ReadCrossLink(cl.ShardID(), newCheckpoint)
 		if err != nil {
 			return err
 		}

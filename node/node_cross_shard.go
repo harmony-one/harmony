@@ -230,8 +230,8 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 		return ctxerror.New("CrossLink BlockNumber should greater than 1")
 	}
 
-	if node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
-		return ctxerror.New("CrossLink Epoch should >= crosslink epoch", "crossLinkEpoch", node.Blockchain().Config().CrossLinkEpoch)
+	if !node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
+		return ctxerror.New("CrossLink Epoch should >= cross link starting epoch", "crossLinkEpoch", cl.Epoch(), "cross_link_starting_eoch", node.Blockchain().Config().CrossLinkEpoch)
 	}
 
 	// Verify signature of the new cross link header
