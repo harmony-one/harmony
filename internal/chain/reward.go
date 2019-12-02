@@ -164,8 +164,7 @@ func whatPercentStakedNow(
 }
 
 // AccumulateRewards credits the coinbase of the given block with the mining
-// reward. The total reward consists of the static block reward and rewards for
-// included uncles. The coinbase of each uncle block is also rewarded.
+// reward. The total reward consists of the static block reward
 func AccumulateRewards(
 	bc engine.ChainReader, state *state.DB, header *block.Header,
 	rewarder reward.Distributor, slasher slash.Slasher,

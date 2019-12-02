@@ -245,8 +245,8 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		}
 	}
 	st.refundGas()
-	// TODO: need to move the gas fee to the general block rewards
-	st.state.AddBalance(st.evm.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
+	txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
+	st.state.AddBalance(st.evm.Coinbase, txFee)
 
 	return ret, st.gasUsed(), vmerr != nil, err
 }
@@ -359,6 +359,9 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		return 0, staking.ErrInvalidStakingKind
 	}
 	st.refundGas()
+
+	txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
+	st.state.AddBalance(st.evm.Coinbase, txFee)
 
 	return st.gasUsed(), err
 }
