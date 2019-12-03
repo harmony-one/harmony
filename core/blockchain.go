@@ -2636,49 +2636,49 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 		return errors.New("[UpdateValidatorVotingPower] Nil shard state")
 	}
 
-	rosters := make([]*votepower.Roster, len(state.Shards))
-
-	for i := range state.Shards {
-		roster, _ := votepower.Compute(state.Shards[i].Slots)
-		rosters[i] = roster
-	}
-
 	type withAddr struct {
-		common.Address
-		staking.ValidatorStats
+		addr      common.Address
+		validator staking.ValidatorStats
 	}
 
 	stats := []withAddr{}
+	rosters := make([]*votepower.Roster, len(state.Shards))
+
+	for i := range state.Shards {
+		roster, err := votepower.Compute(state.Shards[i].Slots)
+		if err != nil {
+			return err
+		}
+		rosters[i] = roster
+	}
 
 	for i := range state.Shards {
 		shardID := state.Shards[i].ShardID
 		for _, slot := range state.Shards[i].Slots {
 			if slot.TotalStake != nil {
-
 				stat := withAddr{slot.EcdsaAddress, staking.ValidatorStats{}}
-
-				for _, roster := range rosters {
-					stat.AvgVotingPower = stat.AvgVotingPower.Add(
-						roster.Voters[slot.BlsPublicKey].EffectivePercent,
-					)
-					stat.TotalEffectiveStake = stat.TotalEffectiveStake.Add(
-						roster.Voters[slot.BlsPublicKey].RawStake,
-					)
-
-					stat.ValidatorStats.VotingPowerPerShard = append(
-						stat.ValidatorStats.VotingPowerPerShard, staking.VotePerShard{
-							shardID, roster.Voters[slot.BlsPublicKey].EffectivePercent,
-						},
-					)
-
-					stat.ValidatorStats.BLSKeyPerShard = append(
-						stat.ValidatorStats.BLSKeyPerShard, staking.KeyPerShard{
-							shardID, roster.Voters[slot.BlsPublicKey].Identity.Hex(),
-						},
-					)
-
-				}
-				stat.AvgVotingPower = stat.AvgVotingPower.Quo(numeric.NewDec(int64(len(rosters))))
+				stat.validator.AvgVotingPower = numeric.ZeroDec()
+				stat.validator.TotalEffectiveStake = numeric.ZeroDec()
+				roster := rosters[i]
+				stat.validator.AvgVotingPower = stat.validator.AvgVotingPower.Add(
+					roster.Voters[slot.BlsPublicKey].EffectivePercent,
+				)
+				stat.validator.TotalEffectiveStake = stat.validator.TotalEffectiveStake.Add(
+					roster.Voters[slot.BlsPublicKey].RawStake,
+				)
+				stat.validator.VotingPowerPerShard = append(
+					stat.validator.VotingPowerPerShard, staking.VotePerShard{
+						shardID, roster.Voters[slot.BlsPublicKey].EffectivePercent,
+					},
+				)
+				stat.validator.BLSKeyPerShard = append(
+					stat.validator.BLSKeyPerShard, staking.KeyPerShard{
+						shardID, roster.Voters[slot.BlsPublicKey].Identity.Hex(),
+					},
+				)
+				stat.validator.AvgVotingPower = stat.validator.AvgVotingPower.Quo(
+					numeric.NewDec(int64(len(rosters))),
+				)
 				stats = append(stats, stat)
 			}
 		}
@@ -2687,16 +2687,16 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 	batch := bc.db.NewBatch()
 
 	for i := range stats {
-		statsFromDB, err := rawdb.ReadValidatorStats(bc.db, stats[i].Address)
+		statsFromDB, err := rawdb.ReadValidatorStats(bc.db, stats[i].addr)
 		if statsFromDB == nil {
 			statsFromDB = &staking.ValidatorStats{
 				big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
 				numeric.NewDec(0), []staking.VotePerShard{}, []staking.KeyPerShard{},
 			}
 		}
-		statsFromDB.AvgVotingPower = stats[i].ValidatorStats.AvgVotingPower
-		statsFromDB.TotalEffectiveStake = stats[i].ValidatorStats.TotalEffectiveStake
-		err = rawdb.WriteValidatorStats(batch, stats[i].Address, statsFromDB)
+		statsFromDB.AvgVotingPower = stats[i].validator.AvgVotingPower
+		statsFromDB.TotalEffectiveStake = stats[i].validator.TotalEffectiveStake
+		err = rawdb.WriteValidatorStats(batch, stats[i].addr, statsFromDB)
 		if err != nil {
 			return err
 		}
@@ -2979,18 +2979,4 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 		}
 	}
 	return common.Address{}, ctxerror.New("cannot find corresponding ECDSA Address", "coinbaseAddr", header.Coinbase())
-}
-
-// ReadVotingPowerSnapshot ..
-func (bc *BlockChain) ReadVotingPowerSnapshot() []byte {
-	payload, err := bc.db.Get(rawdb.VotingpowerSnapshot)
-	if err != nil {
-		return []byte{}
-	}
-	return payload
-}
-
-// WriteVotingPowerSnapshot ..
-func (bc *BlockChain) WriteVotingPowerSnapshot(dump []byte) error {
-	return bc.db.Put(rawdb.VotingpowerSnapshot, dump)
 }

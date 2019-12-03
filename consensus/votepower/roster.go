@@ -1,6 +1,8 @@
 package votepower
 
 import (
+	"encoding/json"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -18,11 +20,12 @@ var (
 )
 
 type stakedVoter struct {
-	IsActive, IsHarmonyNode bool
-	EarningAccount          common.Address
-	Identity                shard.BlsPublicKey
-	EffectivePercent        numeric.Dec
-	RawStake                numeric.Dec
+	IsActive         bool               `json:"is-active"`
+	IsHarmonyNode    bool               `json:"is-harmony"`
+	EarningAccount   common.Address     `json:"earning-account"`
+	Identity         shard.BlsPublicKey `json:"bls-public-key"`
+	EffectivePercent numeric.Dec        `json:"voting"`
+	RawStake         numeric.Dec        `json:"raw-stake"`
 }
 
 // Roster ..
@@ -32,6 +35,27 @@ type Roster struct {
 	TheirVotingPowerTotalPercentage numeric.Dec
 	RawStakedTotal                  numeric.Dec
 	HmySlotCount                    int64
+}
+
+// JSON dump
+func (r *Roster) JSON() string {
+	v := map[string]stakedVoter{}
+	for k, value := range r.Voters {
+		v[k.Hex()] = value
+	}
+	c := struct {
+		Voters map[string]stakedVoter `json:"voters"`
+		Our    string                 `json:"ours"`
+		Their  string                 `json:"theirs"`
+		Raw    string                 `json:"raw-total"`
+	}{
+		v,
+		r.OurVotingPowerTotalPercentage.String(),
+		r.TheirVotingPowerTotalPercentage.String(),
+		r.RawStakedTotal.String(),
+	}
+	b, _ := json.Marshal(&c)
+	return string(b)
 }
 
 // Compute creates a new roster based off the shard.SlotList
@@ -46,7 +70,7 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 			)
 		}
 	}
-
+	// TODO Check for duplicate BLS Keys
 	ourCount := numeric.NewDec(roster.HmySlotCount)
 	ourPercentage := numeric.ZeroDec()
 	theirPercentage := numeric.ZeroDec()
@@ -86,12 +110,15 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 	if diff := numeric.OneDec().Sub(
 		ourPercentage.Add(theirPercentage),
 	); !diff.IsZero() && lastStakedVoter != nil {
+		utils.Logger().Info().
+			Str("theirs", theirPercentage.String()).
+			Str("ours", ourPercentage.String()).
+			Str("diff", diff.String()).
+			Str("combined", theirPercentage.Add(diff).Add(ourPercentage).String()).
+			Str("bls-public-key-of-receipent", lastStakedVoter.Identity.Hex()).
+			Msg("voting power of hmy & staked slots not sum to 1, giving diff to staked slot")
 		lastStakedVoter.EffectivePercent = lastStakedVoter.EffectivePercent.Add(diff)
 		theirPercentage = theirPercentage.Add(diff)
-		utils.Logger().Info().
-			Str("diff", diff.String()).
-			Str("bls-public-key-of-receipent", lastStakedVoter.Identity.Hex()).
-			Msg("sum of voting power of hmy & staked slots not equal to 1, gave diff to staked slot")
 	}
 
 	if lastStakedVoter != nil &&
