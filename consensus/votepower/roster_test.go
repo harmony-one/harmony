@@ -64,11 +64,11 @@ func TestCompute(t *testing.T) {
 			IsHarmonyNode:    false,
 			EarningAccount:   slot.EcdsaAddress,
 			EffectivePercent: numeric.ZeroDec(),
-			EPoSedStake:      numeric.ZeroDec(),
+			EffectiveStake:   numeric.ZeroDec(),
 		}
 		// Not Harmony node
 		if slot.TotalStake != nil {
-			newMember.EPoSedStake = *slot.TotalStake
+			newMember.EffectiveStake = *slot.TotalStake
 			newMember.EffectivePercent = slot.TotalStake.Quo(expectedRoster.RawStakedTotal).Mul(StakersShare)
 			expectedRoster.TheirVotingPowerTotalPercentage = expectedRoster.TheirVotingPowerTotalPercentage.Add(newMember.EffectivePercent)
 		} else {
@@ -120,7 +120,7 @@ func compareStakedVoter(a, b stakedVoter) bool {
 		a.IsHarmonyNode == b.IsHarmonyNode &&
 		a.EarningAccount == b.EarningAccount &&
 		a.EffectivePercent.Equal(b.EffectivePercent) &&
-		a.EPoSedStake.Equal(b.EPoSedStake)
+		a.EffectiveStake.Equal(b.EffectiveStake)
 }
 
 func (s *stakedVoter) formatString() string {
@@ -129,14 +129,14 @@ func (s *stakedVoter) formatString() string {
 		IsHarmony        string `json:"harmony-node"`
 		EarningAccount   string `json:"one-address"`
 		EffectivePercent string `json:"effective-percent"`
-		EPoSedStake      string `json:"eposed-stake"`
+		EffectiveStake   string `json:"eposed-stake"`
 	}
 	data := t{
 		strconv.FormatBool(s.IsActive),
 		strconv.FormatBool(s.IsHarmonyNode),
 		s.EarningAccount.String(),
 		s.EffectivePercent.String(),
-		s.EPoSedStake.String(),
+		s.EffectiveStake.String(),
 	}
 	output, _ := json.Marshal(data)
 	return string(output)

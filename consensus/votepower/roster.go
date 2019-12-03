@@ -27,7 +27,7 @@ type stakedVoter struct {
 	EarningAccount   common.Address     `json:"earning-account"`
 	Identity         shard.BlsPublicKey `json:"bls-public-key"`
 	EffectivePercent numeric.Dec        `json:"voting"`
-	EPoSedStake      numeric.Dec        `json:"eposed-stake"`
+	EffectiveStake   numeric.Dec        `json:"effective-stake"`
 }
 
 // Roster ..
@@ -68,7 +68,7 @@ func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
 				payload, alreadyExists := result[value.EarningAccount]
 				if alreadyExists {
 					payload.TotalEffectiveStake = payload.TotalEffectiveStake.Add(
-						value.EPoSedStake,
+						value.EffectiveStake,
 					)
 					payload.AverageVotingPower = payload.AverageVotingPower.Add(
 						value.EffectivePercent,
@@ -83,7 +83,7 @@ func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
 					result[value.EarningAccount] = Staker{
 						AverageVotingPower:    value.EffectivePercent,
 						AverageEffectiveStake: numeric.ZeroDec(),
-						TotalEffectiveStake:   value.EPoSedStake,
+						TotalEffectiveStake:   value.EffectiveStake,
 						VotingPower: []staking.VotePerShard{
 							{roster.ShardID, value.EffectivePercent},
 						},
@@ -149,13 +149,13 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 			EarningAccount:   staked[i].EcdsaAddress,
 			Identity:         staked[i].BlsPublicKey,
 			EffectivePercent: numeric.ZeroDec(),
-			EPoSedStake:      numeric.ZeroDec(),
+			EffectiveStake:   numeric.ZeroDec(),
 		}
 
 		// Real Staker
 		if staked[i].TotalStake != nil {
 			member.IsHarmonyNode = false
-			member.EPoSedStake = member.EPoSedStake.Add(*staked[i].TotalStake)
+			member.EffectiveStake = member.EffectiveStake.Add(*staked[i].TotalStake)
 			member.EffectivePercent = staked[i].TotalStake.
 				Quo(roster.RawStakedTotal).
 				Mul(StakersShare)
