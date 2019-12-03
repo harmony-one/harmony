@@ -188,7 +188,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil)
+			block, _, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil)
 			if err != nil {
 				panic(err)
 			}
@@ -278,7 +278,8 @@ func (cr *fakeChainReader) ReadValidatorInformation(addr common.Address) (*staki
 func (cr *fakeChainReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) BlockRewardAccumulator() (*big.Int, error)                   { return nil, nil }
-func (cr *fakeChainReader) UpdateBlockRewardAccumulator(diff *big.Int) error            { return nil }
+func (cr *fakeChainReader) ReadBlockRewardAccumulator(uint64) (*big.Int, error)         { return nil, nil }
 func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) *big.Int { return nil }
-func (cr *fakeChainReader) WriteBlockRewardAccumulator(reward *big.Int) error           { return nil }
+func (cr *fakeChainReader) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
+	return nil
+}

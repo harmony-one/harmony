@@ -241,7 +241,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	}
 
 	// Process block using the parent state as reference point.
-	receipts, cxReceipts, _, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(block, state, bc.vmConfig)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
@@ -1016,7 +1016,10 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, state *state.DB) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(
+	block *types.Block, receipts []*types.Receipt,
+	cxReceipts []*types.CXReceipt, payout *big.Int, state *state.DB,
+) (status WriteStatus, err error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -1305,11 +1308,17 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		len(block.Header().ShardState()) > 0 &&
 		!bc.chainConfig.IsStaking(block.Epoch())
 
-	if curHeader := bc.CurrentHeader(); isFirstTimeStaking &&
+	curHeader := bc.CurrentHeader()
+	if isFirstTimeStaking &&
 		curHeader.ShardID() == shard.BeaconChainShardID {
-		bc.WriteBlockRewardAccumulator(big.NewInt(0))
+		bc.WriteBlockRewardAccumulator(big.NewInt(0), curHeader.Number().Uint64())
 	}
 
+	if payout != nil &&
+		curHeader.ShardID() == shard.BeaconChainShardID &&
+		bc.chainConfig.IsStaking(block.Epoch()) {
+		bc.WriteBlockRewardAccumulator(payout, block.Number().Uint64())
+	}
 	/////////////////////////// END
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
@@ -1518,7 +1527,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1533,7 +1542,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		proctime := time.Since(bstart)
 
 		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, state)
+		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, payout, state)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
@@ -2850,25 +2859,15 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	return nil
 }
 
-// BlockRewardAccumulator ..
-func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
-	return rawdb.ReadBlockRewardAccumulator(bc.db)
+// ReadBlockRewardAccumulator ..
+func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
+	return rawdb.ReadBlockRewardAccumulator(bc.db, number)
 }
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
-func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int) error {
-	return rawdb.WriteBlockRewardAccumulator(bc.db, reward)
-}
-
-//UpdateBlockRewardAccumulator ..
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int) error {
-	current, err := bc.BlockRewardAccumulator()
-	if err != nil {
-		return err
-	}
-	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff))
+func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
+	return rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
 }
 
 // Note this should read from the state of current block in concern (root == newBlock.root)
