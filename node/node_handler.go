@@ -264,6 +264,16 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			"my shard ID", node.Blockchain().ShardID(),
 			"new block's shard ID", newBlock.ShardID())
 	}
+
+	err = node.Blockchain().Engine().VerifyShardState(node.Blockchain(), node.Beaconchain(), newBlock.Header())
+	if err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Err(err).
+			Msg("cannot VerifyShardState for the new block")
+		return ctxerror.New("cannot VerifyShardState for the new block", "blockHash", newBlock.Hash()).WithCause(err)
+	}
+
 	err = node.Blockchain().ValidateNewBlock(newBlock)
 	if err != nil {
 		utils.Logger().Error().

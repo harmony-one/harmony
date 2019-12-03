@@ -50,6 +50,9 @@ type ChainReader interface {
 
 	//ReadBlockRewardAccumulator is the block-reward given for block number
 	ReadBlockRewardAccumulator(uint64) (*big.Int, error)
+
+	//SuperCommitteeForNextEpoch calculates the next epoch's supper committee
+	SuperCommitteeForNextEpoch(shardID uint32, beacon ChainReader, header *block.Header) (*shard.State, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.
@@ -80,6 +83,9 @@ type Engine interface {
 	// VerifySeal checks whether the crypto seal on a header is valid according to
 	// the consensus rules of the given engine.
 	VerifySeal(chain ChainReader, header *block.Header) error
+
+	// VerifyShardState verifies the shard state during epoch transition is valid
+	VerifyShardState(chain ChainReader, beacon ChainReader, header *block.Header) error
 
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.

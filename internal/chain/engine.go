@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"bytes"
 	"encoding/binary"
 	"math/big"
 
@@ -143,6 +144,34 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 func ReadPublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	return GetPublicKeys(bc, parentHeader, false)
+}
+
+// VerifyShardState implements Engine, checking the shardstate is valid at epoch transition
+func (e *engineImpl) VerifyShardState(bc engine.ChainReader, beacon engine.ChainReader, header *block.Header) error {
+	headerShardState, _ := header.GetShardState()
+	// TODO: figure out leader withhold shardState
+	if headerShardState.Epoch == nil {
+		return nil
+	}
+	shardState, err := bc.SuperCommitteeForNextEpoch(header.ShardID(), beacon, header)
+	if err != nil {
+		return ctxerror.New("[VerifyShardState] SuperCommitteeForNexEpoch calculation had error", "shardState", shardState).WithCause(err)
+	}
+
+	by1, err := shard.EncodeWrapper(*shardState, bc.Config().IsStaking(header.Epoch()))
+	if err != nil {
+		return ctxerror.New("[VerifyShardState] ShardState Encoding had error", "shardStateBytes", by1).WithCause(err)
+	}
+	by2, err := shard.EncodeWrapper(headerShardState, bc.Config().IsStaking(header.Epoch()))
+	if err != nil {
+		return ctxerror.New("[VerifyShardState] ShardState Encoding had error", "headerShardStateBytes", by2).WithCause(err)
+	}
+
+	if !bytes.Equal(by1, by2) {
+		return ctxerror.New("[VerifyShardState] ShardState is Invalid", "shardState", shardState, "headerShardState", headerShardState)
+	}
+
+	return nil
 }
 
 // VerifySeal implements Engine, checking whether the given block's parent block satisfies
