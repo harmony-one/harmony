@@ -1308,7 +1308,13 @@ func (bc *BlockChain) WriteBlockWithState(
 		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
 
-	bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
+	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
+		if bc.chainConfig.IsStaking(block.Epoch()) {
+			bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
+		} else {
+			bc.UpdateBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
+		}
+	}
 
 	/////////////////////////// END
 
