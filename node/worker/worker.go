@@ -390,7 +390,10 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 
 	// Shard State
 	if shardState != nil && len(shardState.Shards) != 0 {
-		w.current.header.SetShardStateHash(shardState.Hash())
+		//we store shardstatehash in header only before prestaking epoch (header v0,v1,v2)
+		if !w.config.IsPreStaking(w.current.header.Epoch()) {
+			w.current.header.SetShardStateHash(shardState.Hash())
+		}
 		isStaking := false
 		if shardState.Epoch != nil && w.config.IsStaking(shardState.Epoch) {
 			isStaking = true
