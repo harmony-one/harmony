@@ -85,7 +85,7 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 	// NOTE Enforce voting power sums to one, give diff (expect tiny amt) to last staked voter
 	if diff := numeric.OneDec().Sub(
 		ourPercentage.Add(theirPercentage),
-	); lastStakedVoter != nil {
+	); !diff.IsZero() && lastStakedVoter != nil {
 		lastStakedVoter.EffectivePercent = lastStakedVoter.EffectivePercent.Add(diff)
 		theirPercentage = theirPercentage.Add(diff)
 		utils.Logger().Info().

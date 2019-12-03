@@ -453,7 +453,7 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 			}
 		}
 	}
-	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase())
+	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase().Hex())
 }
 
 // UpdateConsensusInformation will update shard information (epoch, publicKeys, blockNum, viewID)

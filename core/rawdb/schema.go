@@ -74,21 +74,21 @@ var (
 	cxReceiptSpentPrefix             = []byte("cxReceiptSpent")             // prefix for indicator of unspent of cxReceiptsProof
 	cxReceiptUnspentCheckpointPrefix = []byte("cxReceiptUnspentCheckpoint") // prefix for cxReceiptsProof unspent checkpoint
 
-	validatorPrefix         = []byte("validator-")            // prefix for staking validator information
-	validatorSnapshotPrefix = []byte("validator-snapshot-")   // prefix for staking validator's snapshot information
-	validatorStatsPrefix    = []byte("validator-stats-")      // prefix for staking validator's stats information
+	validatorPrefix         = []byte("validator")            // prefix for staking validator information
+	validatorSnapshotPrefix = []byte("validator-snapshot")   // prefix for staking validator's snapshot information
+	validatorStatsPrefix    = []byte("validator-stats")      // prefix for staking validator's stats information
 	validatorListKey        = []byte("validator-list")        // key for all validators list
 	activeValidatorListKey  = []byte("active-validator-list") // key for active validators list
 
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
-	epochBlockNumberPrefix = []byte("harmony-epoch-block-number-")
+	epochBlockNumberPrefix = []byte("harmony-epoch-block-number")
 
 	// epochVrfBlockNumbersPrefix  + epoch (big.Int.Bytes())
-	epochVrfBlockNumbersPrefix = []byte("epoch-vrf-block-numbers-")
+	epochVrfBlockNumbersPrefix = []byte("epoch-vrf-block-numbers")
 
 	// epochVdfBlockNumberPrefix  + epoch (big.Int.Bytes())
-	epochVdfBlockNumberPrefix = []byte("epoch-vdf-block-number-")
+	epochVdfBlockNumberPrefix = []byte("epoch-vdf-block-number")
 
 	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
 	BloomBitsIndexPrefix = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
