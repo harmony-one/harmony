@@ -30,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -129,7 +130,7 @@ func setUpTXGen() *node.Node {
 }
 
 func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	flag.Var(&p2putils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
 	flag.Parse()
 	if *versionFlag {
 		printVersion(os.Args[0])
@@ -137,12 +138,12 @@ func main() {
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	if len(utils.BootNodes) == 0 {
-		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
+	if len(p2putils.BootNodes) == 0 {
+		bootNodeAddrs, err := p2putils.StringsToAddrs(p2putils.DefaultBootNodeAddrStrings)
 		if err != nil {
 			panic(err)
 		}
-		utils.BootNodes = bootNodeAddrs
+		p2putils.BootNodes = bootNodeAddrs
 	}
 	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
 	setting := Settings{

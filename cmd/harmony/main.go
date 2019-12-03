@@ -33,6 +33,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -154,12 +155,12 @@ func initSetup() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	if len(utils.BootNodes) == 0 {
-		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
+	if len(p2putils.BootNodes) == 0 {
+		bootNodeAddrs, err := p2putils.StringsToAddrs(p2putils.DefaultBootNodeAddrStrings)
 		if err != nil {
 			panic(err)
 		}
-		utils.BootNodes = bootNodeAddrs
+		p2putils.BootNodes = bootNodeAddrs
 	}
 }
 
@@ -398,7 +399,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 }
 
 func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
+	flag.Var(&p2putils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
 	switch *nodeType {
