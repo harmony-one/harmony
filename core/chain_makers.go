@@ -280,6 +280,3 @@ func (cr *fakeChainReader) ReadValidatorSnapshot(addr common.Address) (*staking.
 }
 func (cr *fakeChainReader) ReadBlockRewardAccumulator(uint64) (*big.Int, error)         { return nil, nil }
 func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) *big.Int { return nil }
-func (cr *fakeChainReader) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
-	return nil
-}

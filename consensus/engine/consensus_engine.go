@@ -50,8 +50,6 @@ type ChainReader interface {
 
 	//ReadBlockRewardAccumulator is the block-reward given for block number
 	ReadBlockRewardAccumulator(uint64) (*big.Int, error)
-	// WriteBlockRewardAccumulator writes directly to the accumulator field
-	WriteBlockRewardAccumulator(reward *big.Int, number uint64) error
 }
 
 // Engine is an algorithm agnostic consensus engine.
