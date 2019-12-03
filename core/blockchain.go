@@ -77,7 +77,7 @@ const (
 	validatorListCacheLimit            = 10
 	validatorListByDelegatorCacheLimit = 1024
 	pendingCrossLinksCacheLimit        = 2
-	blockAccumulatorCacheLimit         = 8
+	blockAccumulatorCacheLimit         = 1024
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
