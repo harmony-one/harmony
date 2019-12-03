@@ -624,8 +624,3 @@ func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.C
 	}
 	return nil, nil
 }
-
-// GetEPOSEDVotingPower ..
-func (s *PublicBlockChainAPI) GetEPOSEDVotingPower(ctx context.Context) string {
-	return string(s.b.GetEPOSEDVotingPower())
-}
