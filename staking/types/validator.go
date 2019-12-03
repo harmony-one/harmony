@@ -47,10 +47,10 @@ type VotePerShard struct {
 	VotingPower numeric.Dec
 }
 
-// KeyPerShard ..
-type KeyPerShard struct {
-	ShardID   uint32
-	PublicKey string
+// KeysPerShard ..
+type KeysPerShard struct {
+	ShardID uint32
+	Keys    []shard.BlsPublicKey
 }
 
 // ValidatorStats to record validator's performance and history records
@@ -68,7 +68,7 @@ type ValidatorStats struct {
 	// VotingPowerPerShard ..
 	VotingPowerPerShard []VotePerShard
 	// BLSKeyPerShard ..
-	BLSKeyPerShard []KeyPerShard
+	BLSKeyPerShard []KeysPerShard
 }
 
 // Validator - data fields for a validator

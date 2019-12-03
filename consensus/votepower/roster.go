@@ -2,11 +2,13 @@ package votepower
 
 import (
 	"encoding/json"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
@@ -25,7 +27,7 @@ type stakedVoter struct {
 	EarningAccount   common.Address     `json:"earning-account"`
 	Identity         shard.BlsPublicKey `json:"bls-public-key"`
 	EffectivePercent numeric.Dec        `json:"voting"`
-	RawStake         numeric.Dec        `json:"raw-stake"`
+	EPoSedStake      numeric.Dec        `json:"eposed-stake"`
 }
 
 // Roster ..
@@ -35,6 +37,72 @@ type Roster struct {
 	TheirVotingPowerTotalPercentage numeric.Dec
 	RawStakedTotal                  numeric.Dec
 	HmySlotCount                    int64
+}
+
+// Staker ..
+type Staker struct {
+	AverageVotingPower    numeric.Dec
+	AverageEffectiveStake numeric.Dec
+	TotalEffectiveStake   numeric.Dec
+	VotingPower           []staking.VotePerShard
+	BLSPublicKeysOwned    []staking.KeysPerShard
+}
+
+// RosterPerShard ..
+type RosterPerShard struct {
+	ShardID uint32
+	Record  *Roster
+}
+
+// AggregateRosters ..
+func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
+
+	result := map[common.Address]Staker{}
+	c := int64(len(rosters))
+
+	sort.SliceStable(rosters,
+		func(i, j int) bool { return rosters[i].ShardID < rosters[j].ShardID },
+	)
+
+	for _, roster := range rosters {
+		for key, value := range roster.Record.Voters {
+			if !value.IsHarmonyNode {
+				payload, alreadyExists := result[value.EarningAccount]
+				if alreadyExists {
+					payload.TotalEffectiveStake = payload.TotalEffectiveStake.Add(
+						value.EPoSedStake,
+					)
+					payload.AverageVotingPower = payload.AverageVotingPower.Add(
+						value.EffectivePercent,
+					)
+					payload.VotingPower = append(payload.VotingPower,
+						staking.VotePerShard{roster.ShardID, value.EffectivePercent},
+					)
+					payload.BLSPublicKeysOwned[roster.ShardID].Keys = append(
+						payload.BLSPublicKeysOwned[roster.ShardID].Keys, key,
+					)
+				} else {
+					result[value.EarningAccount] = Staker{
+						AverageVotingPower:    value.EffectivePercent,
+						AverageEffectiveStake: numeric.ZeroDec(),
+						TotalEffectiveStake:   value.EPoSedStake,
+						VotingPower: []staking.VotePerShard{
+							{roster.ShardID, value.EffectivePercent},
+						},
+						BLSPublicKeysOwned: []staking.KeysPerShard{
+							{roster.ShardID, []shard.BlsPublicKey{key}}},
+					}
+				}
+			}
+		}
+	}
+
+	for _, value := range result {
+		value.AverageEffectiveStake = value.TotalEffectiveStake.QuoInt64(c)
+		value.AverageVotingPower = value.AverageVotingPower.QuoInt64(c)
+	}
+
+	return result
 }
 
 // JSON dump
@@ -83,13 +151,13 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 			EarningAccount:   staked[i].EcdsaAddress,
 			Identity:         staked[i].BlsPublicKey,
 			EffectivePercent: numeric.ZeroDec(),
-			RawStake:         numeric.ZeroDec(),
+			EPoSedStake:      numeric.ZeroDec(),
 		}
 
 		// Real Staker
 		if staked[i].TotalStake != nil {
 			member.IsHarmonyNode = false
-			member.RawStake = member.RawStake.Add(*staked[i].TotalStake)
+			member.EPoSedStake = member.EPoSedStake.Add(*staked[i].TotalStake)
 			member.EffectivePercent = staked[i].TotalStake.
 				Quo(roster.RawStakedTotal).
 				Mul(StakersShare)

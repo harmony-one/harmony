@@ -230,7 +230,7 @@ func (v *stakedVoteWeight) JSON() string {
 		IsHarmony   bool   `json:"is-harmony-slot"`
 		Identity    string `json:"bls-public-key"`
 		VotingPower string `json:"voting-power-%"`
-		RawStake    string `json:"raw-stake,omitempty"`
+		EPoSedStake string `json:"effective-stake,omitempty"`
 	}
 
 	type t struct {
@@ -254,7 +254,7 @@ func (v *stakedVoteWeight) JSON() string {
 			"",
 		}
 		if !voter.IsHarmonyNode {
-			member.RawStake = voter.RawStake.String()
+			member.EPoSedStake = voter.EPoSedStake.String()
 		}
 		parts[i] = member
 		i++
