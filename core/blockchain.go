@@ -1314,8 +1314,7 @@ func (bc *BlockChain) WriteBlockWithState(
 		bc.WriteBlockRewardAccumulator(big.NewInt(0), curHeader.Number().Uint64())
 	}
 
-	if payout != nil &&
-		curHeader.ShardID() == shard.BeaconChainShardID &&
+	if curHeader.ShardID() == shard.BeaconChainShardID &&
 		bc.chainConfig.IsStaking(block.Epoch()) {
 		bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
 	}
