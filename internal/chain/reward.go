@@ -141,7 +141,7 @@ func whatPercentStakedNow(
 	}
 
 	soFarDoledOut, err := beaconchain.ReadBlockRewardAccumulator(
-		beaconchain.CurrentHeader().Number().Uint64() - 1,
+		beaconchain.CurrentHeader().Number().Uint64(),
 	)
 
 	if err != nil {

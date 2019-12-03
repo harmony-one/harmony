@@ -1317,7 +1317,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	if payout != nil &&
 		curHeader.ShardID() == shard.BeaconChainShardID &&
 		bc.chainConfig.IsStaking(block.Epoch()) {
-		bc.WriteBlockRewardAccumulator(payout, block.Number().Uint64())
+		bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
 	}
 	/////////////////////////// END
 
@@ -2868,6 +2868,16 @@ func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error
 // Note: this should only be called once during staking launch.
 func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
 	return rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
+}
+
+//UpdateBlockRewardAccumulator ..
+// Note: this should only be called within the blockchain insertBlock process.
+func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int, number uint64) error {
+	current, err := bc.ReadBlockRewardAccumulator(number - 1)
+	if err != nil {
+		return err
+	}
+	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
 }
 
 // Note this should read from the state of current block in concern (root == newBlock.root)
