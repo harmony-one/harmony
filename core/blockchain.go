@@ -39,6 +39,7 @@ import (
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -49,7 +50,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -1349,12 +1349,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		bc.insert(block)
 	}
 	bc.futureBlocks.Remove(block.Hash())
-
-	if header.ShardID() == shard.BeaconChainShardID {
-		r, _ := committee.EPOSStakedCommittee(shard.Schedule.InstanceForEpoch(header.Epoch()), bc, 320)
-		bc.WriteVotingPowerSnapshot([]byte(r.JSON()))
-	}
-
 	return status, nil
 }
 
@@ -2604,7 +2598,10 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 			// Retrieve the stats and add new counts
 			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
 			if stats == nil {
-				stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0), numeric.NewDec(0)}
+				stats = &staking.ValidatorStats{
+					big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
+					numeric.NewDec(0), []staking.VotePerShard{}, []staking.KeyPerShard{},
+				}
 			}
 			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, big.NewInt(1))
 
@@ -2639,50 +2636,72 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 		return errors.New("[UpdateValidatorVotingPower] Nil shard state")
 	}
 
-	totalEffectiveStake := make(map[uint32]numeric.Dec)
-	addrToEffectiveStakes := make(map[common.Address]map[uint32]numeric.Dec)
+	rosters := make([]*votepower.Roster, len(state.Shards))
 
-	for _, committee := range state.Shards {
-		for _, slot := range committee.Slots {
+	for i := range state.Shards {
+		roster, _ := votepower.Compute(state.Shards[i].Slots)
+		rosters[i] = roster
+	}
+
+	type withAddr struct {
+		common.Address
+		staking.ValidatorStats
+	}
+
+	stats := []withAddr{}
+
+	for i := range state.Shards {
+		shardID := state.Shards[i].ShardID
+		for _, slot := range state.Shards[i].Slots {
 			if slot.TotalStake != nil {
-				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress]; !ok {
-					addrToEffectiveStakes[slot.EcdsaAddress] = map[uint32]numeric.Dec{}
-				}
-				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID]; !ok {
-					addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID] = numeric.NewDec(0)
-				}
-				addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID] = addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID].Add(*slot.TotalStake)
 
-				if _, ok := totalEffectiveStake[committee.ShardID]; !ok {
-					totalEffectiveStake[committee.ShardID] = numeric.NewDec(0)
+				stat := withAddr{slot.EcdsaAddress, staking.ValidatorStats{}}
+
+				for _, roster := range rosters {
+					stat.AvgVotingPower = stat.AvgVotingPower.Add(
+						roster.Voters[slot.BlsPublicKey].EffectivePercent,
+					)
+					stat.TotalEffectiveStake = stat.TotalEffectiveStake.Add(
+						roster.Voters[slot.BlsPublicKey].RawStake,
+					)
+
+					stat.ValidatorStats.VotingPowerPerShard = append(
+						stat.ValidatorStats.VotingPowerPerShard, staking.VotePerShard{
+							shardID, roster.Voters[slot.BlsPublicKey].EffectivePercent,
+						},
+					)
+
+					stat.ValidatorStats.BLSKeyPerShard = append(
+						stat.ValidatorStats.BLSKeyPerShard, staking.KeyPerShard{
+							shardID, roster.Voters[slot.BlsPublicKey].Identity.Hex(),
+						},
+					)
+
 				}
-				totalEffectiveStake[committee.ShardID] = totalEffectiveStake[committee.ShardID].Add(*slot.TotalStake)
+				stat.AvgVotingPower = stat.AvgVotingPower.Quo(numeric.NewDec(int64(len(rosters))))
+				stats = append(stats, stat)
 			}
 		}
 	}
 
 	batch := bc.db.NewBatch()
-	for addr, votingPowers := range addrToEffectiveStakes {
-		addrTotalVotingPower := numeric.NewDec(0) // Total voting power is the average voting power across all shards
-		addrTotalEffectiveStake := numeric.NewDec(0)
-		for shardID, eStake := range votingPowers {
-			addrTotalVotingPower = addrTotalVotingPower.Add(eStake.Quo(totalEffectiveStake[shardID]))
-			addrTotalEffectiveStake = addrTotalEffectiveStake.Add(eStake)
-		}
-		// Retrieve the stats and update
-		stats, err := rawdb.ReadValidatorStats(bc.db, addr)
-		if stats == nil {
-			stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0), numeric.NewDec(0)}
-		}
 
-		stats.AvgVotingPower = addrTotalVotingPower.Quo(numeric.NewDec(int64(len(state.Shards))))
-		stats.TotalEffectiveStake = addrTotalEffectiveStake
-
-		err = rawdb.WriteValidatorStats(batch, addr, stats)
+	for i := range stats {
+		statsFromDB, err := rawdb.ReadValidatorStats(bc.db, stats[i].Address)
+		if statsFromDB == nil {
+			statsFromDB = &staking.ValidatorStats{
+				big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
+				numeric.NewDec(0), []staking.VotePerShard{}, []staking.KeyPerShard{},
+			}
+		}
+		statsFromDB.AvgVotingPower = stats[i].ValidatorStats.AvgVotingPower
+		statsFromDB.TotalEffectiveStake = stats[i].ValidatorStats.TotalEffectiveStake
+		err = rawdb.WriteValidatorStats(batch, stats[i].Address, statsFromDB)
 		if err != nil {
 			return err
 		}
 	}
+
 	if err := batch.Write(); err != nil {
 		return err
 	}

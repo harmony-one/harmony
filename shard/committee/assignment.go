@@ -113,7 +113,8 @@ func EPOSStakedCommittee(
 	candidates := stakerReader.ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
 
-	utils.Logger().Info().Int("staked-candidates", len(candidates)).Msg("preparing epos staked committee")
+	utils.Logger().Info().Int("staked-candidates", len(candidates)).
+		Msg("preparing epos staked committee")
 
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {

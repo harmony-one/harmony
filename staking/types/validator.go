@@ -41,6 +41,18 @@ type ValidatorWrapper struct {
 	Delegations []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
 }
 
+// VotePerShard ..
+type VotePerShard struct {
+	ShardID     uint32
+	VotingPower numeric.Dec
+}
+
+// KeyPerShard ..
+type KeyPerShard struct {
+	ShardID   uint32
+	PublicKey string
+}
+
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// The number of blocks the validator should've signed when in active mode (selected in committee)
@@ -53,6 +65,10 @@ type ValidatorStats struct {
 	AvgVotingPower numeric.Dec `json:"avg_voting_power" rlp:"nil"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `json:"total_effective_stake" rlp:"nil"`
+	// VotingPowerPerShard ..
+	VotingPowerPerShard []VotePerShard
+	// BLSKeyPerShard ..
+	BLSKeyPerShard []KeyPerShard
 }
 
 // Validator - data fields for a validator
