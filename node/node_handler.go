@@ -26,8 +26,7 @@ import (
 )
 
 const (
-	consensusTimeout   = 30 * time.Second
-	crossLinkBatchSize = 7
+	crossLinkBatchSize = 50
 )
 
 // receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
@@ -218,23 +217,23 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 	if err != nil {
 		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLink] ReadShardLastCrossLink Failed")
 		header := node.Blockchain().GetHeaderByNumber(newBlock.NumberU64() - 2)
-		if header != nil {
+		if header != nil && node.Blockchain().Config().IsCrossLink(header.Epoch()) {
 			headers = append(headers, header)
 		}
 		header = node.Blockchain().GetHeaderByNumber(newBlock.NumberU64() - 1)
-		if header != nil {
+		if header != nil && node.Blockchain().Config().IsCrossLink(header.Epoch()) {
 			headers = append(headers, header)
 		}
 		headers = append(headers, newBlock.Header())
 	} else {
 		latestBlockNum = lastLink.BlockNum()
 		for blockNum := latestBlockNum + 1; blockNum <= newBlock.NumberU64(); blockNum++ {
-			if blockNum > latestBlockNum+crossLinkBatchSize {
-				break
-			}
 			header := node.Blockchain().GetHeaderByNumber(blockNum)
-			if header != nil {
+			if header != nil && node.Blockchain().Config().IsCrossLink(header.Epoch()) {
 				headers = append(headers, header)
+				if len(headers) == crossLinkBatchSize {
+					break
+				}
 			}
 		}
 	}

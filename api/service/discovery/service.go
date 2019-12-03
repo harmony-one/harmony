@@ -74,7 +74,6 @@ func (s *Service) Run() {
 }
 
 func (s *Service) contactP2pPeers() {
-	pingInterval := 5
 
 	nodeConfig := nodeconfig.GetShardConfig(s.config.ShardID)
 	// Don't send ping message for Explorer Node
@@ -86,6 +85,8 @@ func (s *Service) contactP2pPeers() {
 	msgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
 	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
 
+	pingInterval := 5
+	initialFlatRetries := 20 // no expotential backoff for 20 times.
 	for {
 		select {
 		case peer, ok := <-s.peerChan:
@@ -104,13 +105,18 @@ func (s *Service) contactP2pPeers() {
 			return
 		}
 
+		utils.Logger().Debug().Msg("[DISCOVERY] Sending Ping Message")
 		s.sentPingMessage(s.config.ShardGroupID, msgBuf)
 
 		// the longest sleep is 3600 seconds
 		if pingInterval >= 3600 {
 			pingInterval = 3600
 		} else {
-			pingInterval *= 2
+			if initialFlatRetries > 0 {
+				initialFlatRetries--
+			} else {
+				pingInterval *= 2
+			}
 		}
 		time.Sleep(time.Duration(pingInterval) * time.Second)
 	}

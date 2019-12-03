@@ -501,7 +501,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		utils.Logger().Error().
 			Err(err).
 			Uint32("shard", consensus.ShardID).
-			Msg("Error retrieving current shard state")
+			Msg("[UpdateConsensusInformation] Error retrieving current shard state")
 		return Syncing
 	}
 
@@ -519,7 +519,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			utils.Logger().Error().
 				Err(err).
 				Uint32("shard", consensus.ShardID).
-				Msg("Error retrieving nextEpoch shard state")
+				Msg("[UpdateConsensusInformation] Error retrieving nextEpoch shard state")
 			return Syncing
 		}
 
@@ -563,7 +563,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		Uint32("shard-id", consensus.ShardID).
 		RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
 		RawJSON("current-subcommittee", []byte(consensus.Decider.JSON())).
-		Msg("changing committee")
+		Msg("[UpdateConsensusInformation] changing committee")
 
 	// take care of possible leader change during the curEpoch
 	if !shard.Schedule.IsLastBlock(curHeader.Number().Uint64()) &&
@@ -571,13 +571,13 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).
-				Msg("[SYNC] Unable to get leaderPubKey from coinbase")
+				Msg("[UpdateConsensusInformation] Unable to get leaderPubKey from coinbase")
 			consensus.ignoreViewIDCheck = true
 			hasError = true
 		} else {
 			consensus.getLogger().Debug().
 				Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
-				Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
+				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
 			consensus.LeaderPubKey = leaderPubKey
 		}
 	}
@@ -596,7 +596,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 						Str("myKey", consensus.PubKey.SerializeToHexStr()).
 						Uint64("viewID", consensus.viewID).
 						Uint64("block", consensus.blockNum).
-						Msg("[onEpochChange] I am the New Leader")
+						Msg("[UpdateConsensusInformation] I am the New Leader")
 					consensus.ReadySignal <- struct{}{}
 				}()
 			}

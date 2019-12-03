@@ -160,26 +160,26 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
 				// TODO: leader add double sign checking
-				utils.Logger().Debug().
+				utils.Logger().Err(err).
 					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Block num: %d, shardID %d", cl.Number(), cl.ShardID())
 				continue
 			}
 
 			if err = node.VerifyCrossLink(cl); err != nil {
-				utils.Logger().Debug().
+				utils.Logger().Err(err).
 					Msgf("[ProcessingCrossLink] Failed to verify new cross link for blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
 				continue
 			}
 
 			candidates = append(candidates, cl)
 			utils.Logger().Debug().
-				Msgf("[ProcessingCrossLink] committing for shardID %d, blockNum %d", cl.ShardID(), cl.Number().Uint64())
+				Msgf("[ProcessingCrossLink] Committing for shardID %d, blockNum %d", cl.ShardID(), cl.Number().Uint64())
 		}
 		node.pendingCLMutex.Lock()
 		Len, _ := node.Blockchain().AddPendingCrossLinks(candidates)
 		node.pendingCLMutex.Unlock()
 		utils.Logger().Debug().
-			Msgf("[ProcessingCrossLink] add pending crosslinks,  total pending: %d", Len)
+			Msgf("[ProcessingCrossLink] Add pending crosslinks,  total pending: %d", Len)
 	}
 }
 
@@ -230,8 +230,8 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 		return ctxerror.New("CrossLink BlockNumber should greater than 1")
 	}
 
-	if node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
-		return ctxerror.New("CrossLink Epoch should >= crosslink epoch", "crossLinkEpoch", node.Blockchain().Config().CrossLinkEpoch)
+	if !node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
+		return ctxerror.New("CrossLink Epoch should >= cross link starting epoch", "crossLinkEpoch", cl.Epoch(), "cross_link_starting_eoch", node.Blockchain().Config().CrossLinkEpoch)
 	}
 
 	// Verify signature of the new cross link header
