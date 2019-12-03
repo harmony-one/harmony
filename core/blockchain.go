@@ -77,7 +77,7 @@ const (
 	validatorListCacheLimit            = 10
 	validatorListByDelegatorCacheLimit = 1024
 	pendingCrossLinksCacheLimit        = 2
-	blockAccumulatorCacheLimit         = 1024
+	blockAccumulatorCacheLimit         = 256
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -1308,23 +1308,8 @@ func (bc *BlockChain) WriteBlockWithState(
 		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
 
-	isFirstTimeStaking := bc.chainConfig.IsStaking(
-		new(big.Int).Add(block.Epoch(), big.NewInt(1)),
-	) &&
-		len(block.Header().ShardState()) > 0 &&
-		!bc.chainConfig.IsStaking(block.Epoch())
+	bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
 
-	curHeader := bc.CurrentHeader()
-
-	if isFirstTimeStaking &&
-		curHeader.ShardID() == shard.BeaconChainShardID {
-		bc.WriteBlockRewardAccumulator(big.NewInt(0), curHeader.Number().Uint64())
-	}
-
-	if curHeader.ShardID() == shard.BeaconChainShardID &&
-		bc.chainConfig.IsStaking(block.Epoch()) {
-		bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
-	}
 	/////////////////////////// END
 
 	// If the total difficulty is higher than our known, add it to the canonical chain

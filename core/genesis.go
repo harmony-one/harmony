@@ -307,6 +307,7 @@ func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
 	if err != nil {
 		panic(err)
 	}
+	rawdb.WriteBlockRewardAccumulator(db, big.NewInt(0), 0)
 	return block
 }
 
