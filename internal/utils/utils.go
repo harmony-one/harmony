@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"sync"
 
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
@@ -88,13 +90,13 @@ func GetAddressFromBlsPubKey(pubKey *bls.PublicKey) common.Address {
 
 // GetAddressFromBlsPubKeyBytes return the address object from bls pub key.
 func GetAddressFromBlsPubKeyBytes(pubKeyBytes []byte) common.Address {
-	pubKey := &bls.PublicKey{}
-	err := pubKey.Deserialize(pubKeyBytes[:])
+	pubKey, err := bls2.BytesToBlsPublicKey(pubKeyBytes[:])
 	addr := common.Address{}
-	if err != nil {
+	if err == nil {
 		addrBytes := pubKey.GetAddress()
 		addr.SetBytes(addrBytes[:])
 	}
+	Logger().Err(err).Msg("Failed to get address of bls key")
 	return addr
 }
 
