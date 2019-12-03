@@ -21,7 +21,10 @@ var (
 )
 
 // PublicKeySizeInBytes ..
-const PublicKeySizeInBytes = 48
+const (
+	PublicKeySizeInBytes    = 48
+	BlsSignatureSizeInBytes = 96
+)
 
 // State is the collection of all committees
 type State struct {
@@ -31,6 +34,8 @@ type State struct {
 
 // BlsPublicKey defines the bls public key
 type BlsPublicKey [PublicKeySizeInBytes]byte
+
+type BlsSignature [BlsSignatureSizeInBytes]byte
 
 // Slot represents node id (BLS address)
 type Slot struct {

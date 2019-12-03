@@ -229,7 +229,7 @@ func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 // GetMinSelfDelegation returns the minimum amount the validator must stake
 func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
 
-func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []string) error {
+func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BlsSignature) error {
 	if len(pubKeys) != len(pubKeySigs) {
 		return errBLSKeysNotMatchSigs
 	}
@@ -243,7 +243,7 @@ func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []string) error {
 	return nil
 }
 
-func verifyBLSKey(pubKey shard.BlsPublicKey, pubKeySig string) error {
+func verifyBLSKey(pubKey shard.BlsPublicKey, pubKeySig shard.BlsSignature) error {
 	if len(pubKeySig) == 0 {
 		return errBLSKeysNotMatchSigs
 	}
@@ -254,7 +254,7 @@ func verifyBLSKey(pubKey shard.BlsPublicKey, pubKeySig string) error {
 	}
 
 	msgSig := bls.Sign{}
-	if err := msgSig.DeserializeHexStr(pubKeySig); err != nil {
+	if err := msgSig.Deserialize(pubKeySig[:]); err != nil {
 		return err
 	}
 
