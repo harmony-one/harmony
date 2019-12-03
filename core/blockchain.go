@@ -2887,11 +2887,6 @@ func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64
 //UpdateBlockRewardAccumulator ..
 // Note: this should only be called within the blockchain insertBlock process.
 func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int, number uint64) error {
-	if cached, ok := bc.blockAccumulatorCache.Get(number - 1); ok {
-		bc.WriteBlockRewardAccumulator(new(big.Int).Add(cached.(*big.Int), diff), number)
-		bc.blockAccumulatorCache.Add(number, new(big.Int).Add(cached.(*big.Int), diff))
-		return nil
-	}
 	current, err := bc.ReadBlockRewardAccumulator(number - 1)
 	if err != nil {
 		return err
