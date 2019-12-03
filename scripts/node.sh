@@ -116,6 +116,8 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -P             enable public rpc end point (default:off)
    -v             print out the version of the node.sh
    -V             print out the version of the Harmony binary
+   -z             run in staking mode
+   -Z             run in legacy, foundational-node mode (default)
 
 examples:
 
@@ -149,7 +151,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc
+unset upgrade_rel public_rpc staking_mode
 start_clean=false
 loop=true
 run_as_root=true
@@ -161,11 +163,12 @@ node_type=validator
 shard_id=1
 download_harmony_db=false
 public_rpc=false
+staking_mode=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvV opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVZz opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -192,6 +195,8 @@ do
       exit 0 ;;
    V) LD_LIBRARY_PATH=. ./harmony -version
       exit 0 ;;
+   z) staking_mode=true;;
+   Z) staking_mode=false;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -659,6 +664,10 @@ do
          args+=(
             -shard_id="${shard_id}"
          )
+         if ${staking_mode}
+         then
+            args+=(-staking="${staking_mode}")
+         fi
          ;;
       esac
       ;;
