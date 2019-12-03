@@ -13,6 +13,7 @@ import (
 
 	blockif "github.com/harmony-one/harmony/block/interface"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -61,16 +62,15 @@ type headerFields struct {
 	Extra               []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest           common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
-	ViewID              *big.Int    `json:"viewID"           gencodec:"required"`
-	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
-	ShardID             uint32      `json:"shardID"          gencodec:"required"`
-	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
-	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
-	ShardStateHash      common.Hash `json:"shardStateRoot"`
-	Vrf                 []byte      `json:"vrf"`
-	Vdf                 []byte      `json:"vdf"`
-	ShardState          []byte      `json:"shardState"`
-	CrossLinks          []byte      `json:"crossLink"`
+	ViewID              *big.Int `json:"viewID"           gencodec:"required"`
+	Epoch               *big.Int `json:"epoch"            gencodec:"required"`
+	ShardID             uint32   `json:"shardID"          gencodec:"required"`
+	LastCommitSignature [96]byte `json:"lastCommitSignature"  gencodec:"required"`
+	LastCommitBitmap    []byte   `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
+	Vrf                 []byte   `json:"vrf"`
+	Vdf                 []byte   `json:"vdf"`
+	ShardState          []byte   `json:"shardState"`
+	CrossLinks          []byte   `json:"crossLink"`
 }
 
 // ParentHash is the header hash of the parent block.  For the genesis block
@@ -300,12 +300,14 @@ func (h *Header) SetLastCommitBitmap(newLastCommitBitmap []byte) {
 
 // ShardStateHash is the shard state hash.
 func (h *Header) ShardStateHash() common.Hash {
-	return h.fields.ShardStateHash
+	return common.Hash{}
 }
 
 // SetShardStateHash sets the shard state hash.
 func (h *Header) SetShardStateHash(newShardStateHash common.Hash) {
-	h.fields.ShardStateHash = newShardStateHash
+	h.Logger(utils.Logger()).Warn().
+		Str("shardStateHash", newShardStateHash.Hex()).
+		Msg("cannot store ShardStateHash in V3 header")
 }
 
 // Vrf is the output of the VRF for the epoch.
