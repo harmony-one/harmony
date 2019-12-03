@@ -1304,11 +1304,14 @@ func (bc *BlockChain) WriteBlockWithState(
 		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
 
-	isFirstTimeStaking := bc.chainConfig.IsStaking(new(big.Int).Add(block.Epoch(), big.NewInt(1))) &&
+	isFirstTimeStaking := bc.chainConfig.IsStaking(
+		new(big.Int).Add(block.Epoch(), big.NewInt(1)),
+	) &&
 		len(block.Header().ShardState()) > 0 &&
 		!bc.chainConfig.IsStaking(block.Epoch())
 
 	curHeader := bc.CurrentHeader()
+
 	if isFirstTimeStaking &&
 		curHeader.ShardID() == shard.BeaconChainShardID {
 		bc.WriteBlockRewardAccumulator(big.NewInt(0), curHeader.Number().Uint64())
@@ -2858,25 +2861,43 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	return nil
 }
 
+var (
+	t, _ = lru.New(120)
+)
+
 // ReadBlockRewardAccumulator ..
 func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
-	return rawdb.ReadBlockRewardAccumulator(bc.db, number)
+	a, b := t.Get(number)
+	if b {
+		return a.(*big.Int), nil
+	}
+	return big.NewInt(0), nil
+	// return rawdb.ReadBlockRewardAccumulator(bc.db, number)
 }
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
 func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
-	return rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
+
+	t.Add(reward, number)
+	return nil
+	// return rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
 }
 
 //UpdateBlockRewardAccumulator ..
 // Note: this should only be called within the blockchain insertBlock process.
 func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int, number uint64) error {
-	current, err := bc.ReadBlockRewardAccumulator(number - 1)
-	if err != nil {
-		return err
+
+	if cached, ok := t.Get(number - 1); ok {
+		bc.WriteBlockRewardAccumulator(new(big.Int).Add(cached.(*big.Int), diff), number)
 	}
-	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
+	return nil
+
+	// current, err := bc.ReadBlockRewardAccumulator(number - 1)
+	// if err != nil {
+	// 	return err
+	// }
+	// return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
 }
 
 // Note this should read from the state of current block in concern (root == newBlock.root)
