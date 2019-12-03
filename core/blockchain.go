@@ -77,6 +77,7 @@ const (
 	validatorListCacheLimit            = 10
 	validatorListByDelegatorCacheLimit = 1024
 	pendingCrossLinksCacheLimit        = 2
+	blockAccumulatorCacheLimit         = 8
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -144,6 +145,7 @@ type BlockChain struct {
 	validatorListCache            *lru.Cache // Cache of validator list
 	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
 	pendingCrossLinksCache        *lru.Cache // Cache of last pending crosslinks
+	blockAccumulatorCache         *lru.Cache // Cache of block accumulators
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -185,6 +187,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	validatorListCache, _ := lru.New(validatorListCacheLimit)
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
+	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:                   chainConfig,
@@ -208,6 +211,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		validatorListCache:            validatorListCache,
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
+		blockAccumulatorCache:         blockAccumulatorCache,
 		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
@@ -2861,43 +2865,38 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	return nil
 }
 
-var (
-	t, _ = lru.New(120)
-)
-
 // ReadBlockRewardAccumulator ..
 func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
-	a, b := t.Get(number)
-	if b {
-		return a.(*big.Int), nil
+	if cached, ok := bc.blockAccumulatorCache.Get(number); ok {
+		return cached.(*big.Int), nil
 	}
-	return big.NewInt(0), nil
-	// return rawdb.ReadBlockRewardAccumulator(bc.db, number)
+	return rawdb.ReadBlockRewardAccumulator(bc.db, number)
 }
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
 func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
-
-	t.Add(reward, number)
+	err := rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
+	if err != nil {
+		return err
+	}
+	bc.blockAccumulatorCache.Add(number, reward)
 	return nil
-	// return rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
 }
 
 //UpdateBlockRewardAccumulator ..
 // Note: this should only be called within the blockchain insertBlock process.
 func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int, number uint64) error {
-
-	if cached, ok := t.Get(number - 1); ok {
+	if cached, ok := bc.blockAccumulatorCache.Get(number - 1); ok {
 		bc.WriteBlockRewardAccumulator(new(big.Int).Add(cached.(*big.Int), diff), number)
+		bc.blockAccumulatorCache.Add(number, new(big.Int).Add(cached.(*big.Int), diff))
+		return nil
 	}
-	return nil
-
-	// current, err := bc.ReadBlockRewardAccumulator(number - 1)
-	// if err != nil {
-	// 	return err
-	// }
-	// return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
+	current, err := bc.ReadBlockRewardAccumulator(number - 1)
+	if err != nil {
+		return err
+	}
+	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
 }
 
 // Note this should read from the state of current block in concern (root == newBlock.root)
