@@ -36,6 +36,7 @@ var (
 	targetStakedPercentage       = numeric.MustNewDecFromStr("0.35")
 	dynamicAdjust                = numeric.MustNewDecFromStr("0.4")
 	errPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
+	noReward                     = big.NewInt(0)
 )
 
 func adjust(amount numeric.Dec) numeric.Dec {
@@ -181,12 +182,12 @@ func AccumulateRewards(
 
 	if blockNum == 0 {
 		// genesis block has no parent to reward.
-		return nil, nil
+		return noReward, nil
 	}
 
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() != shard.BeaconChainShardID {
-		return nil, nil
+		return noReward, nil
 	}
 
 	//// After staking
@@ -198,7 +199,7 @@ func AccumulateRewards(
 		// TODO Use cached result in off-chain db instead of full computation
 		percentageStaked, err := whatPercentStakedNow(beaconChain, header.Time().Int64())
 		if err != nil {
-			return nil, err
+			return noReward, err
 		}
 		howMuchOff := targetStakedPercentage.Sub(*percentageStaked)
 		adjustBy := adjust(
@@ -214,7 +215,7 @@ func AccumulateRewards(
 		// If too much is staked, then possible to have negative reward,
 		// not an error, just a possible economic situation, hence we return
 		if defaultReward.IsNegative() {
-			return nil, nil
+			return noReward, nil
 		}
 
 		newRewards := big.NewInt(0)
@@ -222,12 +223,12 @@ func AccumulateRewards(
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		members, payable, _, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
-			return nil, err
+			return noReward, err
 		}
 
 		votingPower, err := votepower.Compute(members)
 		if err != nil {
-			return nil, err
+			return noReward, err
 		}
 
 		for beaconMember := range payable {
@@ -237,7 +238,7 @@ func AccumulateRewards(
 			if !voter.IsHarmonyNode {
 				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
 				if err != nil {
-					return nil, err
+					return noReward, err
 				}
 				due := defaultReward.Mul(
 					voter.EffectivePercent.Quo(votepower.StakersShare),
@@ -252,7 +253,7 @@ func AccumulateRewards(
 			crossLinks := types.CrossLinks{}
 			err := rlp.DecodeBytes(cxLinks, &crossLinks)
 			if err != nil {
-				return nil, err
+				return noReward, err
 			}
 
 			type slotPayable struct {
@@ -269,7 +270,7 @@ func AccumulateRewards(
 				shardState, err := bc.ReadShardState(cxLink.Epoch())
 
 				if err != nil {
-					return nil, err
+					return noReward, err
 				}
 
 				subComm := shardState.FindCommitteeByID(cxLink.ShardID())
@@ -277,12 +278,12 @@ func AccumulateRewards(
 				payableSigners, _, err := blockSigners(cxLink.Bitmap(), subComm)
 
 				if err != nil {
-					return nil, err
+					return noReward, err
 				}
 
 				votingPower, err := votepower.Compute(payableSigners)
 				if err != nil {
-					return nil, err
+					return noReward, err
 				}
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
@@ -326,7 +327,7 @@ func AccumulateRewards(
 				for payThem := range resultsHandle[bucket] {
 					snapshot, err := bc.ReadValidatorSnapshot(resultsHandle[bucket][payThem].payee)
 					if err != nil {
-						return nil, err
+						return noReward, err
 					}
 					due := resultsHandle[bucket][payThem].payout.TruncateInt()
 					newRewards = new(big.Int).Add(newRewards, due)
@@ -337,7 +338,7 @@ func AccumulateRewards(
 			return newRewards, nil
 			// return bc.UpdateBlockRewardAccumulator(newRewards)
 		}
-		return nil, nil
+		return noReward, nil
 	}
 
 	//// Before staking
@@ -351,13 +352,13 @@ func AccumulateRewards(
 	if parentHeader.Number().Cmp(common.Big0) == 0 {
 		// Parent is an epoch block,
 		// which is not signed in the usual manner therefore rewards nothing.
-		return nil, nil
+		return noReward, nil
 	}
 
 	_, signers, _, err := ballotResult(bc, header, header.ShardID())
 
 	if err != nil {
-		return nil, err
+		return noReward, err
 	}
 
 	totalAmount := rewarder.Award(
