@@ -5,12 +5,17 @@ package nodeconfig
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
+	"github.com/pkg/errors"
+
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Role defines a role of a node.
@@ -70,7 +75,7 @@ type ConfigType struct {
 	client   GroupID // the client group ID of the shard
 	isClient bool    // whether this node is a client node, such as wallet
 	isBeacon bool    // whether this node is beacon node doing consensus or not
-	ShardID  uint32  // ShardID of this node; TODO ek – reviisit when resharding
+	ShardID  uint32  // ShardID of this node; TODO ek – revisit when resharding
 	role     Role    // Role of the node
 	Port     string  // Port of the node.
 	IP       string  // IP of the node.
@@ -88,6 +93,8 @@ type ConfigType struct {
 	DBDir string
 
 	networkType NetworkType
+
+	shardingSchedule shardingconfig.Schedule
 }
 
 // configs is a list of node configuration.
@@ -97,30 +104,22 @@ var shardConfigs []ConfigType
 var defaultConfig ConfigType
 var onceForConfigs sync.Once
 
-// GetShardConfig return the shard's ConfigType variable
-func GetShardConfig(shardID uint32) *ConfigType {
+func ensureShardConfigs() {
 	onceForConfigs.Do(func() {
 		shardConfigs = make([]ConfigType, MaxShards)
 		for i := range shardConfigs {
 			shardConfigs[i].ShardID = uint32(i)
 		}
 	})
+}
+
+// GetShardConfig return the shard's ConfigType variable
+func GetShardConfig(shardID uint32) *ConfigType {
+	ensureShardConfigs()
 	if int(shardID) >= cap(shardConfigs) {
 		return nil
 	}
 	return &shardConfigs[shardID]
-}
-
-// SetConfigs set ConfigType in the right index.
-func SetConfigs(config ConfigType, shardID uint32) error {
-	onceForConfigs.Do(func() {
-		shardConfigs = make([]ConfigType, MaxShards)
-	})
-	if int(shardID) >= cap(shardConfigs) {
-		return errors.New("Failed to set ConfigType")
-	}
-	shardConfigs[int(shardID)] = config
-	return nil
 }
 
 // GetDefaultConfig returns default config.
@@ -224,6 +223,7 @@ func (conf *ConfigType) Role() Role {
 
 // SetNetworkType set the networkType
 func SetNetworkType(networkType NetworkType) {
+	ensureShardConfigs()
 	defaultConfig.networkType = networkType
 	for i := range shardConfigs {
 		shardConfigs[i].networkType = networkType
@@ -253,4 +253,50 @@ func SetPublicRPC(v bool) {
 // GetPublicRPC get the boolean value of public RPC access
 func GetPublicRPC() bool {
 	return publicRPC
+}
+
+// ShardingSchedule returns the sharding schedule for this node config.
+func (conf *ConfigType) ShardingSchedule() shardingconfig.Schedule {
+	return conf.shardingSchedule
+}
+
+// SetShardingSchedule sets the sharding schedule for this node config.
+func (conf *ConfigType) SetShardingSchedule(schedule shardingconfig.Schedule) {
+	conf.shardingSchedule = schedule
+}
+
+// SetShardingSchedule sets the sharding schedule for all config instances.
+func SetShardingSchedule(schedule shardingconfig.Schedule) {
+	ensureShardConfigs()
+	defaultConfig.SetShardingSchedule(schedule)
+	for _, config := range shardConfigs {
+		config.SetShardingSchedule(schedule)
+	}
+}
+
+// ShardIDFromConsensusKey returns the shard ID statically determined from the
+// consensus key.
+func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
+	var pubKey shard.BlsPublicKey
+	if err := pubKey.FromLibBLSPublicKey(conf.ConsensusPubKey); err != nil {
+		return 0, errors.Wrapf(err,
+			"cannot convert libbls public key %s to internal form",
+			conf.ConsensusPubKey.SerializeToHexStr())
+	}
+	epoch := conf.networkType.ChainConfig().StakingEpoch
+	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
+	shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
+	return uint32(shardID.Uint64()), nil
+}
+
+// ChainConfig returns the chain configuration for the network type.
+func (t NetworkType) ChainConfig() params.ChainConfig {
+	switch t {
+	case Mainnet:
+		return *params.MainnetChainConfig
+	case Pangaea:
+		return *params.PangaeaChainConfig
+	default:
+		return *params.TestnetChainConfig
+	}
 }

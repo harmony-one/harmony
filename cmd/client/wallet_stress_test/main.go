@@ -27,10 +27,12 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/wallet"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	p2putils "github.com/harmony-one/harmony/p2p/utils"
 )
 
 var (
@@ -72,7 +74,7 @@ var (
 )
 
 var (
-	walletProfile *utils.WalletProfile
+	walletProfile *wallet.Profile
 	ks            *keystore.KeyStore
 )
 
@@ -162,7 +164,7 @@ func readProfile(profile string) {
 		iniBytes = []byte(defaultWalletIni)
 	}
 
-	walletProfile, err = utils.ReadWalletProfile(iniBytes, profile)
+	walletProfile, err = wallet.ReadProfile(iniBytes, profile)
 	if err != nil {
 		fmt.Printf("Read wallet profile error: %v\nExiting ...\n", err)
 		os.Exit(2)
@@ -171,11 +173,11 @@ func readProfile(profile string) {
 
 // createWalletNode creates wallet server node.
 func createWalletNode() *node.Node {
-	bootNodeAddrs, err := utils.StringsToAddrs(walletProfile.Bootnodes)
+	bootNodeAddrs, err := p2putils.StringsToAddrs(walletProfile.Bootnodes)
 	if err != nil {
 		panic(err)
 	}
-	utils.BootNodes = bootNodeAddrs
+	p2putils.BootNodes = bootNodeAddrs
 	shardID := 0
 	// dummy host for wallet
 	// TODO: potentially, too many dummy IP may flush out good IP address from our bootnode DHT

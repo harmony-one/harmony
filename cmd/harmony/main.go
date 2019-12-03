@@ -15,6 +15,8 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/pkg/errors"
+
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -31,6 +33,7 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -48,7 +51,7 @@ var (
 )
 
 func printVersion() {
-	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
+	_, _ = fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
 	os.Exit(0)
 }
 
@@ -85,6 +88,8 @@ var (
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
+	// staking indicates whether the node is operating in staking mode.
+	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
 	// shardID indicates the shard ID of this node
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
@@ -138,6 +143,9 @@ func initSetup() {
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
 
+	// Set sharding schedule
+	nodeconfig.SetShardingSchedule(shard.Schedule)
+
 	// Setup mem profiling.
 	memprofiling.GetMemProfiling().Config()
 
@@ -147,12 +155,12 @@ func initSetup() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	if len(utils.BootNodes) == 0 {
-		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
+	if len(p2putils.BootNodes) == 0 {
+		bootNodeAddrs, err := p2putils.StringsToAddrs(p2putils.DefaultBootNodeAddrStrings)
 		if err != nil {
 			panic(err)
 		}
-		utils.BootNodes = bootNodeAddrs
+		p2putils.BootNodes = bootNodeAddrs
 	}
 }
 
@@ -169,47 +177,54 @@ func passphraseForBls() {
 	}
 	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
 		os.Exit(100)
 	}
 	blsPassphrase = passphrase
 }
 
-func setupInitialAccount() (isLeader bool) {
+func setupLegacyNodeAccount() error {
 	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
-	// TODO: after staking, what if the FN validator uses the old bls pub keys?
 	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
-			isLeader, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
+			_, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
 			if initialAccount != nil {
 				break
 			}
 		}
 	} else {
-		isLeader, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+		_, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
 	}
 
 	if initialAccount == nil {
-		initialAccount = &genesis.DeployAccount{}
-		initialAccount.ShardID = uint32(*shardID)
-		initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
-		blsAddressBytes := pubKey.GetAddress()
-		initialAccount.Address = hex.EncodeToString(blsAddressBytes[:])
-	} else {
-		fmt.Printf("My Genesis Account: %v\n", *initialAccount)
+		return errors.Errorf("cannot find key %s in table", pubKey.SerializeToHexStr())
 	}
+	fmt.Printf("My Genesis Account: %v\n", *initialAccount)
+	return nil
+}
 
-	return isLeader
+func setupStakingNodeAccount() error {
+	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
+	shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
+	if err != nil {
+		return errors.Wrap(err, "cannot determine shard to join")
+	}
+	initialAccount = &genesis.DeployAccount{}
+	initialAccount.ShardID = shardID
+	initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
+	blsAddressBytes := pubKey.GetAddress()
+	initialAccount.Address = hex.EncodeToString(blsAddressBytes[:])
+	return nil
 }
 
 func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
 		os.Exit(100)
 	}
 	pubKey := consensusPriKey.GetPublicKey()
@@ -223,7 +238,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	return pubKey
 }
 
-func createGlobalConfig() *nodeconfig.ConfigType {
+func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	var err error
 
 	nodeConfig := nodeconfig.GetShardConfig(initialAccount.ShardID)
@@ -236,13 +251,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	// Set network type
 	netType := nodeconfig.NetworkType(*networkType)
-	switch netType {
-	case nodeconfig.Mainnet, nodeconfig.Testnet, nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
-		nodeconfig.SetNetworkType(netType)
-	default:
-		panic(fmt.Sprintf("invalid network type: %s", *networkType))
-	}
-
+	nodeconfig.SetNetworkType(netType) // sets for both global and shard configs
 	nodeConfig.SetPushgatewayIP(*pushgatewayIP)
 	nodeConfig.SetPushgatewayPort(*pushgatewayPort)
 	nodeConfig.SetMetricsFlag(*metricsFlag)
@@ -250,22 +259,23 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrapf(err, "cannot load or create P2P key at %#v",
+			*keyFile)
 	}
 
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
 	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create P2P network host")
+	}
 	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogger()))
-	}
-	if err != nil {
-		panic("unable to new host in harmony")
 	}
 
 	nodeConfig.DBDir = *dbDir
 
-	return nodeConfig
+	return nodeConfig, nil
 }
 
 func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
@@ -287,7 +297,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
 	commitDelay, err := time.ParseDuration(*delayCommit)
@@ -396,7 +406,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 }
 
 func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
+	flag.Var(&p2putils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
 	switch *nodeType {
@@ -404,7 +414,7 @@ func main() {
 	case "explorer":
 		break
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
+		_, _ = fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
 		os.Exit(1)
 	}
 
@@ -436,6 +446,9 @@ func main() {
 			os.Exit(1)
 		}
 		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
+	default:
+		_, _ = fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
+		os.Exit(2)
 	}
 
 	initSetup()
@@ -446,8 +459,21 @@ func main() {
 	}
 
 	if *nodeType == "validator" {
-		setupInitialAccount()
+		var err error
+		if *stakingFlag {
+			err = setupStakingNodeAccount()
+		} else {
+			err = setupLegacyNodeAccount()
+		}
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "cannot set up node account: %s\n", err)
+			os.Exit(1)
+		}
 	}
+	fmt.Printf("%s mode; node key %s -> shard %d\n",
+		map[bool]string{false: "Legacy", true: "Staking"}[*stakingFlag],
+		nodeconfig.GetDefaultConfig().ConsensusPubKey.SerializeToHexStr(),
+		initialAccount.ShardID)
 
 	if *nodeType != "validator" && *shardID >= 0 {
 		utils.Logger().Info().
@@ -457,7 +483,11 @@ func main() {
 		initialAccount.ShardID = uint32(*shardID)
 	}
 
-	nodeConfig := createGlobalConfig()
+	nodeConfig, err := createGlobalConfig()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
+		os.Exit(1)
+	}
 	currentNode := setupConsensusAndNode(nodeConfig)
 	//setup state syncing and beacon syncing frequency
 	currentNode.SetSyncFreq(*syncFreq)

@@ -407,13 +407,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
-	chainConfig := *params.TestnetChainConfig
-	switch node.NodeConfig.GetNetworkType() {
-	case nodeconfig.Mainnet:
-		chainConfig = *params.MainnetChainConfig
-	case nodeconfig.Pangaea:
-		chainConfig = *params.PangaeaChainConfig
-	}
+	networkType := node.NodeConfig.GetNetworkType()
+	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
 
 	collection := shardchain.NewCollection(
@@ -457,7 +452,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
-		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+		if networkType != nodeconfig.Mainnet {
 			if node.isFirstTime {
 				// Setup one time smart contracts
 				node.AddFaucetContractToPendingTransactions()
