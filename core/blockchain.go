@@ -2877,10 +2877,10 @@ func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error
 // Note: this should only be called once during staking launch.
 func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
 	err := rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
-	bc.blockAccumulatorCache.Add(number, reward)
 	if err != nil {
 		return err
 	}
+	bc.blockAccumulatorCache.Add(number, reward)
 	return nil
 }
 
