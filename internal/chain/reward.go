@@ -148,6 +148,8 @@ func whatPercentStakedNow(
 		return nil, err
 	}
 
+	dole := numeric.NewDecFromBigInt(soFarDoledOut)
+
 	for i := range active {
 		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
 		if err != nil {
@@ -159,9 +161,12 @@ func whatPercentStakedNow(
 	}
 	percentage := stakedNow.Quo(totalTokens.Mul(
 		reward.PercentageForTimeStamp(timestamp),
-	).Add(
-		numeric.NewDecFromBigInt(soFarDoledOut)),
-	)
+	).Add(dole))
+	utils.Logger().Info().
+		Str("so-far-doled-out", dole.String()).
+		Str("staked-percentage", percentage.String()).
+		Str("currently-staked", stakedNow.String()).
+		Msg("Computed how much staked right now")
 	return &percentage, nil
 }
 
