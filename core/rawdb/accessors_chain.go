@@ -428,7 +428,7 @@ func ReadShardState(
 	if err2 != nil {
 		return nil, ctxerror.New("cannot decode sharding state",
 			"epoch", epoch,
-		).WithCause(err)
+		).WithCause(err2)
 	}
 	return ss, nil
 }
