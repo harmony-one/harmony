@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	address2 "github.com/harmony-one/go-sdk/pkg/address"
+
 	"github.com/harmony-one/harmony/numeric"
 
 	"math/big"
@@ -559,8 +561,8 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, add
 			})
 		}
 		result = append(result, &RPCDelegation{
-			validators[i],
-			delegatorAddress,
+			address2.ToBech32(validators[i]),
+			address2.ToBech32(delegatorAddress),
 			delegation.Amount,
 			delegation.Reward,
 			undelegations,
@@ -585,8 +587,8 @@ func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, add
 			})
 		}
 		result = append(result, &RPCDelegation{
-			validatorAddress,
-			delegation.DelegatorAddress,
+			address2.ToBech32(validatorAddress),
+			address2.ToBech32(delegation.DelegatorAddress),
 			delegation.Amount,
 			delegation.Reward,
 			undelegations,
@@ -615,8 +617,8 @@ func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.C
 			})
 		}
 		return &RPCDelegation{
-			validatorAddress,
-			delegatorAddress,
+			address2.ToBech32(validatorAddress),
+			address2.ToBech32(delegatorAddress),
 			delegation.Amount,
 			delegation.Reward,
 			undelegations,
