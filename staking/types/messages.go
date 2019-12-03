@@ -60,7 +60,7 @@ type CreateValidator struct {
 	MinSelfDelegation  *big.Int             `json:"min_self_delegation" yaml:"min_self_delegation"`
 	MaxTotalDelegation *big.Int             `json:"max_total_delegation" yaml:"max_total_delegation"`
 	SlotPubKeys        []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
-	PubKeySigs         []shard.BlsSignature `json:"pub_key_sigs" yarml:"pub_key_sigs"`
+	SlotKeySigs        []shard.BlsSignature `json:"pub_key_sigs" yarml:"pub_key_sigs"`
 	Amount             *big.Int             `json:"amount" yaml:"amount"`
 }
 
@@ -73,7 +73,7 @@ type EditValidator struct {
 	MaxTotalDelegation *big.Int            `json:"max_total_delegation" yaml:"max_total_delegation" rlp:"nil"`
 	SlotKeyToRemove    *shard.BlsPublicKey `json:"slot_key_to_remove" yaml:"slot_key_to_remove" rlp:"nil"`
 	SlotKeyToAdd       *shard.BlsPublicKey `json:"slot_key_to_add" yaml:"slot_key_to_add" rlp:"nil"`
-	AddKeySig          shard.BlsSignature  `json:"add_key_sig" yaml:"add_key_sig" rlp:"nil"`
+	SlotKeyToAddSig    shard.BlsSignature  `json:"add_key_sig" yaml:"add_key_sig" rlp:"nil"`
 }
 
 // Delegate - type for delegating to a validator

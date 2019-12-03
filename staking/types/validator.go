@@ -277,7 +277,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	pubKeys := []shard.BlsPublicKey{}
 	pubKeys = append(pubKeys, val.SlotPubKeys...)
 
-	if err = verifyBLSKeys(pubKeys, val.PubKeySigs); err != nil {
+	if err = verifyBLSKeys(pubKeys, val.SlotKeySigs); err != nil {
 		return nil, err
 	}
 
@@ -340,7 +340,7 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 			}
 		}
 		if !found {
-			if err := verifyBLSKey(*edit.SlotKeyToAdd, edit.AddKeySig); err != nil {
+			if err := verifyBLSKey(*edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
 				return err
 			}
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
