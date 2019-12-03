@@ -788,7 +788,6 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 	consensus.FBFTLog.AddMessage(pbftMsg)
-	consensus.ChainReader.WriteLastCommits(pbftMsg.Payload)
 
 	// find correct block content
 	curBlockHash := consensus.blockHash
@@ -806,8 +805,10 @@ func (consensus *Consensus) finalizeCommits() {
 			Msg("[FinalizeCommits] Leader cannot provide the correct block for committed message")
 		return
 	}
-	// if leader success finalize the block, send committed message to validators
 
+	consensus.ChainReader.WriteLastCommits(pbftMsg.Payload)
+
+	// if leader success finalize the block, send committed message to validators
 	if err := consensus.msgSender.SendWithRetry(
 		block.NumberU64(),
 		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
@@ -1012,7 +1013,7 @@ func (consensus *Consensus) tryCatchup() {
 		if consensus.BlockVerifier == nil {
 			// do nothing
 		} else if err := consensus.BlockVerifier(block); err != nil {
-			utils.Logger().Info().Msg("[TryCatchup]block verification faied")
+			utils.Logger().Info().Msg("[TryCatchup] block verification failed")
 			return
 		}
 

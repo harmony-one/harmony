@@ -247,9 +247,6 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are running consensus on
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
-	// TODO ek – where do we verify parent-child invariants,
-	//  e.g. "child.Number == child.IsGenesis() ? 0 : parent.Number+1"?
-
 	err := node.Blockchain().Validator().ValidateHeader(newBlock, true)
 	if err != nil {
 		utils.Logger().Error().
@@ -272,9 +269,10 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Int("numTx", len(newBlock.Transactions())).
+			Int("numStakingTx", len(newBlock.StakingTransactions())).
 			Err(err).
-			Msg("cannot ValidateNewBlock")
-		return ctxerror.New("cannot ValidateNewBlock",
+			Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
+		return ctxerror.New("[VerifyNewBlock] Cannot Verify New Block!!!",
 			"blockHash", newBlock.Hash(),
 			"numTx", len(newBlock.Transactions()),
 		).WithCause(err)
@@ -301,15 +299,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		return ctxerror.New("[VerifyNewBlock] Cannot ValidateNewBlock", "blockHash", newBlock.Hash(),
 			"numIncomingReceipts", len(newBlock.IncomingReceipts())).WithCause(err)
 	}
-
-	// TODO: verify the vrf randomness
-	// _ = newBlock.Header().Vrf
-
-	// TODO: uncomment 4 lines after we finish staking mechanism
-	//err = node.validateNewShardState(newBlock, &node.CurrentStakes)
-	//	if err != nil {
-	//		return ctxerror.New("failed to verify sharding state").WithCause(err)
-	//	}
 	return nil
 }
 
