@@ -56,10 +56,8 @@ type RosterPerShard struct {
 
 // AggregateRosters ..
 func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
-
 	result := map[common.Address]Staker{}
 	c := int64(len(rosters))
-
 	sort.SliceStable(rosters,
 		func(i, j int) bool { return rosters[i].ShardID < rosters[j].ShardID },
 	)
