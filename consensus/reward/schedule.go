@@ -96,7 +96,7 @@ var (
 		mustParse("2025-Feb-28"): numeric.MustNewDecFromStr("0.9941"),
 		mustParse("2025-Mar-31"): numeric.MustNewDecFromStr("0.9961"),
 		mustParse("2025-Apr-30"): numeric.MustNewDecFromStr("0.9980"),
-		mustParse("2025-May-30"): numeric.MustNewDecFromStr("1.0000"),
+		mustParse("2025-May-31"): numeric.MustNewDecFromStr("1.0000"),
 	}
 	sorted = func() []pair {
 		s := []pair{}
@@ -126,8 +126,12 @@ func PercentageForTimeStamp(ts int64) numeric.Dec {
 	i, j := 0, 1
 
 	for range sorted {
-		if i == len(sorted) {
-			bucket = sorted[i-1]
+		if i == (len(sorted) - 1) {
+			if ts < sorted[0].ts {
+				bucket = sorted[0]
+			} else {
+				bucket = sorted[i]
+			}
 			break
 		}
 		if ts >= sorted[i].ts && ts < sorted[j].ts {
