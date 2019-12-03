@@ -1230,24 +1230,22 @@ func (bc *BlockChain) WriteBlockWithState(
 
 			members := []*bls2.PublicKey{}
 			for _, slot := range committee.Slots {
-				if slot.TotalStake != nil {
-					pubKey := &bls2.PublicKey{}
-					err := pubKey.Deserialize(slot.BlsPublicKey[:])
-					if err != nil {
-						return NonStatTy, err
-					}
-					members = append(members, pubKey)
+				pubKey := &bls2.PublicKey{}
+				err := pubKey.Deserialize(slot.BlsPublicKey[:])
+				if err != nil {
+					return NonStatTy, err
 				}
+				members = append(members, pubKey)
 			}
 
 			mask, _ := bls.NewMask(members, nil)
 			mask.SetMask(block.Header().LastCommitBitmap())
 
 			if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
-				utils.Logger().Err(err)
+				utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 			}
 		} else {
-			return NonStatTy, errors.New("failed reading shard state for uptime accounting")
+			return NonStatTy, errors.New("[Uptime] failed reading shard state for uptime accounting")
 		}
 	}
 
@@ -1290,10 +1288,10 @@ func (bc *BlockChain) WriteBlockWithState(
 					mask.SetMask(crossLink.Bitmap())
 
 					if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
-						utils.Logger().Err(err)
+						utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 					}
 				} else {
-					return NonStatTy, errors.New("failed reading shard state for uptime accounting")
+					return NonStatTy, errors.New("[Uptime] failed reading shard state for uptime accounting")
 				}
 			}
 
