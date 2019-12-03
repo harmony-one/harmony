@@ -2,6 +2,7 @@ package chain
 
 import (
 	"encoding/binary"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -191,14 +192,15 @@ func (e *engineImpl) Finalize(
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
-) (*types.Block, error) {
+) (*types.Block, *big.Int, error) {
 
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	if err := AccumulateRewards(
+	payout, err := AccumulateRewards(
 		chain, state, header, e.Rewarder(), e.Slasher(), e.Beaconchain(),
-	); err != nil {
-		return nil, ctxerror.New("cannot pay block reward").WithCause(err)
+	)
+	if err != nil {
+		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 
 	// TODO Shouldnt this logic only apply to beaconchain, right?
@@ -208,7 +210,7 @@ func (e *engineImpl) Finalize(
 		// TODO: make sure we are using the correct validator list
 		validators, err := chain.ReadActiveValidatorList()
 		if err != nil {
-			return nil, ctxerror.New("failed to read active validators").WithCause(err)
+			return nil, nil, ctxerror.New("failed to read active validators").WithCause(err)
 		}
 		for _, validator := range validators {
 			wrapper := state.GetStakingInfo(validator)
@@ -219,16 +221,16 @@ func (e *engineImpl) Finalize(
 					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 				}
 				if err := state.UpdateStakingInfo(validator, wrapper); err != nil {
-					return nil, ctxerror.New("failed update validator info").WithCause(err)
+					return nil, nil, ctxerror.New("failed update validator info").WithCause(err)
 				}
 			} else {
 				err = errors.New("validator came back empty " + common2.MustAddressToBech32(validator))
-				return nil, ctxerror.New("failed getting validator info").WithCause(err)
+				return nil, nil, ctxerror.New("failed getting validator info").WithCause(err)
 			}
 		}
 	}
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
-	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), nil
+	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
 }
 
 // QuorumForBlock returns the quorum for the given block header.

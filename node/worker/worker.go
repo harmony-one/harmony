@@ -360,7 +360,10 @@ func (w *Worker) SuperCommitteeForNextEpoch(
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
-func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks types.CrossLinks, shardState *shard.State) (*types.Block, error) {
+func (w *Worker) FinalizeNewBlock(
+	sig []byte, signers []byte, viewID uint64, coinbase common.Address,
+	crossLinks types.CrossLinks, shardState *shard.State,
+) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		sig2 := w.current.header.LastCommitSignature()
 		copy(sig2[:], sig[:])
@@ -412,7 +415,10 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 
 	copyHeader := types.CopyHeader(w.current.header)
 	// TODO: feed coinbase into here so the proposer gets extra rewards.
-	block, err := w.engine.Finalize(w.chain, copyHeader, state, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stakingTxs)
+	block, _, err := w.engine.Finalize(
+		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
+		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
+	)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}

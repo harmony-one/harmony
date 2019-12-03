@@ -77,6 +77,7 @@ const (
 	validatorListCacheLimit            = 10
 	validatorListByDelegatorCacheLimit = 1024
 	pendingCrossLinksCacheLimit        = 2
+	blockAccumulatorCacheLimit         = 256
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -144,6 +145,7 @@ type BlockChain struct {
 	validatorListCache            *lru.Cache // Cache of validator list
 	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
 	pendingCrossLinksCache        *lru.Cache // Cache of last pending crosslinks
+	blockAccumulatorCache         *lru.Cache // Cache of block accumulators
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -185,6 +187,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	validatorListCache, _ := lru.New(validatorListCacheLimit)
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
+	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:                   chainConfig,
@@ -208,6 +211,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		validatorListCache:            validatorListCache,
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
+		blockAccumulatorCache:         blockAccumulatorCache,
 		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
@@ -241,7 +245,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	}
 
 	// Process block using the parent state as reference point.
-	receipts, cxReceipts, _, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(block, state, bc.vmConfig)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
@@ -1016,7 +1020,10 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, state *state.DB) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(
+	block *types.Block, receipts []*types.Receipt,
+	cxReceipts []*types.CXReceipt, payout *big.Int, state *state.DB,
+) (status WriteStatus, err error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -1301,13 +1308,12 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
 
-	isFirstTimeStaking := bc.chainConfig.IsStaking(new(big.Int).Add(block.Epoch(), big.NewInt(1))) &&
-		len(block.Header().ShardState()) > 0 &&
-		!bc.chainConfig.IsStaking(block.Epoch())
-
-	if curHeader := bc.CurrentHeader(); isFirstTimeStaking &&
-		curHeader.ShardID() == shard.BeaconChainShardID {
-		bc.WriteBlockRewardAccumulator(big.NewInt(0))
+	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
+		if bc.chainConfig.IsStaking(block.Epoch()) {
+			bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
+		} else {
+			bc.UpdateBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
+		}
 	}
 
 	/////////////////////////// END
@@ -1518,7 +1524,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1533,7 +1539,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		proctime := time.Since(bstart)
 
 		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, state)
+		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, payout, state)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
@@ -2850,25 +2856,33 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	return nil
 }
 
-// BlockRewardAccumulator ..
-func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
-	return rawdb.ReadBlockRewardAccumulator(bc.db)
+// ReadBlockRewardAccumulator ..
+func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
+	if cached, ok := bc.blockAccumulatorCache.Get(number); ok {
+		return cached.(*big.Int), nil
+	}
+	return rawdb.ReadBlockRewardAccumulator(bc.db, number)
 }
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
-func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int) error {
-	return rawdb.WriteBlockRewardAccumulator(bc.db, reward)
+func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
+	err := rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
+	if err != nil {
+		return err
+	}
+	bc.blockAccumulatorCache.Add(number, reward)
+	return nil
 }
 
 //UpdateBlockRewardAccumulator ..
 // Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int) error {
-	current, err := bc.BlockRewardAccumulator()
+func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int, number uint64) error {
+	current, err := bc.ReadBlockRewardAccumulator(number - 1)
 	if err != nil {
 		return err
 	}
-	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff))
+	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
 }
 
 // Note this should read from the state of current block in concern (root == newBlock.root)

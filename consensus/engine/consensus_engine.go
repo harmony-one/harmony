@@ -48,12 +48,8 @@ type ChainReader interface {
 	// Methods needed for EPoS committee assignment calculation
 	committee.StakingCandidatesReader
 
-	//BlockRewardAccumulator is the current accumulator
-	BlockRewardAccumulator() (*big.Int, error)
-	// UpdateBlockRewardAccumulator => accumulator = accumulator + diff
-	UpdateBlockRewardAccumulator(diff *big.Int) error
-	// WriteBlockRewardAccumulator writes directly to the accumulator field
-	WriteBlockRewardAccumulator(reward *big.Int) error
+	//ReadBlockRewardAccumulator is the block-reward given for block number
+	ReadBlockRewardAccumulator(uint64) (*big.Int, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.
@@ -115,7 +111,7 @@ type Engine interface {
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
-	) (*types.Block, error)
+	) (*types.Block, *big.Int, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.
