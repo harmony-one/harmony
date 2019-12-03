@@ -183,35 +183,42 @@ func passphraseForBls() {
 	blsPassphrase = passphrase
 }
 
-func setupInitialAccount() (isLeader bool) {
+func setupLegacyNodeAccount() error {
 	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
-	// TODO: after staking, what if the FN validator uses the old bls pub keys?
 	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
-			isLeader, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
+			_, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
 			if initialAccount != nil {
 				break
 			}
 		}
 	} else {
-		isLeader, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+		_, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
 	}
 
 	if initialAccount == nil {
-		initialAccount = &genesis.DeployAccount{}
-		initialAccount.ShardID = uint32(*shardID)
-		initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
-		blsAddressBytes := pubKey.GetAddress()
-		initialAccount.Address = hex.EncodeToString(blsAddressBytes[:])
-	} else {
-		fmt.Printf("My Genesis Account: %v\n", *initialAccount)
+		return errors.Errorf("cannot find key %s in table", pubKey.SerializeToHexStr())
 	}
+	fmt.Printf("My Genesis Account: %v\n", *initialAccount)
+	return nil
+}
 
-	return isLeader
+func setupStakingNodeAccount() error {
+	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
+	shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
+	if err != nil {
+		return errors.Wrap(err, "cannot determine shard to join")
+	}
+	initialAccount = &genesis.DeployAccount{}
+	initialAccount.ShardID = shardID
+	initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
+	blsAddressBytes := pubKey.GetAddress()
+	initialAccount.Address = hex.EncodeToString(blsAddressBytes[:])
+	return nil
 }
 
 func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
@@ -452,15 +459,15 @@ func main() {
 	}
 
 	if *nodeType == "validator" {
-		setupInitialAccount()
+		var err error
 		if *stakingFlag {
-			shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
-			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr,
-					"ERROR cannot determine shard to join: %s", err)
-				os.Exit(1)
-			}
-			initialAccount.ShardID = shardID
+			err = setupStakingNodeAccount()
+		} else {
+			err = setupLegacyNodeAccount()
+		}
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "cannot set up node account: %s\n", err)
+			os.Exit(1)
 		}
 	}
 	fmt.Printf("%s mode; node key %s -> shard %d\n",
