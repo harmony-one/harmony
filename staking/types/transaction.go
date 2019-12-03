@@ -179,11 +179,6 @@ func (tx *StakingTransaction) Nonce() uint64 {
 	return tx.data.AccountNonce
 }
 
-// Directive ..
-func (tx *StakingTransaction) Directive() Directive {
-	return tx.data.Directive
-}
-
 // RLPEncodeStakeMsg ..
 func (tx *StakingTransaction) RLPEncodeStakeMsg() (by []byte, err error) {
 	return rlp.EncodeToBytes(tx.data.StakeMsg)

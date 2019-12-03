@@ -105,16 +105,14 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 	return shardState
 }
 
-// EPOSStakedCommittee ..
-func EPOSStakedCommittee(
+func eposStakedCommittee(
 	s shardingconfig.Instance, stakerReader DataProvider, stakedSlotsCount int,
 ) (*shard.State, error) {
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
 
-	utils.Logger().Info().Int("staked-candidates", len(candidates)).
-		Msg("preparing epos staked committee")
+	utils.Logger().Info().Int("staked-candidates", len(candidates)).Msg("preparing epos staked committee")
 
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
@@ -231,7 +229,7 @@ func (def partialStakingEnabled) Compute(
 	stakedSlots :=
 		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
 			int(instance.NumShards())
-	shardState, err := EPOSStakedCommittee(instance, stakerReader, stakedSlots)
+	shardState, err := eposStakedCommittee(instance, stakerReader, stakedSlots)
 
 	if err != nil {
 		return nil, err
