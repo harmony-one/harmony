@@ -117,7 +117,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -v             print out the version of the node.sh
    -V             print out the version of the Harmony binary
    -z             run in staking mode
-   -Z             run in legacy, foundational-node mode (default)
+   -y             run in legacy, foundational-node mode (default)
 
 examples:
 
@@ -168,7 +168,7 @@ ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVZz opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyz opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -196,7 +196,7 @@ do
    V) LD_LIBRARY_PATH=. ./harmony -version
       exit 0 ;;
    z) staking_mode=true;;
-   Z) staking_mode=false;;
+   y) staking_mode=false;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
