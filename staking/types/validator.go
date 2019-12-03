@@ -61,8 +61,6 @@ type ValidatorStats struct {
 	NumBlocksSigned *big.Int `json:"num_blocks_signed" rlp:"nil"`
 	// The number of times they validator is jailed due to extensive downtime
 	NumJailed *big.Int `json:"num_jailed" rlp:"nil"`
-	// AvgVotingPower is the average percent of voting power this validator has over all shards
-	AvgVotingPower numeric.Dec `json:"avg_voting_power" rlp:"nil"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `json:"total_effective_stake" rlp:"nil"`
 	// VotingPowerPerShard ..

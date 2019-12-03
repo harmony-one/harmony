@@ -515,7 +515,11 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 
 	if stats != nil {
 		rpcValidator.Uptime = numeric.NewDecFromBigInt(stats.NumBlocksSigned).Quo(numeric.NewDecFromBigInt(stats.NumBlocksToSign)).String()
-		rpcValidator.AvgVotingPower = stats.AvgVotingPower.String()
+		avg := numeric.ZeroDec()
+		for i := range stats.VotingPowerPerShard {
+			avg = avg.Add(stats.VotingPowerPerShard[i].VotingPower)
+		}
+		rpcValidator.AvgVotingPower = avg.QuoInt64(int64(len(stats.VotingPowerPerShard))).String()
 		rpcValidator.TotalEffectiveStake = stats.TotalEffectiveStake.String()
 	}
 

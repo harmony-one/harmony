@@ -2600,7 +2600,7 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 			if stats == nil {
 				stats = &staking.ValidatorStats{
 					big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
-					numeric.NewDec(0), []staking.VotePerShard{}, []staking.KeysPerShard{},
+					[]staking.VotePerShard{}, []staking.KeysPerShard{},
 				}
 			}
 			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, big.NewInt(1))
@@ -2654,12 +2654,10 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 		statsFromDB, err := rawdb.ReadValidatorStats(bc.db, key)
 		if statsFromDB == nil {
 			statsFromDB = &staking.ValidatorStats{
-				big.NewInt(0), big.NewInt(0), big.NewInt(0),
-				numeric.NewDec(0), numeric.NewDec(0),
+				big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
 				[]staking.VotePerShard{}, []staking.KeysPerShard{},
 			}
 		}
-		statsFromDB.AvgVotingPower = value.AverageVotingPower
 		statsFromDB.TotalEffectiveStake = value.TotalEffectiveStake
 		statsFromDB.VotingPowerPerShard = value.VotingPower
 		statsFromDB.BLSKeyPerShard = value.BLSPublicKeysOwned
