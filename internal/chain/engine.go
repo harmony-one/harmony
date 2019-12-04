@@ -290,9 +290,20 @@ func (e *engineImpl) Finalize(
 					totalWithdraw := delegation.RemoveUnlockedUndelegations(header.Epoch(), wrapper.LastEpochInCommittee)
 					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 				}
+
+				stats, err := chain.ReadValidatorStats(validator)
+				if err != nil {
+					return nil, nil, ctxerror.New("could not read validator stats").WithCause(err)
+				}
+
+				if stats.NumBlocksMissed.Cmp(slash.MissedThresholdForInactive) == 0 {
+					wrapper.Active = false
+				}
+
 				if err := state.UpdateStakingInfo(validator, wrapper); err != nil {
 					return nil, nil, ctxerror.New("[Finalize] failed update validator info").WithCause(err)
 				}
+
 			} else {
 				err = errors.New("[Finalize] validator came back empty " + common2.MustAddressToBech32(validator))
 				return nil, nil, ctxerror.New("[Finalize] failed getting validator info").WithCause(err)

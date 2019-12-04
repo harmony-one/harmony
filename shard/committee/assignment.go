@@ -125,7 +125,12 @@ func eposStakedCommittee(
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		validator, err := stakerReader.ReadValidatorInformation(candidates[i])
-
+		if !validator.Active {
+			utils.Logger().Info().
+				Str("inactive", common2.MustAddressToBech32(validator.Address)).
+				Msg("passed over inactive validator")
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}

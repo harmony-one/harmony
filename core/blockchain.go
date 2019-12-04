@@ -51,7 +51,6 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -2634,27 +2633,7 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 				stats.NumBlocksMissed.Add(stats.NumBlocksMissed, one)
 			}
 
-			if stats.NumBlocksMissed.Cmp(slash.MissedThresholdForInactive) == 0 {
-				active, err := bc.ReadActiveValidatorList()
-				if err != nil {
-					return err
-				}
-
-				faithful := []common.Address{}
-				mia := addr.Bytes()
-				for i := range active {
-					if bytes.Compare(mia, active[i].Bytes()) != 0 {
-						faithful = append(faithful, active[i])
-					}
-				}
-				if err := bc.WriteActiveValidatorList(faithful); err != nil {
-					return err
-				}
-
-			}
-
 			// TODO: record time being jailed.
-
 			err = rawdb.WriteValidatorStats(batch, addr, stats)
 			if err != nil {
 				return err
