@@ -39,6 +39,7 @@ import (
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -1203,7 +1204,8 @@ func (bc *BlockChain) WriteBlockWithState(
 	}
 
 	// Update voting power of validators for all shards
-	if block.ShardID() == 0 && len(block.Header().ShardState()) > 0 {
+	if block.ShardID() == shard.BeaconChainShardID &&
+		len(block.Header().ShardState()) > 0 {
 		shardState := new(shard.State)
 
 		if shardState, err = shard.DecodeWrapper(block.Header().ShardState()); err == nil {
@@ -1217,7 +1219,8 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	// NOTE: Uptime stats is not mission critical code. Should move to offchain server
 	// Writing validator stats (for uptime recording) for shard 0
-	if block.ShardID() == 0 && bc.chainConfig.IsStaking(block.Epoch()) {
+	if block.ShardID() == shard.BeaconChainShardID &&
+		bc.chainConfig.IsStaking(block.Epoch()) {
 		parentHeader := bc.GetHeaderByHash(block.ParentHash())
 		if parentHeader == nil {
 			utils.Logger().Debug().Msg("[Uptime] no parent found for uptime accounting")
@@ -1251,7 +1254,9 @@ func (bc *BlockChain) WriteBlockWithState(
 	}
 
 	//// Writing beacon chain cross links
-	if header.ShardID() == 0 && bc.chainConfig.IsStaking(block.Epoch()) && len(header.CrossLinks()) > 0 {
+	if header.ShardID() == shard.BeaconChainShardID &&
+		bc.chainConfig.IsStaking(block.Epoch()) &&
+		len(header.CrossLinks()) > 0 {
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
 		if err != nil {
@@ -2600,7 +2605,10 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 			// Retrieve the stats and add new counts
 			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
 			if stats == nil {
-				stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0), numeric.NewDec(0)}
+				stats = &staking.ValidatorStats{
+					big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
+					[]staking.VotePerShard{}, []staking.KeysPerShard{},
+				}
 			}
 			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, big.NewInt(1))
 
@@ -2635,50 +2643,37 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 		return errors.New("[UpdateValidatorVotingPower] Nil shard state")
 	}
 
-	totalEffectiveStake := make(map[uint32]numeric.Dec)
-	addrToEffectiveStakes := make(map[common.Address]map[uint32]numeric.Dec)
+	rosters := make([]votepower.RosterPerShard, len(state.Shards))
 
-	for _, committee := range state.Shards {
-		for _, slot := range committee.Slots {
-			if slot.TotalStake != nil {
-				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress]; !ok {
-					addrToEffectiveStakes[slot.EcdsaAddress] = map[uint32]numeric.Dec{}
-				}
-				if _, ok := addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID]; !ok {
-					addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID] = numeric.NewDec(0)
-				}
-				addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID] = addrToEffectiveStakes[slot.EcdsaAddress][committee.ShardID].Add(*slot.TotalStake)
-
-				if _, ok := totalEffectiveStake[committee.ShardID]; !ok {
-					totalEffectiveStake[committee.ShardID] = numeric.NewDec(0)
-				}
-				totalEffectiveStake[committee.ShardID] = totalEffectiveStake[committee.ShardID].Add(*slot.TotalStake)
-			}
+	for i := range state.Shards {
+		roster, err := votepower.Compute(state.Shards[i].Slots)
+		if err != nil {
+			return err
 		}
+		rosters[i] = votepower.RosterPerShard{state.Shards[i].ShardID, roster}
 	}
 
+	networkWide := votepower.AggregateRosters(rosters)
+
 	batch := bc.db.NewBatch()
-	for addr, votingPowers := range addrToEffectiveStakes {
-		addrTotalVotingPower := numeric.NewDec(0) // Total voting power is the average voting power across all shards
-		addrTotalEffectiveStake := numeric.NewDec(0)
-		for shardID, eStake := range votingPowers {
-			addrTotalVotingPower = addrTotalVotingPower.Add(eStake.Quo(totalEffectiveStake[shardID]))
-			addrTotalEffectiveStake = addrTotalEffectiveStake.Add(eStake)
-		}
-		// Retrieve the stats and update
-		stats, err := rawdb.ReadValidatorStats(bc.db, addr)
-		if stats == nil {
-			stats = &staking.ValidatorStats{big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0), numeric.NewDec(0)}
-		}
 
-		stats.AvgVotingPower = addrTotalVotingPower.Quo(numeric.NewDec(int64(len(state.Shards))))
-		stats.TotalEffectiveStake = addrTotalEffectiveStake
-
-		err = rawdb.WriteValidatorStats(batch, addr, stats)
+	for key, value := range networkWide {
+		statsFromDB, err := rawdb.ReadValidatorStats(bc.db, key)
+		if statsFromDB == nil {
+			statsFromDB = &staking.ValidatorStats{
+				big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
+				[]staking.VotePerShard{}, []staking.KeysPerShard{},
+			}
+		}
+		statsFromDB.TotalEffectiveStake = value.TotalEffectiveStake
+		statsFromDB.VotingPowerPerShard = value.VotingPower
+		statsFromDB.BLSKeyPerShard = value.BLSPublicKeysOwned
+		err = rawdb.WriteValidatorStats(batch, key, statsFromDB)
 		if err != nil {
 			return err
 		}
 	}
+
 	if err := batch.Write(); err != nil {
 		return err
 	}
