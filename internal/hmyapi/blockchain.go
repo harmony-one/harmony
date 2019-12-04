@@ -492,13 +492,23 @@ func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformati
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
-func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]common.Address, error) {
-	return s.b.GetAllValidatorAddresses(), nil
+func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
+	addresses := []string{}
+	for _, addr := range s.b.GetAllValidatorAddresses() {
+		oneAddr, _ := internal_common.AddressToBech32(addr)
+		addresses = append(addresses, oneAddr)
+	}
+	return addresses, nil
 }
 
 // GetActiveValidatorAddresses returns active validator addresses.
-func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]common.Address, error) {
-	return s.b.GetActiveValidatorAddresses(), nil
+func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]string, error) {
+	addresses := []string{}
+	for _, addr := range s.b.GetActiveValidatorAddresses() {
+		oneAddr, _ := internal_common.AddressToBech32(addr)
+		addresses = append(addresses, oneAddr)
+	}
+	return addresses, nil
 }
 
 // GetValidatorInformation returns information about a validator.
@@ -562,9 +572,11 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, add
 				delegation.Undelegations[j].Epoch,
 			})
 		}
+		valAddr, _ := internal_common.AddressToBech32(validators[i])
+		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
 		result = append(result, &RPCDelegation{
-			validators[i],
-			delegatorAddress,
+			valAddr,
+			delAddr,
 			delegation.Amount,
 			delegation.Reward,
 			undelegations,
@@ -588,9 +600,11 @@ func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, add
 				delegation.Undelegations[j].Epoch,
 			})
 		}
+		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
+		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
 		result = append(result, &RPCDelegation{
-			validatorAddress,
-			delegation.DelegatorAddress,
+			valAddr,
+			delAddr,
 			delegation.Amount,
 			delegation.Reward,
 			undelegations,
@@ -618,9 +632,11 @@ func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.C
 				delegation.Undelegations[j].Epoch,
 			})
 		}
+		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
+		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
 		return &RPCDelegation{
-			validatorAddress,
-			delegatorAddress,
+			valAddr,
+			delAddr,
 			delegation.Amount,
 			delegation.Reward,
 			undelegations,

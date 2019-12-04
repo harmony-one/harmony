@@ -83,7 +83,7 @@ type HeaderInformation struct {
 
 // RPCValidator represents a validator
 type RPCValidator struct {
-	Address             common.Address       `json:"address"`
+	Address             string               `json:"address"`
 	SlotPubKeys         []shard.BlsPublicKey `json:"slot_pub_keys"`
 	SlotShardIDs        []int                `json:"slot_shard_ids"`
 	UnbondingHeight     *big.Int             `json:"unbonding_height"`
@@ -100,8 +100,8 @@ type RPCValidator struct {
 
 // RPCDelegation represents a particular delegation to a validator
 type RPCDelegation struct {
-	ValidatorAddress common.Address    `json:"validator_address" yaml:"validator_address"`
-	DelegatorAddress common.Address    `json:"delegator_address" yaml:"delegator_address"`
+	ValidatorAddress string            `json:"validator_address" yaml:"validator_address"`
+	DelegatorAddress string            `json:"delegator_address" yaml:"delegator_address"`
 	Amount           *big.Int          `json:"amount" yaml:"amount"`
 	Reward           *big.Int          `json:"reward" yaml:"reward"`
 	Undelegations    []RPCUndelegation `json:"Undelegations" yaml:"Undelegations"`
@@ -172,8 +172,9 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 }
 
 func newRPCValidator(validator *types2.Validator) *RPCValidator {
+	addr, _ := internal_common.AddressToBech32(validator.Address)
 	return &RPCValidator{
-		validator.Address,
+		addr,
 		validator.SlotPubKeys,
 		nil,
 		validator.UnbondingHeight,
