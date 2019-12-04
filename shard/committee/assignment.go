@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // ValidatorListProvider ..
@@ -46,6 +47,8 @@ type ChainReader interface {
 	GetHeaderByHash(common.Hash) *block.Header
 	// Config retrieves the blockchain's chain configuration.
 	Config() *params.ChainConfig
+	// CurrentHeader retrieves the current header from the local chain.
+	CurrentHeader() *block.Header
 }
 
 // DataProvider ..
@@ -59,6 +62,8 @@ type partialStakingEnabled struct{}
 var (
 	// WithStakingEnabled ..
 	WithStakingEnabled Reader = partialStakingEnabled{}
+	// ErrComputeForEpochInPast ..
+	ErrComputeForEpochInPast = errors.New("cannot compute for epoch in past")
 )
 
 func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
@@ -225,6 +230,13 @@ func (def partialStakingEnabled) Compute(
 	if preStaking {
 		// Pre-staking shard state doesn't need to set epoch (backward compatible)
 		return preStakingEnabledCommittee(instance), nil
+	}
+	// Sanity check, can't compute against epochs in past
+	if e := stakerReader.CurrentHeader().Epoch(); epoch.Cmp(e) == -1 {
+		utils.Logger().Error().Uint64("header-epoch", e.Uint64()).
+			Uint64("compute-epoch", epoch.Uint64()).
+			Msg("Tried to compute committee for epoch in past")
+		return nil, ErrComputeForEpochInPast
 	}
 	stakedSlots :=
 		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
