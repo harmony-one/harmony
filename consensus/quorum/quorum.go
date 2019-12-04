@@ -108,7 +108,7 @@ type WithJSONDump interface {
 type Decider interface {
 	SignatureReader
 	DependencyInjectionWriter
-	slash.Slasher
+	// slash.Slasher
 	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
 	SetVoters(shard.SlotList, bool) (*TallyResult, error)
@@ -132,7 +132,7 @@ type cIdentities struct {
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewID      map[string]*bls.Sign
-	seenCounter map[[shard.PublicKeySizeInBytes]byte]int
+	seenCounter map[shard.BlsPublicKey]uint64
 }
 
 type depInject struct {
@@ -165,8 +165,6 @@ func (s *cIdentities) Participants() []*bls.PublicKey {
 }
 
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
-	// TODO - might need to put reset of seen counter in separate method
-	s.seenCounter = make(map[[shard.PublicKeySizeInBytes]byte]int, len(pubKeys))
 	for i := range pubKeys {
 		k := shard.BlsPublicKey{}
 		k.FromLibBLSPublicKey(pubKeys[i])
@@ -175,10 +173,10 @@ func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
 }
 
-func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
-	s.seenCounter[key]++
-	return s.seenCounter[key] == slash.UnavailabilityInConsecutiveBlockSigning
-}
+// func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
+// 	s.seenCounter[key]++
+// 	return s.seenCounter[key] == slash.MissedThresholdForInactive.Uint64()
+// }
 
 func (s *cIdentities) DumpParticipants() []string {
 	keys := make([]string, len(s.publicKeys))
@@ -276,7 +274,7 @@ func newMapBackedSignatureReader() *cIdentities {
 	return &cIdentities{
 		[]*bls.PublicKey{}, map[string]*bls.Sign{},
 		map[string]*bls.Sign{}, map[string]*bls.Sign{},
-		map[[shard.PublicKeySizeInBytes]byte]int{},
+		map[shard.BlsPublicKey]uint64{},
 	}
 }
 

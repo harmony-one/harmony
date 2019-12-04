@@ -96,10 +96,10 @@ func (v *uniformVoteWeight) Award(
 	return payout
 }
 
-func (v *uniformVoteWeight) ShouldSlash(k shard.BlsPublicKey) bool {
-	// No-op, no semantic meaning in one-slot-one-vote
-	return false
-}
+// func (v *uniformVoteWeight) ShouldSlash(k shard.BlsPublicKey) bool {
+// 	// No-op, no semantic meaning in one-slot-one-vote
+// 	return false
+// }
 
 func (v *uniformVoteWeight) JSON() string {
 	s, _ := v.ShardIDProvider()()
