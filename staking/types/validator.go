@@ -24,6 +24,7 @@ const (
 	MaxWebsiteLength         = 140
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
+	BlsVerificationStr       = "harmony-one"
 )
 
 var (
@@ -258,7 +259,7 @@ func verifyBLSKey(pubKey shard.BlsPublicKey, pubKeySig shard.BlsSignature) error
 		return err
 	}
 
-	messageBytes := []byte("harmony-one")
+	messageBytes := []byte(BlsVerificationStr)
 	msgHash := hash.Keccak256(messageBytes)
 	if !msgSig.VerifyHash(blsPubKey, msgHash[:]) {
 		return errBLSKeysNotMatchSigs
