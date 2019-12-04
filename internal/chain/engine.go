@@ -296,7 +296,15 @@ func (e *engineImpl) Finalize(
 					return nil, nil, ctxerror.New("could not read validator stats").WithCause(err)
 				}
 
-				if stats.NumBlocksMissed.Cmp(slash.MissedThresholdForInactive) == 0 {
+				count := len(stats.Delinquency.Missing)
+				didMiss := 0
+
+				for _, mia := range stats.Delinquency.Missing {
+					if mia.Count >= slash.MissedThresholdForInactive {
+						didMiss++
+					}
+				}
+				if didMiss >= ((count * (2 / 3)) + 1) {
 					wrapper.Active = false
 				}
 

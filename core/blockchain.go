@@ -51,6 +51,7 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -2614,11 +2615,13 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
 			if stats == nil {
 				stats = &staking.ValidatorStats{
-					big.NewInt(0), big.NewInt(0), big.NewInt(0),
-					big.NewInt(0), numeric.NewDec(0),
+					big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
 					[]staking.VotePerShard{}, []staking.KeysPerShard{},
+					slash.DelinquentPerEpoch{},
 				}
 			}
+
+			stats.Delinquency.Epoch = bc.CurrentHeader().Epoch().Uint64()
 			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, big.NewInt(1))
 
 			enabled, err := mask.IndexEnabled(i)
@@ -2628,9 +2631,9 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 
 			if one := big.NewInt(1); enabled {
 				stats.NumBlocksSigned.Add(stats.NumBlocksSigned, one)
-				stats.NumBlocksMissed.Set(big.NewInt(0))
+				stats.Delinquency.Reset(blsKeyBytes)
 			} else {
-				stats.NumBlocksMissed.Add(stats.NumBlocksMissed, one)
+				stats.Delinquency.Increment(blsKeyBytes)
 			}
 
 			// TODO: record time being jailed.
@@ -2674,8 +2677,8 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 		if statsFromDB == nil {
 			statsFromDB = &staking.ValidatorStats{
 				big.NewInt(0), big.NewInt(0), big.NewInt(0),
-				big.NewInt(0), numeric.NewDec(0),
-				[]staking.VotePerShard{}, []staking.KeysPerShard{},
+				numeric.NewDec(0), []staking.VotePerShard{}, []staking.KeysPerShard{},
+				slash.DelinquentPerEpoch{},
 			}
 		}
 		statsFromDB.TotalEffectiveStake = value.TotalEffectiveStake

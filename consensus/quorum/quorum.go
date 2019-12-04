@@ -177,7 +177,7 @@ func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 
 func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
 	s.seenCounter[key]++
-	return s.seenCounter[key] == slash.MissedThresholdForInactive.Uint64()
+	return s.seenCounter[key] == slash.MissedThresholdForInactive
 }
 
 func (s *cIdentities) DumpParticipants() []string {

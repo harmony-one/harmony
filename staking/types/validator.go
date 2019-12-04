@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
 
@@ -64,8 +65,6 @@ type ValidatorStats struct {
 	NumBlocksToSign *big.Int `rlp:"nil"`
 	// The number of blocks the validator actually signed
 	NumBlocksSigned *big.Int `json:"num_blocks_signed" rlp:"nil"`
-	// How many times this validator missed their signatures
-	NumBlocksMissed *big.Int `json:"num_blocks_not_signed" rlp:"nil"`
 	// The number of times they validator is jailed due to extensive downtime
 	NumJailed *big.Int `rlp:"nil"`
 	// TotalEffectiveStake is the total effective stake this validator has
@@ -74,6 +73,8 @@ type ValidatorStats struct {
 	VotingPowerPerShard []VotePerShard
 	// BLSKeyPerShard ..
 	BLSKeyPerShard []KeysPerShard
+	// Delinquency ..
+	Delinquency slash.DelinquentPerEpoch
 }
 
 // Validator - data fields for a validator

@@ -194,9 +194,14 @@ func (pk BlsPublicKey) Big() *big.Int {
 	return new(big.Int).SetBytes(pk[:])
 }
 
+// Equal ..
+func (pk BlsPublicKey) Equal(other BlsPublicKey) bool {
+	return bytes.Compare(pk[:], other[:]) == 0
+}
+
 // IsEmpty returns whether the bls public key is empty 0 bytes
 func (pk BlsPublicKey) IsEmpty() bool {
-	return bytes.Compare(pk[:], emptyBlsPubKey[:]) == 0
+	return pk.Equal(emptyBlsPubKey)
 }
 
 // Hex returns the hex string of bls public key
