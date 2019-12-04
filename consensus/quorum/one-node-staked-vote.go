@@ -208,15 +208,15 @@ func (v *stakedVoteWeight) ToggleActive(k *bls.PublicKey) bool {
 	return v.roster.Voters[w].IsActive
 }
 
-// func (v *stakedVoteWeight) ShouldSlash(key shard.BlsPublicKey) bool {
-// 	s, _ := v.ShardIDProvider()()
-// 	switch s {
-// 	case shard.BeaconChainShardID:
-// 		return v.SlashThresholdMet(key)
-// 	default:
-// 		return false
-// 	}
-// }
+func (v *stakedVoteWeight) ShouldSlash(key shard.BlsPublicKey) bool {
+	s, _ := v.ShardIDProvider()()
+	switch s {
+	case shard.BeaconChainShardID:
+		return v.SlashThresholdMet(key)
+	default:
+		return false
+	}
+}
 
 func (v *stakedVoteWeight) JSON() string {
 	s, _ := v.ShardIDProvider()()

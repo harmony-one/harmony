@@ -108,7 +108,7 @@ type WithJSONDump interface {
 type Decider interface {
 	SignatureReader
 	DependencyInjectionWriter
-	// slash.Slasher
+	slash.Slasher
 	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
 	SetVoters(shard.SlotList, bool) (*TallyResult, error)
@@ -165,6 +165,8 @@ func (s *cIdentities) Participants() []*bls.PublicKey {
 }
 
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
+	// TODO - might need to put reset of seen counter in separate method
+	s.seenCounter = make(map[shard.BlsPublicKey]uint64, len(pubKeys))
 	for i := range pubKeys {
 		k := shard.BlsPublicKey{}
 		k.FromLibBLSPublicKey(pubKeys[i])
@@ -173,10 +175,10 @@ func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
 }
 
-// func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
-// 	s.seenCounter[key]++
-// 	return s.seenCounter[key] == slash.MissedThresholdForInactive.Uint64()
-// }
+func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
+	s.seenCounter[key]++
+	return s.seenCounter[key] == slash.MissedThresholdForInactive.Uint64()
+}
 
 func (s *cIdentities) DumpParticipants() []string {
 	keys := make([]string, len(s.publicKeys))
