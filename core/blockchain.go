@@ -78,6 +78,7 @@ const (
 	validatorListCacheLimit            = 10
 	validatorListByDelegatorCacheLimit = 1024
 	pendingCrossLinksCacheLimit        = 2
+	blockAccumulatorCacheLimit         = 256
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
@@ -145,6 +146,7 @@ type BlockChain struct {
 	validatorListCache            *lru.Cache // Cache of validator list
 	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
 	pendingCrossLinksCache        *lru.Cache // Cache of last pending crosslinks
+	blockAccumulatorCache         *lru.Cache // Cache of block accumulators
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -186,6 +188,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	validatorListCache, _ := lru.New(validatorListCacheLimit)
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
+	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:                   chainConfig,
@@ -209,6 +212,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		validatorListCache:            validatorListCache,
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
+		blockAccumulatorCache:         blockAccumulatorCache,
 		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
@@ -242,7 +246,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	}
 
 	// Process block using the parent state as reference point.
-	receipts, cxReceipts, _, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(block, state, bc.vmConfig)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
@@ -1017,7 +1021,10 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, state *state.DB) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(
+	block *types.Block, receipts []*types.Receipt,
+	cxReceipts []*types.CXReceipt, payout *big.Int, state *state.DB,
+) (status WriteStatus, err error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -1210,48 +1217,46 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 		}
 	}
 
+	// NOTE: Uptime stats is not mission critical code. Should move to offchain server
 	// Writing validator stats (for uptime recording) for shard 0
 	if block.ShardID() == shard.BeaconChainShardID &&
 		bc.chainConfig.IsStaking(block.Epoch()) {
 		parentHeader := bc.GetHeaderByHash(block.ParentHash())
 		if parentHeader == nil {
-			return NonStatTy, errors.New("no parent found for uptime accounting")
+			utils.Logger().Debug().Msg("[Uptime] no parent found for uptime accounting")
 		}
 		shardState, err := bc.ReadShardState(parentHeader.Epoch())
 		if err == nil {
 			committee := shardState.FindCommitteeByID(block.Header().ShardID())
 			if committee == nil {
-				return NonStatTy, errors.New("no shard found for cross-link")
+				utils.Logger().Debug().Msg("[Uptime] no shard found for cross-link")
 			}
 
 			members := []*bls2.PublicKey{}
 			for _, slot := range committee.Slots {
-				if slot.TotalStake != nil {
-					pubKey := &bls2.PublicKey{}
-					err := pubKey.Deserialize(slot.BlsPublicKey[:])
-					if err != nil {
-						return NonStatTy, err
-					}
-					members = append(members, pubKey)
+				pubKey := &bls2.PublicKey{}
+				err := pubKey.Deserialize(slot.BlsPublicKey[:])
+				if err != nil {
+					utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
 				}
+				members = append(members, pubKey)
 			}
 
 			mask, _ := bls.NewMask(members, nil)
 			mask.SetMask(block.Header().LastCommitBitmap())
 
 			if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
-				utils.Logger().Err(err)
+				utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 			}
 		} else {
-			return NonStatTy, errors.New("failed reading shard state for uptime accounting")
+			utils.Logger().Debug().Msg("[Uptime] failed reading shard state for uptime accounting")
 		}
 	}
 
-	//// Writing validator stats (for uptime recording) for for other shards
+	//// Writing beacon chain cross links
 	if header.ShardID() == shard.BeaconChainShardID &&
 		bc.chainConfig.IsStaking(block.Epoch()) &&
 		len(header.CrossLinks()) > 0 {
-		header.Logger(utils.Logger()).Debug().Msg("[insertChain/crosslinks] writing crosslinks into blockchain...")
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
 		if err != nil {
@@ -1263,13 +1268,21 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			return NonStatTy, errors.New("proposed cross links are not sorted")
 		}
 		for _, crossLink := range *crossLinks {
+			// Process crosslink
+			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
+				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
+			}
+			bc.LastContinuousCrossLink(crossLink)
+
+			// NOTE: Uptime stats is not mission critical code. Should move to offchain server
 			// Writing validator stats (for uptime recording) for other shards
 			if bc.chainConfig.IsStaking(crossLink.Epoch()) {
 				shardState, err := bc.ReadShardState(crossLink.Epoch())
 				if err == nil {
 					committee := shardState.FindCommitteeByID(crossLink.ShardID())
 					if committee == nil {
-						return NonStatTy, errors.New("no shard found for cross-link")
+						utils.Logger().Debug().Msg("[Uptime] no shard found for cross-link")
+						continue
 					}
 
 					members := []*bls2.PublicKey{}
@@ -1278,7 +1291,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 							pubKey := &bls2.PublicKey{}
 							err := pubKey.Deserialize(slot.BlsPublicKey[:])
 							if err != nil {
-								return NonStatTy, err
+								utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
 							}
 							members = append(members, pubKey)
 						}
@@ -1288,31 +1301,25 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 					mask.SetMask(crossLink.Bitmap())
 
 					if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
-						utils.Logger().Err(err)
+						utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 					}
 				} else {
-					return NonStatTy, errors.New("failed reading shard state for uptime accounting")
+					utils.Logger().Debug().Msg("[Uptime] failed reading shard state for uptime accounting")
 				}
 			}
-
-			// Process crosslink
-			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
-				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
-			}
-			bc.LastContinuousCrossLink(crossLink)
 		}
+
 		//clean/update local database cache after crosslink inserted into blockchain
 		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
 		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
 
-	isFirstTimeStaking := bc.chainConfig.IsStaking(new(big.Int).Add(block.Epoch(), big.NewInt(1))) &&
-		len(block.Header().ShardState()) > 0 &&
-		!bc.chainConfig.IsStaking(block.Epoch())
-
-	if curHeader := bc.CurrentHeader(); isFirstTimeStaking &&
-		curHeader.ShardID() == shard.BeaconChainShardID {
-		bc.WriteBlockRewardAccumulator(big.NewInt(0))
+	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
+		if bc.chainConfig.IsStaking(block.Epoch()) {
+			bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
+		} else {
+			bc.UpdateBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
+		}
 	}
 
 	/////////////////////////// END
@@ -1523,7 +1530,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1538,7 +1545,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		proctime := time.Since(bstart)
 
 		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, state)
+		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, payout, state)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
@@ -2845,25 +2852,33 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	return nil
 }
 
-// BlockRewardAccumulator ..
-func (bc *BlockChain) BlockRewardAccumulator() (*big.Int, error) {
-	return rawdb.ReadBlockRewardAccumulator(bc.db)
+// ReadBlockRewardAccumulator ..
+func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
+	if cached, ok := bc.blockAccumulatorCache.Get(number); ok {
+		return cached.(*big.Int), nil
+	}
+	return rawdb.ReadBlockRewardAccumulator(bc.db, number)
 }
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
-func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int) error {
-	return rawdb.WriteBlockRewardAccumulator(bc.db, reward)
+func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
+	err := rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
+	if err != nil {
+		return err
+	}
+	bc.blockAccumulatorCache.Add(number, reward)
+	return nil
 }
 
 //UpdateBlockRewardAccumulator ..
 // Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int) error {
-	current, err := bc.BlockRewardAccumulator()
+func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int, number uint64) error {
+	current, err := bc.ReadBlockRewardAccumulator(number - 1)
 	if err != nil {
 		return err
 	}
-	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff))
+	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
 }
 
 // Note this should read from the state of current block in concern (root == newBlock.root)

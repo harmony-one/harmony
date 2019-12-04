@@ -93,10 +93,9 @@ var (
 	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
 	BloomBitsIndexPrefix = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
 
-	preimageCounter    = metrics.NewRegisteredCounter("db/preimage/total", nil)
-	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
-	// CurrentRewardGivenOut ..
-	CurrentRewardGivenOut = []byte("total-reward-given-out")
+	preimageCounter             = metrics.NewRegisteredCounter("db/preimage/total", nil)
+	preimageHitCounter          = metrics.NewRegisteredCounter("db/preimage/hits", nil)
+	currentRewardGivenOutPrefix = []byte("blk-rwd-")
 )
 
 // TxLookupEntry is a positional metadata to help looking up the data content of
@@ -250,4 +249,8 @@ func validatorSnapshotKey(addr common.Address) []byte {
 func validatorStatsKey(addr common.Address) []byte {
 	prefix := validatorStatsPrefix
 	return append(prefix, addr.Bytes()...)
+}
+
+func blockRewardAccumKey(number uint64) []byte {
+	return append(currentRewardGivenOutPrefix, encodeBlockNumber(number)...)
 }
