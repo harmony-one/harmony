@@ -50,6 +50,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -2959,4 +2960,95 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 		}
 	}
 	return common.Address{}, ctxerror.New("cannot find corresponding ECDSA Address", "coinbaseAddr", header.Coinbase())
+}
+
+// SuperCommitteeForNextEpoch ...
+// isVerify=true means validators use it to verify
+// isVerify=false means leader is to propose
+func (bc *BlockChain) SuperCommitteeForNextEpoch(
+	beacon consensus_engine.ChainReader,
+	header *block.Header,
+	isVerify bool,
+) (*shard.State, error) {
+	var (
+		nextCommittee = new(shard.State)
+		err           error
+		beaconEpoch   = new(big.Int)
+		shardState    = shard.State{}
+	)
+	switch header.ShardID() {
+	case shard.BeaconChainShardID:
+		if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+			nextCommittee, err = committee.WithStakingEnabled.Compute(
+				new(big.Int).Add(header.Epoch(), common.Big1),
+				beacon,
+			)
+		}
+	default:
+		// TODO: needs to make sure beacon chain sync works.
+		if isVerify {
+			//verify
+			shardState, err = header.GetShardState()
+			if err != nil {
+				return &shard.State{}, err
+			}
+			// before staking epoch
+			if shardState.Epoch == nil {
+				beaconEpoch = new(big.Int).Add(header.Epoch(), common.Big1)
+			} else { // after staking epoch
+				beaconEpoch = shardState.Epoch
+			}
+		} else {
+			//propose
+			beaconEpoch = beacon.CurrentHeader().Epoch()
+		}
+		utils.Logger().Debug().Msgf("[SuperCommitteeCalculation] isVerify: %+v, realBeaconEpoch:%+v, beaconEpoch: %+v, headerEpoch:%+v, shardStateEpoch:%+v",
+			isVerify, beacon.CurrentHeader().Epoch(), beaconEpoch, header.Epoch(), shardState.Epoch)
+		nextEpoch := new(big.Int).Add(header.Epoch(), common.Big1)
+		if bc.Config().IsStaking(nextEpoch) {
+			// If next epoch is staking epoch, I should wait and listen for beacon chain for epoch changes
+			switch beaconEpoch.Cmp(header.Epoch()) {
+			case 1:
+				// If beacon chain is bigger than shard chain in epoch, it means I should catch up with beacon chain now
+				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
+					beaconEpoch, beacon,
+				)
+
+				utils.Logger().Debug().
+					Uint64("blockNum", header.Number().Uint64()).
+					Uint64("myCurEpoch", header.Epoch().Uint64()).
+					Uint64("beaconEpoch", beaconEpoch.Uint64()).
+					Msg("Propose new epoch as beacon chain's epoch")
+			case 0:
+				// If it's same epoch, no need to propose new shard state (new epoch change)
+			case -1:
+				// If beacon chain is behind, shard chain should wait for the beacon chain by not changing epochs.
+			}
+		} else {
+			if bc.Config().IsStaking(beaconEpoch) {
+				// If I am not even in the last epoch before staking epoch and beacon chain is already in staking epoch,
+				// I should just catch up with beacon chain's epoch
+				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
+					beaconEpoch, beacon,
+				)
+
+				utils.Logger().Debug().
+					Uint64("blockNum", header.Number().Uint64()).
+					Uint64("myCurEpoch", header.Epoch().Uint64()).
+					Uint64("beaconEpoch", beaconEpoch.Uint64()).
+					Msg("Propose entering staking along with beacon chain's epoch")
+			} else {
+				// If I are not in staking nor has beacon chain proposed a staking-based shard state,
+				// do pre-staking committee calculation
+				if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+					nextCommittee, err = committee.WithStakingEnabled.Compute(
+						nextEpoch,
+						bc,
+					)
+				}
+			}
+		}
+
+	}
+	return nextCommittee, err
 }

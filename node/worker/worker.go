@@ -20,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -288,75 +287,6 @@ func (w *Worker) OutgoingReceipts() []*types.CXReceipt {
 // IncomingReceipts get incoming receipts in destination shard that is received from source shard
 func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 	return w.current.incxs
-}
-
-// SuperCommitteeForNextEpoch assumes only called by consensus leader
-func (w *Worker) SuperCommitteeForNextEpoch(
-	shardID uint32,
-	beacon *core.BlockChain,
-) (*shard.State, error) {
-	var (
-		nextCommittee = new(shard.State)
-		err           error
-	)
-	switch shardID {
-	case shard.BeaconChainShardID:
-		if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
-			nextCommittee, err = committee.WithStakingEnabled.Compute(
-				new(big.Int).Add(w.current.header.Epoch(), common.Big1),
-				beacon,
-			)
-		}
-	default:
-		// TODO: needs to make sure beacon chain sync works.
-		beaconEpoch := beacon.CurrentHeader().Epoch()
-		nextEpoch := new(big.Int).Add(w.current.header.Epoch(), common.Big1)
-		if w.config.IsStaking(nextEpoch) {
-			// If next epoch is staking epoch, I should wait and listen for beacon chain for epoch changes
-			switch beaconEpoch.Cmp(w.current.header.Epoch()) {
-			case 1:
-				// If beacon chain is bigger than shard chain in epoch, it means I should catch up with beacon chain now
-				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
-					beaconEpoch, beacon,
-				)
-
-				utils.Logger().Debug().
-					Uint64("blockNum", w.current.header.Number().Uint64()).
-					Uint64("myCurEpoch", w.current.header.Epoch().Uint64()).
-					Uint64("beaconEpoch", beaconEpoch.Uint64()).
-					Msg("Propose new epoch as beacon chain's epoch")
-			case 0:
-				// If it's same epoch, no need to propose new shard state (new epoch change)
-			case -1:
-				// If beacon chain is behind, shard chain should wait for the beacon chain by not changing epochs.
-			}
-		} else {
-			if w.config.IsStaking(beaconEpoch) {
-				// If I am not even in the last epoch before staking epoch and beacon chain is already in staking epoch,
-				// I should just catch up with beacon chain's epoch
-				nextCommittee, err = committee.WithStakingEnabled.ReadFromDB(
-					beaconEpoch, beacon,
-				)
-
-				utils.Logger().Debug().
-					Uint64("blockNum", w.current.header.Number().Uint64()).
-					Uint64("myCurEpoch", w.current.header.Epoch().Uint64()).
-					Uint64("beaconEpoch", beaconEpoch.Uint64()).
-					Msg("Propose entering staking along with beacon chain's epoch")
-			} else {
-				// If I are not in staking nor has beacon chain proposed a staking-based shard state,
-				// do pre-staking committee calculation
-				if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
-					nextCommittee, err = committee.WithStakingEnabled.Compute(
-						nextEpoch,
-						w.chain,
-					)
-				}
-			}
-		}
-
-	}
-	return nextCommittee, err
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
