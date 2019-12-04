@@ -43,7 +43,7 @@ type DerivableList interface {
 func DeriveSha(list ...DerivableBase) common.Hash {
 	keybuf := new(bytes.Buffer)
 	trie := new(trie.Trie)
-	var num uint = 0
+	var num uint
 
 	for j := range list {
 		for i := 0; i < list[j].Len(); i++ {

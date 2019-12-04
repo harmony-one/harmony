@@ -140,7 +140,7 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 	ourCount := numeric.NewDec(roster.HmySlotCount)
 	ourPercentage := numeric.ZeroDec()
 	theirPercentage := numeric.ZeroDec()
-	var lastStakedVoter *stakedVoter = nil
+	var lastStakedVoter *stakedVoter
 
 	for i := range staked {
 		member := stakedVoter{
