@@ -203,12 +203,10 @@ func (e *engineImpl) Finalize(
 		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 
-	// TODO Shouldnt this logic only apply to beaconchain, right?
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
 	if header.ShardID() == shard.BeaconChainShardID && len(header.ShardState()) > 0 {
-		// TODO: make sure we are using the correct validator list
-		validators, err := chain.ReadActiveValidatorList()
+		validators, err := chain.ReadValidatorList()
 		if err != nil {
 			return nil, nil, ctxerror.New("failed to read active validators").WithCause(err)
 		}
