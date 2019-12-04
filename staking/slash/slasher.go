@@ -1,11 +1,14 @@
 package slash
 
-import "github.com/harmony-one/harmony/shard"
+import (
+	"math/big"
 
-const (
-	// UnavailabilityInConsecutiveBlockSigning is how many blocks in a row
-	// before "slashing by unavailability" occurs
-	UnavailabilityInConsecutiveBlockSigning = 1380
+	"github.com/harmony-one/harmony/shard"
+)
+
+var (
+	// MissedThresholdForInactive ..
+	MissedThresholdForInactive = big.NewInt(int64(shard.Schedule.BlocksPerEpoch()))
 )
 
 // Slasher ..

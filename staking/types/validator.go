@@ -63,7 +63,9 @@ type ValidatorStats struct {
 	// The number of blocks the validator should've signed when in active mode (selected in committee)
 	NumBlocksToSign *big.Int `rlp:"nil"`
 	// The number of blocks the validator actually signed
-	NumBlocksSigned *big.Int `rlp:"nil"`
+	NumBlocksSigned *big.Int `json:"num_blocks_signed" rlp:"nil"`
+	// How many times this validator missed their signatures
+	NumBlocksMissed *big.Int `json:"num_blocks_not_signed" rlp:"nil"`
 	// The number of times they validator is jailed due to extensive downtime
 	NumJailed *big.Int `rlp:"nil"`
 	// TotalEffectiveStake is the total effective stake this validator has

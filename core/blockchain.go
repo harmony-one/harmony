@@ -51,6 +51,7 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -2614,7 +2615,8 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
 			if stats == nil {
 				stats = &staking.ValidatorStats{
-					big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
+					big.NewInt(0), big.NewInt(0), big.NewInt(0),
+					big.NewInt(0), numeric.NewDec(0),
 					[]staking.VotePerShard{}, []staking.KeysPerShard{},
 				}
 			}
@@ -2625,9 +2627,32 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 				return err
 			}
 
-			if enabled {
-				stats.NumBlocksSigned.Add(stats.NumBlocksSigned, big.NewInt(1))
+			if one := big.NewInt(1); enabled {
+				stats.NumBlocksSigned.Add(stats.NumBlocksSigned, one)
+				stats.NumBlocksMissed.Set(big.NewInt(0))
+			} else {
+				stats.NumBlocksMissed.Add(stats.NumBlocksMissed, one)
 			}
+
+			if stats.NumBlocksMissed.Cmp(slash.MissedThresholdForInactive) == 0 {
+				active, err := bc.ReadActiveValidatorList()
+				if err != nil {
+					return err
+				}
+
+				faithful := []common.Address{}
+				mia := addr.Bytes()
+				for i := range active {
+					if bytes.Compare(mia, active[i].Bytes()) != 0 {
+						faithful = append(faithful, active[i])
+					}
+				}
+				if err := bc.WriteActiveValidatorList(faithful); err != nil {
+					return err
+				}
+
+			}
+
 			// TODO: record time being jailed.
 
 			err = rawdb.WriteValidatorStats(batch, addr, stats)
@@ -2669,7 +2694,8 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 		statsFromDB, err := rawdb.ReadValidatorStats(bc.db, key)
 		if statsFromDB == nil {
 			statsFromDB = &staking.ValidatorStats{
-				big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
+				big.NewInt(0), big.NewInt(0), big.NewInt(0),
+				big.NewInt(0), numeric.NewDec(0),
 				[]staking.VotePerShard{}, []staking.KeysPerShard{},
 			}
 		}
