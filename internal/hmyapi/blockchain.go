@@ -494,13 +494,21 @@ func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformati
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
-func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]common.Address, error) {
-	return s.b.GetAllValidatorAddresses(), nil
+func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
+	addresses := []string{}
+	for _, addr := range s.b.GetAllValidatorAddresses() {
+		addresses = append(addresses, address2.ToBech32(addr))
+	}
+	return addresses, nil
 }
 
 // GetActiveValidatorAddresses returns active validator addresses.
-func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]common.Address, error) {
-	return s.b.GetActiveValidatorAddresses(), nil
+func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]string, error) {
+	addresses := []string{}
+	for _, addr := range s.b.GetActiveValidatorAddresses() {
+		addresses = append(addresses, address2.ToBech32(addr))
+	}
+	return addresses, nil
 }
 
 // GetValidatorInformation returns information about a validator.
