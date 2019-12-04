@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harmony-one/go-sdk/pkg/address"
-
 	"github.com/harmony-one/harmony/shard"
 
 	types2 "github.com/harmony-one/harmony/staking/types"
@@ -174,8 +172,9 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 }
 
 func newRPCValidator(validator *types2.Validator) *RPCValidator {
+	addr, _ := internal_common.AddressToBech32(validator.Address)
 	return &RPCValidator{
-		address.ToBech32(validator.Address),
+		addr,
 		validator.SlotPubKeys,
 		nil,
 		validator.UnbondingHeight,
