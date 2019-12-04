@@ -56,7 +56,7 @@ type BlockArgs struct {
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if block != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: false}
+		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
 		response, err := RPCMarshalBlock(block, blockArgs)
 		if err == nil && blockNr == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
@@ -74,7 +74,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.GetBlock(ctx, blockHash)
 	if block != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: false}
+		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
 		return RPCMarshalBlock(block, blockArgs)
 	}
 	return nil, err
