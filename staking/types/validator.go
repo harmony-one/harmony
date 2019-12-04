@@ -299,7 +299,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	// TODO: a new validator should have a minimum of 1 token as self delegation, and that should be added as a delegation entry here.
 	v := Validator{
 		val.ValidatorAddress, pubKeys,
-		new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, false,
+		new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, true,
 		commission, desc, blockNum,
 	}
 	return &v, nil
