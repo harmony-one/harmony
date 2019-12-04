@@ -152,7 +152,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Prepare shard state
 	shardState := new(shard.State)
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
-		node.Consensus.ShardID, node.Beaconchain(), node.Worker.GetCurrentHeader(),
+		node.Beaconchain(), node.Worker.GetCurrentHeader(), false,
 	); err != nil {
 		return nil, err
 	}

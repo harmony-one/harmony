@@ -2967,17 +2967,20 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 }
 
 // SuperCommitteeForNextEpoch ...
-// TODO: remove shardID in parameter if not needed in worker code
+// isVerify=true means validators use it to verify
+// isVerify=false means leader is to propose
 func (bc *BlockChain) SuperCommitteeForNextEpoch(
-	shardID uint32,
 	beacon consensus_engine.ChainReader,
 	header *block.Header,
+	isVerify bool,
 ) (*shard.State, error) {
 	var (
 		nextCommittee = new(shard.State)
 		err           error
+		beaconEpoch   = new(big.Int)
+		shardState    = shard.State{}
 	)
-	switch shardID {
+	switch header.ShardID() {
 	case shard.BeaconChainShardID:
 		if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
 			nextCommittee, err = committee.WithStakingEnabled.Compute(
@@ -2987,7 +2990,24 @@ func (bc *BlockChain) SuperCommitteeForNextEpoch(
 		}
 	default:
 		// TODO: needs to make sure beacon chain sync works.
-		beaconEpoch := beacon.CurrentHeader().Epoch()
+		if isVerify {
+			//verify
+			shardState, err = header.GetShardState()
+			if err != nil {
+				return &shard.State{}, err
+			}
+			// before staking epoch
+			if shardState.Epoch == nil {
+				beaconEpoch = new(big.Int).Add(header.Epoch(), common.Big1)
+			} else { // after staking epoch
+				beaconEpoch = shardState.Epoch
+			}
+		} else {
+			//propose
+			beaconEpoch = beacon.CurrentHeader().Epoch()
+		}
+		utils.Logger().Debug().Msgf("[SuperCommitteeCalculation] isVerify: %+v, realBeaconEpoch:%+v, beaconEpoch: %+v, headerEpoch:%+v, shardStateEpoch:%+v",
+			isVerify, beacon.CurrentHeader().Epoch(), beaconEpoch, header.Epoch(), shardState.Epoch)
 		nextEpoch := new(big.Int).Add(header.Epoch(), common.Big1)
 		if bc.Config().IsStaking(nextEpoch) {
 			// If next epoch is staking epoch, I should wait and listen for beacon chain for epoch changes

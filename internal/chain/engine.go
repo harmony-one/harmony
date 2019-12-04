@@ -148,27 +148,34 @@ func ReadPublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header) ([
 
 // VerifyShardState implements Engine, checking the shardstate is valid at epoch transition
 func (e *engineImpl) VerifyShardState(bc engine.ChainReader, beacon engine.ChainReader, header *block.Header) error {
-	headerShardState, _ := header.GetShardState()
+	if bc.ShardID() != header.ShardID() {
+		return ctxerror.New("[VerifyShardState] shardID not match", "bc.ShardID", bc.ShardID(), "header.ShardID", header.ShardID())
+	}
+	headerShardStateBytes := header.ShardState()
 	// TODO: figure out leader withhold shardState
-	if headerShardState.Epoch == nil {
+	if headerShardStateBytes == nil || len(headerShardStateBytes) == 0 {
 		return nil
 	}
-	shardState, err := bc.SuperCommitteeForNextEpoch(header.ShardID(), beacon, header)
+	shardState, err := bc.SuperCommitteeForNextEpoch(beacon, header, true)
 	if err != nil {
 		return ctxerror.New("[VerifyShardState] SuperCommitteeForNexEpoch calculation had error", "shardState", shardState).WithCause(err)
 	}
 
-	by1, err := shard.EncodeWrapper(*shardState, bc.Config().IsStaking(header.Epoch()))
-	if err != nil {
-		return ctxerror.New("[VerifyShardState] ShardState Encoding had error", "shardStateBytes", by1).WithCause(err)
+	isStaking := false
+	if shardState.Epoch != nil && bc.Config().IsStaking(shardState.Epoch) {
+		isStaking = true
 	}
-	by2, err := shard.EncodeWrapper(headerShardState, bc.Config().IsStaking(header.Epoch()))
+	shardStateBytes, err := shard.EncodeWrapper(*shardState, isStaking)
 	if err != nil {
-		return ctxerror.New("[VerifyShardState] ShardState Encoding had error", "headerShardStateBytes", by2).WithCause(err)
+		return ctxerror.New("[VerifyShardState] ShardState Encoding had error", "shardStateBytes", shardStateBytes).WithCause(err)
 	}
 
-	if !bytes.Equal(by1, by2) {
-		return ctxerror.New("[VerifyShardState] ShardState is Invalid", "shardState", shardState, "headerShardState", headerShardState)
+	if !bytes.Equal(shardStateBytes, headerShardStateBytes) {
+		headerSS, err := header.GetShardState()
+		if err != nil {
+			headerSS = shard.State{}
+		}
+		return ctxerror.New("[VerifyShardState] ShardState is Invalid", "shardStateEpoch", shardState.Epoch, "headerEpoch", header.Epoch(), "headerShardStateEpoch", headerSS.Epoch, "beaconEpoch", beacon.CurrentHeader().Epoch())
 	}
 
 	return nil

@@ -34,6 +34,9 @@ type ChainReader interface {
 	// GetHeaderByHash retrieves a block header from the database by its hash.
 	GetHeaderByHash(hash common.Hash) *block.Header
 
+	// ShardID returns shardID
+	ShardID() uint32
+
 	// GetBlock retrieves a block from the database by hash and number.
 	GetBlock(hash common.Hash, number uint64) *types.Block
 
@@ -52,7 +55,8 @@ type ChainReader interface {
 	ReadBlockRewardAccumulator(uint64) (*big.Int, error)
 
 	//SuperCommitteeForNextEpoch calculates the next epoch's supper committee
-	SuperCommitteeForNextEpoch(shardID uint32, beacon ChainReader, header *block.Header) (*shard.State, error)
+	// isVerify flag is to indicate which stage to call this function: true (verification stage), false(propose stage)
+	SuperCommitteeForNextEpoch(beacon ChainReader, header *block.Header, isVerify bool) (*shard.State, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.
