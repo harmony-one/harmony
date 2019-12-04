@@ -41,6 +41,7 @@ var (
 	errCommissionRateChangeTooFast = errors.New("commission rate can not be changed more than MaxChangeRate within the same epoch")
 	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than MaxCommissionRate")
 	errNoRewardsToCollect          = errors.New("no rewards to collect")
+	errNegativeAmount              = errors.New("amount can not be negative")
 )
 
 /*
@@ -367,6 +368,10 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 }
 
 func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.CreateValidator, blockNum *big.Int) error {
+	if createValidator.Amount.Sign() == -1 {
+		return errNegativeAmount
+	}
+
 	if st.state.IsValidator(createValidator.ValidatorAddress) {
 		return errValidatorExist
 	}
@@ -429,6 +434,10 @@ func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValid
 }
 
 func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
+	if delegate.Amount.Sign() == -1 {
+		return errNegativeAmount
+	}
+
 	if !st.state.IsValidator(delegate.ValidatorAddress) {
 		return errValidatorNotExist
 	}
@@ -465,7 +474,7 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 
 				// Secondly, if all locked token are used, try use the balance.
 				if err == nil && undelegateAmount.Cmp(big.NewInt(0)) > 0 {
-					stateDB.SubBalance(delegate.DelegatorAddress, delegate.Amount)
+					stateDB.SubBalance(delegate.DelegatorAddress, undelegateAmount)
 				}
 				return err
 			}
@@ -490,6 +499,10 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 }
 
 func (st *StateTransition) applyUndelegateTx(undelegate *staking.Undelegate) error {
+	if undelegate.Amount.Sign() == -1 {
+		return errNegativeAmount
+	}
+
 	if !st.state.IsValidator(undelegate.ValidatorAddress) {
 		return errValidatorNotExist
 	}

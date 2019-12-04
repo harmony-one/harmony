@@ -45,6 +45,9 @@ type ChainReader interface {
 	// ReadActiveValidatorList retrieves the list of active validators
 	ReadActiveValidatorList() ([]common.Address, error)
 
+	// ReadValidatorList retrieves the list of all validators
+	ReadValidatorList() ([]common.Address, error)
+
 	// Methods needed for EPoS committee assignment calculation
 	committee.StakingCandidatesReader
 
