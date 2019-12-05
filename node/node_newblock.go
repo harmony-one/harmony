@@ -167,7 +167,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
-	if !node.Blockchain().Config().AcceptsCrossTx(node.Worker.GetCurrentHeader().Epoch()) {
+	if !node.Blockchain().Config().HasCrossTxFields(node.Worker.GetCurrentHeader().Epoch()) {
 		return []*types.CXReceiptsProof{}
 	}
 
