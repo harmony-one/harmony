@@ -360,7 +360,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		// 15% of the validator also need to do broadcasting
 		rand.Seed(time.Now().UTC().UnixNano())
 		rnd := rand.Intn(100)
-		if rnd < 15 {
+		if rnd < 1 {
 			// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
 			if node.NodeConfig.ShardID == 0 {
 				node.BroadcastNewBlock(newBlock)
