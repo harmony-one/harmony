@@ -6,6 +6,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -90,13 +91,13 @@ type SignatureReader interface {
 // DependencyInjectionWriter ..
 type DependencyInjectionWriter interface {
 	SetShardIDProvider(func() (uint32, error))
-	SetMyPublicKeyProvider(func() (*bls.PublicKey, error))
+	SetMyPublicKeyProvider(func() (*nodeconfig.MultiBlsPublicKey, error))
 }
 
 // DependencyInjectionReader ..
 type DependencyInjectionReader interface {
 	ShardIDProvider() func() (uint32, error)
-	MyPublicKey() func() (*bls.PublicKey, error)
+	MyPublicKey() func() (*nodeconfig.MultiBlsPublicKey, error)
 }
 
 //WithJSONDump representation dump
@@ -135,7 +136,7 @@ type cIdentities struct {
 
 type depInject struct {
 	shardIDProvider   func() (uint32, error)
-	publicKeyProvider func() (*bls.PublicKey, error)
+	publicKeyProvider func() (*nodeconfig.MultiBlsPublicKey, error)
 }
 
 func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
@@ -292,11 +293,11 @@ func (d *depInject) ShardIDProvider() func() (uint32, error) {
 	return d.shardIDProvider
 }
 
-func (d *depInject) SetMyPublicKeyProvider(p func() (*bls.PublicKey, error)) {
+func (d *depInject) SetMyPublicKeyProvider(p func() (*nodeconfig.MultiBlsPublicKey, error)) {
 	d.publicKeyProvider = p
 }
 
-func (d *depInject) MyPublicKey() func() (*bls.PublicKey, error) {
+func (d *depInject) MyPublicKey() func() (*nodeconfig.MultiBlsPublicKey, error) {
 	return d.publicKeyProvider
 }
 

@@ -18,6 +18,7 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -486,7 +487,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		decider.SetShardIDProvider(func() (uint32, error) {
 			return consensus.ShardID, nil
 		})
-		decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		decider.SetMyPublicKeyProvider(func() (*nodeconfig.MultiBlsPublicKey, error) {
 			return consensus.PubKey, nil
 		})
 		consensus.Decider = decider

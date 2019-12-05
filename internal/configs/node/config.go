@@ -6,6 +6,7 @@ package nodeconfig
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -341,16 +342,31 @@ func SetShardingSchedule(schedule shardingconfig.Schedule) {
 // ShardIDFromConsensusKey returns the shard ID statically determined from the
 // consensus key.
 func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
-	var pubKey shard.BlsPublicKey
-	if err := pubKey.FromLibBLSPublicKey(conf.ConsensusPubKey); err != nil {
-		return 0, errors.Wrapf(err,
-			"cannot convert libbls public key %s to internal form",
-			conf.ConsensusPubKey.SerializeToHexStr())
-	}
+
 	epoch := conf.networkType.ChainConfig().StakingEpoch
 	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
-	shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
-	return uint32(shardID.Uint64()), nil
+	var sID, shardID uint32
+	sID = uint32(math.MaxUint32)
+
+	for _, pkey := range conf.ConsensusPubKey.PublicKey {
+		var pubKey shard.BlsPublicKey
+		if err := pubKey.FromLibBLSPublicKey(pkey); err != nil {
+			return 0, errors.Wrapf(err,
+				"cannot convert libbls public key %s to internal form",
+				conf.ConsensusPubKey.SerializeToHexStr())
+		}
+		shardID = uint32(new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards))).Uint64())
+		if sID == math.MaxUint32 {
+			sID = shardID
+		} else {
+			if sID != shardID {
+				return 0, fmt.Errorf("multiple blskeys %s return different shard",
+					conf.ConsensusPubKey.SerializeToHexStr())
+			}
+		}
+	}
+
+	return shardID, nil
 }
 
 // ChainConfig returns the chain configuration for the network type.

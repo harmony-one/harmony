@@ -224,11 +224,7 @@ func setupStakingNodeAccount() error {
 }
 
 func readMultiBlsKeys(nodeConfig *nodeconfig.ConfigType) error {
-<<<<<<< HEAD
 	multiKeyFolder := "./hmy/multikeys"
-=======
-	multiKeyFolder := "./MultiKeys"
->>>>>>> handled leader key in node_newblock.go
 	fileList, err := ioutil.ReadDir(multiKeyFolder)
 	if err != nil {
 		return err
@@ -336,7 +332,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.Decider.SetShardIDProvider(func() (uint32, error) {
 		return currentConsensus.ShardID, nil
 	})
-	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*nodeconfig.MultiBlsPublicKey, error) {
 		return currentConsensus.PubKey, nil
 	})
 
@@ -521,10 +517,13 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	fmt.Printf("%s mode; node key %s -> shard %d\n",
+
+	if nodeconfig.GetDefaultConfig().ConsensusPubKey!=nil {
+		fmt.Printf("%s mode; node key %s -> shard %d\n",
 		map[bool]string{false: "Legacy", true: "Staking"}[*stakingFlag],
 		nodeconfig.GetDefaultConfig().ConsensusPubKey.SerializeToHexStr(),
 		initialAccount.ShardID)
+	}
 
 	if *nodeType != "validator" && *shardID >= 0 {
 		utils.Logger().Info().
