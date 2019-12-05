@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/internal/genesis"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
 // TestnetSchedule is the long-running public testnet sharding
@@ -26,6 +27,8 @@ const (
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case epoch.Cmp(params.PangaeaChainConfig.StakingEpoch) >= 0:
+		return testnetV1
 	default: // genesis
 		return testnetV0
 	}
@@ -74,6 +77,8 @@ func (ts testnetSchedule) GetShardingStructure(numShard, shardID int) []map[stri
 
 var testnetReshardingEpoch = []*big.Int{
 	big.NewInt(0),
+	params.PangaeaChainConfig.StakingEpoch,
 }
 
 var testnetV0 = MustNewInstance(3, 100, 80, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)
+var testnetV1 = MustNewInstance(3, 100, 68, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)
