@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
@@ -175,7 +176,15 @@ func (e *engineImpl) VerifyShardState(bc engine.ChainReader, beacon engine.Chain
 		if err != nil {
 			headerSS = shard.State{}
 		}
-		return ctxerror.New("[VerifyShardState] ShardState is Invalid", "shardStateEpoch", shardState.Epoch, "headerEpoch", header.Epoch(), "headerShardStateEpoch", headerSS.Epoch, "beaconEpoch", beacon.CurrentHeader().Epoch())
+		utils.Logger().Error().
+			Str("shard-state", hexutil.Encode(shardStateBytes)).
+			Str("header-shard-state", hexutil.Encode(headerShardStateBytes)).
+			Msg("Shard states did not match, use rlpdump to inspect")
+		return ctxerror.New(
+			"[VerifyShardState] ShardState is Invalid", "shardStateEpoch", shardState.Epoch, "headerEpoch",
+			header.Epoch(), "headerShardStateEpoch", headerSS.Epoch, "beaconEpoch",
+			beacon.CurrentHeader().Epoch(),
+		)
 	}
 
 	return nil
