@@ -122,8 +122,8 @@ func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
 	}
 	identity, _ := pubKeyFunc()
 	everyone := v.DumpParticipants()
-	
-	for _,key := range identity.PublicKey {
+
+	for _, key := range identity.PublicKey {
 		myVoterID := key.SerializeToHexStr()
 		for i := range everyone {
 			if everyone[i] == myVoterID {
@@ -131,6 +131,6 @@ func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
 			}
 		}
 	}
-	
+
 	return false
 }

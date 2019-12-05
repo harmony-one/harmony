@@ -7,6 +7,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -23,7 +24,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	blsPriKey := bls.RandPrivateKey()
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, blsPriKey, decider,
+		host, shard.BeaconChainShardID, leader, nodeconfig.ToMultiPriKey(blsPriKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -38,7 +39,7 @@ func TestPopulateMessageFields(t *testing.T) {
 		},
 	}
 	consensusMsg := msg.GetConsensus()
-	consensus.populateMessageFields(consensusMsg)
+	consensus.populateMessageFields(consensusMsg, blsPriKey.GetPublicKey())
 
 	if consensusMsg.ViewId != 2 {
 		t.Errorf("Consensus ID is not populated correctly")
@@ -59,8 +60,9 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	privateKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, nodeconfig.ToMultiPriKey(privateKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -69,7 +71,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	msg := &msg_pb.Message{}
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg, privateKey)
 
 	if err != nil || len(marshaledMessage) == 0 {
 		t.Errorf("Failed to sign and marshal the message: %s", err)
@@ -88,7 +90,7 @@ func TestSetViewID(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, nodeconfig.ToMultiPriKey(bls.RandPrivateKey()), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

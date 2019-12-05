@@ -4,10 +4,12 @@ import (
 	"testing"
 
 	protobuf "github.com/golang/protobuf/proto"
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -23,8 +25,9 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	privateKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, nodeconfig.ToMultiPriKey(privateKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
@@ -32,7 +35,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := &msg_pb.Message{}
-	msgBytes := consensus.constructAnnounceMessage()
+	msgBytes := consensus.constructAnnounceMessage(privateKey)
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
 
 	if err := protobuf.Unmarshal(msgPayload, message); err != nil {
@@ -49,7 +52,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999", ConsensusPubKey: leaderPubKey}
 
 	validatorPriKey := bls.RandPrivateKey()
-	validatorPubKey := leaderPriKey.GetPublicKey()
+	validatorPubKey := validatorPriKey.GetPublicKey()
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
@@ -57,8 +60,9 @@ func TestConstructPreparedMessage(test *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, nodeconfig.ToMultiPriKey(leaderPriKey), decider,
 	)
+	consensus.UpdatePublicKeys([]*bls2.PublicKey{leaderPubKey, validatorPubKey})
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}

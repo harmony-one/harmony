@@ -126,7 +126,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	key, err := consensus.GetLeaderPrivateKey()
 	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("[Announce] Node not a leader")
+		consensus.getLogger().Warn().Err(err).Msg("[Announce] Node not a leader")
 		return
 	}
 	msgToSend := consensus.constructAnnounceMessage(key)

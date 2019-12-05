@@ -115,7 +115,7 @@ func TestConfigType_ShardIDFromConsensusKey(t *testing.T) {
 			schedule := mock_shardingconfig.NewMockSchedule(mc)
 			schedule.EXPECT().InstanceForEpoch(tt.epoch).Return(instance)
 			conf := &ConfigType{
-				ConsensusPubKey:  tt.fields.ConsensusPubKey,
+				ConsensusPubKey:  &MultiBlsPublicKey{PublicKey: []*bls.PublicKey{tt.fields.ConsensusPubKey}},
 				networkType:      tt.fields.networkType,
 				shardingSchedule: schedule,
 			}

@@ -278,7 +278,7 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 		return false
 	}
 	identity, _ := pubKeyFunc()
-	for _,key := range identity.PublicKey {
+	for _, key := range identity.PublicKey {
 		w := shard.BlsPublicKey{}
 		w.FromLibBLSPublicKey(key)
 		_, ok := v.roster.Voters[w]

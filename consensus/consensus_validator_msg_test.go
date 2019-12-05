@@ -8,6 +8,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -22,14 +23,15 @@ func TestConstructPrepareMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	privateKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, nodeconfig.ToMultiPriKey(bls.RandPrivateKey()), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	msgBytes := consensus.constructPrepareMessage()
+	msgBytes := consensus.constructPrepareMessage(privateKey.GetPublicKey(), privateKey)
 	msgBytes, err = proto.GetConsensusMessagePayload(msgBytes)
 	if err != nil {
 		test.Error("Error when getting consensus message", "error", err)
@@ -53,14 +55,15 @@ func TestConstructCommitMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	privateKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, nodeconfig.ToMultiPriKey(privateKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	msg := consensus.constructCommitMessage([]byte("random string"))
+	msg := consensus.constructCommitMessage([]byte("random string"), privateKey.GetPublicKey(), privateKey)
 	msg, err = proto.GetConsensusMessagePayload(msg)
 	if err != nil {
 		test.Errorf("Failed to get consensus message")

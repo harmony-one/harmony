@@ -518,11 +518,11 @@ func main() {
 		}
 	}
 
-	if nodeconfig.GetDefaultConfig().ConsensusPubKey!=nil {
+	if nodeconfig.GetDefaultConfig().ConsensusPubKey != nil {
 		fmt.Printf("%s mode; node key %s -> shard %d\n",
-		map[bool]string{false: "Legacy", true: "Staking"}[*stakingFlag],
-		nodeconfig.GetDefaultConfig().ConsensusPubKey.SerializeToHexStr(),
-		initialAccount.ShardID)
+			map[bool]string{false: "Legacy", true: "Staking"}[*stakingFlag],
+			nodeconfig.GetDefaultConfig().ConsensusPubKey.SerializeToHexStr(),
+			initialAccount.ShardID)
 	}
 
 	if *nodeType != "validator" && *shardID >= 0 {
