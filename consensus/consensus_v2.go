@@ -262,7 +262,12 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).
 				Str("LeaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
 				Msg("[OnAnnounce] Leader is malicious")
-			consensus.startViewChange(consensus.viewID + 1)
+			if consensus.current.Mode() == ViewChanging {
+				viewID := consensus.current.ViewID()
+				consensus.startViewChange(viewID + 1)
+			} else {
+				consensus.startViewChange(consensus.viewID + 1)
+			}
 		}
 		consensus.getLogger().Debug().
 			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
