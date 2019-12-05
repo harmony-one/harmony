@@ -1102,7 +1102,7 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	//// Cross-shard txns
 	epoch := block.Header().Epoch()
-	if bc.chainConfig.IsCrossTx(block.Epoch()) {
+	if bc.chainConfig.HasCrossTxFields(block.Epoch()) {
 		shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
 		shardNum := int(shardingConfig.NumShards())
 		for i := 0; i < shardNum; i++ {

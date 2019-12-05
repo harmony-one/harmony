@@ -122,7 +122,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 
 // return true if it is valid
 func getTransactionType(config *params.ChainConfig, header *block.Header, tx *types.Transaction) types.TransactionType {
-	if header.ShardID() == tx.ShardID() && (!config.IsCrossTx(header.Epoch()) || tx.ShardID() == tx.ToShardID()) {
+	if header.ShardID() == tx.ShardID() && (!config.AcceptsCrossTx(header.Epoch()) || tx.ShardID() == tx.ToShardID()) {
 		return types.SameShardTx
 	}
 	numShards := shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards()
@@ -143,7 +143,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
 	}
 
-	if txType != types.SameShardTx && !config.IsCrossTx(header.Epoch()) {
+	if txType != types.SameShardTx && !config.AcceptsCrossTx(header.Epoch()) {
 		return nil, nil, 0, fmt.Errorf(
 			"cannot handle cross-shard transaction until after epoch %v (now %v)",
 			config.CrossTxEpoch, header.Epoch())
