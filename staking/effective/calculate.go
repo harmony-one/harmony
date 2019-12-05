@@ -74,7 +74,7 @@ func median(stakes []SlotPurchase) numeric.Dec {
 
 	sort.SliceStable(
 		stakes,
-		func(i, j int) bool { return stakes[i].Dec.LTE(stakes[j].Dec) },
+		func(i, j int) bool { return stakes[i].Dec.LT(stakes[j].Dec) },
 	)
 	const isEven = 0
 	switch l := len(stakes); l % 2 {
