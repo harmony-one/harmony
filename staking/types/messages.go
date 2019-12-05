@@ -60,7 +60,7 @@ type CreateValidator struct {
 	MinSelfDelegation  *big.Int             `json:"min_self_delegation" yaml:"min_self_delegation"`
 	MaxTotalDelegation *big.Int             `json:"max_total_delegation" yaml:"max_total_delegation"`
 	SlotPubKeys        []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
-	SlotKeySigs        []shard.BlsSignature `json:"slot_key_sigs" yarml:"slot_key_sigs"`
+	SlotKeySigs        []shard.BlsSignature `json:"slot_key_sigs" yaml:"slot_key_sigs"`
 	Amount             *big.Int             `json:"amount" yaml:"amount"`
 }
 

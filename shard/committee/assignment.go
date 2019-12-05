@@ -10,6 +10,7 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -178,20 +179,26 @@ func eposStakedCommittee(
 		stakedSlotsCount = l
 	}
 
+	totalStake := numeric.ZeroDec()
+
 	for i := 0; i < stakedSlotsCount; i++ {
 		shardID := int(new(big.Int).Mod(staked[i].BlsPublicKey.Big(), shardBig).Int64())
 		slot := staked[i]
+		totalStake = totalStake.Add(slot.Dec)
 		shardState.Shards[shardID].Slots = append(shardState.Shards[shardID].Slots, shard.Slot{
 			slot.Address,
 			staked[i].BlsPublicKey,
 			&slot.Dec,
 		})
 	}
+
 	if c := len(candidates); c != 0 {
 		utils.Logger().Info().Int("staked-candidates", c).
+			Str("total-staked-by-validators", totalStake.String()).
 			RawJSON("staked-super-committee", []byte(shardState.JSON())).
 			Msg("EPoS based super-committe")
 	}
+
 	return shardState, nil
 }
 
