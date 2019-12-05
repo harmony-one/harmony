@@ -1,6 +1,7 @@
 package effective
 
 import (
+	"bytes"
 	"encoding/json"
 	"math/big"
 	"sort"
@@ -95,15 +96,35 @@ func Apply(shortHand map[common.Address]SlotOrder, pull int) Slots {
 	if len(shortHand) == 0 {
 		return eposedSlots
 	}
+
+	type t struct {
+		addr common.Address
+		slot SlotOrder
+	}
+
+	shorter := []t{}
+	for key, value := range shortHand {
+		shorter = append(shorter, t{key, value})
+	}
+
+	sort.SliceStable(
+		shorter,
+		func(i, j int) bool {
+			return bytes.Compare(
+				shorter[i].addr.Bytes(), shorter[j].addr.Bytes(),
+			) == -1
+		},
+	)
+
 	// Expand
-	for staker := range shortHand {
-		slotsCount := len(shortHand[staker].SpreadAmong)
-		spread := numeric.NewDecFromBigInt(shortHand[staker].Stake).
+	for _, staker := range shorter {
+		slotsCount := len(staker.slot.SpreadAmong)
+		spread := numeric.NewDecFromBigInt(staker.slot.Stake).
 			QuoInt64(int64(slotsCount))
 		for i := 0; i < slotsCount; i++ {
 			eposedSlots = append(eposedSlots, SlotPurchase{
-				staker,
-				shortHand[staker].SpreadAmong[i],
+				staker.addr,
+				staker.slot.SpreadAmong[i],
 				spread,
 			})
 		}
