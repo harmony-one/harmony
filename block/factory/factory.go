@@ -34,7 +34,7 @@ func (f *factory) NewHeader(epoch *big.Int) *block.Header {
 		impl = v3.NewHeader()
 	case f.chainConfig.IsCrossLink(epoch):
 		impl = v2.NewHeader()
-	case f.chainConfig.IsCrossTx(epoch):
+	case f.chainConfig.HasCrossTxFields(epoch):
 		impl = v1.NewHeader()
 	default:
 		impl = v0.NewHeader()
