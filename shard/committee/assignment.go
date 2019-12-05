@@ -120,6 +120,8 @@ func eposStakedCommittee(
 
 	utils.Logger().Info().Int("staked-candidates", len(candidates)).Msg("preparing epos staked committee")
 
+	blsKeys := make(map[shard.BlsPublicKey]struct{})
+
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		validator, err := stakerReader.ReadValidatorInformation(candidates[i])
@@ -129,12 +131,31 @@ func eposStakedCommittee(
 		}
 
 		if err := validator.SanityCheck(); err != nil {
+			utils.Logger().Error().
+				Str("failure", validator.String()).
+				Msg("Sanity check of validator failed")
 			continue
 		}
 		validatorStake := big.NewInt(0)
 		for _, delegation := range validator.Delegations {
 			validatorStake.Add(validatorStake, delegation.Amount)
 		}
+
+		found := false
+		dupKey := shard.BlsPublicKey{}
+		for _, key := range validator.SlotPubKeys {
+			if _, ok := blsKeys[key]; ok {
+				found = true
+				dupKey = key
+			} else {
+				blsKeys[key] = struct{}{}
+			}
+		}
+		if found {
+			utils.Logger().Info().Msgf("[eposStakedCommittee] Duplicate bls key found %x, in validator %+v. Ignoring", dupKey, validator)
+			continue
+		}
+
 		essentials[validator.Address] = effective.SlotOrder{
 			validatorStake,
 			validator.SlotPubKeys,
