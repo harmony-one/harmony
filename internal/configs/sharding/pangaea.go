@@ -12,9 +12,9 @@ import (
 
 const (
 	// PangaeaHTTPPattern is the http pattern for pangaea.
-	PangaeaHTTPPattern = "https://api.s%d.pga.hmny.io"
+	PangaeaHTTPPattern = "https://api.s%d.t2.hmny.io"
 	// PangaeaWSPattern is the websocket pattern for pangaea.
-	PangaeaWSPattern = "wss://ws.s%d.pga.hmny.io"
+	PangaeaWSPattern = "wss://ws.s%d.t2.hmny.io"
 	// transaction throttling disabled on pangaea network
 	pangaeaEnableTxnThrottling = false
 )
