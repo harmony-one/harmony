@@ -106,8 +106,8 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -d             just download the Harmony binaries (default: off)
    -D             do not download Harmony binaries (default: download when start)
    -m             collect and upload node metrics to harmony prometheus + grafana
-   -N network     join the given network (main, beta, pangaea, dev; default: main)
-   -t             equivalent to -N pangaea (deprecated)
+   -N network     join the given network (main, beta, testnet, devnet, dev; default: main)
+   -t             equivalent to -N testnet (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
    -b             download harmony_db files from shard specified by -i <shardid> (default: off)
@@ -185,7 +185,7 @@ do
    D) do_not_download=true;;
    m) metrics=true;;
    N) network="${OPTARG}";;
-   t) network=pangaea;;
+   t) network=devnet;;
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
    a) db_file_to_dl="${OPTARG}";;
@@ -222,27 +222,27 @@ main)
   network_type=mainnet
   dns_zone=t.hmny.io
   ;;
-beta|pangaea)
+beta|testnet)
   case "${network}" in
   beta)
-    msg "WARNING: -N beta has been deprecated and will be removed in a future release; please use -N pangaea instead."
+    msg "WARNING: -N beta has been deprecated and will be removed in a future release; please use -N testnet instead."
     ;;
   esac
   bootnodes=(
     /ip4/54.218.73.167/tcp/9876/p2p/QmWBVCPXQmc2ULigm3b9ayCZa15gj25kywiQQwPhHCZeXj
     /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
   )
-  REL=pangaea
+  REL=testnet
   network_type=testnet
   dns_zone=p.hmny.io
   ;;
-dev)
+dev|devnet)
   bootnodes=(
     /ip4/52.40.84.2/tcp/9870/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
     /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
   )
   REL=devnet
-  network_type=pangaea
+  network_type=devnet
   dns_zone=pga.hmny.io
   ;;
 *)
