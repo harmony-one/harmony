@@ -12,9 +12,9 @@ import (
 
 const (
 	// PangaeaHTTPPattern is the http pattern for pangaea.
-	PangaeaHTTPPattern = "https://api.s%d.pga.hmny.io"
+	PangaeaHTTPPattern = "https://api.s%d.t2.hmny.io"
 	// PangaeaWSPattern is the websocket pattern for pangaea.
-	PangaeaWSPattern = "wss://ws.s%d.pga.hmny.io"
+	PangaeaWSPattern = "wss://ws.s%d.t2.hmny.io"
 	// transaction throttling disabled on pangaea network
 	pangaeaEnableTxnThrottling = false
 )
@@ -29,7 +29,7 @@ func (ps pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (ps pangaeaSchedule) BlocksPerEpoch() uint64 {
-	return 2700 // 6 hours with 8 seconds/block
+	return 450 // 1 hour with 8 seconds/block
 }
 
 func (ps pangaeaSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
@@ -56,7 +56,7 @@ func (ps pangaeaSchedule) ConsensusRatio() float64 {
 var pangaeaReshardingEpoch = []*big.Int{common.Big0}
 
 var pangaeaV0 = MustNewInstance(
-	4, 250, 20, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
+	2, 50, 40, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
 
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
