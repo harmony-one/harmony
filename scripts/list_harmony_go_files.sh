@@ -6,5 +6,4 @@ exec git ls-files '*.go' | grep -v \
 	-e '/host_mock\.go' \
 	-e '/mock/[^/]*\.go' \
 	-e '/mock_[^/]*/[^/]*\.go' \
-	-e '_mock_for_test\.go' \
 	-e '/gen_[^/]*\.go'
