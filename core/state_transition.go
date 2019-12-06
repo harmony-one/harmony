@@ -456,14 +456,15 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 			// If the sum of normal balance and the total amount of tokens in undelegation is greater than the amount to delegate
 			if big.NewInt(0).Add(totalInUndelegation, stateDB.GetBalance(delegate.DelegatorAddress)).Cmp(delegate.Amount) >= 0 {
 				// Firstly use the tokens in undelegation to delegate (redelegate)
-				undelegateAmount := big.NewInt(0).Set(delegate.Amount)
+				delegateBalance := big.NewInt(0).Set(delegate.Amount)
 				// Use the latest undelegated token first as it has the longest remaining locking time.
 				i := len(delegation.Undelegations) - 1
 				for ; i >= 0; i-- {
-					if delegation.Undelegations[i].Amount.Cmp(undelegateAmount) <= 0 {
-						undelegateAmount.Sub(undelegateAmount, delegation.Undelegations[i].Amount)
+					if delegation.Undelegations[i].Amount.Cmp(delegateBalance) <= 0 {
+						delegateBalance.Sub(delegateBalance, delegation.Undelegations[i].Amount)
 					} else {
-						delegation.Undelegations[i].Amount.Sub(delegation.Undelegations[i].Amount, undelegateAmount)
+						delegation.Undelegations[i].Amount.Sub(delegation.Undelegations[i].Amount, delegateBalance)
+						delegateBalance = big.NewInt(0)
 						break
 					}
 				}
@@ -473,8 +474,8 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 				err := stateDB.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
 
 				// Secondly, if all locked token are used, try use the balance.
-				if err == nil && undelegateAmount.Cmp(big.NewInt(0)) > 0 {
-					stateDB.SubBalance(delegate.DelegatorAddress, undelegateAmount)
+				if err == nil && delegateBalance.Cmp(big.NewInt(0)) > 0 {
+					stateDB.SubBalance(delegate.DelegatorAddress, delegateBalance)
 				}
 				return err
 			}
