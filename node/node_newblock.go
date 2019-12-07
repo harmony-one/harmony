@@ -5,15 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harmony-one/harmony/shard"
-
-	"github.com/harmony-one/harmony/core/rawdb"
-
-	types2 "github.com/harmony-one/harmony/staking/types"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
+	types2 "github.com/harmony-one/harmony/staking/types"
 )
 
 // Constants of proposing a new block
@@ -112,7 +110,12 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		node.pendingStakingTxMutex.Unlock()
 	}
 
-	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase); err != nil {
+	if err := node.Worker.CommitTransactions(
+		pending, pendingStakingTransactions, coinbase,
+		func(payload core.StakingTransactionError) {
+			core.StakingTransactionErrorSink.Store(payload.TxHashID, payload)
+		},
+	); err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 		return nil, err
 	}

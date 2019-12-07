@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
@@ -64,4 +65,22 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		s.b.IsLeader(),
 		s.b.GetShardID(),
 	}
+}
+
+// GetCurrentTransactionErrorSink ..
+func (s *PublicHarmonyAPI) GetCurrentTransactionErrorSink() []core.StakingTransactionError {
+	result := []core.StakingTransactionError{}
+	count := 0
+	core.StakingTransactionErrorSink.Range(func(key, value interface{}) bool {
+		count++
+		result = append(result, value.(core.StakingTransactionError))
+		return true
+	})
+	const maxMapSize = 1024
+	if count == maxMapSize {
+		for i := range result {
+			core.StakingTransactionErrorSink.Delete(result[i].TxHashID)
+		}
+	}
+	return result
 }
