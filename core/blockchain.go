@@ -1122,6 +1122,7 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	//// VRF + VDF
 	//check non zero VRF field in header and add to local db
+
 	if len(block.Vrf()) > 0 {
 		vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch())
 		if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
@@ -1319,7 +1320,8 @@ func (bc *BlockChain) WriteBlockWithState(
 		if bc.chainConfig.IsStaking(block.Epoch()) {
 			bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
 		} else {
-			bc.UpdateBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
+			// block reward never accumulate before staking
+			bc.WriteBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
 		}
 	}
 
@@ -2877,7 +2879,9 @@ func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64
 func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int, number uint64) error {
 	current, err := bc.ReadBlockRewardAccumulator(number - 1)
 	if err != nil {
-		return err
+		// one-off fix for pangaea, return after pangaea enter staking.
+		current = big.NewInt(0)
+		bc.WriteBlockRewardAccumulator(current, number)
 	}
 	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
 }
