@@ -1122,7 +1122,6 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	//// VRF + VDF
 	//check non zero VRF field in header and add to local db
-
 	if len(block.Vrf()) > 0 {
 		vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch())
 		if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
@@ -1257,7 +1256,7 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	//// Writing beacon chain cross links
 	if header.ShardID() == shard.BeaconChainShardID &&
-		bc.chainConfig.IsStaking(block.Epoch()) &&
+		bc.chainConfig.IsCrossLink(block.Epoch()) &&
 		len(header.CrossLinks()) > 0 {
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
@@ -2337,11 +2336,11 @@ func (bc *BlockChain) DeleteCommittedFromPendingCrossLinks(crossLinks []types.Cr
 	}
 
 	pendingCLs := []types.CrossLink{}
-Loop:
+
 	for _, cl := range cls {
 		if _, ok := m[cl.ShardID()]; ok {
 			if _, ok1 := m[cl.ShardID()][cl.BlockNum()]; ok1 {
-				continue Loop
+				continue
 			}
 		}
 		pendingCLs = append(pendingCLs, cl)

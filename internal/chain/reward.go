@@ -267,6 +267,10 @@ func AccumulateRewards(
 
 			for i := range crossLinks {
 				cxLink := crossLinks[i]
+				if !bc.Config().IsStaking(cxLink.Epoch()) {
+					continue
+				}
+
 				shardState, err := bc.ReadShardState(cxLink.Epoch())
 
 				if err != nil {
