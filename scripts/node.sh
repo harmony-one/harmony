@@ -106,7 +106,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -d             just download the Harmony binaries (default: off)
    -D             do not download Harmony binaries (default: download when start)
    -m             collect and upload node metrics to harmony prometheus + grafana
-   -N network     join the given network (main, testnet, devnet, dev; default: main)
+   -N network     join the given network (main, testnet, devnet; default: main)
    -t             equivalent to -N testnet (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
@@ -231,7 +231,7 @@ testnet)
   network_type=testnet
   dns_zone=p.hmny.io
   ;;
-dev|devnet)
+devnet)
   bootnodes=(
     /ip4/52.40.84.2/tcp/9870/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
     /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
