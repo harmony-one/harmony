@@ -106,7 +106,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -d             just download the Harmony binaries (default: off)
    -D             do not download Harmony binaries (default: download when start)
    -m             collect and upload node metrics to harmony prometheus + grafana
-   -N network     join the given network (main, beta, testnet, devnet, dev; default: main)
+   -N network     join the given network (main, testnet, devnet, dev; default: main)
    -t             equivalent to -N testnet (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
@@ -222,12 +222,7 @@ main)
   network_type=mainnet
   dns_zone=t.hmny.io
   ;;
-beta|testnet)
-  case "${network}" in
-  beta)
-    msg "WARNING: -N beta has been deprecated and will be removed in a future release; please use -N testnet instead."
-    ;;
-  esac
+testnet)
   bootnodes=(
     /ip4/54.218.73.167/tcp/9876/p2p/QmWBVCPXQmc2ULigm3b9ayCZa15gj25kywiQQwPhHCZeXj
     /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
@@ -242,7 +237,7 @@ dev|devnet)
     /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
   )
   REL=devnet
-  network_type=devnet
+  network_type=pangaea
   dns_zone=pga.hmny.io
   ;;
 *)
