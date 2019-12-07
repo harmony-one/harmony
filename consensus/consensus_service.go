@@ -170,19 +170,19 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	return validatorPeers
 }
 
-// GetBhpSigsArray returns the signatures for prepared message in viewchange
-func (consensus *Consensus) GetBhpSigsArray() []*bls.Sign {
+// GetViewIDSigsArray returns the signatures for viewID in viewchange
+func (consensus *Consensus) GetViewIDSigsArray(viewID uint64) []*bls.Sign {
 	sigs := []*bls.Sign{}
-	for _, sig := range consensus.bhpSigs {
+	for _, sig := range consensus.viewIDSigs[viewID] {
 		sigs = append(sigs, sig)
 	}
 	return sigs
 }
 
 // GetNilSigsArray returns the signatures for nil prepared message in viewchange
-func (consensus *Consensus) GetNilSigsArray() []*bls.Sign {
+func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls.Sign {
 	sigs := []*bls.Sign{}
-	for _, sig := range consensus.nilSigs {
+	for _, sig := range consensus.nilSigs[viewID] {
 		sigs = append(sigs, sig)
 	}
 	return sigs
@@ -623,4 +623,29 @@ func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
 	}
 
 	return false
+}
+
+func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
+	members := consensus.Decider.Participants()
+	if _, ok := consensus.bhpSigs[viewID]; !ok {
+		consensus.bhpSigs[viewID] = map[string]*bls.Sign{}
+	}
+	if _, ok := consensus.nilSigs[viewID]; !ok {
+		consensus.nilSigs[viewID] = map[string]*bls.Sign{}
+	}
+	if _, ok := consensus.viewIDSigs[viewID]; !ok {
+		consensus.viewIDSigs[viewID] = map[string]*bls.Sign{}
+	}
+	if _, ok := consensus.bhpBitmap[viewID]; !ok {
+		bhpBitmap, _ := bls_cosi.NewMask(members, nil)
+		consensus.bhpBitmap[viewID] = bhpBitmap
+	}
+	if _, ok := consensus.nilBitmap[viewID]; !ok {
+		nilBitmap, _ := bls_cosi.NewMask(members, nil)
+		consensus.nilBitmap[viewID] = nilBitmap
+	}
+	if _, ok := consensus.viewIDBitmap[viewID]; !ok {
+		viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
+		consensus.viewIDBitmap[viewID] = viewIDBitmap
+	}
 }
