@@ -78,7 +78,7 @@ func TestCommitTransactions(t *testing.T) {
 	// Commit the tx to the worker
 	txs := make(map[common.Address]types.Transactions)
 	txs[testBankAddress] = types.Transactions{tx}
-	err := worker.CommitTransactions(txs, nil, testBankAddress)
+	err := worker.CommitTransactions(txs, nil, testBankAddress, func(core.StakingTransactionError) {})
 	if err != nil {
 		t.Error(err)
 	}
