@@ -113,7 +113,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase); err != nil {
-		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
+		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] cannot commit transactions")
 		return nil, err
 	}
 
@@ -121,7 +121,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {
 		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
-			utils.Logger().Error().Err(err).Msg("cannot commit receipts")
+			utils.Logger().Error().Err(err).Msg("[proposeNewBlock] cannot commit receipts")
 		}
 	}
 
@@ -143,9 +143,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 				}
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
-			utils.Logger().Debug().Msgf("Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
+			utils.Logger().Debug().Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
 		} else {
-			utils.Logger().Error().Err(err).Msgf("Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
+			utils.Logger().Error().Err(err).Msgf("[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
 		}
 	}
 
@@ -160,7 +160,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Prepare last commit signatures
 	sig, mask, err := node.Consensus.LastCommitSig()
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Cannot get commit signatures from last block")
+		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 		return nil, err
 	}
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState)
