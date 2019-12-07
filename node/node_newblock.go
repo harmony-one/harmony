@@ -84,6 +84,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	coinbase := node.Consensus.SelfAddress
+	beneficiary := node.Consensus.SelfAddress
 
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) {
@@ -112,7 +113,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		node.pendingStakingTxMutex.Unlock()
 	}
 
-	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase); err != nil {
+	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, beneficiary); err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 		return nil, err
 	}
