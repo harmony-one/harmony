@@ -11,7 +11,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -176,30 +175,4 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 		}
 	}
 	return hashes, nil
-}
-
-// CommitCommittee commits committee with shard id and epoch to explorer service.
-func (node *Node) CommitCommittee() {
-	events := make(chan core.ChainEvent)
-	node.Blockchain().SubscribeChainEvent(events)
-	for event := range events {
-		curBlock := event.Block
-		if curBlock == nil {
-			continue
-		}
-		state, err := node.Blockchain().ReadShardState(curBlock.Epoch())
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("[Explorer] Error reading shard state")
-			continue
-		}
-		for _, committee := range state.Shards {
-			if committee.ShardID == curBlock.ShardID() {
-				utils.Logger().Debug().Msg("[Explorer] Dumping committee")
-				err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).DumpCommittee(curBlock.ShardID(), curBlock.Epoch().Uint64(), committee)
-				if err != nil {
-					utils.Logger().Warn().Err(err).Msgf("[Explorer] Error dumping committee for block %d", curBlock.NumberU64())
-				}
-			}
-		}
-	}
 }

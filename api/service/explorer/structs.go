@@ -35,11 +35,6 @@ type Address struct {
 	TXs     []*Transaction `json:"txs"`
 }
 
-// Committee contains list of node validators of a particular shard and epoch.
-type Committee struct {
-	Validators []*Validator `json:"validators"`
-}
-
 // Validator contains harmony validator node address and its balance.
 type Validator struct {
 	Address string   `json:"address"`
