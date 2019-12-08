@@ -119,6 +119,7 @@ var (
 	// Bad block revert
 	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
+	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
 )
 
 func initSetup() {
@@ -505,6 +506,9 @@ func main() {
 
 	if uint64(*doRevertBefore) != 0 && uint64(*revertTo) != 0 {
 		chain := currentNode.Blockchain()
+		if *revertBeacon {
+			chain = currentNode.Beaconchain()
+		}
 		curNum := chain.CurrentBlock().NumberU64()
 		if curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
 			// Remove invalid blocks
