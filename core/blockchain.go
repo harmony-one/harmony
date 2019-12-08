@@ -2856,7 +2856,7 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 
 // ReadBlockRewardAccumulator must only be called on beaconchain
 func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
-	if bc.chainConfig.IsPreStaking(shard.Schedule.CalcEpochNumber(number)) {
+	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
 		return big.NewInt(0), nil
 	}
 	if cached, ok := bc.blockAccumulatorCache.Get(number); ok {
