@@ -163,27 +163,25 @@ func eposStakedCommittee(
 	}
 
 	shardCount := int(s.NumShards())
-
 	shardState := &shard.State{}
 	shardState.Shards = make([]shard.Committee, shardCount)
 	hAccounts := s.HmyAccounts()
+	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 
-	// Shard state needs to be sorted by shard ID
 	for i := 0; i < shardCount; i++ {
 		shardState.Shards[i] = shard.Committee{uint32(i), shard.SlotList{}}
-	}
-
-	for i := range hAccounts {
-		shardID := i % shardCount
-		pub := &bls.PublicKey{}
-		pub.DeserializeHexStr(hAccounts[i].BlsPublicKey)
-		pubKey := shard.BlsPublicKey{}
-		pubKey.FromLibBLSPublicKey(pub)
-		shardState.Shards[shardID].Slots = append(shardState.Shards[shardID].Slots, shard.Slot{
-			common2.ParseAddr(hAccounts[i].Address),
-			pubKey,
-			nil,
-		})
+		for j := 0; j < shardHarmonyNodes; j++ {
+			index := i + j*shardCount
+			pub := &bls.PublicKey{}
+			pub.DeserializeHexStr(hAccounts[index].BlsPublicKey)
+			pubKey := shard.BlsPublicKey{}
+			pubKey.FromLibBLSPublicKey(pub)
+			shardState.Shards[i].Slots = append(shardState.Shards[i].Slots, shard.Slot{
+				common2.ParseAddr(hAccounts[index].Address),
+				pubKey,
+				nil,
+			})
+		}
 	}
 
 	if stakedSlotsCount == 0 {
