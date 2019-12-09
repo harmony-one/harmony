@@ -1,6 +1,7 @@
 package node
 
 import (
+	"bytes"
 	"sort"
 	"strings"
 	"time"
@@ -83,21 +84,27 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	node.Worker.UpdateCurrent()
 
 	// Update worker's current header and state data in preparation to propose/process new transactions
-	coinbase := node.Consensus.SelfAddress
+	var (
+		coinbase = node.Consensus.SelfAddress
+		beneficiary = coinbase
+		err error
+	)
 
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) {
 		addr := common.Address{}
-		blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
-		addr.SetBytes(blsPubKeyBytes[:])
-		coinbase = addr
-	}
+		if bytes.Compare(coinbase[:], addr[:]) == 0 { // empty SelfAddress means it's a staking validator
+			blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
+			addr.SetBytes(blsPubKeyBytes[:])
+			coinbase = addr  // coinbase will be the bls address
 
-	node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
-	beneficiary, err := node.Blockchain().GetECDSAFromCoinbase(node.Worker.GetCurrentHeader())
-
-	if err != nil {
-		return nil, err
+			// validator's ecdsa address
+			node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
+			beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(node.Worker.GetCurrentHeader())
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// Prepare transactions including staking transactions
