@@ -67,18 +67,22 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		receipts types.Receipts
 		outcxs   types.CXReceipts
 
-		incxs    = block.IncomingReceipts()
-		usedGas  = new(uint64)
-		header   = block.Header()
-		coinbase = block.Header().Coinbase()
-		allLogs  []*types.Log
-		gp       = new(GasPool).AddGas(block.GasLimit())
+		incxs   = block.IncomingReceipts()
+		usedGas = new(uint64)
+		header  = block.Header()
+		allLogs []*types.Log
+		gp      = new(GasPool).AddGas(block.GasLimit())
 	)
+	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
+
+	if err != nil {
+		return nil, nil, nil, 0, nil, err
+	}
 
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, cxReceipt, _, err := ApplyTransaction(p.config, p.bc, &coinbase, gp, statedb, header, tx, usedGas, cfg)
+		receipt, cxReceipt, _, err := ApplyTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
 		if err != nil {
 			return nil, nil, nil, 0, nil, err
 		}
@@ -94,7 +98,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	for i, tx := range block.StakingTransactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
 		receipt, _, err :=
-			ApplyStakingTransaction(p.config, p.bc, &coinbase, gp, statedb, header, tx, usedGas, cfg)
+			ApplyStakingTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
 
 		if err != nil {
 			return nil, nil, nil, 0, nil, err

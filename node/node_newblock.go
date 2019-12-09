@@ -93,6 +93,13 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		coinbase = addr
 	}
 
+	node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
+	beneficiary, err := node.Blockchain().GetECDSAFromCoinbase(node.Worker.GetCurrentHeader())
+
+	if err != nil {
+		return nil, err
+	}
+
 	// Prepare transactions including staking transactions
 	pending, err := node.TxPool.Pending()
 	if err != nil {
@@ -112,7 +119,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		node.pendingStakingTxMutex.Unlock()
 	}
 
-	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase); err != nil {
+	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, beneficiary); err != nil {
 		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] cannot commit transactions")
 		return nil, err
 	}
