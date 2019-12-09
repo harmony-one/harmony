@@ -2938,16 +2938,17 @@ func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Dele
 // GetECDSAFromCoinbase retrieve corresponding ecdsa address from Coinbase Address
 func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address, error) {
 	// backward compatibility: before isStaking epoch, coinbase address is the ecdsa address
+	coinbase := header.Coinbase()
 	isStaking := bc.Config().IsStaking(header.Epoch())
 	if !isStaking {
-		return header.Coinbase(), nil
+		return coinbase, nil
 	}
 
 	shardState, err := bc.ReadShardState(header.Epoch())
 	if err != nil {
 		return common.Address{}, ctxerror.New("cannot read shard state",
 			"epoch", header.Epoch(),
-			"coinbaseAddr", header.Coinbase(),
+			"coinbaseAddr", coinbase,
 		).WithCause(err)
 	}
 
@@ -2956,12 +2957,16 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 		return common.Address{}, ctxerror.New("cannot find shard in the shard state",
 			"blockNum", header.Number(),
 			"shardID", header.ShardID(),
-			"coinbaseAddr", header.Coinbase(),
+			"coinbaseAddr", coinbase,
 		)
 	}
 	for _, member := range committee.Slots {
 		// After staking the coinbase address will be the address of bls public key
-		if utils.GetAddressFromBlsPubKeyBytes(member.BlsPublicKey[:]) == header.Coinbase() {
+		if bytes.Compare(member.EcdsaAddress[:], coinbase[:]) == 0 {
+			return member.EcdsaAddress, nil
+		}
+
+		if utils.GetAddressFromBlsPubKeyBytes(member.BlsPublicKey[:]) == coinbase {
 			return member.EcdsaAddress, nil
 		}
 	}
