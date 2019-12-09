@@ -217,8 +217,7 @@ func setupStakingNodeAccount() error {
 	initialAccount = &genesis.DeployAccount{}
 	initialAccount.ShardID = shardID
 	initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
-	blsAddressBytes := pubKey.GetAddress()
-	initialAccount.Address = hex.EncodeToString(blsAddressBytes[:])
+	initialAccount.Address = ""
 	return nil
 }
 
@@ -295,7 +294,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		return currentConsensus.PubKey, nil
 	})
 
-	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
+	if initialAccount.Address != "" { // staking validator doesn't have to specify ECDSA address
+		currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
+	}
 
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)

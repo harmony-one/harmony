@@ -27,7 +27,6 @@ import (
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // ChainContext supports retrieving headers and consensus parameters from the
@@ -44,21 +43,14 @@ type ChainContext interface {
 
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
 	ReadValidatorSnapshot(common.Address) (*types2.ValidatorWrapper, error)
-
-	// GetECDSAFromCoinbase retrieves corresponding ECDSA address from the coinbase (BLS Address)
-	GetECDSAFromCoinbase(*block.Header) (common.Address, error)
 }
 
 // NewEVMContext creates a new context for use in the EVM.
 func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author *common.Address) vm.Context {
 	// If we don't have an explicit author (i.e. not mining), extract from the header
 	var beneficiary common.Address
-	var err error
 	if author == nil {
-		beneficiary, err = chain.GetECDSAFromCoinbase(header) // Ignore error, we're past header validation
-		if err != nil {
-			utils.Logger().Warn().Msg("oops! We cannot find any beneficiary from header")
-		}
+		beneficiary, _ = chain.Engine().Author(header) // Ignore error, we're past header validation
 	} else {
 		beneficiary = *author
 	}
