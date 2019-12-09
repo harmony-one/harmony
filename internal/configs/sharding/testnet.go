@@ -39,7 +39,7 @@ func (testnetSchedule) BlocksPerEpoch() uint64 {
 }
 
 func (ts testnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
-	epoch := blockNum % ts.BlocksPerEpoch()
+	epoch := blockNum / ts.BlocksPerEpoch()
 	return big.NewInt(int64(epoch))
 }
 
