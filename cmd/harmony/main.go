@@ -294,7 +294,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		return currentConsensus.PubKey, nil
 	})
 
-	if initialAccount.Address != "" {  // staking validator doesn't have to specify ECDSA address
+	if initialAccount.Address != "" { // staking validator doesn't have to specify ECDSA address
 		currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
 	}
 

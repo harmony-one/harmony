@@ -85,9 +85,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Update worker's current header and state data in preparation to propose/process new transactions
 	var (
-		coinbase = node.Consensus.SelfAddress
+		coinbase    = node.Consensus.SelfAddress
 		beneficiary = coinbase
-		err error
+		err         error
 	)
 
 	// After staking, all coinbase will be the address of bls pub key
@@ -96,7 +96,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		if bytes.Compare(coinbase[:], addr[:]) == 0 { // empty SelfAddress means it's a staking validator
 			blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
 			addr.SetBytes(blsPubKeyBytes[:])
-			coinbase = addr  // coinbase will be the bls address
+			coinbase = addr // coinbase will be the bls address
 
 			// validator's ecdsa address
 			node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
