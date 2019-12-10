@@ -1159,6 +1159,12 @@ func (bc *BlockChain) WriteBlockWithState(
 	if len(header.ShardState()) > 0 {
 		// Write shard state for the new epoch
 		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
+		shardState, err := block.Header().GetShardState()
+		if err == nil && shardState.Epoch != nil && bc.chainConfig.IsStaking(shardState.Epoch) {
+			// After staking, the epoch will be decided by the epoch in the shard state.
+			epoch = new(big.Int).Set(shardState.Epoch)
+		}
+
 		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
 		if err != nil {
 			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
