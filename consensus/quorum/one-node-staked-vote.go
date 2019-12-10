@@ -19,9 +19,6 @@ var (
 	totalShare    = numeric.MustNewDecFromStr("1.00")
 )
 
-// TODO Test the case where we have 33 nodes, 68/33 will give precision hell and it should trigger
-// the 100% mismatch err.
-
 // TallyResult is the result of when we calculate voting power,
 // recall that it happens to us at epoch change
 type TallyResult struct {
@@ -29,12 +26,24 @@ type TallyResult struct {
 	theirPercent numeric.Dec
 }
 
+type voteBox struct {
+	voters       map[shard.BlsPublicKey]struct{}
+	currentTotal numeric.Dec
+}
+
+type box struct {
+	Prepare    *voteBox
+	Commit     *voteBox
+	ViewChange *voteBox
+}
+
 type stakedVoteWeight struct {
 	SignatureReader
 	DependencyInjectionWriter
 	DependencyInjectionReader
 	slash.ThresholdDecider
-	roster votepower.Roster
+	roster    votepower.Roster
+	ballotBox box
 }
 
 // Policy ..
@@ -83,39 +92,56 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, error) {
 	w := shard.BlsPublicKey{}
 	members := v.Participants()
-	currentTotalPower := numeric.ZeroDec()
+	ballot := func() *voteBox {
+		switch p {
+		case Prepare:
+			return v.ballotBox.Prepare
+		case Commit:
+			return v.ballotBox.Commit
+		case ViewChange:
+			return v.ballotBox.ViewChange
+		default:
+			// Should not happen
+			return nil
+		}
+	}()
 
 	for i := range members {
-		if v.ReadSignature(p, members[i]) != nil {
+		w.FromLibBLSPublicKey(members[i])
+		if _, didVote := ballot.voters[w]; !didVote &&
+			v.ReadSignature(p, members[i]) != nil {
 			err := w.FromLibBLSPublicKey(members[i])
 			if err != nil {
 				return nil, err
 			}
-			currentTotalPower = currentTotalPower.Add(
+			ballot.currentTotal = ballot.currentTotal.Add(
 				v.roster.Voters[w].EffectivePercent,
 			)
+			ballot.voters[w] = struct{}{}
 		}
 	}
-	return &currentTotalPower, nil
+
+	return &ballot.currentTotal, nil
 }
 
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
-	currentTotalPower := numeric.ZeroDec()
 	pubKeys := mask.Publics
-	for _, key := range pubKeys {
-		w := shard.BlsPublicKey{}
-		err := w.FromLibBLSPublicKey(key)
+	w := shard.BlsPublicKey{}
+	currentTotal := numeric.ZeroDec()
+
+	for i := range pubKeys {
+		err := w.FromLibBLSPublicKey(pubKeys[i])
 		if err != nil {
 			return nil
 		}
-		if enabled, err := mask.KeyEnabled(key); err == nil && enabled {
-			currentTotalPower = currentTotalPower.Add(
+		if enabled, err := mask.KeyEnabled(pubKeys[i]); err == nil && enabled {
+			currentTotal = currentTotal.Add(
 				v.roster.Voters[w].EffectivePercent,
 			)
 		}
 	}
-	return &currentTotalPower
+	return &currentTotal
 }
 
 // QuorumThreshold ..
@@ -135,43 +161,6 @@ func (v *stakedVoteWeight) IsRewardThresholdAchieved() bool {
 	return reached.GTE(ninetyPercent)
 }
 
-// Award ..
-// func (v *stakedVoteWeight) Award(
-// 	Pie numeric.Dec,
-// 	earners []common.Address,
-// 	hook func(earner common.Address, due *big.Int),
-// ) numeric.Dec {
-// 	payout := big.NewInt(0)
-// 	last := big.NewInt(0)
-// 	count := big.NewInt(int64(len(earners)))
-// 	// proportional := map[common.Address]numeric.Dec{}
-
-// 	for _, voter := range v.voters {
-// 		if voter.isHarmonyNode == false {
-// 			// proportional[details.earningAccount] = details.effective.QuoTruncate(
-// 			// 	v.stakedTotal,
-// 			// )
-// 		}
-// 	}
-// 	// TODO Finish implementing this logic w/Chao
-
-// 	for i := range earners {
-// 		cur := big.NewInt(0)
-
-// 		cur.Mul(Pie, big.NewInt(int64(i+1))).Div(cur, count)
-
-// 		diff := big.NewInt(0).Sub(cur, last)
-
-// 		// hook(common.Address(account), diff)
-
-// 		payout = big.NewInt(0).Add(payout, diff)
-
-// 		last = cur
-// 	}
-
-// 	return payout
-// }
-
 var (
 	errSumOfVotingPowerNotOne   = errors.New("sum of total votes do not sum to 100 percent")
 	errSumOfOursAndTheirsNotOne = errors.New(
@@ -183,7 +172,8 @@ func (v *stakedVoteWeight) SetVoters(
 	staked shard.SlotList,
 ) (*TallyResult, error) {
 	s, _ := v.ShardIDProvider()()
-	v.Reset([]Phase{Prepare, Commit, ViewChange})
+	v.ResetPrepareAndCommitVotes()
+	v.ResetViewChangeVotes()
 
 	roster, err := votepower.Compute(staked)
 	if err != nil {
@@ -282,4 +272,27 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 	w.FromLibBLSPublicKey(identity)
 	_, ok := v.roster.Voters[w]
 	return ok
+}
+
+func newBox() *voteBox {
+	return &voteBox{map[shard.BlsPublicKey]struct{}{}, numeric.ZeroDec()}
+}
+
+func newBallotBox() box {
+	return box{
+		Prepare:    newBox(),
+		Commit:     newBox(),
+		ViewChange: newBox(),
+	}
+}
+
+func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
+	v.reset([]Phase{Prepare, Commit})
+	v.ballotBox.Prepare = newBox()
+	v.ballotBox.Commit = newBox()
+}
+
+func (v *stakedVoteWeight) ResetViewChangeVotes() {
+	v.reset([]Phase{ViewChange})
+	v.ballotBox.ViewChange = newBox()
 }

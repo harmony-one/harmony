@@ -80,14 +80,26 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	node.Worker.UpdateCurrent()
 
 	// Update worker's current header and state data in preparation to propose/process new transactions
-	coinbase := node.Consensus.SelfAddress
+	var (
+		coinbase    = node.Consensus.SelfAddress
+		beneficiary = coinbase
+		err         error
+	)
+
+	node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
 
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) {
 		addr := common.Address{}
 		blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
 		addr.SetBytes(blsPubKeyBytes[:])
-		coinbase = addr
+		coinbase = addr // coinbase will be the bls address
+		node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
+	}
+
+	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(node.Worker.GetCurrentHeader())
+	if err != nil {
+		return nil, err
 	}
 
 	// Prepare transactions including staking transactions
@@ -110,7 +122,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	if err := node.Worker.CommitTransactions(
-		pending, pendingStakingTransactions, coinbase,
+		pending, pendingStakingTransactions, beneficiary,
 		func(payload staking.RPCTransactionError) {
 			const maxSize = 1024
 			node.errorSink.Lock()
@@ -130,7 +142,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {
 		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
-			utils.Logger().Error().Err(err).Msg("cannot commit receipts")
+			utils.Logger().Error().Err(err).Msg("[proposeNewBlock] cannot commit receipts")
 		}
 	}
 
@@ -152,9 +164,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 				}
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
-			utils.Logger().Debug().Msgf("Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
+			utils.Logger().Debug().Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
 		} else {
-			utils.Logger().Error().Err(err).Msgf("Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
+			utils.Logger().Error().Err(err).Msgf("[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
 		}
 	}
 
@@ -169,7 +181,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Prepare last commit signatures
 	sig, mask, err := node.Consensus.LastCommitSig()
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Cannot get commit signatures from last block")
+		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 		return nil, err
 	}
 	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState)

@@ -119,6 +119,7 @@ var (
 	// Bad block revert
 	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
+	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
 )
 
 func initSetup() {
@@ -216,8 +217,7 @@ func setupStakingNodeAccount() error {
 	initialAccount = &genesis.DeployAccount{}
 	initialAccount.ShardID = shardID
 	initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
-	blsAddressBytes := pubKey.GetAddress()
-	initialAccount.Address = hex.EncodeToString(blsAddressBytes[:])
+	initialAccount.Address = ""
 	return nil
 }
 
@@ -294,7 +294,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		return currentConsensus.PubKey, nil
 	})
 
-	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
+	if initialAccount.Address != "" { // staking validator doesn't have to specify ECDSA address
+		currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
+	}
 
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
@@ -385,7 +387,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// Set the consensus ID to be the current block number
 	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
-	currentConsensus.SetViewID(viewID)
+	currentConsensus.SetViewID(viewID + 1)
 	utils.Logger().Info().
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
@@ -505,6 +507,9 @@ func main() {
 
 	if uint64(*doRevertBefore) != 0 && uint64(*revertTo) != 0 {
 		chain := currentNode.Blockchain()
+		if *revertBeacon {
+			chain = currentNode.Beaconchain()
+		}
 		curNum := chain.CurrentBlock().NumberU64()
 		if curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
 			// Remove invalid blocks
@@ -552,10 +557,6 @@ func main() {
 	// Collect node metrics if metrics flag is set
 	if currentNode.NodeConfig.GetMetricsFlag() {
 		go currentNode.CollectMetrics()
-	}
-	// Commit committtee if node role is explorer
-	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
-		go currentNode.CommitCommittee()
 	}
 
 	currentNode.StartServer()

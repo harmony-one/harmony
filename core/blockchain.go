@@ -1122,7 +1122,6 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	//// VRF + VDF
 	//check non zero VRF field in header and add to local db
-
 	if len(block.Vrf()) > 0 {
 		vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch())
 		if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
@@ -1160,6 +1159,12 @@ func (bc *BlockChain) WriteBlockWithState(
 	if len(header.ShardState()) > 0 {
 		// Write shard state for the new epoch
 		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
+		shardState, err := block.Header().GetShardState()
+		if err == nil && shardState.Epoch != nil && bc.chainConfig.IsStaking(shardState.Epoch) {
+			// After staking, the epoch will be decided by the epoch in the shard state.
+			epoch = new(big.Int).Set(shardState.Epoch)
+		}
+
 		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
 		if err != nil {
 			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
@@ -1257,7 +1262,7 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	//// Writing beacon chain cross links
 	if header.ShardID() == shard.BeaconChainShardID &&
-		bc.chainConfig.IsStaking(block.Epoch()) &&
+		bc.chainConfig.IsCrossLink(block.Epoch()) &&
 		len(header.CrossLinks()) > 0 {
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
@@ -2337,11 +2342,11 @@ func (bc *BlockChain) DeleteCommittedFromPendingCrossLinks(crossLinks []types.Cr
 	}
 
 	pendingCLs := []types.CrossLink{}
-Loop:
+
 	for _, cl := range cls {
 		if _, ok := m[cl.ShardID()]; ok {
 			if _, ok1 := m[cl.ShardID()][cl.BlockNum()]; ok1 {
-				continue Loop
+				continue
 			}
 		}
 		pendingCLs = append(pendingCLs, cl)
@@ -2855,8 +2860,11 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	return nil
 }
 
-// ReadBlockRewardAccumulator ..
+// ReadBlockRewardAccumulator must only be called on beaconchain
 func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
+	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
+		return big.NewInt(0), nil
+	}
 	if cached, ok := bc.blockAccumulatorCache.Get(number); ok {
 		return cached.(*big.Int), nil
 	}
@@ -2936,16 +2944,17 @@ func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Dele
 // GetECDSAFromCoinbase retrieve corresponding ecdsa address from Coinbase Address
 func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address, error) {
 	// backward compatibility: before isStaking epoch, coinbase address is the ecdsa address
+	coinbase := header.Coinbase()
 	isStaking := bc.Config().IsStaking(header.Epoch())
 	if !isStaking {
-		return header.Coinbase(), nil
+		return coinbase, nil
 	}
 
 	shardState, err := bc.ReadShardState(header.Epoch())
 	if err != nil {
 		return common.Address{}, ctxerror.New("cannot read shard state",
 			"epoch", header.Epoch(),
-			"coinbaseAddr", header.Coinbase(),
+			"coinbaseAddr", coinbase,
 		).WithCause(err)
 	}
 
@@ -2954,12 +2963,16 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 		return common.Address{}, ctxerror.New("cannot find shard in the shard state",
 			"blockNum", header.Number(),
 			"shardID", header.ShardID(),
-			"coinbaseAddr", header.Coinbase(),
+			"coinbaseAddr", coinbase,
 		)
 	}
 	for _, member := range committee.Slots {
 		// After staking the coinbase address will be the address of bls public key
-		if utils.GetAddressFromBlsPubKeyBytes(member.BlsPublicKey[:]) == header.Coinbase() {
+		if bytes.Compare(member.EcdsaAddress[:], coinbase[:]) == 0 {
+			return member.EcdsaAddress, nil
+		}
+
+		if utils.GetAddressFromBlsPubKeyBytes(member.BlsPublicKey[:]) == coinbase {
 			return member.EcdsaAddress, nil
 		}
 	}

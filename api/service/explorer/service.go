@@ -18,16 +18,12 @@ import (
 	"github.com/gorilla/mux"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/bech32"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants for explorer service.
@@ -137,10 +133,6 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/shard").Queries("id", "{[0-9]*?}").HandlerFunc(s.GetExplorerShard).Methods("GET")
 	s.router.Path("/shard").HandlerFunc(s.GetExplorerShard)
 
-	// Set up router for committee.
-	s.router.Path("/committee").Queries("shard_id", "{[0-9]*?}", "epoch", "{[0-9]*?}").HandlerFunc(s.GetExplorerCommittee).Methods("GET")
-	s.router.Path("/committee").HandlerFunc(s.GetExplorerCommittee).Methods("GET")
-
 	// Do serving now.
 	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
 	server := &http.Server{Addr: addr, Handler: s.router}
@@ -183,11 +175,6 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	to := r.FormValue("to")
 	pageParam := r.FormValue("page")
 	offsetParam := r.FormValue("offset")
-	withSignersParam := r.FormValue("with_signers")
-	withSigners := false
-	if withSignersParam == "true" {
-		withSigners = true
-	}
 	order := r.FormValue("order")
 	data := &Data{
 		Blocks: []*Block{},
@@ -251,60 +238,11 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountBlocks := s.ReadBlocksFromDB(fromInt, toInt)
-	curEpoch := int64(-1)
-	committee := &shard.Committee{}
-	if withSigners {
-		if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.ShardID), 0))); err == nil {
-			if err = rlp.DecodeBytes(bytes, committee); err != nil {
-				utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
-			}
-		}
-	}
 	for id, accountBlock := range accountBlocks {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
 		block := NewBlock(accountBlock, id+fromInt-1)
-		if withSigners && int64(block.Epoch) > curEpoch {
-			if accountBlocks[id-1] != nil {
-				state, err := accountBlocks[id-1].Header().GetShardState()
-				if err == nil {
-					for _, shardCommittee := range state.Shards {
-						if shardCommittee.ShardID == accountBlock.ShardID() {
-							committee = &shardCommittee
-							break
-						}
-					}
-				} else {
-					utils.Logger().Warn().Err(err).Msg("error parsing shard state")
-				}
-			}
-			curEpoch = int64(block.Epoch)
-		}
-		if withSigners {
-			pubkeys := make([]*bls.PublicKey, len(committee.Slots))
-			for i, validator := range committee.Slots {
-				pubkeys[i] = new(bls.PublicKey)
-				validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
-			}
-			mask, err := bls2.NewMask(pubkeys, nil)
-			if err == nil && accountBlocks[id+1] != nil {
-				err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
-				if err == nil {
-					for _, validator := range committee.Slots {
-						oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
-						if err != nil {
-							continue
-						}
-						blsPublicKey := new(bls.PublicKey)
-						validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
-						if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
-							block.Signers = append(block.Signers, oneAddress)
-						}
-					}
-				}
-			}
-		}
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
 			transaction := GetTransaction(tx, accountBlock)
@@ -357,7 +295,7 @@ func (s *Service) GetExplorerBlocks(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetExplorerBlocks rpc end-point.
-func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offset int, withSigners bool, order string) ([]*Block, error) {
+func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offset int, order string) ([]*Block, error) {
 	if offset == 0 {
 		offset = paginationOffset
 	}
@@ -374,58 +312,11 @@ func (s *ServiceAPI) GetExplorerBlocks(ctx context.Context, from, to, page, offs
 	}
 	blocks := make([]*Block, 0)
 	accountBlocks := s.Service.ReadBlocksFromDB(from, to)
-	curEpoch := int64(-1)
-	committee := &shard.Committee{}
-	if withSigners {
-		if bytes, err := db.Get([]byte(GetCommitteeKey(uint32(s.Service.ShardID), 0))); err == nil {
-			if err = rlp.DecodeBytes(bytes, committee); err != nil {
-				utils.Logger().Warn().Err(err).Msg("cannot read committee for new epoch")
-			}
-		}
-	}
 	for id, accountBlock := range accountBlocks {
 		if id == 0 || id == len(accountBlocks)-1 || accountBlock == nil {
 			continue
 		}
 		block := NewBlock(accountBlock, id+from-1)
-		if withSigners && int64(block.Epoch) > curEpoch {
-			if accountBlocks[id-1] != nil {
-				state, err := accountBlocks[id-1].Header().GetShardState()
-				if err == nil {
-					for _, shardCommittee := range state.Shards {
-						if shardCommittee.ShardID == accountBlock.ShardID() {
-							committee = &shardCommittee
-							break
-						}
-					}
-				}
-			}
-			curEpoch = int64(block.Epoch)
-		}
-		if withSigners {
-			pubkeys := make([]*bls.PublicKey, len(committee.Slots))
-			for i, validator := range committee.Slots {
-				pubkeys[i] = new(bls.PublicKey)
-				validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
-			}
-			mask, err := bls2.NewMask(pubkeys, nil)
-			if err == nil && accountBlocks[id+1] != nil {
-				err = mask.SetMask(accountBlocks[id+1].Header().LastCommitBitmap())
-				if err == nil {
-					for _, validator := range committee.Slots {
-						oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
-						if err != nil {
-							continue
-						}
-						blsPublicKey := new(bls.PublicKey)
-						validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
-						if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
-							block.Signers = append(block.Signers, oneAddress)
-						}
-					}
-				}
-			}
-		}
 		// Populate transactions
 		for _, tx := range accountBlock.Transactions() {
 			transaction := GetTransaction(tx, accountBlock)
@@ -528,136 +419,6 @@ func (s *ServiceAPI) GetExplorerTransaction(ctx context.Context, id string) (*Tr
 		return nil, err
 	}
 	return tx, nil
-}
-
-// GetExplorerCommittee servers /comittee end-point.
-func (s *Service) GetExplorerCommittee(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	shardIDRead := r.FormValue("shard_id")
-	epochRead := r.FormValue("epoch")
-	shardID := uint64(0)
-	epoch := uint64(0)
-	var err error
-	if shardIDRead != "" {
-		shardID, err = strconv.ParseUint(shardIDRead, 10, 32)
-		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot read shard id")
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-	}
-	if epochRead != "" {
-		epoch, err = strconv.ParseUint(epochRead, 10, 64)
-		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot read shard epoch")
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-	}
-	if s.ShardID != uint32(shardID) {
-		utils.Logger().Warn().Msg("incorrect shard id")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	// fetch current epoch if epoch is 0
-	db := s.Storage.GetDB()
-	if epoch == 0 {
-		bytes, err := db.Get([]byte(BlockHeightKey))
-		blockHeight, err := strconv.Atoi(string(bytes))
-		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot decode block height from DB")
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		key := GetBlockKey(blockHeight)
-		data, err := db.Get([]byte(key))
-		block := new(types.Block)
-		if rlp.DecodeBytes(data, block) != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot get block from db")
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		epoch = block.Epoch().Uint64()
-	}
-	bytes, err := db.Get([]byte(GetCommitteeKey(uint32(shardID), epoch)))
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot read committee")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	committee := &shard.Committee{}
-	if err := rlp.DecodeBytes(bytes, committee); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot decode committee data from DB")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	validators := &Committee{}
-	for _, validator := range committee.Slots {
-		validatorBalance := big.NewInt(0)
-		validatorBalance, err := s.GetAccountBalance(validator.EcdsaAddress)
-		if err != nil {
-			continue
-		}
-		oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
-		if err != nil {
-			continue
-		}
-		validators.Validators = append(validators.Validators, &Validator{Address: oneAddress, Balance: validatorBalance})
-	}
-	if err := json.NewEncoder(w).Encode(validators); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode committee")
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
-// GetExplorerCommittee rpc end-point.
-func (s *ServiceAPI) GetExplorerCommittee(ctx context.Context, shardID uint32, epoch uint64) (*Committee, error) {
-	if s.Service.ShardID != uint32(shardID) {
-		utils.Logger().Warn().Msg("incorrect shard id")
-		return nil, nil
-	}
-	// fetch current epoch if epoch is 0
-	db := s.Service.Storage.GetDB()
-	if epoch == 0 {
-		bytes, err := db.Get([]byte(BlockHeightKey))
-		blockHeight, err := strconv.Atoi(string(bytes))
-		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot decode block height from DB")
-			return nil, err
-		}
-		key := GetBlockKey(blockHeight)
-		data, err := db.Get([]byte(key))
-		block := new(types.Block)
-		if rlp.DecodeBytes(data, block) != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot get block from db")
-			return nil, err
-		}
-		epoch = block.Epoch().Uint64()
-	}
-	bytes, err := db.Get([]byte(GetCommitteeKey(uint32(shardID), epoch)))
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot read committee")
-		return nil, err
-	}
-	committee := &shard.Committee{}
-	if err := rlp.DecodeBytes(bytes, committee); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot decode committee data from DB")
-		return nil, err
-	}
-	validators := &Committee{}
-	for _, validator := range committee.Slots {
-		validatorBalance := big.NewInt(0)
-		validatorBalance, err := s.Service.GetAccountBalance(validator.EcdsaAddress)
-		if err != nil {
-			continue
-		}
-		oneAddress, err := common2.AddressToBech32(validator.EcdsaAddress)
-		if err != nil {
-			continue
-		}
-		validators.Validators = append(validators.Validators, &Validator{Address: oneAddress, Balance: validatorBalance})
-	}
-	return validators, nil
 }
 
 // GetExplorerAddress serves /address end-point.

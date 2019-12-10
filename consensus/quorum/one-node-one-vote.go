@@ -44,7 +44,8 @@ func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 		return false
 	}
 	utils.Logger().Debug().
-		Msgf("[IsQuorumAchievedByMask] have enough voting power: need %+v, have %+v", threshold, currentTotalPower)
+		Msgf("[IsQuorumAchievedByMask] have enough voting power: need %+v, have %+v",
+			threshold, currentTotalPower)
 	return true
 }
 
@@ -129,4 +130,12 @@ func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
 		}
 	}
 	return false
+}
+
+func (v *uniformVoteWeight) ResetPrepareAndCommitVotes() {
+	v.reset([]Phase{Prepare, Commit})
+}
+
+func (v *uniformVoteWeight) ResetViewChangeVotes() {
+	v.reset([]Phase{ViewChange})
 }
