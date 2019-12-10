@@ -42,9 +42,8 @@ type stakedVoteWeight struct {
 	DependencyInjectionWriter
 	DependencyInjectionReader
 	slash.ThresholdDecider
-	roster          votepower.Roster
-	ballotBox       box
-	bitmapBallotBox box
+	roster    votepower.Roster
+	ballotBox box
 }
 
 // Policy ..
@@ -74,9 +73,9 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *stakedVoteWeight) IsQuorumAchievedByMask(p Phase, mask *bls_cosi.Mask) bool {
+func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	threshold := v.QuorumThreshold()
-	currentTotalPower := v.computeTotalPowerByMask(p, mask)
+	currentTotalPower := v.computeTotalPowerByMask(mask)
 	if currentTotalPower == nil {
 		utils.Logger().Warn().
 			Msgf("[IsQuorumAchievedByMask] currentTotalPower is nil")
@@ -126,38 +125,23 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 }
 
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
-func (v *stakedVoteWeight) computeTotalPowerByMask(p Phase, mask *bls_cosi.Mask) *numeric.Dec {
+func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	pubKeys := mask.Publics
-	ballot := func() *voteBox {
-		switch p {
-		case Prepare:
-			return v.bitmapBallotBox.Prepare
-		case Commit:
-			return v.bitmapBallotBox.Commit
-		case ViewChange:
-			return v.bitmapBallotBox.ViewChange
-		default:
-			// Should not happen
-			return nil
-		}
-	}()
 	w := shard.BlsPublicKey{}
+	currentTotal := numeric.ZeroDec()
 
 	for i := range pubKeys {
 		err := w.FromLibBLSPublicKey(pubKeys[i])
 		if err != nil {
 			return nil
 		}
-		if _, didVote := ballot.voters[w]; !didVote {
-			if enabled, err := mask.KeyEnabled(pubKeys[i]); err == nil && enabled {
-				ballot.currentTotal = ballot.currentTotal.Add(
-					v.roster.Voters[w].EffectivePercent,
-				)
-				ballot.voters[w] = struct{}{}
-			}
+		if enabled, err := mask.KeyEnabled(pubKeys[i]); err == nil && enabled {
+			currentTotal = currentTotal.Add(
+				v.roster.Voters[w].EffectivePercent,
+			)
 		}
 	}
-	return &ballot.currentTotal
+	return &currentTotal
 }
 
 // QuorumThreshold ..
@@ -306,12 +290,9 @@ func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
 	v.reset([]Phase{Prepare, Commit})
 	v.ballotBox.Prepare = newBox()
 	v.ballotBox.Commit = newBox()
-	v.bitmapBallotBox.Prepare = newBox()
-	v.bitmapBallotBox.Commit = newBox()
 }
 
 func (v *stakedVoteWeight) ResetViewChangeVotes() {
 	v.reset([]Phase{ViewChange})
 	v.ballotBox.ViewChange = newBox()
-	v.bitmapBallotBox.ViewChange = newBox()
 }

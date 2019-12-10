@@ -518,7 +518,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
-	if !consensus.Decider.IsQuorumAchievedByMask(quorum.Prepare, mask) {
+	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 		consensus.getLogger().Warn().
 			Msgf("[OnPrepared] Quorum Not achieved")
 		return
@@ -904,7 +904,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	if !consensus.Decider.IsQuorumAchievedByMask(quorum.Commit, mask) {
+	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 		consensus.getLogger().Warn().
 			Msgf("[OnCommitted] Quorum Not achieved")
 		return

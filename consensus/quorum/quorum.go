@@ -114,7 +114,7 @@ type Decider interface {
 	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	IsQuorumAchievedByMask(p Phase, mask *bls_cosi.Mask) bool
+	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
 	QuorumThreshold() numeric.Dec
 	AmIMemberOfCommitee() bool
 	IsRewardThresholdAchieved() bool
@@ -319,7 +319,6 @@ func NewDecider(p Policy) Decider {
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
 			c.SignatureReader.(slash.ThresholdDecider),
 			*votepower.NewRoster(),
-			newBallotBox(),
 			newBallotBox(),
 		}
 	default:
