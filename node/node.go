@@ -216,6 +216,11 @@ type Node struct {
 
 	// last time consensus reached for metrics
 	lastConsensusTime int64
+	// Last 1024 staking transaction error, only in memory
+	errorSink struct {
+		sync.Mutex
+		failedTxns []staking.RPCTransactionError
+	}
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -390,6 +395,10 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(host p2p.Host, consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
+	node.errorSink = struct {
+		sync.Mutex
+		failedTxns []staking.RPCTransactionError
+	}{}
 
 	node.syncFreq = SyncFrequency
 	node.beaconSyncFreq = SyncFrequency

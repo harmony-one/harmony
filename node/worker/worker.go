@@ -52,7 +52,7 @@ type Worker struct {
 func (w *Worker) CommitTransactions(
 	pendingNormal map[common.Address]types.Transactions,
 	pendingStaking staking.StakingTransactions, coinbase common.Address,
-	stkingTxErrorSink func(core.StakingTransactionError),
+	stkingTxErrorSink func(staking.RPCTransactionError),
 ) error {
 
 	if w.current.gasPool == nil {
@@ -132,9 +132,9 @@ func (w *Worker) CommitTransactions(
 		for _, tx := range pendingStaking {
 			logs, err := w.commitStakingTransaction(tx, coinbase)
 			if txID := tx.Hash().Hex(); err != nil {
-				stkingTxErrorSink(core.StakingTransactionError{
+				stkingTxErrorSink(staking.RPCTransactionError{
 					TxHashID:             txID,
-					StakingDirective:     tx.StakingType().String(),
+					StakingDirective:     tx.StakingType(),
 					TimestampOfRejection: time.Now().Unix(),
 					ErrMessage:           err.Error(),
 				})

@@ -367,3 +367,8 @@ func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
 func (b *APIBackend) GetShardState() (*shard.State, error) {
 	return b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentHeader().Epoch())
 }
+
+// GetCurrentStakingTransactionErrorSink ..
+func (b *APIBackend) GetCurrentStakingTransactionErrorSink() []staking.RPCTransactionError {
+	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
+}

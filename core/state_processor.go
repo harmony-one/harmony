@@ -19,7 +19,6 @@ package core
 import (
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -33,19 +32,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
-)
-
-// StakingTransactionError ..
-type StakingTransactionError struct {
-	TxHashID             string `json:"tx-hash-id"`
-	StakingDirective     string `json:"directive-kind"`
-	TimestampOfRejection int64  `json:"time-at-rejection"`
-	ErrMessage           string `json:"error-message"`
-}
-
-var (
-	// StakingTransactionErrorSink ..
-	StakingTransactionErrorSink = sync.Map{}
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
