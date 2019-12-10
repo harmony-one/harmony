@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -215,9 +216,25 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		return errors.Wrapf(err,
 			"cannot calculate quorum for block %s", header.Number())
 	}
-	if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
-		return ctxerror.New("[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
-			"need", parentQuorum, "got", count)
+	if chain.Config().IsStaking(parentHeader.Epoch()) {
+		slotList, err := shard.DecodeWrapper(parentHeader.ShardState())
+		if err != nil {
+			return errors.Wrapf(err, "cannot decoded shard state")
+		}
+		d := quorum.NewDecider(quorum.SuperMajorityStake)
+		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
+		if !d.IsQuorumAchievedByMask(mask) {
+			return ctxerror.New(
+				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
+			)
+		}
+	} else {
+		if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
+			return ctxerror.New(
+				"[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
+				"need", parentQuorum, "got", count,
+			)
+		}
 	}
 
 	blockNumHash := make([]byte, 8)
