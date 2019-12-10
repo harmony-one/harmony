@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -210,14 +211,36 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
-	if err != nil {
-		return errors.Wrapf(err,
-			"cannot calculate quorum for block %s", header.Number())
-	}
-	if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
-		return ctxerror.New("[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
-			"need", parentQuorum, "got", count)
+	if chain.Config().IsStaking(parentHeader.Epoch()) {
+		slotList, err := chain.ReadShardState(parentHeader.Epoch())
+		if err != nil {
+			return errors.Wrapf(err, "cannot decoded shard state")
+		}
+		d := quorum.NewDecider(quorum.SuperMajorityStake)
+		d.SetShardIDProvider(func() (uint32, error) {
+			return parentHeader.ShardID(), nil
+		})
+		d.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+			return nil, nil
+		})
+		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
+		if !d.IsQuorumAchievedByMask(mask) {
+			return ctxerror.New(
+				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
+			)
+		}
+	} else {
+		parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
+		if err != nil {
+			return errors.Wrapf(err,
+				"cannot calculate quorum for block %s", header.Number())
+		}
+		if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
+			return ctxerror.New(
+				"[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
+				"need", parentQuorum, "got", count,
+			)
+		}
 	}
 
 	blockNumHash := make([]byte, 8)
@@ -259,7 +282,7 @@ func (e *engineImpl) Finalize(
 			wrapper := state.GetStakingInfo(validator)
 			if wrapper != nil {
 				for i := range wrapper.Delegations {
-					delegation := wrapper.Delegations[i]
+					delegation := &wrapper.Delegations[i]
 					totalWithdraw := delegation.RemoveUnlockedUndelegations(header.Epoch())
 					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 				}
