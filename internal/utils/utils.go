@@ -95,8 +95,9 @@ func GetAddressFromBlsPubKeyBytes(pubKeyBytes []byte) common.Address {
 	if err == nil {
 		addrBytes := pubKey.GetAddress()
 		addr.SetBytes(addrBytes[:])
+	} else {
+		Logger().Err(err).Msg("Failed to get address of bls key")
 	}
-	Logger().Err(err).Msg("Failed to get address of bls key")
 	return addr
 }
 
