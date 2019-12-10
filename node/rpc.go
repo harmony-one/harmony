@@ -51,6 +51,8 @@ func (node *Node) IsCurrentlyLeader() bool {
 
 // ErroredStakingTransactionSink is the inmemory failed staking transactions this node has
 func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError {
+	node.errorSink.Lock()
+	defer node.errorSink.Unlock()
 	return node.errorSink.failedTxns
 }
 
