@@ -214,10 +214,10 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	if chain.Config().IsStaking(parentHeader.Epoch()) {
-		slotList, err := chain.ReadShardState(parentHeader.Epoch())
+	if e := parentHeader.Epoch(); chain.Config().IsStaking(e) {
+		slotList, err := chain.ReadShardState(e)
 		if err != nil {
-			return errors.Wrapf(err, "cannot decoded shard state")
+			return errors.Wrapf(err, "cannot read shard state")
 		}
 		d := quorum.NewDecider(quorum.SuperMajorityStake)
 		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
@@ -338,18 +338,31 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 	if err != nil {
 		return ctxerror.New("[VerifyHeaderWithSignature] Unable to deserialize the commitSignature and commitBitmap in Block Header").WithCause(err)
 	}
-
 	hash := header.Hash()
-	quorum, err := QuorumForBlock(chain, header, reCalculate)
-	if err != nil {
-		return errors.Wrapf(err,
-			"cannot calculate quorum for block %s", header.Number())
-	}
-	if count := utils.CountOneBits(mask.Bitmap); count < int64(quorum) {
-		return ctxerror.New("[VerifyHeaderWithSignature] Not enough signature in commitSignature from Block Header",
-			"need", quorum, "got", count)
-	}
 
+	if e := header.Epoch(); chain.Config().IsStaking(e) {
+		slotList, err := chain.ReadShardState(e)
+		if err != nil {
+			return errors.Wrapf(err, "cannot read shard state")
+		}
+		d := quorum.NewDecider(quorum.SuperMajorityStake)
+		d.SetVoters(slotList.FindCommitteeByID(header.ShardID()).Slots)
+		if !d.IsQuorumAchievedByMask(mask) {
+			return ctxerror.New(
+				"[VerifySeal] Not enough voting power in commitSignature from Block Header",
+			)
+		}
+	} else {
+		quorumCount, err := QuorumForBlock(chain, header, reCalculate)
+		if err != nil {
+			return errors.Wrapf(err,
+				"cannot calculate quorum for block %s", header.Number())
+		}
+		if count := utils.CountOneBits(mask.Bitmap); count < int64(quorumCount) {
+			return ctxerror.New("[VerifyHeaderWithSignature] Not enough signature in commitSignature from Block Header",
+				"need", quorumCount, "got", count)
+		}
+	}
 	blockNumHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumHash, header.Number().Uint64())
 	commitPayload := append(blockNumHash, hash[:]...)
