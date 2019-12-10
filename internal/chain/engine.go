@@ -3,8 +3,9 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"math/big"
+
+	"github.com/harmony-one/harmony/consensus/quorum"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
