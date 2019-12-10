@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -206,18 +207,37 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	payload := append(sig[:], header.LastCommitBitmap()...)
 	aggSig, mask, err := ReadSignatureBitmapByPublicKeys(payload, publicKeys)
 	if err != nil {
-		return ctxerror.New("[VerifySeal] Unable to deserialize the LastCommitSignature and LastCommitBitmap in Block Header").WithCause(err)
+		return ctxerror.New(
+			"[VerifySeal] Unable to deserialize the LastCommitSignature" +
+				" and LastCommitBitmap in Block Header",
+		).WithCause(err)
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
-	if err != nil {
-		return errors.Wrapf(err,
-			"cannot calculate quorum for block %s", header.Number())
-	}
-	if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
-		return ctxerror.New("[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
-			"need", parentQuorum, "got", count)
+	if e := parentHeader.Epoch(); chain.Config().IsStaking(e) {
+		slotList, err := chain.ReadShardState(e)
+		if err != nil {
+			return errors.Wrapf(err, "cannot read shard state")
+		}
+		d := quorum.NewDecider(quorum.SuperMajorityStake)
+		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
+		if !d.IsQuorumAchievedByMask(mask) {
+			return ctxerror.New(
+				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
+			)
+		}
+	} else {
+		parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
+		if err != nil {
+			return errors.Wrapf(err,
+				"cannot calculate quorum for block %s", header.Number())
+		}
+		if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
+			return ctxerror.New(
+				"[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
+				"need", parentQuorum, "got", count,
+			)
+		}
 	}
 
 	blockNumHash := make([]byte, 8)
@@ -318,18 +338,31 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 	if err != nil {
 		return ctxerror.New("[VerifyHeaderWithSignature] Unable to deserialize the commitSignature and commitBitmap in Block Header").WithCause(err)
 	}
-
 	hash := header.Hash()
-	quorum, err := QuorumForBlock(chain, header, reCalculate)
-	if err != nil {
-		return errors.Wrapf(err,
-			"cannot calculate quorum for block %s", header.Number())
-	}
-	if count := utils.CountOneBits(mask.Bitmap); count < int64(quorum) {
-		return ctxerror.New("[VerifyHeaderWithSignature] Not enough signature in commitSignature from Block Header",
-			"need", quorum, "got", count)
-	}
 
+	if e := header.Epoch(); chain.Config().IsStaking(e) {
+		slotList, err := chain.ReadShardState(e)
+		if err != nil {
+			return errors.Wrapf(err, "cannot read shard state")
+		}
+		d := quorum.NewDecider(quorum.SuperMajorityStake)
+		d.SetVoters(slotList.FindCommitteeByID(header.ShardID()).Slots)
+		if !d.IsQuorumAchievedByMask(mask) {
+			return ctxerror.New(
+				"[VerifySeal] Not enough voting power in commitSignature from Block Header",
+			)
+		}
+	} else {
+		quorumCount, err := QuorumForBlock(chain, header, reCalculate)
+		if err != nil {
+			return errors.Wrapf(err,
+				"cannot calculate quorum for block %s", header.Number())
+		}
+		if count := utils.CountOneBits(mask.Bitmap); count < int64(quorumCount) {
+			return ctxerror.New("[VerifyHeaderWithSignature] Not enough signature in commitSignature from Block Header",
+				"need", quorumCount, "got", count)
+		}
+	}
 	blockNumHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumHash, header.Number().Uint64())
 	commitPayload := append(blockNumHash, hash[:]...)
