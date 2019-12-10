@@ -387,7 +387,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// Set the consensus ID to be the current block number
 	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
-	currentConsensus.SetViewID(viewID)
+	currentConsensus.SetViewID(viewID + 1)
 	utils.Logger().Info().
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
@@ -557,10 +557,6 @@ func main() {
 	// Collect node metrics if metrics flag is set
 	if currentNode.NodeConfig.GetMetricsFlag() {
 		go currentNode.CollectMetrics()
-	}
-	// Commit committtee if node role is explorer
-	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
-		go currentNode.CommitCommittee()
 	}
 
 	currentNode.StartServer()

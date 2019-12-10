@@ -11,7 +11,6 @@ import (
 
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants for storage.
@@ -21,7 +20,6 @@ const (
 	BlockPrefix     = "b"
 	TXPrefix        = "tx"
 	AddressPrefix   = "ad"
-	CommitteePrefix = "cp"
 )
 
 // GetBlockInfoKey ...
@@ -42,11 +40,6 @@ func GetBlockKey(id int) string {
 // GetTXKey ...
 func GetTXKey(hash string) string {
 	return fmt.Sprintf("%s_%s", TXPrefix, hash)
-}
-
-// GetCommitteeKey ...
-func GetCommitteeKey(shardID uint32, epoch uint64) string {
-	return fmt.Sprintf("%s_%d_%d", CommitteePrefix, shardID, epoch)
 }
 
 var storage *Storage
@@ -118,23 +111,6 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	if err := batch.Write(); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot write batch")
 	}
-}
-
-// DumpCommittee commits validators for shardNum and epoch.
-func (storage *Storage) DumpCommittee(shardID uint32, epoch uint64, committee shard.Committee) error {
-	batch := storage.db.NewBatch()
-	// Store committees.
-	committeeData, err := rlp.EncodeToBytes(committee)
-	if err != nil {
-		return err
-	}
-	if err := batch.Put([]byte(GetCommitteeKey(shardID, epoch)), committeeData); err != nil {
-		return err
-	}
-	if err := batch.Write(); err != nil {
-		return err
-	}
-	return nil
 }
 
 // UpdateTXStorage ...
