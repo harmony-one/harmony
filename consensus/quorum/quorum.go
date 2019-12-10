@@ -76,7 +76,7 @@ type SignatoryTracker interface {
 	AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign)
 	// Caller assumes concurrency protection
 	SignersCount(Phase) int64
-	Reset([]Phase)
+	reset([]Phase)
 }
 
 // SignatureReader ..
@@ -114,10 +114,12 @@ type Decider interface {
 	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	IsQuorumAchievedByMask(*bls_cosi.Mask) bool
+	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
 	QuorumThreshold() numeric.Dec
 	AmIMemberOfCommitee() bool
 	IsRewardThresholdAchieved() bool
+	ResetPrepareAndCommitVotes()
+	ResetViewChangeVotes()
 }
 
 // These maps represent the signatories (validators), keys are BLS public keys
@@ -216,7 +218,7 @@ func (s *cIdentities) AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign
 	}
 }
 
-func (s *cIdentities) Reset(ps []Phase) {
+func (s *cIdentities) reset(ps []Phase) {
 	for i := range ps {
 		switch m := map[string]*bls.Sign{}; ps[i] {
 		case Prepare:
@@ -311,13 +313,13 @@ func NewDecider(p Policy) Decider {
 			c.DependencyInjectionWriter, c.DependencyInjectionReader, c,
 		}
 	case SuperMajorityStake:
-		roster := votepower.NewRoster()
 		return &stakedVoteWeight{
 			c.SignatureReader,
 			c.DependencyInjectionWriter,
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
 			c.SignatureReader.(slash.ThresholdDecider),
-			*roster,
+			*votepower.NewRoster(),
+			newBallotBox(),
 		}
 	default:
 		// Should not be possible

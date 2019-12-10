@@ -94,12 +94,10 @@ func (consensus *Consensus) ResetViewChangeState() {
 	consensus.bhpSigs = map[uint64]map[string]*bls.Sign{}
 	consensus.nilSigs = map[uint64]map[string]*bls.Sign{}
 	consensus.viewIDSigs = map[uint64]map[string]*bls.Sign{}
-
 	consensus.bhpBitmap = map[uint64]*bls_cosi.Mask{}
 	consensus.nilBitmap = map[uint64]*bls_cosi.Mask{}
 	consensus.viewIDBitmap = map[uint64]*bls_cosi.Mask{}
-
-	consensus.Decider.Reset([]quorum.Phase{quorum.ViewChange})
+	consensus.Decider.ResetViewChangeVotes()
 }
 
 func createTimeout() map[TimeoutType]*utils.Timeout {
