@@ -11,11 +11,9 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 )
 
 var once sync.Once
@@ -49,34 +47,10 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 				Msg("[Explorer] readSignatureBitmapPayload failed")
 			return
 		}
-		if node.chainConfig.IsStaking(node.Blockchain().CurrentHeader().Epoch()) {
-			blk := types.Block{}
-			if err := rlp.DecodeBytes(recvMsg.Block, &blk); err != nil {
-				utils.Logger().Error().Msg("Could not RLP decode block")
-				return
-			}
-			if comm, err := committee.WithStakingEnabled.ReadFromDB(
-				blk.Header().Epoch(),
-				node.Beaconchain(),
-			); err != nil {
-				// TODO Is it okay to just use the one from node.Consensus.Decider?
-				d := quorum.NewDecider(quorum.SuperMajorityStake)
-				d.SetVoters(comm.FindCommitteeByID(blk.Header().ShardID()).Slots)
-				if !d.IsQuorumAchievedByMask(mask) {
-					utils.Logger().Error().
-						Msg("Quorum not achieved by mask in explorer ")
-					return
-				}
 
-			}
-		} else {
-			// check has 2f+1 signatures
-			need := node.Consensus.Decider.TwoThirdsSignersCount()
-			if count := utils.CountOneBits(mask.Bitmap); count < need {
-				utils.Logger().Error().Int64("need", need).Int64("have", count).
-					Msg("[Explorer] not have enough signature")
-				return
-			}
+		if node.Consensus.Decider.IsQuorumAchievedByMask(mask) {
+			utils.Logger().Error().Msg("[Explorer] not have enough signature power")
+			return
 		}
 
 		blockNumHash := make([]byte, 8)
