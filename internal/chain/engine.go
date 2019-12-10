@@ -207,17 +207,15 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	payload := append(sig[:], header.LastCommitBitmap()...)
 	aggSig, mask, err := ReadSignatureBitmapByPublicKeys(payload, publicKeys)
 	if err != nil {
-		return ctxerror.New("[VerifySeal] Unable to deserialize the LastCommitSignature and LastCommitBitmap in Block Header").WithCause(err)
+		return ctxerror.New(
+			"[VerifySeal] Unable to deserialize the LastCommitSignature" +
+				" and LastCommitBitmap in Block Header",
+		).WithCause(err)
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
-	if err != nil {
-		return errors.Wrapf(err,
-			"cannot calculate quorum for block %s", header.Number())
-	}
 	if chain.Config().IsStaking(parentHeader.Epoch()) {
-		slotList, err := shard.DecodeWrapper(parentHeader.ShardState())
+		slotList, err := chain.ReadShardState(parentHeader.Epoch())
 		if err != nil {
 			return errors.Wrapf(err, "cannot decoded shard state")
 		}
@@ -229,6 +227,11 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 			)
 		}
 	} else {
+		parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
+		if err != nil {
+			return errors.Wrapf(err,
+				"cannot calculate quorum for block %s", header.Number())
+		}
 		if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
