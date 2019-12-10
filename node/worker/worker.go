@@ -134,7 +134,7 @@ func (w *Worker) CommitTransactions(
 			if txID := tx.Hash().Hex(); err != nil {
 				stkingTxErrorSink(staking.RPCTransactionError{
 					TxHashID:             txID,
-					StakingDirective:     tx.StakingType(),
+					StakingDirective:     tx.StakingType().String(),
 					TimestampOfRejection: time.Now().Unix(),
 					ErrMessage:           err.Error(),
 				})
