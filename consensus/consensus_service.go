@@ -197,7 +197,7 @@ func (consensus *Consensus) ResetState() {
 	consensus.blockHash = [32]byte{}
 	consensus.blockHeader = []byte{}
 	consensus.block = []byte{}
-	consensus.Decider.Reset([]quorum.Phase{quorum.Prepare, quorum.Commit})
+	consensus.Decider.ResetPrepareAndCommitVotes()
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
 	commitBitmap, _ := bls_cosi.NewMask(members, nil)
