@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -22,15 +23,16 @@ func constructAnnounceMessage(t *testing.T) []byte {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	privateKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.ToMultiPriKey(privateKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
 
-	msgBytes := consensus.constructAnnounceMessage()
+	msgBytes := consensus.constructAnnounceMessage(privateKey)
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
 	return msgPayload
 }

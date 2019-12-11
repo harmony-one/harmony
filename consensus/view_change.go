@@ -422,7 +422,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Uint64("my current viewID", consensus.current.ViewID()).
 			Uint64("recvMsg.ViewID", recvMsg.ViewID).
 			Msg("[onViewChange] New Leader Start Consensus Timer and Stop View Change Timer")
-		consensus.getLogger().Debug().
+		utils.Logger().Debug().
 			Str("myKey", newLeaderKey.SerializeToHexStr()).
 			Uint64("viewID", consensus.viewID).
 			Uint64("block", consensus.blockNum).
