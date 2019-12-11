@@ -352,6 +352,12 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			return errors.Wrapf(err, "cannot read shard state")
 		}
 		d := quorum.NewDecider(quorum.SuperMajorityStake)
+		d.SetShardIDProvider(func() (uint32, error) {
+			return header.ShardID(), nil
+		})
+		d.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+			return nil, nil
+		})
 		d.SetVoters(slotList.FindCommitteeByID(header.ShardID()).Slots)
 		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
