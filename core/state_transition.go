@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -173,8 +174,12 @@ func (st *StateTransition) useGas(amount uint64) error {
 
 func (st *StateTransition) buyGas() error {
 	mgval := new(big.Int).Mul(new(big.Int).SetUint64(st.msg.Gas()), st.gasPrice)
-	if st.state.GetBalance(st.msg.From()).Cmp(mgval) < 0 {
-		return errInsufficientBalanceForGas
+	if have := st.state.GetBalance(st.msg.From()); have.Cmp(mgval) < 0 {
+		return errors.Wrapf(
+			errInsufficientBalanceForGas,
+			"had: %s", have.String(),
+			"need: %s", mgval.String(),
+		)
 	}
 	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
 		return err
@@ -372,8 +377,8 @@ func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.Creat
 		return errNegativeAmount
 	}
 
-	if st.state.IsValidator(createValidator.ValidatorAddress) {
-		return errValidatorExist
+	if val := createValidator.ValidatorAddress; st.state.IsValidator(val) {
+		return errors.Wrapf(errValidatorExist, common2.MustAddressToBech32(val))
 	}
 
 	v, err := staking.CreateValidatorFromNewMsg(createValidator, blockNum)
@@ -381,14 +386,15 @@ func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.Creat
 		return err
 	}
 
-	delegations := []staking.Delegation{}
-	delegations = append(delegations, staking.NewDelegation(v.Address, createValidator.Amount))
-
+	delegations := []staking.Delegation{
+		staking.NewDelegation(v.Address, createValidator.Amount),
+	}
 	wrapper := staking.ValidatorWrapper{*v, delegations}
 
 	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
 		return err
 	}
+
 	st.state.SetValidatorFlag(v.Address)
 	return nil
 }
@@ -469,8 +475,8 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 						break
 					}
 				}
-				delegation.Undelegations = delegation.Undelegations[:i+1]
 
+				delegation.Undelegations = delegation.Undelegations[:i+1]
 				delegation.Amount.Add(delegation.Amount, delegate.Amount)
 				err := stateDB.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
 
