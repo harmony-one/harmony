@@ -18,7 +18,6 @@ package core
 
 import (
 	"bytes"
-	"errors"
 	"math"
 	"math/big"
 
@@ -29,6 +28,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -453,8 +453,9 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), delegate.DelegatorAddress.Bytes()) {
 			delegatorExist = true
 			totalInUndelegation := delegation.TotalInUndelegation()
+			balance := stateDB.GetBalance(delegate.DelegatorAddress)
 			// If the sum of normal balance and the total amount of tokens in undelegation is greater than the amount to delegate
-			if big.NewInt(0).Add(totalInUndelegation, stateDB.GetBalance(delegate.DelegatorAddress)).Cmp(delegate.Amount) >= 0 {
+			if big.NewInt(0).Add(totalInUndelegation, balance).Cmp(delegate.Amount) >= 0 {
 				// Firstly use the tokens in undelegation to delegate (redelegate)
 				delegateBalance := big.NewInt(0).Set(delegate.Amount)
 				// Use the latest undelegated token first as it has the longest remaining locking time.
@@ -479,7 +480,12 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 				}
 				return err
 			}
-			return errInsufficientBalanceForStake
+			return errors.Wrapf(
+				errInsufficientBalanceForStake,
+				"total-delegated %s", totalInUndelegation.String(),
+				"own-current-balance %s", balance.String(),
+				"amount-to-delegate %s", delegate.Amount.String(),
+			)
 		}
 	}
 
