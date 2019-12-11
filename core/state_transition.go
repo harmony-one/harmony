@@ -177,8 +177,7 @@ func (st *StateTransition) buyGas() error {
 	if have := st.state.GetBalance(st.msg.From()); have.Cmp(mgval) < 0 {
 		return errors.Wrapf(
 			errInsufficientBalanceForGas,
-			"had: %s", have.String(),
-			"need: %s", mgval.String(),
+			"had: %s but need: %s", have.String(), mgval.String(),
 		)
 	}
 	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
@@ -488,9 +487,10 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 			}
 			return errors.Wrapf(
 				errInsufficientBalanceForStake,
-				"total-delegated %s", totalInUndelegation.String(),
-				"own-current-balance %s", balance.String(),
-				"amount-to-delegate %s", delegate.Amount.String(),
+				"total-delegated %s own-current-balance %s amount-to-delegate %s",
+				totalInUndelegation.String(),
+				balance.String(),
+				delegate.Amount.String(),
 			)
 		}
 	}

@@ -146,8 +146,7 @@ func (w *ValidatorWrapper) SanityCheck() error {
 		if w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidSelfDelegation,
-				"have %s", w.Delegations[0].Amount.String(),
-				"want %s", w.Validator.MinSelfDelegation,
+				"have %s want %s", w.Delegations[0].Amount.String(), w.Validator.MinSelfDelegation,
 			)
 		}
 	}
@@ -158,8 +157,9 @@ func (w *ValidatorWrapper) SanityCheck() error {
 		if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidMaxTotalDelegation,
-				"max-total-delegation %s", w.Validator.MaxTotalDelegation.String(),
-				"min-self-delegation %s", w.Validator.MinSelfDelegation.String(),
+				"max-total-delegation %s min-self-delegation %s",
+				w.Validator.MaxTotalDelegation.String(),
+				w.Validator.MinSelfDelegation.String(),
 			)
 		}
 
@@ -168,8 +168,9 @@ func (w *ValidatorWrapper) SanityCheck() error {
 		if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
 			return errors.Wrapf(
 				errInvalidTotalDelegation,
-				"total %s", totalDelegation.String(),
-				"max-total %s", w.Validator.MaxTotalDelegation.String(),
+				"total %s max-total %s",
+				totalDelegation.String(),
+				w.Validator.MaxTotalDelegation.String(),
 			)
 		}
 	}
