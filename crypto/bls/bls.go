@@ -3,6 +3,8 @@ package bls
 import (
 	"errors"
 	"fmt"
+	"unsafe"
+	"encoding/hex"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -38,18 +40,66 @@ func AggregateSig(sigs []*bls.Sign) *bls.Sign {
 	return &aggregatedSig
 }
 
+// TransformSignature multiply signature by hash of public key
+// following https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html
+// this is used for anti-Rogue Public Key Attack without KOSK
+func TransformSignature(sig *bls.Sign, hexPubKey []byte) *bls.Sign {
+	var T bls.Fr
+	var sigmaT bls.Sign
+
+	// T = hash(pubkey)
+	T.SetHashOf(hexPubKey)
+
+	//after swap, G2 is signature and G1 is pub key
+	bls.G2Mul((*bls.G2)(unsafe.Pointer(&sigmaT)), (*bls.G2)(unsafe.Pointer(sig)), &T)
+	return &sigmaT
+}
+
+// TransformPublicKey multiply public key by hash of public key
+// following https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html
+// this is used for anti-Rogue Public Key Attack without KOSK
+func TransformPublicKey(pub *bls.PublicKey) *bls.PublicKey {
+	var T bls.Fr
+	var apk bls.PublicKey
+
+	// T = hash(pubkey)
+	T.SetHashOf(pub.Serialize())
+
+	//after swap, G2 is signature and G1 is pub key
+	bls.G1Mul((*bls.G1)(unsafe.Pointer(&apk)), (*bls.G1)(unsafe.Pointer(pub)), &T)
+	return &apk
+}
+
+// AggregateSig aggregates all the BLS signature into a single multi-signature.
+// using hash value  of the serialized public key string
+// following https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html
+// this is used for anti-Rogue Public Key Attack without KOSK
+func AggregateSigWithPublicKey(m map[string]*bls.Sign) *bls.Sign {
+	var aggregatedSig bls.Sign
+	for pubkeyStr, sig := range m {
+		decodedPubKey, err :=  hex.DecodeString(pubkeyStr)
+		if (err != nil) {
+			return nil
+		}
+
+		aggregatedSig.Add(TransformSignature(sig, decodedPubKey))
+	}
+	return &aggregatedSig
+}
+
 // Mask represents a cosigning participation bitmask.
 type Mask struct {
 	Bitmap          []byte
 	Publics         []*bls.PublicKey
 	AggregatePublic *bls.PublicKey
+	UsePubKeyHash   bool
 }
 
 // NewMask returns a new participation bitmask for cosigning where all
 // cosigners are disabled by default. If a public key is given it verifies that
 // it is present in the list of keys and sets the corresponding index in the
 // bitmask to 1 (enabled).
-func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey) (*Mask, error) {
+func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey, optionalUsePubKeyHash...bool) (*Mask, error) {
 	m := &Mask{
 		Publics: publics,
 	}
@@ -68,6 +118,16 @@ func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey) (*Mask, error) {
 			return nil, errors.New("key not found")
 		}
 	}
+
+	// additional flag to use
+	// old version (UsePubKeyHash == false)
+	// or new version (UsePubKeyHash == true)
+	if (len(optionalUsePubKeyHash)>0 &&  (optionalUsePubKeyHash[0])){
+		m.UsePubKeyHash = true
+	} else {
+		m.UsePubKeyHash = false
+	}
+
 	return m, nil
 }
 
@@ -97,11 +157,19 @@ func (m *Mask) SetMask(mask []byte) error {
 		msk := byte(1) << uint(i&7)
 		if ((m.Bitmap[byt] & msk) == 0) && ((mask[byt] & msk) != 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
-			m.AggregatePublic.Add(m.Publics[i])
+			if (m.UsePubKeyHash) {
+				m.AggregatePublic.Add(TransformPublicKey(m.Publics[i]))
+			} else {
+				m.AggregatePublic.Add(m.Publics[i])
+			}
 		}
 		if ((m.Bitmap[byt] & msk) != 0) && ((mask[byt] & msk) == 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-			m.AggregatePublic.Sub(m.Publics[i])
+			if (m.UsePubKeyHash) {
+				m.AggregatePublic.Sub(TransformPublicKey(m.Publics[i]))
+			} else {
+				m.AggregatePublic.Sub(m.Publics[i])
+			}
 		}
 	}
 	return nil
@@ -117,11 +185,19 @@ func (m *Mask) SetBit(i int, enable bool) error {
 	msk := byte(1) << uint(i&7)
 	if ((m.Bitmap[byt] & msk) == 0) && enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
-		m.AggregatePublic.Add(m.Publics[i])
+		if (m.UsePubKeyHash) {
+			m.AggregatePublic.Add(TransformPublicKey(m.Publics[i]))
+		} else {
+			m.AggregatePublic.Add(m.Publics[i])
+		}
 	}
 	if ((m.Bitmap[byt] & msk) != 0) && !enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-		m.AggregatePublic.Sub(m.Publics[i])
+		if (m.UsePubKeyHash) {
+			m.AggregatePublic.Sub(TransformPublicKey(m.Publics[i]))
+		} else {
+			m.AggregatePublic.Sub(m.Publics[i])
+		}
 	}
 	return nil
 }

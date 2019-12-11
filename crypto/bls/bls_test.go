@@ -244,3 +244,86 @@ func TestSetMask(test *testing.T) {
 		test.Error("Expected mismatching Bitmap lengths")
 	}
 }
+
+
+func TestNewImplementationWithPublicKeyHash1(test *testing.T) {
+	secs := make([]*bls.SecretKey, 10)
+	pubs := make([]*bls.PublicKey, 10)
+	sigs := make([]*bls.Sign, 10)
+
+	m := "test test"
+	for i:= 0; i < 10; i++ {
+		secs[i] = RandPrivateKey()
+		pubs[i] = secs[i].GetPublicKey()
+		sigs[i] = secs[i].Sign(m)
+	}
+
+	aggPub := pubs[0]
+	aggSig := sigs[0]
+
+	for i:= 1; i < 10; i++ {
+		aggPub.Add(TransformPublicKey(pubs[i]))
+		aggSig.Add(TransformSignature(sigs[i], pubs[i].Serialize()))
+	}
+
+	if ! aggSig.Verify(aggPub, m) {
+		test.Error("Aggregated signature doesn't verify in new implementation ")
+	}
+}
+
+func TestNewImplementationWithPublicKeyHash2(test *testing.T) {
+	secs := make([]*bls.SecretKey, 10)
+	pubs := make([]*bls.PublicKey, 10)
+	sigs := make([]*bls.Sign, 10)
+
+	m := "test test"
+	for i:= 0; i < 10; i++ {
+		secs[i] = RandPrivateKey()
+		pubs[i] = secs[i].GetPublicKey()
+		sigs[i] = secs[i].Sign(m)
+	}
+
+	aggPub := pubs[0]
+	aggSig := sigs[0]
+
+	for i:= 1; i < 10; i++ {
+		aggPub.Add(TransformPublicKey(pubs[i]))
+		if (i != 5) {
+			aggSig.Add(TransformSignature(sigs[i], pubs[i].Serialize()))
+		}
+	}
+
+	aggPub.Sub(TransformPublicKey(pubs[5]))
+
+	if ! aggSig.Verify(aggPub, m) {
+		test.Error("Aggregated signature (add, sub) doesn't verify in new implementation ")
+	}
+}
+
+func TestNewMaskWithPublicKeyHash1(test *testing.T) {
+	secs := make([]*bls.SecretKey, 10)
+	pubs := make([]*bls.PublicKey, 10)
+	sigs := make([]*bls.Sign, 10)
+	m    := make(map[string]*bls.Sign)
+
+	mesg := "test test"
+	mask, _ := NewMask(pubs, nil, true)
+
+	for i:= 0; i < 10; i++ {
+		secs[i] = RandPrivateKey()
+		pubs[i] = secs[i].GetPublicKey()
+		sigs[i] = secs[i].Sign(mesg)
+
+		// add the odd public keys
+		if (i % 2 == 1) {
+			m[pubs[i].SerializeToHexStr()] = sigs[i]
+			mask.SetBit(i, true)
+		}
+	}
+
+	aggSig := AggregateSigWithPublicKey(m)
+	if ! aggSig.Verify(mask.AggregatePublic, mesg) {
+		test.Error("NewMaskWithPublicKeyiHash1doesn't verify aggregated keys in new implementation ")
+	}
+}
+
