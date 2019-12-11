@@ -1,10 +1,10 @@
 package bls
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"unsafe"
-	"encoding/hex"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -77,8 +77,8 @@ func TransformPublicKey(pub *bls.PublicKey) *bls.PublicKey {
 func AggregateSigWithPublicKey(m map[string]*bls.Sign) *bls.Sign {
 	var aggregatedSig bls.Sign
 	for pubkeyStr, sig := range m {
-		decodedPubKey, err :=  hex.DecodeString(pubkeyStr)
-		if (err != nil) {
+		decodedPubKey, err := hex.DecodeString(pubkeyStr)
+		if err != nil {
 			return nil
 		}
 
@@ -99,7 +99,7 @@ type Mask struct {
 // cosigners are disabled by default. If a public key is given it verifies that
 // it is present in the list of keys and sets the corresponding index in the
 // bitmask to 1 (enabled).
-func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey, optionalUsePubKeyHash...bool) (*Mask, error) {
+func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey, optionalUsePubKeyHash ...bool) (*Mask, error) {
 	m := &Mask{
 		Publics: publics,
 	}
@@ -122,7 +122,7 @@ func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey, optionalUsePubKeyHa
 	// additional flag to use
 	// old version (UsePubKeyHash == false)
 	// or new version (UsePubKeyHash == true)
-	if (len(optionalUsePubKeyHash)>0 &&  (optionalUsePubKeyHash[0])){
+	if len(optionalUsePubKeyHash) > 0 && (optionalUsePubKeyHash[0]) {
 		m.UsePubKeyHash = true
 	} else {
 		m.UsePubKeyHash = false
@@ -157,7 +157,7 @@ func (m *Mask) SetMask(mask []byte) error {
 		msk := byte(1) << uint(i&7)
 		if ((m.Bitmap[byt] & msk) == 0) && ((mask[byt] & msk) != 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
-			if (m.UsePubKeyHash) {
+			if m.UsePubKeyHash {
 				m.AggregatePublic.Add(TransformPublicKey(m.Publics[i]))
 			} else {
 				m.AggregatePublic.Add(m.Publics[i])
@@ -165,7 +165,7 @@ func (m *Mask) SetMask(mask []byte) error {
 		}
 		if ((m.Bitmap[byt] & msk) != 0) && ((mask[byt] & msk) == 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-			if (m.UsePubKeyHash) {
+			if m.UsePubKeyHash {
 				m.AggregatePublic.Sub(TransformPublicKey(m.Publics[i]))
 			} else {
 				m.AggregatePublic.Sub(m.Publics[i])
@@ -185,7 +185,7 @@ func (m *Mask) SetBit(i int, enable bool) error {
 	msk := byte(1) << uint(i&7)
 	if ((m.Bitmap[byt] & msk) == 0) && enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
-		if (m.UsePubKeyHash) {
+		if m.UsePubKeyHash {
 			m.AggregatePublic.Add(TransformPublicKey(m.Publics[i]))
 		} else {
 			m.AggregatePublic.Add(m.Publics[i])
@@ -193,7 +193,7 @@ func (m *Mask) SetBit(i int, enable bool) error {
 	}
 	if ((m.Bitmap[byt] & msk) != 0) && !enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-		if (m.UsePubKeyHash) {
+		if m.UsePubKeyHash {
 			m.AggregatePublic.Sub(TransformPublicKey(m.Publics[i]))
 		} else {
 			m.AggregatePublic.Sub(m.Publics[i])
