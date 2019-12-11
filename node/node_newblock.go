@@ -139,7 +139,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare cross links
 	var crossLinksToPropose types.CrossLinks
-	if node.NodeConfig.ShardID == 0 && node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) {
+	if node.NodeConfig.ShardID == 0 && node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
 		node.pendingCLMutex.Lock()
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
 		node.pendingCLMutex.Unlock()
