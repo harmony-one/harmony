@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/params"
 	pkgworker "github.com/harmony-one/harmony/node/worker"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -129,7 +130,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 	txmap := make(map[common.Address]types.Transactions)
 	txmap[FaucetAddress] = txs
 
-	err := contractworker.CommitTransactions(txmap, nil, testUserAddress)
+	err := contractworker.CommitTransactions(txmap, nil, testUserAddress, func(staking.RPCTransactionError) {})
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -170,7 +171,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	txmap := make(map[common.Address]types.Transactions)
 	txmap[FaucetAddress] = types.Transactions{callfaucettx}
 
-	err = contractworker.CommitTransactions(txmap, nil, testUserAddress)
+	err = contractworker.CommitTransactions(txmap, nil, testUserAddress, func(staking.RPCTransactionError) {})
 	if err != nil {
 		fmt.Println(err)
 	}
