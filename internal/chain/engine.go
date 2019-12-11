@@ -214,12 +214,18 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	if e := parentHeader.Epoch(); chain.Config().IsStaking(e) {
-		slotList, err := chain.ReadShardState(e)
+	if chain.Config().IsStaking(parentHeader.Epoch()) {
+		slotList, err := chain.ReadShardState(parentHeader.Epoch())
 		if err != nil {
-			return errors.Wrapf(err, "cannot read shard state")
+			return errors.Wrapf(err, "cannot decoded shard state")
 		}
 		d := quorum.NewDecider(quorum.SuperMajorityStake)
+		d.SetShardIDProvider(func() (uint32, error) {
+			return parentHeader.ShardID(), nil
+		})
+		d.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+			return nil, nil
+		})
 		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
 		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
@@ -279,7 +285,7 @@ func (e *engineImpl) Finalize(
 			wrapper := state.GetStakingInfo(validator)
 			if wrapper != nil {
 				for i := range wrapper.Delegations {
-					delegation := wrapper.Delegations[i]
+					delegation := &wrapper.Delegations[i]
 					totalWithdraw := delegation.RemoveUnlockedUndelegations(header.Epoch())
 					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 				}
