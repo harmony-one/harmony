@@ -5,15 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harmony-one/harmony/shard"
-
-	"github.com/harmony-one/harmony/core/rawdb"
-
-	types2 "github.com/harmony-one/harmony/staking/types"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // Constants of proposing a new block
@@ -113,19 +110,31 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// TODO: integrate staking transaction into tx pool
-	pendingStakingTransactions := types2.StakingTransactions{}
+	pendingStakingTransactions := staking.StakingTransactions{}
 	// Only process staking transactions after pre-staking epoch happened.
 	if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
 		node.pendingStakingTxMutex.Lock()
 		for _, tx := range node.pendingStakingTransactions {
 			pendingStakingTransactions = append(pendingStakingTransactions, tx)
 		}
-		node.pendingStakingTransactions = make(map[common.Hash]*types2.StakingTransaction)
+		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
 		node.pendingStakingTxMutex.Unlock()
 	}
 
-	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, beneficiary); err != nil {
-		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] cannot commit transactions")
+	if err := node.Worker.CommitTransactions(
+		pending, pendingStakingTransactions, beneficiary,
+		func(payload staking.RPCTransactionError) {
+			const maxSize = 1024
+			node.errorSink.Lock()
+			if l := len(node.errorSink.failedTxns); l >= maxSize {
+				node.errorSink.failedTxns = append(node.errorSink.failedTxns[1:], payload)
+			} else {
+				node.errorSink.failedTxns = append(node.errorSink.failedTxns, payload)
+			}
+			node.errorSink.Unlock()
+		},
+	); err != nil {
+		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 		return nil, err
 	}
 

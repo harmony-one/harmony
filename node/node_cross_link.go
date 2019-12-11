@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	maxPendingCrossLinkSize = 300
+	maxPendingCrossLinkSize = 1000
 	crossLinkBatchSize      = 10
 )
 
@@ -160,6 +160,12 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	}
 
 	decider := quorum.NewDecider(quorum.SuperMajorityStake)
+	decider.SetShardIDProvider(func() (uint32, error) {
+		return cl.ShardID(), nil
+	})
+	decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		return nil, nil
+	})
 	if _, err := decider.SetVoters(committee.Slots); err != nil {
 		return ctxerror.New("[VerifyCrossLink] Cannot SetVoters for committee", "shardID", cl.ShardID())
 	}

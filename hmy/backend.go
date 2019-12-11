@@ -52,11 +52,15 @@ type NodeAPI interface {
 	GetNonceOfAddress(address common.Address) uint64
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	IsCurrentlyLeader() bool
+	ErroredStakingTransactionSink() []staking.RPCTransactionError
 }
 
 // New creates a new Harmony object (including the
 // initialisation of the common Harmony object)
-func New(nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool, eventMux *event.TypeMux, shardID uint32) (*Harmony, error) {
+func New(
+	nodeAPI NodeAPI, txPool *core.TxPool,
+	cxPool *core.CxPool, eventMux *event.TypeMux, shardID uint32,
+) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	hmy := &Harmony{
 		shutdownChan:   make(chan bool),

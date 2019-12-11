@@ -8,12 +8,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/hmyapi"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -49,10 +49,19 @@ func (node *Node) IsCurrentlyLeader() bool {
 	return node.Consensus.IsLeader()
 }
 
+// ErroredStakingTransactionSink is the inmemory failed staking transactions this node has
+func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError {
+	node.errorSink.Lock()
+	defer node.errorSink.Unlock()
+	return node.errorSink.failedTxns
+}
+
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
-	harmony, _ = hmy.New(node, node.TxPool, node.CxPool, new(event.TypeMux), node.Consensus.ShardID)
+	harmony, _ = hmy.New(
+		node, node.TxPool, node.CxPool, new(event.TypeMux), node.Consensus.ShardID,
+	)
 
 	apis := node.APIs()
 

@@ -25,11 +25,9 @@ import (
 
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
-	signer types.Signer
-
-	state   *state.DB     // apply state changes here
-	gasPool *core.GasPool // available gas used to pack transactions
-
+	signer     types.Signer
+	state      *state.DB     // apply state changes here
+	gasPool    *core.GasPool // available gas used to pack transactions
 	header     *block.Header
 	txs        []*types.Transaction
 	stakingTxs staking.StakingTransactions
@@ -41,19 +39,21 @@ type environment struct {
 // Worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type Worker struct {
-	config  *params.ChainConfig
-	factory blockfactory.Factory
-	chain   *core.BlockChain
-	current *environment // An environment for current running cycle.
-
-	engine consensus_engine.Engine
-
+	config   *params.ChainConfig
+	factory  blockfactory.Factory
+	chain    *core.BlockChain
+	current  *environment // An environment for current running cycle.
+	engine   consensus_engine.Engine
 	gasFloor uint64
 	gasCeil  uint64
 }
 
 // CommitTransactions commits transactions for new block.
-func (w *Worker) CommitTransactions(pendingNormal map[common.Address]types.Transactions, pendingStaking staking.StakingTransactions, coinbase common.Address) error {
+func (w *Worker) CommitTransactions(
+	pendingNormal map[common.Address]types.Transactions,
+	pendingStaking staking.StakingTransactions, coinbase common.Address,
+	stkingTxErrorSink func(staking.RPCTransactionError),
+) error {
 
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
@@ -131,11 +131,21 @@ func (w *Worker) CommitTransactions(pendingNormal map[common.Address]types.Trans
 	if w.chain.ShardID() == shard.BeaconChainShardID {
 		for _, tx := range pendingStaking {
 			logs, err := w.commitStakingTransaction(tx, coinbase)
-			if err != nil {
-				utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Commit staking transaction error")
+			if txID := tx.Hash().Hex(); err != nil {
+				stkingTxErrorSink(staking.RPCTransactionError{
+					TxHashID:             txID,
+					StakingDirective:     tx.StakingType().String(),
+					TimestampOfRejection: time.Now().Unix(),
+					ErrMessage:           err.Error(),
+				})
+				utils.Logger().Error().Err(err).
+					Str("stakingTxId", txID).
+					Msg("Commit staking transaction error")
 			} else {
 				coalescedLogs = append(coalescedLogs, logs...)
-				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("StakingTransaction gas limit info")
+				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).
+					Uint64("txGasLimit", tx.Gas()).
+					Msg("StakingTransaction gas limit info")
 			}
 		}
 	}
@@ -145,11 +155,15 @@ func (w *Worker) CommitTransactions(pendingNormal map[common.Address]types.Trans
 	return nil
 }
 
-func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinbase common.Address) ([]*types.Log, error) {
+func (w *Worker) commitStakingTransaction(
+	tx *staking.StakingTransaction, coinbase common.Address,
+) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, _, err :=
-		core.ApplyStakingTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	receipt, _, err := core.ApplyStakingTransaction(
+		w.config, w.chain, &coinbase, w.current.gasPool,
+		w.current.state, w.current.header, tx, &gasUsed, vm.Config{},
+	)
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)

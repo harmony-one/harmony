@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // PublicHarmonyAPI provides an API to access Harmony related information.
@@ -64,4 +65,9 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		s.b.IsLeader(),
 		s.b.GetShardID(),
 	}
+}
+
+// GetCurrentTransactionErrorSink ..
+func (s *PublicHarmonyAPI) GetCurrentTransactionErrorSink() []staking.RPCTransactionError {
+	return s.b.GetCurrentStakingTransactionErrorSink()
 }

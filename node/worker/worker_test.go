@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -16,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 var (
@@ -78,7 +78,7 @@ func TestCommitTransactions(t *testing.T) {
 	// Commit the tx to the worker
 	txs := make(map[common.Address]types.Transactions)
 	txs[testBankAddress] = types.Transactions{tx}
-	err := worker.CommitTransactions(txs, nil, testBankAddress)
+	err := worker.CommitTransactions(txs, nil, testBankAddress, func(staking.RPCTransactionError) {})
 	if err != nil {
 		t.Error(err)
 	}
