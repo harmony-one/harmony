@@ -109,11 +109,16 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context
 // GetTransactionByHash returns the transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, hash common.Hash) *RPCTransaction {
 	// Try to return an already finalized transaction
-	if tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash); tx != nil {
-		return newRPCTransaction(tx, blockHash, blockNumber, index)
+	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash)
+	block, _ := s.b.GetBlock(ctx, blockHash)
+	if block == nil {
+		return nil
+	}
+	if tx != nil {
+		return newRPCTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
 	}
 	// No finalized transaction, try to retrieve it from the pool
-	if tx := s.b.GetPoolTransaction(hash); tx != nil {
+	if tx = s.b.GetPoolTransaction(hash); tx != nil {
 		return newRPCPendingTransaction(tx)
 	}
 	// Transaction unknown, return as such
