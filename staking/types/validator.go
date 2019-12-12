@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -47,26 +48,26 @@ type ValidatorWrapper struct {
 
 // VotePerShard ..
 type VotePerShard struct {
-	ShardID     uint32
-	VotingPower numeric.Dec
+	ShardID     uint32      `json:"shard-id"`
+	VotingPower numeric.Dec `json:"voting-power"`
 }
 
 // KeysPerShard ..
 type KeysPerShard struct {
-	ShardID uint32
-	Keys    []shard.BlsPublicKey
+	ShardID uint32               `json:"shard-id"`
+	Keys    []shard.BlsPublicKey `json:"bls-public-keys"`
 }
 
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// The number of blocks the validator should've signed when in active mode (selected in committee)
-	NumBlocksToSign *big.Int `json:"num_blocks_to_sign" rlp:"nil"`
+	NumBlocksToSign *big.Int `rlp:"nil"`
 	// The number of blocks the validator actually signed
-	NumBlocksSigned *big.Int `json:"num_blocks_signed" rlp:"nil"`
+	NumBlocksSigned *big.Int `rlp:"nil"`
 	// The number of times they validator is jailed due to extensive downtime
-	NumJailed *big.Int `json:"num_jailed" rlp:"nil"`
+	NumJailed *big.Int `rlp:"nil"`
 	// TotalEffectiveStake is the total effective stake this validator has
-	TotalEffectiveStake numeric.Dec `json:"total_effective_stake" rlp:"nil"`
+	TotalEffectiveStake numeric.Dec `rlp:"nil"`
 	// VotingPowerPerShard ..
 	VotingPowerPerShard []VotePerShard
 	// BLSKeyPerShard ..
@@ -76,23 +77,72 @@ type ValidatorStats struct {
 // Validator - data fields for a validator
 type Validator struct {
 	// ECDSA address of the validator
-	Address common.Address `json:"address" yaml:"address"`
+	Address common.Address
 	// The BLS public key of the validator for consensus
-	SlotPubKeys []shard.BlsPublicKey `json:"slot_pub_keys" yaml:"slot_pub_keys"`
-	// if unbonding, height at which this validator has begun unbonding
-	UnbondingHeight *big.Int `json:"unbonding_height" yaml:"unbonding_height"`
+	SlotPubKeys []shard.BlsPublicKey
+	// TODO Remove this field
+	UnbondingHeight *big.Int
 	// validator's self declared minimum self delegation
-	MinSelfDelegation *big.Int `json:"min_self_delegation" yaml:"min_self_delegation"`
+	MinSelfDelegation *big.Int
 	// maximum total delegation allowed
-	MaxTotalDelegation *big.Int `json:"max_total_delegation" yaml:"max_total_delegation"`
+	MaxTotalDelegation *big.Int
 	// Is the validator active in the validating process or not
-	Active bool `json:"active" yaml:"active"`
+	Active bool
 	// commission parameters
-	Commission `json:"commission" yaml:"commission"`
+	Commission
 	// description for the validator
-	Description `json:"description" yaml:"description"`
+	Description
 	// CreationHeight is the height of creation
-	CreationHeight *big.Int `json:"creation_height" yaml:"creation_height"`
+	CreationHeight *big.Int
+}
+
+// MarshalJSON ..
+func (v *ValidatorStats) MarshalJSON() ([]byte, error) {
+	type t struct {
+		NumBlocksToSign     uint64         `json:"blocks-to-sign"`
+		NumBlocksSigned     uint64         `json:"blocks-signed"`
+		NumJailed           uint64         `json:"blocks-jailed"`
+		TotalEffectiveStake numeric.Dec    `json:"total-effective-stake"`
+		VotingPowerPerShard []VotePerShard `json:"voting-power-per-shard"`
+		BLSKeyPerShard      []KeysPerShard `json:"bls-keys-per-shard"`
+	}
+	return json.Marshal(t{
+		NumBlocksToSign:     v.NumBlocksToSign.Uint64(),
+		NumBlocksSigned:     v.NumBlocksSigned.Uint64(),
+		NumJailed:           v.NumJailed.Uint64(),
+		TotalEffectiveStake: v.TotalEffectiveStake,
+		VotingPowerPerShard: v.VotingPowerPerShard,
+		BLSKeyPerShard:      v.BLSKeyPerShard,
+	})
+
+}
+
+// MarshalJSON ..
+func (v *Validator) MarshalJSON() ([]byte, error) {
+	type t struct {
+		Address            string      `json:"one-address"`
+		SlotPubKeys        []string    `json:"bls-public-keys"`
+		MinSelfDelegation  uint64      `json:"min-self-delegation"`
+		MaxTotalDelegation uint64      `json:"max-total-delegation"`
+		Active             bool        `json:"active"`
+		Commission         Commission  `json:"commission"`
+		Description        Description `json:"description"`
+		CreationHeight     uint64      `json:"creation-height"`
+	}
+	slots := make([]string, len(v.SlotPubKeys))
+	for i := range v.SlotPubKeys {
+		slots[i] = v.SlotPubKeys[i].Hex()
+	}
+	return json.Marshal(t{
+		Address:            common2.MustAddressToBech32(v.Address),
+		SlotPubKeys:        slots,
+		MinSelfDelegation:  v.MinSelfDelegation.Uint64(),
+		MaxTotalDelegation: v.MaxTotalDelegation.Uint64(),
+		Active:             v.Active,
+		Commission:         v.Commission,
+		Description:        v.Description,
+		CreationHeight:     v.CreationHeight.Uint64(),
+	})
 }
 
 func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
