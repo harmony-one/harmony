@@ -1,20 +1,19 @@
 package types
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/common/denominations"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/pkg/errors"
 )
 
 // Define validator staking related const
@@ -37,6 +36,7 @@ var (
 	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
 	errNeedAtLeastOneSlotKey     = errors.New("need at least one slot key")
 	errBLSKeysNotMatchSigs       = errors.New("bls keys and corresponding signatures could not be verified")
+	errNilMinSelfDelegation      = errors.New("nil min self delegation")
 )
 
 // ValidatorWrapper contains validator and its delegation information
@@ -113,55 +113,96 @@ func (w *ValidatorWrapper) TotalDelegation() *big.Int {
 	return total
 }
 
+var (
+	hundredPercent = numeric.NewDec(1)
+	zeroPercent    = numeric.NewDec(0)
+)
+
 // SanityCheck checks the basic requirements
 func (w *ValidatorWrapper) SanityCheck() error {
 	if len(w.SlotPubKeys) == 0 {
 		return errNeedAtLeastOneSlotKey
 	}
 
+	if w.Validator.MinSelfDelegation == nil {
+		return errNilMinSelfDelegation
+	}
+
 	// MinSelfDelegation must be >= 1 ONE
-	if w.Validator.MinSelfDelegation == nil || w.Validator.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
-		return errMinSelfDelegationTooSmall
+	if w.Validator.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+		return errors.Wrapf(
+			errMinSelfDelegationTooSmall,
+			"delegation-given %s", w.Validator.MinSelfDelegation.String(),
+		)
 	}
 
 	// Self delegation must be >= MinSelfDelegation
-	if len(w.Delegations) == 0 || w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
-		return errInvalidSelfDelegation
+	switch len(w.Delegations) {
+	case 0:
+		return errors.Wrapf(
+			errInvalidSelfDelegation, "no self delegation given at all",
+		)
+	default:
+		if w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
+			return errors.Wrapf(
+				errInvalidSelfDelegation,
+				"have %s want %s", w.Delegations[0].Amount.String(), w.Validator.MinSelfDelegation,
+			)
+		}
 	}
 
 	// Only enforce rules on MaxTotalDelegation is it's > 0; 0 means no limit for max total delegation
 	if w.Validator.MaxTotalDelegation != nil && w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) > 0 {
 		// MaxTotalDelegation must not be less than MinSelfDelegation
 		if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
-			return errInvalidMaxTotalDelegation
+			return errors.Wrapf(
+				errInvalidMaxTotalDelegation,
+				"max-total-delegation %s min-self-delegation %s",
+				w.Validator.MaxTotalDelegation.String(),
+				w.Validator.MinSelfDelegation.String(),
+			)
 		}
 
 		totalDelegation := w.TotalDelegation()
 		// Total delegation must be <= MaxTotalDelegation
 		if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
-			return errInvalidTotalDelegation
+			return errors.Wrapf(
+				errInvalidTotalDelegation,
+				"total %s max-total %s",
+				totalDelegation.String(),
+				w.Validator.MaxTotalDelegation.String(),
+			)
 		}
 	}
 
-	hundredPercent := numeric.NewDec(1)
-	zeroPercent := numeric.NewDec(0)
-
 	if w.Validator.Rate.LT(zeroPercent) || w.Validator.Rate.GT(hundredPercent) {
-		return errInvalidComissionRate
+		return errors.Wrapf(
+			errInvalidComissionRate, "rate:%s", w.Validator.Rate.String(),
+		)
 	}
+
 	if w.Validator.MaxRate.LT(zeroPercent) || w.Validator.MaxRate.GT(hundredPercent) {
-		return errInvalidComissionRate
+		return errors.Wrapf(
+			errInvalidComissionRate, "rate:%s", w.Validator.MaxRate.String(),
+		)
 	}
+
 	if w.Validator.MaxChangeRate.LT(zeroPercent) || w.Validator.MaxChangeRate.GT(hundredPercent) {
-		return errInvalidComissionRate
+		return errors.Wrapf(
+			errInvalidComissionRate, "rate:%s", w.Validator.MaxChangeRate.String(),
+		)
 	}
 
 	if w.Validator.Rate.GT(w.Validator.MaxRate) {
-		return errCommissionRateTooLarge
+		return errors.Wrapf(
+			errCommissionRateTooLarge, "rate:%s", w.Validator.MaxRate.String(),
+		)
 	}
 
 	if w.Validator.MaxChangeRate.GT(w.Validator.MaxRate) {
-		return errCommissionRateTooLarge
+		return errors.Wrapf(
+			errCommissionRateTooLarge, "rate:%s", w.Validator.MaxChangeRate.String(),
+		)
 	}
 
 	return nil
@@ -289,8 +330,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 		return nil, err
 	}
 	commission := Commission{val.CommissionRates, blockNum}
-	pubKeys := []shard.BlsPublicKey{}
-	pubKeys = append(pubKeys, val.SlotPubKeys...)
+	pubKeys := append(val.SlotPubKeys[0:0], val.SlotPubKeys...)
 
 	if err = verifyBLSKeys(pubKeys, val.SlotKeySigs); err != nil {
 		return nil, err
