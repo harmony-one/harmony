@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harmony-one/harmony/shard"
-
 	types2 "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -83,23 +81,6 @@ type HeaderInformation struct {
 	LastCommitBitmap string      `json:"lastCommitBitmap"`
 }
 
-// RPCValidator represents a validator
-type RPCValidator struct {
-	Address             string               `json:"address"`
-	SlotPubKeys         []shard.BlsPublicKey `json:"slot_pub_keys"`
-	SlotShardIDs        []int                `json:"slot_shard_ids"`
-	UnbondingHeight     *big.Int             `json:"unbonding_height"`
-	MinSelfDelegation   *big.Int             `json:"min_self_delegation"`
-	MaxTotalDelegation  *big.Int             `json:"max_total_delegation"`
-	Active              bool                 `json:"active"`
-	Commission          types2.Commission    `json:"commission"`
-	Description         types2.Description   `json:"description"`
-	CreationHeight      *big.Int             `json:"creation_height"`
-	Uptime              string               `json:"uptime"`
-	AvgVotingPower      string               `json:"avg_voting_power"`
-	TotalEffectiveStake string               `json:"total_effective_stake"`
-}
-
 // RPCDelegation represents a particular delegation to a validator
 type RPCDelegation struct {
 	ValidatorAddress string            `json:"validator_address" yaml:"validator_address"`
@@ -171,25 +152,6 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 	result.To = toAddr
 
 	return result
-}
-
-func newRPCValidator(validator *types2.Validator) *RPCValidator {
-	addr, _ := internal_common.AddressToBech32(validator.Address)
-	return &RPCValidator{
-		addr,
-		validator.SlotPubKeys,
-		nil,
-		validator.UnbondingHeight,
-		validator.MinSelfDelegation,
-		validator.MaxTotalDelegation,
-		validator.Active,
-		validator.Commission,
-		validator.Description,
-		validator.CreationHeight,
-		"",
-		"",
-		"",
-	}
 }
 
 // newRPCTransaction returns a transaction that will serialize to the RPC

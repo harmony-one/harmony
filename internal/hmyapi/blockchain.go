@@ -3,9 +3,6 @@ package hmyapi
 import (
 	"context"
 	"fmt"
-
-	"github.com/harmony-one/harmony/numeric"
-
 	"math/big"
 	"time"
 
@@ -13,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
@@ -23,6 +19,7 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -511,49 +508,24 @@ func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]string, error) {
 	return addresses, nil
 }
 
+// GetValidatorMetrics ..
+func (s *PublicBlockChainAPI) GetValidatorMetrics(ctx context.Context, address string) (*staking.ValidatorStats, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	stats := s.b.GetValidatorStats(validatorAddress)
+	if stats == nil {
+		return nil, fmt.Errorf("validator stats not found: %s", validatorAddress.Hex())
+	}
+	return stats, nil
+}
+
 // GetValidatorInformation returns information about a validator.
-func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (*RPCValidator, error) {
+func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (*staking.Validator, error) {
 	validatorAddress := internal_common.ParseAddr(address)
 	validator := s.b.GetValidatorInformation(validatorAddress)
 	if validator == nil {
 		return nil, fmt.Errorf("validator not found: %s", validatorAddress.Hex())
 	}
-
-	rpcValidator := newRPCValidator(validator)
-
-	stats := s.b.GetValidatorStats(validatorAddress)
-
-	if stats != nil {
-		rpcValidator.Uptime = numeric.NewDecFromBigInt(stats.NumBlocksSigned).Quo(numeric.NewDecFromBigInt(stats.NumBlocksToSign)).String()
-		avg := numeric.ZeroDec()
-		for i := range stats.VotingPowerPerShard {
-			avg = avg.Add(stats.VotingPowerPerShard[i].VotingPower)
-		}
-		rpcValidator.AvgVotingPower = avg.QuoInt64(int64(len(stats.VotingPowerPerShard))).String()
-		rpcValidator.TotalEffectiveStake = stats.TotalEffectiveStake.String()
-	}
-
-	shardState, err := s.b.GetShardState()
-	if err == nil {
-		blsKeyToShardID := make(map[shard.BlsPublicKey]uint32)
-
-		for _, committee := range shardState.Shards {
-			for _, slot := range committee.Slots {
-				blsKeyToShardID[slot.BlsPublicKey] = committee.ShardID
-			}
-		}
-
-		shardIDs := make([]int, len(rpcValidator.SlotPubKeys))
-
-		for i, slotKey := range rpcValidator.SlotPubKeys {
-			shardID, ok := blsKeyToShardID[slotKey]
-			if !ok {
-				shardIDs[i] = int(shardID)
-			}
-		}
-		rpcValidator.SlotShardIDs = shardIDs
-	}
-	return rpcValidator, nil
+	return validator, nil
 }
 
 // GetDelegationsByDelegator returns list of delegations for a delegator address.
