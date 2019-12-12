@@ -111,7 +111,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 	// Try to return an already finalized transaction
 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash)
 	block, _ := s.b.GetBlock(ctx, blockHash)
-	if block != nil {
+	if block == nil {
 		return nil
 	}
 	if tx != nil {
@@ -130,7 +130,7 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Conte
 	// Try to return an already finalized transaction
 	stx, blockHash, blockNumber, index := rawdb.ReadStakingTransaction(s.b.ChainDb(), hash)
 	block, _ := s.b.GetBlock(ctx, blockHash)
-	if block != nil {
+	if block == nil {
 		return nil
 	}
 	if stx != nil {
