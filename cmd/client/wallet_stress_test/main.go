@@ -175,7 +175,7 @@ func readProfile(profile string) {
 func createWalletNode() *node.Node {
 	bootNodeAddrs, err := p2putils.StringsToAddrs(walletProfile.Bootnodes)
 	if err != nil {
-		panic(err)
+		utils.FatalErrMsg(err, "cannot parse bootnodes %#v", walletProfile.Bootnodes)
 	}
 	p2putils.BootNodes = bootNodeAddrs
 	shardID := 0
@@ -186,7 +186,7 @@ func createWalletNode() *node.Node {
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "6999")
 	host, err := p2pimpl.NewHost(&self, priKey)
 	if err != nil {
-		panic(err)
+		utils.FatalErrMsg(err, "cannot initialize network")
 	}
 	chainDBFactory := &shardchain.MemDBFactory{}
 	w := node.New(host, nil, chainDBFactory, false)
@@ -444,7 +444,7 @@ func GetFreeToken(address common.Address) {
 func clearKeystore() {
 	dir, err := ioutil.ReadDir(keystoreDir)
 	if err != nil {
-		panic("Failed to read keystore directory")
+		utils.FatalErrMsg(err, "cannot read keystore directory %s", keystoreDir)
 	}
 	for _, d := range dir {
 		subdir := path.Join([]string{keystoreDir, d.Name()}...)
