@@ -194,7 +194,7 @@ func newRPCValidator(validator *types2.Validator) *RPCValidator {
 
 // newRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, uinindex uint64) *RPCTransaction {
+func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, index uint64) *RPCTransaction {
 	var signer types.Signer = types.FrontierSigner{}
 	if tx.Protected() {
 		signer = types.NewEIP155Signer(tx.ChainID())
@@ -333,7 +333,7 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 
 // newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
 func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
-	return newRPCTransaction(tx, common.Hash{}, 0, 0)
+	return newRPCTransaction(tx, common.Hash{}, 0, 0, 0)
 }
 
 // RPCBlock represents a block that will serialize to the RPC representation of a block
