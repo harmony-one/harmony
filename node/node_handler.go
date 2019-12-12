@@ -25,10 +25,6 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
-const (
-	crossLinkBatchSize = 3
-)
-
 // receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
 func (node *Node) receiveGroupMessage(
 	receiver p2p.GroupReceiver, rxQueue msgq.MessageAdder,
