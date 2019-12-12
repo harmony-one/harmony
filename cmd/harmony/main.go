@@ -273,10 +273,11 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 		// Consensus keys are the BLS12-381 keys used to sign consensus messages
 		nodeConfig.ConsensusPriKey = nodeconfig.AppendPriKey(nodeConfig.ConsensusPriKey, consensusPriKey)
 		nodeConfig.ConsensusPubKey = nodeconfig.AppendPubKey(nodeConfig.ConsensusPubKey, consensusPriKey.GetPublicKey())
-		if len(nodeConfig.ConsensusPriKey.PrivateKey) == 0 || len(nodeConfig.ConsensusPubKey.PublicKey) == 0 {
-			fmt.Println("error to get consensus keys.")
-			os.Exit(100)
-		}
+	}
+
+	if len(nodeConfig.ConsensusPriKey.PrivateKey) == 0 || len(nodeConfig.ConsensusPubKey.PublicKey) == 0 {
+		fmt.Println("error to get consensus keys.")
+		os.Exit(100)
 	}
 
 	return nodeConfig.ConsensusPubKey.PublicKey[0]
@@ -533,7 +534,6 @@ func main() {
 	}
 
 	utils.Logger().Info().
-		Str("BlsPubKey", "").
 		Uint32("ShardID", nodeConfig.ShardID).
 		Str("ShardGroupID", nodeConfig.GetShardGroupID().String()).
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).

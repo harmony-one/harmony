@@ -90,8 +90,12 @@ type Consensus struct {
 	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
-	priKey *nodeconfig.MultiBlsPrivateKey
-	PubKey *nodeconfig.MultiBlsPublicKey
+	priKeys *nodeconfig.MultiBlsPrivateKey
+	PubKeys *nodeconfig.MultiBlsPublicKey
+
+	// keys prensent in committee
+	CurrentPubKeys *nodeconfig.MultiBlsPublicKey
+	CurrentPriKeys *nodeconfig.MultiBlsPrivateKey
 
 	SelfAddress common.Address
 	// the publickey of leader
@@ -227,10 +231,10 @@ func New(
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if blsPriKey != nil {
-		consensus.priKey = blsPriKey
-		consensus.PubKey = blsPriKey.GetPublicKey()
+		consensus.priKeys = blsPriKey
+		consensus.PubKeys = blsPriKey.GetPublicKey()
 		utils.Logger().Info().
-			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Keys")
+			Str("publicKey", consensus.PubKeys.SerializeToHexStr()).Msg("My Public Keys")
 	} else {
 		utils.Logger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")

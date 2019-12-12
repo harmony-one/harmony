@@ -19,6 +19,7 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -121,6 +122,23 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 		consensus.CommitteePublicKeys[pubKey] = true
 	}
 
+	consensus.CurrentPubKeys = &nodeconfig.MultiBlsPublicKey{PublicKey: []*bls.PublicKey{}}
+	consensus.CurrentPriKeys = &nodeconfig.MultiBlsPrivateKey{PrivateKey: []*bls.SecretKey{}}
+
+	// Update current public keys in committee
+	for _, key := range pubKeys {
+		if consensus.PubKeys.Contains(key) {
+			consensus.CurrentPubKeys = nodeconfig.AppendPubKey(consensus.CurrentPubKeys, key)
+		}
+	}
+
+	// Update current private keys in committee
+	for i, key := range consensus.PubKeys.PublicKey {
+		if consensus.CurrentPubKeys.Contains(key) {
+			consensus.CurrentPriKeys = nodeconfig.AppendPriKey(consensus.CurrentPriKeys, consensus.priKeys.PrivateKey[i])
+		}
+	}
+
 	consensus.LeaderPubKey = pubKeys[0]
 	utils.Logger().Info().
 		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
@@ -219,7 +237,7 @@ func (consensus *Consensus) String() string {
 		duty = "VLD" // validator
 	}
 	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v]",
-		duty, consensus.PubKey.SerializeToHexStr(), consensus.ShardID)
+		duty, consensus.CurrentPubKeys.SerializeToHexStr(), consensus.ShardID)
 }
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
@@ -390,7 +408,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 		txHashes = append(txHashes, hex.EncodeToString(txHash[:]))
 	}
 	metrics := map[string]interface{}{
-		"key":             hex.EncodeToString(consensus.PubKey.PublicKey[0].Serialize()),
+		"key":             hex.EncodeToString(consensus.CurrentPubKeys.PublicKey[0].Serialize()),
 		"tps":             tps,
 		"txCount":         numOfTxs,
 		"nodeCount":       consensus.Decider.ParticipantsCount() + 1,
@@ -511,16 +529,16 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	for _, key := range pubKeys {
 		// in committee
-		if consensus.PubKey.Contains(key) {
+		if consensus.CurrentPubKeys.Contains(key) {
 			if hasError {
 				return Syncing
 			}
 
 			// If the leader changed and I myself become the leader
-			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.PubKey.Contains(consensus.LeaderPubKey) {
+			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.CurrentPubKeys.Contains(consensus.LeaderPubKey) {
 				go func() {
 					utils.Logger().Debug().
-						Str("myKey", consensus.PubKey.PublicKey[0].SerializeToHexStr()).
+						Str("myKey", consensus.CurrentPubKeys.SerializeToHexStr()).
 						Uint64("viewID", consensus.viewID).
 						Uint64("block", consensus.blockNum).
 						Msg("[onEpochChange] I am the New Leader")
@@ -537,8 +555,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
-		for _, key := range consensus.PubKey.PublicKey {
+	if consensus.CurrentPubKeys != nil && consensus.LeaderPubKey != nil {
+		for _, key := range consensus.CurrentPubKeys.PublicKey {
 			if key.IsEqual(consensus.LeaderPubKey) {
 				return true
 			}

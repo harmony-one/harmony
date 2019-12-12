@@ -129,8 +129,8 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		Str("NextLeader", consensus.LeaderPubKey.SerializeToHexStr()).
 		Msg("[startViewChange]")
 
-	for i, key := range consensus.priKey.PrivateKey {
-		msgToSend := consensus.constructViewChangeMessage(key, consensus.PubKey.PublicKey[i])
+	for i, key := range consensus.CurrentPriKeys.PrivateKey {
+		msgToSend := consensus.constructViewChangeMessage(key, consensus.CurrentPubKeys.PublicKey[i])
 		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
@@ -152,15 +152,15 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 	newLeaderKey := recvMsg.LeaderPubkey
-	if !consensus.PubKey.Contains(newLeaderKey) {
+	if !consensus.CurrentPubKeys.Contains(newLeaderKey) {
 		return
 	}
 
 	// Get new Leader private key
 	var newLeaderPriKey *bls.SecretKey
-	for i, key := range consensus.PubKey.PublicKey {
+	for i, key := range consensus.CurrentPubKeys.PublicKey {
 		if key.IsEqual(newLeaderKey) {
-			newLeaderPriKey = consensus.priKey.PrivateKey[i]
+			newLeaderPriKey = consensus.CurrentPriKeys.PrivateKey[i]
 		}
 	}
 
