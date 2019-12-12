@@ -14,7 +14,10 @@ import (
 // for hostv2, it generates multiaddress, keypair and add PeerID to peer, add priKey to host
 // TODO (leo) The peerstore has to be persisted on disk.
 func NewHost(self *p2p.Peer, key libp2p_crypto.PrivKey) (p2p.Host, error) {
-	h := hostv2.New(self, key)
+	h, err := hostv2.New(self, key)
+	if err != nil {
+		return nil, err
+	}
 
 	utils.Logger().Info().
 		Str("self", net.JoinHostPort(self.IP, self.Port)).

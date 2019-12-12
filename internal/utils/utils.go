@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/pkg/errors"
+
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -269,4 +271,28 @@ func AppendIfMissing(slice []common.Address, addr common.Address) []common.Addre
 		}
 	}
 	return append(slice, addr)
+}
+
+// PrintError prints the given error in the extended format (%+v) onto stderr.
+func PrintError(err error) {
+	_, _ = fmt.Fprintf(os.Stderr, "%+v\n", err)
+}
+
+// FatalError prints the given error in the extended format (%+v) onto stderr,
+// then exits with status 1.
+func FatalError(err error) {
+	PrintError(err)
+	os.Exit(1)
+}
+
+// PrintErrMsg prints the given error wrapped with the given message in the
+// extended format (%+v) onto stderr.
+func PrintErrMsg(err error, format string, args ...interface{}) {
+	PrintError(errors.WithMessagef(err, format, args...))
+}
+
+// FatalErrMsg prints the given error wrapped with the given message in the
+// extended format (%+v) onto stderr, then exits with status 1.
+func FatalErrMsg(err error, format string, args ...interface{}) {
+	FatalError(errors.WithMessagef(err, format, args...))
 }

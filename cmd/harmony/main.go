@@ -159,7 +159,8 @@ func initSetup() {
 	if len(p2putils.BootNodes) == 0 {
 		bootNodeAddrs, err := p2putils.StringsToAddrs(p2putils.DefaultBootNodeAddrStrings)
 		if err != nil {
-			panic(err)
+			utils.FatalErrMsg(err, "cannot parse default bootnode list %#v",
+				p2putils.DefaultBootNodeAddrStrings)
 		}
 		p2putils.BootNodes = bootNodeAddrs
 	}
