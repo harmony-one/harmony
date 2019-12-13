@@ -80,13 +80,13 @@ type Validator struct {
 	Address common.Address
 	// The BLS public key of the validator for consensus
 	SlotPubKeys []shard.BlsPublicKey
-	// TODO Remove this field
-	UnbondingHeight *big.Int
+	// The number of the last epoch this validator is selected in committee (0 means never selected)
+	LastEpochInCommittee *big.Int
 	// validator's self declared minimum self delegation
 	MinSelfDelegation *big.Int
 	// maximum total delegation allowed
 	MaxTotalDelegation *big.Int
-	// Is the validator active in the validating process or not
+	// Is the validator active in participating committee selection process or not
 	Active bool
 	// commission parameters
 	Commission
@@ -459,13 +459,13 @@ func (v *Validator) String() string {
 	return fmt.Sprintf(`Validator
   Address:                    %s
   SlotPubKeys:                %s
-  Unbonding Height:           %v
+  LastEpochInCommittee:           %v
   Minimum Self Delegation:     %v
   Maximum Total Delegation:     %v
   Description:                %v
   Commission:                 %v`,
 		common2.MustAddressToBech32(v.Address), printSlotPubKeys(v.SlotPubKeys),
-		v.UnbondingHeight,
+		v.LastEpochInCommittee,
 		v.MinSelfDelegation, v.MaxTotalDelegation, v.Description, v.Commission,
 	)
 }

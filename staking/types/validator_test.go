@@ -12,7 +12,7 @@ func CreateNewValidator() Validator {
 	c := Commission{cr, big.NewInt(300)}
 	d := Description{Name: "SuperHero", Identity: "YouWillNotKnow", Website: "under_construction", Details: "N/A"}
 	v := Validator{Address: common.Address{}, SlotPubKeys: nil,
-		UnbondingHeight: big.NewInt(20), MinSelfDelegation: big.NewInt(7),
+		LastEpochInCommittee: big.NewInt(20), MinSelfDelegation: big.NewInt(7),
 		Active: false, Commission: c, Description: d}
 	return v
 }

@@ -279,22 +279,48 @@ func (e *engineImpl) Finalize(
 	if header.ShardID() == shard.BeaconChainShardID && len(header.ShardState()) > 0 {
 		validators, err := chain.ReadValidatorList()
 		if err != nil {
-			return nil, nil, ctxerror.New("failed to read active validators").WithCause(err)
+			return nil, nil, ctxerror.New("[Finalize] failed to read active validators").WithCause(err)
 		}
+		// Payout undelegated/unlocked tokens
 		for _, validator := range validators {
 			wrapper := state.GetStakingInfo(validator)
 			if wrapper != nil {
 				for i := range wrapper.Delegations {
 					delegation := &wrapper.Delegations[i]
-					totalWithdraw := delegation.RemoveUnlockedUndelegations(header.Epoch())
+					totalWithdraw := delegation.RemoveUnlockedUndelegations(header.Epoch(), wrapper.LastEpochInCommittee)
 					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 				}
 				if err := state.UpdateStakingInfo(validator, wrapper); err != nil {
-					return nil, nil, ctxerror.New("failed update validator info").WithCause(err)
+					return nil, nil, ctxerror.New("[Finalize] failed update validator info").WithCause(err)
 				}
 			} else {
-				err = errors.New("validator came back empty " + common2.MustAddressToBech32(validator))
-				return nil, nil, ctxerror.New("failed getting validator info").WithCause(err)
+				err = errors.New("[Finalize] validator came back empty " + common2.MustAddressToBech32(validator))
+				return nil, nil, ctxerror.New("[Finalize] failed getting validator info").WithCause(err)
+			}
+		}
+
+		// Set the LastEpochInCommittee field for all external validators in the upcoming epoch.
+		newShardState, err := header.GetShardState()
+		if err != nil {
+			return nil, nil, ctxerror.New("[Finalize] failed to read shard state").WithCause(err)
+		}
+		processed := make(map[common.Address]struct{})
+		for i := range newShardState.Shards {
+			shard := newShardState.Shards[i]
+			for j := range shard.Slots {
+				slot := shard.Slots[j]
+				if slot.EffectiveStake != nil { // For external validator
+					_, ok := processed[slot.EcdsaAddress]
+					if !ok {
+						processed[slot.EcdsaAddress] = struct{}{}
+						wrapper := state.GetStakingInfo(slot.EcdsaAddress)
+						wrapper.LastEpochInCommittee = newShardState.Epoch
+
+						if err := state.UpdateStakingInfo(slot.EcdsaAddress, wrapper); err != nil {
+							return nil, nil, ctxerror.New("[Finalize] failed update validator info").WithCause(err)
+						}
+					}
+				}
 			}
 		}
 	}

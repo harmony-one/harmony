@@ -54,7 +54,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 	for i := 0; i < quorumNodes; i++ {
 		newSlot, sKey := generateRandomSlot()
 		if i < 50 {
-			newSlot.TotalStake = nil
+			newSlot.EffectiveStake = nil
 			sKeys[hmy][newSlot.BlsPublicKey] = sKey
 		} else {
 			sKeys[reg][newSlot.BlsPublicKey] = sKey
@@ -82,7 +82,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	for i := 0; i < quorumNodes; i++ {
 		newSlot, sKey := generateRandomSlot()
 		if i < 33 {
-			newSlot.TotalStake = nil
+			newSlot.EffectiveStake = nil
 			sKeys[newSlot.BlsPublicKey] = sKey
 		}
 		slotList = append(slotList, newSlot)
