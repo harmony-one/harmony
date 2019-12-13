@@ -78,12 +78,12 @@ var (
 func setUpTXGen() *node.Node {
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
-		panic(err)
+		utils.FatalErrMsg(err, "cannot load key from %s", *keyFile)
 	}
 
 	peerPubKey := bls.RandPrivateKey().GetPublicKey()
 	if peerPubKey == nil {
-		panic(fmt.Errorf("generate key error"))
+		utils.FatalErrMsg(err, "cannot generate BLS key")
 	}
 	shardID := *shardIDFlag
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: peerPubKey}
@@ -91,9 +91,6 @@ func setUpTXGen() *node.Node {
 	// Nodes containing blockchain data to mirror the shards' data in the network
 
 	myhost, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
-	if err != nil {
-		panic("unable to new host in txgen")
-	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
@@ -141,7 +138,7 @@ func main() {
 	if len(p2putils.BootNodes) == 0 {
 		bootNodeAddrs, err := p2putils.StringsToAddrs(p2putils.DefaultBootNodeAddrStrings)
 		if err != nil {
-			panic(err)
+			utils.FatalErrMsg(err, "cannot parse default bootnode list")
 		}
 		p2putils.BootNodes = bootNodeAddrs
 	}

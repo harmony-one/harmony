@@ -35,7 +35,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
+func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool {
 	threshold := v.TwoThirdsSignersCount()
 	currentTotalPower := utils.CountOneBits(mask.Bitmap)
 	if currentTotalPower < threshold {
@@ -60,7 +60,7 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 }
 
 func (v *uniformVoteWeight) SetVoters(
-	shard.SlotList,
+	shard.SlotList, bool,
 ) (*TallyResult, error) {
 	// NO-OP do not add anything here
 	return nil, nil
