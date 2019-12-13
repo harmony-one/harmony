@@ -1178,7 +1178,7 @@ func (bc *BlockChain) WriteBlockWithState(
 			shard := newShardState.Shards[i]
 			for j := range shard.Slots {
 				slot := shard.Slots[j]
-				if slot.TotalStake != nil { // For external validator
+				if slot.EffectiveStake != nil { // For external validator
 					_, ok := processed[slot.EcdsaAddress]
 					if !ok {
 						processed[slot.EcdsaAddress] = struct{}{}
@@ -1294,7 +1294,7 @@ func (bc *BlockChain) WriteBlockWithState(
 
 					members := []*bls2.PublicKey{}
 					for _, slot := range committee.Slots {
-						if slot.TotalStake != nil {
+						if slot.EffectiveStake != nil {
 							pubKey := &bls2.PublicKey{}
 							err := pubKey.Deserialize(slot.BlsPublicKey[:])
 							if err != nil {

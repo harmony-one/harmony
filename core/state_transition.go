@@ -380,6 +380,10 @@ func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.Creat
 		return errors.Wrapf(errValidatorExist, common2.MustAddressToBech32(val))
 	}
 
+	if !CanTransfer(st.state, createValidator.ValidatorAddress, createValidator.Amount) {
+		return errInsufficientBalanceForStake
+	}
+
 	v, err := staking.CreateValidatorFromNewMsg(createValidator, blockNum)
 	if err != nil {
 		return err
@@ -395,6 +399,8 @@ func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.Creat
 	}
 
 	st.state.SetValidatorFlag(v.Address)
+
+	st.state.SubBalance(v.Address, createValidator.Amount)
 	return nil
 }
 
