@@ -91,7 +91,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			if err == nil && exist != nil {
 				// TODO: leader add double sign checking
 				utils.Logger().Err(err).
-					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Block num: %d, shardID %d", cl.Number(), cl.ShardID())
+					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d", node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
 				continue
 			}
 
@@ -133,7 +133,7 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	committee := shardState.FindCommitteeByID(cl.ShardID())
 
 	if err != nil || committee == nil {
-		return ctxerror.New("[VerifyCrossLink] Failed to read shard state for cross link", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
+		return ctxerror.New("[VerifyCrossLink] Failed to read shard state for cross link", "beaconEpoch", node.Blockchain().CurrentHeader().Epoch(), "epoch", cl.Epoch(), "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
 	}
 	var committerKeys []*bls.PublicKey
 
@@ -166,10 +166,10 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
 		return nil, nil
 	})
-	if _, err := decider.SetVoters(committee.Slots); err != nil {
+	if _, err := decider.SetVoters(committee.Slots, false); err != nil {
 		return ctxerror.New("[VerifyCrossLink] Cannot SetVoters for committee", "shardID", cl.ShardID())
 	}
-	if !decider.IsQuorumAchievedByMask(mask) {
+	if !decider.IsQuorumAchievedByMask(mask, false) {
 		return ctxerror.New("[VerifyCrossLink] Not enough voting power for crosslink", "shardID", cl.ShardID())
 	}
 

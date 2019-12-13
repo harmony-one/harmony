@@ -48,7 +48,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
-		if node.Consensus.Decider.IsQuorumAchievedByMask(mask) {
+		if node.Consensus.Decider.IsQuorumAchievedByMask(mask, false) {
 			utils.Logger().Error().Msg("[Explorer] not have enough signature power")
 			return
 		}
