@@ -128,7 +128,7 @@ var (
 	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
 	// libp2p control interface
 	libp2pctlFlag         = flag.Bool("libp2pctl", false, "Enable libp2p control interface")
-	libp2pctlPortFlag     = flag.String("libp2pctl_port", "-4000", "libp2pctl port number; if prefixed with +/-, treat as offset from the -port value (default: -5000)")
+	libp2pctlPortFlag     = flag.String("libp2pctl_port", "4000", "libp2pctl port number (default: 4000)")
 	libp2pctlCertFlag     = flag.String("libp2pctl_cert", "harmony-libp2pctl-cert.pem", "libp2pctl HTTPS certificate filename (default: harmony-libp2pctl.crt)")
 	libp2pctlKeyFlag      = flag.String("libp2pctl_key", "harmony-libp2pctl-key.pem", "libp2pctl HTTPS private key filename (default: harmony-libp2pctl.key)")
 	libp2pctlClientCAFlag = flag.String("libp2pct_client_ca", "harmony-libp2pctl-client-ca.pem", "libp2pctl HTTPS client CA (default: harmony-libp2pctl-ca.pem)")
