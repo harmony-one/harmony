@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -435,6 +436,12 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
+		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
+			fmt.Fprintf(
+				os.Stderr, "beaconchain-is-nil:%t shardchain-is-nil:%t", b1, b2,
+			)
+			os.Exit(-1)
+		}
 
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
