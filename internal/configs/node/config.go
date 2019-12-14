@@ -4,18 +4,16 @@
 package nodeconfig
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"sync"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
-	"github.com/pkg/errors"
-
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
+	"github.com/pkg/errors"
 )
 
 // Role defines a role of a node.
@@ -70,30 +68,25 @@ var publicRPC bool // enable public RPC access
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon   GroupID // the beacon group ID
-	group    GroupID // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
-	client   GroupID // the client group ID of the shard
-	isClient bool    // whether this node is a client node, such as wallet
-	isBeacon bool    // whether this node is beacon node doing consensus or not
-	ShardID  uint32  // ShardID of this node; TODO ek – revisit when resharding
-	role     Role    // Role of the node
-	Port     string  // Port of the node.
-	IP       string  // IP of the node.
-
-	MetricsFlag     bool   // collect and upload metrics flag
-	PushgatewayIP   string // metrics pushgateway prometheus ip
-	PushgatewayPort string // metrics pushgateway prometheus port
+	beacon          GroupID // the beacon group ID
+	group           GroupID // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
+	client          GroupID // the client group ID of the shard
+	isClient        bool    // whether this node is a client node, such as wallet
+	isBeacon        bool    // whether this node is beacon node doing consensus or not
+	ShardID         uint32  // ShardID of this node; TODO ek – revisit when resharding
+	role            Role    // Role of the node
+	Port            string  // Port of the node.
+	IP              string  // IP of the node.
+	MetricsFlag     bool    // collect and upload metrics flag
+	PushgatewayIP   string  // metrics pushgateway prometheus ip
+	PushgatewayPort string  // metrics pushgateway prometheus port
 	StringRole      string
-	StakingPriKey   *ecdsa.PrivateKey
 	P2pPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey *bls.SecretKey
 	ConsensusPubKey *bls.PublicKey
-
 	// Database directory
-	DBDir string
-
-	networkType NetworkType
-
+	DBDir            string
+	networkType      NetworkType
 	shardingSchedule shardingconfig.Schedule
 }
 

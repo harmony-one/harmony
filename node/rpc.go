@@ -56,6 +56,11 @@ func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError 
 	return node.errorSink.failedTxns
 }
 
+// IsExplorerNode ..
+func (node *Node) IsExplorerNode() bool {
+	return node.NodeConfig.Role() == nodeconfig.ExplorerNode
+}
+
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface

@@ -2,6 +2,7 @@ package hmyapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -486,6 +487,18 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformation {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
 	return newHeaderInformation(header)
+}
+
+var (
+	errNotExplorerNode = errors.New("cannot call this rpc on non-explorer node")
+)
+
+// GetMedianRawStakeSnapshot ..
+func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (uint64, error) {
+	if s.b.IsExplorerNode() {
+		return s.GetMedianRawStakeSnapshot()
+	}
+	return 0, errNotExplorerNode
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
