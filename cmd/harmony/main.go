@@ -567,7 +567,7 @@ func main() {
 	}
 
 	if *libp2pctlFlag {
-		port, err := getPort(*libp2pctlPortFlag)
+		port, err := net.LookupPort("tcp", *libp2pctlPortFlag)
 		if err != nil {
 			utils.FatalErrMsg(err, "cannot parse -libp2pctl_port %#v",
 				*libp2pctlPortFlag)
@@ -610,30 +610,4 @@ func main() {
 	}
 
 	currentNode.StartServer()
-}
-
-func getPort(s string) (int, error) {
-	if s == "" {
-		return 0, errors.New("empty port")
-	}
-	if s[0] != '+' && s[0] != '-' {
-		return net.LookupPort("tcp", s)
-	}
-	n, err := strconv.ParseUint(s[1:], 0, 16)
-	if err != nil {
-		return 0, err
-	}
-	num, err := net.LookupPort("tcp", *port)
-	if err != nil {
-		return 0, errors.Wrapf(err, "cannot parse -port value %#v", *port)
-	}
-	if s[0] == '+' {
-		num += int(n)
-	} else {
-		num -= int(n)
-	}
-	if num < 1 || num > 65535 {
-		return 0, errors.Wrapf(err, "offset result %v out of range", num)
-	}
-	return num, nil
 }
