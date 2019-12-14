@@ -53,6 +53,7 @@ type NodeAPI interface {
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	IsCurrentlyLeader() bool
 	ErroredStakingTransactionSink() []staking.RPCTransactionError
+	IsBeaconChainExplorerNode() bool
 }
 
 // New creates a new Harmony object (including the

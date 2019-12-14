@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -307,6 +308,46 @@ func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Valid
 	return &val.Validator
 }
 
+var (
+	two = big.NewInt(2)
+)
+
+// GetMedianRawStakeSnapshot  ..
+func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
+	candidates := b.hmy.BlockChain().ValidatorCandidates()
+	if len(candidates) == 0 {
+		return big.NewInt(0)
+	}
+	stakes := []*big.Int{}
+	for i := range candidates {
+		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
+		stake := big.NewInt(0)
+		validator.GetAddress()
+		for i := range validator.Delegations {
+			stake.Add(stake, validator.Delegations[i].Amount)
+		}
+		stakes = append(stakes, stake)
+	}
+	sort.SliceStable(
+		stakes,
+		func(i, j int) bool { return stakes[i].Cmp(stakes[j]) == -1 },
+	)
+
+	if l := len(stakes); l > 320 {
+		stakes = stakes[:320]
+	}
+
+	const isEven = 0
+	switch l := len(stakes); l % 2 {
+	case isEven:
+		left := stakes[(l/2)-1]
+		right := stakes[l/2]
+		return new(big.Int).Div(new(big.Int).Add(left, right), two)
+	default:
+		return stakes[l/2]
+	}
+}
+
 // GetValidatorStats returns the stats of validator
 func (b *APIBackend) GetValidatorStats(addr common.Address) *staking.ValidatorStats {
 	val, _ := b.hmy.BlockChain().ReadValidatorStats(addr)
@@ -371,4 +412,9 @@ func (b *APIBackend) GetShardState() (*shard.State, error) {
 // GetCurrentStakingTransactionErrorSink ..
 func (b *APIBackend) GetCurrentStakingTransactionErrorSink() []staking.RPCTransactionError {
 	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
+}
+
+// IsBeaconChainExplorerNode ..
+func (b *APIBackend) IsBeaconChainExplorerNode() bool {
+	return b.hmy.nodeAPI.IsBeaconChainExplorerNode()
 }

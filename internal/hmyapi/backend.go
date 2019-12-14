@@ -82,6 +82,8 @@ type Backend interface {
 	GetValidatorSelfDelegation(addr common.Address) *big.Int
 	GetShardState() (*shard.State, error)
 	GetCurrentStakingTransactionErrorSink() []staking.RPCTransactionError
+	IsBeaconChainExplorerNode() bool
+	GetMedianRawStakeSnapshot() *big.Int
 }
 
 // GetAPIs returns all the APIs.

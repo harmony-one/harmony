@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/internal/hmyapi"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -54,6 +55,12 @@ func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError 
 	node.errorSink.Lock()
 	defer node.errorSink.Unlock()
 	return node.errorSink.failedTxns
+}
+
+// IsBeaconChainExplorerNode ..
+func (node *Node) IsBeaconChainExplorerNode() bool {
+	return node.NodeConfig.Role() == nodeconfig.ExplorerNode &&
+		node.Consensus.ShardID == shard.BeaconChainShardID
 }
 
 // StartRPC start RPC service
