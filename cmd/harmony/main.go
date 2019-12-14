@@ -1,11 +1,16 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"net"
+	"net/http"
 	"os"
 	"path"
 	"runtime"
@@ -30,6 +35,7 @@ import (
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/libp2pctl"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -120,6 +126,12 @@ var (
 	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
 	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
+	// libp2p control interface
+	libp2pctlFlag         = flag.Bool("libp2pctl", false, "Enable libp2p control interface")
+	libp2pctlPortFlag     = flag.String("libp2pctl_port", "-4000", "libp2pctl port number; if prefixed with +/-, treat as offset from the -port value (default: -5000)")
+	libp2pctlCertFlag     = flag.String("libp2pctl_cert", "harmony-libp2pctl-cert.pem", "libp2pctl HTTPS certificate filename (default: harmony-libp2pctl.crt)")
+	libp2pctlKeyFlag      = flag.String("libp2pctl_key", "harmony-libp2pctl-key.pem", "libp2pctl HTTPS private key filename (default: harmony-libp2pctl.key)")
+	libp2pctlClientCAFlag = flag.String("libp2pct_client_ca", "harmony-libp2pctl-client-ca.pem", "libp2pctl HTTPS client CA (default: harmony-libp2pctl-ca.pem)")
 )
 
 func initSetup() {
@@ -554,6 +566,43 @@ func main() {
 			Msg("StartRPC failed")
 	}
 
+	if *libp2pctlFlag {
+		port, err := getPort(*libp2pctlPortFlag)
+		if err != nil {
+			utils.FatalErrMsg(err, "cannot parse -libp2pctl_port %#v",
+				*libp2pctlPortFlag)
+		}
+		cert, err := tls.LoadX509KeyPair(*libp2pctlCertFlag, *libp2pctlKeyFlag)
+		if err != nil {
+			utils.FatalErrMsg(err, "cannot load libp2pctl TLS cert/key")
+		}
+		clientCAPEM, err := ioutil.ReadFile(*libp2pctlClientCAFlag)
+		if err != nil {
+			utils.FatalErrMsg(err, "cannot load libp2pctl client CA %s",
+				*libp2pctlClientCAFlag)
+		}
+		clientCAs := x509.NewCertPool()
+		if !clientCAs.AppendCertsFromPEM(clientCAPEM) {
+			utils.Fatal("no libp2pctl client CA in %s", *libp2pctlClientCAFlag)
+		}
+		tlsConfig := tls.Config{
+			Certificates: []tls.Certificate{cert},
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			ClientCAs:  clientCAs,
+		}
+		listenAddr := &net.TCPAddr{Port: port}
+		listener, err := net.ListenTCP("tcp", listenAddr)
+		if err != nil {
+			utils.FatalErrMsg(err, "cannot listen on libp2pctl port %d",
+				port)
+		}
+		tlsListener := tls.NewListener(listener, &tlsConfig)
+		ctl := libp2pctl.New(myHost.GetP2PHost())
+		go func() { _ = http.Serve(tlsListener, ctl.Handler()) }()
+		utils.Logger().Info().Interface("listenAddr", listenAddr).
+			Msg("started libp2pctl")
+	}
+
 	// Run additional node collectors
 	// Collect node metrics if metrics flag is set
 	if currentNode.NodeConfig.GetMetricsFlag() {
@@ -561,4 +610,30 @@ func main() {
 	}
 
 	currentNode.StartServer()
+}
+
+func getPort(s string) (int, error) {
+	if s == "" {
+		return 0, errors.New("empty port")
+	}
+	if s[0] != '+' && s[0] != '-' {
+		return net.LookupPort("tcp", s)
+	}
+	n, err := strconv.ParseUint(s[1:], 0, 16)
+	if err != nil {
+		return 0, err
+	}
+	num, err := net.LookupPort("tcp", *port)
+	if err != nil {
+		return 0, errors.Wrapf(err, "cannot parse -port value %#v", *port)
+	}
+	if s[0] == '+' {
+		num += int(n)
+	} else {
+		num -= int(n)
+	}
+	if num < 1 || num > 65535 {
+		return 0, errors.Wrapf(err, "offset result %v out of range", num)
+	}
+	return num, nil
 }
