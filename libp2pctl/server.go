@@ -161,21 +161,8 @@ func (inst *Instance) Handler() http.Handler {
 	return inst.rtr
 }
 
-func httpWriteJSON(w http.ResponseWriter, data interface{}) error {
-	bytes, err := json.Marshal(data)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return errors.Wrapf(err, "cannot marshal data")
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if _, err := w.Write(bytes); err != nil {
-		return errors.Wrapf(err, "cannot write JSON")
-	}
-	return nil
-}
-
 func (inst *Instance) getAddrs(w http.ResponseWriter, r *http.Request) {
-	if err := httpWriteJSON(w, inst.host.Addrs()); err != nil {
+	if err := json.NewEncoder(w).Encode(inst.host.Addrs()); err != nil {
 		utils.Logger().Err(err).Msg("cannot serve libp2p addresses")
 	}
 }
@@ -241,7 +228,7 @@ func (inst *Instance) getConns(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if err := httpWriteJSON(w, conns); err != nil {
+	if err := json.NewEncoder(w).Encode(conns); err != nil {
 		utils.Logger().Err(err).Msg("cannot serve libp2p connections")
 	}
 	return
@@ -274,7 +261,7 @@ func (inst *Instance) getConn(w http.ResponseWriter, r *http.Request) {
 	case conn == nil:
 		w.WriteHeader(http.StatusNotFound)
 	default:
-		if err := httpWriteJSON(w, conn); err != nil {
+		if err := json.NewEncoder(w).Encode(conn); err != nil {
 			utils.Logger().Err(err).Interface("conn", conn).
 				Msg("cannot write connection details")
 		}
@@ -334,7 +321,7 @@ func (inst *Instance) getConnStat(w http.ResponseWriter, r *http.Request) {
 	case conn == nil:
 		w.WriteHeader(http.StatusNotFound)
 	default:
-		if err := httpWriteJSON(w, conn.Stat()); err != nil {
+		if err := json.NewEncoder(w).Encode(conn.Stat()); err != nil {
 			utils.Logger().Err(err).Msg("cannot serve connection stat")
 		}
 	}
