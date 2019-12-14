@@ -29,6 +29,8 @@ type EndpointID struct {
 	Addr ma.Multiaddr
 }
 
+// EndpointIDFromURLVar parses the given URL-variable-format endpoint ID in the
+// peer-id@url64-encoded-binary-multiaddr format into connection endpoint ID.
 func EndpointIDFromURLVar(v string) (EndpointID, error) {
 	idma := strings.SplitN(v, "@", 2)
 	if len(idma) != 2 {
@@ -50,13 +52,13 @@ func EndpointIDFromURLVar(v string) (EndpointID, error) {
 }
 
 // URLVar returns the encoded form of the receiver, suitable for use in a URL.
-func (id EndpointID) URLVar() string {
-	return id.ID.String() + "@" + url64Encode(id.Addr.Bytes())
+func (epid EndpointID) URLVar() string {
+	return epid.ID.String() + "@" + url64Encode(epid.Addr.Bytes())
 }
 
 // Key returns a struct usable as a map key.
-func (ep EndpointID) Key() EndpointKey {
-	return EndpointKey{ep.ID, string(ep.Addr.Bytes())}
+func (epid EndpointID) Key() EndpointKey {
+	return EndpointKey{epid.ID, string(epid.Addr.Bytes())}
 }
 
 // EndpointKey is a libp2p connection endpoint, usable as a map key.
