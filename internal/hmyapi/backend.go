@@ -82,7 +82,7 @@ type Backend interface {
 	GetValidatorSelfDelegation(addr common.Address) *big.Int
 	GetShardState() (*shard.State, error)
 	GetCurrentStakingTransactionErrorSink() []staking.RPCTransactionError
-	IsExplorerNode() bool
+	IsBeaconChainExplorerNode() bool
 	GetMedianRawStakeSnapshot() *big.Int
 }
 

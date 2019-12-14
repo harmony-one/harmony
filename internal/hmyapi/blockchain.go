@@ -490,12 +490,13 @@ func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformati
 }
 
 var (
-	errNotExplorerNode = errors.New("cannot call this rpc on non-explorer node")
+	errNotExplorerNode = errors.New("cannot call this rpc on non beaconchain explorer node")
 )
 
-// GetMedianRawStakeSnapshot ..
+// GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
+// explorer node
 func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (uint64, error) {
-	if s.b.IsExplorerNode() {
+	if s.b.IsBeaconChainExplorerNode() {
 		return s.GetMedianRawStakeSnapshot()
 	}
 	return 0, errNotExplorerNode

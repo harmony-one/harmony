@@ -332,6 +332,11 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 		stakes,
 		func(i, j int) bool { return stakes[i].Cmp(stakes[j]) == -1 },
 	)
+
+	if l := len(stakes); l > 320 {
+		stakes = stakes[:320]
+	}
+
 	const isEven = 0
 	switch l := len(stakes); l % 2 {
 	case isEven:
@@ -409,7 +414,7 @@ func (b *APIBackend) GetCurrentStakingTransactionErrorSink() []staking.RPCTransa
 	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
 }
 
-// IsExplorerNode ..
-func (b *APIBackend) IsExplorerNode() bool {
-	return b.hmy.nodeAPI.IsExplorerNode()
+// IsBeaconChainExplorerNode ..
+func (b *APIBackend) IsBeaconChainExplorerNode() bool {
+	return b.hmy.nodeAPI.IsBeaconChainExplorerNode()
 }
