@@ -191,8 +191,8 @@ func newConnJSON(conn network.Conn) connJSON {
 }
 
 type connEntryJSON struct {
-	ID         ConnID
-	URL        string
+	ID  ConnID
+	URL string
 	connJSON
 }
 

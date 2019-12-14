@@ -587,8 +587,8 @@ func main() {
 		}
 		tlsConfig := tls.Config{
 			Certificates: []tls.Certificate{cert},
-			ClientAuth: tls.RequireAndVerifyClientCert,
-			ClientCAs:  clientCAs,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			ClientCAs:    clientCAs,
 		}
 		listenAddr := &net.TCPAddr{Port: port}
 		listener, err := net.ListenTCP("tcp", listenAddr)
