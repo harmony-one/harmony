@@ -35,6 +35,8 @@ var emptyCodeHash = crypto.Keccak256Hash(nil)
 type (
 	// CanTransferFunc is the signature of a transfer guard function
 	CanTransferFunc func(StateDB, common.Address, *big.Int) bool
+	// IsValidatorFunc is the signature of IsValidator function
+	IsValidatorFunc func(StateDB, common.Address) bool
 	// TransferFunc is the signature of a transfer function
 	TransferFunc func(StateDB, common.Address, common.Address, *big.Int, types.TransactionType)
 	// GetHashFunc returns the nth block hash in the blockchain
@@ -79,6 +81,10 @@ type Context struct {
 	Transfer TransferFunc
 	// GetHash returns the hash corresponding to n
 	GetHash GetHashFunc
+
+	// IsValidator determines whether the address corresponds to a validator or a smart contract
+	// true: is a validator address; false: is smart contract address
+	IsValidator IsValidatorFunc
 
 	// Message information
 	Origin   common.Address // Provides information for ORIGIN
@@ -224,10 +230,19 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		evm.StateDB.CreateAccount(addr)
 	}
 	evm.Transfer(evm.StateDB, caller.Address(), to.Address(), value, txType)
+
+	codeHash := evm.StateDB.GetCodeHash(addr)
+	code := evm.StateDB.GetCode(addr)
+	// If address is a validator address, then it's not a smart contract address
+	// we don't use its code and codeHash fields
+	if evm.Context.IsValidator(evm.StateDB, addr) {
+		codeHash = emptyCodeHash
+		code = nil
+	}
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
 	contract := NewContract(caller, to, value, gas)
-	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
+	contract.SetCallCode(&addr, codeHash, code)
 
 	// Even if the account has no code, we need to continue because it might be a precompile
 	start := time.Now()
