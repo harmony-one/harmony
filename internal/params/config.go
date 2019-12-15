@@ -55,6 +55,17 @@ var (
 		S3Epoch:         big.NewInt(0),
 	}
 
+	// LocalnetChainConfig contains the chain parameters to run for local development.
+	LocalnetChainConfig = &ChainConfig{
+		ChainID:         TestnetChainID,
+		CrossTxEpoch:    big.NewInt(0),
+		CrossLinkEpoch:  big.NewInt(3),
+		StakingEpoch:    big.NewInt(4),
+		PreStakingEpoch: big.NewInt(2),
+		EIP155Epoch:     big.NewInt(0),
+		S3Epoch:         big.NewInt(0),
+	}
+
 	// AllProtocolChanges ...
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.

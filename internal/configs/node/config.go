@@ -296,6 +296,8 @@ func (t NetworkType) ChainConfig() params.ChainConfig {
 		return *params.MainnetChainConfig
 	case Pangaea:
 		return *params.PangaeaChainConfig
+	case Localnet:
+		return *params.LocalnetChainConfig
 	default:
 		return *params.TestnetChainConfig
 	}
