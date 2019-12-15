@@ -193,7 +193,8 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
 	var cxReceipt *types.CXReceipt
-	if txType == types.SubtractionOnly {
+	// Do not create cxReceipt if EVM call failed
+	if txType == types.SubtractionOnly && !failed {
 		cxReceipt = &types.CXReceipt{tx.Hash(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
 	} else {
 		cxReceipt = nil
