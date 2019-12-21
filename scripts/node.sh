@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20191105.1"
+version="v1 20191221.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -94,7 +94,9 @@ function setup_env
 print_usage() {
    cat <<- ENDEND
 
-usage: ${progname} [-1ch] [-k KEYFILE]
+usage: ${progname} [options]
+
+options:
    -c             back up database/logs and start clean
                   (use only when directed by Harmony)
    -1             do not loop; run once and exit
@@ -107,6 +109,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -D             do not download Harmony binaries (default: download when start)
    -m             collect and upload node metrics to harmony prometheus + grafana
    -N network     join the given network (mainnet, testnet, devnet; default: mainnet)
+   -n port        specify the public base port of the node (default: 9000)
    -t             equivalent to -N testnet (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
@@ -137,6 +140,9 @@ examples:
 # upgrade harmony binaries from specified repo
    ${progname} -1 -U upgrade
 
+# start the node in a different port 9010
+   ${progname} -n 9010
+
 ENDEND
 }
 
@@ -151,7 +157,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode
+unset upgrade_rel public_rpc staking_mode pub_port
 start_clean=false
 loop=true
 run_as_root=true
@@ -168,7 +174,7 @@ ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyz opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -185,6 +191,7 @@ do
    D) do_not_download=true;;
    m) metrics=true;;
    N) network="${OPTARG}";;
+   n) pub_port="${OPTARG}";;
    t) network=devnet;;
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
@@ -483,7 +490,7 @@ else
    download_binaries . || err 69 "initial node software update failed"
 fi
 
-NODE_PORT=9000
+NODE_PORT=${pub_port:-9000}
 PUB_IP=
 METRICS=
 PUSHGATEWAY_IP=
