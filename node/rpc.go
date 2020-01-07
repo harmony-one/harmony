@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/hmyapi"
@@ -24,25 +25,20 @@ const (
 
 var (
 	// HTTP RPC
-	rpcAPIs      []rpc.API
-	httpListener net.Listener
-	httpHandler  *rpc.Server
-
-	wsListener net.Listener
-	wsHandler  *rpc.Server
-
-	httpEndpoint = ""
-	wsEndpoint   = ""
-
+	rpcAPIs          []rpc.API
+	httpListener     net.Listener
+	httpHandler      *rpc.Server
+	wsListener       net.Listener
+	wsHandler        *rpc.Server
+	httpEndpoint     = ""
+	wsEndpoint       = ""
 	httpModules      = []string{"hmy", "net", "explorer"}
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
 	httpOrigins      = []string{"*"}
-
-	wsModules = []string{"net", "web3"}
-	wsOrigins = []string{"*"}
-
-	harmony *hmy.Harmony
+	wsModules        = []string{"net", "web3"}
+	wsOrigins        = []string{"*"}
+	harmony          *hmy.Harmony
 )
 
 // IsCurrentlyLeader exposes if node is currently the leader node
@@ -51,10 +47,27 @@ func (node *Node) IsCurrentlyLeader() bool {
 }
 
 // ErroredStakingTransactionSink is the inmemory failed staking transactions this node has
-func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError {
+func (node *Node) ErroredStakingTransactionSink() (result []staking.RPCTransactionError) {
 	node.errorSink.Lock()
 	defer node.errorSink.Unlock()
-	return node.errorSink.failedTxns
+	node.errorSink.failedStakingTxns.Do(func(d interface{}) {
+		if d != nil {
+			result = append(result, d.(staking.RPCTransactionError))
+		}
+	})
+	return result
+}
+
+// ErroredTransactionSink is the inmemory failed transactions this node has
+func (node *Node) ErroredTransactionSink() (result []types.RPCTransactionError) {
+	node.errorSink.Lock()
+	defer node.errorSink.Unlock()
+	node.errorSink.failedTxns.Do(func(d interface{}) {
+		if d != nil {
+			result = append(result, d.(types.RPCTransactionError))
+		}
+	})
+	return result
 }
 
 // IsBeaconChainExplorerNode ..
@@ -117,7 +130,6 @@ func (node *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, c
 	// All listeners booted successfully
 	httpListener = listener
 	httpHandler = handler
-
 	return nil
 }
 
@@ -126,7 +138,6 @@ func (node *Node) stopHTTP() {
 	if httpListener != nil {
 		httpListener.Close()
 		httpListener = nil
-
 		utils.Logger().Info().Str("url", fmt.Sprintf("http://%s", httpEndpoint)).Msg("HTTP endpoint closed")
 	}
 	if httpHandler != nil {
@@ -149,7 +160,6 @@ func (node *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsO
 	// All listeners booted successfully
 	wsListener = listener
 	wsHandler = handler
-
 	return nil
 }
 
@@ -158,7 +168,6 @@ func (node *Node) stopWS() {
 	if wsListener != nil {
 		wsListener.Close()
 		wsListener = nil
-
 		utils.Logger().Info().Str("url", fmt.Sprintf("ws://%s", wsEndpoint)).Msg("WebSocket endpoint closed")
 	}
 	if wsHandler != nil {
@@ -172,7 +181,6 @@ func (node *Node) stopWS() {
 func (node *Node) APIs() []rpc.API {
 	// Gather all the possible APIs to surface
 	apis := hmyapi.GetAPIs(harmony.APIBackend)
-
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
 		{
