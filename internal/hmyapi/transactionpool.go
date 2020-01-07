@@ -73,35 +73,33 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
-func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) *hexutil.Uint {
+func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) int {
 	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
-		n := hexutil.Uint(len(block.Transactions()))
-		return &n
+		return len(block.Transactions())
 	}
-	return nil
+	return 0
 }
 
 // GetBlockTransactionCountByHash returns the number of transactions in the block with the given hash.
-func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Context, blockHash common.Hash) *hexutil.Uint {
+func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Context, blockHash common.Hash) int {
 	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
-		n := hexutil.Uint(len(block.Transactions()))
-		return &n
+		return len(block.Transactions())
 	}
-	return nil
+	return 0
 }
 
 // GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
-func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index hexutil.Uint) *RPCTransaction {
+func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index uint64) *RPCTransaction {
 	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
-		return newRPCTransactionFromBlockIndex(block, uint64(index))
+		return newRPCTransactionFromBlockIndex(block, index)
 	}
 	return nil
 }
 
 // GetTransactionByBlockHashAndIndex returns the transaction for the given block hash and index.
-func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index hexutil.Uint) *RPCTransaction {
+func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index uint64) *RPCTransaction {
 	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
-		return newRPCTransactionFromBlockIndex(block, uint64(index))
+		return newRPCTransactionFromBlockIndex(block, index)
 	}
 	return nil
 }
@@ -126,23 +124,23 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 }
 
 // GetTransactionCount returns the number of transactions the given address has sent for the given block number
-func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr string, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
+func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr string, blockNr rpc.BlockNumber) (uint64, error) {
 	address := internal_common.ParseAddr(addr)
 	// Ask transaction pool for the nonce which includes pending transactions
 	if blockNr == rpc.PendingBlockNumber {
 		nonce, err := s.b.GetPoolNonce(ctx, address)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
-		return (*hexutil.Uint64)(&nonce), nil
+		return nonce, nil
 	}
 	// Resolve block number and use its state to ask for the nonce
 	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
 	if state == nil || err != nil {
-		return nil, err
+		return 0, err
 	}
 	nonce := state.GetNonce(address)
-	return (*hexutil.Uint64)(&nonce), state.Error()
+	return nonce, state.Error()
 }
 
 // SendTransaction creates a transaction for the given argument, sign it and submit it to the
@@ -156,7 +154,7 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 		return common.Hash{}, err
 	}
 
-	if args.Nonce == nil {
+	if &args.Nonce == nil {
 		// Hold the addresse's mutex around signing to prevent concurrent assignment of
 		// the same nonce to multiple accounts.
 		s.nonceLock.LockAddr(args.From)
@@ -230,12 +228,12 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	}
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
-		"blockNumber":       hexutil.Uint64(blockNumber),
+		"blockNumber":       blockNumber,
 		"transactionHash":   hash,
-		"transactionIndex":  hexutil.Uint64(index),
+		"transactionIndex":  index,
 		"shardID":           tx.ShardID(),
-		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
-		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
+		"gasUsed":           receipt.GasUsed,
+		"cumulativeGasUsed": receipt.CumulativeGasUsed,
 		"contractAddress":   nil,
 		"logs":              receipt.Logs,
 		"logsBloom":         receipt.Bloom,
@@ -257,7 +255,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	if len(receipt.PostState) > 0 {
 		fields["root"] = hexutil.Bytes(receipt.PostState)
 	} else {
-		fields["status"] = hexutil.Uint(receipt.Status)
+		fields["status"] = receipt.Status
 	}
 	if receipt.Logs == nil {
 		fields["logs"] = [][]*types.Log{}
