@@ -30,7 +30,7 @@ func (s *PrivateAccountAPI) NewAccount(password string) (common.Address, error) 
 // tries to sign it with the key associated with args.To. If the given passwd isn't
 // able to decrypt the key it fails.
 func (s *PrivateAccountAPI) SendTransaction(ctx context.Context, args SendTxArgs, passwd string) (common.Hash, error) {
-	if args.Nonce == nil {
+	if &args.Nonce == nil {
 		// Hold the addresse's mutex around signing to prevent concurrent assignment of
 		// the same nonce to multiple accounts.
 		s.nonceLock.LockAddr(args.From)
@@ -41,7 +41,7 @@ func (s *PrivateAccountAPI) SendTransaction(ctx context.Context, args SendTxArgs
 		utils.Logger().Warn().
 			Str("from", args.From.Hex()).
 			Str("to", args.To.Hex()).
-			Uint64("value", args.Value.ToInt().Uint64()).
+			Uint64("value", args.Value.Uint64()).
 			AnErr("err", err).
 			Msg("Failed transaction send attempt")
 		return common.Hash{}, err

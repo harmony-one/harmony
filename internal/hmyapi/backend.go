@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -60,7 +59,7 @@ type Backend interface {
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
 	// Get balance
-	GetBalance(address common.Address) (*hexutil.Big, error)
+	GetBalance(address common.Address) (*big.Int, error)
 	// Get validators for a particular epoch
 	GetValidators(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
