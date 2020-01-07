@@ -227,7 +227,11 @@ func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 // CommitTransactions commits transactions including staking transactions.
 func (w *Worker) CommitTransactions(
-	txs types.Transactions, stakingTxns staking.StakingTransactions, coinbase common.Address) error {
+	txs types.Transactions,
+	stakingTxns staking.StakingTransactions,
+	coinbase common.Address,
+	txnErrorSink func([]types.RPCTransactionError),
+) error {
 	// Must update to the correct current state before processing potential txns
 	if err := w.UpdateCurrent(coinbase); err != nil {
 		utils.Logger().Error().
@@ -239,9 +243,17 @@ func (w *Worker) CommitTransactions(
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
+	erroredTxns := []types.RPCTransactionError{}
+
 	for _, tx := range txs {
 		snap := w.current.state.Snapshot()
 		_, err := w.commitTransaction(tx, coinbase)
+		if err != nil {
+			erroredTxns = append(erroredTxns, types.RPCTransactionError{
+				tx.Hash().Hex(), time.Now().Unix(), err.Error(),
+			})
+		}
+
 		if err != nil {
 			w.current.state.RevertToSnapshot(snap)
 			return err
@@ -252,6 +264,7 @@ func (w *Worker) CommitTransactions(
 		_ = stakingTx
 		// TODO: add logic to commit staking txns
 	}
+	txnErrorSink(erroredTxns)
 	return nil
 }
 

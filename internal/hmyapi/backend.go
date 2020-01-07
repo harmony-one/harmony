@@ -73,6 +73,7 @@ type Backend interface {
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
+	GetCurrentTransactionErrorSink() []types.RPCTransactionError
 }
 
 // GetAPIs returns all the APIs.

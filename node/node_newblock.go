@@ -82,8 +82,16 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare transactions including staking transactions
 	selectedTxs, selectedStakingTxs := node.getTransactionsForNewBlock(coinbase)
-
-	if err := node.Worker.CommitTransactions(selectedTxs, selectedStakingTxs, coinbase); err != nil {
+	if err := node.Worker.CommitTransactions(
+		selectedTxs, selectedStakingTxs, coinbase,
+		func(payload []types.RPCTransactionError) {
+			node.errorSink.Lock()
+			for i := range payload {
+				node.errorSink.failedTxns.Value = payload[i]
+				node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
+			}
+		},
+	); err != nil {
 		ctxerror.Log15(utils.GetLogger().Error,
 			ctxerror.New("cannot commit transactions").
 				WithCause(err))
