@@ -243,28 +243,22 @@ func (w *Worker) CommitTransactions(
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
-	erroredTxns := []types.RPCTransactionError{}
 
 	for _, tx := range txs {
 		snap := w.current.state.Snapshot()
 		_, err := w.commitTransaction(tx, coinbase)
 		if err != nil {
-			erroredTxns = append(erroredTxns, types.RPCTransactionError{
+			txnErrorSink([]types.RPCTransactionError{{
 				tx.Hash().Hex(), time.Now().Unix(), err.Error(),
-			})
-		}
-
-		if err != nil {
+			}})
 			w.current.state.RevertToSnapshot(snap)
 			return err
-
 		}
 	}
 	for _, stakingTx := range stakingTxns {
 		_ = stakingTx
 		// TODO: add logic to commit staking txns
 	}
-	txnErrorSink(erroredTxns)
 	return nil
 }
 
