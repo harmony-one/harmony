@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -68,6 +69,11 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 }
 
 // GetCurrentTransactionErrorSink ..
-func (s *PublicHarmonyAPI) GetCurrentTransactionErrorSink() []staking.RPCTransactionError {
-	return s.b.GetCurrentStakingTransactionErrorSink()
+func (s *PublicHarmonyAPI) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+	return s.b.GetCurrentTransactionErrorSink()
+}
+
+// GetCurrentStakingErrorSink ..
+func (s *PublicHarmonyAPI) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
+	return s.b.GetCurrentStakingErrorSink()
 }

@@ -409,8 +409,8 @@ func (b *APIBackend) GetShardState() (*shard.State, error) {
 	return b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentHeader().Epoch())
 }
 
-// GetCurrentStakingTransactionErrorSink ..
-func (b *APIBackend) GetCurrentStakingTransactionErrorSink() []staking.RPCTransactionError {
+// GetCurrentStakingErrorSink ..
+func (b *APIBackend) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
 	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
 }
 
