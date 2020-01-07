@@ -168,6 +168,7 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		Gas:       tx.Gas(),
 		GasPrice:  tx.GasPrice(),
 		Hash:      tx.Hash(),
+		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     tx.Nonce(),
 		Value:     tx.Value(),
 		ShardID:   tx.ShardID(),
