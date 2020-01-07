@@ -414,6 +414,11 @@ func (b *APIBackend) GetCurrentStakingTransactionErrorSink() []staking.RPCTransa
 	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
 }
 
+// GetCurrentTransactionErrorSink ..
+func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+	return b.hmy.nodeAPI.ErroredTransactionSink()
+}
+
 // IsBeaconChainExplorerNode ..
 func (b *APIBackend) IsBeaconChainExplorerNode() bool {
 	return b.hmy.nodeAPI.IsBeaconChainExplorerNode()

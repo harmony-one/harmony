@@ -123,13 +123,19 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	if err := node.Worker.CommitTransactions(
 		pending, pendingStakingTransactions, beneficiary,
-		func(payload staking.RPCTransactionError) {
-			const maxSize = 1024
+		func(payload []staking.RPCTransactionError) {
 			node.errorSink.Lock()
-			if l := len(node.errorSink.failedTxns); l >= maxSize {
-				node.errorSink.failedTxns = append(node.errorSink.failedTxns[1:], payload)
-			} else {
-				node.errorSink.failedTxns = append(node.errorSink.failedTxns, payload)
+			for i := range payload {
+				node.errorSink.failedStakingTxns.Value = payload[i]
+				node.errorSink.failedStakingTxns = node.errorSink.failedStakingTxns.Next()
+			}
+			node.errorSink.Unlock()
+		},
+		func(payload []types.RPCTransactionError) {
+			node.errorSink.Lock()
+			for i := range payload {
+				node.errorSink.failedTxns.Value = payload[i]
+				node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
 			}
 			node.errorSink.Unlock()
 		},

@@ -17,22 +17,18 @@ import (
 // Harmony implements the Harmony full node service.
 type Harmony struct {
 	// Channel for shutting down the service
-	shutdownChan  chan bool                      // Channel for shutting down the Harmony
-	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-
+	shutdownChan   chan bool                      // Channel for shutting down the Harmony
+	bloomRequests  chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
 	blockchain     *core.BlockChain
 	txPool         *core.TxPool
 	cxPool         *core.CxPool
 	accountManager *accounts.Manager
 	eventMux       *event.TypeMux
 	// DB interfaces
-	chainDb ethdb.Database // Block chain database
-
+	chainDb      ethdb.Database     // Block chain database
 	bloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
 	APIBackend   *APIBackend
-
-	nodeAPI NodeAPI
-
+	nodeAPI      NodeAPI
 	// aka network version, which is used to identify which network we are using
 	networkID uint64
 	// TODO(ricl): put this into config object
@@ -53,6 +49,7 @@ type NodeAPI interface {
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	IsCurrentlyLeader() bool
 	ErroredStakingTransactionSink() []staking.RPCTransactionError
+	ErroredTransactionSink() []types.RPCTransactionError
 	IsBeaconChainExplorerNode() bool
 }
 
@@ -77,9 +74,7 @@ func New(
 		networkID:      1, // TODO(ricl): this should be from config
 		shardID:        shardID,
 	}
-
 	hmy.APIBackend = &APIBackend{hmy}
-
 	return hmy, nil
 }
 

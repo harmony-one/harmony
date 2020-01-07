@@ -1,6 +1,7 @@
 package node
 
 import (
+	"container/ring"
 	"crypto/ecdsa"
 	"fmt"
 	"os"
@@ -220,7 +221,8 @@ type Node struct {
 	// Last 1024 staking transaction error, only in memory
 	errorSink struct {
 		sync.Mutex
-		failedTxns []staking.RPCTransactionError
+		failedStakingTxns *ring.Ring
+		failedTxns        *ring.Ring
 	}
 }
 
@@ -289,7 +291,8 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
 	txPoolLimit := 1000 // TODO: incorporate staking txn into TxPool
 
-	if node.NodeConfig.ShardID == 0 && node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
 		node.pendingStakingTxMutex.Lock()
 		for _, tx := range newStakingTxs {
 			if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
@@ -396,11 +399,12 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(host p2p.Host, consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
+	const sinkSize = 1024
 	node.errorSink = struct {
 		sync.Mutex
-		failedTxns []staking.RPCTransactionError
-	}{}
-
+		failedStakingTxns *ring.Ring
+		failedTxns        *ring.Ring
+	}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)}
 	node.syncFreq = SyncFrequency
 	node.beaconSyncFreq = SyncFrequency
 
