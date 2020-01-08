@@ -289,17 +289,13 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
-	txPoolLimit := 1000 // TODO: incorporate staking txn into TxPool
-
+	// TODO: incorporate staking txn into TxPool
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
 		node.pendingStakingTxMutex.Lock()
 		for _, tx := range newStakingTxs {
 			if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
 				node.pendingStakingTransactions[tx.Hash()] = tx
-			}
-			if len(node.pendingStakingTransactions) > txPoolLimit {
-				break
 			}
 		}
 		utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingStakingTransactions)).Msg("Got more staking transactions")
@@ -311,7 +307,16 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 func (node *Node) AddPendingStakingTransaction(
 	newStakingTx *staking.StakingTransaction) {
 	// TODO: everyone should record staking txns, not just leader
-	if node.Consensus.IsLeader() && node.NodeConfig.ShardID == 0 {
+	if node.Consensus.IsLeader() &&
+		node.NodeConfig.ShardID == shard.BeaconChainShardID {
+		const txPoolLimit = 1000
+		if s := len(node.pendingStakingTransactions); s > txPoolLimit {
+			utils.Logger().Info().
+				Int("tx-pool-size", s).
+				Int("tx-pool-limit", txPoolLimit).
+				Msg("Current staking txn pool reached limit")
+			return
+		}
 		node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
 	} else {
 		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
