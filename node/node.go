@@ -310,7 +310,7 @@ func (node *Node) AddPendingStakingTransaction(
 	if node.Consensus.IsLeader() &&
 		node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		const txPoolLimit = 1000
-		if s := len(node.pendingStakingTransactions); s > txPoolLimit {
+		if s := len(node.pendingStakingTransactions); s >= txPoolLimit {
 			utils.Logger().Info().
 				Int("tx-pool-size", s).
 				Int("tx-pool-limit", txPoolLimit).
@@ -370,6 +370,16 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	}
 
 	key := utils.GetPendingCXKey(shardID, blockNum)
+
+	// DDoS protection
+	const maxCrossTxnSize = 4096
+	if s := len(node.pendingCXReceipts); s >= maxCrossTxnSize {
+		utils.Logger().Info().
+			Int("pending-cx-receipts-size", s).
+			Int("pending-cx-receipts-limit", maxCrossTxnSize).
+			Msg("Current pending cx-receipts reached size limit")
+		return
+	}
 
 	if _, ok := node.pendingCXReceipts[key]; ok {
 		utils.Logger().Info().
