@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -355,6 +357,13 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	shardID := receipts.Header.ShardID()
 
 	// Sanity checks
+
+	if err := node.Blockchain().Validator().ValidateCXReceiptsProof(receipts); err != nil {
+		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
+			utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			return
+		}
+	}
 
 	// cross-shard receipt should not be coming from our shard
 	if s := node.Consensus.ShardID; s == shardID {
