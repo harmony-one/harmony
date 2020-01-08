@@ -187,7 +187,7 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	merkleProof := cxp.MerkleProof
 	shardRoot := common.Hash{}
 	foundMatchingShardID := false
-	byteBuffer := bytes.NewBuffer([]byte{})
+	byteBuffer := bytes.Buffer{}
 
 	// prepare to calculate source shard outgoing cxreceipts root hash
 	for j := 0; j < len(merkleProof.ShardIDs); j++ {
