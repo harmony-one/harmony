@@ -360,7 +360,8 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	if s := node.Consensus.ShardID; s == shardID {
 		utils.Logger().Info().
 			Uint32("my-shard", s).
-			Msg("Already Got Same Receipt message")
+			Uint32("receipt-shard", shardID).
+			Msg("ShardID of incoming receipt was same as mine")
 		return
 	}
 
