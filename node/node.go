@@ -342,20 +342,45 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	defer node.pendingCXMutex.Unlock()
 
 	if receipts.ContainsEmptyField() {
-		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("CXReceiptsProof contains empty field")
+		utils.Logger().Info().
+			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
+			Msg("CXReceiptsProof contains empty field")
 		return
 	}
 
 	blockNum := receipts.Header.Number().Uint64()
 	shardID := receipts.Header.ShardID()
+
+	// Sanity checks
+
+	// cross-shard receipt should not be coming from our shard
+	if s := node.Consensus.ShardID; s == shardID {
+		utils.Logger().Info().
+			Uint32("my-shard", s).
+			Msg("Already Got Same Receipt message")
+		return
+	}
+
+	if e := receipts.Header.Epoch(); blockNum == 0 ||
+		!node.Blockchain().Config().IsCrossLink(e) {
+		utils.Logger().Info().
+			Uint64("incoming-epoch", e.Uint64()).
+			Msg("Incoming receipt had meaningless epoch")
+		return
+	}
+
 	key := utils.GetPendingCXKey(shardID, blockNum)
 
 	if _, ok := node.pendingCXReceipts[key]; ok {
-		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Already Got Same Receipt message")
+		utils.Logger().Info().
+			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
+			Msg("Already Got Same Receipt message")
 		return
 	}
 	node.pendingCXReceipts[key] = receipts
-	utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
+	utils.Logger().Info().
+		Int("totalPendingReceipts", len(node.pendingCXReceipts)).
+		Msg("Got ONE more receipt message")
 }
 
 func (node *Node) startRxPipeline(
