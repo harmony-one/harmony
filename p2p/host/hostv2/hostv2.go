@@ -5,6 +5,7 @@ package hostv2
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -88,11 +89,13 @@ func (host *HostV2) getTopic(topic string) (topicHandle, error) {
 	host.lock.Lock()
 	defer host.lock.Unlock()
 	if t, ok := host.joined[topic]; ok {
+		host.logger.Info().Str("topic", topic).Msg("Found Topic")
 		return t, nil
 	} else if t, err := host.joiner.JoinTopic(topic); err != nil {
 		return nil, errors.Wrapf(err, "cannot join pubsub topic %x", topic)
 	} else {
 		host.joined[topic] = t
+		host.logger.Info().Str("topic", topic).Msg("Joined Topic")
 		return t, nil
 	}
 }
@@ -226,7 +229,16 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
-	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost)
+	traceFile := os.Getenv("P2P_TRACEFILE")
+	var options = make([]libp2p_pubsub.Option, 0, 0)
+	// increase the peer outbound queue size from default 32 to 64
+	options = append(options, libp2p_pubsub.WithPeerOutboundQueueSize(64))
+
+	if len(traceFile) > 0 {
+		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
+		options = append(options, libp2p_pubsub.WithEventTracer(tracer))
+	}
+	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p pubsub")
 	}
