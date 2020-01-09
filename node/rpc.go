@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/hmyapi"
@@ -135,6 +136,18 @@ func (node *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsO
 	wsHandler = handler
 
 	return nil
+}
+
+// ErroredTransactionSink is the inmemory failed transactions this node has
+func (node *Node) ErroredTransactionSink() (result []types.RPCTransactionError) {
+	node.errorSink.Lock()
+	defer node.errorSink.Unlock()
+	node.errorSink.failedTxns.Do(func(d interface{}) {
+		if d != nil {
+			result = append(result, d.(types.RPCTransactionError))
+		}
+	})
+	return result
 }
 
 // stopWS terminates the websocket RPC endpoint.

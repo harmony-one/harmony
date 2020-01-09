@@ -289,3 +289,8 @@ func (b *APIBackend) SendStakingTx(
 	b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
 	return nil
 }
+
+// GetCurrentTransactionErrorSink ..
+func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+	return b.hmy.nodeAPI.ErroredTransactionSink()
+}
