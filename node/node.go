@@ -1,6 +1,7 @@
 package node
 
 import (
+	"container/ring"
 	"crypto/ecdsa"
 	"fmt"
 	"sync"
@@ -240,6 +241,10 @@ type Node struct {
 
 	// last time consensus reached for metrics
 	lastConsensusTime int64
+	errorSink         struct {
+		sync.Mutex
+		failedTxns *ring.Ring
+	}
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -466,9 +471,13 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
-
+	const sinkSize = 1024
 	node.syncFreq = SyncFrequency
 	node.beaconSyncFreq = SyncFrequency
+	node.errorSink = struct {
+		sync.Mutex
+		failedTxns *ring.Ring
+	}{sync.Mutex{}, ring.New(sinkSize)}
 
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {

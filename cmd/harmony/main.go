@@ -34,6 +34,9 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
+	golog "github.com/ipfs/go-log"
+	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Version string variables
@@ -121,6 +124,8 @@ var (
 
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	// Use a separate log file to log libp2p traces
+	logP2P = flag.Bool("log_p2p", false, "log libp2p debug info")
 
 	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 
@@ -504,6 +509,19 @@ func main() {
 	if *enableMemProfiling {
 		memprofiling.GetMemProfiling().Start()
 	}
+
+	if *logP2P {
+		f, err := os.OpenFile(path.Join(*logFolder, "libp2p.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to open libp2p.log. %v\n", err)
+		} else {
+			defer f.Close()
+			backend1 := gologging.NewLogBackend(f, "", 0)
+			gologging.SetBackend(backend1)
+			golog.SetAllLoggers(gologging.DEBUG) // Change to DEBUG for extra info
+		}
+	}
+
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 
