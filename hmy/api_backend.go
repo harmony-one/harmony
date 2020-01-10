@@ -138,12 +138,6 @@ func (b *APIBackend) ProtocolVersion() int {
 
 // GetLogs ...
 func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
-	// TODO(ricl): implement
-	return nil, nil
-}
-
-// GetLogs ...
-func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
 	receipts := b.hmy.blockchain.GetReceiptsByHash(blockHash)
 	if receipts == nil {
 		return nil, errors.New("Missing receipts")
