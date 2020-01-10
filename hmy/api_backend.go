@@ -142,15 +142,26 @@ func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*t
 	return nil, nil
 }
 
-// HeaderByHash ...
-func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*block.Header, error) {
-	// TODO(ricl): implement
-	return nil, nil
+// GetLogs ...
+func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
+	receipts := b.hmy.blockchain.GetReceiptsByHash(blockHash)
+	if receipts == nil {
+		return nil, errors.New("Missing receipts")
+	}
+	logs := make([][]*types.Log, len(receipts))
+	for i, receipt := range receipts {
+		logs[i] = receipt.Logs
+	}
+	return logs, nil
 }
 
-// ServiceFilter ...
-func (b *APIBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
-	// TODO(ricl): implement
+// HeaderByHash ...
+func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*block.Header, error) {
+	header := b.hmy.blockchain.GetHeaderByHash(blockHash)
+	if header == nil {
+		return nil, errors.New("Header is not found")
+	}
+	return header, nil
 }
 
 // SubscribeNewTxsEvent subcribes new tx event.
