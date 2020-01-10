@@ -41,11 +41,6 @@ var (
 	chainConfig  = params.TestChainConfig
 	blockFactory = blockfactory.ForTest
 
-	//StakingPriKey is the keys for the deposit contract.
-	StakingPriKey, _ = crypto.GenerateKey()
-	//StakingAddress is the address of the deposit contract.
-	StakingAddress = crypto.PubkeyToAddress(StakingPriKey.PublicKey)
-
 	// Test transactions
 	pendingTxs []*types.Transaction
 	newTxs     []*types.Transaction
@@ -124,13 +119,19 @@ func fundFaucetContract(chain *core.BlockChain) {
 		txs = append(txs, tx)
 	}
 	amount := 720000
-	tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(4), StakingAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
+	randomUserKey, _ := crypto.GenerateKey()
+	randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)
+	tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(4), randomUserAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 	txs = append(txs, tx)
 
 	txmap := make(map[common.Address]types.Transactions)
 	txmap[FaucetAddress] = txs
 
-	err := contractworker.CommitTransactions(txmap, nil, testUserAddress, func(staking.RPCTransactionError) {})
+	err := contractworker.CommitTransactions(
+		txmap, nil, testUserAddress,
+		func([]staking.RPCTransactionError) {},
+		func([]types.RPCTransactionError) {},
+	)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -146,8 +147,6 @@ func fundFaucetContract(chain *core.BlockChain) {
 	fmt.Println(state.GetBalance(faucetContractAddress))
 	fmt.Println("user address balance")
 	fmt.Println(state.GetBalance(allRandomUserAddress[0]))
-	fmt.Println("staking address balance")
-	fmt.Println(state.GetBalance(StakingAddress))
 	fmt.Println()
 	fmt.Println("--------- Funding addresses for Faucet Contract Call DONE ---------")
 }
@@ -171,7 +170,11 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	txmap := make(map[common.Address]types.Transactions)
 	txmap[FaucetAddress] = types.Transactions{callfaucettx}
 
-	err = contractworker.CommitTransactions(txmap, nil, testUserAddress, func(staking.RPCTransactionError) {})
+	err = contractworker.CommitTransactions(
+		txmap, nil, testUserAddress,
+		func([]staking.RPCTransactionError) {},
+		func([]types.RPCTransactionError) {},
+	)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -189,8 +192,6 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	fmt.Println(state.GetBalance(faucetContractAddress))
 	fmt.Println("user address balance")
 	fmt.Println(state.GetBalance(allRandomUserAddress[0]))
-	fmt.Println("staking address balance")
-	fmt.Println(state.GetBalance(StakingAddress))
 	fmt.Println()
 	fmt.Println("--------- Faucet Contract Call DONE ---------")
 }

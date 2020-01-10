@@ -52,7 +52,8 @@ type Worker struct {
 func (w *Worker) CommitTransactions(
 	pendingNormal map[common.Address]types.Transactions,
 	pendingStaking staking.StakingTransactions, coinbase common.Address,
-	stkingTxErrorSink func(staking.RPCTransactionError),
+	stkingTxErrorSink func([]staking.RPCTransactionError),
+	txnErrorSink func([]types.RPCTransactionError),
 ) error {
 
 	if w.current.gasPool == nil {
@@ -60,9 +61,9 @@ func (w *Worker) CommitTransactions(
 	}
 
 	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
-
-	var coalescedLogs []*types.Log
-
+	coalescedLogs := []*types.Log{}
+	erroredTxns := []types.RPCTransactionError{}
+	erroredStakingTxns := []staking.RPCTransactionError{}
 	// NORMAL
 	for {
 		// If we don't have enough gas for any further transactions then we're done
@@ -77,14 +78,12 @@ func (w *Worker) CommitTransactions(
 		}
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
-		//
 		// We use the eip155 signer regardless of the current hf.
 		from, _ := types.Sender(w.current.signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Number()) {
 			utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
-
 			txs.Pop()
 			continue
 		}
@@ -97,6 +96,11 @@ func (w *Worker) CommitTransactions(
 		}
 
 		logs, err := w.commitTransaction(tx, coinbase)
+		if err != nil {
+			erroredTxns = append(erroredTxns, types.RPCTransactionError{
+				tx.Hash().Hex(), time.Now().Unix(), err.Error(),
+			})
+		}
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
 		case core.ErrGasLimitReached:
@@ -131,8 +135,9 @@ func (w *Worker) CommitTransactions(
 	if w.chain.ShardID() == shard.BeaconChainShardID {
 		for _, tx := range pendingStaking {
 			logs, err := w.commitStakingTransaction(tx, coinbase)
-			if txID := tx.Hash().Hex(); err != nil {
-				stkingTxErrorSink(staking.RPCTransactionError{
+			if err != nil {
+				txID := tx.Hash().Hex()
+				erroredStakingTxns = append(erroredStakingTxns, staking.RPCTransactionError{
 					TxHashID:             txID,
 					StakingDirective:     tx.StakingType().String(),
 					TimestampOfRejection: time.Now().Unix(),
@@ -149,9 +154,15 @@ func (w *Worker) CommitTransactions(
 			}
 		}
 	}
+	// Here call the error functions
+	stkingTxErrorSink(erroredStakingTxns)
+	txnErrorSink(erroredTxns)
 
-	utils.Logger().Info().Int("newTxns", len(w.current.txs)).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("Block gas limit and usage info")
-
+	utils.Logger().Info().
+		Int("newTxns", len(w.current.txs)).
+		Uint64("blockGasLimit", w.current.header.GasLimit()).
+		Uint64("blockGasUsed", w.current.header.GasUsed()).
+		Msg("Block gas limit and usage info")
 	return nil
 }
 

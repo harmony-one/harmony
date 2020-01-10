@@ -189,12 +189,16 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		receipt.ContractAddress = crypto.CreateAddress(vmenv.Context.Origin, tx.Nonce())
 	}
 	// Set the receipt logs and create a bloom for filtering
+<<<<<<< HEAD
 	//receipt.Logs = statedb.GetLogs(tx.Hash())
+=======
+>>>>>>> cf7d737c8810b26ce1adfab7f8c61d0dcabf6159
 	receipt.Logs = statedb.GetLogs(tx.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
 	var cxReceipt *types.CXReceipt
-	if txType == types.SubtractionOnly {
+	// Do not create cxReceipt if EVM call failed
+	if txType == types.SubtractionOnly && !failed {
 		cxReceipt = &types.CXReceipt{tx.Hash(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
 	} else {
 		cxReceipt = nil

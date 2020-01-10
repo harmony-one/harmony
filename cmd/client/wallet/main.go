@@ -291,7 +291,7 @@ func readProfile(profile string) {
 func createWalletNode() *node.Node {
 	bootNodeAddrs, err := p2putils.StringsToAddrs(walletProfile.Bootnodes)
 	if err != nil {
-		panic(err)
+		utils.FatalErrMsg(err, "cannot parse bootnodes %#v", walletProfile.Bootnodes)
 	}
 	p2putils.BootNodes = bootNodeAddrs
 	shardID := 0
@@ -303,7 +303,7 @@ func createWalletNode() *node.Node {
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", port)
 	host, err := p2pimpl.NewHost(&self, priKey)
 	if err != nil {
-		panic(err)
+		utils.FatalErrMsg(err, "cannot initialize network")
 	}
 	chainDBFactory := &shardchain.MemDBFactory{}
 	w := node.New(host, nil, chainDBFactory, false)
@@ -361,11 +361,11 @@ func _exportAccount(account accounts.Account) {
 		filename := fmt.Sprintf(".hmy/%s.key", common2.MustAddressToBech32(account.Address))
 		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			panic("Failed to open keystore")
+			utils.FatalErrMsg(err, "cannot open exported key file %s", filename)
 		}
 		_, err = f.Write(data)
 		if err != nil {
-			panic("Failed to write to keystore")
+			utils.FatalErrMsg(err, "cannot write to exported key file %s", filename)
 		}
 		if err := f.Close(); err != nil {
 			fmt.Println(ctxerror.New("cannot close key file",
@@ -489,12 +489,12 @@ func processImportCommnad() {
 
 	data, err := ioutil.ReadFile(priKey)
 	if err != nil {
-		panic("Failed to readfile")
+		utils.FatalErrMsg(err, "cannot load private key file %s", priKey)
 	}
 
 	account, err := ks.Import(data, pass, pass)
 	if err != nil {
-		panic("Failed to import the private key")
+		utils.FatalErrMsg(err, "cannot import private key in file %s", priKey)
 	}
 	fmt.Printf("Private key imported for account: %s\n", common2.MustAddressToBech32(account.Address))
 }
@@ -955,7 +955,7 @@ func GetFreeToken(address common.Address) {
 func clearKeystore() {
 	dir, err := ioutil.ReadDir(keystoreDir)
 	if err != nil {
-		panic("Failed to read keystore directory")
+		utils.FatalErrMsg(err, "cannot read keystore directory %s", keystoreDir)
 	}
 	for _, d := range dir {
 		subdir := path.Join([]string{keystoreDir, d.Name()}...)

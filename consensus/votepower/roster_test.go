@@ -29,14 +29,14 @@ var (
 func init() {
 	for i := 0; i < harmonyNodes; i++ {
 		newSlot := generateRandomSlot()
-		newSlot.TotalStake = nil
+		newSlot.EffectiveStake = nil
 		slotList = append(slotList, newSlot)
 	}
 
 	totalStake = numeric.ZeroDec()
 	for j := 0; j < stakedNodes; j++ {
 		newSlot := generateRandomSlot()
-		totalStake = totalStake.Add(*newSlot.TotalStake)
+		totalStake = totalStake.Add(*newSlot.EffectiveStake)
 		slotList = append(slotList, newSlot)
 	}
 }
@@ -67,9 +67,9 @@ func TestCompute(t *testing.T) {
 			EffectiveStake:   numeric.ZeroDec(),
 		}
 		// Not Harmony node
-		if slot.TotalStake != nil {
-			newMember.EffectiveStake = *slot.TotalStake
-			newMember.EffectivePercent = slot.TotalStake.Quo(expectedRoster.RawStakedTotal).Mul(StakersShare)
+		if slot.EffectiveStake != nil {
+			newMember.EffectiveStake = *slot.EffectiveStake
+			newMember.EffectivePercent = slot.EffectiveStake.Quo(expectedRoster.RawStakedTotal).Mul(StakersShare)
 			expectedRoster.TheirVotingPowerTotalPercentage = expectedRoster.TheirVotingPowerTotalPercentage.Add(newMember.EffectivePercent)
 		} else {
 			// Harmony node

@@ -280,7 +280,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				return
 			}
 
-			if !consensus.Decider.IsQuorumAchievedByMask(mask) {
+			if !consensus.Decider.IsQuorumAchievedByMask(mask, true) {
 				consensus.getLogger().Warn().
 					Msgf("[onViewChange] Quorum Not achieved")
 				return
@@ -347,7 +347,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		Msg("[onViewChange]")
 
 	// received enough view change messages, change state to normal consensus
-	if consensus.Decider.IsQuorumAchievedByMask(consensus.viewIDBitmap[recvMsg.ViewID]) {
+	if consensus.Decider.IsQuorumAchievedByMask(consensus.viewIDBitmap[recvMsg.ViewID], true) {
 		consensus.current.SetMode(Normal)
 		consensus.LeaderPubKey = consensus.PubKey
 		consensus.ResetState()
@@ -443,7 +443,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 
-	if !consensus.Decider.IsQuorumAchievedByMask(m3Mask) {
+	if !consensus.Decider.IsQuorumAchievedByMask(m3Mask, true) {
 		consensus.getLogger().Warn().
 			Msgf("[onNewView] Quorum Not achieved")
 		return

@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harmony-one/harmony/shard"
-
 	types2 "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,6 +21,7 @@ type RPCTransaction struct {
 	BlockHash        common.Hash    `json:"blockHash"`
 	BlockNumber      *hexutil.Big   `json:"blockNumber"`
 	From             string         `json:"from"`
+	Timestamp        hexutil.Uint64 `json:"timestamp"`
 	Gas              hexutil.Uint64 `json:"gas"`
 	GasPrice         *hexutil.Big   `json:"gasPrice"`
 	Hash             common.Hash    `json:"hash"`
@@ -43,6 +42,7 @@ type RPCStakingTransaction struct {
 	BlockHash        common.Hash            `json:"blockHash"`
 	BlockNumber      *hexutil.Big           `json:"blockNumber"`
 	From             string                 `json:"from"`
+	Timestamp        hexutil.Uint64         `json:"timestamp"`
 	Gas              hexutil.Uint64         `json:"gas"`
 	GasPrice         *hexutil.Big           `json:"gasPrice"`
 	Hash             common.Hash            `json:"hash"`
@@ -79,23 +79,6 @@ type HeaderInformation struct {
 	UnixTime         uint64      `json:"unixtime"`
 	LastCommitSig    string      `json:"lastCommitSig"`
 	LastCommitBitmap string      `json:"lastCommitBitmap"`
-}
-
-// RPCValidator represents a validator
-type RPCValidator struct {
-	Address             string               `json:"address"`
-	SlotPubKeys         []shard.BlsPublicKey `json:"slot_pub_keys"`
-	SlotShardIDs        []int                `json:"slot_shard_ids"`
-	UnbondingHeight     *big.Int             `json:"unbonding_height"`
-	MinSelfDelegation   *big.Int             `json:"min_self_delegation"`
-	MaxTotalDelegation  *big.Int             `json:"max_total_delegation"`
-	Active              bool                 `json:"active"`
-	Commission          types2.Commission    `json:"commission"`
-	Description         types2.Description   `json:"description"`
-	CreationHeight      *big.Int             `json:"creation_height"`
-	Uptime              string               `json:"uptime"`
-	AvgVotingPower      string               `json:"avg_voting_power"`
-	TotalEffectiveStake string               `json:"total_effective_stake"`
 }
 
 // RPCDelegation represents a particular delegation to a validator
@@ -171,28 +154,9 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 	return result
 }
 
-func newRPCValidator(validator *types2.Validator) *RPCValidator {
-	addr, _ := internal_common.AddressToBech32(validator.Address)
-	return &RPCValidator{
-		addr,
-		validator.SlotPubKeys,
-		nil,
-		validator.UnbondingHeight,
-		validator.MinSelfDelegation,
-		validator.MaxTotalDelegation,
-		validator.Active,
-		validator.Commission,
-		validator.Description,
-		validator.CreationHeight,
-		"",
-		"",
-		"",
-	}
-}
-
 // newRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, index uint64) *RPCTransaction {
+func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, index uint64) *RPCTransaction {
 	var signer types.Signer = types.FrontierSigner{}
 	if tx.Protected() {
 		signer = types.NewEIP155Signer(tx.ChainID())
@@ -208,6 +172,7 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		Value:     (*hexutil.Big)(tx.Value()),
 		ShardID:   tx.ShardID(),
 		ToShardID: tx.ToShardID(),
+		Timestamp: hexutil.Uint64(timestamp),
 		V:         (*hexutil.Big)(v),
 		R:         (*hexutil.Big)(r),
 		S:         (*hexutil.Big)(s),
@@ -239,7 +204,7 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 
 // newRPCStakingTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Hash, blockNumber uint64, index uint64) *RPCStakingTransaction {
+func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, index uint64) *RPCStakingTransaction {
 	from, _ := tx.SenderAddress()
 	v, r, s := tx.RawSignatureValues()
 
@@ -302,15 +267,16 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 	}
 
 	result := &RPCStakingTransaction{
-		Gas:      hexutil.Uint64(tx.Gas()),
-		GasPrice: (*hexutil.Big)(tx.Price()),
-		Hash:     tx.Hash(),
-		Nonce:    hexutil.Uint64(tx.Nonce()),
-		V:        (*hexutil.Big)(v),
-		R:        (*hexutil.Big)(r),
-		S:        (*hexutil.Big)(s),
-		Type:     stakingTxType,
-		Msg:      fields,
+		Gas:       hexutil.Uint64(tx.Gas()),
+		GasPrice:  (*hexutil.Big)(tx.Price()),
+		Hash:      tx.Hash(),
+		Nonce:     hexutil.Uint64(tx.Nonce()),
+		Timestamp: hexutil.Uint64(timestamp),
+		V:         (*hexutil.Big)(v),
+		R:         (*hexutil.Big)(r),
+		S:         (*hexutil.Big)(s),
+		Type:      stakingTxType,
+		Msg:       fields,
 	}
 	if blockHash != (common.Hash{}) {
 		result.BlockHash = blockHash
@@ -329,7 +295,7 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 
 // newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
 func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
-	return newRPCTransaction(tx, common.Hash{}, 0, 0)
+	return newRPCTransaction(tx, common.Hash{}, 0, 0, 0)
 }
 
 // RPCBlock represents a block that will serialize to the RPC representation of a block
@@ -448,7 +414,7 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64) *RPCTransacti
 	if index >= uint64(len(txs)) {
 		return nil
 	}
-	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), index)
+	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
 }
 
 // newRPCStakingTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.
@@ -467,7 +433,7 @@ func newRPCStakingTransactionFromBlockIndex(b *types.Block, index uint64) *RPCSt
 	if index >= uint64(len(txs)) {
 		return nil
 	}
-	return newRPCStakingTransaction(txs[index], b.Hash(), b.NumberU64(), index)
+	return newRPCStakingTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
 }
 
 // CallArgs represents the arguments for a call.

@@ -111,10 +111,10 @@ type Decider interface {
 	slash.Slasher
 	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
-	SetVoters(shard.SlotList) (*TallyResult, error)
+	SetVoters(shard.SlotList, bool) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
-	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
+	IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool
 	QuorumThreshold() numeric.Dec
 	AmIMemberOfCommitee() bool
 	IsRewardThresholdAchieved() bool

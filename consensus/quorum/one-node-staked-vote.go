@@ -73,19 +73,23 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
+func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool {
 	threshold := v.QuorumThreshold()
 	currentTotalPower := v.computeTotalPowerByMask(mask)
 	if currentTotalPower == nil {
-		utils.Logger().Warn().
-			Msgf("[IsQuorumAchievedByMask] currentTotalPower is nil")
+		if debug { // temp for remove debug info on crosslink verification
+			utils.Logger().Warn().
+				Msgf("[IsQuorumAchievedByMask] currentTotalPower is nil")
+		}
 		return false
 	}
-	utils.Logger().Info().
-		Str("policy", v.Policy().String()).
-		Str("threshold", threshold.String()).
-		Str("total-power-of-signers", currentTotalPower.String()).
-		Msg("[IsQuorumAchievedByMask] Checking quorum")
+	if debug {
+		utils.Logger().Info().
+			Str("policy", v.Policy().String()).
+			Str("threshold", threshold.String()).
+			Str("total-power-of-signers", currentTotalPower.String()).
+			Msg("[IsQuorumAchievedByMask] Checking quorum")
+	}
 	return (*currentTotalPower).GT(threshold)
 }
 
@@ -169,7 +173,7 @@ var (
 )
 
 func (v *stakedVoteWeight) SetVoters(
-	staked shard.SlotList,
+	staked shard.SlotList, debug bool,
 ) (*TallyResult, error) {
 	s, _ := v.ShardIDProvider()()
 	v.ResetPrepareAndCommitVotes()
@@ -179,12 +183,14 @@ func (v *stakedVoteWeight) SetVoters(
 	if err != nil {
 		return nil, err
 	}
-	utils.Logger().Info().
-		Str("our-percentage", roster.OurVotingPowerTotalPercentage.String()).
-		Str("their-percentage", roster.TheirVotingPowerTotalPercentage.String()).
-		Uint32("on-shard", s).
-		Str("Raw-Staked", roster.RawStakedTotal.String()).
-		Msg("Total staked")
+	if debug {
+		utils.Logger().Info().
+			Str("our-percentage", roster.OurVotingPowerTotalPercentage.String()).
+			Str("their-percentage", roster.TheirVotingPowerTotalPercentage.String()).
+			Uint32("on-shard", s).
+			Str("Raw-Staked", roster.RawStakedTotal.String()).
+			Msg("Total staked")
+	}
 
 	// Hold onto this calculation
 	v.roster = *roster

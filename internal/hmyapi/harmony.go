@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -52,6 +53,7 @@ type NodeMetadata struct {
 	ChainID      string `json:"chainid"`
 	IsLeader     bool   `json:"is-leader"`
 	ShardID      uint32 `json:"shard-id"`
+	Role         string `json:"role"`
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
@@ -64,10 +66,16 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		s.b.ChainConfig().ChainID.String(),
 		s.b.IsLeader(),
 		s.b.GetShardID(),
+		cfg.Role().String(),
 	}
 }
 
 // GetCurrentTransactionErrorSink ..
-func (s *PublicHarmonyAPI) GetCurrentTransactionErrorSink() []staking.RPCTransactionError {
-	return s.b.GetCurrentStakingTransactionErrorSink()
+func (s *PublicHarmonyAPI) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+	return s.b.GetCurrentTransactionErrorSink()
+}
+
+// GetCurrentStakingErrorSink ..
+func (s *PublicHarmonyAPI) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
+	return s.b.GetCurrentStakingErrorSink()
 }
