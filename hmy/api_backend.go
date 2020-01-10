@@ -207,8 +207,8 @@ func (b *APIBackend) GetBalance(address common.Address) (*big.Int, error) {
 }
 
 // GetTransactionsHistory returns list of transactions hashes of address.
-func (b *APIBackend) GetTransactionsHistory(address string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address)
+func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
 	return hashes, err
 }
 
