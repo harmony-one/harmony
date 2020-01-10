@@ -1,4 +1,4 @@
-package hmyapi
+package apiv2
 
 import (
 	"encoding/hex"
@@ -199,10 +199,10 @@ type RPCBlock struct {
 // RPCMarshalBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
-func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]interface{}, error) {
+func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{}, error) {
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
-		"number":           (*big.Int)(head.Number()),
+		"number":           (*hexutil.Big)(head.Number()),
 		"hash":             b.Hash(),
 		"parentHash":       head.ParentHash(),
 		"nonce":            0, // Remove this because we don't have it in our header
@@ -212,19 +212,19 @@ func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]inter
 		"miner":            head.Coinbase(),
 		"difficulty":       0, // Remove this because we don't have it in our header
 		"extraData":        hexutil.Bytes(head.Extra()),
-		"size":             uint64(b.Size()),
-		"gasLimit":         head.GasLimit(),
-		"gasUsed":          head.GasUsed(),
-		"timestamp":        head.Time().Uint64(),
+		"size":             hexutil.Uint64(b.Size()),
+		"gasLimit":         hexutil.Uint64(head.GasLimit()),
+		"gasUsed":          hexutil.Uint64(head.GasUsed()),
+		"timestamp":        hexutil.Uint64(head.Time().Uint64()),
 		"transactionsRoot": head.TxHash(),
 		"receiptsRoot":     head.ReceiptHash(),
 	}
 
-	if inclTx {
+	if blockArgs.InclTx {
 		formatTx := func(tx *types.Transaction) (interface{}, error) {
 			return tx.Hash(), nil
 		}
-		if fullTx {
+		if blockArgs.FullTx {
 			formatTx = func(tx *types.Transaction) (interface{}, error) {
 				return newRPCTransactionFromBlockHash(b, tx.Hash()), nil
 			}
@@ -246,6 +246,7 @@ func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]inter
 		uncleHashes[i] = uncle.Hash()
 	}
 	fields["uncles"] = uncleHashes
+	
 	return fields, nil
 }
 
@@ -272,8 +273,8 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64) *RPCTransacti
 type CallArgs struct {
 	From     *common.Address `json:"from"`
 	To       *common.Address `json:"to"`
-	Gas      uint64          `json:"gas"`
-	GasPrice *big.Int        `json:"gasPrice"`
-	Value    *big.Int        `json:"value"`
+	Gas      *hexutil.Uint64 `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	Value    *hexutil.Big    `json:"value"`
 	Data     *hexutil.Bytes  `json:"data"`
 }

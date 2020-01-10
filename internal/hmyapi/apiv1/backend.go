@@ -1,4 +1,4 @@
-package hmyapi
+package apiv1
 
 import (
 	"context"
@@ -14,8 +14,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -37,6 +35,7 @@ type Backend interface {
 	AccountManager() *accounts.Manager
 	// ExtRPCEnabled() bool
 	RPCGasCap() *big.Int // global gas cap for hmy_call over rpc: DoS protection
+
 	// BlockChain API
 	// SetHead(number uint64)
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error)
@@ -49,6 +48,7 @@ type Backend interface {
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
+
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
 	// GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
@@ -58,85 +58,18 @@ type Backend interface {
 	// Stats() (pending int, queued int)
 	// TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
+
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
 	// Get balance
 	GetBalance(address common.Address) (*big.Int, error)
-	// Get validators for a particular epoch
+	// Get committee for a particular epoch
 	GetCommittee(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
 	// Get transactions history for an address
-	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	GetTransactionsHistory(address string, txType, order string) ([]common.Hash, error)
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
-}
-
-// GetAPIs returns all the APIs.
-func GetAPIs(b Backend) []rpc.API {
-	nonceLock := new(apiv1.AddrLocker)
-	nonceLockV2 := new(apiv2.AddrLocker)
-	return []rpc.API{
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicHarmonyAPI(b),
-			Public:    true,
-		},
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicBlockChainAPI(b),
-			Public:    true,
-		},
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicTransactionPoolAPI(b, nonceLock),
-			Public:    true,
-		},
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicAccountAPI(b.AccountManager()),
-			Public:    true,
-		},
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewDebugAPI(b),
-			Public:    true, // FIXME: change to false once IPC implemented
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicHarmonyAPI(b),
-			Public:    true,
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicBlockChainAPI(b),
-			Public:    true,
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicTransactionPoolAPI(b, nonceLockV2),
-			Public:    true,
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicAccountAPI(b.AccountManager()),
-			Public:    true,
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewDebugAPI(b),
-			Public:    true, // FIXME: change to false once IPC implemented
-		},
-	}
 }

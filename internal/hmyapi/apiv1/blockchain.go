@@ -1,4 +1,4 @@
-package hmyapi
+package apiv1
 
 import (
 	"context"
@@ -81,7 +81,7 @@ func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (ma
 		}
 		validatorsFields := map[string]interface{}{
 			"address": oneAddress,
-			"balance": validatorBalance,
+			"balance": (*hexutil.Big)(validatorBalance),
 		}
 		validators = append(validators, validatorsFields)
 	}
@@ -134,16 +134,20 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 // GetBalance returns the amount of Nano for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*big.Int, error) {
+func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	// TODO: currently only get latest balance. Will add complete logic later.
 	addr := internal_common.ParseAddr(address)
-	return s.b.GetBalance(addr)
+	balance, err := s.b.GetBalance(addr)
+	if balance == nil {
+		return nil, err
+	}
+	return (*hexutil.Big)(balance), err
 }
 
 // BlockNumber returns the block number of the chain head.
-func (s *PublicBlockChainAPI) BlockNumber() uint64 {
+func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
-	return header.Number().Uint64()
+	return hexutil.Uint64(header.Number().Uint64())
 }
 
 // ResendCx requests that the egress receipt for the given cross-shard
@@ -194,8 +198,8 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	}
 	// Set default gas & gas price if none were set
 	gas := uint64(math.MaxUint64 / 2)
-	if args.Gas != 0 {
-		gas = args.Gas
+	if args.Gas != nil {
+		gas = uint64(*args.Gas)
 	}
 	if globalGasCap != nil && globalGasCap.Uint64() < gas {
 		utils.Logger().Warn().
@@ -206,12 +210,12 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	}
 	gasPrice := new(big.Int).SetUint64(defaultGasPrice)
 	if args.GasPrice != nil {
-		gasPrice = args.GasPrice
+		gasPrice = args.GasPrice.ToInt()
 	}
 
 	value := new(big.Int)
 	if args.Value != nil {
-		value = args.Value
+		value = args.Value.ToInt()
 	}
 
 	var data []byte

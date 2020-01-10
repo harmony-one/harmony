@@ -12,6 +12,8 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/hmyapi"
+	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
+	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -33,12 +35,12 @@ var (
 	httpEndpoint = ""
 	wsEndpoint   = ""
 
-	httpModules      = []string{"hmy", "net", "explorer"}
+	httpModules      = []string{"hmy", "hmyv2", "net", "netv2", "explorer"}
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
 	httpOrigins      = []string{"*"}
 
-	wsModules = []string{"net", "web3"}
+	wsModules = []string{"net", "netv2", "web3"}
 	wsOrigins = []string{"*"}
 
 	harmony *hmy.Harmony
@@ -168,7 +170,13 @@ func (node *Node) APIs() []rpc.API {
 		{
 			Namespace: "net",
 			Version:   "1.0",
-			Service:   hmyapi.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
+			Service:   apiv1.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
+			Public:    true,
+		},
+		{
+			Namespace: "netv2",
+			Version:   "1.0",
+			Service:   apiv2.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
 			Public:    true,
 		},
 	}...)
