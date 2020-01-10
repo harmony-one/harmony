@@ -142,7 +142,7 @@ func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*t
 	// return nil, nil
 	receipts := b.hmy.blockchain.GetReceiptsByHash(blockHash)
 	if receipts == nil {
-		return nil, nil
+		return nil, errors.New("no receipts found in block")
 	}
 	logs := make([][]*types.Log, len(receipts))
 	for i, receipt := range receipts {
