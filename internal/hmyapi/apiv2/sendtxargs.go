@@ -1,4 +1,4 @@
-package hmyapi
+package apiv2
 
 import (
 	"bytes"
@@ -16,10 +16,10 @@ type SendTxArgs struct {
 	From     common.Address  `json:"from"`
 	To       *common.Address `json:"to"`
 	ShardID  uint32          `json:"shardID"`
-	Gas      uint64          `json:"gas"`
-	GasPrice *big.Int        `json:"gasPrice"`
-	Value    *big.Int        `json:"value"`
-	Nonce    uint64          `json:"nonce"`
+	Gas      *hexutil.Uint64 `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	Value    *hexutil.Big    `json:"value"`
+	Nonce    *hexutil.Uint64 `json:"nonce"`
 	// We accept "data" and "input" for backwards-compatibility reasons. "input" is the
 	// newer name and should be preferred by clients.
 	Data  *hexutil.Bytes `json:"data"`
@@ -28,8 +28,9 @@ type SendTxArgs struct {
 
 // setDefaults is a helper function that fills in default values for unspecified tx fields.
 func (args *SendTxArgs) setDefaults(ctx context.Context, b Backend) error {
-	if args.Gas == 0 {
-		args.Gas = 90000
+	if args.Gas == nil {
+		args.Gas = new(hexutil.Uint64)
+		*(*uint64)(args.Gas) = 90000
 	}
 	// TODO(ricl): add check for shardID
 	if args.GasPrice == nil {
@@ -41,14 +42,14 @@ func (args *SendTxArgs) setDefaults(ctx context.Context, b Backend) error {
 		// args.GasPrice = (*hexutil.Big)(price)
 	}
 	if args.Value == nil {
-		args.Value = big.NewInt(0)
+		args.Value = new(hexutil.Big)
 	}
-	if &args.Nonce == nil {
+	if args.Nonce == nil {
 		nonce, err := b.GetPoolNonce(ctx, args.From)
 		if err != nil {
 			return err
 		}
-		args.Nonce = nonce
+		args.Nonce = (*hexutil.Uint64)(&nonce)
 	}
 	if args.Data != nil && args.Input != nil && !bytes.Equal(*args.Data, *args.Input) {
 		return errors.New(`both "data" and "input" are set and not equal. Please use "input" to pass transaction call data`)
@@ -76,7 +77,7 @@ func (args *SendTxArgs) toTransaction() *types.Transaction {
 		input = *args.Input
 	}
 	if args.To == nil {
-		return types.NewContractCreation(args.Nonce, args.ShardID, args.Value, args.Gas, args.GasPrice, input)
+		return types.NewContractCreation(uint64(*args.Nonce), args.ShardID, (*big.Int)(args.Value), uint64(*args.Gas), (*big.Int)(args.GasPrice), input)
 	}
-	return types.NewTransaction(args.Nonce, *args.To, args.ShardID, args.Value, args.Gas, args.GasPrice, input)
+	return types.NewTransaction(uint64(*args.Nonce), *args.To, args.ShardID, (*big.Int)(args.Value), uint64(*args.Gas), (*big.Int)(args.GasPrice), input)
 }

@@ -1,4 +1,4 @@
-package hmyapi
+package apiv2
 
 import (
 	"encoding/hex"
@@ -441,8 +441,8 @@ func newRPCStakingTransactionFromBlockIndex(b *types.Block, index uint64) *RPCSt
 type CallArgs struct {
 	From     *common.Address `json:"from"`
 	To       *common.Address `json:"to"`
-	Gas      uint64          `json:"gas"`
-	GasPrice *big.Int        `json:"gasPrice"`
-	Value    *big.Int        `json:"value"`
+	Gas      *hexutil.Uint64 `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	Value    *hexutil.Big    `json:"value"`
 	Data     *hexutil.Bytes  `json:"data"`
 }

@@ -1,4 +1,4 @@
-package hmyapi
+package apiv1
 
 import (
 	"context"
@@ -165,7 +165,7 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 		}
 		validatorsFields := map[string]interface{}{
 			"address": oneAddress,
-			"balance": validatorBalance,
+			"balance": (*hexutil.Big)(validatorBalance),
 		}
 		validators = append(validators, validatorsFields)
 	}
@@ -272,7 +272,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 }
 
 // GetSignedBlocks returns how many blocks a particular validator signed for last defaultBlocksPeriod (3 hours ~ 1500 blocks).
-func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address string) uint64 {
+func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address string) hexutil.Uint64 {
 	totalSigned := uint64(0)
 	lastBlock := uint64(0)
 	blockHeight := uint64(s.BlockNumber())
@@ -285,12 +285,12 @@ func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address strin
 			totalSigned++
 		}
 	}
-	return totalSigned
+	return hexutil.Uint64(totalSigned)
 }
 
 // GetEpoch returns current epoch.
-func (s *PublicBlockChainAPI) GetEpoch(ctx context.Context) uint64 {
-	return s.LatestHeader(ctx).Epoch
+func (s *PublicBlockChainAPI) GetEpoch(ctx context.Context) hexutil.Uint64 {
+	return hexutil.Uint64(s.LatestHeader(ctx).Epoch)
 }
 
 // GetLeader returns current shard leader.
@@ -299,19 +299,19 @@ func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 }
 
 // GetValidatorSelfDelegation returns validator stake.
-func (s *PublicBlockChainAPI) GetValidatorSelfDelegation(ctx context.Context, address string) uint64 {
-	return s.b.GetValidatorSelfDelegation(internal_common.ParseAddr(address)).Uint64()
+func (s *PublicBlockChainAPI) GetValidatorSelfDelegation(ctx context.Context, address string) hexutil.Uint64 {
+	return hexutil.Uint64(s.b.GetValidatorSelfDelegation(internal_common.ParseAddr(address)).Uint64())
 }
 
 // GetValidatorTotalDelegation returns total balace stacking for validator with delegation.
-func (s *PublicBlockChainAPI) GetValidatorTotalDelegation(ctx context.Context, address string) uint64 {
+func (s *PublicBlockChainAPI) GetValidatorTotalDelegation(ctx context.Context, address string) hexutil.Uint64 {
 	delegations := s.b.GetDelegationsByValidator(internal_common.ParseAddr(address))
 	totalStake := big.NewInt(0)
 	for _, delegation := range delegations {
 		totalStake.Add(totalStake, delegation.Amount)
 	}
 	// TODO: return more than uint64
-	return totalStake.Uint64()
+	return hexutil.Uint64(totalStake.Uint64())
 }
 
 // GetShardingStructure returns an array of sharding structures.
@@ -356,16 +356,20 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 // GetBalance returns the amount of Nano for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*big.Int, error) {
+func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	// TODO: currently only get latest balance. Will add complete logic later.
 	addr := internal_common.ParseAddr(address)
-	return s.b.GetBalance(addr)
+	balance, err := s.b.GetBalance(addr)
+	if balance == nil {
+		return nil, err
+	}
+	return (*hexutil.Big)(balance), err
 }
 
 // BlockNumber returns the block number of the chain head.
-func (s *PublicBlockChainAPI) BlockNumber() uint64 {
+func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
-	return header.Number().Uint64()
+	return hexutil.Uint64(header.Number().Uint64())
 }
 
 // ResendCx requests that the egress receipt for the given cross-shard
@@ -416,8 +420,8 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	}
 	// Set default gas & gas price if none were set
 	gas := uint64(math.MaxUint64 / 2)
-	if args.Gas != 0 {
-		gas = args.Gas
+	if args.Gas != nil {
+		gas = uint64(*args.Gas)
 	}
 	if globalGasCap != nil && globalGasCap.Uint64() < gas {
 		utils.Logger().Warn().
@@ -428,12 +432,12 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	}
 	gasPrice := new(big.Int).SetUint64(defaultGasPrice)
 	if args.GasPrice != nil {
-		gasPrice = args.GasPrice
+		gasPrice = args.GasPrice.ToInt()
 	}
 
 	value := new(big.Int)
 	if args.Value != nil {
-		value = args.Value
+		value = args.Value.ToInt()
 	}
 
 	var data []byte
