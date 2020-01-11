@@ -333,28 +333,14 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 }
 
 // PendingTransactions returns the transactions that are in the transaction pool
-// and have a from address that is one of the accounts this node manages.
 func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
 	pending, err := s.b.GetPoolTransactions()
 	if err != nil {
 		return nil, err
 	}
-	accounts := make(map[common.Address]struct{})
-	for _, wallet := range s.b.AccountManager().Wallets() {
-		for _, account := range wallet.Accounts() {
-			accounts[account.Address] = struct{}{}
-		}
-	}
-	transactions := make([]*RPCTransaction, 0, len(pending))
-	for _, tx := range pending {
-		var signer types.Signer = types.HomesteadSigner{}
-		if tx.Protected() {
-			signer = types.NewEIP155Signer(tx.ChainID())
-		}
-		from, _ := types.Sender(signer, tx)
-		if _, exists := accounts[from]; exists {
-			transactions = append(transactions, newRPCPendingTransaction(tx))
-		}
+	transactions := make([]*RPCTransaction, len(pending))
+	for i := range pending {
+		transactions[i] = newRPCPendingTransaction(pending[i])
 	}
 	return transactions, nil
 }
