@@ -158,6 +158,11 @@ func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*
 	return header, nil
 }
 
+// ServiceFilter ...
+func (b *APIBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
+	// TODO(ricl): implement
+}
+
 // SubscribeNewTxsEvent subcribes new tx event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
