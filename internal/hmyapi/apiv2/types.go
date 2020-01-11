@@ -246,7 +246,7 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 		uncleHashes[i] = uncle.Hash()
 	}
 	fields["uncles"] = uncleHashes
-	
+
 	return fields, nil
 }
 

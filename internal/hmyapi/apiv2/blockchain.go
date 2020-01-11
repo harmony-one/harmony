@@ -35,6 +35,7 @@ type PublicBlockChainAPI struct {
 func NewPublicBlockChainAPI(b Backend) *PublicBlockChainAPI {
 	return &PublicBlockChainAPI{b}
 }
+
 // BlockArgs is struct to include optional block formatting params.
 type BlockArgs struct {
 	WithSigners bool     `json:"withSigners"`
@@ -44,7 +45,7 @@ type BlockArgs struct {
 	InclStaking bool     `json:"inclStaking"`
 }
 
-// GetBlockByNumberNew returns the requested block. When blockNr is -1 the chain head is returned. When fullTx in blockArgs is true all
+// GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx in blockArgs is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
 // it shows block signers for this block in list of one addresses.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, blockArgs BlockArgs) (map[string]interface{}, error) {
@@ -63,7 +64,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 	return nil, err
 }
 
-// GetBlockByHashNew returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full
+// GetBlockByHash returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
 // it shows block signers for this block in list of one addresses.
 func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, blockArgs BlockArgs) (map[string]interface{}, error) {
