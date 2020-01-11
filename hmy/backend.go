@@ -52,6 +52,7 @@ type NodeAPI interface {
 	GetNonceOfAddress(address common.Address) uint64
 	// Get transactions history for an address
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	ErroredTransactionSink() []types.RPCTransactionError
 	IsCurrentlyLeader() bool
 }
 
