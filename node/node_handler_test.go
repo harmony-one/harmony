@@ -3,12 +3,10 @@ package node
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/core/types"
-	types2 "github.com/harmony-one/harmony/staking/types"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -37,8 +35,7 @@ func TestAddNewBlock(t *testing.T) {
 	node := New(host, consensus, testDBFactory, false)
 
 	txs := make(map[common.Address]types.Transactions)
-	stks := types2.StakingTransactions{}
-	node.Worker.CommitTransactions(txs, stks, common.Address{},
+	node.Worker.CommitTransactions(txs, common.Address{},
 		func([]types.RPCTransactionError) {})
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
@@ -71,8 +68,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	node := New(host, consensus, testDBFactory, false)
 
 	txs := make(map[common.Address]types.Transactions)
-	stks := types2.StakingTransactions{}
-	node.Worker.CommitTransactions(txs, stks, common.Address{},
+	node.Worker.CommitTransactions(txs, common.Address{},
 		func([]types.RPCTransactionError) {})
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 

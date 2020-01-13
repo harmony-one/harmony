@@ -56,7 +56,7 @@ type Worker struct {
 // CommitTransactions commits transactions for new block.
 func (w *Worker) CommitTransactions(
 	pendingNormal map[common.Address]types.Transactions,
-	pendingStaking staking.StakingTransactions, coinbase common.Address,
+	coinbase common.Address,
 	txnErrorSink func([]types.RPCTransactionError),
 ) error {
 

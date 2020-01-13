@@ -5,8 +5,6 @@ import (
 	"sort"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -89,14 +87,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 
-	// TODO: integrate staking transaction into tx pool
-	pendingStakingTransactions := types2.StakingTransactions{}
-	for _, tx := range node.pendingStakingTransactions {
-		pendingStakingTransactions = append(pendingStakingTransactions, tx)
-	}
-
 	node.Worker.UpdateCurrent(coinbase)
-	if err := node.Worker.CommitTransactions(pending, pendingStakingTransactions, coinbase,
+	if err := node.Worker.CommitTransactions(pending, coinbase,
 		func(payload []types.RPCTransactionError) {
 			node.errorSink.Lock()
 			for i := range payload {
