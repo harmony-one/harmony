@@ -38,6 +38,11 @@ func (node *Node) receiveGroupMessage(
 				Msg("cannot receive from group")
 			continue
 		}
+		if len(msg) < 5 {
+			utils.Logger().Warn().Err(err).Int("msg size", len(msg)).
+				Msg("invalid p2p message size")
+			continue
+		}
 		if sender == node.host.GetID() {
 			continue
 		}
