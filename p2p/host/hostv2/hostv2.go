@@ -89,13 +89,11 @@ func (host *HostV2) getTopic(topic string) (topicHandle, error) {
 	host.lock.Lock()
 	defer host.lock.Unlock()
 	if t, ok := host.joined[topic]; ok {
-		host.logger.Info().Str("topic", topic).Msg("Found Topic")
 		return t, nil
 	} else if t, err := host.joiner.JoinTopic(topic); err != nil {
 		return nil, errors.Wrapf(err, "cannot join pubsub topic %x", topic)
 	} else {
 		host.joined[topic] = t
-		host.logger.Info().Str("topic", topic).Msg("Joined Topic")
 		return t, nil
 	}
 }
