@@ -384,6 +384,7 @@ func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_en
 		chain:   chain,
 		engine:  engine,
 	}
+	// 10 time capacity than Ethereum
 	worker.gasFloor = 80000000
 	worker.gasCeil = 120000000
 
