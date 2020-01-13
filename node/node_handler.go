@@ -110,6 +110,10 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			node.stakingMessageHandler(msgPayload)
 		case proto_node.Block:
 			utils.Logger().Debug().Msg("NET: received message: Node/Block")
+			if len(msgPayload) < 1 {
+				utils.Logger().Debug().Msgf("Invalid block message size")
+				return
+			}
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
@@ -161,6 +165,10 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
+	if len(msgPayload) < 1 {
+		utils.Logger().Debug().Msgf("Invalid transaction message size")
+		return
+	}
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
 	switch txMessageType {
@@ -178,6 +186,10 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
+	if len(msgPayload) < 1 {
+		utils.Logger().Debug().Msgf("Invalid staking transaction message size")
+		return
+	}
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
 	switch txMessageType {
