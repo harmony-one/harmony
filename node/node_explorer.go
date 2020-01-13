@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 )
 
 var once sync.Once
@@ -104,7 +103,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	utils.Logger().Debug().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
 	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, true); err == nil {
-		if shard.Schedule.IsLastBlock(block.Number().Uint64()) {
+		if len(block.Header().ShardState()) > 0 {
 			node.Consensus.UpdateConsensusInformation()
 		}
 		// Clean up the blocks to avoid OOM.
