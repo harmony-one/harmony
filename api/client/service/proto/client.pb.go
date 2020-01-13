@@ -8,6 +8,8 @@ import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -269,6 +271,17 @@ func (c *clientServiceClient) GetFreeToken(ctx context.Context, in *GetFreeToken
 type ClientServiceServer interface {
 	FetchAccountState(context.Context, *FetchAccountStateRequest) (*FetchAccountStateResponse, error)
 	GetFreeToken(context.Context, *GetFreeTokenRequest) (*GetFreeTokenResponse, error)
+}
+
+// UnimplementedClientServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedClientServiceServer struct {
+}
+
+func (*UnimplementedClientServiceServer) FetchAccountState(ctx context.Context, req *FetchAccountStateRequest) (*FetchAccountStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountState not implemented")
+}
+func (*UnimplementedClientServiceServer) GetFreeToken(ctx context.Context, req *GetFreeTokenRequest) (*GetFreeTokenResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFreeToken not implemented")
 }
 
 func RegisterClientServiceServer(s *grpc.Server, srv ClientServiceServer) {
