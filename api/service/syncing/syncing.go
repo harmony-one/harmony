@@ -784,14 +784,20 @@ Loop:
 			currentHeight := bc.CurrentBlock().NumberU64()
 
 			if currentHeight >= otherHeight {
-				utils.Logger().Info().
-					Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-						isBeacon, bc.ShardID(), otherHeight, currentHeight)
+				utils.Logger().Debug().
+					Bool("isBeacon", isBeacon).
+					Uint32("ShardID", bc.ShardID()).
+					Uint64("otherHeight", otherHeight).
+					Uint64("currentHeight", currentHeight).
+					Msg("[SYNC] Node is now IN SYNC!")
 				break Loop
 			} else {
 				utils.Logger().Debug().
-					Msgf("[SYNC] Node is Not in Sync (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-						isBeacon, bc.ShardID(), otherHeight, currentHeight)
+					Bool("isBeacon", isBeacon).
+					Uint32("ShardID", bc.ShardID()).
+					Uint64("otherHeight", otherHeight).
+					Uint64("currentHeight", currentHeight).
+					Msg("[SYNC] Node is Not in Sync.")
 			}
 			startHash := bc.CurrentBlock().Hash()
 			size := uint32(otherHeight - currentHeight)
@@ -801,28 +807,35 @@ Loop:
 
 			retryCount := 0
 			var err error
-			for err == nil && retryCount < stateSyncRetryLimit {
+			for {
 				err = ss.ProcessStateSync(startHash[:], size, bc, worker)
-				if err != nil {
-					utils.Logger().Warn().Err(err).
-						Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d, retryCount: %d)",
-							isBeacon, bc.ShardID(), otherHeight, currentHeight, retryCount)
-					if err != nil {
-						ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
-							ss.syncConfig.failedPeers = append(ss.syncConfig.failedPeers, configPeer)
-							brk = true
-							return
-						})
-					}
-					retryCount++
-				} else {
+				if err == nil {
 					break
 				}
-			}
-			if err != nil {
-				utils.Logger().Error().Err(err).
-					Msgf("[SYNC] ProcessStateSync failed despite retries (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-						isBeacon, bc.ShardID(), otherHeight, currentHeight)
+				if retryCount >= stateSyncRetryLimit {
+					utils.Logger().Warn().Err(err).
+						Bool("isBeacon", isBeacon).
+						Uint32("ShardID", bc.ShardID()).
+						Uint64("otherHeight", otherHeight).
+						Uint64("currentHeight", currentHeight).
+						Msg("[SYNC] ProcessStateSync failed after retries. Node failed to sync.")
+					break
+				}
+
+				utils.Logger().Warn().Err(err).
+					Bool("isBeacon", isBeacon).
+					Uint32("ShardID", bc.ShardID()).
+					Uint64("otherHeight", otherHeight).
+					Uint64("currentHeight", currentHeight).
+					Int("retryCount", retryCount).
+					Msg("[SYNC] ProcessStateSync failed. Retrying ...")
+
+				ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
+					ss.syncConfig.failedPeers = append(ss.syncConfig.failedPeers, configPeer)
+					brk = true
+					return
+				})
+				retryCount++
 			}
 
 			ss.purgeOldBlocksFromCache()
