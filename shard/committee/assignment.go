@@ -34,7 +34,7 @@ type Reader interface {
 // StakingCandidatesReader ..
 type StakingCandidatesReader interface {
 	ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error)
-	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
+	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error)
 	ValidatorCandidates() []common.Address
 }
 

@@ -244,7 +244,7 @@ func AccumulateRewards(
 					voter.EffectivePercent.Quo(votepower.StakersShare),
 				).RoundInt()
 				newRewards = new(big.Int).Add(newRewards, due)
-				state.AddReward(snapshot, due)
+				state.AddReward(snapshot.Validator, due)
 			}
 		}
 
@@ -335,12 +335,11 @@ func AccumulateRewards(
 					}
 					due := resultsHandle[bucket][payThem].payout.TruncateInt()
 					newRewards = new(big.Int).Add(newRewards, due)
-					state.AddReward(snapshot, due)
+					state.AddReward(snapshot.Validator, due)
 				}
 			}
 
 			return newRewards, nil
-			// return bc.UpdateBlockRewardAccumulator(newRewards)
 		}
 		return noReward, nil
 	}

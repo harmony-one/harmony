@@ -280,7 +280,7 @@ func (cr *fakeChainReader) SuperCommitteeForNextEpoch(beacon consensus_engine.Ch
 func (cr *fakeChainReader) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
+func (cr *fakeChainReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error) {
 	return nil, nil
 }
 func (cr *fakeChainReader) ReadBlockRewardAccumulator(uint64) (*big.Int, error)         { return nil, nil }

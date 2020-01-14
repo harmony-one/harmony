@@ -2546,10 +2546,12 @@ func (bc *BlockChain) ReadValidatorInformation(addr common.Address) (*staking.Va
 }
 
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
-func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
+func (bc *BlockChain) ReadValidatorSnapshot(
+	addr common.Address,
+) (*staking.ValidatorSnapshot, error) {
 	if cached, ok := bc.validatorCache.Get("validator-snapshot-" + string(addr.Bytes())); ok {
 		by := cached.([]byte)
-		v := staking.ValidatorWrapper{}
+		v := staking.ValidatorSnapshot{}
 		if err := rlp.DecodeBytes(by, &v); err != nil {
 			return nil, err
 		}
@@ -2570,12 +2572,17 @@ func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 		}
 		validators = append(validators, validator)
 	}
-
+	epoch := bc.CurrentHeader().Epoch()
 	// Batch write the current data as snapshot
 	batch := bc.db.NewBatch()
 	for i := range validators {
-		err := rawdb.WriteValidatorSnapshot(batch, validators[i])
+		stats, err := rawdb.ReadValidatorStats(bc.db, validators[i].Address)
 		if err != nil {
+			return err
+		}
+		if err := rawdb.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{
+			validators[i], epoch, stats.NumBlocksToSign, stats.NumBlocksSigned,
+		}); err != nil {
 			return err
 		}
 	}
@@ -2587,7 +2594,8 @@ func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 	for i := range validators {
 		by, err := rlp.EncodeToBytes(validators[i])
 		if err == nil {
-			bc.validatorCache.Add("validator-snapshot-"+string(validators[i].Address.Bytes()), by)
+			key := "validator-snapshot-" + string(validators[i].Address.Bytes())
+			bc.validatorCache.Add(key, by)
 		}
 	}
 	return nil
@@ -2722,10 +2730,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots() error {
 	//	return err
 	//}
 
-	if err := bc.writeValidatorSnapshots(allValidators); err != nil {
-		return err
-	}
-	return nil
+	return bc.writeValidatorSnapshots(allValidators)
 }
 
 // ReadValidatorList reads the addresses of current all validators
@@ -2820,6 +2825,8 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	if err != nil {
 		return err
 	}
+	epoch := bc.CurrentHeader().Epoch()
+
 	switch tx.StakingType() {
 	case staking.DirectiveCreateValidator:
 		createValidator := decodePayload.(*staking.CreateValidator)
@@ -2845,8 +2852,10 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 		if err != nil {
 			return err
 		}
-		err = rawdb.WriteValidatorSnapshot(bc.db, validator)
-		if err != nil {
+		zero := big.NewInt(0)
+		if err := rawdb.WriteValidatorSnapshot(
+			bc.db, &staking.ValidatorSnapshot{validator, epoch, zero, zero},
+		); err != nil {
 			return err
 		}
 
@@ -2855,7 +2864,6 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	case staking.DirectiveEditValidator:
 	case staking.DirectiveDelegate:
 		delegate := decodePayload.(*staking.Delegate)
-
 		return bc.addDelegationIndex(delegate.DelegatorAddress, delegate.ValidatorAddress, root)
 	case staking.DirectiveUndelegate:
 	case staking.DirectiveCollectRewards:

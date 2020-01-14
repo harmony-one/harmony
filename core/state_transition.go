@@ -424,7 +424,7 @@ func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValid
 	if err != nil {
 		return err
 	}
-	rateAtBeginningOfEpoch := snapshotValidator.Rate
+	rateAtBeginningOfEpoch := snapshotValidator.Validator.Rate
 
 	if rateAtBeginningOfEpoch.IsNil() || (!newRate.IsNil() && !rateAtBeginningOfEpoch.Equal(newRate)) {
 		wrapper.Validator.UpdateHeight = blockNum

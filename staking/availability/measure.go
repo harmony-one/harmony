@@ -22,10 +22,12 @@ func SetInactiveUnavailableValidators(
 	addrs []common.Address, batch ethdb.Batch, bc consensus_engine.ChainReader,
 ) error {
 	for i := range addrs {
+
 		stats, err := bc.ReadValidatorStats(addrs[i])
 		if err != nil {
 			return err
 		}
+		// TODO need to do this on a per epoch basis
 		if r := new(big.Int).Div(
 			stats.NumBlocksSigned, stats.NumBlocksToSign,
 		); r.Cmp(measure) == -1 {

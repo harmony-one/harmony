@@ -74,6 +74,16 @@ type ValidatorStats struct {
 	BLSKeyPerShard []KeysPerShard
 }
 
+// ValidatorSnapshot ..
+type ValidatorSnapshot struct {
+	Validator *ValidatorWrapper
+	Epoch     *big.Int
+	// The number of blocks the validator should've signed when in active mode (selected in committee)
+	NumBlocksToSign *big.Int `rlp:"nil"`
+	// The number of blocks the validator actually signed
+	NumBlocksSigned *big.Int `rlp:"nil"`
+}
+
 // Validator - data fields for a validator
 type Validator struct {
 	// ECDSA address of the validator
