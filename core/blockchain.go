@@ -1264,7 +1264,9 @@ func (bc *BlockChain) WriteBlockWithState(
 			}
 
 			if isNewEpoch {
-				if err := availability.SetInactiveUnavailableValidators(addrs, batch, bc); err != nil {
+				if err := availability.SetInactiveUnavailableValidators(
+					addrs, batch, bc,
+				); err != nil {
 					return NonStatTy, err
 				}
 			}
