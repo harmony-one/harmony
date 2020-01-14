@@ -51,6 +51,7 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/availability"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -1241,6 +1242,8 @@ func (bc *BlockChain) WriteBlockWithState(
 			}
 
 			members := []*bls2.PublicKey{}
+			addrs := []common.Address{}
+
 			for _, slot := range committee.Slots {
 				pubKey := &bls2.PublicKey{}
 				err := pubKey.Deserialize(slot.BlsPublicKey[:])
@@ -1248,6 +1251,7 @@ func (bc *BlockChain) WriteBlockWithState(
 					utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
 				}
 				members = append(members, pubKey)
+				addrs = append(addrs, slot.EcdsaAddress)
 			}
 
 			mask, _ := bls.NewMask(members, nil)
@@ -1256,6 +1260,10 @@ func (bc *BlockChain) WriteBlockWithState(
 			if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
 				utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 			}
+			if err := availability.SetInactiveUnavailableValidators(addrs, batch, bc); err != nil {
+				return NonStatTy, err
+			}
+
 		} else {
 			utils.Logger().Debug().Msg("[Uptime] failed reading shard state for uptime accounting")
 		}
@@ -1294,6 +1302,8 @@ func (bc *BlockChain) WriteBlockWithState(
 					}
 
 					members := []*bls2.PublicKey{}
+					addrs := []common.Address{}
+
 					for _, slot := range committee.Slots {
 						if slot.EffectiveStake != nil {
 							pubKey := &bls2.PublicKey{}
@@ -1302,6 +1312,8 @@ func (bc *BlockChain) WriteBlockWithState(
 								utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
 							}
 							members = append(members, pubKey)
+							addrs = append(addrs, slot.EcdsaAddress)
+
 						}
 					}
 
@@ -1311,6 +1323,11 @@ func (bc *BlockChain) WriteBlockWithState(
 					if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
 						utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 					}
+
+					if err := availability.SetInactiveUnavailableValidators(addrs, batch, bc); err != nil {
+						return NonStatTy, err
+					}
+
 				} else {
 					utils.Logger().Debug().Msg("[Uptime] failed reading shard state for uptime accounting")
 				}
@@ -2597,7 +2614,8 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 					[]staking.VotePerShard{}, []staking.KeysPerShard{},
 				}
 			}
-			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, big.NewInt(1))
+			one := big.NewInt(1)
+			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, one)
 
 			enabled, err := mask.IndexEnabled(i)
 			if err != nil {
@@ -2605,7 +2623,7 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 			}
 
 			if enabled {
-				stats.NumBlocksSigned.Add(stats.NumBlocksSigned, big.NewInt(1))
+				stats.NumBlocksSigned.Add(stats.NumBlocksSigned, one)
 			}
 			// TODO: record time being jailed.
 
