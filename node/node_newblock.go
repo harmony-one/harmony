@@ -81,9 +81,14 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	coinbase := node.Consensus.SelfAddress
 
 	// Prepare transactions including staking transactions
-	selectedTxs, selectedStakingTxs := node.getTransactionsForNewBlock(coinbase)
-	if err := node.Worker.CommitTransactions(
-		selectedTxs, selectedStakingTxs, coinbase,
+	pending, err := node.TxPool.Pending()
+	if err != nil {
+		utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
+		return nil, err
+	}
+
+	node.Worker.UpdateCurrent(coinbase)
+	if err := node.Worker.CommitTransactions(pending, coinbase,
 		func(payload []types.RPCTransactionError) {
 			node.errorSink.Lock()
 			for i := range payload {
@@ -91,8 +96,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 				node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
 			}
 			node.errorSink.Unlock()
-		},
-	); err != nil {
+		}); err != nil {
 		ctxerror.Log15(utils.GetLogger().Error,
 			ctxerror.New("cannot commit transactions").
 				WithCause(err))
