@@ -1242,7 +1242,7 @@ func (bc *BlockChain) WriteBlockWithState(
 			}
 
 			members := []*bls2.PublicKey{}
-			addrs := []common.Address{}
+			addrs, isNewEpoch := []common.Address{}, len(block.Header().ShardState()) > 0
 
 			for _, slot := range committee.Slots {
 				pubKey := &bls2.PublicKey{}
@@ -1251,7 +1251,9 @@ func (bc *BlockChain) WriteBlockWithState(
 					utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
 				}
 				members = append(members, pubKey)
-				addrs = append(addrs, slot.EcdsaAddress)
+				if isNewEpoch {
+					addrs = append(addrs, slot.EcdsaAddress)
+				}
 			}
 
 			mask, _ := bls.NewMask(members, nil)
@@ -1260,8 +1262,11 @@ func (bc *BlockChain) WriteBlockWithState(
 			if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
 				utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 			}
-			if err := availability.SetInactiveUnavailableValidators(addrs, batch, bc); err != nil {
-				return NonStatTy, err
+
+			if isNewEpoch {
+				if err := availability.SetInactiveUnavailableValidators(addrs, batch, bc); err != nil {
+					return NonStatTy, err
+				}
 			}
 
 		} else {
@@ -1302,7 +1307,7 @@ func (bc *BlockChain) WriteBlockWithState(
 					}
 
 					members := []*bls2.PublicKey{}
-					addrs := []common.Address{}
+					addrs, isNewEpoch := []common.Address{}, len(block.Header().ShardState()) > 0
 
 					for _, slot := range committee.Slots {
 						if slot.EffectiveStake != nil {
@@ -1312,8 +1317,9 @@ func (bc *BlockChain) WriteBlockWithState(
 								utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
 							}
 							members = append(members, pubKey)
-							addrs = append(addrs, slot.EcdsaAddress)
-
+							if isNewEpoch {
+								addrs = append(addrs, slot.EcdsaAddress)
+							}
 						}
 					}
 
@@ -1324,10 +1330,11 @@ func (bc *BlockChain) WriteBlockWithState(
 						utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 					}
 
-					if err := availability.SetInactiveUnavailableValidators(addrs, batch, bc); err != nil {
-						return NonStatTy, err
+					if isNewEpoch {
+						if err := availability.SetInactiveUnavailableValidators(addrs, batch, bc); err != nil {
+							return NonStatTy, err
+						}
 					}
-
 				} else {
 					utils.Logger().Debug().Msg("[Uptime] failed reading shard state for uptime accounting")
 				}
