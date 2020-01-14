@@ -8,7 +8,7 @@ import (
 
 const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14
-	blocksPerShard     = 16384  // 2^14
+	blocksPerEpoch     = 16384  // 2^14
 
 	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.1)
@@ -76,7 +76,7 @@ func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (mainnetSchedule) BlocksPerEpoch() uint64 {
-	return blocksPerShard
+	return blocksPerEpoch
 }
 
 func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {

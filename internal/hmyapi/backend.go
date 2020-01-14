@@ -36,7 +36,6 @@ type Backend interface {
 	AccountManager() *accounts.Manager
 	// ExtRPCEnabled() bool
 	RPCGasCap() *big.Int // global gas cap for hmy_call over rpc: DoS protection
-
 	// BlockChain API
 	// SetHead(number uint64)
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error)
@@ -49,7 +48,6 @@ type Backend interface {
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
-
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
 	// GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
@@ -59,7 +57,6 @@ type Backend interface {
 	// Stats() (pending int, queued int)
 	// TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
-
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
 	// Get balance
@@ -73,11 +70,18 @@ type Backend interface {
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
-	GetCurrentValidatorAddresses() []common.Address
-	GetValidatorCandidates() []common.Address
+	GetActiveValidatorAddresses() []common.Address
+	GetAllValidatorAddresses() []common.Address
 	GetValidatorInformation(addr common.Address) *staking.Validator
-	GetDelegatorsInformation(addr common.Address) []*staking.Delegation
-	GetValidatorStakingWithDelegation(addr common.Address) *big.Int
+	GetValidatorStats(addr common.Address) *staking.ValidatorStats
+	GetDelegationsByValidator(validator common.Address) []*staking.Delegation
+	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)
+	GetValidatorSelfDelegation(addr common.Address) *big.Int
+	GetShardState() (*shard.State, error)
+	GetCurrentStakingErrorSink() []staking.RPCTransactionError
+	GetCurrentTransactionErrorSink() []types.RPCTransactionError
+	IsBeaconChainExplorerNode() bool
+	GetMedianRawStakeSnapshot() *big.Int
 }
 
 // GetAPIs returns all the APIs.

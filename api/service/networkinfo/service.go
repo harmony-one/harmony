@@ -15,6 +15,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	badger "github.com/ipfs/go-ds-badger"
 	coredis "github.com/libp2p/go-libp2p-core/discovery"
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
@@ -27,7 +28,7 @@ import (
 type Service struct {
 	Host        p2p.Host
 	Rendezvous  nodeconfig.GroupID
-	bootnodes   utils.AddrList
+	bootnodes   p2putils.AddrList
 	dht         *libp2pdht.IpfsDHT
 	cancel      context.CancelFunc
 	stopChan    chan struct{}
@@ -43,9 +44,6 @@ type Service struct {
 var (
 	// retry for 30s and give up then
 	ConnectionRetry = 15
-
-	// context
-	ctx context.Context
 )
 
 const (
@@ -63,10 +61,9 @@ const (
 // points to a persistent database directory to use.
 func New(
 	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
-	bootnodes utils.AddrList, dataStorePath string,
+	bootnodes p2putils.AddrList, dataStorePath string,
 ) (*Service, error) {
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(context.Background(), connectionTimeout)
+	ctx, cancel := context.WithCancel(context.Background())
 	var dhtOpts []libp2pdhtopts.Option
 	if dataStorePath != "" {
 		dataStore, err := badger.NewDatastore(dataStorePath, nil)
@@ -102,7 +99,7 @@ func New(
 // MustNew is a panic-on-error version of New.
 func MustNew(
 	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
-	bootnodes utils.AddrList, dataStorePath string,
+	bootnodes p2putils.AddrList, dataStorePath string,
 ) *Service {
 	service, err := New(h, rendezvous, peerChan, bootnodes, dataStorePath)
 	if err != nil {
@@ -124,6 +121,8 @@ func (s *Service) StartService() {
 
 // Init initializes role conversion service.
 func (s *Service) Init() error {
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	defer cancel()
 	utils.Logger().Info().Msg("Init networkinfo service")
 
 	// Bootstrap the DHT. In the default configuration, this spawns a Background
@@ -136,7 +135,7 @@ func (s *Service) Init() error {
 	var wg sync.WaitGroup
 	if s.bootnodes == nil {
 		// TODO: should've passed in bootnodes through constructor.
-		s.bootnodes = utils.BootNodes
+		s.bootnodes = p2putils.BootNodes
 	}
 
 	connected := false
@@ -191,6 +190,9 @@ func (s *Service) Run() {
 // DoService does network info.
 func (s *Service) DoService() {
 	tick := time.NewTicker(dhtTicker)
+	defer tick.Stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for {
 		select {
 		case <-s.stopChan:
@@ -208,13 +210,13 @@ func (s *Service) DoService() {
 				return
 			}
 
-			s.findPeers()
+			s.findPeers(ctx)
 			time.Sleep(findPeerInterval)
 		}
 	}
 }
 
-func (s *Service) findPeers() {
+func (s *Service) findPeers(ctx context.Context) {
 	_, cgnPrefix, err := net.ParseCIDR("100.64.0.0/10")
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("can't parse CIDR")

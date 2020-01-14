@@ -1,4 +1,4 @@
-package utils
+package wallet
 
 // this module in utils handles the ini file read/write
 import (
@@ -12,8 +12,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-// WalletProfile contains a section and key value pair map
-type WalletProfile struct {
+// Profile contains a section and key value pair map
+type Profile struct {
 	Profile   string
 	ChainID   string
 	Bootnodes []string
@@ -22,13 +22,13 @@ type WalletProfile struct {
 	Network   string
 }
 
-// ReadWalletProfile reads an ini file and return WalletProfile
-func ReadWalletProfile(iniBytes []byte, profile string) (*WalletProfile, error) {
+// ReadProfile reads an ini file and return Profile
+func ReadProfile(iniBytes []byte, profile string) (*Profile, error) {
 	cfg, err := ini.ShadowLoad(iniBytes)
 	if err != nil {
 		return nil, err
 	}
-	config := new(WalletProfile)
+	config := new(Profile)
 	config.Profile = profile
 
 	// get the profile section

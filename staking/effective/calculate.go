@@ -1,11 +1,14 @@
 package effective
 
 import (
+	"bytes"
 	"encoding/json"
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -43,22 +46,46 @@ type Slots []SlotPurchase
 // JSON is a plain JSON dump
 func (s Slots) JSON() string {
 	type t struct {
-		Slots []SlotPurchase `json:"slots"`
+		Address string `json:"slot-owner"`
+		Key     string `json:"bls-public-key"`
+		Stake   string `json:"actual-stake"`
 	}
-	b, _ := json.Marshal(t{s})
+	type v struct {
+		Slots []t `json:"slots"`
+	}
+	data := v{}
+	for i := range s {
+		newData := t{
+			common2.MustAddressToBech32(s[i].Address),
+			s[i].BlsPublicKey.Hex(),
+			s[i].Dec.String(),
+		}
+		data.Slots = append(data.Slots, newData)
+	}
+	b, _ := json.Marshal(data)
 	return string(b)
 }
 
 func median(stakes []SlotPurchase) numeric.Dec {
+
+	if len(stakes) == 0 {
+		utils.Logger().Error().Int("non-zero", len(stakes)).
+			Msg("Input to median has len 0, check caller")
+	}
+
 	sort.SliceStable(
 		stakes,
-		func(i, j int) bool { return stakes[i].Dec.LTE(stakes[j].Dec) },
+		func(i, j int) bool { return stakes[i].Dec.LT(stakes[j].Dec) },
 	)
 	const isEven = 0
 	switch l := len(stakes); l % 2 {
 	case isEven:
-		return stakes[(l/2)-1].Dec.Add(stakes[(l/2)+1].Dec).Quo(two)
+		left := (l / 2) - 1
+		right := (l / 2)
+		utils.Logger().Info().Int("left", left).Int("right", right)
+		return stakes[left].Dec.Add(stakes[right].Dec).Quo(two)
 	default:
+		utils.Logger().Info().Int("median index", l/2)
 		return stakes[l/2].Dec
 	}
 }
@@ -69,15 +96,35 @@ func Apply(shortHand map[common.Address]SlotOrder, pull int) Slots {
 	if len(shortHand) == 0 {
 		return eposedSlots
 	}
+
+	type t struct {
+		addr common.Address
+		slot SlotOrder
+	}
+
+	shorter := []t{}
+	for key, value := range shortHand {
+		shorter = append(shorter, t{key, value})
+	}
+
+	sort.SliceStable(
+		shorter,
+		func(i, j int) bool {
+			return bytes.Compare(
+				shorter[i].addr.Bytes(), shorter[j].addr.Bytes(),
+			) == -1
+		},
+	)
+
 	// Expand
-	for staker := range shortHand {
-		slotsCount := len(shortHand[staker].SpreadAmong)
-		spread := numeric.NewDecFromBigInt(shortHand[staker].Stake).
+	for _, staker := range shorter {
+		slotsCount := len(staker.slot.SpreadAmong)
+		spread := numeric.NewDecFromBigInt(staker.slot.Stake).
 			QuoInt64(int64(slotsCount))
 		for i := 0; i < slotsCount; i++ {
 			eposedSlots = append(eposedSlots, SlotPurchase{
-				staker,
-				shortHand[staker].SpreadAmong[i],
+				staker.addr,
+				staker.slot.SpreadAmong[i],
 				spread,
 			})
 		}
@@ -95,6 +142,11 @@ func Apply(shortHand map[common.Address]SlotOrder, pull int) Slots {
 		pull = l
 	}
 	picks := eposedSlots[:pull]
+
+	if len(picks) == 0 {
+		return Slots{}
+	}
+
 	median := median(picks)
 
 	for i := range picks {

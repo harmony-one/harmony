@@ -1,17 +1,21 @@
 package quorum
 
 import (
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
-	// "github.com/harmony-one/harmony/staking/effective"
+	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 )
 
 type uniformVoteWeight struct {
-	SignatureReader
 	DependencyInjectionWriter
+	DependencyInjectionReader
+	SignatureReader
 }
 
 // Policy ..
@@ -21,18 +25,33 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // IsQuorumAchieved ..
 func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
-	r := v.SignersCount(p) >= v.QuorumThreshold().Int64()
+	r := v.SignersCount(p) >= v.TwoThirdsSignersCount()
 	utils.Logger().Info().Str("phase", p.String()).
 		Int64("signers-count", v.SignersCount(p)).
-		Int64("threshold", v.QuorumThreshold().Int64()).
+		Int64("threshold", v.TwoThirdsSignersCount()).
 		Int64("participants", v.ParticipantsCount()).
 		Msg("Quorum details")
 	return r
 }
 
+// IsQuorumAchivedByMask ..
+func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool {
+	threshold := v.TwoThirdsSignersCount()
+	currentTotalPower := utils.CountOneBits(mask.Bitmap)
+	if currentTotalPower < threshold {
+		utils.Logger().Warn().
+			Msgf("[IsQuorumAchievedByMask] Not enough voting power: need %+v, have %+v", threshold, currentTotalPower)
+		return false
+	}
+	utils.Logger().Debug().
+		Msgf("[IsQuorumAchievedByMask] have enough voting power: need %+v, have %+v",
+			threshold, currentTotalPower)
+	return true
+}
+
 // QuorumThreshold ..
-func (v *uniformVoteWeight) QuorumThreshold() *big.Int {
-	return big.NewInt(v.ParticipantsCount()*2/3 + 1)
+func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
+	return numeric.NewDec(v.TwoThirdsSignersCount())
 }
 
 // RewardThreshold ..
@@ -40,9 +59,12 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 	return v.SignersCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }
 
-// func (v *uniformVoteWeight) UpdateVotingPower(effective.StakeKeeper) {
-// NO-OP do not add anything here
-// }
+func (v *uniformVoteWeight) SetVoters(
+	shard.SlotList, bool,
+) (*TallyResult, error) {
+	// NO-OP do not add anything here
+	return nil, nil
+}
 
 // ToggleActive for uniform vote is a no-op, always says that voter is active
 func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
@@ -54,7 +76,9 @@ func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
 func (v *uniformVoteWeight) Award(
 	// Here hook is the callback which gets the amount the earner is due in just reward
 	// up to the hook to do side-effects like write the statedb
-	Pie *big.Int, earners []common.Address, hook func(earner common.Address, due *big.Int),
+	Pie *big.Int,
+	earners shard.SlotList,
+	hook func(earner common.Address, due *big.Int),
 ) *big.Int {
 	payout := big.NewInt(0)
 	last := big.NewInt(0)
@@ -64,10 +88,54 @@ func (v *uniformVoteWeight) Award(
 		cur := big.NewInt(0)
 		cur.Mul(Pie, big.NewInt(int64(i+1))).Div(cur, count)
 		diff := big.NewInt(0).Sub(cur, last)
-		hook(common.Address(account), diff)
+		hook(common.Address(account.EcdsaAddress), diff)
 		payout = big.NewInt(0).Add(payout, diff)
 		last = cur
 	}
 
 	return payout
+}
+
+func (v *uniformVoteWeight) ShouldSlash(k shard.BlsPublicKey) bool {
+	// No-op, no semantic meaning in one-slot-one-vote
+	return false
+}
+
+func (v *uniformVoteWeight) JSON() string {
+	s, _ := v.ShardIDProvider()()
+
+	type t struct {
+		Policy       string   `json"policy"`
+		ShardID      uint32   `json:"shard-id"`
+		Count        int      `json:"count"`
+		Participants []string `json:"committee-members"`
+	}
+
+	members := v.DumpParticipants()
+	b1, _ := json.Marshal(t{v.Policy().String(), s, len(members), members})
+	return string(b1)
+}
+
+func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
+	pubKeyFunc := v.MyPublicKey()
+	if pubKeyFunc == nil {
+		return false
+	}
+	identity, _ := pubKeyFunc()
+	everyone := v.DumpParticipants()
+	myVoterID := identity.SerializeToHexStr()
+	for i := range everyone {
+		if everyone[i] == myVoterID {
+			return true
+		}
+	}
+	return false
+}
+
+func (v *uniformVoteWeight) ResetPrepareAndCommitVotes() {
+	v.reset([]Phase{Prepare, Commit})
+}
+
+func (v *uniformVoteWeight) ResetViewChangeVotes() {
+	v.reset([]Phase{ViewChange})
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -247,7 +248,7 @@ func (b *APIBackend) GetValidators(epoch *big.Int) (*shard.Committee, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, committee := range state {
+	for _, committee := range state.Shards {
 		if committee.ShardID == b.GetShardID() {
 			return &committee, nil
 		}
@@ -290,28 +291,135 @@ func (b *APIBackend) SendStakingTx(
 	return nil
 }
 
-// GetCurrentValidatorAddresses returns the address of active validators for current epoch
-func (b *APIBackend) GetCurrentValidatorAddresses() []common.Address {
-	return b.hmy.BlockChain().CurrentValidatorAddresses()
+// GetActiveValidatorAddresses returns the address of active validators for current epoch
+func (b *APIBackend) GetActiveValidatorAddresses() []common.Address {
+	list, _ := b.hmy.BlockChain().ReadActiveValidatorList()
+	return list
 }
 
-// GetValidatorCandidates returns the up to date validator candidates for next epoch
-func (b *APIBackend) GetValidatorCandidates() []common.Address {
+// GetAllValidatorAddresses returns the up to date validator candidates for next epoch
+func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
 	return b.hmy.BlockChain().ValidatorCandidates()
 }
 
 // GetValidatorInformation returns the information of validator
 func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Validator {
-	val, _ := b.hmy.BlockChain().ValidatorInformation(addr)
+	val, _ := b.hmy.BlockChain().ReadValidatorInformation(addr)
+	return &val.Validator
+}
+
+var (
+	two = big.NewInt(2)
+)
+
+// GetMedianRawStakeSnapshot  ..
+func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
+	candidates := b.hmy.BlockChain().ValidatorCandidates()
+	if len(candidates) == 0 {
+		return big.NewInt(0)
+	}
+	stakes := []*big.Int{}
+	for i := range candidates {
+		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
+		stake := big.NewInt(0)
+		validator.GetAddress()
+		for i := range validator.Delegations {
+			stake.Add(stake, validator.Delegations[i].Amount)
+		}
+		stakes = append(stakes, stake)
+	}
+	sort.SliceStable(
+		stakes,
+		func(i, j int) bool { return stakes[i].Cmp(stakes[j]) == -1 },
+	)
+
+	if l := len(stakes); l > 320 {
+		stakes = stakes[:320]
+	}
+
+	const isEven = 0
+	switch l := len(stakes); l % 2 {
+	case isEven:
+		left := stakes[(l/2)-1]
+		right := stakes[l/2]
+		return new(big.Int).Div(new(big.Int).Add(left, right), two)
+	default:
+		return stakes[l/2]
+	}
+}
+
+// GetValidatorStats returns the stats of validator
+func (b *APIBackend) GetValidatorStats(addr common.Address) *staking.ValidatorStats {
+	val, _ := b.hmy.BlockChain().ReadValidatorStats(addr)
 	return val
 }
 
-// GetDelegatorsInformation returns up to date information of delegators of a given validator address
-func (b *APIBackend) GetDelegatorsInformation(addr common.Address) []*staking.Delegation {
-	return b.hmy.BlockChain().DelegatorsInformation(addr)
+// GetDelegationsByValidator returns all delegation information of a validator
+func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*staking.Delegation {
+	wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(validator)
+	if err != nil || wrapper == nil {
+		return nil
+	}
+	delegations := []*staking.Delegation{}
+	for i := range wrapper.Delegations {
+		delegations = append(delegations, &wrapper.Delegations[i])
+	}
+	return delegations
 }
 
-// GetValidatorStakingWithDelegation returns the amount of staking after applying all delegated stakes
-func (b *APIBackend) GetValidatorStakingWithDelegation(addr common.Address) *big.Int {
-	return b.hmy.BlockChain().ValidatorStakingWithDelegation(addr)
+// GetDelegationsByDelegator returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation) {
+	addresses := []common.Address{}
+	delegations := []*staking.Delegation{}
+	delegationIndexes, err := b.hmy.BlockChain().ReadDelegationsByDelegator(delegator)
+	if err != nil {
+		return nil, nil
+	}
+
+	for i := range delegationIndexes {
+		wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(delegationIndexes[i].ValidatorAddress)
+		if err != nil || wrapper == nil {
+			return nil, nil
+		}
+
+		if uint64(len(wrapper.Delegations)) > delegationIndexes[i].Index {
+			delegations = append(delegations, &wrapper.Delegations[delegationIndexes[i].Index])
+		} else {
+			delegations = append(delegations, nil)
+		}
+		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
+	}
+	return addresses, delegations
+}
+
+// GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
+func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
+	wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(addr)
+	if err != nil || wrapper == nil {
+		return nil
+	}
+	if len(wrapper.Delegations) == 0 {
+		return nil
+	}
+	return wrapper.Delegations[0].Amount
+}
+
+// GetShardState ...
+func (b *APIBackend) GetShardState() (*shard.State, error) {
+	return b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentHeader().Epoch())
+}
+
+// GetCurrentStakingErrorSink ..
+func (b *APIBackend) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
+	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
+}
+
+// GetCurrentTransactionErrorSink ..
+func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+	return b.hmy.nodeAPI.ErroredTransactionSink()
+}
+
+// IsBeaconChainExplorerNode ..
+func (b *APIBackend) IsBeaconChainExplorerNode() bool {
+	return b.hmy.nodeAPI.IsBeaconChainExplorerNode()
 }

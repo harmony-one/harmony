@@ -60,25 +60,31 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // Process returns the receipts and logs accumulated during the process and
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
-func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.Config) (types.Receipts, types.CXReceipts, []*types.Log, uint64, error) {
+func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.Config) (
+	types.Receipts, types.CXReceipts, []*types.Log, uint64, *big.Int, error,
+) {
 	var (
 		receipts types.Receipts
 		outcxs   types.CXReceipts
 
-		incxs    = block.IncomingReceipts()
-		usedGas  = new(uint64)
-		header   = block.Header()
-		coinbase = block.Header().Coinbase()
-		allLogs  []*types.Log
-		gp       = new(GasPool).AddGas(block.GasLimit())
+		incxs   = block.IncomingReceipts()
+		usedGas = new(uint64)
+		header  = block.Header()
+		allLogs []*types.Log
+		gp      = new(GasPool).AddGas(block.GasLimit())
 	)
+	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
+
+	if err != nil {
+		return nil, nil, nil, 0, nil, err
+	}
 
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, cxReceipt, _, err := ApplyTransaction(p.config, p.bc, &coinbase, gp, statedb, header, tx, usedGas, cfg)
+		receipt, cxReceipt, _, err := ApplyTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
 		if err != nil {
-			return nil, nil, nil, 0, err
+			return nil, nil, nil, 0, nil, err
 		}
 		receipts = append(receipts, receipt)
 		if cxReceipt != nil {
@@ -92,10 +98,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	for i, tx := range block.StakingTransactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
 		receipt, _, err :=
-			ApplyStakingTransaction(p.config, p.bc, &coinbase, gp, statedb, header, tx, usedGas, cfg)
+			ApplyStakingTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
 
 		if err != nil {
-			return nil, nil, nil, 0, err
+			return nil, nil, nil, 0, nil, err
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
@@ -105,22 +111,22 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	for _, cx := range block.IncomingReceipts() {
 		err := ApplyIncomingReceipt(p.config, statedb, header, cx)
 		if err != nil {
-			return nil, nil, nil, 0, ctxerror.New("cannot apply incoming receipts").WithCause(err)
+			return nil, nil, nil, 0, nil, ctxerror.New("cannot apply incoming receipts").WithCause(err)
 		}
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, outcxs, incxs, block.StakingTransactions())
+	_, payout, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, outcxs, incxs, block.StakingTransactions())
 	if err != nil {
-		return nil, nil, nil, 0, ctxerror.New("cannot finalize block").WithCause(err)
+		return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 
-	return receipts, outcxs, allLogs, *usedGas, nil
+	return receipts, outcxs, allLogs, *usedGas, payout, nil
 }
 
 // return true if it is valid
 func getTransactionType(config *params.ChainConfig, header *block.Header, tx *types.Transaction) types.TransactionType {
-	if header.ShardID() == tx.ShardID() && (!config.IsCrossTx(header.Epoch()) || tx.ShardID() == tx.ToShardID()) {
+	if header.ShardID() == tx.ShardID() && (!config.AcceptsCrossTx(header.Epoch()) || tx.ShardID() == tx.ToShardID()) {
 		return types.SameShardTx
 	}
 	numShards := shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards()
@@ -141,7 +147,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
 	}
 
-	if txType != types.SameShardTx && !config.IsCrossTx(header.Epoch()) {
+	if txType != types.SameShardTx && !config.AcceptsCrossTx(header.Epoch()) {
 		return nil, nil, 0, fmt.Errorf(
 			"cannot handle cross-shard transaction until after epoch %v (now %v)",
 			config.CrossTxEpoch, header.Epoch())
@@ -183,11 +189,12 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		receipt.ContractAddress = crypto.CreateAddress(vmenv.Context.Origin, tx.Nonce())
 	}
 	// Set the receipt logs and create a bloom for filtering
-	//receipt.Logs = statedb.GetLogs(tx.Hash())
+	receipt.Logs = statedb.GetLogs(tx.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
 	var cxReceipt *types.CXReceipt
-	if txType == types.SubtractionOnly {
+	// Do not create cxReceipt if EVM call failed
+	if txType == types.SubtractionOnly && !failed {
 		cxReceipt = &types.CXReceipt{tx.Hash(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
 	} else {
 		cxReceipt = nil
@@ -219,7 +226,7 @@ func ApplyStakingTransaction(
 
 	// Apply the transaction to the current state (included in the env)
 	gas, err = ApplyStakingMessage(vmenv, msg, gp, bc)
-	utils.Logger().Info().Msgf("ApplyStakingMessage: usedGas: %v, err: %v", gas, err)
+	utils.Logger().Info().Msgf("ApplyStakingMessage: usedGas: %v, err: %v, stakingTxn:", gas, err)
 
 	// even there is error, we charge it
 	if err != nil {

@@ -10,6 +10,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -32,16 +34,32 @@ type ChainReader interface {
 	// GetHeaderByHash retrieves a block header from the database by its hash.
 	GetHeaderByHash(hash common.Hash) *block.Header
 
+	// ShardID returns shardID
+	ShardID() uint32
+
 	// GetBlock retrieves a block from the database by hash and number.
 	GetBlock(hash common.Hash, number uint64) *types.Block
 
 	// ReadShardState retrieves sharding state given the epoch number.
 	// This api reads the shard state cached or saved on the chaindb.
 	// Thus, only should be used to read the shard state of the current chain.
-	ReadShardState(epoch *big.Int) (shard.State, error)
+	ReadShardState(epoch *big.Int) (*shard.State, error)
 
-	// CurrentValidatorAddresses retrieves the current list of validators
-	CurrentValidatorAddresses() []common.Address
+	// ReadActiveValidatorList retrieves the list of active validators
+	ReadActiveValidatorList() ([]common.Address, error)
+
+	// ReadValidatorList retrieves the list of all validators
+	ReadValidatorList() ([]common.Address, error)
+
+	// Methods needed for EPoS committee assignment calculation
+	committee.StakingCandidatesReader
+
+	//ReadBlockRewardAccumulator is the block-reward given for block number
+	ReadBlockRewardAccumulator(uint64) (*big.Int, error)
+
+	//SuperCommitteeForNextEpoch calculates the next epoch's supper committee
+	// isVerify flag is to indicate which stage to call this function: true (verification stage), false(propose stage)
+	SuperCommitteeForNextEpoch(beacon ChainReader, header *block.Header, isVerify bool) (*shard.State, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.
@@ -73,6 +91,9 @@ type Engine interface {
 	// the consensus rules of the given engine.
 	VerifySeal(chain ChainReader, header *block.Header) error
 
+	// VerifyShardState verifies the shard state during epoch transition is valid
+	VerifyShardState(chain ChainReader, beacon ChainReader, header *block.Header) error
+
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.
 	Prepare(chain ChainReader, header *block.Header) error
@@ -83,13 +104,27 @@ type Engine interface {
 	// SetRewarder assigns the Distributor used in block reward
 	SetRewarder(reward.Distributor)
 
+	// Slasher handles slashing accounts due to inavailibility or double-signing
+	Slasher() slash.Slasher
+
+	// SetSlasher assigns the slasher used
+	SetSlasher(slash.Slasher)
+
+	// Beaconchain provides the handle for Beaconchain
+	Beaconchain() ChainReader
+
+	// SetBeaconchain sets the beaconchain handler on engine
+	SetBeaconchain(ChainReader)
+
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block.
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	Finalize(chain ChainReader, header *block.Header, state *state.DB, txs []*types.Transaction,
+	Finalize(chain ChainReader, header *block.Header,
+		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
-		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction) (*types.Block, error)
+		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+	) (*types.Block, *big.Int, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.

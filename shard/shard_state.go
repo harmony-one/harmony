@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -20,58 +21,141 @@ var (
 )
 
 // PublicKeySizeInBytes ..
-const PublicKeySizeInBytes = 48
-
-// EpochShardState is the shard state of an epoch
-type EpochShardState struct {
-	Epoch      uint64
-	ShardState State
-}
+const (
+	PublicKeySizeInBytes    = 48
+	BlsSignatureSizeInBytes = 96
+)
 
 // State is the collection of all committees
-type State []Committee
+type State struct {
+	Epoch  *big.Int    `json:"epoch"`
+	Shards []Committee `json:"shards"`
+}
 
 // BlsPublicKey defines the bls public key
 type BlsPublicKey [PublicKeySizeInBytes]byte
 
-// NodeID represents node id (BLS address)
-type NodeID struct {
+// BlsSignature defines the bls signature
+type BlsSignature [BlsSignatureSizeInBytes]byte
+
+// Slot represents node id (BLS address)
+type Slot struct {
 	EcdsaAddress common.Address `json:"ecdsa-address"`
 	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
-	// nil means not active, 0 means our node, >= 0 means staked node
-	StakeWithDelegationApplied *numeric.Dec `json:"staked-validator" rlp:"nil"`
+	// nil means our node, 0 means not active, > 0 means staked node
+	EffectiveStake *numeric.Dec `json:"effective-stake" rlp:"nil"`
 }
 
-// NodeIDList is a list of NodeIDList.
-type NodeIDList []NodeID
+// SlotList is a list of Slot.
+type SlotList []Slot
 
 // Committee contains the active nodes in one shard
 type Committee struct {
-	ShardID  uint32     `json:"shard-id"`
-	NodeList NodeIDList `json:"subcommittee"`
+	ShardID uint32   `json:"shard-id"`
+	Slots   SlotList `json:"subcommittee"`
+}
+
+/* Legacy
+These are the pre-staking used data-structures, needed to maintain
+compatibilty for RLP decode/encode
+*/
+
+// StateLegacy ..
+type StateLegacy []CommitteeLegacy
+
+// SlotLegacy represents node id (BLS address)
+type SlotLegacy struct {
+	EcdsaAddress common.Address `json:"ecdsa-address"`
+	BlsPublicKey BlsPublicKey   `json:"bls-pubkey"`
+}
+
+// SlotListLegacy is a list of SlotList.
+type SlotListLegacy []SlotLegacy
+
+// CommitteeLegacy contains the active nodes in one shard
+type CommitteeLegacy struct {
+	ShardID uint32         `json:"shard-id"`
+	Slots   SlotListLegacy `json:"subcommittee"`
+}
+
+// DecodeWrapper ..
+func DecodeWrapper(shardState []byte) (*State, error) {
+	oldSS := StateLegacy{}
+	newSS := State{}
+	var (
+		err1 error
+		err2 error
+	)
+	err1 = rlp.DecodeBytes(shardState, &newSS)
+	if err1 == nil {
+		return &newSS, nil
+	}
+	err2 = rlp.DecodeBytes(shardState, &oldSS)
+	if err2 == nil {
+		newSS := State{}
+		newSS.Shards = make([]Committee, len(oldSS))
+		for i := range oldSS {
+			newSS.Shards[i] = Committee{ShardID: oldSS[i].ShardID, Slots: SlotList{}}
+			for _, slot := range oldSS[i].Slots {
+				newSS.Shards[i].Slots = append(newSS.Shards[i].Slots, Slot{
+					slot.EcdsaAddress, slot.BlsPublicKey, nil,
+				})
+			}
+		}
+		newSS.Epoch = nil // Make sure for legacy state, the epoch is nil
+		return &newSS, nil
+	}
+	return nil, err2
+}
+
+// EncodeWrapper ..
+func EncodeWrapper(shardState State, isStaking bool) ([]byte, error) {
+	var (
+		data []byte
+		err  error
+	)
+	if isStaking {
+		data, err = rlp.EncodeToBytes(shardState)
+	} else {
+		shardStateLegacy := make(StateLegacy, len(shardState.Shards))
+		for i := range shardState.Shards {
+			shardStateLegacy[i] = CommitteeLegacy{
+				ShardID: shardState.Shards[i].ShardID, Slots: SlotListLegacy{},
+			}
+			for _, slot := range shardState.Shards[i].Slots {
+				shardStateLegacy[i].Slots = append(shardStateLegacy[i].Slots, SlotLegacy{
+					slot.EcdsaAddress, slot.BlsPublicKey,
+				})
+			}
+		}
+
+		data, err = rlp.EncodeToBytes(shardStateLegacy)
+	}
+
+	return data, err
 }
 
 // JSON produces a non-pretty printed JSON string of the SuperCommittee
-func (ss State) JSON() string {
+func (ss *State) JSON() string {
 	type t struct {
-		NodeID
-		EcdsaAddress string `json:"one-address"`
+		Slot
+		EcdsaAddress string `json:"ecdsa-address"`
 	}
 	type v struct {
 		Committee
 		Count    int `json:"member-count"`
 		NodeList []t `json:"subcommittee"`
 	}
-	dump := make([]v, len(ss))
-	for i := range ss {
-		c := len(ss[i].NodeList)
-		dump[i].ShardID = ss[i].ShardID
+	dump := make([]v, len(ss.Shards))
+	for i := range ss.Shards {
+		c := len(ss.Shards[i].Slots)
+		dump[i].ShardID = ss.Shards[i].ShardID
 		dump[i].NodeList = make([]t, c)
 		dump[i].Count = c
-		for j := range ss[i].NodeList {
-			n := ss[i].NodeList[j]
+		for j := range ss.Shards[i].Slots {
+			n := ss.Shards[i].Slots[j]
 			dump[i].NodeList[j].BlsPublicKey = n.BlsPublicKey
-			dump[i].NodeList[j].StakeWithDelegationApplied = n.StakeWithDelegationApplied
+			dump[i].NodeList[j].EffectiveStake = n.EffectiveStake
 			dump[i].NodeList[j].EcdsaAddress = common2.MustAddressToBech32(n.EcdsaAddress)
 		}
 	}
@@ -81,42 +165,28 @@ func (ss State) JSON() string {
 
 // FindCommitteeByID returns the committee configuration for the given shard,
 // or nil if the given shard is not found.
-func (ss State) FindCommitteeByID(shardID uint32) *Committee {
-	for committee := range ss {
-		if ss[committee].ShardID == shardID {
-			return &ss[committee]
+func (ss *State) FindCommitteeByID(shardID uint32) *Committee {
+	if ss == nil {
+		return nil
+	}
+	for committee := range ss.Shards {
+		if ss.Shards[committee].ShardID == shardID {
+			return &ss.Shards[committee]
 		}
 	}
 	return nil
 }
 
 // DeepCopy returns a deep copy of the receiver.
-func (ss State) DeepCopy() State {
+func (ss *State) DeepCopy() *State {
 	var r State
-	for _, c := range ss {
-		r = append(r, c.DeepCopy())
+	if ss.Epoch != nil {
+		r.Epoch = big.NewInt(0).Set(ss.Epoch)
 	}
-	return r
-}
-
-// CompareShardState compares two State instances.
-func CompareShardState(s1, s2 State) int {
-	commonLen := len(s1)
-	if commonLen > len(s2) {
-		commonLen = len(s2)
+	for _, c := range ss.Shards {
+		r.Shards = append(r.Shards, c.DeepCopy())
 	}
-	for idx := 0; idx < commonLen; idx++ {
-		if c := CompareCommittee(&s1[idx], &s2[idx]); c != 0 {
-			return c
-		}
-	}
-	switch {
-	case len(s1) < len(s2):
-		return -1
-	case len(s1) > len(s2):
-		return +1
-	}
-	return 0
+	return &r
 }
 
 // Big ..
@@ -166,7 +236,7 @@ func CompareBlsPublicKey(k1, k2 BlsPublicKey) int {
 }
 
 // CompareNodeID compares two node IDs.
-func CompareNodeID(id1, id2 *NodeID) int {
+func CompareNodeID(id1, id2 *Slot) int {
 	if c := bytes.Compare(id1.EcdsaAddress[:], id2.EcdsaAddress[:]); c != 0 {
 		return c
 	}
@@ -177,12 +247,12 @@ func CompareNodeID(id1, id2 *NodeID) int {
 }
 
 // DeepCopy returns a deep copy of the receiver.
-func (l NodeIDList) DeepCopy() NodeIDList {
+func (l SlotList) DeepCopy() SlotList {
 	return append(l[:0:0], l...)
 }
 
 // CompareNodeIDList compares two node ID lists.
-func CompareNodeIDList(l1, l2 NodeIDList) int {
+func CompareNodeIDList(l1, l2 SlotList) int {
 	commonLen := len(l1)
 	if commonLen > len(l2) {
 		commonLen = len(l2)
@@ -205,7 +275,7 @@ func CompareNodeIDList(l1, l2 NodeIDList) int {
 func (c Committee) DeepCopy() Committee {
 	r := Committee{}
 	r.ShardID = c.ShardID
-	r.NodeList = c.NodeList.DeepCopy()
+	r.Slots = c.Slots.DeepCopy()
 	return r
 }
 
@@ -217,7 +287,7 @@ func CompareCommittee(c1, c2 *Committee) int {
 	case c1.ShardID > c2.ShardID:
 		return +1
 	}
-	if c := CompareNodeIDList(c1.NodeList, c2.NodeList); c != 0 {
+	if c := CompareNodeIDList(c1.Slots, c2.Slots); c != 0 {
 		return c
 	}
 	return 0
@@ -225,7 +295,7 @@ func CompareCommittee(c1, c2 *Committee) int {
 
 // GetHashFromNodeList will sort the list, then use Keccak256 to hash the list
 // NOTE: do not modify the underlining content for hash
-func GetHashFromNodeList(nodeList []NodeID) []byte {
+func GetHashFromNodeList(nodeList []Slot) []byte {
 	// in general, nodeList should not be empty
 	if nodeList == nil || len(nodeList) == 0 {
 		return []byte{}
@@ -239,32 +309,31 @@ func GetHashFromNodeList(nodeList []NodeID) []byte {
 }
 
 // Hash is the root hash of State
-func (ss State) Hash() (h common.Hash) {
+func (ss *State) Hash() (h common.Hash) {
 	// TODO ek – this sorting really doesn't belong here; it should instead
 	//  be made an explicit invariant to be maintained and, if needed, checked.
 	copy := ss.DeepCopy()
-	sort.Slice(copy, func(i, j int) bool {
-		return copy[i].ShardID < copy[j].ShardID
+	sort.Slice(copy.Shards, func(i, j int) bool {
+		return copy.Shards[i].ShardID < copy.Shards[j].ShardID
 	})
 	d := sha3.NewLegacyKeccak256()
-	for i := range copy {
-		hash := GetHashFromNodeList(copy[i].NodeList)
+	for i := range copy.Shards {
+		hash := GetHashFromNodeList(copy.Shards[i].Slots)
 		d.Write(hash)
 	}
 	d.Sum(h[:0])
 	return h
 }
 
-// CompareNodeIDByBLSKey compares two nodes by their ID; used to sort node list
-func CompareNodeIDByBLSKey(n1 NodeID, n2 NodeID) int {
-	return bytes.Compare(n1.BlsPublicKey[:], n2.BlsPublicKey[:])
-}
-
-// Serialize serialize NodeID into bytes
-func (n NodeID) Serialize() []byte {
+// Serialize serialize Slot into bytes
+func (n Slot) Serialize() []byte {
 	return append(n.EcdsaAddress[:], n.BlsPublicKey[:]...)
 }
 
-func (n NodeID) String() string {
-	return "ECDSA: " + common2.MustAddressToBech32(n.EcdsaAddress) + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:])
+func (n Slot) String() string {
+	total := "nil"
+	if n.EffectiveStake != nil {
+		total = n.EffectiveStake.String()
+	}
+	return "ECDSA: " + common2.MustAddressToBech32(n.EcdsaAddress) + ", BLS: " + hex.EncodeToString(n.BlsPublicKey[:]) + ", EffectiveStake: " + total
 }

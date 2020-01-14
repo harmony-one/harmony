@@ -13,6 +13,10 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/pkg/errors"
+
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
@@ -83,6 +87,19 @@ func GetAddressFromBlsPubKey(pubKey *bls.PublicKey) common.Address {
 	addr := common.Address{}
 	addrBytes := pubKey.GetAddress()
 	addr.SetBytes(addrBytes[:])
+	return addr
+}
+
+// GetAddressFromBlsPubKeyBytes return the address object from bls pub key.
+func GetAddressFromBlsPubKeyBytes(pubKeyBytes []byte) common.Address {
+	pubKey, err := bls2.BytesToBlsPublicKey(pubKeyBytes[:])
+	addr := common.Address{}
+	if err == nil {
+		addrBytes := pubKey.GetAddress()
+		addr.SetBytes(addrBytes[:])
+	} else {
+		Logger().Err(err).Msg("Failed to get address of bls key")
+	}
 	return addr
 }
 
@@ -254,4 +271,34 @@ func AppendIfMissing(slice []common.Address, addr common.Address) []common.Addre
 		}
 	}
 	return append(slice, addr)
+}
+
+// Fatal prints the given message onto stderr, then exits with status 1.
+func Fatal(format string, args ...interface{}) {
+	_, _ = fmt.Fprintf(os.Stderr, format, args...)
+	os.Exit(1)
+}
+
+// PrintError prints the given error in the extended format (%+v) onto stderr.
+func PrintError(err error) {
+	_, _ = fmt.Fprintf(os.Stderr, "%+v\n", err)
+}
+
+// FatalError prints the given error in the extended format (%+v) onto stderr,
+// then exits with status 1.
+func FatalError(err error) {
+	PrintError(err)
+	os.Exit(1)
+}
+
+// PrintErrMsg prints the given error wrapped with the given message in the
+// extended format (%+v) onto stderr.
+func PrintErrMsg(err error, format string, args ...interface{}) {
+	PrintError(errors.WithMessagef(err, format, args...))
+}
+
+// FatalErrMsg prints the given error wrapped with the given message in the
+// extended format (%+v) onto stderr, then exits with status 1.
+func FatalErrMsg(err error, format string, args ...interface{}) {
+	FatalError(errors.WithMessagef(err, format, args...))
 }

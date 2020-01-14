@@ -30,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -77,12 +78,12 @@ var (
 func setUpTXGen() *node.Node {
 	nodePriKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
-		panic(err)
+		utils.FatalErrMsg(err, "cannot load key from %s", *keyFile)
 	}
 
 	peerPubKey := bls.RandPrivateKey().GetPublicKey()
 	if peerPubKey == nil {
-		panic(fmt.Errorf("generate key error"))
+		utils.FatalErrMsg(err, "cannot generate BLS key")
 	}
 	shardID := *shardIDFlag
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: peerPubKey}
@@ -90,9 +91,6 @@ func setUpTXGen() *node.Node {
 	// Nodes containing blockchain data to mirror the shards' data in the network
 
 	myhost, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
-	if err != nil {
-		panic("unable to new host in txgen")
-	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
@@ -129,7 +127,7 @@ func setUpTXGen() *node.Node {
 }
 
 func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
+	flag.Var(&p2putils.BootNodes, "bootnodes", "a list of bootnode multiaddress")
 	flag.Parse()
 	if *versionFlag {
 		printVersion(os.Args[0])
@@ -137,12 +135,12 @@ func main() {
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	if len(utils.BootNodes) == 0 {
-		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
+	if len(p2putils.BootNodes) == 0 {
+		bootNodeAddrs, err := p2putils.StringsToAddrs(p2putils.DefaultBootNodeAddrStrings)
 		if err != nil {
-			panic(err)
+			utils.FatalErrMsg(err, "cannot parse default bootnode list")
 		}
-		utils.BootNodes = bootNodeAddrs
+		p2putils.BootNodes = bootNodeAddrs
 	}
 	// Init with LibP2P enabled, FIXME: (leochen) right now we support only one shard
 	setting := Settings{
@@ -213,13 +211,13 @@ syncLoop:
 					Uint64("incoming block", block.NumberU64()).
 					Msg("Got block from leader")
 				if block.NumberU64()-txGen.Blockchain().CurrentBlock().NumberU64() == 1 {
-					if err := txGen.AddNewBlock(block); err != nil {
+					if _, err := txGen.Blockchain().InsertChain([]*types.Block{block}, true); err != nil {
 						utils.Logger().Error().
 							Err(err).
 							Msg("Error when adding new block")
 					}
 					stateMutex.Lock()
-					if err := txGen.Worker.UpdateCurrent(block.Coinbase()); err != nil {
+					if err := txGen.Worker.UpdateCurrent(); err != nil {
 						utils.Logger().Warn().Err(err).Msg("(*Worker).UpdateCurrent failed")
 					}
 					stateMutex.Unlock()

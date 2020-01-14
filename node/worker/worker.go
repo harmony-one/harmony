@@ -20,17 +20,14 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
-	signer types.Signer
-
-	state   *state.DB     // apply state changes here
-	gasPool *core.GasPool // available gas used to pack transactions
-
+	signer     types.Signer
+	state      *state.DB     // apply state changes here
+	gasPool    *core.GasPool // available gas used to pack transactions
 	header     *block.Header
 	txs        []*types.Transaction
 	stakingTxs staking.StakingTransactions
@@ -42,28 +39,31 @@ type environment struct {
 // Worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type Worker struct {
-	config  *params.ChainConfig
-	factory blockfactory.Factory
-	chain   *core.BlockChain
-	current *environment // An environment for current running cycle.
-
-	engine consensus_engine.Engine
-
+	config   *params.ChainConfig
+	factory  blockfactory.Factory
+	chain    *core.BlockChain
+	current  *environment // An environment for current running cycle.
+	engine   consensus_engine.Engine
 	gasFloor uint64
 	gasCeil  uint64
 }
 
 // CommitTransactions commits transactions for new block.
-func (w *Worker) CommitTransactions(pendingNormal map[common.Address]types.Transactions, pendingStaking staking.StakingTransactions, coinbase common.Address) error {
+func (w *Worker) CommitTransactions(
+	pendingNormal map[common.Address]types.Transactions,
+	pendingStaking staking.StakingTransactions, coinbase common.Address,
+	stkingTxErrorSink func([]staking.RPCTransactionError),
+	txnErrorSink func([]types.RPCTransactionError),
+) error {
 
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
 
 	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
-
-	var coalescedLogs []*types.Log
-
+	coalescedLogs := []*types.Log{}
+	erroredTxns := []types.RPCTransactionError{}
+	erroredStakingTxns := []staking.RPCTransactionError{}
 	// NORMAL
 	for {
 		// If we don't have enough gas for any further transactions then we're done
@@ -78,14 +78,12 @@ func (w *Worker) CommitTransactions(pendingNormal map[common.Address]types.Trans
 		}
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
-		//
 		// We use the eip155 signer regardless of the current hf.
 		from, _ := types.Sender(w.current.signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Number()) {
 			utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
-
 			txs.Pop()
 			continue
 		}
@@ -98,6 +96,11 @@ func (w *Worker) CommitTransactions(pendingNormal map[common.Address]types.Trans
 		}
 
 		logs, err := w.commitTransaction(tx, coinbase)
+		if err != nil {
+			erroredTxns = append(erroredTxns, types.RPCTransactionError{
+				tx.Hash().Hex(), time.Now().Unix(), err.Error(),
+			})
+		}
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
 		case core.ErrGasLimitReached:
@@ -133,24 +136,45 @@ func (w *Worker) CommitTransactions(pendingNormal map[common.Address]types.Trans
 		for _, tx := range pendingStaking {
 			logs, err := w.commitStakingTransaction(tx, coinbase)
 			if err != nil {
-				utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Commit staking transaction error")
+				txID := tx.Hash().Hex()
+				erroredStakingTxns = append(erroredStakingTxns, staking.RPCTransactionError{
+					TxHashID:             txID,
+					StakingDirective:     tx.StakingType().String(),
+					TimestampOfRejection: time.Now().Unix(),
+					ErrMessage:           err.Error(),
+				})
+				utils.Logger().Error().Err(err).
+					Str("stakingTxId", txID).
+					Msg("Commit staking transaction error")
 			} else {
 				coalescedLogs = append(coalescedLogs, logs...)
-				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).Uint64("txGasLimit", tx.Gas()).Msg("StakingTransaction gas limit info")
+				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).
+					Uint64("txGasLimit", tx.Gas()).
+					Msg("StakingTransaction gas limit info")
 			}
 		}
 	}
+	// Here call the error functions
+	stkingTxErrorSink(erroredStakingTxns)
+	txnErrorSink(erroredTxns)
 
-	utils.Logger().Info().Int("newTxns", len(w.current.txs)).Uint64("blockGasLimit", w.current.header.GasLimit()).Uint64("blockGasUsed", w.current.header.GasUsed()).Msg("Block gas limit and usage info")
-
+	utils.Logger().Info().
+		Int("newTxns", len(w.current.txs)).
+		Uint64("blockGasLimit", w.current.header.GasLimit()).
+		Uint64("blockGasUsed", w.current.header.GasUsed()).
+		Msg("Block gas limit and usage info")
 	return nil
 }
 
-func (w *Worker) commitStakingTransaction(tx *staking.StakingTransaction, coinbase common.Address) ([]*types.Log, error) {
+func (w *Worker) commitStakingTransaction(
+	tx *staking.StakingTransaction, coinbase common.Address,
+) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, _, err :=
-		core.ApplyStakingTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	receipt, _, err := core.ApplyStakingTransaction(
+		w.config, w.chain, &coinbase, w.current.gasPool,
+		w.current.state, w.current.header, tx, &gasUsed, vm.Config{},
+	)
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
@@ -215,7 +239,7 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 }
 
 // UpdateCurrent updates the current environment with the current state and header.
-func (w *Worker) UpdateCurrent(coinbase common.Address) error {
+func (w *Worker) UpdateCurrent() error {
 	parent := w.chain.CurrentBlock()
 	num := parent.Number()
 	timestamp := time.Now().Unix()
@@ -227,9 +251,13 @@ func (w *Worker) UpdateCurrent(coinbase common.Address) error {
 		GasLimit(core.CalcGasLimit(parent, w.gasFloor, w.gasCeil)).
 		Time(big.NewInt(timestamp)).
 		ShardID(w.chain.ShardID()).
-		Coinbase(coinbase).
 		Header()
 	return w.makeCurrent(parent, header)
+}
+
+// GetCurrentHeader returns the current header to propose
+func (w *Worker) GetCurrentHeader() *block.Header {
+	return w.current.header
 }
 
 // makeCurrent creates a new environment for the current cycle.
@@ -258,10 +286,15 @@ func (w *Worker) GetNewEpoch() *big.Int {
 	parent := w.chain.CurrentBlock()
 	epoch := new(big.Int).Set(parent.Header().Epoch())
 
-	// TODO: Don't depend on sharding state for epoch change.
-	if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
-		// ... except if parent has a resharding assignment it increases by 1.
-		epoch = epoch.Add(epoch, common.Big1)
+	shardState, err := parent.Header().GetShardState()
+	if err == nil && shardState.Epoch != nil && w.config.IsStaking(shardState.Epoch) {
+		// For shard state of staking epochs, the shard state will have an epoch and it will decide the next epoch for following blocks
+		epoch = new(big.Int).Set(shardState.Epoch)
+	} else {
+		if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
+			// if parent has proposed a new shard state it increases by 1, except for genesis block.
+			epoch = epoch.Add(epoch, common.Big1)
+		}
 	}
 	return epoch
 }
@@ -281,40 +314,11 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 	return w.current.incxs
 }
 
-// SuperCommitteeForNextEpoch assumes only called by consensus leader
-func (w *Worker) SuperCommitteeForNextEpoch(
-	shardID uint32,
-	beacon *core.BlockChain,
-) (shard.State, error) {
-	var (
-		nextCommittee shard.State
-		oops          error
-	)
-
-	switch shardID {
-	case shard.BeaconChainShardID:
-		if shard.Schedule.IsLastBlock(w.current.header.Number().Uint64()) {
-			nextCommittee, oops = committee.WithStakingEnabled.Compute(
-				new(big.Int).Add(w.current.header.Epoch(), common.Big1),
-				*w.config,
-				beacon,
-			)
-		}
-	default:
-		// WARN When we first enable staking, this condition may not be robust by itself.
-		switch beacon.CurrentHeader().Epoch().Cmp(w.current.header.Epoch()) {
-		case 1:
-			nextCommittee, oops = committee.WithStakingEnabled.ReadFromDB(
-				beacon.CurrentHeader().Epoch(), beacon,
-			)
-		}
-
-	}
-	return nextCommittee, oops
-}
-
 // FinalizeNewBlock generate a new block for the next consensus round.
-func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coinbase common.Address, crossLinks types.CrossLinks, shardState shard.State) (*types.Block, error) {
+func (w *Worker) FinalizeNewBlock(
+	sig []byte, signers []byte, viewID uint64, coinbase common.Address,
+	crossLinks types.CrossLinks, shardState *shard.State,
+) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		sig2 := w.current.header.LastCommitSignature()
 		copy(sig2[:], sig[:])
@@ -326,6 +330,7 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 
 	// Cross Links
 	if crossLinks != nil && len(crossLinks) != 0 {
+		crossLinks.Sort()
 		crossLinkData, err := rlp.EncodeToBytes(crossLinks)
 		if err == nil {
 			utils.Logger().Debug().
@@ -337,12 +342,22 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed cross links")
 			return nil, err
 		}
+	} else {
+		utils.Logger().Debug().Msg("Zero crosslinks to finalize")
 	}
 
 	// Shard State
-	if shardState != nil && len(shardState) != 0 {
-		w.current.header.SetShardStateHash(shardState.Hash())
-		shardStateData, err := rlp.EncodeToBytes(shardState)
+	if shardState != nil && len(shardState.Shards) != 0 {
+		//we store shardstatehash in header only before prestaking epoch (header v0,v1,v2)
+		if !w.config.IsPreStaking(w.current.header.Epoch()) {
+			w.current.header.SetShardStateHash(shardState.Hash())
+		}
+		isStaking := false
+		if shardState.Epoch != nil && w.config.IsStaking(shardState.Epoch) {
+			isStaking = true
+		}
+		// NOTE: Besides genesis, this is the only place where the shard state is encoded.
+		shardStateData, err := shard.EncodeWrapper(*shardState, isStaking)
 		if err == nil {
 			w.current.header.SetShardState(shardStateData)
 		} else {
@@ -351,10 +366,14 @@ func (w *Worker) FinalizeNewBlock(sig []byte, signers []byte, viewID uint64, coi
 		}
 	}
 
-	s := w.current.state.Copy()
+	state := w.current.state.Copy()
 
 	copyHeader := types.CopyHeader(w.current.header)
-	block, err := w.engine.Finalize(w.chain, copyHeader, s, w.current.txs, w.current.receipts, w.current.outcxs, w.current.incxs, w.current.stakingTxs)
+	// TODO: feed coinbase into here so the proposer gets extra rewards.
+	block, _, err := w.engine.Finalize(
+		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
+		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
+	)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}

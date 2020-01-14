@@ -11,10 +11,8 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 )
 
 var once sync.Once
@@ -49,11 +47,8 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
-		// check has 2f+1 signatures
-		need := node.Consensus.Decider.QuorumThreshold().Int64()
-		if count := utils.CountOneBits(mask.Bitmap); count < need {
-			utils.Logger().Error().Int64("need", need).Int64("have", count).
-				Msg("[Explorer] not have enough signature")
+		if node.Consensus.Decider.IsQuorumAchievedByMask(mask, false) {
+			utils.Logger().Error().Msg("[Explorer] not have enough signature power")
 			return
 		}
 
@@ -107,8 +102,8 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	utils.Logger().Debug().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
-	if err := node.AddNewBlock(block); err == nil {
-		if shard.Schedule.IsLastBlock(block.Number().Uint64()) {
+	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, true); err == nil {
+		if len(block.Header().ShardState()) > 0 {
 			node.Consensus.UpdateConsensusInformation()
 		}
 		// Clean up the blocks to avoid OOM.
@@ -176,30 +171,4 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 		}
 	}
 	return hashes, nil
-}
-
-// CommitCommittee commits committee with shard id and epoch to explorer service.
-func (node *Node) CommitCommittee() {
-	events := make(chan core.ChainEvent)
-	node.Blockchain().SubscribeChainEvent(events)
-	for event := range events {
-		curBlock := event.Block
-		if curBlock == nil {
-			continue
-		}
-		state, err := node.Blockchain().ReadShardState(curBlock.Epoch())
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("[Explorer] Error reading shard state")
-			continue
-		}
-		for _, committee := range state {
-			if committee.ShardID == curBlock.ShardID() {
-				utils.Logger().Debug().Msg("[Explorer] Dumping committee")
-				err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).DumpCommittee(curBlock.ShardID(), curBlock.Epoch().Uint64(), committee)
-				if err != nil {
-					utils.Logger().Warn().Err(err).Msgf("[Explorer] Error dumping committee for block %d", curBlock.NumberU64())
-				}
-			}
-		}
-	}
 }

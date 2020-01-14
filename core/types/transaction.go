@@ -59,7 +59,7 @@ const (
 // StakingTypeMap is the map from staking type to transactionType
 var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveCreateValidator: StakeNewVal,
 	staking.DirectiveEditValidator: StakeEditVal, staking.DirectiveDelegate: Delegate,
-	staking.DirectiveUndelegate: Undelegate}
+	staking.DirectiveUndelegate: Undelegate, staking.DirectiveCollectRewards: CollectRewards}
 
 // Transaction struct.
 type Transaction struct {
@@ -68,6 +68,13 @@ type Transaction struct {
 	hash atomic.Value
 	size atomic.Value
 	from atomic.Value
+}
+
+// RPCTransactionError ..
+type RPCTransactionError struct {
+	TxHashID             string `json:"tx-hash-id"`
+	TimestampOfRejection int64  `json:"time-at-rejection"`
+	ErrMessage           string `json:"error-message"`
 }
 
 //String print mode string

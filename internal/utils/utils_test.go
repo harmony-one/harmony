@@ -3,10 +3,8 @@ package utils
 import (
 	"net"
 	"os"
-	"reflect"
 	"testing"
 
-	"github.com/harmony-one/harmony/p2p"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/stretchr/testify/assert"
 )
@@ -165,42 +163,6 @@ func TestIsPrivateIP(t *testing.T) {
 		r := IsPrivateIP(a.ip)
 		if r != a.isPrivate {
 			t.Errorf("IP: %v, IsPrivate: %v, Expected: %v", a.ip, r, a.isPrivate)
-		}
-	}
-}
-
-func TestStringsToPeers(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected []p2p.Peer
-	}{
-		{
-			"127.0.0.1:9000,192.168.192.1:8888,54.32.12.3:9898",
-			[]p2p.Peer{
-				{IP: "127.0.0.1", Port: "9000"},
-				{IP: "192.168.192.1", Port: "8888"},
-				{IP: "54.32.12.3", Port: "9898"},
-			},
-		},
-		{
-			"a:b,xx:XX,hello:world",
-			[]p2p.Peer{
-				{IP: "a", Port: "b"},
-				{IP: "xx", Port: "XX"},
-				{IP: "hello", Port: "world"},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		peers := StringsToPeers(test.input)
-		if len(peers) != 3 {
-			t.Errorf("StringsToPeers failure")
-		}
-		for i, p := range peers {
-			if !reflect.DeepEqual(p, test.expected[i]) {
-				t.Errorf("StringToPeers: expected: %v, got: %v", test.expected[i], p)
-			}
 		}
 	}
 }

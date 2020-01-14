@@ -19,6 +19,8 @@ package core
 import (
 	"math/big"
 
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/harmony-one/harmony/block"
@@ -36,8 +38,11 @@ type ChainContext interface {
 	// GetHeader returns the hash corresponding to their hash.
 	GetHeader(common.Hash, uint64) *block.Header
 
-	// ReadValidatorListByDelegator returns the validators list of a delegator
-	ReadValidatorListByDelegator(common.Address) ([]common.Address, error)
+	// ReadDelegationsByDelegator returns the validators list of a delegator
+	ReadDelegationsByDelegator(common.Address) ([]types2.DelegationIndex, error)
+
+	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
+	ReadValidatorSnapshot(common.Address) (*types2.ValidatorWrapper, error)
 }
 
 // NewEVMContext creates a new context for use in the EVM.
@@ -52,6 +57,7 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 	return vm.Context{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
+		IsValidator: IsValidator,
 		GetHash:     GetHashFn(header, chain),
 		Origin:      msg.From(),
 		Coinbase:    beneficiary,
@@ -93,6 +99,11 @@ func GetHashFn(ref *block.Header, chain ChainContext) func(n uint64) common.Hash
 // This does not take the necessary gas in to account to make the transfer valid.
 func CanTransfer(db vm.StateDB, addr common.Address, amount *big.Int) bool {
 	return db.GetBalance(addr).Cmp(amount) >= 0
+}
+
+// IsValidator determines whether it is a validator address or not
+func IsValidator(db vm.StateDB, addr common.Address) bool {
+	return db.IsValidator(addr)
 }
 
 // Transfer subtracts amount from sender and adds amount to recipient using the given Db

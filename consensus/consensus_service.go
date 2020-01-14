@@ -170,19 +170,19 @@ func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
 	return validatorPeers
 }
 
-// GetBhpSigsArray returns the signatures for prepared message in viewchange
-func (consensus *Consensus) GetBhpSigsArray() []*bls.Sign {
+// GetViewIDSigsArray returns the signatures for viewID in viewchange
+func (consensus *Consensus) GetViewIDSigsArray(viewID uint64) []*bls.Sign {
 	sigs := []*bls.Sign{}
-	for _, sig := range consensus.bhpSigs {
+	for _, sig := range consensus.viewIDSigs[viewID] {
 		sigs = append(sigs, sig)
 	}
 	return sigs
 }
 
 // GetNilSigsArray returns the signatures for nil prepared message in viewchange
-func (consensus *Consensus) GetNilSigsArray() []*bls.Sign {
+func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls.Sign {
 	sigs := []*bls.Sign{}
-	for _, sig := range consensus.nilSigs {
+	for _, sig := range consensus.nilSigs[viewID] {
 		sigs = append(sigs, sig)
 	}
 	return sigs
@@ -197,7 +197,7 @@ func (consensus *Consensus) ResetState() {
 	consensus.blockHash = [32]byte{}
 	consensus.blockHeader = []byte{}
 	consensus.block = []byte{}
-	consensus.Decider.Reset([]quorum.Phase{quorum.Prepare, quorum.Commit})
+	consensus.Decider.ResetPrepareAndCommitVotes()
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
 	commitBitmap, _ := bls_cosi.NewMask(members, nil)
@@ -428,18 +428,32 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 		)
 	}
 	committerKey := new(bls.PublicKey)
-	for _, member := range committee.NodeList {
-		if member.EcdsaAddress == header.Coinbase() {
-			err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-			if err != nil {
-				return nil, ctxerror.New("cannot convert BLS public key",
-					"blsPublicKey", member.BlsPublicKey,
-					"coinbaseAddr", header.Coinbase()).WithCause(err)
+	isStaking := consensus.ChainReader.Config().IsStaking(header.Epoch())
+	for _, member := range committee.Slots {
+		if isStaking {
+			// After staking the coinbase address will be the address of bls public key
+			if utils.GetAddressFromBlsPubKeyBytes(member.BlsPublicKey[:]) == header.Coinbase() {
+				err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+				if err != nil {
+					return nil, ctxerror.New("cannot convert BLS public key",
+						"blsPublicKey", member.BlsPublicKey,
+						"coinbaseAddr", header.Coinbase()).WithCause(err)
+				}
+				return committerKey, nil
 			}
-			return committerKey, nil
+		} else {
+			if member.EcdsaAddress == header.Coinbase() {
+				err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
+				if err != nil {
+					return nil, ctxerror.New("cannot convert BLS public key",
+						"blsPublicKey", member.BlsPublicKey,
+						"coinbaseAddr", header.Coinbase()).WithCause(err)
+				}
+				return committerKey, nil
+			}
 		}
 	}
-	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase())
+	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase().Hex())
 }
 
 // UpdateConsensusInformation will update shard information (epoch, publicKeys, blockNum, viewID)
@@ -453,55 +467,117 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
-	pubKeys := []*bls.PublicKey{}
-	hasError := false
-	header := consensus.ChainReader.CurrentHeader()
-	epoch := header.Epoch()
-	curPubKeys := committee.WithStakingEnabled.ComputePublicKeys(
-		epoch, consensus.ChainReader,
-	)[int(header.ShardID())]
+	curHeader := consensus.ChainReader.CurrentHeader()
+	curEpoch := curHeader.Epoch()
+	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
+	prevSubCommitteeDump := consensus.Decider.JSON()
 
-	consensus.numPrevPubKeys = len(curPubKeys)
-	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
-	if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
-		// increase epoch by one if it's the last block
-		consensus.SetEpochNum(epoch.Uint64() + 1)
-		consensus.getLogger().Info().Uint64("headerNum", header.Number().Uint64()).
-			Msg("[UpdateConsensusInformation] Epoch updated for next epoch")
-		pubKeys = committee.WithStakingEnabled.ComputePublicKeys(
-			new(big.Int).Add(epoch, common.Big1), consensus.ChainReader,
-		)[int(header.ShardID())]
-	} else {
-		consensus.SetEpochNum(epoch.Uint64())
-		pubKeys = curPubKeys
+	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
+		len(curHeader.ShardState()) > 0 &&
+		!consensus.ChainReader.Config().IsStaking(curEpoch)
+
+	haventUpdatedDecider := consensus.ChainReader.Config().IsStaking(curEpoch) &&
+		consensus.Decider.Policy() != quorum.SuperMajorityStake
+
+	// Only happens once, the flip-over to a new Decider policy
+	if isFirstTimeStaking || haventUpdatedDecider {
+		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		decider.SetShardIDProvider(func() (uint32, error) {
+			return consensus.ShardID, nil
+		})
+		decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+			return consensus.PubKey, nil
+		})
+		consensus.Decider = decider
 	}
 
-	if len(pubKeys) == 0 {
+	committeeToSet := &shard.Committee{}
+	hasError := false
+
+	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
+		curEpoch, consensus.ChainReader,
+	)
+	if err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint32("shard", consensus.ShardID).
+			Msg("[UpdateConsensusInformation] Error retrieving current shard state")
+		return Syncing
+	}
+
+	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
+	if len(curHeader.ShardState()) > 0 {
+		// increase curEpoch by one if it's the last block
+		consensus.SetEpochNum(curEpoch.Uint64() + 1)
+		consensus.getLogger().Info().Uint64("headerNum", curHeader.Number().Uint64()).
+			Msg("[UpdateConsensusInformation] Epoch updated for nextEpoch curEpoch")
+
+		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
+			nextEpoch, consensus.ChainReader,
+		)
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("[UpdateConsensusInformation] Error retrieving nextEpoch shard state")
+			return Syncing
+		}
+
+		committeeToSet = nextShardState.FindCommitteeByID(curHeader.ShardID())
+
+	} else {
+		consensus.SetEpochNum(curEpoch.Uint64())
+		committeeToSet = curShardState.FindCommitteeByID(curHeader.ShardID())
+	}
+
+	if len(committeeToSet.Slots) == 0 {
 		consensus.getLogger().Warn().
-			Msg("[UpdateConsensusInformation] PublicKeys is Nil")
+			Msg("[UpdateConsensusInformation] No members in the committee to update")
 		hasError = true
 	}
 
-	// update public keys committee
+	// update public keys in the committee
 	oldLeader := consensus.LeaderPubKey
+	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
+		committeeToSet,
+	)
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
 	consensus.UpdatePublicKeys(pubKeys)
 
-	// take care of possible leader change during the epoch
-	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) &&
-		header.Number().Uint64() != 0 {
-		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(header)
+	// Update voters in the committee
+	if _, err := consensus.Decider.SetVoters(
+		committeeToSet.Slots, true,
+	); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint32("shard", consensus.ShardID).
+			Msg("Error when updating voters")
+		return Syncing
+	}
+
+	utils.Logger().Info().
+		Uint64("block-number", curHeader.Number().Uint64()).
+		Uint64("curEpoch", curHeader.Epoch().Uint64()).
+		Uint32("shard-id", consensus.ShardID).
+		RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
+		RawJSON("current-subcommittee", []byte(consensus.Decider.JSON())).
+		Msg("[UpdateConsensusInformation] changing committee")
+
+	// take care of possible leader change during the curEpoch
+	if !shard.Schedule.IsLastBlock(curHeader.Number().Uint64()) &&
+		curHeader.Number().Uint64() != 0 {
+		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).
-				Msg("[SYNC] Unable to get leaderPubKey from coinbase")
+				Msg("[UpdateConsensusInformation] Unable to get leaderPubKey from coinbase")
 			consensus.ignoreViewIDCheck = true
 			hasError = true
 		} else {
 			consensus.getLogger().Debug().
 				Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
-				Msg("[SYNC] Most Recent LeaderPubKey Updated Based on BlockChain")
+				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
 			consensus.LeaderPubKey = leaderPubKey
 		}
 	}
@@ -520,7 +596,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 						Str("myKey", consensus.PubKey.SerializeToHexStr()).
 						Uint64("viewID", consensus.viewID).
 						Uint64("block", consensus.blockNum).
-						Msg("[onEpochChange] I am the New Leader")
+						Msg("[UpdateConsensusInformation] I am the New Leader")
 					consensus.ReadySignal <- struct{}{}
 				}()
 			}
@@ -547,4 +623,29 @@ func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
 	}
 
 	return false
+}
+
+func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
+	members := consensus.Decider.Participants()
+	if _, ok := consensus.bhpSigs[viewID]; !ok {
+		consensus.bhpSigs[viewID] = map[string]*bls.Sign{}
+	}
+	if _, ok := consensus.nilSigs[viewID]; !ok {
+		consensus.nilSigs[viewID] = map[string]*bls.Sign{}
+	}
+	if _, ok := consensus.viewIDSigs[viewID]; !ok {
+		consensus.viewIDSigs[viewID] = map[string]*bls.Sign{}
+	}
+	if _, ok := consensus.bhpBitmap[viewID]; !ok {
+		bhpBitmap, _ := bls_cosi.NewMask(members, nil)
+		consensus.bhpBitmap[viewID] = bhpBitmap
+	}
+	if _, ok := consensus.nilBitmap[viewID]; !ok {
+		nilBitmap, _ := bls_cosi.NewMask(members, nil)
+		consensus.nilBitmap[viewID] = nilBitmap
+	}
+	if _, ok := consensus.viewIDBitmap[viewID]; !ok {
+		viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
+		consensus.viewIDBitmap[viewID] = viewIDBitmap
+	}
 }

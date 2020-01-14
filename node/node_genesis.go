@@ -23,14 +23,19 @@ import (
 )
 
 const (
-	// GenesisFund is the initial total fund in the genesis block for mainnet.
-	GenesisFund = 12600000000
+	// GenesisONEToken is the initial total number of ONE in the genesis block for mainnet.
+	GenesisONEToken = 12600000000
 	// TestAccountNumber is the number of test accounts for testnet/devnet/
 	TestAccountNumber = 100
 	// ContractDeployerInitFund is the initial fund for the contract deployer account in testnet/devnet.
 	ContractDeployerInitFund = 100000000
 	// InitFreeFund is the initial fund for permissioned accounts for testnet/devnet/
 	InitFreeFund = 100
+)
+
+var (
+	// GenesisFund is the initial total number of ONE (in Nano) in the genesis block for mainnet.
+	GenesisFund = new(big.Int).Mul(big.NewInt(GenesisONEToken), big.NewInt(denominations.One))
 )
 
 // genesisInitializer is a shardchain.DBInitializer adapter.
@@ -41,22 +46,26 @@ type genesisInitializer struct {
 // InitChainDB sets up a new genesis block in the database for the given shard.
 func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) error {
 	shardState, _ := committee.WithStakingEnabled.Compute(
-		big.NewInt(core.GenesisEpoch), gi.node.chainConfig, nil,
+		big.NewInt(core.GenesisEpoch), nil,
 	)
+	if shardState == nil {
+		return errors.New("failed to create genesis shard state")
+	}
+
 	if shardID != shard.BeaconChainShardID {
 		// store only the local shard for shard chains
 		c := shardState.FindCommitteeByID(shardID)
 		if c == nil {
 			return errors.New("cannot find local shard in genesis")
 		}
-		shardState = shard.State{*c}
+		shardState = &shard.State{nil, []shard.Committee{*c}}
 	}
 	gi.node.SetupGenesisBlock(db, shardID, shardState)
 	return nil
 }
 
 // SetupGenesisBlock sets up a genesis blockchain.
-func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState shard.State) {
+func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardState *shard.State) {
 	utils.Logger().Info().Interface("shardID", shardID).Msg("setting up a brand new chain database")
 	if shardID == node.NodeConfig.ShardID {
 		node.isFirstTime = true
@@ -72,9 +81,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		chainConfig = *params.MainnetChainConfig
 		if shardID == 0 {
 			foundationAddress := common.HexToAddress("0xE25ABC3f7C3d5fB7FB81EAFd421FF1621A61107c")
-			genesisFunds := big.NewInt(GenesisFund)
-			genesisFunds = genesisFunds.Mul(genesisFunds, big.NewInt(denominations.One))
-			genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: genesisFunds}
+			genesisAlloc[foundationAddress] = core.GenesisAccount{Balance: GenesisFund}
 		}
 	case nodeconfig.Pangaea:
 		chainConfig = *params.PangaeaChainConfig
@@ -99,7 +106,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		ShardID:        shardID,
 		GasLimit:       params.GenesisGasLimit,
 		ShardStateHash: myShardState.Hash(),
-		ShardState:     myShardState.DeepCopy(),
+		ShardState:     *myShardState.DeepCopy(),
 		Timestamp:      1561734000, // GMT: Friday, June 28, 2019 3:00:00 PM. PST: Friday, June 28, 2019 8:00:00 AM
 		ExtraData:      []byte("Harmony for One and All. Open Consensus for 10B."),
 	}

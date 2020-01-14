@@ -1,8 +1,11 @@
 package node
 
 import (
+	"container/ring"
 	"crypto/ecdsa"
 	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,10 +18,10 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -33,6 +36,7 @@ import (
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -107,11 +111,11 @@ type Node struct {
 	ConfirmedBlockChannel chan *types.Block    // The channel to send confirmed blocks
 	BeaconBlockChannel    chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
 	DRand                 *drand.DRand         // The instance for distributed randomness protocol
-	pendingCrossLinks     []*block.Header
-	pendingClMutex        sync.Mutex
 
 	pendingCXReceipts map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex    sync.Mutex
+
+	pendingCLMutex sync.Mutex //mutex for read/write pending crosslinks
 
 	// Shard databases
 	shardChains shardchain.Collection
@@ -129,13 +133,9 @@ type Node struct {
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
 	BeaconNeighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 
-	TxPool *core.TxPool // TODO migrate to TxPool from pendingTransactions list below
+	TxPool *core.TxPool
 
 	CxPool *core.CxPool // pool for missing cross shard receipts resend
-
-	pendingTransactions map[common.Hash]*types.Transaction // All the transactions received but not yet processed for Consensus
-	pendingTxMutex      sync.Mutex
-	recentTxsStats      types.RecentTxsStats
 
 	pendingStakingTransactions map[common.Hash]*staking.StakingTransaction // All the staking transactions received but not yet processed for Consensus
 	pendingStakingTxMutex      sync.Mutex
@@ -214,23 +214,18 @@ type Node struct {
 
 	accountManager *accounts.Manager
 
-	// Next shard state
-	nextShardState struct {
-		// The received master shard state
-		master *shard.EpochShardState
-
-		// When for a leader to propose the next shard state,
-		// or for a validator to wait for a proposal before view change.
-		// TODO ek – replace with retry-based logic instead of delay
-		proposeTime time.Time
-	}
-
 	isFirstTime bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
 
 	// last time consensus reached for metrics
 	lastConsensusTime int64
+	// Last 1024 staking transaction error, only in memory
+	errorSink struct {
+		sync.Mutex
+		failedStakingTxns *ring.Ring
+		failedTxns        *ring.Ring
+	}
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -255,6 +250,7 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	return bc
 }
 
+// TODO: make this batch more transactions
 func (node *Node) tryBroadcast(tx *types.Transaction) {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 
@@ -270,13 +266,24 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 	}
 }
 
+func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
+	msg := proto_node.ConstructStakingTransactionListMessageAccount(staking.StakingTransactions{stakingTx})
+
+	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(0)) // broadcast to beacon chain
+	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcastStaking")
+
+	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
+		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
+			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
+		} else {
+			break
+		}
+	}
+}
+
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	node.pendingTxMutex.Lock()
-
 	node.TxPool.AddRemotes(newTxs)
-
-	node.pendingTxMutex.Unlock()
 
 	pendingCount, queueCount := node.TxPool.Stats()
 	utils.Logger().Info().Int("length of newTxs", len(newTxs)).Int("totalPending", pendingCount).Int("totalQueued", queueCount).Msg("Got more transactions")
@@ -284,29 +291,48 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
-	txPoolLimit := 1000 // TODO: incorporate staking txn into TxPool
-	node.pendingStakingTxMutex.Lock()
-	for _, tx := range newStakingTxs {
-		if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
-			node.pendingStakingTransactions[tx.Hash()] = tx
+	// TODO: incorporate staking txn into TxPool
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
+		node.pendingStakingTxMutex.Lock()
+		for _, tx := range newStakingTxs {
+			const txPoolLimit = 1000
+			if s := len(node.pendingStakingTransactions); s >= txPoolLimit {
+				utils.Logger().Info().
+					Int("tx-pool-size", s).
+					Int("tx-pool-limit", txPoolLimit).
+					Msg("Current staking txn pool reached limit")
+				break
+			}
+			if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
+				node.pendingStakingTransactions[tx.Hash()] = tx
+			}
 		}
-		if len(node.pendingStakingTransactions) > txPoolLimit {
-			break
-		}
+		utils.Logger().Info().
+			Int("length of newStakingTxs", len(newStakingTxs)).
+			Int("totalPending", len(node.pendingStakingTransactions)).
+			Msg("Got more staking transactions")
+		node.pendingStakingTxMutex.Unlock()
 	}
-	node.pendingStakingTxMutex.Unlock()
-	utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingStakingTransactions)).Msg("Got more staking transactions")
 }
 
 // AddPendingStakingTransaction staking transactions
 func (node *Node) AddPendingStakingTransaction(
 	newStakingTx *staking.StakingTransaction) {
-	node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+	// TODO: everyone should record staking txns, not just leader
+	if node.Consensus.IsLeader() &&
+		node.NodeConfig.ShardID == shard.BeaconChainShardID {
+		node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+	} else {
+		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
+		node.tryBroadcastStaking(newStakingTx)
+	}
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 // This is only called from SDK.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
+	// TODO: everyone should record txns, not just leader
 	if node.Consensus.IsLeader() && newTx.ShardID() == node.NodeConfig.ShardID {
 		node.addPendingTransactions(types.Transactions{newTx})
 	} else {
@@ -321,20 +347,63 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	defer node.pendingCXMutex.Unlock()
 
 	if receipts.ContainsEmptyField() {
-		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("CXReceiptsProof contains empty field")
+		utils.Logger().Info().
+			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
+			Msg("CXReceiptsProof contains empty field")
 		return
 	}
 
 	blockNum := receipts.Header.Number().Uint64()
 	shardID := receipts.Header.ShardID()
+
+	// Sanity checks
+
+	if err := node.Blockchain().Validator().ValidateCXReceiptsProof(receipts); err != nil {
+		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
+			utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			return
+		}
+	}
+
+	// cross-shard receipt should not be coming from our shard
+	if s := node.Consensus.ShardID; s == shardID {
+		utils.Logger().Info().
+			Uint32("my-shard", s).
+			Uint32("receipt-shard", shardID).
+			Msg("ShardID of incoming receipt was same as mine")
+		return
+	}
+
+	if e := receipts.Header.Epoch(); blockNum == 0 ||
+		!node.Blockchain().Config().IsCrossLink(e) {
+		utils.Logger().Info().
+			Uint64("incoming-epoch", e.Uint64()).
+			Msg("Incoming receipt had meaningless epoch")
+		return
+	}
+
 	key := utils.GetPendingCXKey(shardID, blockNum)
 
+	// DDoS protection
+	const maxCrossTxnSize = 4096
+	if s := len(node.pendingCXReceipts); s >= maxCrossTxnSize {
+		utils.Logger().Info().
+			Int("pending-cx-receipts-size", s).
+			Int("pending-cx-receipts-limit", maxCrossTxnSize).
+			Msg("Current pending cx-receipts reached size limit")
+		return
+	}
+
 	if _, ok := node.pendingCXReceipts[key]; ok {
-		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Already Got Same Receipt message")
+		utils.Logger().Info().
+			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
+			Msg("Already Got Same Receipt message")
 		return
 	}
 	node.pendingCXReceipts[key] = receipts
-	utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
+	utils.Logger().Info().
+		Int("totalPendingReceipts", len(node.pendingCXReceipts)).
+		Msg("Got ONE more receipt message")
 }
 
 func (node *Node) startRxPipeline(
@@ -380,9 +449,15 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 }
 
 // New creates a new node.
-func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
+func New(host p2p.Host, consensusObj *consensus.Consensus,
+	chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
-
+	const sinkSize = 1024
+	node.errorSink = struct {
+		sync.Mutex
+		failedStakingTxns *ring.Ring
+		failedTxns        *ring.Ring
+	}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)}
 	node.syncFreq = SyncFrequency
 	node.beaconSyncFreq = SyncFrequency
 
@@ -399,13 +474,8 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.SelfPeer = host.GetSelfPeer()
 	}
 
-	chainConfig := *params.TestnetChainConfig
-	switch node.NodeConfig.GetNetworkType() {
-	case nodeconfig.Mainnet:
-		chainConfig = *params.MainnetChainConfig
-	case nodeconfig.Pangaea:
-		chainConfig = *params.PangaeaChainConfig
-	}
+	networkType := node.NodeConfig.GetNetworkType()
+	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
 
 	collection := shardchain.NewCollection(
@@ -423,29 +493,39 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
+		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
+			fmt.Fprintf(
+				os.Stderr, "beaconchain-is-nil:%t shardchain-is-nil:%t", b1, b2,
+			)
+			os.Exit(-1)
+		}
 
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.recentTxsStats = make(types.RecentTxsStats)
 		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
 		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-			node.BeaconWorker = worker.New(node.Beaconchain().Config(), beaconChain, chain.Engine)
+			node.BeaconWorker = worker.New(
+				node.Beaconchain().Config(), beaconChain, chain.Engine,
+			)
 		}
 
 		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
-		node.pendingTransactions = make(map[common.Hash]*types.Transaction)
 		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
-		// the sequence number is the next block number to be added in consensus protocol, which is always one more than current chain header block
+		chain.Engine.SetSlasher(node.Consensus.Decider.(slash.Slasher))
+		chain.Engine.SetBeaconchain(beaconChain)
+
+		// the sequence number is the next block number to be added in consensus protocol, which is
+		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
 
 		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
-		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+		if networkType != nodeconfig.Mainnet {
 			if node.isFirstTime {
 				// Setup one time smart contracts
 				node.AddFaucetContractToPendingTransactions()
@@ -492,9 +572,12 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		Uint32("shardID", shardID).
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
-	pubKeys := committee.WithStakingEnabled.ComputePublicKeys(
+	shardState, err := committee.WithStakingEnabled.Compute(
 		epoch, node.Consensus.ChainReader,
-	)[int(shardID)]
+	)
+	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
+		shardState.FindCommitteeByID(shardID),
+	)
 	if len(pubKeys) == 0 {
 		utils.Logger().Error().
 			Uint32("shardID", shardID).

@@ -32,6 +32,9 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+// MsgNoShardStateFromDB error message for shard state reading failure
+var MsgNoShardStateFromDB = "failed to read shard state from DB"
+
 // Indicate whether the receipts corresponding to a blockHash is spent or not
 const (
 	SpentByte byte = iota
@@ -342,7 +345,7 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 	if body == nil {
 		return nil
 	}
-	return types.NewBlockWithHeader(header).WithBody(body.Transactions(), body.Uncles(), body.IncomingReceipts())
+	return types.NewBlockWithHeader(header).WithBody(body.Transactions(), body.StakingTransactions(), body.Uncles(), body.IncomingReceipts())
 }
 
 // WriteBlock serializes a block into the database, header and body separately.
@@ -414,39 +417,24 @@ func FindCommonAncestor(db DatabaseReader, a, b *block.Header) *block.Header {
 // ReadShardState retrieves sharding state.
 func ReadShardState(
 	db DatabaseReader, epoch *big.Int,
-) (shardState shard.State, err error) {
-	var data []byte
-	data, err = db.Get(shardStateKey(epoch))
+) (*shard.State, error) {
+	data, err := db.Get(shardStateKey(epoch))
 	if err != nil {
-		return nil, ctxerror.New("cannot read sharding state from rawdb",
+		return nil, ctxerror.New(MsgNoShardStateFromDB,
 			"epoch", epoch,
 		).WithCause(err)
 	}
-	if err = rlp.DecodeBytes(data, &shardState); err != nil {
+	ss, err2 := shard.DecodeWrapper(data)
+	if err2 != nil {
 		return nil, ctxerror.New("cannot decode sharding state",
 			"epoch", epoch,
-		).WithCause(err)
+		).WithCause(err2)
 	}
-	return shardState, nil
-}
-
-// WriteShardState stores sharding state into database.
-func WriteShardState(
-	db DatabaseWriter, epoch *big.Int, shardState shard.State,
-) (err error) {
-	data, err := rlp.EncodeToBytes(shardState)
-	if err != nil {
-		return ctxerror.New("cannot encode sharding state",
-			"epoch", epoch,
-		).WithCause(err)
-	}
-	return WriteShardStateBytes(db, epoch, data)
+	return ss, nil
 }
 
 // WriteShardStateBytes stores sharding state into database.
-func WriteShardStateBytes(
-	db DatabaseWriter, epoch *big.Int, data []byte,
-) (err error) {
+func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) (err error) {
 	if err = db.Put(shardStateKey(epoch), data); err != nil {
 		return ctxerror.New("cannot write sharding state",
 			"epoch", epoch,
@@ -515,18 +503,18 @@ func WriteEpochVdfBlockNum(db DatabaseWriter, epoch *big.Int, data []byte) error
 }
 
 // ReadCrossLinkShardBlock retrieves the blockHash given shardID and blockNum
-func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64, temp bool) ([]byte, error) {
-	return db.Get(crosslinkKey(shardID, blockNum, temp))
+func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64) ([]byte, error) {
+	return db.Get(crosslinkKey(shardID, blockNum))
 }
 
 // WriteCrossLinkShardBlock stores the blockHash given shardID and blockNum
-func WriteCrossLinkShardBlock(db DatabaseWriter, shardID uint32, blockNum uint64, data []byte, temp bool) error {
-	return db.Put(crosslinkKey(shardID, blockNum, temp), data)
+func WriteCrossLinkShardBlock(db DatabaseWriter, shardID uint32, blockNum uint64, data []byte) error {
+	return db.Put(crosslinkKey(shardID, blockNum), data)
 }
 
 // DeleteCrossLinkShardBlock deletes the blockHash given shardID and blockNum
-func DeleteCrossLinkShardBlock(db DatabaseDeleter, shardID uint32, blockNum uint64, temp bool) error {
-	return db.Delete(crosslinkKey(shardID, blockNum, temp))
+func DeleteCrossLinkShardBlock(db DatabaseDeleter, shardID uint32, blockNum uint64) error {
+	return db.Delete(crosslinkKey(shardID, blockNum))
 }
 
 // ReadShardLastCrossLink read the last cross link of a shard
@@ -539,39 +527,45 @@ func WriteShardLastCrossLink(db DatabaseWriter, shardID uint32, data []byte) err
 	return db.Put(shardLastCrosslinkKey(shardID), data)
 }
 
+// ReadPendingCrossLinks retrieves last pending crosslinks.
+func ReadPendingCrossLinks(db DatabaseReader) ([]byte, error) {
+	return db.Get(pendingCrosslinkKey)
+}
+
+// WritePendingCrossLinks stores last pending crosslinks into database.
+func WritePendingCrossLinks(db DatabaseWriter, bytes []byte) error {
+	return db.Put(pendingCrosslinkKey, bytes)
+}
+
+// DeletePendingCrossLinks stores last pending crosslinks into database.
+func DeletePendingCrossLinks(db DatabaseDeleter) error {
+	return db.Delete(pendingCrosslinkKey)
+}
+
 // ReadCXReceipts retrieves all the transactions of receipts given destination shardID, number and blockHash
-func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash, temp bool) (types.CXReceipts, error) {
-	data, err := db.Get(cxReceiptKey(shardID, number, hash, temp))
-	if len(data) == 0 || err != nil {
-		utils.Logger().Info().Err(err).Uint64("number", number).Int("dataLen", len(data)).Msg("ReadCXReceipts")
+func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash) (types.CXReceipts, error) {
+	data, err := db.Get(cxReceiptKey(shardID, number, hash))
+	if err != nil || len(data) == 0 {
 		return nil, err
 	}
 	cxReceipts := types.CXReceipts{}
 	if err := rlp.DecodeBytes(data, &cxReceipts); err != nil {
-		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid cross-shard tx receipt array RLP")
 		return nil, err
 	}
 	return cxReceipts, nil
 }
 
 // WriteCXReceipts stores all the transaction receipts given destination shardID, blockNumber and blockHash
-func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash common.Hash, receipts types.CXReceipts, temp bool) error {
+func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash common.Hash, receipts types.CXReceipts) error {
 	bytes, err := rlp.EncodeToBytes(receipts)
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteCXReceipts] Failed to encode cross shard tx receipts")
 	}
 	// Store the receipt slice
-	if err := db.Put(cxReceiptKey(shardID, number, hash, temp), bytes); err != nil {
+	if err := db.Put(cxReceiptKey(shardID, number, hash), bytes); err != nil {
 		utils.Logger().Error().Msg("[WriteCXReceipts] Failed to store cxreceipts")
 	}
 	return err
-}
-
-// DeleteCXReceipts removes all receipt data associated with a block hash.
-func DeleteCXReceipts(db DatabaseDeleter, shardID uint32, number uint64, hash common.Hash, temp bool) {
-	if err := db.Delete(cxReceiptKey(shardID, number, hash, temp)); err != nil {
-		utils.Logger().Error().Msg("Failed to delete cross shard tx receipts")
-	}
 }
 
 // ReadCXReceiptsProofSpent check whether a CXReceiptsProof is unspent
@@ -614,11 +608,11 @@ func WriteCXReceiptsProofUnspentCheckpoint(db DatabaseWriter, shardID uint32, bl
 	return db.Put(cxReceiptUnspentCheckpointKey(shardID), by)
 }
 
-// ReadStakingValidator retrieves staking validator by its address
-func ReadStakingValidator(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
-	data, err := db.Get(stakingKey(addr))
-	if len(data) == 0 || err != nil {
-		utils.Logger().Info().Err(err).Msg("ReadStakingValidator")
+// ReadValidatorInformation retrieves staking validator by its address
+func ReadValidatorInformation(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
+	data, err := db.Get(validatorKey(addr))
+	if err != nil || len(data) == 0 {
+		utils.Logger().Info().Err(err).Msg("ReadValidatorInformation")
 		return nil, err
 	}
 	v := staking.ValidatorWrapper{}
@@ -629,22 +623,94 @@ func ReadStakingValidator(db DatabaseReader, addr common.Address) (*staking.Vali
 	return &v, nil
 }
 
-// WriteStakingValidator stores staking validator's information by its address
-func WriteStakingValidator(db DatabaseWriter, v *staking.ValidatorWrapper) error {
+// WriteValidatorData stores validator's information by its address
+func WriteValidatorData(db DatabaseWriter, v *staking.ValidatorWrapper) error {
 	bytes, err := rlp.EncodeToBytes(v)
 	if err != nil {
-		utils.Logger().Error().Msg("[WriteStakingValidator] Failed to encode")
+		utils.Logger().Error().Msg("[WriteValidatorData] Failed to encode")
+		return err
 	}
-	if err := db.Put(stakingKey(v.Address), bytes); err != nil {
-		utils.Logger().Error().Msg("[WriteStakingValidator] Failed to store to database")
+	if err := db.Put(validatorKey(v.Address), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorData] Failed to store to database")
+		return err
 	}
 	return err
 }
 
+// ReadValidatorSnapshot retrieves validator's snapshot by its address
+func ReadValidatorSnapshot(db DatabaseReader, addr common.Address) (*staking.ValidatorWrapper, error) {
+	data, err := db.Get(validatorSnapshotKey(addr))
+	if err != nil || len(data) == 0 {
+		utils.Logger().Info().Err(err).Msg("ReadValidatorSnapshot")
+		return nil, err
+	}
+	v := staking.ValidatorWrapper{}
+	if err := rlp.DecodeBytes(data, &v); err != nil {
+		utils.Logger().Error().Err(err).Str("address", addr.Hex()).Msg("Unable to decode validator snapshot from database")
+		return nil, err
+	}
+	return &v, nil
+}
+
+// WriteValidatorSnapshot stores validator's snapshot by its address
+func WriteValidatorSnapshot(db DatabaseWriter, v *staking.ValidatorWrapper) error {
+	bytes, err := rlp.EncodeToBytes(v)
+	if err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorSnapshot] Failed to encode")
+		return err
+	}
+	if err := db.Put(validatorSnapshotKey(v.Address), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorSnapshot] Failed to store to database")
+		return err
+	}
+	return err
+}
+
+// ReadValidatorStats retrieves validator's stats by its address
+func ReadValidatorStats(db DatabaseReader, addr common.Address) (*staking.ValidatorStats, error) {
+	data, err := db.Get(validatorStatsKey(addr))
+	if err != nil || len(data) == 0 {
+		utils.Logger().Info().Err(err).Msg("ReadValidatorStats")
+		return nil, err
+	}
+	stats := staking.ValidatorStats{}
+	if err := rlp.DecodeBytes(data, &stats); err != nil {
+		utils.Logger().Error().Err(err).Str("address", addr.Hex()).Msg("Unable to decode validator stats from database")
+		return nil, err
+	}
+	return &stats, nil
+}
+
+// WriteValidatorStats stores validator's stats by its address
+func WriteValidatorStats(db DatabaseWriter, addr common.Address, stats *staking.ValidatorStats) error {
+	bytes, err := rlp.EncodeToBytes(stats)
+	if err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorStats] Failed to encode")
+		return err
+	}
+	if err := db.Put(validatorStatsKey(addr), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorStats] Failed to store to database")
+		return err
+	}
+	return err
+}
+
+// DeleteValidatorSnapshot removes the validator's snapshot by its address
+func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address) {
+	if err := db.Delete(validatorSnapshotKey(addr)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete snapshot of a validator")
+	}
+}
+
 // ReadValidatorList retrieves staking validator by its address
-func ReadValidatorList(db DatabaseReader) ([]common.Address, error) {
-	data, err := db.Get([]byte("validatorList"))
-	if len(data) == 0 || err != nil {
+// Return only active validators if activeOnly==true, otherwise, return all validators
+func ReadValidatorList(db DatabaseReader, activeOnly bool) ([]common.Address, error) {
+	key := validatorListKey
+	if activeOnly {
+		key = activeValidatorListKey
+	}
+	data, err := db.Get(key)
+	if err != nil || len(data) == 0 {
 		return []common.Address{}, nil
 	}
 	addrs := []common.Address{}
@@ -656,39 +722,59 @@ func ReadValidatorList(db DatabaseReader) ([]common.Address, error) {
 }
 
 // WriteValidatorList stores staking validator's information by its address
-func WriteValidatorList(db DatabaseWriter, addrs []common.Address) error {
+// Writes only for active validators if activeOnly==true, otherwise, writes for all validators
+func WriteValidatorList(db DatabaseWriter, addrs []common.Address, activeOnly bool) error {
+	key := validatorListKey
+	if activeOnly {
+		key = activeValidatorListKey
+	}
+
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorList] Failed to encode")
 	}
-	if err := db.Put([]byte("validatorList"), bytes); err != nil {
+	if err := db.Put(key, bytes); err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorList] Failed to store to database")
 	}
 	return err
 }
 
-// ReadValidatorListByDelegator retrieves the list of validators delegated by a delegator
-func ReadValidatorListByDelegator(db DatabaseReader, delegator common.Address) ([]common.Address, error) {
+// ReadDelegationsByDelegator retrieves the list of validators delegated by a delegator
+func ReadDelegationsByDelegator(db DatabaseReader, delegator common.Address) ([]staking.DelegationIndex, error) {
 	data, err := db.Get(delegatorValidatorListKey(delegator))
-	if len(data) == 0 || err != nil {
-		return []common.Address{}, nil
+	if err != nil || len(data) == 0 {
+		return []staking.DelegationIndex{}, nil
 	}
-	addrs := []common.Address{}
+	addrs := []staking.DelegationIndex{}
 	if err := rlp.DecodeBytes(data, &addrs); err != nil {
-		utils.Logger().Error().Err(err).Msg("Unable to Decode validator List from database")
+		utils.Logger().Error().Err(err).Msg("Unable to Decode delegations from database")
 		return nil, err
 	}
 	return addrs, nil
 }
 
-// WriteValidatorListByDelegator stores the list of validators delegated by a delegator
-func WriteValidatorListByDelegator(db DatabaseWriter, delegator common.Address, addrs []common.Address) error {
-	bytes, err := rlp.EncodeToBytes(addrs)
+// WriteDelegationsByDelegator stores the list of validators delegated by a delegator
+func WriteDelegationsByDelegator(db DatabaseWriter, delegator common.Address, indices []staking.DelegationIndex) error {
+	bytes, err := rlp.EncodeToBytes(indices)
 	if err != nil {
-		utils.Logger().Error().Msg("[WriteValidatorListByDelegator] Failed to encode")
+		utils.Logger().Error().Msg("[writeDelegationsByDelegator] Failed to encode")
 	}
 	if err := db.Put(delegatorValidatorListKey(delegator), bytes); err != nil {
-		utils.Logger().Error().Msg("[WriteValidatorListByDelegator] Failed to store to database")
+		utils.Logger().Error().Msg("[writeDelegationsByDelegator] Failed to store to database")
 	}
 	return err
+}
+
+// ReadBlockRewardAccumulator ..
+func ReadBlockRewardAccumulator(db DatabaseReader, number uint64) (*big.Int, error) {
+	data, err := db.Get(blockRewardAccumKey(number))
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(data), nil
+}
+
+// WriteBlockRewardAccumulator ..
+func WriteBlockRewardAccumulator(db DatabaseWriter, newAccum *big.Int, number uint64) error {
+	return db.Put(blockRewardAccumKey(number), newAccum.Bytes())
 }

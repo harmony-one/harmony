@@ -1,4 +1,4 @@
-package utils
+package wallet
 
 import (
 	"io/ioutil"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestReadWalletProfile(t *testing.T) {
-	config := []*WalletProfile{
+	config := []*Profile{
 		{
 			Profile:   "default",
 			ChainID:   params.MainnetChainID.String(),
@@ -106,16 +106,16 @@ func TestReadWalletProfile(t *testing.T) {
 		t.Fatalf("Failed to read test.ini: %v", err)
 	}
 
-	config1, err := ReadWalletProfile(testIniBytes, "default")
+	config1, err := ReadProfile(testIniBytes, "default")
 	if err != nil {
-		t.Fatalf("ReadWalletProfile Error: %v", err)
+		t.Fatalf("ReadProfile Error: %v", err)
 	}
 	if !reflect.DeepEqual(config[0], config1) {
 		t.Errorf("Got: %v\nExpect: %v\n", config1, config[0])
 	}
-	config2, err := ReadWalletProfile(testIniBytes, "testnet")
+	config2, err := ReadProfile(testIniBytes, "testnet")
 	if err != nil {
-		t.Fatalf("ReadWalletProfile Error: %v", err)
+		t.Fatalf("ReadProfile Error: %v", err)
 	}
 	if !reflect.DeepEqual(config[1], config2) {
 		t.Errorf("Got: %v\nExpect: %v\n", config2, config[1])

@@ -17,6 +17,8 @@
 package core
 
 import (
+	"math/big"
+
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -54,5 +56,7 @@ type Validator interface {
 // of gas used in the process and return an error if any of the internal rules
 // failed.
 type Processor interface {
-	Process(block *types.Block, statedb *state.DB, cfg vm.Config) (types.Receipts, types.CXReceipts, []*types.Log, uint64, error)
+	Process(block *types.Block, statedb *state.DB, cfg vm.Config) (
+		types.Receipts, types.CXReceipts, []*types.Log, uint64, *big.Int, error,
+	)
 }

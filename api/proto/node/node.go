@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"log"
 
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	peer "github.com/libp2p/go-libp2p-peer"
 
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -25,9 +27,9 @@ const (
 	Transaction MessageType = iota
 	Block
 	Client
-	_    // used to be Control
-	PING // node send ip/pki to register with leader
-	ShardState
+	_          // used to be Control
+	PING       // node send ip/pki to register with leader
+	ShardState // Deprecated
 	Staking
 )
 
@@ -97,8 +99,8 @@ type BlockMessageType int
 const (
 	Sync BlockMessageType = iota
 
-	Header  // used for crosslink from beacon chain to shard chain
-	Receipt // cross-shard transaction receipts
+	CrossLink // used for crosslink from beacon chain to shard chain
+	Receipt   // cross-shard transaction receipts
 )
 
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
@@ -138,6 +140,21 @@ func ConstructTransactionListMessageAccount(transactions types.Transactions) []b
 	return byteBuffer.Bytes()
 }
 
+// ConstructStakingTransactionListMessageAccount constructs serialized staking transactions in account model
+func ConstructStakingTransactionListMessageAccount(transactions types2.StakingTransactions) []byte {
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
+	byteBuffer.WriteByte(byte(Staking))
+	byteBuffer.WriteByte(byte(Send))
+
+	txs, err := rlp.EncodeToBytes(transactions)
+	if err != nil {
+		log.Fatal(err)
+		return []byte{} // TODO(RJ): better handle of the error
+	}
+	byteBuffer.Write(txs)
+	return byteBuffer.Bytes()
+}
+
 // ConstructBlocksSyncMessage constructs blocks sync message to send blocks to other nodes
 func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
@@ -149,45 +166,27 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 	return byteBuffer.Bytes()
 }
 
-// ConstructCrossLinkHeadersMessage constructs cross link header message to send to beacon chain
-func ConstructCrossLinkHeadersMessage(headers []*block.Header) []byte {
+// ConstructCrossLinkMessage constructs cross link message to send to beacon chain
+func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(Header))
+	byteBuffer.WriteByte(byte(CrossLink))
 
-	headersData, _ := rlp.EncodeToBytes(headers)
-	byteBuffer.Write(headersData)
-	return byteBuffer.Bytes()
-}
-
-// ConstructEpochShardStateMessage contructs epoch shard state message
-func ConstructEpochShardStateMessage(epochShardState shard.EpochShardState) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(ShardState))
-
-	encoder := gob.NewEncoder(byteBuffer)
-	err := encoder.Encode(epochShardState)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[ConstructEpochShardStateMessage] Encode")
-		return nil
+	crosslinks := []types.CrossLink{}
+	for _, header := range headers {
+		if header.Number().Uint64() <= 1 || !bc.Config().IsCrossLink(header.Epoch()) {
+			continue
+		}
+		parentHeader := bc.GetHeaderByHash(header.ParentHash())
+		if parentHeader == nil {
+			continue
+		}
+		epoch := parentHeader.Epoch()
+		crosslinks = append(crosslinks, types.NewCrossLink(header, epoch))
 	}
+	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
+	byteBuffer.Write(crosslinksData)
 	return byteBuffer.Bytes()
-}
-
-// DeserializeEpochShardStateFromMessage deserializes the shard state Message from bytes payload
-func DeserializeEpochShardStateFromMessage(payload []byte) (*shard.EpochShardState, error) {
-	epochShardState := new(shard.EpochShardState)
-
-	r := bytes.NewBuffer(payload)
-	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(epochShardState)
-
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[GetEpochShardStateFromMessage] Decode")
-		return nil, fmt.Errorf("Decode epoch shard state Error")
-	}
-
-	return epochShardState, nil
 }
 
 // ConstructCXReceiptsProof constructs cross shard receipts and related proof including

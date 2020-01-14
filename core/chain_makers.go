@@ -188,7 +188,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil)
+			block, _, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil)
 			if err != nil {
 				panic(err)
 			}
@@ -265,9 +265,23 @@ func (cr *fakeChainReader) Config() *params.ChainConfig {
 }
 
 func (cr *fakeChainReader) CurrentHeader() *block.Header                            { return nil }
+func (cr *fakeChainReader) ShardID() uint32                                         { return 0 }
 func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *block.Header           { return nil }
 func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *block.Header          { return nil }
 func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Header { return nil }
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
-func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (shard.State, error)      { return nil, nil }
-func (cr *fakeChainReader) CurrentValidatorAddresses() []common.Address             { return nil }
+func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (*shard.State, error)     { return nil, nil }
+func (cr *fakeChainReader) ReadActiveValidatorList() ([]common.Address, error)      { return nil, nil }
+func (cr *fakeChainReader) ReadValidatorList() ([]common.Address, error)            { return nil, nil }
+func (cr *fakeChainReader) ValidatorCandidates() []common.Address                   { return nil }
+func (cr *fakeChainReader) SuperCommitteeForNextEpoch(beacon consensus_engine.ChainReader, header *block.Header, isVerify bool) (*shard.State, error) {
+	return nil, nil
+}
+func (cr *fakeChainReader) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+func (cr *fakeChainReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+func (cr *fakeChainReader) ReadBlockRewardAccumulator(uint64) (*big.Int, error)         { return nil, nil }
+func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) *big.Int { return nil }

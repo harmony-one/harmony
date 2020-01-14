@@ -2,8 +2,8 @@ package hmyapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
-
 	"math/big"
 	"time"
 
@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
@@ -21,6 +20,7 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -46,6 +46,7 @@ type BlockArgs struct {
 	InclTx      bool     `json:"inclTx"`
 	FullTx      bool     `json:"fullTx"`
 	Signers     []string `json:"signers"`
+	InclStaking bool     `json:"inclStaking"`
 }
 
 // GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
@@ -53,7 +54,7 @@ type BlockArgs struct {
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if block != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx}
+		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
 		response, err := RPCMarshalBlock(block, blockArgs)
 		if err == nil && blockNr == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
@@ -71,7 +72,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.GetBlock(ctx, blockHash)
 	if block != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx}
+		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
 		return RPCMarshalBlock(block, blockArgs)
 	}
 	return nil, err
@@ -153,7 +154,7 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 		return nil, err
 	}
 	validators := make([]map[string]interface{}, 0)
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		validatorBalance := new(hexutil.Big)
 		validatorBalance, err = s.b.GetBalance(validator.EcdsaAddress)
 		if err != nil {
@@ -193,8 +194,8 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 	if err != nil {
 		return nil, err
 	}
-	pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-	for i, validator := range committee.NodeList {
+	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+	for i, validator := range committee.Slots {
 		pubkeys[i] = new(bls.PublicKey)
 		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
@@ -210,7 +211,7 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 	if err != nil {
 		return result, err
 	}
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return result, err
@@ -241,8 +242,8 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 	if err != nil {
 		return false, err
 	}
-	pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
-	for i, validator := range committee.NodeList {
+	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+	for i, validator := range committee.Slots {
 		pubkeys[i] = new(bls.PublicKey)
 		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
@@ -254,7 +255,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 	if err != nil {
 		return false, err
 	}
-	for _, validator := range committee.NodeList {
+	for _, validator := range committee.Slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return false, err
@@ -298,62 +299,20 @@ func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 	return s.LatestHeader(ctx).Leader
 }
 
-// GetValidatorInformation returns full validator info.
-func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (map[string]interface{}, error) {
-	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
-	slotPubKeys := make([]string, 0)
-	for _, slotPubKey := range validator.SlotPubKeys {
-		slotPubKeys = append(slotPubKeys, slotPubKey.Hex())
+// GetValidatorSelfDelegation returns validator stake.
+func (s *PublicBlockChainAPI) GetValidatorSelfDelegation(ctx context.Context, address string) hexutil.Uint64 {
+	return hexutil.Uint64(s.b.GetValidatorSelfDelegation(internal_common.ParseAddr(address)).Uint64())
+}
+
+// GetValidatorTotalDelegation returns total balace stacking for validator with delegation.
+func (s *PublicBlockChainAPI) GetValidatorTotalDelegation(ctx context.Context, address string) hexutil.Uint64 {
+	delegations := s.b.GetDelegationsByValidator(internal_common.ParseAddr(address))
+	totalStake := big.NewInt(0)
+	for _, delegation := range delegations {
+		totalStake.Add(totalStake, delegation.Amount)
 	}
-	fields := map[string]interface{}{
-		"address":                 validator.Address.String(),
-		"stake":                   hexutil.Uint64(validator.Stake.Uint64()),
-		"name":                    validator.Description.Name,
-		"slotPubKeys":             slotPubKeys,
-		"unbondingHeight":         hexutil.Uint64(validator.UnbondingHeight.Uint64()),
-		"minSelfDelegation":       hexutil.Uint64(validator.MinSelfDelegation.Uint64()),
-		"active":                  validator.Active,
-		"identity":                validator.Description.Identity,
-		"commissionRate":          hexutil.Uint64(validator.Commission.CommissionRates.Rate.Int.Uint64()),
-		"commissionUpdateHeight":  hexutil.Uint64(validator.Commission.UpdateHeight.Uint64()),
-		"commissionMaxRate":       hexutil.Uint64(validator.Commission.CommissionRates.MaxRate.Uint64()),
-		"commissionMaxChangeRate": hexutil.Uint64(validator.Commission.CommissionRates.MaxChangeRate.Uint64()),
-		"website":                 validator.Description.Website,
-		"securityContact":         validator.Description.SecurityContact,
-		"details":                 validator.Description.Details,
-	}
-	return fields, nil
-}
-
-// GetStake returns validator stake.
-func (s *PublicBlockChainAPI) GetStake(ctx context.Context, address string) hexutil.Uint64 {
-	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
-	return hexutil.Uint64(validator.Stake.Uint64())
-}
-
-// GetValidatorStakingAddress stacking address returns validator stacking address.
-func (s *PublicBlockChainAPI) GetValidatorStakingAddress(ctx context.Context, address string) string {
-	validator := s.b.GetValidatorInformation(internal_common.ParseAddr(address))
-	return validator.Address.String()
-}
-
-// GetValidatorStakingWithDelegation returns total balace stacking for validator with delegation.
-func (s *PublicBlockChainAPI) GetValidatorStakingWithDelegation(ctx context.Context, address string) hexutil.Uint64 {
-	return hexutil.Uint64(s.b.GetValidatorStakingWithDelegation(internal_common.ParseAddr(address)).Uint64())
-}
-
-// GetDelegatorsInformation returns list of delegators for a validator address.
-func (s *PublicBlockChainAPI) GetDelegatorsInformation(ctx context.Context, address string) ([]map[string]interface{}, error) {
-	delegators := s.b.GetDelegatorsInformation(internal_common.ParseAddr(address))
-	delegatorsFields := make([]map[string]interface{}, 0)
-	for _, delegator := range delegators {
-		fields := map[string]interface{}{
-			"delegator": delegator.DelegatorAddress.String(),
-			"amount":    hexutil.Uint64(delegator.Amount.Uint64()),
-		}
-		delegatorsFields = append(delegatorsFields, fields)
-	}
-	return delegatorsFields, nil
+	// TODO: return more than uint64
+	return hexutil.Uint64(totalStake.Uint64())
 }
 
 // GetShardingStructure returns an array of sharding structures.
@@ -528,4 +487,146 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformation {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
 	return newHeaderInformation(header)
+}
+
+var (
+	errNotExplorerNode = errors.New("cannot call this rpc on non beaconchain explorer node")
+)
+
+// GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
+// explorer node
+func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (uint64, error) {
+	if s.b.IsBeaconChainExplorerNode() {
+		return s.GetMedianRawStakeSnapshot()
+	}
+	return 0, errNotExplorerNode
+}
+
+// GetAllValidatorAddresses returns all validator addresses.
+func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
+	addresses := []string{}
+	for _, addr := range s.b.GetAllValidatorAddresses() {
+		oneAddr, _ := internal_common.AddressToBech32(addr)
+		addresses = append(addresses, oneAddr)
+	}
+	return addresses, nil
+}
+
+// GetActiveValidatorAddresses returns active validator addresses.
+func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]string, error) {
+	addresses := []string{}
+	for _, addr := range s.b.GetActiveValidatorAddresses() {
+		oneAddr, _ := internal_common.AddressToBech32(addr)
+		addresses = append(addresses, oneAddr)
+	}
+	return addresses, nil
+}
+
+// GetValidatorMetrics ..
+func (s *PublicBlockChainAPI) GetValidatorMetrics(ctx context.Context, address string) (*staking.ValidatorStats, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	stats := s.b.GetValidatorStats(validatorAddress)
+	if stats == nil {
+		return nil, fmt.Errorf("validator stats not found: %s", validatorAddress.Hex())
+	}
+	return stats, nil
+}
+
+// GetValidatorInformation returns information about a validator.
+func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (*staking.Validator, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	validator := s.b.GetValidatorInformation(validatorAddress)
+	if validator == nil {
+		return nil, fmt.Errorf("validator not found: %s", validatorAddress.Hex())
+	}
+	return validator, nil
+}
+
+// GetDelegationsByDelegator returns list of delegations for a delegator address.
+func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, address string) ([]*RPCDelegation, error) {
+	delegatorAddress := internal_common.ParseAddr(address)
+	validators, delegations := s.b.GetDelegationsByDelegator(delegatorAddress)
+	result := []*RPCDelegation{}
+	for i := range delegations {
+		delegation := delegations[i]
+
+		undelegations := []RPCUndelegation{}
+
+		for j := range delegation.Undelegations {
+			undelegations = append(undelegations, RPCUndelegation{
+				delegation.Undelegations[j].Amount,
+				delegation.Undelegations[j].Epoch,
+			})
+		}
+		valAddr, _ := internal_common.AddressToBech32(validators[i])
+		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
+		result = append(result, &RPCDelegation{
+			valAddr,
+			delAddr,
+			delegation.Amount,
+			delegation.Reward,
+			undelegations,
+		})
+	}
+	return result, nil
+}
+
+// GetDelegationsByValidator returns list of delegations for a validator address.
+func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, address string) ([]*RPCDelegation, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	delegations := s.b.GetDelegationsByValidator(validatorAddress)
+	result := make([]*RPCDelegation, 0)
+	for _, delegation := range delegations {
+
+		undelegations := []RPCUndelegation{}
+
+		for j := range delegation.Undelegations {
+			undelegations = append(undelegations, RPCUndelegation{
+				delegation.Undelegations[j].Amount,
+				delegation.Undelegations[j].Epoch,
+			})
+		}
+		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
+		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
+		result = append(result, &RPCDelegation{
+			valAddr,
+			delAddr,
+			delegation.Amount,
+			delegation.Reward,
+			undelegations,
+		})
+	}
+	return result, nil
+}
+
+// GetDelegationByDelegatorAndValidator returns a delegation for delegator and validator.
+func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.Context, address string, validator string) (*RPCDelegation, error) {
+	delegatorAddress := internal_common.ParseAddr(address)
+	validatorAddress := internal_common.ParseAddr(validator)
+	validators, delegations := s.b.GetDelegationsByDelegator(delegatorAddress)
+	for i := range delegations {
+		if validators[i] != validatorAddress {
+			continue
+		}
+		delegation := delegations[i]
+
+		undelegations := []RPCUndelegation{}
+
+		for j := range delegation.Undelegations {
+			undelegations = append(undelegations, RPCUndelegation{
+				delegation.Undelegations[j].Amount,
+				delegation.Undelegations[j].Epoch,
+			})
+		}
+		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
+		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
+		return &RPCDelegation{
+			valAddr,
+			delAddr,
+			delegation.Amount,
+			delegation.Reward,
+			undelegations,
+		}, nil
+	}
+	return nil, nil
 }

@@ -4,12 +4,12 @@ import (
 	"errors"
 	"io"
 	"math/big"
-	"reflect"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 var (
@@ -35,7 +35,20 @@ func (d *txdata) CopyFrom(d2 *txdata) {
 	d.AccountNonce = d2.AccountNonce
 	d.Price = new(big.Int).Set(d2.Price)
 	d.GasLimit = d2.GasLimit
-	d.StakeMsg = reflect.New(reflect.ValueOf(d2.StakeMsg).Elem().Type()).Interface()
+	// This is workaround, direct RLP encoding/decoding not work
+	if d2.StakeMsg == nil {
+		utils.Logger().Debug().Msg("[CopyFrom] d2.StakeMsg is nil")
+	}
+	payload, _ := rlp.EncodeToBytes(d2.StakeMsg)
+	restored, err := RLPDecodeStakeMsg(
+		payload, d2.Directive,
+	)
+	if restored == nil || err != nil {
+		utils.Logger().Error().Err(err).Msg("[CopyFrom] RLPDeocdeStakeMsg returns nil/err")
+		d.StakeMsg = d2.StakeMsg
+	} else {
+		d.StakeMsg = restored.(StakeMsg).Copy()
+	}
 	d.V = new(big.Int).Set(d2.V)
 	d.R = new(big.Int).Set(d2.R)
 	d.S = new(big.Int).Set(d2.S)
@@ -89,6 +102,15 @@ var (
 
 // StakingTransactions is a stake slice type for basic sorting.
 type StakingTransactions []*StakingTransaction
+
+// Len ..
+func (s StakingTransactions) Len() int { return len(s) }
+
+// GetRlp implements Rlpable and returns the i'th element of s in rlp.
+func (s StakingTransactions) GetRlp(i int) []byte {
+	enc, _ := rlp.EncodeToBytes(s[i])
+	return enc
+}
 
 // Hash hashes the RLP encoding of tx.
 // It uniquely identifies the transaction.
@@ -194,6 +216,11 @@ func RLPDecodeStakeMsg(payload []byte, d Directive) (interface{}, error) {
 	}
 
 	return ds, nil
+}
+
+// RawSignatureValues return raw signature values.
+func (tx *StakingTransaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
+	return tx.data.V, tx.data.R, tx.data.S
 }
 
 // StakingType returns the type of staking transaction

@@ -38,7 +38,6 @@ import (
 	v3 "github.com/harmony-one/harmony/block/v3"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/taggedrlp"
 	"github.com/pkg/errors"
@@ -90,6 +89,10 @@ type BodyInterface interface {
 	// It returns nil if index is out of bounds.
 	TransactionAt(index int) *Transaction
 
+	// StakingTransactionAt returns the staking transaction at the given index in this block.
+	// It returns nil if index is out of bounds.
+	StakingTransactionAt(index int) *staking.StakingTransaction
+
 	// CXReceiptAt returns the CXReceipt given index (calculated from IncomingReceipts)
 	// It returns nil if index is out of bounds
 	CXReceiptAt(index int) *CXReceipt
@@ -97,6 +100,10 @@ type BodyInterface interface {
 	// SetTransactions sets the list of transactions with a deep copy of the
 	// given list.
 	SetTransactions(newTransactions []*Transaction)
+
+	// SetStakingTransactions sets the list of staking transactions with a deep copy of the
+	// given list.
+	SetStakingTransactions(newStakingTransactions []*staking.StakingTransaction)
 
 	// Uncles returns a deep copy of the list of uncle headers of this block.
 	Uncles() []*block.Header
@@ -190,11 +197,11 @@ func init() {
 
 // Block represents an entire block in the Harmony blockchain.
 type Block struct {
-	header           *block.Header
-	uncles           []*block.Header
-	transactions     Transactions
-	stks             staking.StakingTransactions
-	incomingReceipts CXReceiptsProofs
+	header              *block.Header
+	uncles              []*block.Header
+	transactions        Transactions
+	stakingTransactions staking.StakingTransactions
+	incomingReceipts    CXReceiptsProofs
 
 	// caches
 	hash atomic.Value
@@ -271,16 +278,29 @@ func init() {
 // The values of TxHash, UncleHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs,
 // and receipts.
-func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof, stks []*staking.StakingTransaction) *Block {
+func NewBlock(
+	header *block.Header, txs []*Transaction,
+	receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof,
+	stks []*staking.StakingTransaction) *Block {
 	b := &Block{header: CopyHeader(header)}
 
-	// TODO: panic if len(txs) != len(receipts)
-	if len(txs) == 0 {
+	if len(receipts) != len(txs)+len(stks) {
+		return nil
+	}
+
+	if len(txs) == 0 && len(stks) == 0 {
 		b.header.SetTxHash(EmptyRootHash)
 	} else {
-		b.header.SetTxHash(DeriveSha(Transactions(txs)))
 		b.transactions = make(Transactions, len(txs))
 		copy(b.transactions, txs)
+
+		b.stakingTransactions = make(staking.StakingTransactions, len(stks))
+		copy(b.stakingTransactions, stks)
+
+		b.header.SetTxHash(DeriveSha(
+			Transactions(txs),
+			staking.StakingTransactions(stks),
+		))
 	}
 
 	if len(receipts) == 0 {
@@ -298,11 +318,6 @@ func NewBlock(header *block.Header, txs []*Transaction, receipts []*Receipt, out
 		b.header.SetIncomingReceiptHash(DeriveSha(CXReceiptsProofs(incxs)))
 		b.incomingReceipts = make(CXReceiptsProofs, len(incxs))
 		copy(b.incomingReceipts, incxs)
-	}
-
-	if len(stks) > 0 {
-		b.stks = make(staking.StakingTransactions, len(stks))
-		copy(b.stks, stks)
 	}
 
 	return b
@@ -332,7 +347,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	}
 	switch eb := eb.(type) {
 	case *extblockV2:
-		b.header, b.uncles, b.transactions, b.incomingReceipts, b.stks = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts, eb.Stks
+		b.header, b.uncles, b.transactions, b.incomingReceipts, b.stakingTransactions = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts, eb.Stks
 	case *extblockV1:
 		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
 	case *extblock:
@@ -349,7 +364,7 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
 	switch h := b.header.Header.(type) {
 	case *v3.Header:
-		eb = extblockV2{b.header, b.transactions, b.stks, b.uncles, b.incomingReceipts}
+		eb = extblockV2{b.header, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
 	case *v2.Header, *v1.Header:
 		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
 	case *v0.Header:
@@ -376,7 +391,7 @@ func (b *Block) Transactions() Transactions {
 
 // StakingTransactions returns stakingTransactions.
 func (b *Block) StakingTransactions() staking.StakingTransactions {
-	return b.stks
+	return b.stakingTransactions
 }
 
 // IncomingReceipts returns verified outgoing receipts
@@ -454,6 +469,7 @@ func (b *Block) Body() *Body {
 	}
 	return body.With().
 		Transactions(b.transactions).
+		StakingTransactions(b.stakingTransactions).
 		Uncles(b.uncles).
 		IncomingReceipts(b.incomingReceipts).
 		Body()
@@ -502,14 +518,16 @@ func (b *Block) WithSeal(header *block.Header) *Block {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(transactions []*Transaction, uncles []*block.Header, incomingReceipts CXReceiptsProofs) *Block {
+func (b *Block) WithBody(transactions []*Transaction, stakingTxns []*staking.StakingTransaction, uncles []*block.Header, incomingReceipts CXReceiptsProofs) *Block {
 	block := &Block{
-		header:           CopyHeader(b.header),
-		transactions:     make([]*Transaction, len(transactions)),
-		uncles:           make([]*block.Header, len(uncles)),
-		incomingReceipts: make([]*CXReceiptsProof, len(incomingReceipts)),
+		header:              CopyHeader(b.header),
+		transactions:        make([]*Transaction, len(transactions)),
+		stakingTransactions: make([]*staking.StakingTransaction, len(stakingTxns)),
+		uncles:              make([]*block.Header, len(uncles)),
+		incomingReceipts:    make([]*CXReceiptsProof, len(incomingReceipts)),
 	}
 	copy(block.transactions, transactions)
+	copy(block.stakingTransactions, stakingTxns)
 	copy(block.incomingReceipts, incomingReceipts)
 	for i := range uncles {
 		block.uncles[i] = CopyHeader(uncles[i])
@@ -577,20 +595,6 @@ func (b *Block) AddVrf(vrf []byte) {
 // AddVdf add vdf into block header
 func (b *Block) AddVdf(vdf []byte) {
 	b.header.SetVdf(vdf)
-}
-
-// AddShardState add shardState into block header
-func (b *Block) AddShardState(shardState shard.State) error {
-	// Make a copy because State.Hash() internally sorts entries.
-	// Store the sorted copy.
-	shardState = append(shardState[:0:0], shardState...)
-	b.header.SetShardStateHash(shardState.Hash())
-	data, err := rlp.EncodeToBytes(shardState)
-	if err != nil {
-		return err
-	}
-	b.header.SetShardState(data)
-	return nil
 }
 
 // Logger returns a sub-logger with block contexts added.

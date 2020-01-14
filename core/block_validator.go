@@ -52,9 +52,8 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 	return validator
 }
 
-// ValidateBody validates the given block's uncles and verifies the block
-// header's transaction and uncle roots. The headers are assumed to be already
-// validated at this point.
+// ValidateBody verifies the block header's transaction root.
+// The headers are assumed to be already validated at this point.
 func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	// Check whether the block's known, and if not, that it's linkable
 	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
@@ -71,7 +70,10 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	//if err := v.engine.VerifyUncles(v.bc, block); err != nil {
 	//	return err
 	//}
-	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash() {
+	if hash := types.DeriveSha(
+		block.Transactions(),
+		block.StakingTransactions(),
+	); hash != header.TxHash() {
 		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash())
 	}
 	return nil
@@ -98,7 +100,7 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash(), receiptSha)
 	}
 
-	if v.config.IsCrossTx(block.Epoch()) {
+	if v.config.HasCrossTxFields(block.Epoch()) {
 		cxsSha := types.DeriveMultipleShardsSha(cxReceipts)
 		if cxsSha != header.OutgoingReceiptHash() {
 			return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash(), cxsSha)
@@ -173,7 +175,7 @@ func CalcGasLimit(parent *types.Block, gasFloor, gasCeil uint64) uint64 {
 
 // ValidateCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
 func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) error {
-	if !v.config.IsCrossTx(cxp.Header.Epoch()) {
+	if !v.config.AcceptsCrossTx(cxp.Header.Epoch()) {
 		return ctxerror.New("[ValidateCXReceiptsProof] cross shard receipt received before cx fork")
 	}
 
@@ -185,7 +187,7 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	merkleProof := cxp.MerkleProof
 	shardRoot := common.Hash{}
 	foundMatchingShardID := false
-	byteBuffer := bytes.NewBuffer([]byte{})
+	byteBuffer := bytes.Buffer{}
 
 	// prepare to calculate source shard outgoing cxreceipts root hash
 	for j := 0; j < len(merkleProof.ShardIDs); j++ {

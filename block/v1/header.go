@@ -406,12 +406,11 @@ func (h *Header) Logger(logger *zerolog.Logger) *zerolog.Logger {
 
 // GetShardState returns the deserialized shard state object.
 func (h *Header) GetShardState() (shard.State, error) {
-	shardState := shard.State{}
-	err := rlp.DecodeBytes(h.ShardState(), &shardState)
+	state, err := shard.DecodeWrapper(h.ShardState())
 	if err != nil {
-		return nil, err
+		return shard.State{}, err
 	}
-	return shardState, nil
+	return *state, nil
 }
 
 // Copy returns a copy of the given header.

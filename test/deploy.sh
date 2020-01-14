@@ -59,6 +59,36 @@ function cleanup_and_result() {
    [ -e $RESULT_FILE ] && cat $RESULT_FILE
 }
 
+function debug_staking() {
+   source "$(go env GOPATH)/src/github.com/harmony-one/harmony/scripts/setup_bls_build_flags.sh"
+   hmy_gosdk="$(go env GOPATH)/src/github.com/harmony-one/go-sdk"
+   hmy_bin="${hmy_gosdk}/hmy"
+   hmy_ops="/tmp/harmony-ops"
+   keystore="${hmy_ops}/test-automation/api-tests/LocalnetValidatorKeys"
+
+   rm -rf $hmy_ops
+   git clone https://github.com/harmony-one/harmony-ops.git $hmy_ops
+
+   if [ ! -d "${hmy_gosdk}" ]; then
+     git clone https://github.com/harmony-one/go-sdk.git $hmy_gosdk
+   fi
+   if [ ! -f "${hmy_bin}" ]; then
+     make -C $hmy_gosdk
+   fi
+
+   hmy_version=$($hmy_bin version 2>&1 >/dev/null)
+   if [[ "${hmy_version:32:3}" -lt "135" ]]; then
+     echo "Aborting staking tests since CLI version is out of date."
+     return
+   fi
+
+   python3 -m pip install pyhmy
+   python3 -m pip install requests
+   python3 "${hmy_ops}/test-automation/api-tests/test.py" --keystore $keystore \
+            --cli_path $hmy_bin --test_dir "${hmy_ops}/test-automation/api-tests/tests/"  \
+            --rpc_endpoint_src="http://localhost:9500/" --rpc_endpoint_dst="http://localhost:9501/" --ignore_regression_test
+}
+
 trap cleanup_and_result SIGINT SIGTERM
 
 function usage {
@@ -192,6 +222,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 done < $config
 
 if [ "$DOTEST" == "true" ]; then
+   # debug_staking
    echo "waiting for some block rewards"
    sleep 60
    i=1
@@ -199,7 +230,7 @@ if [ "$DOTEST" == "true" ]; then
    while [ $i -le $NUM_TEST ]; do
       "${ROOT}/bin/wallet" -p local transfer --from $ACC1 --to $ACC3 --shardID 0 --toShardID 1 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
       "${ROOT}/bin/wallet" -p local transfer --from $ACC2 --to $ACC3 --shardID 1 --toShardID 0 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
-      sleep 20
+      sleep 25
       i=$((i+1))
    done
    echo "waiting for the result"

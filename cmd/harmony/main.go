@@ -1,11 +1,16 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"net"
+	"net/http"
 	"os"
 	"path"
 	"runtime"
@@ -13,9 +18,10 @@ import (
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/pkg/errors"
+
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -29,9 +35,11 @@ import (
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/libp2pctl"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -48,25 +56,8 @@ var (
 	myHost p2p.Host
 )
 
-// InitLDBDatabase initializes a LDBDatabase. isGenesis=true will return the beacon chain database for normal shard nodes
-func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethdb.LDBDatabase, error) {
-	var dbFileName string
-	if isBeacon {
-		dbFileName = fmt.Sprintf("./db/harmony_beacon_%s_%s", ip, port)
-	} else {
-		dbFileName = fmt.Sprintf("./db/harmony_%s_%s", ip, port)
-	}
-	if freshDB {
-		var err = os.RemoveAll(dbFileName)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}
-	return ethdb.NewLDBDatabase(dbFileName, 0, 0)
-}
-
 func printVersion() {
-	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
+	_, _ = fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
 	os.Exit(0)
 }
 
@@ -103,6 +94,8 @@ var (
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
+	// staking indicates whether the node is operating in staking mode.
+	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
 	// shardID indicates the shard ID of this node
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
@@ -129,6 +122,16 @@ var (
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
 	publicRPC       = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+	// Bad block revert
+	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
+	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
+	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
+	// libp2p control interface
+	libp2pctlFlag         = flag.Bool("libp2pctl", false, "Enable libp2p control interface")
+	libp2pctlPortFlag     = flag.String("libp2pctl_port", "4000", "libp2pctl port number (default: 4000)")
+	libp2pctlCertFlag     = flag.String("libp2pctl_cert", "harmony-libp2pctl-cert.pem", "libp2pctl HTTPS certificate filename (default: harmony-libp2pctl.crt)")
+	libp2pctlKeyFlag      = flag.String("libp2pctl_key", "harmony-libp2pctl-key.pem", "libp2pctl HTTPS private key filename (default: harmony-libp2pctl.key)")
+	libp2pctlClientCAFlag = flag.String("libp2pct_client_ca", "harmony-libp2pctl-client-ca.pem", "libp2pctl HTTPS client CA (default: harmony-libp2pctl-ca.pem)")
 )
 
 func initSetup() {
@@ -153,6 +156,9 @@ func initSetup() {
 	nodeconfig.GetDefaultConfig().Port = *port
 	nodeconfig.GetDefaultConfig().IP = *ip
 
+	// Set sharding schedule
+	nodeconfig.SetShardingSchedule(shard.Schedule)
+
 	// Setup mem profiling.
 	memprofiling.GetMemProfiling().Config()
 
@@ -162,12 +168,13 @@ func initSetup() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	if len(utils.BootNodes) == 0 {
-		bootNodeAddrs, err := utils.StringsToAddrs(utils.DefaultBootNodeAddrStrings)
+	if len(p2putils.BootNodes) == 0 {
+		bootNodeAddrs, err := p2putils.StringsToAddrs(p2putils.DefaultBootNodeAddrStrings)
 		if err != nil {
-			panic(err)
+			utils.FatalErrMsg(err, "cannot parse default bootnode list %#v",
+				p2putils.DefaultBootNodeAddrStrings)
 		}
-		utils.BootNodes = bootNodeAddrs
+		p2putils.BootNodes = bootNodeAddrs
 	}
 }
 
@@ -184,13 +191,13 @@ func passphraseForBls() {
 	}
 	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
 		os.Exit(100)
 	}
 	blsPassphrase = passphrase
 }
 
-func setupInitialAccount() (isLeader bool) {
+func setupLegacyNodeAccount() error {
 	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
@@ -198,29 +205,39 @@ func setupInitialAccount() (isLeader bool) {
 	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
-			isLeader, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
+			_, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
 			if initialAccount != nil {
 				break
 			}
 		}
 	} else {
-		isLeader, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+		_, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
 	}
 
 	if initialAccount == nil {
-		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", pubKey.SerializeToHexStr())
-		os.Exit(100)
+		return errors.Errorf("cannot find key %s in table", pubKey.SerializeToHexStr())
 	}
-
 	fmt.Printf("My Genesis Account: %v\n", *initialAccount)
+	return nil
+}
 
-	return isLeader
+func setupStakingNodeAccount() error {
+	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
+	shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
+	if err != nil {
+		return errors.Wrap(err, "cannot determine shard to join")
+	}
+	initialAccount = &genesis.DeployAccount{}
+	initialAccount.ShardID = shardID
+	initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
+	initialAccount.Address = ""
+	return nil
 }
 
 func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
 		os.Exit(100)
 	}
 	pubKey := consensusPriKey.GetPublicKey()
@@ -234,7 +251,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	return pubKey
 }
 
-func createGlobalConfig() *nodeconfig.ConfigType {
+func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	var err error
 
 	nodeConfig := nodeconfig.GetShardConfig(initialAccount.ShardID)
@@ -247,13 +264,7 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 
 	// Set network type
 	netType := nodeconfig.NetworkType(*networkType)
-	switch netType {
-	case nodeconfig.Mainnet, nodeconfig.Testnet, nodeconfig.Pangaea, nodeconfig.Localnet, nodeconfig.Devnet:
-		nodeconfig.SetNetworkType(netType)
-	default:
-		panic(fmt.Sprintf("invalid network type: %s", *networkType))
-	}
-
+	nodeconfig.SetNetworkType(netType) // sets for both global and shard configs
 	nodeConfig.SetPushgatewayIP(*pushgatewayIP)
 	nodeConfig.SetPushgatewayPort(*pushgatewayPort)
 	nodeConfig.SetMetricsFlag(*metricsFlag)
@@ -261,22 +272,23 @@ func createGlobalConfig() *nodeconfig.ConfigType {
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrapf(err, "cannot load or create P2P key at %#v",
+			*keyFile)
 	}
 
 	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
 
 	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create P2P network host")
+	}
 	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
 		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogger()))
-	}
-	if err != nil {
-		panic("unable to new host in harmony")
 	}
 
 	nodeConfig.DBDir = *dbDir
 
-	return nodeConfig
+	return nodeConfig, nil
 }
 
 func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
@@ -284,16 +296,23 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
 	)
 	currentConsensus.Decider.SetShardIDProvider(func() (uint32, error) {
 		return currentConsensus.ShardID, nil
 	})
-	currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
+	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		return currentConsensus.PubKey, nil
+	})
+
+	if initialAccount.Address != "" { // staking validator doesn't have to specify ECDSA address
+		currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
+	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
 	commitDelay, err := time.ParseDuration(*delayCommit)
@@ -381,7 +400,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// Set the consensus ID to be the current block number
 	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
-	currentConsensus.SetViewID(viewID)
+	currentConsensus.SetViewID(viewID + 1)
 	utils.Logger().Info().
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
@@ -402,7 +421,12 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 }
 
 func main() {
-	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
+	// HACK Force usage of go implementation rather than the C based one. Do the right way, see the
+	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
+	// build time.
+	os.Setenv("GODEBUG", "netdns=go")
+
+	flag.Var(&p2putils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
 	switch *nodeType {
@@ -410,7 +434,7 @@ func main() {
 	case "explorer":
 		break
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
+		_, _ = fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
 		os.Exit(1)
 	}
 
@@ -442,6 +466,9 @@ func main() {
 			os.Exit(1)
 		}
 		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
+	default:
+		_, _ = fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
+		os.Exit(2)
 	}
 
 	initSetup()
@@ -452,10 +479,23 @@ func main() {
 	}
 
 	if *nodeType == "validator" {
-		setupInitialAccount()
+		var err error
+		if *stakingFlag {
+			err = setupStakingNodeAccount()
+		} else {
+			err = setupLegacyNodeAccount()
+		}
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "cannot set up node account: %s\n", err)
+			os.Exit(1)
+		}
 	}
+	fmt.Printf("%s mode; node key %s -> shard %d\n",
+		map[bool]string{false: "Legacy", true: "Staking"}[*stakingFlag],
+		nodeconfig.GetDefaultConfig().ConsensusPubKey.SerializeToHexStr(),
+		initialAccount.ShardID)
 
-	if *shardID >= 0 {
+	if *nodeType != "validator" && *shardID >= 0 {
 		utils.Logger().Info().
 			Uint32("original", initialAccount.ShardID).
 			Int("override", *shardID).
@@ -463,7 +503,11 @@ func main() {
 		initialAccount.ShardID = uint32(*shardID)
 	}
 
-	nodeConfig := createGlobalConfig()
+	nodeConfig, err := createGlobalConfig()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
+		os.Exit(1)
+	}
 	currentNode := setupConsensusAndNode(nodeConfig)
 	//setup state syncing and beacon syncing frequency
 	currentNode.SetSyncFreq(*syncFreq)
@@ -472,6 +516,25 @@ func main() {
 	if nodeConfig.ShardID != shard.BeaconChainShardID && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 		utils.Logger().Info().Uint32("shardID", currentNode.Blockchain().ShardID()).Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
 		go currentNode.SupportBeaconSyncing()
+	}
+
+	if uint64(*doRevertBefore) != 0 && uint64(*revertTo) != 0 {
+		chain := currentNode.Blockchain()
+		if *revertBeacon {
+			chain = currentNode.Beaconchain()
+		}
+		curNum := chain.CurrentBlock().NumberU64()
+		if curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
+			// Remove invalid blocks
+			for chain.CurrentBlock().NumberU64() >= uint64(*revertTo) {
+				curBlock := chain.CurrentBlock()
+				rollbacks := []ethCommon.Hash{curBlock.Hash()}
+				chain.Rollback(rollbacks)
+				lastSig := curBlock.Header().LastCommitSignature()
+				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
+				chain.WriteLastCommits(sigAndBitMap)
+			}
+		}
 	}
 
 	startMsg := "==== New Harmony Node ===="
@@ -503,14 +566,47 @@ func main() {
 			Msg("StartRPC failed")
 	}
 
+	if *libp2pctlFlag {
+		port, err := net.LookupPort("tcp", *libp2pctlPortFlag)
+		if err != nil {
+			utils.FatalErrMsg(err, "cannot parse -libp2pctl_port %#v",
+				*libp2pctlPortFlag)
+		}
+		cert, err := tls.LoadX509KeyPair(*libp2pctlCertFlag, *libp2pctlKeyFlag)
+		if err != nil {
+			utils.FatalErrMsg(err, "cannot load libp2pctl TLS cert/key")
+		}
+		clientCAPEM, err := ioutil.ReadFile(*libp2pctlClientCAFlag)
+		if err != nil {
+			utils.FatalErrMsg(err, "cannot load libp2pctl client CA %s",
+				*libp2pctlClientCAFlag)
+		}
+		clientCAs := x509.NewCertPool()
+		if !clientCAs.AppendCertsFromPEM(clientCAPEM) {
+			utils.Fatal("no libp2pctl client CA in %s", *libp2pctlClientCAFlag)
+		}
+		tlsConfig := tls.Config{
+			Certificates: []tls.Certificate{cert},
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			ClientCAs:    clientCAs,
+		}
+		listenAddr := &net.TCPAddr{Port: port}
+		listener, err := net.ListenTCP("tcp", listenAddr)
+		if err != nil {
+			utils.FatalErrMsg(err, "cannot listen on libp2pctl port %d",
+				port)
+		}
+		tlsListener := tls.NewListener(listener, &tlsConfig)
+		ctl := libp2pctl.New(myHost.GetP2PHost())
+		go func() { _ = http.Serve(tlsListener, ctl.Handler()) }()
+		utils.Logger().Info().Interface("listenAddr", listenAddr).
+			Msg("started libp2pctl")
+	}
+
 	// Run additional node collectors
 	// Collect node metrics if metrics flag is set
 	if currentNode.NodeConfig.GetMetricsFlag() {
 		go currentNode.CollectMetrics()
-	}
-	// Commit committtee if node role is explorer
-	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
-		go currentNode.CommitCommittee()
 	}
 
 	currentNode.StartServer()

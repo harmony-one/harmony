@@ -8,39 +8,33 @@ import (
 	"github.com/harmony-one/harmony/block"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // ValidatorListProvider ..
 type ValidatorListProvider interface {
 	Compute(
-		epoch *big.Int, config params.ChainConfig, reader DataProvider,
-	) (shard.State, error)
-	ReadFromDB(epoch *big.Int, reader DataProvider) (shard.State, error)
-}
-
-// PublicKeysProvider per epoch
-type PublicKeysProvider interface {
-	ComputePublicKeys(epoch *big.Int, reader DataProvider) [][]*bls.PublicKey
-	ReadPublicKeysFromDB(
-		hash common.Hash, reader DataProvider,
-	) ([]*bls.PublicKey, error)
+		epoch *big.Int, reader DataProvider,
+	) (*shard.State, error)
+	ReadFromDB(epoch *big.Int, reader DataProvider) (*shard.State, error)
+	GetCommitteePublicKeys(committee *shard.Committee) []*bls.PublicKey
 }
 
 // Reader is committee.Reader and it is the API that committee membership assignment needs
 type Reader interface {
-	PublicKeysProvider
 	ValidatorListProvider
 }
 
 // StakingCandidatesReader ..
 type StakingCandidatesReader interface {
-	ValidatorInformation(addr common.Address) (*staking.Validator, error)
-	ValidatorStakingWithDelegation(addr common.Address) *big.Int
+	ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error)
+	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
 	ValidatorCandidates() []common.Address
 }
 
@@ -49,11 +43,13 @@ type ChainReader interface {
 	// ReadShardState retrieves sharding state given the epoch number.
 	// This api reads the shard state cached or saved on the chaindb.
 	// Thus, only should be used to read the shard state of the current chain.
-	ReadShardState(epoch *big.Int) (shard.State, error)
+	ReadShardState(epoch *big.Int) (*shard.State, error)
 	// GetHeader retrieves a block header from the database by hash and number.
 	GetHeaderByHash(common.Hash) *block.Header
 	// Config retrieves the blockchain's chain configuration.
 	Config() *params.ChainConfig
+	// CurrentHeader retrieves the current header from the local chain.
+	CurrentHeader() *block.Header
 }
 
 // DataProvider ..
@@ -67,15 +63,18 @@ type partialStakingEnabled struct{}
 var (
 	// WithStakingEnabled ..
 	WithStakingEnabled Reader = partialStakingEnabled{}
+	// ErrComputeForEpochInPast ..
+	ErrComputeForEpochInPast = errors.New("cannot compute for epoch in past")
 )
 
-func preStakingEnabledCommittee(s shardingconfig.Instance) shard.State {
+func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 	shardNum := int(s.NumShards())
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 	shardSize := s.NumNodesPerShard()
 	hmyAccounts := s.HmyAccounts()
 	fnAccounts := s.FnAccounts()
-	shardState := shard.State{}
+	shardState := &shard.State{}
+	// Shard state needs to be sorted by shard ID
 	for i := 0; i < shardNum; i++ {
 		com := shard.Committee{ShardID: uint32(i)}
 		for j := 0; j < shardHarmonyNodes; j++ {
@@ -85,12 +84,12 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.State {
 			pubKey := shard.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := shard.NodeID{
+			curNodeID := shard.Slot{
 				common2.ParseAddr(hmyAccounts[index].Address),
 				pubKey,
 				nil,
 			}
-			com.NodeList = append(com.NodeList, curNodeID)
+			com.Slots = append(com.Slots, curNodeID)
 		}
 		// add FN runner's key
 		for j := shardHarmonyNodes; j < shardSize; j++ {
@@ -100,57 +99,95 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) shard.State {
 			pubKey := shard.BlsPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
-			curNodeID := shard.NodeID{
+			curNodeID := shard.Slot{
 				common2.ParseAddr(fnAccounts[index].Address),
 				pubKey,
 				nil,
 			}
-			com.NodeList = append(com.NodeList, curNodeID)
+			com.Slots = append(com.Slots, curNodeID)
 		}
-		shardState = append(shardState, com)
+		shardState.Shards = append(shardState.Shards, com)
 	}
 	return shardState
 }
 
 func eposStakedCommittee(
 	s shardingconfig.Instance, stakerReader DataProvider, stakedSlotsCount int,
-) (shard.State, error) {
+) (*shard.State, error) {
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
 
+	utils.Logger().Info().Int("staked-candidates", len(candidates)).Msg("preparing epos staked committee")
+
+	blsKeys := make(map[shard.BlsPublicKey]struct{})
+
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
-		// TODO Should be using .ValidatorStakingWithDelegation, not implemented yet
-		validator, err := stakerReader.ValidatorInformation(candidates[i])
+		validator, err := stakerReader.ReadValidatorInformation(candidates[i])
+
 		if err != nil {
 			return nil, err
 		}
+
+		if err := validator.SanityCheck(); err != nil {
+			utils.Logger().Error().
+				Str("failure", validator.String()).
+				Msg("Sanity check of validator failed")
+			continue
+		}
+		validatorStake := big.NewInt(0)
+		for _, delegation := range validator.Delegations {
+			validatorStake.Add(validatorStake, delegation.Amount)
+		}
+
+		found := false
+		dupKey := shard.BlsPublicKey{}
+		for _, key := range validator.SlotPubKeys {
+			if _, ok := blsKeys[key]; ok {
+				found = true
+				dupKey = key
+			} else {
+				blsKeys[key] = struct{}{}
+			}
+		}
+		if found {
+			utils.Logger().Info().Msgf("[eposStakedCommittee] Duplicate bls key found %x, in validator %+v. Ignoring", dupKey, validator)
+			continue
+		}
+
 		essentials[validator.Address] = effective.SlotOrder{
-			validator.Stake,
+			validatorStake,
 			validator.SlotPubKeys,
 		}
 	}
 
 	shardCount := int(s.NumShards())
-	superComm := make(shard.State, shardCount)
+	shardState := &shard.State{}
+	shardState.Shards = make([]shard.Committee, shardCount)
 	hAccounts := s.HmyAccounts()
+	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 
 	for i := 0; i < shardCount; i++ {
-		superComm[i] = shard.Committee{uint32(i), shard.NodeIDList{}}
+		shardState.Shards[i] = shard.Committee{uint32(i), shard.SlotList{}}
+		for j := 0; j < shardHarmonyNodes; j++ {
+			index := i + j*shardCount
+			pub := &bls.PublicKey{}
+			pub.DeserializeHexStr(hAccounts[index].BlsPublicKey)
+			pubKey := shard.BlsPublicKey{}
+			pubKey.FromLibBLSPublicKey(pub)
+			shardState.Shards[i].Slots = append(shardState.Shards[i].Slots, shard.Slot{
+				common2.ParseAddr(hAccounts[index].Address),
+				pubKey,
+				nil,
+			})
+		}
 	}
 
-	for i := range hAccounts {
-		spot := i % shardCount
-		pub := &bls.PublicKey{}
-		pub.DeserializeHexStr(hAccounts[i].BlsPublicKey)
-		pubKey := shard.BlsPublicKey{}
-		pubKey.FromLibBLSPublicKey(pub)
-		superComm[spot].NodeList = append(superComm[spot].NodeList, shard.NodeID{
-			common2.ParseAddr(hAccounts[i].Address),
-			pubKey,
-			nil,
-		})
+	if stakedSlotsCount == 0 {
+		utils.Logger().Info().Int("slots-for-epos", stakedSlotsCount).
+			Msg("committe composed only of harmony node")
+		return shardState, nil
 	}
 
 	staked := effective.Apply(essentials, stakedSlotsCount)
@@ -161,95 +198,81 @@ func eposStakedCommittee(
 		stakedSlotsCount = l
 	}
 
+	totalStake := numeric.ZeroDec()
+
 	for i := 0; i < stakedSlotsCount; i++ {
-		bucket := int(new(big.Int).Mod(staked[i].BlsPublicKey.Big(), shardBig).Int64())
+		shardID := int(new(big.Int).Mod(staked[i].BlsPublicKey.Big(), shardBig).Int64())
 		slot := staked[i]
-		superComm[bucket].NodeList = append(superComm[bucket].NodeList, shard.NodeID{
+		totalStake = totalStake.Add(slot.Dec)
+		shardState.Shards[shardID].Slots = append(shardState.Shards[shardID].Slots, shard.Slot{
 			slot.Address,
 			staked[i].BlsPublicKey,
 			&slot.Dec,
 		})
 	}
 
-	return superComm, nil
-}
-
-// ComputePublicKeys produces publicKeys of entire supercommittee per epoch
-func (def partialStakingEnabled) ComputePublicKeys(
-	epoch *big.Int, d DataProvider,
-) [][]*bls.PublicKey {
-
-	config := d.Config()
-	instance := shard.Schedule.InstanceForEpoch(epoch)
-	superComm := shard.State{}
-	if config.IsStaking(epoch) {
-		superComm, _ = eposStakedCommittee(instance, d, 320)
-	} else {
-		superComm = preStakingEnabledCommittee(instance)
+	if c := len(candidates); c != 0 {
+		utils.Logger().Info().Int("staked-candidates", c).
+			Str("total-staked-by-validators", totalStake.String()).
+			RawJSON("staked-super-committee", []byte(shardState.JSON())).
+			Msg("EPoS based super-committe")
 	}
 
-	allIdentities := make([][]*bls.PublicKey, len(superComm))
+	return shardState, nil
+}
 
-	for i := range superComm {
-		allIdentities[i] = make([]*bls.PublicKey, len(superComm[i].NodeList))
-		for j := range superComm[i].NodeList {
-			identity := &bls.PublicKey{}
-			superComm[i].NodeList[j].BlsPublicKey.ToLibBLSPublicKey(identity)
-			allIdentities[i][j] = identity
-		}
+// GetCommitteePublicKeys returns the public keys of a shard
+func (def partialStakingEnabled) GetCommitteePublicKeys(committee *shard.Committee) []*bls.PublicKey {
+	allIdentities := make([]*bls.PublicKey, len(committee.Slots))
+
+	for i := range committee.Slots {
+		identity := &bls.PublicKey{}
+		committee.Slots[i].BlsPublicKey.ToLibBLSPublicKey(identity)
+		allIdentities[i] = identity
 	}
 
 	return allIdentities
 }
 
-func (def partialStakingEnabled) ReadPublicKeysFromDB(
-	h common.Hash, reader DataProvider,
-) ([]*bls.PublicKey, error) {
-	header := reader.GetHeaderByHash(h)
-	shardID := header.ShardID()
-	superCommittee, err := reader.ReadShardState(header.Epoch())
-	if err != nil {
-		return nil, err
-	}
-	subCommittee := superCommittee.FindCommitteeByID(shardID)
-	if subCommittee == nil {
-		return nil, ctxerror.New("cannot find shard in the shard state",
-			"blockNumber", header.Number(),
-			"shardID", header.ShardID(),
-		)
-	}
-	committerKeys := []*bls.PublicKey{}
-
-	for i := range subCommittee.NodeList {
-		committerKey := new(bls.PublicKey)
-		err := subCommittee.NodeList[i].BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", subCommittee.NodeList[i].BlsPublicKey).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	return committerKeys, nil
-
-	return nil, nil
-}
-
 func (def partialStakingEnabled) ReadFromDB(
 	epoch *big.Int, reader DataProvider,
-) (newSuperComm shard.State, err error) {
+) (newSuperComm *shard.State, err error) {
 	return reader.ReadShardState(epoch)
 }
 
 // ReadFromComputation is single entry point for reading the State of the network
 func (def partialStakingEnabled) Compute(
-	epoch *big.Int, config params.ChainConfig, stakerReader DataProvider,
-) (newSuperComm shard.State, err error) {
+	epoch *big.Int, stakerReader DataProvider,
+) (newSuperComm *shard.State, err error) {
+	preStaking := true
+	if stakerReader != nil {
+		config := stakerReader.Config()
+		if config.IsStaking(epoch) {
+			preStaking = false
+		}
+	}
+
 	instance := shard.Schedule.InstanceForEpoch(epoch)
-	if !config.IsStaking(epoch) {
+	if preStaking {
+		// Pre-staking shard state doesn't need to set epoch (backward compatible)
 		return preStakingEnabledCommittee(instance), nil
+	}
+	// Sanity check, can't compute against epochs in past
+	if e := stakerReader.CurrentHeader().Epoch(); epoch.Cmp(e) == -1 {
+		utils.Logger().Error().Uint64("header-epoch", e.Uint64()).
+			Uint64("compute-epoch", epoch.Uint64()).
+			Msg("Tried to compute committee for epoch in past")
+		return nil, ErrComputeForEpochInPast
 	}
 	stakedSlots :=
 		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
 			int(instance.NumShards())
-	return eposStakedCommittee(instance, stakerReader, stakedSlots)
+	shardState, err := eposStakedCommittee(instance, stakerReader, stakedSlots)
+
+	if err != nil {
+		return nil, err
+	}
+	// Set the epoch of shard state
+	shardState.Epoch = big.NewInt(0).Set(epoch)
+	return shardState, nil
 }

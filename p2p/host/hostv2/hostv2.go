@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -156,23 +157,27 @@ func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
 }
 
 // New creates a host for p2p communication
-func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
-	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
+func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 	// TODO: Convert to zerolog or internal logger interface
 	logger := utils.Logger()
+	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	if err != nil {
-		logger.Error().Str("IP", self.IP).Str("Port", self.Port).Msg("New MA Error")
-		return nil
+		return nil, errors.Wrapf(err,
+			"cannot create listen multiaddr from port %#v", self.Port)
 	}
 	// TODO – use WithCancel for orderly host teardown (which we don't have yet)
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey),
 	)
-	catchError(err)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
+	}
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost)
 	// pubsub, err := libp2p_pubsub.NewFloodSub(ctx, p2pHost)
-	catchError(err)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot initialize libp2p pubsub")
+	}
 
 	self.PeerID = p2pHost.ID()
 
@@ -193,7 +198,7 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
 		Msg("HostV2 is up!")
 
-	return h
+	return h, nil
 }
 
 // GetID returns ID.Pretty

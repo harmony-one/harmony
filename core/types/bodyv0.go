@@ -40,6 +40,13 @@ func (b *BodyV0) TransactionAt(index int) *Transaction {
 	return b.f.Transactions[index].Copy()
 }
 
+// StakingTransactionAt returns the staking transaction at the given index in this block.
+// It returns nil if index is out of bounds. (not supported by Body V0)
+func (b *BodyV0) StakingTransactionAt(index int) *staking.StakingTransaction {
+	// not supported
+	return nil
+}
+
 // CXReceiptAt returns the CXReceipt at given index in this block
 // It returns nil if index is out of bounds
 // V0 will just return nil because we don't support CXReceipt
@@ -55,6 +62,13 @@ func (b *BodyV0) SetTransactions(newTransactions []*Transaction) {
 		txs = append(txs, tx.Copy())
 	}
 	b.f.Transactions = txs
+}
+
+// SetStakingTransactions sets the list of staking transactions with a deep copy of the given
+// list. (not supported by Body V0)
+func (b *BodyV0) SetStakingTransactions(newTransactions []*staking.StakingTransaction) {
+	// not supported
+	return
 }
 
 // Uncles returns a deep copy of the list of uncle headers of this block.

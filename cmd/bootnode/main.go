@@ -10,6 +10,7 @@ import (
 	"path"
 
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -54,14 +55,14 @@ func main() {
 
 	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
-		panic(err)
+		utils.FatalErrMsg(err, "cannot load key from %s", *keyFile)
 	}
 
 	var selfPeer = p2p.Peer{IP: *ip, Port: *port}
 
 	host, err := p2pimpl.NewHost(&selfPeer, privKey)
 	if err != nil {
-		panic(err)
+		utils.FatalErrMsg(err, "cannot initialize network")
 	}
 
 	fmt.Printf("bootnode BN_MA=%s", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
@@ -73,15 +74,15 @@ func main() {
 	// set the KValue to 50 for DHT
 	// 50 is the size of every bucket in the DHT
 	kaddht.KValue = 50
-	dataStore, err := badger.NewDatastore(fmt.Sprintf(".dht-%s-%s", *ip, *port), nil)
+	dataStorePath := fmt.Sprintf(".dht-%s-%s", *ip, *port)
+	dataStore, err := badger.NewDatastore(dataStorePath, nil)
 	if err != nil {
-		panic(err)
+		utils.FatalErrMsg(err, "cannot initialize DHT cache at %s", dataStorePath)
 	}
 	dht := kaddht.NewDHT(context.Background(), host.GetP2PHost(), dataStore)
 
 	if err := dht.Bootstrap(context.Background()); err != nil {
-		log.Error("failed to bootstrap DHT")
-		panic(err)
+		utils.FatalErrMsg(err, "cannot bootstrap DHT")
 	}
 
 	select {}
