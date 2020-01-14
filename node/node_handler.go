@@ -25,6 +25,8 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
+const p2pMsgPrefixSize = 5
+
 // receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
 func (node *Node) receiveGroupMessage(
 	receiver p2p.GroupReceiver, rxQueue msgq.MessageAdder,
@@ -38,17 +40,17 @@ func (node *Node) receiveGroupMessage(
 				Msg("cannot receive from group")
 			continue
 		}
-		if len(msg) < 5 {
-			utils.Logger().Warn().Err(err).Int("msg size", len(msg)).
-				Msg("invalid p2p message size")
-			continue
-		}
 		if sender == node.host.GetID() {
 			continue
 		}
 		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-		if err := rxQueue.AddMessage(msg[5:], sender); err != nil {
+		if len(msg) < p2pMsgPrefixSize {
+			utils.Logger().Warn().Err(err).Int("msg size", len(msg)).
+				Msg("invalid p2p message size")
+			continue
+		}
+		if err := rxQueue.AddMessage(msg[p2pMsgPrefixSize:], sender); err != nil {
 			utils.Logger().Warn().Err(err).
 				Str("sender", sender.Pretty()).
 				Msg("cannot enqueue incoming message for processing")
