@@ -145,7 +145,8 @@ var (
 	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
 
-	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")	// Bad block revert
+	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+	// Bad block revert
 	doRevertBefore = flag.Int("do_revert_before", -1, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", -1, "The revert will rollback all blocks until and including block number revert_to")
 )
@@ -506,6 +507,7 @@ func main() {
 		for chain.CurrentBlock().NumberU64() >= uint64(*revertTo) {
 			curBlock := chain.CurrentBlock()
 			rollbacks := []ethCommon.Hash{curBlock.Hash()}
+			utils.Logger().Info().Msgf("Rolling back block %d", chain.CurrentBlock().NumberU64())
 			chain.Rollback(rollbacks)
 			lastSig := curBlock.Header().LastCommitSignature()
 			sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
@@ -513,7 +515,7 @@ func main() {
 		}
 	}
 	///////////////////////////////////////////////
-	
+
 	startMsg := "==== New Harmony Node ===="
 	if *nodeType == "explorer" {
 		startMsg = "==== New Explorer Node ===="
