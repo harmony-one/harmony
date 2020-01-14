@@ -74,6 +74,7 @@ type EditValidator struct {
 	SlotKeyToRemove    *shard.BlsPublicKey `json:"slot_key_to_remove" yaml:"slot_key_to_remove" rlp:"nil"`
 	SlotKeyToAdd       *shard.BlsPublicKey `json:"slot_key_to_add" yaml:"slot_key_to_add" rlp:"nil"`
 	SlotKeyToAddSig    shard.BlsSignature  `json:"slot_key_to_add_sig" yaml:"slot_key_to_add_sig" rlp:"nil"`
+	Active             *bool               `json:"active" rlp:"nil"`
 }
 
 // Delegate - type for delegating to a validator

@@ -451,6 +451,11 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
 		}
 	}
+
+	if edit.Active != nil {
+		validator.Active = *edit.Active
+	}
+
 	return nil
 }
 
