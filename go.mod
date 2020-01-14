@@ -27,22 +27,22 @@ require (
 	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
-	github.com/ipfs/go-ds-badger v0.0.5
+	github.com/ipfs/go-ds-badger v0.0.7
 	github.com/ipfs/go-log v0.0.1
 	github.com/karalabe/hid v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/libp2p/go-libp2p v0.3.1
-	github.com/libp2p/go-libp2p-core v0.2.2
+	github.com/libp2p/go-libp2p v0.5.0
+	github.com/libp2p/go-libp2p-core v0.3.0
 	github.com/libp2p/go-libp2p-crypto v0.1.0
-	github.com/libp2p/go-libp2p-discovery v0.1.0
+	github.com/libp2p/go-libp2p-discovery v0.2.0
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-kad-dht v0.2.0
 	github.com/libp2p/go-libp2p-net v0.1.0
 	github.com/libp2p/go-libp2p-peer v0.2.0
-	github.com/libp2p/go-libp2p-peerstore v0.1.3
+	github.com/libp2p/go-libp2p-peerstore v0.1.4
 	github.com/libp2p/go-libp2p-pubsub v0.1.1
-	github.com/multiformats/go-multiaddr v0.0.4
-	github.com/multiformats/go-multiaddr-net v0.0.1
+	github.com/multiformats/go-multiaddr v0.2.0
+	github.com/multiformats/go-multiaddr-net v0.1.1
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
@@ -56,8 +56,8 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965
-	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
-	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
+	github.com/whyrusleeping/go-logging v0.0.1
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/tools v0.0.0-20191113232020-e2727e816f5a
 	google.golang.org/grpc v1.22.0
