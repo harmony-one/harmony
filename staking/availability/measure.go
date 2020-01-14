@@ -35,7 +35,7 @@ func SetInactiveUnavailableValidators(
 			}
 			wrapper.Active = false
 			if writeErr := rawdb.WriteValidatorData(batch, wrapper); writeErr != nil {
-				return err
+				return writeErr
 			}
 		}
 	}
