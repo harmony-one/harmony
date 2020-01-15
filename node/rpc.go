@@ -141,9 +141,10 @@ func (node *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsO
 }
 
 // ErroredTransactionSink is the inmemory failed transactions this node has
-func (node *Node) ErroredTransactionSink() (result []types.RPCTransactionError) {
+func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
 	node.errorSink.Lock()
 	defer node.errorSink.Unlock()
+	result := []types.RPCTransactionError{}
 	node.errorSink.failedTxns.Do(func(d interface{}) {
 		if d != nil {
 			result = append(result, d.(types.RPCTransactionError))
