@@ -244,7 +244,7 @@ func AccumulateRewards(
 					voter.EffectivePercent.Quo(votepower.StakersShare),
 				).RoundInt()
 				newRewards = new(big.Int).Add(newRewards, due)
-				state.AddReward(snapshot.Validator, due)
+				state.AddReward(snapshot, due)
 			}
 		}
 
@@ -335,7 +335,7 @@ func AccumulateRewards(
 					}
 					due := resultsHandle[bucket][payThem].payout.TruncateInt()
 					newRewards = new(big.Int).Add(newRewards, due)
-					state.AddReward(snapshot.Validator, due)
+					state.AddReward(snapshot, due)
 				}
 			}
 

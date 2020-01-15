@@ -40,7 +40,7 @@ type ChainContext interface {
 	ReadDelegationsByDelegator(common.Address) ([]staking.DelegationIndex, error)
 
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
-	ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error)
+	ReadValidatorSnapshot(common.Address) (*staking.ValidatorWrapper, error)
 }
 
 // NewEVMContext creates a new context for use in the EVM.

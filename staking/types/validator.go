@@ -44,6 +44,15 @@ var (
 type ValidatorWrapper struct {
 	Validator   `json:"validator" yaml:"validator" rlp:"nil"`
 	Delegations []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
+
+	Snapshot struct {
+		// TODO Remove this Epoch field once feel comfortable that unavailability logic in core protocol is working
+		Epoch *big.Int
+		// The number of blocks the validator should've signed when in active mode (selected in committee)
+		NumBlocksToSign *big.Int `rlp:"nil"`
+		// The number of blocks the validator actually signed
+		NumBlocksSigned *big.Int `rlp:"nil"`
+	}
 }
 
 // VotePerShard ..
@@ -72,16 +81,6 @@ type ValidatorStats struct {
 	VotingPowerPerShard []VotePerShard
 	// BLSKeyPerShard ..
 	BLSKeyPerShard []KeysPerShard
-}
-
-// ValidatorSnapshot ..
-type ValidatorSnapshot struct {
-	Validator *ValidatorWrapper
-	Epoch     *big.Int
-	// The number of blocks the validator should've signed when in active mode (selected in committee)
-	NumBlocksToSign *big.Int `rlp:"nil"`
-	// The number of blocks the validator actually signed
-	NumBlocksSigned *big.Int `rlp:"nil"`
 }
 
 // Validator - data fields for a validator

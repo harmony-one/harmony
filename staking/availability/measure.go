@@ -36,31 +36,35 @@ func SetInactiveUnavailableValidators(
 			return err
 		}
 
+		snapEpoch := snapshot.Snapshot.Epoch
+		snapSigned := snapshot.Snapshot.NumBlocksSigned
+		snapToSign := snapshot.Snapshot.NumBlocksToSign
+
 		// NOTE Temp sanity check that each snapshot is indeed
 		// happening correctly on epoch. Once comfortable with
 		// protocol code robustness, then remove this code and
 		// the associated .Epoch field of ValidatorSnapshot
-		if diff := new(big.Int).Sub(now, snapshot.Epoch); diff.Cmp(one) != 0 {
+		if diff := new(big.Int).Sub(now, snapEpoch); diff.Cmp(one) != 0 {
 			return errors.Wrapf(
 				errValidatorEpochDeviation, "bc %s, snapshot %s",
-				now.String(), snapshot.Epoch.String(),
+				now.String(), snapEpoch.String(),
 			)
 		}
 
-		signed := new(big.Int).Sub(stats.NumBlocksSigned, snapshot.NumBlocksSigned)
-		toSign := new(big.Int).Sub(stats.NumBlocksToSign, snapshot.NumBlocksToSign)
+		signed := new(big.Int).Sub(stats.NumBlocksSigned, snapSigned)
+		toSign := new(big.Int).Sub(stats.NumBlocksToSign, snapToSign)
 
 		if signed.Sign() == -1 {
 			return errors.Wrapf(
 				errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
-				stats.NumBlocksSigned.String(), snapshot.NumBlocksSigned.String(),
+				stats.NumBlocksSigned.String(), snapSigned.String(),
 			)
 		}
 
 		if toSign.Sign() == -1 {
 			return errors.Wrapf(
 				errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
-				stats.NumBlocksToSign.String(), snapshot.NumBlocksToSign.String(),
+				stats.NumBlocksToSign.String(), snapToSign.String(),
 			)
 		}
 
