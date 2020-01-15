@@ -25,6 +25,8 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
+const p2pMsgPrefixSize = 5
+
 // receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
 func (node *Node) receiveGroupMessage(
 	receiver p2p.GroupReceiver, rxQueue msgq.MessageAdder,
@@ -43,7 +45,12 @@ func (node *Node) receiveGroupMessage(
 		}
 		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-		if err := rxQueue.AddMessage(msg[5:], sender); err != nil {
+		if len(msg) < p2pMsgPrefixSize {
+			utils.Logger().Warn().Err(err).Int("msg size", len(msg)).
+				Msg("invalid p2p message size")
+			continue
+		}
+		if err := rxQueue.AddMessage(msg[p2pMsgPrefixSize:], sender); err != nil {
 			utils.Logger().Warn().Err(err).
 				Str("sender", sender.Pretty()).
 				Msg("cannot enqueue incoming message for processing")
@@ -105,6 +112,10 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			node.stakingMessageHandler(msgPayload)
 		case proto_node.Block:
 			utils.Logger().Debug().Msg("NET: received message: Node/Block")
+			if len(msgPayload) < 1 {
+				utils.Logger().Debug().Msgf("Invalid block message size")
+				return
+			}
 			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
 			switch blockMsgType {
 			case proto_node.Sync:
@@ -156,6 +167,10 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
+	if len(msgPayload) < 1 {
+		utils.Logger().Debug().Msgf("Invalid transaction message size")
+		return
+	}
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
 	switch txMessageType {
@@ -173,6 +188,10 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
+	if len(msgPayload) < 1 {
+		utils.Logger().Debug().Msgf("Invalid staking transaction message size")
+		return
+	}
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
 	switch txMessageType {
