@@ -1242,8 +1242,6 @@ func (bc *BlockChain) WriteBlockWithState(
 			}
 
 			members := []*bls2.PublicKey{}
-			addrs, isNewEpoch := []common.Address{}, len(block.Header().ShardState()) > 0
-
 			for _, slot := range committee.Slots {
 				pubKey := &bls2.PublicKey{}
 				err := pubKey.Deserialize(slot.BlsPublicKey[:])
@@ -1251,9 +1249,6 @@ func (bc *BlockChain) WriteBlockWithState(
 					utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
 				}
 				members = append(members, pubKey)
-				if isNewEpoch {
-					addrs = append(addrs, slot.EcdsaAddress)
-				}
 			}
 
 			mask, _ := bls.NewMask(members, nil)
@@ -1261,14 +1256,6 @@ func (bc *BlockChain) WriteBlockWithState(
 
 			if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
 				utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
-			}
-
-			if isNewEpoch {
-				if err := availability.SetInactiveUnavailableValidators(
-					addrs, batch, bc,
-				); err != nil {
-					return NonStatTy, err
-				}
 			}
 
 		} else {
@@ -1309,7 +1296,6 @@ func (bc *BlockChain) WriteBlockWithState(
 					}
 
 					members := []*bls2.PublicKey{}
-					addrs, isNewEpoch := []common.Address{}, len(block.Header().ShardState()) > 0
 
 					for _, slot := range committee.Slots {
 						if slot.EffectiveStake != nil {
@@ -1319,9 +1305,6 @@ func (bc *BlockChain) WriteBlockWithState(
 								utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
 							}
 							members = append(members, pubKey)
-							if isNewEpoch {
-								addrs = append(addrs, slot.EcdsaAddress)
-							}
 						}
 					}
 
@@ -1332,11 +1315,6 @@ func (bc *BlockChain) WriteBlockWithState(
 						utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 					}
 
-					if isNewEpoch {
-						if err := availability.SetInactiveUnavailableValidators(addrs, batch, bc); err != nil {
-							return NonStatTy, err
-						}
-					}
 				} else {
 					utils.Logger().Debug().Msg("[Uptime] failed reading shard state for uptime accounting")
 				}
@@ -1354,6 +1332,21 @@ func (bc *BlockChain) WriteBlockWithState(
 		} else {
 			// block reward never accumulate before staking
 			bc.WriteBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
+		}
+	}
+
+	// NOTE This code must run AFTER validator uptime accounting happened
+	if block.ShardID() == shard.BeaconChainShardID &&
+		bc.chainConfig.IsStaking(block.Epoch()) &&
+		len(block.Header().ShardState()) > 0 {
+		addrs, err := bc.ReadActiveValidatorList()
+		if err != nil {
+			return NonStatTy, err
+		}
+		if err := availability.SetInactiveUnavailableValidators(
+			addrs, batch, bc,
+		); err != nil {
+			return NonStatTy, err
 		}
 	}
 
