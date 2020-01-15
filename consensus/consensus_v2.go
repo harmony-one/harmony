@@ -1110,6 +1110,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 		for {
 			select {
 			case <-ticker.C:
+				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ticker")
 				if toStart == false && isInitialLeader {
 					continue
 				}
@@ -1133,6 +1134,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 					}
 				}
 			case <-consensus.syncReadyChan:
+				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] syncReadyChan")
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
 				consensus.SetViewID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
 				mode := consensus.UpdateConsensusInformation()
@@ -1140,6 +1142,7 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is in sync")
 
 			case <-consensus.syncNotReadyChan:
+				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] syncNotReadyChan")
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
 				consensus.current.SetMode(Syncing)
 				consensus.getLogger().Info().Msg("Node is out of sync")
@@ -1241,9 +1244,11 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				consensus.announce(newBlock)
 
 			case msg := <-consensus.MsgChan:
+				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] MsgChan")
 				consensus.handleMessageUpdate(msg)
 
 			case viewID := <-consensus.commitFinishChan:
+				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
 				// Only Leader execute this condition
 				func() {
 					consensus.mutex.Lock()
@@ -1254,9 +1259,11 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 				}()
 
 			case <-stopChan:
+				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] stopChan")
 				return
 			}
 		}
+		consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ended.")
 	}()
 }
 

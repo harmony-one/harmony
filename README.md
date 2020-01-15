@@ -134,22 +134,21 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 ### Features Done
 
 - Fully sharded network with beacon chain and shard chains
-- Cuckoo-rule based resharding
-- Staking on beacon chain
-- Distributed randomness generation with VRF and VDF (Proof-of-Concept VDF)
 - Sharded P2P network and P2P gossiping
 - FBFT (Fast Byzantine Fault Tolerance) Consensus with BLS multi-signature
+- Consensus view-change protocol
 - Account model and support for Solidity
-- Simple wallet program
+- Cross-shard transaction
+- VRF (Verifiable Random Function) and VDF (Verifiable Delay Function)
+- Cross-links
 - Information disposal algorithm using erasure encoding (to be integrated)
-- Blockchain explorer with performance report and transaction lookup
 - Transaction generator for loadtesting
+- Cuckoo-rule based resharding
 
 ### Features To Be Implemented
 
-- Secure VDF
-- Consensus view-change protocol
-- Cross-shard transaction
+- EPoS staking mechanism
+- Leader rotation
 
 ### Features Planned after Mainnet
 
