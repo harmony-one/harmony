@@ -1158,48 +1158,6 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	//// Shard State and Validator Update
 	header := block.Header()
-	if len(header.ShardState()) > 0 {
-		// Write shard state for the new epoch
-		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
-		shardState, err := block.Header().GetShardState()
-		if err == nil && shardState.Epoch != nil && bc.chainConfig.IsStaking(shardState.Epoch) {
-			// After staking, the epoch will be decided by the epoch in the shard state.
-			epoch = new(big.Int).Set(shardState.Epoch)
-		}
-
-		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
-		if err != nil {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
-			return NonStatTy, err
-		}
-
-		// Find all the active validator addresses and store them in db
-		allActiveValidators := []common.Address{}
-		processed := make(map[common.Address]struct{})
-		for i := range newShardState.Shards {
-			shard := newShardState.Shards[i]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-						allActiveValidators = append(allActiveValidators, shard.Slots[j].EcdsaAddress)
-					}
-				}
-			}
-		}
-
-		// Update active validators
-		if err := bc.WriteActiveValidatorList(allActiveValidators); err != nil {
-			return NonStatTy, err
-		}
-
-		// Update snapshots for all validators
-		if err := bc.UpdateValidatorSnapshots(); err != nil {
-			return NonStatTy, err
-		}
-	}
 
 	// Do bookkeeping for new staking txns
 	for _, tx := range block.StakingTransactions() {
@@ -1343,6 +1301,49 @@ func (bc *BlockChain) WriteBlockWithState(
 		if err := availability.SetInactiveUnavailableValidators(
 			addrs, batch, bc,
 		); err != nil {
+			return NonStatTy, err
+		}
+	}
+
+	if len(header.ShardState()) > 0 {
+		// Write shard state for the new epoch
+		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
+		shardState, err := block.Header().GetShardState()
+		if err == nil && shardState.Epoch != nil && bc.chainConfig.IsStaking(shardState.Epoch) {
+			// After staking, the epoch will be decided by the epoch in the shard state.
+			epoch = new(big.Int).Set(shardState.Epoch)
+		}
+
+		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
+		if err != nil {
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
+			return NonStatTy, err
+		}
+
+		// Find all the active validator addresses and store them in db
+		allActiveValidators := []common.Address{}
+		processed := make(map[common.Address]struct{})
+		for i := range newShardState.Shards {
+			shard := newShardState.Shards[i]
+			for j := range shard.Slots {
+				slot := shard.Slots[j]
+				if slot.EffectiveStake != nil { // For external validator
+					_, ok := processed[slot.EcdsaAddress]
+					if !ok {
+						processed[slot.EcdsaAddress] = struct{}{}
+						allActiveValidators = append(allActiveValidators, shard.Slots[j].EcdsaAddress)
+					}
+				}
+			}
+		}
+
+		// Update active validators
+		if err := bc.WriteActiveValidatorList(allActiveValidators); err != nil {
+			return NonStatTy, err
+		}
+
+		// Update snapshots for all validators
+		if err := bc.UpdateValidatorSnapshots(); err != nil {
 			return NonStatTy, err
 		}
 	}
