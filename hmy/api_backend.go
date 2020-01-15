@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -213,14 +212,13 @@ func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 }
 
 // GetBalance returns balance of an given address.
-func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
-	balance, err := b.hmy.nodeAPI.GetBalanceOfAddress(address)
-	return (*hexutil.Big)(balance), err
+func (b *APIBackend) GetBalance(address common.Address) (*big.Int, error) {
+	return b.hmy.nodeAPI.GetBalanceOfAddress(address)
 }
 
 // GetTransactionsHistory returns list of transactions hashes of address.
-func (b *APIBackend) GetTransactionsHistory(address string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address)
+func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
 	return hashes, err
 }
 

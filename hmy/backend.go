@@ -50,7 +50,8 @@ type NodeAPI interface {
 	AccountManager() *accounts.Manager
 	GetBalanceOfAddress(address common.Address) (*big.Int, error)
 	GetNonceOfAddress(address common.Address) uint64
-	GetTransactionsHistory(address string) ([]common.Hash, error)
+	// Get transactions history for an address
+	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	ErroredTransactionSink() []types.RPCTransactionError
 	IsCurrentlyLeader() bool
 }

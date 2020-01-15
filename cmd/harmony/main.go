@@ -561,10 +561,6 @@ func main() {
 	if currentNode.NodeConfig.GetMetricsFlag() {
 		go currentNode.CollectMetrics()
 	}
-	// Commit committtee if node role is explorer
-	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
-		go currentNode.CommitCommittee()
-	}
 
 	currentNode.StartServer()
 }
