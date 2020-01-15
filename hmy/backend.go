@@ -54,6 +54,8 @@ type NodeAPI interface {
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	ErroredTransactionSink() []types.RPCTransactionError
 	IsCurrentlyLeader() bool
+	PendingCrosslinks() int
+	PendingCXReceipts() int
 }
 
 // New creates a new Harmony object (including the
