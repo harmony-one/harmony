@@ -60,9 +60,11 @@ func (node *Node) PendingCrossLinks() []*block.Header {
 
 // PendingCXReceipts returns node.pendingCXReceiptsProof
 func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
-	cxReceipts := make([]*types.CXReceiptsProof, 0)
+	cxReceipts := make([]*types.CXReceiptsProof, len(node.pendingCXReceipts))
+	i := 0
 	for _, cxReceipt := range node.pendingCXReceipts {
-		cxReceipts = append(cxReceipts, cxReceipt)
+		cxReceipts[i] = cxReceipt
+		i++
 	}
 	return cxReceipts
 }
