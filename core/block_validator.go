@@ -99,7 +99,7 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	}
 
 	if v.config.IsCrossTx(block.Epoch()) {
-		cxsSha := types.DeriveMultipleShardsSha(cxReceipts)
+		cxsSha := cxReceipts.ComputeMerkleRoot()
 		if cxsSha != header.OutgoingReceiptHash() {
 			return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash(), cxsSha)
 		}
@@ -200,7 +200,7 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	}
 
 	if !foundMatchingShardID {
-		return ctxerror.New("[ValidateCXReceiptsProof] Didn't find matching shardID")
+		return ctxerror.New("[ValidateCXReceiptsProof] Didn't find matching toShardID (no receipts for my shard)")
 	}
 
 	sourceShardID := merkleProof.ShardID
