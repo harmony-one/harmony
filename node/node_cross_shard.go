@@ -71,7 +71,7 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 	cxReceiptsProof := &types.CXReceiptsProof{Receipts: cxReceipts, MerkleProof: merkleProof, Header: block.Header(), CommitSig: commitSig, CommitBitmap: commitBitmap}
 
 	groupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(toShardID))
-	utils.Logger().Info().Uint32("ToShardID", toShardID).Str("GroupID", string(groupID)).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof ready. Sending CX receipts...")
+	utils.Logger().Info().Uint32("ToShardID", toShardID).Str("GroupID", string(groupID)).Interface("cxp", cxReceiptsProof).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof ready. Sending CX receipts...")
 	// TODO ek – limit concurrency
 	go node.host.SendMessageToGroups([]nodeconfig.GroupID{groupID}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceiptsProof)))
 }
