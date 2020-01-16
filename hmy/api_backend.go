@@ -302,3 +302,13 @@ func (b *APIBackend) SendStakingTx(
 func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
 	return b.hmy.nodeAPI.ErroredTransactionSink()
 }
+
+// GetPendingCrosslinks ..
+func (b *APIBackend) GetPendingCrosslinks() int {
+	return b.hmy.nodeAPI.PendingCrosslinks()
+}
+
+// GetPendingCXReceipts ..
+func (b *APIBackend) GetPendingCXReceipts() int {
+	return b.hmy.nodeAPI.PendingCXReceipts()
+}

@@ -289,3 +289,13 @@ func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash 
 	}
 	return nil
 }
+
+// GetPendingCrosslinks returns the transaction for the given hash
+func (s *PublicTransactionPoolAPI) GetPendingCrosslinks(ctx context.Context) int {
+	return s.b.GetPendingCrosslinks()
+}
+
+// GetPendingCXReceipts returns the transaction for the given hash
+func (s *PublicTransactionPoolAPI) GetPendingCXReceipts(ctx context.Context) int {
+	return s.b.GetPendingCXReceipts()
+}
