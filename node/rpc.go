@@ -57,7 +57,7 @@ func (node *Node) PendingCrosslinks() int {
 	return len(node.pendingCrossLinks)
 }
 
-// PendingCrosslinks returns length of node.pendingCrossLinks
+// PendingCXReceipts returns length of node.pendingCrossLinks
 func (node *Node) PendingCXReceipts() int {
 	return len(node.pendingCXReceipts)
 }
