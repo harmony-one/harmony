@@ -303,12 +303,12 @@ func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionErro
 	return b.hmy.nodeAPI.ErroredTransactionSink()
 }
 
-// GetPendingCrosslinks ..
-func (b *APIBackend) GetPendingCrosslinks() int {
-	return b.hmy.nodeAPI.PendingCrosslinks()
+// GetPendingCrossLinks ..
+func (b *APIBackend) GetPendingCrossLinks() []*block.Header {
+	return b.hmy.nodeAPI.PendingCrossLinks()
 }
 
 // GetPendingCXReceipts ..
-func (b *APIBackend) GetPendingCXReceipts() int {
+func (b *APIBackend) GetPendingCXReceipts() []*types.CXReceiptsProof {
 	return b.hmy.nodeAPI.PendingCXReceipts()
 }

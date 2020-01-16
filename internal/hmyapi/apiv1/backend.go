@@ -73,6 +73,6 @@ type Backend interface {
 	IsLeader() bool
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
-	GetPendingCrosslinks() int
-	GetPendingCXReceipts() int
+	GetPendingCrossLinks() []*block.Header
+	GetPendingCXReceipts() []*types.CXReceiptsProof
 }
