@@ -49,9 +49,10 @@ func (node *Node) IsCurrentlyLeader() bool {
 }
 
 // ErroredStakingTransactionSink is the inmemory failed staking transactions this node has
-func (node *Node) ErroredStakingTransactionSink() (result []staking.RPCTransactionError) {
+func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError {
 	node.errorSink.Lock()
 	defer node.errorSink.Unlock()
+	result := []staking.RPCTransactionError{}
 	node.errorSink.failedStakingTxns.Do(func(d interface{}) {
 		if d != nil {
 			result = append(result, d.(staking.RPCTransactionError))
@@ -61,9 +62,10 @@ func (node *Node) ErroredStakingTransactionSink() (result []staking.RPCTransacti
 }
 
 // ErroredTransactionSink is the inmemory failed transactions this node has
-func (node *Node) ErroredTransactionSink() (result []types.RPCTransactionError) {
+func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
 	node.errorSink.Lock()
 	defer node.errorSink.Unlock()
+	result := []types.RPCTransactionError{}
 	node.errorSink.failedTxns.Do(func(d interface{}) {
 		if d != nil {
 			result = append(result, d.(types.RPCTransactionError))
