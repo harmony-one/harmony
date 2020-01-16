@@ -421,6 +421,21 @@ download_harmony_db_file() {
    done
 }
 
+any_new_binaries() {
+   local outdir
+   ${do_not_download} && return 0
+   outdir="${1}"
+   mkdir -p "${outdir}"
+   curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
+   if diff $outdir/md5sum.txt.new md5sum.txt
+   then
+      rm "${outdir}/md5sum.txt.new"
+   else
+      mv "${outdir}/md5sum.txt.new" "${outdir}/md5sum.txt"
+      return 1
+   fi
+}
+
 if ${download_only}; then
    if any_new_binaries staging
    then
@@ -473,21 +488,6 @@ if ! ${multi_key}; then
       ;;
    esac
 fi
-
-any_new_binaries() {
-   local outdir
-   ${do_not_download} && return 0
-   outdir="${1}"
-   mkdir -p "${outdir}"
-   curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
-   if diff $outdir/md5sum.txt.new md5sum.txt
-   then
-      rm "${outdir}/md5sum.txt.new"
-   else
-      mv "${outdir}/md5sum.txt.new" "${outdir}/md5sum.txt"
-      return 1
-   fi
-}
 
 if any_new_binaries .
 then
