@@ -362,7 +362,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		// 15% of the validator also need to do broadcasting
 		rand.Seed(time.Now().UTC().UnixNano())
 		rnd := rand.Intn(100)
-		if rnd < 15 {
+		if rnd < 1 {
 			node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 		}
 	}

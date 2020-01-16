@@ -542,8 +542,8 @@ func WriteShardLastCrossLink(db DatabaseWriter, shardID uint32, data []byte) err
 }
 
 // ReadCXReceipts retrieves all the transactions of receipts given destination shardID, number and blockHash
-func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash, temp bool) (types.CXReceipts, error) {
-	data, err := db.Get(cxReceiptKey(shardID, number, hash, temp))
+func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash) (types.CXReceipts, error) {
+	data, err := db.Get(cxReceiptKey(shardID, number, hash, false))
 	if len(data) == 0 || err != nil {
 		utils.Logger().Info().Err(err).Uint64("number", number).Int("dataLen", len(data)).Msg("ReadCXReceipts")
 		return nil, err
@@ -557,21 +557,21 @@ func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash commo
 }
 
 // WriteCXReceipts stores all the transaction receipts given destination shardID, blockNumber and blockHash
-func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash common.Hash, receipts types.CXReceipts, temp bool) error {
+func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash common.Hash, receipts types.CXReceipts) error {
 	bytes, err := rlp.EncodeToBytes(receipts)
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteCXReceipts] Failed to encode cross shard tx receipts")
 	}
 	// Store the receipt slice
-	if err := db.Put(cxReceiptKey(shardID, number, hash, temp), bytes); err != nil {
+	if err := db.Put(cxReceiptKey(shardID, number, hash, false), bytes); err != nil {
 		utils.Logger().Error().Msg("[WriteCXReceipts] Failed to store cxreceipts")
 	}
 	return err
 }
 
 // DeleteCXReceipts removes all receipt data associated with a block hash.
-func DeleteCXReceipts(db DatabaseDeleter, shardID uint32, number uint64, hash common.Hash, temp bool) {
-	if err := db.Delete(cxReceiptKey(shardID, number, hash, temp)); err != nil {
+func DeleteCXReceipts(db DatabaseDeleter, shardID uint32, number uint64, hash common.Hash) {
+	if err := db.Delete(cxReceiptKey(shardID, number, hash, false)); err != nil {
 		utils.Logger().Error().Msg("Failed to delete cross shard tx receipts")
 	}
 }
