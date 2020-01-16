@@ -372,10 +372,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 			Int("numTxns", len(newBlock.Transactions())).
 			Int("numStakingTxns", len(newBlock.StakingTransactions())).
 			Msg("BINGO !!! Reached Consensus")
-		// 15% of the validator also need to do broadcasting
+		// 1% of the validator also need to do broadcasting
 		rand.Seed(time.Now().UTC().UnixNano())
 		rnd := rand.Intn(100)
-		if rnd < 0 {
+		if rnd < 1 {
 			// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
 			if node.NodeConfig.ShardID == 0 {
 				node.BroadcastNewBlock(newBlock)
