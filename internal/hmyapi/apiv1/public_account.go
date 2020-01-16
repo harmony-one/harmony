@@ -1,4 +1,4 @@
-package hmyapi
+package apiv1
 
 import (
 	"github.com/ethereum/go-ethereum/common"

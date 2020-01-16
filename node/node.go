@@ -1,8 +1,10 @@
 package node
 
 import (
+	"container/ring"
 	"crypto/ecdsa"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/contracts"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/drand"
@@ -51,8 +54,6 @@ const (
 )
 
 const (
-	// TxPoolLimit is the limit of transaction pool.
-	TxPoolLimit = 20000
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
 	// ClientRxQueueSize is the number of client messages to queue before tail-dropping.
@@ -240,6 +241,10 @@ type Node struct {
 
 	// last time consensus reached for metrics
 	lastConsensusTime int64
+	errorSink         struct {
+		sync.Mutex
+		failedTxns *ring.Ring
+	}
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -281,23 +286,19 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
 	node.pendingTxMutex.Lock()
-	for _, tx := range newTxs {
-		if _, ok := node.pendingTransactions[tx.Hash()]; !ok {
-			node.pendingTransactions[tx.Hash()] = tx
-		}
-		if len(node.pendingTransactions) > txPoolLimit {
-			break
-		}
-	}
+
+	node.TxPool.AddRemotes(newTxs)
+
 	node.pendingTxMutex.Unlock()
-	utils.Logger().Info().Int("length of newTxs", len(newTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more transactions")
+
+	pendingCount, queueCount := node.TxPool.Stats()
+	utils.Logger().Info().Int("length of newTxs", len(newTxs)).Int("totalPending", pendingCount).Int("totalQueued", queueCount).Msg("Got more transactions")
 }
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
-	txPoolLimit := core.ShardingSchedule.MaxTxPoolSizeLimit()
+	txPoolLimit := 1000 // TODO: incorporate staking txn into TxPool
 	node.pendingStakingTxMutex.Lock()
 	for _, tx := range newStakingTxs {
 		if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
@@ -308,13 +309,15 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 		}
 	}
 	node.pendingStakingTxMutex.Unlock()
-	utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingTransactions)).Msg("Got more staking transactions")
+	utils.Logger().Info().Int("length of newStakingTxs", len(newStakingTxs)).Int("totalPending", len(node.pendingStakingTransactions)).Msg("Got more staking transactions")
 }
 
 // AddPendingStakingTransaction staking transactions
 func (node *Node) AddPendingStakingTransaction(
 	newStakingTx *staking.StakingTransaction) {
+
 	node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
@@ -326,7 +329,6 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 		utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
 		node.tryBroadcast(newTx)
 	}
-	utils.Logger().Debug().Int("totalPending", len(node.pendingTransactions)).Msg("Got ONE more transaction")
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
@@ -335,90 +337,63 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	defer node.pendingCXMutex.Unlock()
 
 	if receipts.ContainsEmptyField() {
-		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("CXReceiptsProof contains empty field")
+		utils.Logger().Info().
+			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
+			Msg("CXReceiptsProof contains empty field")
 		return
 	}
 
 	blockNum := receipts.Header.Number().Uint64()
 	shardID := receipts.Header.ShardID()
+
+	// Sanity checks
+
+	if err := node.Blockchain().Validator().ValidateCXReceiptsProof(receipts); err != nil {
+		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
+			utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			return
+		}
+	}
+
+	// cross-shard receipt should not be coming from our shard
+	if s := node.Consensus.ShardID; s == shardID {
+		utils.Logger().Info().
+			Uint32("my-shard", s).
+			Uint32("receipt-shard", shardID).
+			Msg("ShardID of incoming receipt was same as mine")
+		return
+	}
+
+	if e := receipts.Header.Epoch(); blockNum == 0 ||
+		!node.Blockchain().Config().IsCrossLink(e) {
+		utils.Logger().Info().
+			Uint64("incoming-epoch", e.Uint64()).
+			Msg("Incoming receipt had meaningless epoch")
+		return
+	}
+
 	key := utils.GetPendingCXKey(shardID, blockNum)
 
+	// DDoS protection
+	const maxCrossTxnSize = 4096
+	if s := len(node.pendingCXReceipts); s >= maxCrossTxnSize {
+		utils.Logger().Info().
+			Int("pending-cx-receipts-size", s).
+			Int("pending-cx-receipts-limit", maxCrossTxnSize).
+			Msg("Current pending cx-receipts reached size limit")
+		return
+	}
+
 	if _, ok := node.pendingCXReceipts[key]; ok {
-		utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Already Got Same Receipt message")
+		utils.Logger().Info().
+			Int("totalPendingReceipts", len(node.pendingCXReceipts)).
+			Msg("Already Got Same Receipt message")
 		return
 	}
 	node.pendingCXReceipts[key] = receipts
-	utils.Logger().Info().Int("totalPendingReceipts", len(node.pendingCXReceipts)).Msg("Got ONE more receipt message")
-}
-
-// Take out a subset of valid transactions from the pending transaction list
-// Note the pending transaction list will then contain the rest of the txs
-func (node *Node) getTransactionsForNewBlock(
-	coinbase common.Address,
-) (types.Transactions, staking.StakingTransactions) {
-
-	txsThrottleConfig := core.ShardingSchedule.TxsThrottleConfig()
-
-	// the next block number to be added in consensus protocol, which is always one more than current chain header block
-	newBlockNum := node.Blockchain().CurrentBlock().NumberU64() + 1
-
-	// remove old (> txsThrottleConfigRecentTxDuration) blockNum keys from recentTxsStats and initiailize for the new block
-	for blockNum := range node.recentTxsStats {
-		recentTxsBlockNumGap := uint64(txsThrottleConfig.RecentTxDuration / node.BlockPeriod)
-		if recentTxsBlockNumGap < newBlockNum-blockNum {
-			delete(node.recentTxsStats, blockNum)
-		}
-	}
-	node.recentTxsStats[newBlockNum] = make(types.BlockTxsCounts)
-
-	// Must update to the correct current state before processing potential txns
-	if err := node.Worker.UpdateCurrent(coinbase); err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("Failed updating worker's state before txn selection")
-		return types.Transactions{}, staking.StakingTransactions{}
-	}
-
-	node.pendingTxMutex.Lock()
-	defer node.pendingTxMutex.Unlock()
-	node.pendingStakingTxMutex.Lock()
-	defer node.pendingStakingTxMutex.Unlock()
-
-	pendingTransactions := types.Transactions{}
-	pendingStakingTransactions := staking.StakingTransactions{}
-
-	for _, tx := range node.pendingTransactions {
-		pendingTransactions = append(pendingTransactions, tx)
-	}
-	for _, tx := range node.pendingStakingTransactions {
-		pendingStakingTransactions = append(pendingStakingTransactions, tx)
-	}
-
-	selected, unselected, invalid := node.Worker.SelectTransactionsForNewBlock(newBlockNum, pendingTransactions, node.recentTxsStats, txsThrottleConfig, coinbase)
-	selectedStaking, unselectedStaking, invalidStaking :=
-		node.Worker.SelectStakingTransactionsForNewBlock(newBlockNum, pendingStakingTransactions, coinbase)
-
-	node.pendingTransactions = make(map[common.Hash]*types.Transaction)
-	for _, unselectedTx := range unselected {
-		node.pendingTransactions[unselectedTx.Hash()] = unselectedTx
-	}
 	utils.Logger().Info().
-		Int("remainPending", len(node.pendingTransactions)).
-		Int("selected", len(selected)).
-		Int("invalidDiscarded", len(invalid)).
-		Msg("Selecting Transactions")
-
-	node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
-	for _, unselectedStakingTx := range unselectedStaking {
-		node.pendingStakingTransactions[unselectedStakingTx.Hash()] = unselectedStakingTx
-	}
-	utils.Logger().Info().
-		Int("remainPending", len(node.pendingStakingTransactions)).
-		Int("selected", len(unselectedStaking)).
-		Int("invalidDiscarded", len(invalidStaking)).
-		Msg("Selecting Transactions")
-
-	return selected, selectedStaking
+		Int("totalPendingReceipts", len(node.pendingCXReceipts)).
+		Msg("Got ONE more receipt message")
 }
 
 func (node *Node) startRxPipeline(
@@ -466,9 +441,13 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
-
+	const sinkSize = 1024
 	node.syncFreq = SyncFrequency
 	node.beaconSyncFreq = SyncFrequency
+	node.errorSink = struct {
+		sync.Mutex
+		failedTxns *ring.Ring
+	}{sync.Mutex{}, ring.New(sinkSize)}
 
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {

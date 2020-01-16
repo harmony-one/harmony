@@ -1,10 +1,9 @@
-package hmyapi
+package apiv2
 
 import (
 	"context"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -21,8 +20,8 @@ func NewPublicHarmonyAPI(b Backend) *PublicHarmonyAPI {
 }
 
 // ProtocolVersion returns the current Harmony protocol version this node supports
-func (s *PublicHarmonyAPI) ProtocolVersion() hexutil.Uint {
-	return hexutil.Uint(proto.ProtocolVersion)
+func (s *PublicHarmonyAPI) ProtocolVersion() int {
+	return proto.ProtocolVersion
 }
 
 // Syncing returns false in case the node is currently not syncing with the network. It can be up to date or has not
@@ -38,9 +37,9 @@ func (s *PublicHarmonyAPI) Syncing() (interface{}, error) {
 }
 
 // GasPrice returns a suggestion for a gas price.
-func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) {
+func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*big.Int, error) {
 	// TODO(ricl): add SuggestPrice API
-	return (*hexutil.Big)(big.NewInt(1)), nil
+	return big.NewInt(1), nil
 }
 
 // NodeMetadata captures select metadata of the RPC answering node

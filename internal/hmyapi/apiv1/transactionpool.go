@@ -1,4 +1,4 @@
-package hmyapi
+package apiv1
 
 import (
 	"context"
@@ -24,9 +24,11 @@ var (
 // TxHistoryArgs is struct to make GetTransactionsHistory request
 type TxHistoryArgs struct {
 	Address   string `json:"address"`
-	PageIndex int    `json:"pageIndex"`
-	PageSize  int    `json:"pageSize"`
+	PageIndex uint32 `json:"pageIndex"`
+	PageSize  uint32 `json:"pageSize"`
 	FullTx    bool   `json:"fullTx"`
+	TxType    string `json:"txType"`
+	Order     string `json:"order"`
 }
 
 // PublicTransactionPoolAPI exposes methods for the RPC interface
@@ -44,19 +46,17 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
 	address := args.Address
 	result := []common.Hash{}
-	if strings.HasPrefix(address, "one1") {
-		hashes, err := s.b.GetTransactionsHistory(address)
+	var err error
+	if strings.HasPrefix(args.Address, "one1") {
+		address = args.Address
+	} else {
+		addr := internal_common.ParseAddr(args.Address)
+		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			return nil, err
 		}
-		result = ReturnWithPagination(hashes, args)
 	}
-	addr := internal_common.ParseAddr(address)
-	oneAddress, err := internal_common.AddressToBech32(addr)
-	if err != nil {
-		return nil, err
-	}
-	hashes, err := s.b.GetTransactionsHistory(oneAddress)
+	hashes, err := s.b.GetTransactionsHistory(address, args.TxType, args.Order)
 	if err != nil {
 		return nil, err
 	}
@@ -109,11 +109,16 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context
 // GetTransactionByHash returns the transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, hash common.Hash) *RPCTransaction {
 	// Try to return an already finalized transaction
-	if tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash); tx != nil {
-		return newRPCTransaction(tx, blockHash, blockNumber, index)
+	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash)
+	block, _ := s.b.GetBlock(ctx, blockHash)
+	if block == nil {
+		return nil
+	}
+	if tx != nil {
+		return newRPCTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
 	}
 	// No finalized transaction, try to retrieve it from the pool
-	if tx := s.b.GetPoolTransaction(hash); tx != nil {
+	if tx = s.b.GetPoolTransaction(hash); tx != nil {
 		return newRPCPendingTransaction(tx)
 	}
 	// Transaction unknown, return as such
@@ -265,28 +270,14 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 }
 
 // PendingTransactions returns the transactions that are in the transaction pool
-// and have a from address that is one of the accounts this node manages.
 func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
 	pending, err := s.b.GetPoolTransactions()
 	if err != nil {
 		return nil, err
 	}
-	accounts := make(map[common.Address]struct{})
-	for _, wallet := range s.b.AccountManager().Wallets() {
-		for _, account := range wallet.Accounts() {
-			accounts[account.Address] = struct{}{}
-		}
-	}
-	transactions := make([]*RPCTransaction, 0, len(pending))
-	for _, tx := range pending {
-		var signer types.Signer = types.HomesteadSigner{}
-		if tx.Protected() {
-			signer = types.NewEIP155Signer(tx.ChainID())
-		}
-		from, _ := types.Sender(signer, tx)
-		if _, exists := accounts[from]; exists {
-			transactions = append(transactions, newRPCPendingTransaction(tx))
-		}
+	transactions := make([]*RPCTransaction, len(pending))
+	for i := range pending {
+		transactions[i] = newRPCPendingTransaction(pending[i])
 	}
 	return transactions, nil
 }

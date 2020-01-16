@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -137,14 +136,24 @@ func (b *APIBackend) ProtocolVersion() int {
 
 // GetLogs ...
 func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
-	// TODO(ricl): implement
-	return nil, nil
+	receipts := b.hmy.blockchain.GetReceiptsByHash(blockHash)
+	if receipts == nil {
+		return nil, errors.New("Missing receipts")
+	}
+	logs := make([][]*types.Log, len(receipts))
+	for i, receipt := range receipts {
+		logs[i] = receipt.Logs
+	}
+	return logs, nil
 }
 
 // HeaderByHash ...
 func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*block.Header, error) {
-	// TODO(ricl): implement
-	return nil, nil
+	header := b.hmy.blockchain.GetHeaderByHash(blockHash)
+	if header == nil {
+		return nil, errors.New("Header is not found")
+	}
+	return header, nil
 }
 
 // ServiceFilter ...
@@ -203,14 +212,13 @@ func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 }
 
 // GetBalance returns balance of an given address.
-func (b *APIBackend) GetBalance(address common.Address) (*hexutil.Big, error) {
-	balance, err := b.hmy.nodeAPI.GetBalanceOfAddress(address)
-	return (*hexutil.Big)(balance), err
+func (b *APIBackend) GetBalance(address common.Address) (*big.Int, error) {
+	return b.hmy.nodeAPI.GetBalanceOfAddress(address)
 }
 
 // GetTransactionsHistory returns list of transactions hashes of address.
-func (b *APIBackend) GetTransactionsHistory(address string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address)
+func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
 	return hashes, err
 }
 
@@ -288,4 +296,9 @@ func (b *APIBackend) SendStakingTx(
 	newStakingTx *staking.StakingTransaction) error {
 	b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
 	return nil
+}
+
+// GetCurrentTransactionErrorSink ..
+func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+	return b.hmy.nodeAPI.ErroredTransactionSink()
 }

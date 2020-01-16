@@ -33,6 +33,13 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
+// RPCTransactionError ..
+type RPCTransactionError struct {
+	TxHashID             string `json:"tx-hash-id"`
+	TimestampOfRejection int64  `json:"time-at-rejection"`
+	ErrMessage           string `json:"error-message"`
+}
+
 // no go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
 
 // Errors constants for Transaction.

@@ -34,6 +34,9 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
+
+	golog "github.com/ipfs/go-log"
+	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Version string variables
@@ -121,6 +124,8 @@ var (
 
 	// logConn logs incoming/outgoing connections
 	logConn = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	// Use a separate log file to log libp2p traces
+	logP2P = flag.Bool("log_p2p", false, "log libp2p debug info")
 
 	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 
@@ -141,6 +146,9 @@ var (
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
 
 	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+	// Bad block revert
+	doRevertBefore = flag.Int("do_revert_before", -1, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
+	revertTo       = flag.Int("revert_to", -1, "The revert will rollback all blocks until and including block number revert_to")
 )
 
 func initSetup() {
@@ -414,6 +422,11 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 }
 
 func main() {
+	// HACK Force usage of go implementation rather than the C based one. Do the right way, see the
+	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
+	// build time.
+	os.Setenv("GODEBUG", "netdns=go")
+
 	flag.Var(&utils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
@@ -486,6 +499,23 @@ func main() {
 		go currentNode.SupportBeaconSyncing()
 	}
 
+	////// Code only used for one-off rollback /////////
+	chain := currentNode.Blockchain()
+	curNum := chain.CurrentBlock().NumberU64()
+	if curNum < uint64(*doRevertBefore) && curNum >= uint64(*revertTo) {
+		// Remove invalid blocks
+		for chain.CurrentBlock().NumberU64() >= uint64(*revertTo) {
+			curBlock := chain.CurrentBlock()
+			rollbacks := []ethCommon.Hash{curBlock.Hash()}
+			utils.Logger().Info().Msgf("Rolling back block %d", chain.CurrentBlock().NumberU64())
+			chain.Rollback(rollbacks)
+			lastSig := curBlock.Header().LastCommitSignature()
+			sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
+			chain.WriteLastCommits(sigAndBitMap)
+		}
+	}
+	///////////////////////////////////////////////
+
 	startMsg := "==== New Harmony Node ===="
 	if *nodeType == "explorer" {
 		startMsg = "==== New Explorer Node ===="
@@ -504,6 +534,19 @@ func main() {
 	if *enableMemProfiling {
 		memprofiling.GetMemProfiling().Start()
 	}
+
+	if *logP2P {
+		f, err := os.OpenFile(path.Join(*logFolder, "libp2p.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to open libp2p.log. %v\n", err)
+		} else {
+			defer f.Close()
+			backend1 := gologging.NewLogBackend(f, "", 0)
+			gologging.SetBackend(backend1)
+			golog.SetAllLoggers(gologging.DEBUG) // Change to DEBUG for extra info
+		}
+	}
+
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 
@@ -517,10 +560,6 @@ func main() {
 	// Collect node metrics if metrics flag is set
 	if currentNode.NodeConfig.GetMetricsFlag() {
 		go currentNode.CollectMetrics()
-	}
-	// Commit committtee if node role is explorer
-	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
-		go currentNode.CommitCommittee()
 	}
 
 	currentNode.StartServer()

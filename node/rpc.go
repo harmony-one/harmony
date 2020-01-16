@@ -9,9 +9,12 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/hmyapi"
+	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
+	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -33,12 +36,12 @@ var (
 	httpEndpoint = ""
 	wsEndpoint   = ""
 
-	httpModules      = []string{"hmy", "net", "explorer"}
+	httpModules      = []string{"hmy", "hmyv2", "net", "netv2", "explorer"}
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
 	httpOrigins      = []string{"*"}
 
-	wsModules = []string{"net", "web3"}
+	wsModules = []string{"net", "netv2", "web3"}
 	wsOrigins = []string{"*"}
 
 	harmony *hmy.Harmony
@@ -137,6 +140,19 @@ func (node *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsO
 	return nil
 }
 
+// ErroredTransactionSink is the inmemory failed transactions this node has
+func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
+	node.errorSink.Lock()
+	defer node.errorSink.Unlock()
+	result := []types.RPCTransactionError{}
+	node.errorSink.failedTxns.Do(func(d interface{}) {
+		if d != nil {
+			result = append(result, d.(types.RPCTransactionError))
+		}
+	})
+	return result
+}
+
 // stopWS terminates the websocket RPC endpoint.
 func (node *Node) stopWS() {
 	if wsListener != nil {
@@ -168,7 +184,13 @@ func (node *Node) APIs() []rpc.API {
 		{
 			Namespace: "net",
 			Version:   "1.0",
-			Service:   hmyapi.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
+			Service:   apiv1.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
+			Public:    true,
+		},
+		{
+			Namespace: "netv2",
+			Version:   "1.0",
+			Service:   apiv2.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
 			Public:    true,
 		},
 	}...)

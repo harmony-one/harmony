@@ -2,21 +2,16 @@ package shardingconfig
 
 import (
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/common/denominations"
-
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
 const (
 	// PangaeaHTTPPattern is the http pattern for pangaea.
-	PangaeaHTTPPattern = "https://api.s%d.t2.hmny.io"
+	PangaeaHTTPPattern = "https://api.s%d.pga.hmny.io"
 	// PangaeaWSPattern is the websocket pattern for pangaea.
-	PangaeaWSPattern = "wss://ws.s%d.t2.hmny.io"
-	// transaction throttling disabled on pangaea network
-	pangaeaEnableTxnThrottling = false
+	PangaeaWSPattern = "wss://ws.s%d.pga.hmny.io"
 )
 
 // PangaeaSchedule is the Pangaea sharding configuration schedule.
@@ -56,49 +51,12 @@ func (ps pangaeaSchedule) ConsensusRatio() float64 {
 var pangaeaReshardingEpoch = []*big.Int{common.Big0}
 
 var pangaeaV0 = MustNewInstance(
-	2, 50, 40, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
+	3, 250, 220, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch)
 
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ps pangaeaSchedule) RandomnessStartingEpoch() uint64 {
 	return mainnetRandomnessStartingEpoch
-}
-
-func (ps pangaeaSchedule) MaxTxAmountLimit() *big.Int {
-	amountBigInt := big.NewInt(mainnetMaxTxAmountLimit)
-	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.One))
-	return amountBigInt
-}
-
-func (ps pangaeaSchedule) MaxNumRecentTxsPerAccountLimit() uint64 {
-	return mainnetMaxNumRecentTxsPerAccountLimit
-}
-
-func (ps pangaeaSchedule) MaxTxPoolSizeLimit() int {
-	return mainnetMaxTxPoolSizeLimit
-}
-
-func (ps pangaeaSchedule) MaxNumTxsPerBlockLimit() int {
-	return mainnetMaxNumTxsPerBlockLimit
-}
-
-func (ps pangaeaSchedule) RecentTxDuration() time.Duration {
-	return mainnetRecentTxDuration
-}
-
-func (ps pangaeaSchedule) EnableTxnThrottling() bool {
-	return pangaeaEnableTxnThrottling
-}
-
-func (ps pangaeaSchedule) TxsThrottleConfig() *TxsThrottleConfig {
-	return &TxsThrottleConfig{
-		MaxTxAmountLimit:               ps.MaxTxAmountLimit(),
-		MaxNumRecentTxsPerAccountLimit: ps.MaxNumRecentTxsPerAccountLimit(),
-		MaxTxPoolSizeLimit:             ps.MaxTxPoolSizeLimit(),
-		MaxNumTxsPerBlockLimit:         ps.MaxNumTxsPerBlockLimit(),
-		RecentTxDuration:               ps.RecentTxDuration(),
-		EnableTxnThrottling:            ps.EnableTxnThrottling(),
-	}
 }
 
 func (pangaeaSchedule) GetNetworkID() NetworkID {

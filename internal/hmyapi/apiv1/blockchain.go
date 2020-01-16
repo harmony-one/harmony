@@ -1,4 +1,4 @@
-package hmyapi
+package apiv1
 
 import (
 	"context"
@@ -71,8 +71,7 @@ func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (ma
 	}
 	validators := make([]map[string]interface{}, 0)
 	for _, validator := range committee.NodeList {
-		validatorBalance := new(hexutil.Big)
-		validatorBalance, err = s.b.GetBalance(validator.EcdsaAddress)
+		validatorBalance, err := s.b.GetBalance(validator.EcdsaAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +81,7 @@ func (s *PublicBlockChainAPI) GetCommittee(ctx context.Context, epoch int64) (ma
 		}
 		validatorsFields := map[string]interface{}{
 			"address": oneAddress,
-			"balance": validatorBalance,
+			"balance": (*hexutil.Big)(validatorBalance),
 		}
 		validators = append(validators, validatorsFields)
 	}
@@ -138,7 +137,11 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	// TODO: currently only get latest balance. Will add complete logic later.
 	addr := internal_common.ParseAddr(address)
-	return s.b.GetBalance(addr)
+	balance, err := s.b.GetBalance(addr)
+	if balance == nil {
+		return nil, err
+	}
+	return (*hexutil.Big)(balance), err
 }
 
 // BlockNumber returns the block number of the chain head.

@@ -1,4 +1,4 @@
-package hmyapi
+package apiv2
 
 import (
 	"bytes"
