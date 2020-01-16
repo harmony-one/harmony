@@ -359,7 +359,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		// Print to normal log too
 		utils.GetLogInstance().Info("BINGO !!! Reached Consensus", "BlockNum", newBlock.NumberU64())
 
-		// 15% of the validator also need to do broadcasting
+		// 1% of the validator also need to do broadcasting
 		rand.Seed(time.Now().UTC().UnixNano())
 		rnd := rand.Intn(100)
 		if rnd < 1 {
