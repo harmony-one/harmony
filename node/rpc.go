@@ -52,6 +52,16 @@ func (node *Node) IsCurrentlyLeader() bool {
 	return node.Consensus.IsLeader()
 }
 
+// PendingCrosslinks returns length of node.pendingCrossLinks
+func (node *Node) PendingCrosslinks() int {
+	return len(node.pendingCrossLinks)
+}
+
+// PendingCXReceipts returns length of node.pendingCrossLinks
+func (node *Node) PendingCXReceipts() int {
+	return len(node.pendingCXReceipts)
+}
+
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
