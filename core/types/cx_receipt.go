@@ -91,7 +91,7 @@ func (cs CXReceipts) MaxToShardID() uint32 {
 // The receiptRoot is the merkle root hash of the receipts for a specific shards.
 func (cs CXReceipts) ComputeMerkleRoot() common.Hash {
 	byteBuffer := bytes.NewBuffer([]byte{})
-	for i := 0; i < int(cs.MaxToShardID()); i++ {
+	for i := 0; i <= int(cs.MaxToShardID()); i++ {
 		shardReceipts := cs.GetToShardReceipts(uint32(i))
 		if len(shardReceipts) != 0 {
 			sKey := make([]byte, 4)
