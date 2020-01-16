@@ -8,8 +8,6 @@ import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -317,14 +315,6 @@ func (c *downloaderClient) Query(ctx context.Context, in *DownloaderRequest, opt
 // DownloaderServer is the server API for Downloader service.
 type DownloaderServer interface {
 	Query(context.Context, *DownloaderRequest) (*DownloaderResponse, error)
-}
-
-// UnimplementedDownloaderServer can be embedded to have forward compatible implementations.
-type UnimplementedDownloaderServer struct {
-}
-
-func (*UnimplementedDownloaderServer) Query(ctx context.Context, req *DownloaderRequest) (*DownloaderResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Query not implemented")
 }
 
 func RegisterDownloaderServer(s *grpc.Server, srv DownloaderServer) {
