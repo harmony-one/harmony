@@ -31,6 +31,9 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
+// MsgNoShardStateFromDB error message for shard state reading failure
+var MsgNoShardStateFromDB = "failed to read shard state from DB"
+
 // Indicate whether the receipts corresponding to a blockHash is spent or not
 const (
 	SpentByte byte = iota
