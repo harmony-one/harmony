@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
@@ -54,8 +55,8 @@ type NodeAPI interface {
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	ErroredTransactionSink() []types.RPCTransactionError
 	IsCurrentlyLeader() bool
-	PendingCrosslinks() int
-	PendingCXReceipts() int
+	PendingCrossLinks() []*block.Header
+	PendingCXReceipts() []*types.CXReceiptsProof
 }
 
 // New creates a new Harmony object (including the

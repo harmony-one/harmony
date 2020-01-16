@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -290,12 +291,12 @@ func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash 
 	return nil
 }
 
-// GetPendingCrosslinks returns the transaction for the given hash
-func (s *PublicTransactionPoolAPI) GetPendingCrosslinks(ctx context.Context) int {
-	return s.b.GetPendingCrosslinks()
+// GetPendingCrossLinks ..
+func (s *PublicTransactionPoolAPI) GetPendingCrossLinks(ctx context.Context) []*block.Header {
+	return s.b.GetPendingCrossLinks()
 }
 
-// GetPendingCXReceipts returns the transaction for the given hash
-func (s *PublicTransactionPoolAPI) GetPendingCXReceipts(ctx context.Context) int {
+// GetPendingCXReceipts ..
+func (s *PublicTransactionPoolAPI) GetPendingCXReceipts(ctx context.Context) []*types.CXReceiptsProof {
 	return s.b.GetPendingCXReceipts()
 }

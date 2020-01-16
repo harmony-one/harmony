@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -52,14 +53,18 @@ func (node *Node) IsCurrentlyLeader() bool {
 	return node.Consensus.IsLeader()
 }
 
-// PendingCrosslinks returns length of node.pendingCrossLinks
-func (node *Node) PendingCrosslinks() int {
-	return len(node.pendingCrossLinks)
+// PendingCrossLinks returns node.pendingCrossLinks
+func (node *Node) PendingCrossLinks() []*block.Header {
+	return node.pendingCrossLinks
 }
 
-// PendingCXReceipts returns length of node.pendingCrossLinks
-func (node *Node) PendingCXReceipts() int {
-	return len(node.pendingCXReceipts)
+// PendingCXReceipts returns node.pendingCXReceiptsProof
+func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
+	cxReceipts := make([]*types.CXReceiptsProof, 0)
+	for _, cxReceipt := range node.pendingCXReceipts {
+		cxReceipts = append(cxReceipts, cxReceipt)
+	}
+	return cxReceipts
 }
 
 // StartRPC start RPC service
