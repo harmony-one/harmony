@@ -301,3 +301,13 @@ func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash 
 	}
 	return nil
 }
+
+// GetPendingCrosslinks ..
+func (s *PublicTransactionPoolAPI) GetPendingCrosslinks(ctx context.Context) int {
+	return s.b.GetPendingCrosslinks()
+}
+
+// GetPendingCXReceipts ..
+func (s *PublicTransactionPoolAPI) GetPendingCXReceipts(ctx context.Context) int {
+	return s.b.GetPendingCXReceipts()
+}
