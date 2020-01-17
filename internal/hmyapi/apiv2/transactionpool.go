@@ -305,7 +305,11 @@ func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash 
 
 // GetPendingCrossLinks ..
 func (s *PublicTransactionPoolAPI) GetPendingCrossLinks(ctx context.Context) []*block.Header {
-	return s.b.GetPendingCrossLinks()
+	crossLinks := s.b.GetPendingCrossLinks()
+	if crossLinks == nil {
+		return make([]*block.Header, 0)
+	}
+	return crossLinks
 }
 
 // GetPendingCXReceipts ..

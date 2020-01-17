@@ -7,52 +7,74 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 )
 
 // MarshalJSON marshals as JSON.
 func (r CXReceipt) MarshalJSON() ([]byte, error) {
 	// CXReceipt represents a receipt for cross-shard transaction
 	type CXReceipt struct {
-		TxHash    common.Hash     `json:"txHash"     gencodec:"required"`
-		From      common.Address  `json:"from"`
-		To        *common.Address `json:"to"`
-		ShardID   uint32          `json:"shardID"`
-		ToShardID uint32          `json:"toShardID"`
-		Amount    *big.Int        `json:"amount"`
+		TxHash    common.Hash `json:"txHash"     gencodec:"required"`
+		From      string      `json:"from"`
+		To        string      `json:"to"`
+		ShardID   uint32      `json:"shardID"`
+		ToShardID uint32      `json:"toShardID"`
+		Amount    *big.Int    `json:"amount"`
 	}
 	var enc CXReceipt
 	enc.Amount = r.Amount
 	enc.ShardID = r.ShardID
 	enc.ToShardID = r.ToShardID
 	enc.TxHash = r.TxHash
-	enc.From = r.From
-	enc.To = r.To
+	address, err := internal_common.AddressToBech32(r.From)
+	if err != nil {
+		return nil, err
+	}
+	enc.From = address
+	if r.To == nil {
+		address = ""
+	} else {
+		address, err = internal_common.AddressToBech32(*r.To)
+	}
+	if err != nil {
+		return nil, err
+	}
+	enc.To = address
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
 func (r *CXReceipt) UnmarshalJSON(input []byte) error {
 	type CXReceipt struct {
-		TxHash    *common.Hash     `json:"txHash"     gencodec:"required"`
-		From      *common.Address  `json:"from"`
-		To        *common.Address  `json:"to"`
-		ShardID   uint32           `json:"shardID"`
-		ToShardID uint32           `json:"toShardID"`
-		Amount    *big.Int         `json:"amount"`
+		TxHash    *common.Hash `json:"txHash"     gencodec:"required"`
+		From      string       `json:"from"`
+		To        string       `json:"to"`
+		ShardID   uint32       `json:"shardID"`
+		ToShardID uint32       `json:"toShardID"`
+		Amount    *big.Int     `json:"amount"`
 	}
 	var dec CXReceipt
-	if err := json.Unmarshal(input, &dec); err != nil {
+	var err error
+	if err = json.Unmarshal(input, &dec); err != nil {
 		return err
 	}
 	if dec.TxHash == nil {
 		return errors.New("missing required field 'txHash' for CXReceipt")
 	}
 	r.TxHash = *dec.TxHash
-	if dec.From == nil {
+	if dec.From == "" {
 		return errors.New("missing required field 'from' for CXReceipt")
 	}
-	r.From = *dec.From
+	r.From, err = internal_common.Bech32ToAddress(dec.From)
+	if err != nil {
+		return err
+	}
 	r.ShardID = dec.ShardID
+	to, err := internal_common.Bech32ToAddress(dec.To)
+	if err != nil {
+		return err
+	}
+	*r.To = to
 	r.ToShardID = dec.ToShardID
 	if dec.Amount != nil {
 		r.Amount = dec.Amount
