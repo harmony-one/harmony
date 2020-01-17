@@ -46,7 +46,6 @@ type ValidatorWrapper struct {
 	Delegations []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
 
 	Snapshot struct {
-		// TODO Remove this Epoch field once feel comfortable that unavailability logic in core protocol is working
 		Epoch *big.Int
 		// The number of blocks the validator should've signed when in active mode (selected in committee)
 		NumBlocksToSign *big.Int `rlp:"nil"`
@@ -69,10 +68,6 @@ type KeysPerShard struct {
 
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
-	// The number of blocks the validator should've signed when in active mode (selected in committee)
-	NumBlocksToSign *big.Int `rlp:"nil"`
-	// The number of blocks the validator actually signed
-	NumBlocksSigned *big.Int `rlp:"nil"`
 	// The number of times they validator is jailed due to extensive downtime
 	NumJailed *big.Int `rlp:"nil"`
 	// TotalEffectiveStake is the total effective stake this validator has
@@ -108,16 +103,12 @@ type Validator struct {
 // MarshalJSON ..
 func (v *ValidatorStats) MarshalJSON() ([]byte, error) {
 	type t struct {
-		NumBlocksToSign     uint64         `json:"blocks-to-sign"`
-		NumBlocksSigned     uint64         `json:"blocks-signed"`
 		NumJailed           uint64         `json:"blocks-jailed"`
 		TotalEffectiveStake numeric.Dec    `json:"total-effective-stake"`
 		VotingPowerPerShard []VotePerShard `json:"voting-power-per-shard"`
 		BLSKeyPerShard      []KeysPerShard `json:"bls-keys-per-shard"`
 	}
 	return json.Marshal(t{
-		NumBlocksToSign:     v.NumBlocksToSign.Uint64(),
-		NumBlocksSigned:     v.NumBlocksSigned.Uint64(),
 		NumJailed:           v.NumJailed.Uint64(),
 		TotalEffectiveStake: v.TotalEffectiveStake,
 		VotingPowerPerShard: v.VotingPowerPerShard,

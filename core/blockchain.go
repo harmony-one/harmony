@@ -2558,25 +2558,16 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
-	for _, addr := range addrs {
-		validator, err := bc.ReadValidatorInformation(addr)
+	for i := range addrs {
+		validator, err := bc.ReadValidatorInformation(addrs[i])
 		if err != nil {
 			return err
 		}
 		validators = append(validators, validator)
 	}
-	epoch := bc.CurrentHeader().Epoch()
 	// Batch write the current data as snapshot
 	batch := bc.db.NewBatch()
 	for i := range validators {
-		stats, err := rawdb.ReadValidatorStats(bc.db, validators[i].Address)
-		if err != nil {
-			return err
-		}
-		validators[i].Snapshot.Epoch = epoch
-		validators[i].Snapshot.NumBlocksSigned = stats.NumBlocksSigned
-		validators[i].Snapshot.NumBlocksToSign = stats.NumBlocksToSign
-
 		if err := rawdb.WriteValidatorSnapshot(batch, validators[i]); err != nil {
 			return err
 		}
@@ -2601,7 +2592,7 @@ func (bc *BlockChain) ReadValidatorStats(addr common.Address) (*staking.Validato
 	return rawdb.ReadValidatorStats(bc.db, addr)
 }
 
-// UpdateValidatorUptime writes the stats for the committee
+// UpdateValidatorUptime writes the stats for the committee and bumps up availability counts
 func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask) error {
 	blsToAddress := make(map[shard.BlsPublicKey]common.Address)
 	for _, slot := range slots {
@@ -2620,12 +2611,17 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
 			if stats == nil {
 				stats = &staking.ValidatorStats{
-					big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
+					big.NewInt(0), numeric.NewDec(0),
 					[]staking.VotePerShard{}, []staking.KeysPerShard{},
 				}
 			}
 			one := big.NewInt(1)
-			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, one)
+			wrapper, err := bc.ReadValidatorInformation(addr)
+			if err != nil {
+				return err
+			}
+
+			wrapper.Snapshot.NumBlocksToSign.Add(wrapper.Snapshot.NumBlocksToSign, one)
 
 			enabled, err := mask.IndexEnabled(i)
 			if err != nil {
@@ -2633,7 +2629,7 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 			}
 
 			if enabled {
-				stats.NumBlocksSigned.Add(stats.NumBlocksSigned, one)
+				wrapper.Snapshot.NumBlocksSigned.Add(wrapper.Snapshot.NumBlocksSigned, one)
 			}
 			// TODO: record time being jailed.
 
@@ -2676,7 +2672,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 		statsFromDB, err := rawdb.ReadValidatorStats(bc.db, key)
 		if statsFromDB == nil {
 			statsFromDB = &staking.ValidatorStats{
-				big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
+				big.NewInt(0), numeric.NewDec(0),
 				[]staking.VotePerShard{}, []staking.KeysPerShard{},
 			}
 		}

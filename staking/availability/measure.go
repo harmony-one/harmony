@@ -26,24 +26,23 @@ func SetInactiveUnavailableValidators(
 ) error {
 	one, now := big.NewInt(1), bc.CurrentHeader().Epoch()
 	for i := range addrs {
-
 		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
-		if err != nil {
-			return err
-		}
-		stats, err := bc.ReadValidatorStats(addrs[i])
+
 		if err != nil {
 			return err
 		}
 
+		wrapper, err := bc.ReadValidatorInformation(addrs[i])
+
+		if err != nil {
+			return err
+		}
+
+		stats := wrapper.Snapshot
 		snapEpoch := snapshot.Snapshot.Epoch
 		snapSigned := snapshot.Snapshot.NumBlocksSigned
 		snapToSign := snapshot.Snapshot.NumBlocksToSign
 
-		// NOTE Temp sanity check that each snapshot is indeed
-		// happening correctly on epoch. Once comfortable with
-		// protocol code robustness, then remove this code and
-		// the associated .Epoch field of ValidatorSnapshot
 		if diff := new(big.Int).Sub(now, snapEpoch); diff.Cmp(one) != 0 {
 			return errors.Wrapf(
 				errValidatorEpochDeviation, "bc %s, snapshot %s",
@@ -69,10 +68,6 @@ func SetInactiveUnavailableValidators(
 		}
 
 		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
-			wrapper, err := bc.ReadValidatorInformation(addrs[i])
-			if err != nil {
-				return err
-			}
 			wrapper.Active = false
 			if writeErr := rawdb.WriteValidatorData(batch, wrapper); writeErr != nil {
 				return writeErr
