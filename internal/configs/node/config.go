@@ -120,6 +120,11 @@ func GetDefaultConfig() *ConfigType {
 	return &defaultConfig
 }
 
+// SetDefaultRole ..
+func SetDefaultRole(r Role) {
+	defaultConfig.role = r
+}
+
 func (conf *ConfigType) String() string {
 	return fmt.Sprintf("%s/%s/%s:%v,%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.ShardID)
 }
