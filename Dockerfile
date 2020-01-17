@@ -18,7 +18,7 @@ ENV PATH="/root/bin:${PATH}"
 
 RUN apt install libgmp-dev libssl-dev curl git \
 jq make gcc g++ bash tig tree sudo vim \
-silversearcher-ag unzip emacs-nox -y
+silversearcher-ag unzip emacs-nox bash-completion -y
 
 RUN mkdir ~/bin && curl -sL -o ~/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme
 
@@ -71,6 +71,10 @@ RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh
 
 RUN cd ${HMY_PATH}/go-sdk && make -j8 && cp hmy /root/bin
 
+RUN echo ". /etc/bash_completion" >> /root/.profile
+
 RUN echo ". <(hmy completion)" >> /root/.profile
+
+RUN echo ". /etc/bash_completion" >> /root/.bashrc
 
 RUN echo ". <(hmy completion)" >> /root/.bashrc
