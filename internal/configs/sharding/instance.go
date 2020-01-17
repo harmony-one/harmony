@@ -26,6 +26,7 @@ type instance struct {
 	hmyAccounts                     []genesis.DeployAccount
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
+	blocksPerEpoch                  uint64
 }
 
 // NewInstance creates and validates a new sharding configuration based
@@ -34,7 +35,7 @@ func NewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int,
+	reshardingEpoch []*big.Int, blocksE uint64,
 ) (Instance, error) {
 	if numShards < 1 {
 		return nil, ctxerror.New("sharding config must have at least one shard",
@@ -62,6 +63,7 @@ func NewInstance(
 		hmyAccounts:                     hmyAccounts,
 		fnAccounts:                      fnAccounts,
 		reshardingEpoch:                 reshardingEpoch,
+		blocksPerEpoch:                  blocksE,
 	}, nil
 }
 
@@ -72,14 +74,21 @@ func MustNewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int,
+	reshardingEpoch []*big.Int, blocksPerEpoch uint64,
 ) Instance {
 	sc, err := NewInstance(
-		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, hmyAccounts, fnAccounts, reshardingEpoch)
+		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard,
+		hmyAccounts, fnAccounts, reshardingEpoch, blocksPerEpoch,
+	)
 	if err != nil {
 		panic(err)
 	}
 	return sc
+}
+
+// BlocksPerEpoch ..
+func (sc instance) BlocksPerEpoch() uint64 {
+	return sc.blocksPerEpoch
 }
 
 // NumShards returns the number of shards in the network.
