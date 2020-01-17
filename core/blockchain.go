@@ -1212,7 +1212,9 @@ func (bc *BlockChain) WriteBlockWithState(
 			mask, _ := bls.NewMask(members, nil)
 			mask.SetMask(block.Header().LastCommitBitmap())
 
-			if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
+			if err = bc.UpdateValidatorUptime(
+				committee.Slots, mask, header.Epoch(),
+			); err != nil {
 				utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 			}
 		} else {
@@ -1267,7 +1269,9 @@ func (bc *BlockChain) WriteBlockWithState(
 					mask, _ := bls.NewMask(members, nil)
 					mask.SetMask(crossLink.Bitmap())
 
-					if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
+					if err = bc.UpdateValidatorUptime(
+						committee.Slots, mask, header.Epoch(),
+					); err != nil {
 						utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
 					}
 				} else {
@@ -2593,7 +2597,9 @@ func (bc *BlockChain) ReadValidatorStats(addr common.Address) (*staking.Validato
 }
 
 // UpdateValidatorUptime writes the stats for the committee and bumps up availability counts
-func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask) error {
+func (bc *BlockChain) UpdateValidatorUptime(
+	slots shard.SlotList, mask *bls.Mask, epoch *big.Int,
+) error {
 	blsToAddress := make(map[shard.BlsPublicKey]common.Address)
 	for _, slot := range slots {
 		blsToAddress[slot.BlsPublicKey] = slot.EcdsaAddress
@@ -2621,6 +2627,7 @@ func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask
 				return err
 			}
 
+			wrapper.Snapshot.Epoch = epoch
 			wrapper.Snapshot.NumBlocksToSign.Add(wrapper.Snapshot.NumBlocksToSign, one)
 
 			enabled, err := mask.IndexEnabled(i)
