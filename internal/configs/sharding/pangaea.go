@@ -51,7 +51,7 @@ func (ps pangaeaSchedule) ConsensusRatio() float64 {
 var pangaeaReshardingEpoch = []*big.Int{common.Big0}
 
 var pangaeaV0 = MustNewInstance(
-	2, 50, 40, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch)
+	2, 50, 40, genesis.PangaeaAccounts, genesis.FoundationalPangaeaAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())
 
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
