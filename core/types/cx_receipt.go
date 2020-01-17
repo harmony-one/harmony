@@ -101,6 +101,9 @@ func (cs CXReceipts) ComputeMerkleRoot() common.Hash {
 			byteBuffer.Write(hash[:])
 		}
 	}
+	if byteBuffer.Len() == 0 {
+		return EmptyRootHash
+	}
 	return crypto.Keccak256Hash(byteBuffer.Bytes())
 }
 
