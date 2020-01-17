@@ -70,3 +70,7 @@ RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/install_build_tools.sh
 RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh
 
 RUN cd ${HMY_PATH}/go-sdk && make -j8 && cp hmy /root/bin
+
+RUN echo ". <(hmy completion)" >> /root/.profile
+
+RUN echo ". <(hmy completion)" >> /root/.bashrc
