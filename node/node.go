@@ -452,7 +452,7 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 func New(host p2p.Host, consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
 	node := Node{}
-	const sinkSize = 1024
+	const sinkSize = 4096
 	node.errorSink = struct {
 		sync.Mutex
 		failedStakingTxns *ring.Ring
