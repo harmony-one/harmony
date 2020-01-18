@@ -19,6 +19,7 @@ package types
 import (
 	"bytes"
 	"encoding/binary"
+
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/ethereum/go-ethereum/common"
