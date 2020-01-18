@@ -360,7 +360,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 	if err := node.Blockchain().Validator().ValidateCXReceiptsProof(receipts); err != nil {
 		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
-			utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			utils.Logger().Error().Err(err).Msg("[AddPendingReceipts] Invalid CXReceiptsProof")
 			return
 		}
 	}
