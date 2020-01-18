@@ -51,6 +51,7 @@ type NodeAPI interface {
 	ErroredStakingTransactionSink() []staking.RPCTransactionError
 	ErroredTransactionSink() []types.RPCTransactionError
 	IsBeaconChainExplorerNode() bool
+	PendingCXReceipts() []*types.CXReceiptsProof
 }
 
 // New creates a new Harmony object (including the
