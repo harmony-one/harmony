@@ -364,10 +364,12 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	switch *nodeType {
 	case "explorer":
+		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
 		currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(*shardID)))
 		currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(*shardID)))
 	case "validator":
+		nodeconfig.SetDefaultRole(nodeconfig.Validator)
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 		if nodeConfig.ShardID == shard.BeaconChainShardID {
 			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID))
@@ -459,7 +461,7 @@ func main() {
 		}
 		// TODO (leo): use a passing list of accounts here
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil)
+			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)

@@ -296,3 +296,17 @@ func (mr *MockInstanceMockRecorder) ReshardingEpoch() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReshardingEpoch", reflect.TypeOf((*MockInstance)(nil).ReshardingEpoch))
 }
+
+// BlocksPerEpoch mocks base method
+func (m *MockInstance) BlocksPerEpoch() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BlocksPerEpoch")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// BlocksPerEpoch indicates an expected call of BlocksPerEpoch
+func (mr *MockInstanceMockRecorder) BlocksPerEpoch() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlocksPerEpoch", reflect.TypeOf((*MockInstance)(nil).BlocksPerEpoch))
+}
