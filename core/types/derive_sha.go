@@ -58,6 +58,7 @@ func DeriveSha(list ...DerivableBase) common.Hash {
 }
 
 //// Legacy forked logic. Keep as is, but do not use it anymore ->
+
 // DeriveOneShardSha calculates the hash of the trie of
 // cross shard transactions with the given destination shard
 func DeriveOneShardSha(list DerivableList, shardID uint32) common.Hash {
