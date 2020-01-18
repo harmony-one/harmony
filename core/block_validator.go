@@ -103,7 +103,10 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	if v.config.AcceptsCrossTx(block.Epoch()) {
 		cxsSha := cxReceipts.ComputeMerkleRoot()
 		if cxsSha != header.OutgoingReceiptHash() {
-			return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash(), cxsSha)
+			legacySha := types.DeriveMultipleShardsSha(cxReceipts)
+			if legacySha != header.OutgoingReceiptHash() {
+				return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x, legacy: %x)", header.OutgoingReceiptHash(), cxsSha, legacySha)
+			}
 		}
 	}
 
