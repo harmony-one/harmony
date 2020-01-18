@@ -46,6 +46,17 @@ func (node *Node) IsCurrentlyLeader() bool {
 	return node.Consensus.IsLeader()
 }
 
+// PendingCXReceipts returns node.pendingCXReceiptsProof
+func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
+	cxReceipts := make([]*types.CXReceiptsProof, len(node.pendingCXReceipts))
+	i := 0
+	for _, cxReceipt := range node.pendingCXReceipts {
+		cxReceipts[i] = cxReceipt
+		i++
+	}
+	return cxReceipts
+}
+
 // ErroredStakingTransactionSink is the inmemory failed staking transactions this node has
 func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError {
 	node.errorSink.Lock()

@@ -433,3 +433,8 @@ func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionErro
 func (b *APIBackend) IsBeaconChainExplorerNode() bool {
 	return b.hmy.nodeAPI.IsBeaconChainExplorerNode()
 }
+
+// GetPendingCXReceipts ..
+func (b *APIBackend) GetPendingCXReceipts() []*types.CXReceiptsProof {
+	return b.hmy.nodeAPI.PendingCXReceipts()
+}
