@@ -218,6 +218,9 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 
 	// (2) verify the outgoingCXReceiptsHash match
 	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
+	if byteBuffer.Len() == 0 {
+		outgoingHashFromSourceShard = types.EmptyRootHash
+	}
 	if outgoingHashFromSourceShard != merkleProof.CXReceiptHash {
 		return ctxerror.New("[ValidateCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
 	}
