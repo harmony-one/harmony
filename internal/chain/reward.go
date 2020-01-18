@@ -91,7 +91,8 @@ func blockSigners(
 	return payable, missing, nil
 }
 
-func ballotResult(
+// BallotResult ..
+func BallotResult(
 	bc engine.ChainReader, header *block.Header, shardID uint32,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
 	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
@@ -127,7 +128,7 @@ func ballotResult(
 func ballotResultBeaconchain(
 	bc engine.ChainReader, header *block.Header,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
-	return ballotResult(bc, header, shard.BeaconChainShardID)
+	return BallotResult(bc, header, shard.BeaconChainShardID)
 }
 
 func whatPercentStakedNow(
@@ -358,7 +359,7 @@ func AccumulateRewards(
 		return noReward, nil
 	}
 
-	_, signers, _, err := ballotResult(bc, header, header.ShardID())
+	_, signers, _, err := BallotResult(bc, header, header.ShardID())
 
 	if err != nil {
 		return noReward, err

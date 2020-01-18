@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -89,12 +90,17 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
 
 	// After staking, all coinbase will be the address of bls pub key
-	if node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) {
+	if header := node.Worker.GetCurrentHeader(); node.Blockchain().Config().IsStaking(header.Epoch()) {
 		addr := common.Address{}
 		blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
 		addr.SetBytes(blsPubKeyBytes[:])
 		coinbase = addr // coinbase will be the bls address
-		node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
+		header.SetCoinbase(coinbase)
+		if err := availability.IncrementValidatorSigningCounts(
+			node.Blockchain(), header, header.ShardID(), node.Worker.GetCurrentState(),
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(node.Worker.GetCurrentHeader())

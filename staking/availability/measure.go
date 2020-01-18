@@ -5,8 +5,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/block"
+	engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/rawdb"
+	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/pkg/errors"
 )
 
@@ -16,13 +19,41 @@ var (
 	errNegativeSign            = errors.New("impossible period of signing")
 )
 
+// IncrementValidatorSigningCounts ..
+func IncrementValidatorSigningCounts(
+	bc engine.ChainReader, header *block.Header, shardID uint32, state *state.DB,
+) error {
+	_, signers, _, err := chain.BallotResult(bc, header, shardID)
+	if err != nil {
+		return err
+	}
+
+	for i := range signers {
+		addr := signers[i].EcdsaAddress
+		wrapper, err := bc.ReadValidatorInformation(addr)
+		if err != nil {
+			return err
+		}
+		one := big.NewInt(1)
+
+		wrapper.Snapshot.NumBlocksToSign.Add(wrapper.Snapshot.NumBlocksToSign, one)
+		wrapper.Snapshot.NumBlocksSigned.Add(wrapper.Snapshot.NumBlocksSigned, one)
+		wrapper.Snapshot.Epoch = bc.CurrentHeader().Epoch()
+		if err := state.UpdateStakingInfo(addr, wrapper); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // SetInactiveUnavailableValidators sets the validator to
 // inactive and thereby keeping it out of
 // consideration in the pool of validators for
 // whenever committee selection happens in future, the
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
-	addrs []common.Address, batch ethdb.Batch, bc consensus_engine.ChainReader,
+	addrs []common.Address, batch ethdb.Batch, bc engine.ChainReader,
 ) error {
 	one, now := big.NewInt(1), bc.CurrentHeader().Epoch()
 	for i := range addrs {
