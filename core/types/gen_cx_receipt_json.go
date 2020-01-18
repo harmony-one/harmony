@@ -140,7 +140,7 @@ func (r *CXMerkleProof) UnmarshalJSON(input []byte) error {
 func (r CXReceiptsProof) MarshalJSON() ([]byte, error) {
 	type CXReceiptsProof struct {
 		Receipts     []*CXReceipt   `json:"receipts"     gencodec:"required"`
-		MerkleProof  *CXMerkleProof `json:"merkleProof"  gencodec:"required"` 
+		MerkleProof  *CXMerkleProof `json:"merkleProof"  gencodec:"required"`
 		Header       *block.Header  `json:"header"       gencoded:"required"`
 		CommitSig    []byte         `json:"commitSig"`
 		CommitBitmap []byte         `json:"commitBitmap"`
@@ -158,7 +158,7 @@ func (r CXReceiptsProof) MarshalJSON() ([]byte, error) {
 func (r *CXReceiptsProof) UnmarshalJSON(input []byte) error {
 	type CXReceiptsProof struct {
 		Receipts     []*CXReceipt   `json:"receipts"     gencodec:"required"`
-		MerkleProof  *CXMerkleProof `json:"merkleProof"  gencodec:"required"` 
+		MerkleProof  *CXMerkleProof `json:"merkleProof"  gencodec:"required"`
 		Header       *block.Header  `json:"header"       gencoded:"required"`
 		CommitSig    []byte         `json:"commitSig"`
 		CommitBitmap []byte         `json:"commitBitmap"`
