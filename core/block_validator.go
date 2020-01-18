@@ -101,7 +101,10 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	if v.config.IsCrossTx(block.Epoch()) {
 		cxsSha := cxReceipts.ComputeMerkleRoot()
 		if cxsSha != header.OutgoingReceiptHash() {
-			return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash(), cxsSha)
+			legacySha := types.DeriveMultipleShardsSha(cxReceipts)
+			if legacySha != header.OutgoingReceiptHash() {
+				return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x, legacy: %x)", header.OutgoingReceiptHash(), cxsSha, legacySha)
+			}
 		}
 	}
 
@@ -215,6 +218,9 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 
 	// (2) verify the outgoingCXReceiptsHash match
 	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
+	if byteBuffer.Len() == 0 {
+		outgoingHashFromSourceShard = types.EmptyRootHash
+	}
 	if outgoingHashFromSourceShard != merkleProof.CXReceiptHash {
 		return ctxerror.New("[ValidateCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
 	}
