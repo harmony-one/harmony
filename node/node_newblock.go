@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/availability"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -96,11 +95,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		addr.SetBytes(blsPubKeyBytes[:])
 		coinbase = addr // coinbase will be the bls address
 		header.SetCoinbase(coinbase)
-		if err := availability.IncrementValidatorSigningCounts(
-			node.Blockchain(), header, header.ShardID(), node.Worker.GetCurrentState(),
-		); err != nil {
-			return nil, err
-		}
 	}
 
 	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(node.Worker.GetCurrentHeader())

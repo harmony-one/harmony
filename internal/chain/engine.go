@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -324,6 +325,20 @@ func (e *engineImpl) Finalize(
 			}
 		}
 	}
+
+	if chain.Config().IsStaking(header.Epoch()) {
+		if header.ShardID() == shard.BeaconChainShardID {
+			if err := availability.IncrementValidatorSigningCounts(
+				chain, header, header.ShardID(), state,
+			); err != nil {
+				return nil, nil, err
+			}
+
+		} else {
+			//
+		}
+	}
+
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
 }

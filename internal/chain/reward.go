@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
@@ -91,44 +92,10 @@ func blockSigners(
 	return payable, missing, nil
 }
 
-// BallotResult ..
-func BallotResult(
-	bc engine.ChainReader, header *block.Header, shardID uint32,
-) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
-	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
-	//  while it is okay with hash.  Sounds like DB inconsistency.
-	//  Figure out why.
-	parentHeader := bc.GetHeaderByHash(header.ParentHash())
-	if parentHeader == nil {
-		return nil, nil, nil, ctxerror.New(
-			"cannot find parent block header in DB",
-			"parentHash", header.ParentHash(),
-		)
-	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
-	if err != nil {
-		return nil, nil, nil, ctxerror.New(
-			"cannot read shard state", "epoch", parentHeader.Epoch(),
-		).WithCause(err)
-	}
-	parentCommittee := parentShardState.FindCommitteeByID(shardID)
-
-	if parentCommittee == nil {
-		return nil, nil, nil, ctxerror.New(
-			"cannot find shard in the shard state",
-			"parentBlockNumber", parentHeader.Number(),
-			"shardID", parentHeader.ShardID(),
-		)
-	}
-
-	payable, missing, err := blockSigners(header.LastCommitBitmap(), parentCommittee)
-	return parentCommittee.Slots, payable, missing, err
-}
-
 func ballotResultBeaconchain(
 	bc engine.ChainReader, header *block.Header,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
-	return BallotResult(bc, header, shard.BeaconChainShardID)
+	return availability.BallotResult(bc, header, shard.BeaconChainShardID)
 }
 
 func whatPercentStakedNow(
@@ -359,7 +326,7 @@ func AccumulateRewards(
 		return noReward, nil
 	}
 
-	_, signers, _, err := BallotResult(bc, header, header.ShardID())
+	_, signers, _, err := availability.BallotResult(bc, header, header.ShardID())
 
 	if err != nil {
 		return noReward, err
