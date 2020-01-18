@@ -360,7 +360,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 	if err := node.Blockchain().Validator().ValidateCXReceiptsProof(receipts); err != nil {
 		if !strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) {
-			utils.Logger().Error().Err(err).Msg("[proposeReceiptsProof] Invalid CXReceiptsProof")
+			utils.Logger().Error().Err(err).Msg("[AddPendingReceipts] Invalid CXReceiptsProof")
 			return
 		}
 	}
@@ -375,7 +375,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 	}
 
 	if e := receipts.Header.Epoch(); blockNum == 0 ||
-		!node.Blockchain().Config().IsCrossLink(e) {
+		!node.Blockchain().Config().AcceptsCrossTx(e) {
 		utils.Logger().Info().
 			Uint64("incoming-epoch", e.Uint64()).
 			Msg("Incoming receipt had meaningless epoch")

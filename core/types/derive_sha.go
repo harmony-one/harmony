@@ -20,8 +20,9 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 )
@@ -55,6 +56,8 @@ func DeriveSha(list ...DerivableBase) common.Hash {
 	}
 	return trie.Hash()
 }
+
+//// Legacy forked logic. Keep as is, but do not use it anymore ->
 
 // DeriveOneShardSha calculates the hash of the trie of
 // cross shard transactions with the given destination shard
@@ -95,3 +98,5 @@ func DeriveMultipleShardsSha(list DerivableList) common.Hash {
 	}
 	return crypto.Keccak256Hash(by)
 }
+
+//// <- Legacy forked logic. Keep as is, but do not use it anymore

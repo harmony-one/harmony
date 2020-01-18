@@ -310,7 +310,7 @@ func NewBlock(
 		b.header.SetBloom(CreateBloom(receipts))
 	}
 
-	b.header.SetOutgoingReceiptHash(DeriveMultipleShardsSha(CXReceipts(outcxs)))
+	b.header.SetOutgoingReceiptHash(CXReceipts(outcxs).ComputeMerkleRoot())
 
 	if len(incxs) == 0 {
 		b.header.SetIncomingReceiptHash(EmptyRootHash)
