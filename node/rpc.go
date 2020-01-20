@@ -48,10 +48,22 @@ func (node *Node) IsCurrentlyLeader() bool {
 	return node.Consensus.IsLeader()
 }
 
+// PendingCXReceipts returns node.pendingCXReceiptsProof
+func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
+	cxReceipts := make([]*types.CXReceiptsProof, len(node.pendingCXReceipts))
+	i := 0
+	for _, cxReceipt := range node.pendingCXReceipts {
+		cxReceipts[i] = cxReceipt
+		i++
+	}
+	return cxReceipts
+}
+
 // ErroredStakingTransactionSink is the inmemory failed staking transactions this node has
-func (node *Node) ErroredStakingTransactionSink() (result []staking.RPCTransactionError) {
+func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError {
 	node.errorSink.Lock()
 	defer node.errorSink.Unlock()
+	result := []staking.RPCTransactionError{}
 	node.errorSink.failedStakingTxns.Do(func(d interface{}) {
 		if d != nil {
 			result = append(result, d.(staking.RPCTransactionError))
@@ -61,9 +73,10 @@ func (node *Node) ErroredStakingTransactionSink() (result []staking.RPCTransacti
 }
 
 // ErroredTransactionSink is the inmemory failed transactions this node has
-func (node *Node) ErroredTransactionSink() (result []types.RPCTransactionError) {
+func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
 	node.errorSink.Lock()
 	defer node.errorSink.Unlock()
+	result := []types.RPCTransactionError{}
 	node.errorSink.failedTxns.Do(func(d interface{}) {
 		if d != nil {
 			result = append(result, d.(types.RPCTransactionError))

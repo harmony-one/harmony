@@ -1109,10 +1109,11 @@ func (bc *BlockChain) WriteBlockWithState(
 			if i == int(block.ShardID()) {
 				continue
 			}
-			shardReceipts := GetToShardReceipts(cxReceipts, uint32(i))
+
+			shardReceipts := types.CXReceipts(cxReceipts).GetToShardReceipts(uint32(i))
 			err := rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts)
 			if err != nil {
-				utils.Logger().Debug().Err(err).Interface("shardReceipts", shardReceipts).Int("toShardID", i).Msg("WriteCXReceipts cannot write into database")
+				utils.Logger().Error().Err(err).Interface("shardReceipts", shardReceipts).Int("toShardID", i).Msg("WriteCXReceipts cannot write into database")
 				return NonStatTy, err
 			}
 		}
@@ -2377,18 +2378,6 @@ func (bc *BlockChain) GetVMConfig() *vm.Config {
 	return &bc.vmConfig
 }
 
-// GetToShardReceipts filters the cross shard receipts with given destination shardID
-func GetToShardReceipts(cxReceipts types.CXReceipts, shardID uint32) types.CXReceipts {
-	cxs := types.CXReceipts{}
-	for i := range cxReceipts {
-		cx := cxReceipts[i]
-		if cx.ToShardID == shardID {
-			cxs = append(cxs, cx)
-		}
-	}
-	return cxs
-}
-
 // ReadCXReceipts retrieves the cross shard transaction receipts of a given shard
 func (bc *BlockChain) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error) {
 	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, blockNum, blockHash)
@@ -2398,19 +2387,9 @@ func (bc *BlockChain) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash 
 	return cxs, nil
 }
 
-// WriteCXReceipts saves the cross shard transaction receipts of a given shard
-func (bc *BlockChain) WriteCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash, receipts types.CXReceipts) error {
-	return rawdb.WriteCXReceipts(bc.db, shardID, blockNum, blockHash, receipts)
-}
-
 // CXMerkleProof calculates the cross shard transaction merkle proof of a given destination shard
-func (bc *BlockChain) CXMerkleProof(shardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
+func (bc *BlockChain) CXMerkleProof(toShardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
 	proof := &types.CXMerkleProof{BlockNum: block.Number(), BlockHash: block.Hash(), ShardID: block.ShardID(), CXReceiptHash: block.Header().OutgoingReceiptHash(), CXShardHashes: []common.Hash{}, ShardIDs: []uint32{}}
-	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, block.NumberU64(), block.Hash())
-
-	if err != nil || cxs == nil {
-		return nil, err
-	}
 
 	epoch := block.Header().Epoch()
 	shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
