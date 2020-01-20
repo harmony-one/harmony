@@ -81,4 +81,5 @@ type Backend interface {
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
 	IsBeaconChainExplorerNode() bool
 	GetMedianRawStakeSnapshot() *big.Int
+	GetPendingCXReceipts() []*types.CXReceiptsProof
 }

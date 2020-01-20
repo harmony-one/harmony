@@ -364,3 +364,8 @@ func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash 
 	}
 	return nil
 }
+
+// GetPendingCXReceipts ..
+func (s *PublicTransactionPoolAPI) GetPendingCXReceipts(ctx context.Context) []*types.CXReceiptsProof {
+	return s.b.GetPendingCXReceipts()
+}
