@@ -1,4 +1,4 @@
-package hmyapi
+package apiv1
 
 import "errors"
 
