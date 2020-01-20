@@ -49,7 +49,6 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/availability"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -1215,21 +1214,6 @@ func (bc *BlockChain) WriteBlockWithState(
 		} else {
 			// block reward never accumulate before staking
 			bc.WriteBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
-		}
-	}
-
-	// NOTE This code must run AFTER validator uptime accounting happened
-	if block.ShardID() == shard.BeaconChainShardID &&
-		bc.chainConfig.IsStaking(block.Epoch()) &&
-		len(block.Header().ShardState()) > 0 {
-		addrs, err := bc.ReadActiveValidatorList()
-		if err != nil {
-			return NonStatTy, err
-		}
-		if err := availability.SetInactiveUnavailableValidators(
-			addrs, batch, bc,
-		); err != nil {
-			return NonStatTy, err
 		}
 	}
 

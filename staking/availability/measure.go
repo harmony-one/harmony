@@ -3,12 +3,9 @@ package availability
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	engine "github.com/harmony-one/harmony/consensus/engine"
-	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -110,6 +107,7 @@ func IncrementValidatorSigningCounts(
 	if err != nil {
 		return err
 	}
+	epoch, one := bc.CurrentHeader().Epoch(), big.NewInt(1)
 
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
@@ -117,11 +115,10 @@ func IncrementValidatorSigningCounts(
 		if err != nil {
 			return err
 		}
-		one := big.NewInt(1)
 
 		wrapper.Snapshot.NumBlocksToSign.Add(wrapper.Snapshot.NumBlocksToSign, one)
 		wrapper.Snapshot.NumBlocksSigned.Add(wrapper.Snapshot.NumBlocksSigned, one)
-		wrapper.Snapshot.Epoch = bc.CurrentHeader().Epoch()
+		wrapper.Snapshot.Epoch = epoch
 		if err := state.UpdateStakingInfo(addr, wrapper); err != nil {
 			return err
 		}
@@ -136,8 +133,14 @@ func IncrementValidatorSigningCounts(
 // whenever committee selection happens in future, the
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
-	addrs []common.Address, batch ethdb.Batch, bc engine.ChainReader,
+	bc engine.ChainReader, state *state.DB,
 ) error {
+
+	addrs, err := bc.ReadActiveValidatorList()
+	if err != nil {
+		return err
+	}
+
 	one, now := big.NewInt(1), bc.CurrentHeader().Epoch()
 	for i := range addrs {
 		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
@@ -183,8 +186,8 @@ func SetInactiveUnavailableValidators(
 
 		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
 			wrapper.Active = false
-			if writeErr := rawdb.WriteValidatorData(batch, wrapper); writeErr != nil {
-				return writeErr
+			if err := state.UpdateStakingInfo(addrs[i], wrapper); err != nil {
+				return err
 			}
 		}
 	}
