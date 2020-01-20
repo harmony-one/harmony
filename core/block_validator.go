@@ -100,10 +100,13 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash(), receiptSha)
 	}
 
-	if v.config.HasCrossTxFields(block.Epoch()) {
-		cxsSha := types.DeriveMultipleShardsSha(cxReceipts)
+	if v.config.AcceptsCrossTx(block.Epoch()) {
+		cxsSha := cxReceipts.ComputeMerkleRoot()
 		if cxsSha != header.OutgoingReceiptHash() {
-			return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x)", header.OutgoingReceiptHash(), cxsSha)
+			legacySha := types.DeriveMultipleShardsSha(cxReceipts)
+			if legacySha != header.OutgoingReceiptHash() {
+				return fmt.Errorf("invalid cross shard receipt root hash (remote: %x local: %x, legacy: %x)", header.OutgoingReceiptHash(), cxsSha, legacySha)
+			}
 		}
 	}
 
@@ -202,7 +205,7 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	}
 
 	if !foundMatchingShardID {
-		return ctxerror.New("[ValidateCXReceiptsProof] Didn't find matching shardID")
+		return ctxerror.New("[ValidateCXReceiptsProof] Didn't find matching toShardID (no receipts for my shard)")
 	}
 
 	sourceShardID := merkleProof.ShardID
@@ -217,6 +220,9 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 
 	// (2) verify the outgoingCXReceiptsHash match
 	outgoingHashFromSourceShard := crypto.Keccak256Hash(byteBuffer.Bytes())
+	if byteBuffer.Len() == 0 {
+		outgoingHashFromSourceShard = types.EmptyRootHash
+	}
 	if outgoingHashFromSourceShard != merkleProof.CXReceiptHash {
 		return ctxerror.New("[ValidateCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
 	}

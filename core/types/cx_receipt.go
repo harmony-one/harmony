@@ -1,7 +1,11 @@
 package types
 
 import (
+	"bytes"
+	"encoding/binary"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -80,6 +84,39 @@ func (cs CXReceipts) MaxToShardID() uint32 {
 		}
 	}
 	return maxShardID
+}
+
+// ComputeMerkleRoot computes the merkle root of this list of receipts
+// The root is the hash of [shardID, receiptsRoot, shardID, receiptsRoot...]
+// The receiptRoot is the merkle root hash of the receipts for a specific shards.
+func (cs CXReceipts) ComputeMerkleRoot() common.Hash {
+	byteBuffer := bytes.NewBuffer([]byte{})
+	for i := 0; i <= int(cs.MaxToShardID()); i++ {
+		shardReceipts := cs.GetToShardReceipts(uint32(i))
+		if len(shardReceipts) != 0 {
+			sKey := make([]byte, 4)
+			binary.BigEndian.PutUint32(sKey, uint32(i))
+			byteBuffer.Write(sKey)
+			hash := DeriveSha(shardReceipts)
+			byteBuffer.Write(hash[:])
+		}
+	}
+	if byteBuffer.Len() == 0 {
+		return EmptyRootHash
+	}
+	return crypto.Keccak256Hash(byteBuffer.Bytes())
+}
+
+// GetToShardReceipts filters the cross shard receipts with given destination shardID
+func (cs CXReceipts) GetToShardReceipts(shardID uint32) CXReceipts {
+	cxs := CXReceipts{}
+	for i := range cs {
+		cx := cs[i]
+		if cx.ToShardID == shardID {
+			cxs = append(cxs, cx)
+		}
+	}
+	return cxs
 }
 
 // CXMerkleProof represents the merkle proof of a collection of ordered cross shard transactions

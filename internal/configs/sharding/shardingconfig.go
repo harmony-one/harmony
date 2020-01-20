@@ -68,6 +68,9 @@ type Instance interface {
 
 	// ReshardingEpoch returns a list of Epoch while off-chain resharding happens
 	ReshardingEpoch() []*big.Int
+
+	// Count of blocks per epoch
+	BlocksPerEpoch() uint64
 }
 
 // genShardingStructure return sharding structure, given shard number and its patterns.

@@ -39,7 +39,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte)
 		if i == int(myShardID) {
 			continue
 		}
-		go node.BroadcastCXReceiptsWithShardID(newBlock, commitSig, commitBitmap, uint32(i))
+		node.BroadcastCXReceiptsWithShardID(newBlock, commitSig, commitBitmap, uint32(i))
 	}
 }
 
@@ -50,19 +50,22 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 
 	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash())
 	if err != nil || len(cxReceipts) == 0 {
-		utils.Logger().Info().Err(err).Uint32("ToShardID", toShardID).Int("numCXReceipts", len(cxReceipts)).Msg("[BroadcastCXReceiptsWithShardID] No ReadCXReceipts found")
+		utils.Logger().Info().Err(err).Uint32("ToShardID", toShardID).Int("numCXReceipts", len(cxReceipts)).Msg("[CXMerkleProof] No receipts found for the destination shard")
 		return
 	}
+
 	merkleProof, err := node.Blockchain().CXMerkleProof(toShardID, block)
 	if err != nil {
 		utils.Logger().Warn().Uint32("ToShardID", toShardID).Msg("[BroadcastCXReceiptsWithShardID] Unable to get merkleProof")
 		return
 	}
 
+	cxReceiptsProof := &types.CXReceiptsProof{Receipts: cxReceipts, MerkleProof: merkleProof, Header: block.Header(), CommitSig: commitSig, CommitBitmap: commitBitmap}
+
 	groupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(toShardID))
-	utils.Logger().Info().Uint32("ToShardID", toShardID).Str("GroupID", string(groupID)).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof Found")
+	utils.Logger().Info().Uint32("ToShardID", toShardID).Str("GroupID", string(groupID)).Interface("cxp", cxReceiptsProof).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof ready. Sending CX receipts...")
 	// TODO ek – limit concurrency
-	go node.host.SendMessageToGroups([]nodeconfig.GroupID{groupID}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceipts, merkleProof, block.Header(), commitSig, commitBitmap)))
+	go node.host.SendMessageToGroups([]nodeconfig.GroupID{groupID}, host.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceiptsProof)))
 }
 
 // BroadcastMissingCXReceipts broadcasts missing cross shard receipts per request

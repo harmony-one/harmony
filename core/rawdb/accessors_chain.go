@@ -546,6 +546,7 @@ func DeletePendingCrossLinks(db DatabaseDeleter) error {
 func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash) (types.CXReceipts, error) {
 	data, err := db.Get(cxReceiptKey(shardID, number, hash))
 	if err != nil || len(data) == 0 {
+		utils.Logger().Info().Err(err).Uint64("number", number).Int("dataLen", len(data)).Msg("ReadCXReceipts")
 		return nil, err
 	}
 	cxReceipts := types.CXReceipts{}

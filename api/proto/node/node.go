@@ -191,13 +191,11 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 
 // ConstructCXReceiptsProof constructs cross shard receipts and related proof including
 // merkle proof, blockHeader and  commitSignatures
-func ConstructCXReceiptsProof(cxs types.CXReceipts, mkp *types.CXMerkleProof, header *block.Header, commitSig []byte, commitBitmap []byte) []byte {
-	msg := &types.CXReceiptsProof{Receipts: cxs, MerkleProof: mkp, Header: header, CommitSig: commitSig, CommitBitmap: commitBitmap}
-
+func ConstructCXReceiptsProof(cxReceiptsProof *types.CXReceiptsProof) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Block))
 	byteBuffer.WriteByte(byte(Receipt))
-	by, err := rlp.EncodeToBytes(msg)
+	by, err := rlp.EncodeToBytes(cxReceiptsProof)
 
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[ConstructCXReceiptsProof] Encode CXReceiptsProof Error")
