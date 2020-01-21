@@ -43,6 +43,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -2440,7 +2441,11 @@ func (bc *BlockChain) ReadValidatorInformationAt(addr common.Address, root commo
 	}
 	wrapper := state.GetStakingInfo(addr)
 	if wrapper == nil {
-		return nil, fmt.Errorf("ValidatorData not found: %v", addr)
+		return nil, fmt.Errorf(
+			"at root: %s, validator info not found: %s",
+			root.Hex(),
+			common2.MustAddressToBech32(addr),
+		)
 	}
 	return wrapper, nil
 }

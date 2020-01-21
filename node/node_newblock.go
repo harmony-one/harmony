@@ -68,6 +68,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						break
 					} else {
 						utils.Logger().Err(err).
+							Uint64("bad-blocknum", newBlock.NumberU64()).
+							Uint64("bad-epoch", newBlock.Epoch().Uint64()).
 							Msg("!!!!!!!!!cannot commit new block!!!!!!!!!")
 					}
 				}
@@ -154,7 +156,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare cross links
 	var crossLinksToPropose types.CrossLinks
-	if node.NodeConfig.ShardID == 0 && node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
 		node.pendingCLMutex.Lock()
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
 		node.pendingCLMutex.Unlock()
@@ -190,7 +193,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 		return nil, err
 	}
-	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState)
+	return node.Worker.FinalizeNewBlock(
+		sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState,
+	)
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
