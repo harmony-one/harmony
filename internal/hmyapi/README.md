@@ -89,3 +89,7 @@ The ``shh`` is for the whisper protocol to communicate p2p and broadcast
 * [ ] shh_uninstallFilter
 * [ ] shh_getFilterChanges
 * [ ] shh_getMessages
+
+### API Versions
+* For API V1 you specify 1.0 version in curl
+* For API V2 you specify 2.0 version in curl, V2 has output numbers were changed to decimals and also fixed few errors

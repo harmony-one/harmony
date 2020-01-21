@@ -1,4 +1,4 @@
-package hmyapi
+package apiv2
 
 import (
 	"context"
@@ -14,8 +14,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -84,72 +82,4 @@ type Backend interface {
 	IsBeaconChainExplorerNode() bool
 	GetMedianRawStakeSnapshot() *big.Int
 	GetPendingCXReceipts() []*types.CXReceiptsProof
-}
-
-// GetAPIs returns all the APIs.
-func GetAPIs(b Backend) []rpc.API {
-	nonceLock := new(apiv1.AddrLocker)
-	nonceLockV2 := new(apiv2.AddrLocker)
-	return []rpc.API{
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicHarmonyAPI(b),
-			Public:    true,
-		},
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicBlockChainAPI(b),
-			Public:    true,
-		},
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicTransactionPoolAPI(b, nonceLock),
-			Public:    true,
-		},
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicAccountAPI(b.AccountManager()),
-			Public:    true,
-		},
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   apiv1.NewDebugAPI(b),
-			Public:    true, // FIXME: change to false once IPC implemented
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicHarmonyAPI(b),
-			Public:    true,
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicBlockChainAPI(b),
-			Public:    true,
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicTransactionPoolAPI(b, nonceLockV2),
-			Public:    true,
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicAccountAPI(b.AccountManager()),
-			Public:    true,
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewDebugAPI(b),
-			Public:    true, // FIXME: change to false once IPC implemented
-		},
-	}
 }
