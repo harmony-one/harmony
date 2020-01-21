@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/pkg/errors"
 )
 
 // Constants of proposing a new block
@@ -178,40 +177,36 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Bump up signers counts
-	state, header := node.Worker.GetCurrentState(), node.Worker.GetCurrentHeader()
+	state, header := node.Worker.GetCurrentState(), node.Blockchain().CurrentHeader()
 	if epoch := header.Epoch(); node.Blockchain().Config().IsStaking(epoch) {
 
 		if header.ShardID() == shard.BeaconChainShardID {
 			superCommittee, err := node.Blockchain().ReadShardState(header.Epoch())
+			processed := make(map[common.Address]struct{})
 
 			if err != nil {
 				return nil, err
 			}
 
-			subCommittee := superCommittee.FindCommitteeByID(shard.BeaconChainShardID)
-			processed := make(map[common.Address]struct{})
-
-			if subCommittee == nil {
-				return nil, errors.New("empty subcommitee for my shardID")
-			}
-
-			for j := range subCommittee.Slots {
-				slot := subCommittee.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
+			for j := range superCommittee.Shards {
+				shard := superCommittee.Shards[j]
+				for j := range shard.Slots {
+					slot := shard.Slots[j]
+					if slot.EffectiveStake != nil { // For external validator
+						_, ok := processed[slot.EcdsaAddress]
+						if !ok {
+							processed[slot.EcdsaAddress] = struct{}{}
+						}
 					}
 				}
 			}
-
 			if err := availability.IncrementValidatorSigningCounts(
 				node.Blockchain(), header, header.ShardID(), state, processed,
 			); err != nil {
 				return nil, err
 			}
 
-			// Kick out the inactive validators so they won't come up in the auction as possible
+			// kick out the inactive validators so they won't come up in the auction as possible
 			// candidates in the following call to SuperCommitteeForNextEpoch
 			if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
 				if err := availability.SetInactiveUnavailableValidators(
