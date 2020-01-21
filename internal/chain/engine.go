@@ -278,7 +278,7 @@ func (e *engineImpl) Finalize(
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
-	if isBeaconChain && isNewEpoch {
+	if isBeaconChain && isNewEpoch && inStakingEra {
 		validators, err := chain.ReadValidatorList()
 		if err != nil {
 			return nil, nil, ctxerror.New("[Finalize] failed to read active validators").WithCause(err)
@@ -326,20 +326,6 @@ func (e *engineImpl) Finalize(
 					}
 				}
 			}
-		}
-	}
-
-	if inStakingEra {
-		if isBeaconChain {
-
-			// if err := availability.SetInactiveUnavailableValidators(
-			// 	chain, state, processed,
-			// ); err != nil {
-			// 	return nil, nil, err
-			// }
-
-		} else {
-			//
 		}
 	}
 

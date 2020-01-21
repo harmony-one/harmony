@@ -69,10 +69,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					} else {
-						utils.Logger().Err(err).
-							Uint64("bad-blocknum", newBlock.NumberU64()).
-							Uint64("bad-epoch", newBlock.Epoch().Uint64()).
-							Msg("!!!!!!!!!cannot commit new block!!!!!!!!!")
+						utils.Logger().Err(err).Msg("!!!!!!!!!cannot commit new block!!!!!!!!!")
 					}
 				}
 			}
@@ -213,6 +210,17 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 			); err != nil {
 				return nil, err
 			}
+
+			// Kick out the inactive validators so they won't come up in the auction as possible
+			// candidates in the following call to SuperCommitteeForNextEpoch
+			if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+				if err := availability.SetInactiveUnavailableValidators(
+					node.Blockchain(), state, processed,
+				); err != nil {
+					return nil, err
+				}
+			}
+
 		} else {
 			// TODO Handle shard chain
 		}
