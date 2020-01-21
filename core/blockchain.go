@@ -2710,10 +2710,8 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 		if err != nil {
 			return err
 		}
-		zero := big.NewInt(0)
+
 		validator.Snapshot.Epoch = epoch
-		validator.Snapshot.NumBlocksSigned = zero
-		validator.Snapshot.NumBlocksToSign = zero
 
 		if err := rawdb.WriteValidatorSnapshot(bc.db, validator); err != nil {
 			return err
