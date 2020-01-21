@@ -123,9 +123,10 @@ type BlockChain struct {
 	scope         event.SubscriptionScope
 	genesisBlock  *types.Block
 
-	mu      sync.RWMutex // global mutex for locking chain operations
-	chainmu sync.RWMutex // blockchain insertion lock
-	procmu  sync.RWMutex // block processor lock
+	mu                     sync.RWMutex // global mutex for locking chain operations
+	chainmu                sync.RWMutex // blockchain insertion lock
+	procmu                 sync.RWMutex // block processor lock
+	pendingCrossLinksMutex sync.RWMutex // pending crosslinks lock
 
 	checkpoint       int          // checkpoint counts towards the new checkpoint
 	currentBlock     atomic.Value // Current head of the block chain
@@ -2247,6 +2248,9 @@ func (bc *BlockChain) WritePendingCrossLinks(crossLinks []types.CrossLink) error
 
 // AddPendingCrossLinks appends pending crosslinks
 func (bc *BlockChain) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error) {
+	bc.pendingCrossLinksMutex.Lock()
+	defer bc.pendingCrossLinksMutex.Unlock()
+
 	cls, err := bc.ReadPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		err := bc.WritePendingCrossLinks(pendingCLs)
@@ -2259,6 +2263,9 @@ func (bc *BlockChain) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, e
 
 // DeleteCommittedFromPendingCrossLinks delete pending crosslinks that already committed (i.e. passed in the params)
 func (bc *BlockChain) DeleteCommittedFromPendingCrossLinks(crossLinks []types.CrossLink) (int, error) {
+	bc.pendingCrossLinksMutex.Lock()
+	defer bc.pendingCrossLinksMutex.Unlock()
+
 	cls, err := bc.ReadPendingCrossLinks()
 	if err != nil || len(cls) == 0 {
 		return 0, err

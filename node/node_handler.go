@@ -67,7 +67,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			Msg("HandleMessage get message category failed")
 		return
 	}
-
 	msgType, err := proto.GetMessageType(content)
 	if err != nil {
 		utils.Logger().Error().
