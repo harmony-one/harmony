@@ -20,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -332,35 +331,12 @@ func (e *engineImpl) Finalize(
 
 	if inStakingEra {
 		if isBeaconChain {
-			superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
 
-			if err != nil {
-				return nil, nil, err
-			}
-			processed := make(map[common.Address]struct{})
-			for i := range superCommittee.Shards {
-				shard := superCommittee.Shards[i]
-				for j := range shard.Slots {
-					slot := shard.Slots[j]
-					if slot.EffectiveStake != nil { // For external validator
-						_, ok := processed[slot.EcdsaAddress]
-						if !ok {
-							processed[slot.EcdsaAddress] = struct{}{}
-						}
-					}
-				}
-			}
-
-			if err := availability.IncrementValidatorSigningCounts(
-				chain, header, header.ShardID(), state, processed,
-			); err != nil {
-				return nil, nil, err
-			}
-			if err := availability.SetInactiveUnavailableValidators(
-				chain, state, processed,
-			); err != nil {
-				return nil, nil, err
-			}
+			// if err := availability.SetInactiveUnavailableValidators(
+			// 	chain, state, processed,
+			// ); err != nil {
+			// 	return nil, nil, err
+			// }
 
 		} else {
 			//

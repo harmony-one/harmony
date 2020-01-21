@@ -10,7 +10,9 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // Constants of proposing a new block
@@ -175,6 +177,44 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 			utils.Logger().Debug().Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
 		} else {
 			utils.Logger().Error().Err(err).Msgf("[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
+		}
+	}
+
+	// Bump up signers counts
+	state, header := node.Worker.GetCurrentState(), node.Worker.GetCurrentHeader()
+	if epoch := header.Epoch(); node.Blockchain().Config().IsStaking(epoch) {
+
+		if header.ShardID() == shard.BeaconChainShardID {
+			superCommittee, err := node.Blockchain().ReadShardState(header.Epoch())
+
+			if err != nil {
+				return nil, err
+			}
+
+			subCommittee := superCommittee.FindCommitteeByID(shard.BeaconChainShardID)
+			processed := make(map[common.Address]struct{})
+
+			if subCommittee == nil {
+				return nil, errors.New("empty subcommitee for my shardID")
+			}
+
+			for j := range subCommittee.Slots {
+				slot := subCommittee.Slots[j]
+				if slot.EffectiveStake != nil { // For external validator
+					_, ok := processed[slot.EcdsaAddress]
+					if !ok {
+						processed[slot.EcdsaAddress] = struct{}{}
+					}
+				}
+			}
+
+			if err := availability.IncrementValidatorSigningCounts(
+				node.Blockchain(), header, header.ShardID(), state, processed,
+			); err != nil {
+				return nil, err
+			}
+		} else {
+			// TODO Handle shard chain
 		}
 	}
 
