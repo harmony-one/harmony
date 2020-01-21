@@ -3,6 +3,7 @@ package availability
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	engine "github.com/harmony-one/harmony/consensus/engine"
@@ -19,7 +20,8 @@ var (
 	errNegativeSign            = errors.New("impossible period of signing")
 )
 
-func blockSigners(
+// BlockSigners ..
+func BlockSigners(
 	bitmap []byte, parentCommittee *shard.Committee,
 ) (shard.SlotList, shard.SlotList, error) {
 	committerKeys := []*bls.PublicKey{}
@@ -95,23 +97,29 @@ func BallotResult(
 		)
 	}
 
-	payable, missing, err := blockSigners(header.LastCommitBitmap(), parentCommittee)
+	payable, missing, err := BlockSigners(header.LastCommitBitmap(), parentCommittee)
 	return parentCommittee.Slots, payable, missing, err
 }
 
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
-	bc engine.ChainReader, header *block.Header, shardID uint32, state *state.DB,
+	chain engine.ChainReader, header *block.Header,
+	shardID uint32, state *state.DB, onlyConsider map[common.Address]struct{},
 ) error {
-	_, signers, _, err := BallotResult(bc, header, shardID)
+	_, signers, _, err := BallotResult(chain, header, shardID)
 	if err != nil {
 		return err
 	}
-	epoch, one := bc.CurrentHeader().Epoch(), big.NewInt(1)
+
+	epoch, one := chain.CurrentHeader().Epoch(), big.NewInt(1)
 
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
-		wrapper, err := bc.ReadValidatorInformation(addr)
+
+		if _, ok := onlyConsider[addr]; !ok {
+			continue
+		}
+		wrapper, err := chain.ReadValidatorInformation(addr)
 		if err != nil {
 			return err
 		}
@@ -134,6 +142,7 @@ func IncrementValidatorSigningCounts(
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
 	bc engine.ChainReader, state *state.DB,
+	onlyConsider map[common.Address]struct{},
 ) error {
 
 	addrs, err := bc.ReadActiveValidatorList()
@@ -143,6 +152,11 @@ func SetInactiveUnavailableValidators(
 
 	one, now := big.NewInt(1), bc.CurrentHeader().Epoch()
 	for i := range addrs {
+
+		if _, ok := onlyConsider[addrs[i]]; !ok {
+			continue
+		}
+
 		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
 
 		if err != nil {

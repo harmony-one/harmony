@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
@@ -14,9 +13,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -44,52 +41,6 @@ func adjust(amount numeric.Dec) numeric.Dec {
 	return amount.MulTruncate(
 		numeric.NewDecFromBigInt(big.NewInt(denominations.One)),
 	)
-}
-
-func blockSigners(
-	bitmap []byte, parentCommittee *shard.Committee,
-) (shard.SlotList, shard.SlotList, error) {
-	committerKeys := []*bls.PublicKey{}
-
-	for _, member := range parentCommittee.Slots {
-		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, nil, ctxerror.New(
-				"cannot convert BLS public key",
-				"blsPublicKey",
-				member.BlsPublicKey,
-			).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	mask, err := bls2.NewMask(committerKeys, nil)
-	if err != nil {
-		return nil, nil, ctxerror.New(
-			"cannot create group sig mask",
-		).WithCause(err)
-	}
-	if err := mask.SetMask(bitmap); err != nil {
-		return nil, nil, ctxerror.New(
-			"cannot set group sig mask bits",
-		).WithCause(err)
-	}
-
-	payable, missing := shard.SlotList{}, shard.SlotList{}
-
-	for idx, member := range parentCommittee.Slots {
-		switch signed, err := mask.IndexEnabled(idx); true {
-		case err != nil:
-			return nil, nil, ctxerror.New("cannot check for committer bit",
-				"committerIndex", idx,
-			).WithCause(err)
-		case signed:
-			payable = append(payable, member)
-		default:
-			missing = append(missing, member)
-		}
-	}
-	return payable, missing, nil
 }
 
 func ballotResultBeaconchain(
@@ -247,7 +198,7 @@ func AccumulateRewards(
 
 				subComm := shardState.FindCommitteeByID(cxLink.ShardID())
 				// _ are the missing signers, later for slashing
-				payableSigners, _, err := blockSigners(cxLink.Bitmap(), subComm)
+				payableSigners, _, err := availability.BlockSigners(cxLink.Bitmap(), subComm)
 
 				if err != nil {
 					return noReward, err
