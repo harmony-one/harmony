@@ -279,7 +279,7 @@ func (e *engineImpl) Finalize(
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
-	if isBeaconChain && isNewEpoch && inStakingEra {
+	if isBeaconChain && isNewEpoch {
 		validators, err := chain.ReadValidatorList()
 		if err != nil {
 			return nil, nil, ctxerror.New("[Finalize] failed to read active validators").WithCause(err)
@@ -332,13 +332,32 @@ func (e *engineImpl) Finalize(
 
 	if inStakingEra {
 		if isBeaconChain {
+			superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
+
+			if err != nil {
+				return nil, nil, err
+			}
+			processed := make(map[common.Address]struct{})
+			for i := range superCommittee.Shards {
+				shard := superCommittee.Shards[i]
+				for j := range shard.Slots {
+					slot := shard.Slots[j]
+					if slot.EffectiveStake != nil { // For external validator
+						_, ok := processed[slot.EcdsaAddress]
+						if !ok {
+							processed[slot.EcdsaAddress] = struct{}{}
+						}
+					}
+				}
+			}
+
 			if err := availability.IncrementValidatorSigningCounts(
-				chain, header, header.ShardID(), state,
+				chain, header, header.ShardID(), state, processed,
 			); err != nil {
 				return nil, nil, err
 			}
 			if err := availability.SetInactiveUnavailableValidators(
-				chain, state,
+				chain, state, processed,
 			); err != nil {
 				return nil, nil, err
 			}
