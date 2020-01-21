@@ -222,6 +222,13 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // BroadcastCrossLink is called by consensus leader to send the new header as cross link to beacon chain.
 func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
+	// no point to broadcast the crosslink if we aren't even in the right epoch yet
+	if !node.Blockchain().Config().IsCrossLink(
+		node.Blockchain().CurrentHeader().Epoch(),
+	) {
+		return
+	}
+
 	utils.Logger().Info().Msgf("Construct and Broadcasting new crosslink to beacon chain groupID %s", nodeconfig.NewGroupIDByShardID(0))
 	headers := []*block.Header{}
 	lastLink, err := node.Beaconchain().ReadShardLastCrossLink(newBlock.ShardID())
