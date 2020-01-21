@@ -105,9 +105,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			utils.Logger().Debug().
 				Msgf("[ProcessingCrossLink] Committing for shardID %d, blockNum %d", cl.ShardID(), cl.Number().Uint64())
 		}
-		node.pendingCLMutex.Lock()
 		Len, _ := node.Blockchain().AddPendingCrossLinks(candidates)
-		node.pendingCLMutex.Unlock()
 		utils.Logger().Debug().
 			Msgf("[ProcessingCrossLink] Add pending crosslinks,  total pending: %d", Len)
 	}
