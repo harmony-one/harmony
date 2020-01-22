@@ -9,12 +9,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/rs/zerolog"
-
 	blockif "github.com/harmony-one/harmony/block/interface"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/rs/zerolog"
 )
 
 // Header is the V1 block header.
@@ -365,6 +364,20 @@ func (h *Header) SetCrossLinks(newCrossLinks []byte) {
 		h.Logger(utils.Logger()).Warn().
 			Hex("crossLinks", newCrossLinks).
 			Msg("cannot store cross-chain links in V1 header")
+	}
+}
+
+// Slashes ..
+func (h *Header) Slashes() []byte {
+	return nil
+}
+
+// SetSlashes ..
+func (h *Header) SetSlashes(newSlashes []byte) {
+	if len(newSlashes) > 0 {
+		h.Logger(utils.Logger()).Warn().
+			Hex("slashes", newSlashes).
+			Msg("cannot store slashes in V1 header")
 	}
 }
 

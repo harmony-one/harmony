@@ -228,4 +228,8 @@ type Header interface {
 
 	// Copy returns a copy of the header.
 	Copy() Header
+
+	Slashes() []byte
+
+	SetSlashes(newSlashes []byte)
 }

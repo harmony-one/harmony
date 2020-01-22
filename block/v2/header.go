@@ -9,11 +9,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/rs/zerolog"
-
 	blockif "github.com/harmony-one/harmony/block/interface"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/rs/zerolog"
 )
 
 // Header is the V2 block header.
@@ -362,6 +362,20 @@ func (h *Header) CrossLinks() []byte {
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetCrossLinks(newCrossLinks []byte) {
 	h.fields.CrossLinks = append(newCrossLinks[:0:0], newCrossLinks...)
+}
+
+// Slashes ..
+func (h *Header) Slashes() []byte {
+	return nil
+}
+
+// SetSlashes ..
+func (h *Header) SetSlashes(newSlashes []byte) {
+	if len(newSlashes) > 0 {
+		h.Logger(utils.Logger()).Warn().
+			Hex("slashes", newSlashes).
+			Msg("cannot store slashes in V2 header")
+	}
 }
 
 // field type overrides for gencodec
