@@ -362,10 +362,11 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	// TODO: refactor the asynchronous calls to separate go routine.
 	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
-		if node.NodeConfig.ShardID == 0 {
+		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)
 		}
-		if node.NodeConfig.ShardID != shard.BeaconChainShardID && node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
+		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
+			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
 			node.BroadcastCrossLink(newBlock)
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
@@ -383,7 +384,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 		rnd := rand.Intn(100)
 		if rnd < 1 {
 			// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
-			if node.NodeConfig.ShardID == 0 {
+			if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 				node.BroadcastNewBlock(newBlock)
 			}
 			node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
