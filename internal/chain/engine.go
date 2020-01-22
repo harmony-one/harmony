@@ -273,10 +273,12 @@ func (e *engineImpl) Finalize(
 	if err != nil {
 		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
-
+	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
+	isNewEpoch := len(header.ShardState()) > 0
+	inStakingEra := chain.Config().IsStaking(header.Epoch())
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
-	if header.ShardID() == shard.BeaconChainShardID && len(header.ShardState()) > 0 {
+	if isBeaconChain && isNewEpoch && inStakingEra {
 		validators, err := chain.ReadValidatorList()
 		if err != nil {
 			return nil, nil, ctxerror.New("[Finalize] failed to read active validators").WithCause(err)
@@ -287,7 +289,9 @@ func (e *engineImpl) Finalize(
 			if wrapper != nil {
 				for i := range wrapper.Delegations {
 					delegation := &wrapper.Delegations[i]
-					totalWithdraw := delegation.RemoveUnlockedUndelegations(header.Epoch(), wrapper.LastEpochInCommittee)
+					totalWithdraw := delegation.RemoveUnlockedUndelegations(
+						header.Epoch(), wrapper.LastEpochInCommittee,
+					)
 					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 				}
 				if err := state.UpdateStakingInfo(validator, wrapper); err != nil {
@@ -324,6 +328,7 @@ func (e *engineImpl) Finalize(
 			}
 		}
 	}
+
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
 }

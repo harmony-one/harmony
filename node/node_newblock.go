@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -67,8 +68,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					} else {
-						utils.Logger().Err(err).
-							Msg("!!!!!!!!!cannot commit new block!!!!!!!!!")
+						utils.Logger().Err(err).Msg("!!!!!!!!!cannot commit new block!!!!!!!!!")
 					}
 				}
 			}
@@ -89,12 +89,12 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
 
 	// After staking, all coinbase will be the address of bls pub key
-	if node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) {
+	if header := node.Worker.GetCurrentHeader(); node.Blockchain().Config().IsStaking(header.Epoch()) {
 		addr := common.Address{}
 		blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
 		addr.SetBytes(blsPubKeyBytes[:])
 		coinbase = addr // coinbase will be the bls address
-		node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
+		header.SetCoinbase(coinbase)
 	}
 
 	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(node.Worker.GetCurrentHeader())
@@ -154,7 +154,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	// Prepare cross links
 	var crossLinksToPropose types.CrossLinks
-	if node.NodeConfig.ShardID == 0 && node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
+
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
 
 		if err == nil {
@@ -174,6 +176,51 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
+	// Bump up signers counts
+	state, header := node.Worker.GetCurrentState(), node.Blockchain().CurrentHeader()
+	if epoch := header.Epoch(); node.Blockchain().Config().IsStaking(epoch) {
+
+		if header.ShardID() == shard.BeaconChainShardID {
+			superCommittee, err := node.Blockchain().ReadShardState(header.Epoch())
+			processed := make(map[common.Address]struct{})
+
+			if err != nil {
+				return nil, err
+			}
+
+			for j := range superCommittee.Shards {
+				shard := superCommittee.Shards[j]
+				for j := range shard.Slots {
+					slot := shard.Slots[j]
+					if slot.EffectiveStake != nil { // For external validator
+						_, ok := processed[slot.EcdsaAddress]
+						if !ok {
+							processed[slot.EcdsaAddress] = struct{}{}
+						}
+					}
+				}
+			}
+			if err := availability.IncrementValidatorSigningCounts(
+				node.Blockchain(), header, header.ShardID(), state, processed,
+			); err != nil {
+				return nil, err
+			}
+
+			// kick out the inactive validators so they won't come up in the auction as possible
+			// candidates in the following call to SuperCommitteeForNextEpoch
+			if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+				if err := availability.SetInactiveUnavailableValidators(
+					node.Blockchain(), state, processed,
+				); err != nil {
+					return nil, err
+				}
+			}
+
+		} else {
+			// TODO Handle shard chain
+		}
+	}
+
 	// Prepare shard state
 	shardState := new(shard.State)
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
@@ -188,7 +235,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 		return nil, err
 	}
-	return node.Worker.FinalizeNewBlock(sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState)
+	return node.Worker.FinalizeNewBlock(
+		sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState,
+	)
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {

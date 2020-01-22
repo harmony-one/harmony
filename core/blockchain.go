@@ -36,7 +36,6 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/votepower"
@@ -44,7 +43,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -1158,6 +1157,68 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	//// Shard State and Validator Update
 	header := block.Header()
+
+	// Do bookkeeping for new staking txns
+	for _, tx := range block.StakingTransactions() {
+		err = bc.UpdateStakingMetaData(tx, root)
+		// keep offchain database consistency with onchain we need revert
+		// but it should not happend unless local database corrupted
+		if err != nil {
+			utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
+			return NonStatTy, err
+		}
+	}
+
+	// Update voting power of validators for all shards
+	if block.ShardID() == shard.BeaconChainShardID &&
+		len(block.Header().ShardState()) > 0 {
+		shardState := new(shard.State)
+
+		if shardState, err = shard.DecodeWrapper(block.Header().ShardState()); err == nil {
+			if err = bc.UpdateValidatorVotingPower(shardState); err != nil {
+				utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to update voting power")
+			}
+		} else {
+			utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
+		}
+	}
+
+	//// Writing beacon chain cross links
+	if header.ShardID() == shard.BeaconChainShardID &&
+		bc.chainConfig.IsCrossLink(block.Epoch()) &&
+		len(header.CrossLinks()) > 0 {
+		crossLinks := &types.CrossLinks{}
+		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
+		if err != nil {
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cannot parse cross links")
+			return NonStatTy, err
+		}
+		if !crossLinks.IsSorted() {
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cross links are not sorted")
+			return NonStatTy, errors.New("proposed cross links are not sorted")
+		}
+		for _, crossLink := range *crossLinks {
+			// Process crosslink
+			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
+				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
+			}
+			bc.LastContinuousCrossLink(crossLink)
+		}
+
+		//clean/update local database cache after crosslink inserted into blockchain
+		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
+		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
+	}
+
+	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
+		if bc.chainConfig.IsStaking(block.Epoch()) {
+			bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
+		} else {
+			// block reward never accumulate before staking
+			bc.WriteBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
+		}
+	}
+
 	if len(header.ShardState()) > 0 {
 		// Write shard state for the new epoch
 		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
@@ -1198,136 +1259,6 @@ func (bc *BlockChain) WriteBlockWithState(
 		// Update snapshots for all validators
 		if err := bc.UpdateValidatorSnapshots(); err != nil {
 			return NonStatTy, err
-		}
-	}
-
-	// Do bookkeeping for new staking txns
-	for _, tx := range block.StakingTransactions() {
-		err = bc.UpdateStakingMetaData(tx, root)
-		// keep offchain database consistency with onchain we need revert
-		// but it should not happend unless local database corrupted
-		if err != nil {
-			utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
-			return NonStatTy, err
-		}
-	}
-
-	// Update voting power of validators for all shards
-	if block.ShardID() == shard.BeaconChainShardID &&
-		len(block.Header().ShardState()) > 0 {
-		shardState := new(shard.State)
-
-		if shardState, err = shard.DecodeWrapper(block.Header().ShardState()); err == nil {
-			if err = bc.UpdateValidatorVotingPower(shardState); err != nil {
-				utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to update voting power")
-			}
-		} else {
-			utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
-		}
-	}
-
-	// NOTE: Uptime stats is not mission critical code. Should move to offchain server
-	// Writing validator stats (for uptime recording) for shard 0
-	if block.ShardID() == shard.BeaconChainShardID &&
-		bc.chainConfig.IsStaking(block.Epoch()) {
-		parentHeader := bc.GetHeaderByHash(block.ParentHash())
-		if parentHeader == nil {
-			utils.Logger().Debug().Msg("[Uptime] no parent found for uptime accounting")
-		}
-		shardState, err := bc.ReadShardState(parentHeader.Epoch())
-		if err == nil {
-			committee := shardState.FindCommitteeByID(block.Header().ShardID())
-			if committee == nil {
-				utils.Logger().Debug().Msg("[Uptime] no shard found for cross-link")
-			}
-
-			members := []*bls2.PublicKey{}
-			for _, slot := range committee.Slots {
-				pubKey := &bls2.PublicKey{}
-				err := pubKey.Deserialize(slot.BlsPublicKey[:])
-				if err != nil {
-					utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
-				}
-				members = append(members, pubKey)
-			}
-
-			mask, _ := bls.NewMask(members, nil)
-			mask.SetMask(block.Header().LastCommitBitmap())
-
-			if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
-				utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
-			}
-		} else {
-			utils.Logger().Debug().Msg("[Uptime] failed reading shard state for uptime accounting")
-		}
-	}
-
-	//// Writing beacon chain cross links
-	if header.ShardID() == shard.BeaconChainShardID &&
-		bc.chainConfig.IsCrossLink(block.Epoch()) &&
-		len(header.CrossLinks()) > 0 {
-		crossLinks := &types.CrossLinks{}
-		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
-		if err != nil {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cannot parse cross links")
-			return NonStatTy, err
-		}
-		if !crossLinks.IsSorted() {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cross links are not sorted")
-			return NonStatTy, errors.New("proposed cross links are not sorted")
-		}
-		for _, crossLink := range *crossLinks {
-			// Process crosslink
-			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
-				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
-			}
-			bc.LastContinuousCrossLink(crossLink)
-
-			// Writing validator stats (for uptime recording) for other shards
-			if bc.chainConfig.IsStaking(crossLink.Epoch()) {
-				shardState, err := bc.ReadShardState(crossLink.Epoch())
-				if err == nil {
-					committee := shardState.FindCommitteeByID(crossLink.ShardID())
-					if committee == nil {
-						utils.Logger().Debug().Msg("[Uptime] no shard found for cross-link")
-						continue
-					}
-
-					members := []*bls2.PublicKey{}
-					for _, slot := range committee.Slots {
-						if slot.EffectiveStake != nil {
-							pubKey := &bls2.PublicKey{}
-							err := pubKey.Deserialize(slot.BlsPublicKey[:])
-							if err != nil {
-								utils.Logger().Err(err).Msg("[Uptime] Failed to deserialize bls public key")
-							}
-							members = append(members, pubKey)
-						}
-					}
-
-					mask, _ := bls.NewMask(members, nil)
-					mask.SetMask(crossLink.Bitmap())
-
-					if err = bc.UpdateValidatorUptime(committee.Slots, mask); err != nil {
-						utils.Logger().Err(err).Msg("[Uptime] Failed updating validator uptime")
-					}
-				} else {
-					utils.Logger().Debug().Msg("[Uptime] failed reading shard state for uptime accounting")
-				}
-			}
-		}
-
-		//clean/update local database cache after crosslink inserted into blockchain
-		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
-		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
-	}
-
-	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		if bc.chainConfig.IsStaking(block.Epoch()) {
-			bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
-		} else {
-			// block reward never accumulate before staking
-			bc.WriteBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
 		}
 	}
 
@@ -2517,7 +2448,11 @@ func (bc *BlockChain) ReadValidatorInformationAt(addr common.Address, root commo
 	}
 	wrapper := state.GetStakingInfo(addr)
 	if wrapper == nil {
-		return nil, fmt.Errorf("ValidatorData not found: %v", addr)
+		return nil, fmt.Errorf(
+			"at root: %s, validator info not found: %s",
+			root.Hex(),
+			common2.MustAddressToBech32(addr),
+		)
 	}
 	return wrapper, nil
 }
@@ -2528,7 +2463,9 @@ func (bc *BlockChain) ReadValidatorInformation(addr common.Address) (*staking.Va
 }
 
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
-func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
+func (bc *BlockChain) ReadValidatorSnapshot(
+	addr common.Address,
+) (*staking.ValidatorWrapper, error) {
 	if cached, ok := bc.validatorCache.Get("validator-snapshot-" + string(addr.Bytes())); ok {
 		by := cached.([]byte)
 		v := staking.ValidatorWrapper{}
@@ -2545,19 +2482,17 @@ func (bc *BlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.Valid
 func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
-	for _, addr := range addrs {
-		validator, err := bc.ReadValidatorInformation(addr)
+	for i := range addrs {
+		validator, err := bc.ReadValidatorInformation(addrs[i])
 		if err != nil {
 			return err
 		}
 		validators = append(validators, validator)
 	}
-
 	// Batch write the current data as snapshot
 	batch := bc.db.NewBatch()
 	for i := range validators {
-		err := rawdb.WriteValidatorSnapshot(batch, validators[i])
-		if err != nil {
+		if err := rawdb.WriteValidatorSnapshot(batch, validators[i]); err != nil {
 			return err
 		}
 	}
@@ -2569,7 +2504,8 @@ func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 	for i := range validators {
 		by, err := rlp.EncodeToBytes(validators[i])
 		if err == nil {
-			bc.validatorCache.Add("validator-snapshot-"+string(validators[i].Address.Bytes()), by)
+			key := "validator-snapshot-" + string(validators[i].Address.Bytes())
+			bc.validatorCache.Add(key, by)
 		}
 	}
 	return nil
@@ -2578,56 +2514,6 @@ func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 // ReadValidatorStats reads the stats of a validator
 func (bc *BlockChain) ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error) {
 	return rawdb.ReadValidatorStats(bc.db, addr)
-}
-
-// UpdateValidatorUptime writes the stats for the committee
-func (bc *BlockChain) UpdateValidatorUptime(slots shard.SlotList, mask *bls.Mask) error {
-	blsToAddress := make(map[shard.BlsPublicKey]common.Address)
-	for _, slot := range slots {
-		blsToAddress[slot.BlsPublicKey] = slot.EcdsaAddress
-	}
-
-	batch := bc.db.NewBatch()
-	blsKeyBytes := shard.BlsPublicKey{}
-	for i, blsPubKey := range mask.Publics {
-		err := blsKeyBytes.FromLibBLSPublicKey(blsPubKey)
-		if err != nil {
-			return err
-		}
-		if addr, ok := blsToAddress[blsKeyBytes]; ok {
-			// Retrieve the stats and add new counts
-			stats, err := rawdb.ReadValidatorStats(bc.db, addr)
-			if stats == nil {
-				stats = &staking.ValidatorStats{
-					big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
-					[]staking.VotePerShard{}, []staking.KeysPerShard{},
-				}
-			}
-			stats.NumBlocksToSign.Add(stats.NumBlocksToSign, big.NewInt(1))
-
-			enabled, err := mask.IndexEnabled(i)
-			if err != nil {
-				return err
-			}
-
-			if enabled {
-				stats.NumBlocksSigned.Add(stats.NumBlocksSigned, big.NewInt(1))
-			}
-			// TODO: record time being jailed.
-
-			err = rawdb.WriteValidatorStats(batch, addr, stats)
-			if err != nil {
-				return err
-			}
-		} else {
-			return fmt.Errorf("Bls public key not found in committee: %x", blsKeyBytes)
-		}
-	}
-	if err := batch.Write(); err != nil {
-		return err
-	}
-	// TODO: Update cache
-	return nil
 }
 
 // UpdateValidatorVotingPower writes the voting power for the committees
@@ -2654,7 +2540,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 		statsFromDB, err := rawdb.ReadValidatorStats(bc.db, key)
 		if statsFromDB == nil {
 			statsFromDB = &staking.ValidatorStats{
-				big.NewInt(0), big.NewInt(0), big.NewInt(0), numeric.NewDec(0),
+				big.NewInt(0), numeric.NewDec(0),
 				[]staking.VotePerShard{}, []staking.KeysPerShard{},
 			}
 		}
@@ -2703,10 +2589,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots() error {
 	//	return err
 	//}
 
-	if err := bc.writeValidatorSnapshots(allValidators); err != nil {
-		return err
-	}
-	return nil
+	return bc.writeValidatorSnapshots(allValidators)
 }
 
 // ReadValidatorList reads the addresses of current all validators
@@ -2801,6 +2684,7 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	if err != nil {
 		return err
 	}
+	epoch := bc.CurrentHeader().Epoch()
 	switch tx.StakingType() {
 	case staking.DirectiveCreateValidator:
 		createValidator := decodePayload.(*staking.CreateValidator)
@@ -2826,8 +2710,10 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 		if err != nil {
 			return err
 		}
-		err = rawdb.WriteValidatorSnapshot(bc.db, validator)
-		if err != nil {
+
+		validator.Snapshot.Epoch = epoch
+
+		if err := rawdb.WriteValidatorSnapshot(bc.db, validator); err != nil {
 			return err
 		}
 
@@ -2836,7 +2722,6 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	case staking.DirectiveEditValidator:
 	case staking.DirectiveDelegate:
 		delegate := decodePayload.(*staking.Delegate)
-
 		return bc.addDelegationIndex(delegate.DelegatorAddress, delegate.ValidatorAddress, root)
 	case staking.DirectiveUndelegate:
 	case staking.DirectiveCollectRewards:

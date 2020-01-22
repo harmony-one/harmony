@@ -666,7 +666,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] VerifySenderKey Failed")
+		consensus.getLogger().Debug().Msgf("[OnCommit] VerifySenderKey Failed %s", err.Error())
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
