@@ -98,6 +98,8 @@ type Validator struct {
 	Description
 	// CreationHeight is the height of creation
 	CreationHeight *big.Int
+	// Banned records whether this validator is banned from the network because they double-signed
+	Banned bool
 }
 
 // MarshalJSON ..
@@ -390,7 +392,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	v := Validator{
 		val.ValidatorAddress, pubKeys,
 		new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, true,
-		commission, desc, blockNum,
+		commission, desc, blockNum, false,
 	}
 	return &v, nil
 }
