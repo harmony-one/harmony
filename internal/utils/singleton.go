@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -18,8 +17,6 @@ import (
 
 var (
 	// Validator ID
-	validatorIDInstance      *UniqueValidatorID
-	onceForUniqueValidatorID sync.Once
 	// Global port and ip for logging.
 	port string
 	ip   string
@@ -71,26 +68,6 @@ func AddLogHandler(handler log.Handler) {
 		multiHandler := log.MultiHandler(logHandlers...)
 		glogger.SetHandler(multiHandler)
 	}
-}
-
-// UniqueValidatorID defines the structure of unique validator ID
-type UniqueValidatorID struct {
-	uniqueID uint32
-}
-
-// GetUniqueValidatorIDInstance returns a singleton instance
-func GetUniqueValidatorIDInstance() *UniqueValidatorID {
-	onceForUniqueValidatorID.Do(func() {
-		validatorIDInstance = &UniqueValidatorID{
-			uniqueID: 0,
-		}
-	})
-	return validatorIDInstance
-}
-
-// GetUniqueID returns a unique ID and increment the internal variable
-func (s *UniqueValidatorID) GetUniqueID() uint32 {
-	return atomic.AddUint32(&s.uniqueID, 1)
 }
 
 // GetLogInstance returns logging singleton.
