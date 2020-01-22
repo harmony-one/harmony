@@ -395,7 +395,7 @@ func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.Creat
 	wrapper.Delegations = []staking.Delegation{
 		staking.NewDelegation(v.Address, createValidator.Amount),
 	}
-	wrapper.Snapshot.Epoch = zero
+	wrapper.Snapshot.Epoch = st.evm.EpochNumber
 	wrapper.Snapshot.NumBlocksSigned = zero
 	wrapper.Snapshot.NumBlocksToSign = zero
 
