@@ -11,6 +11,52 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
+// LeaderNetworkMessage ..
+type LeaderNetworkMessage struct {
+	Phase                      quorum.Phase
+	Bytes                      []byte
+	OptionalAggregateSignature *bls.Sign
+}
+
+// TODO Finish refactoring other three message constructions folded into this function.
+func (consensus *Consensus) construct(p quorum.Phase) *LeaderNetworkMessage {
+
+	msgType := msg_pb.MessageType_ANNOUNCE
+
+	switch p {
+	case quorum.Commit:
+		msgType = msg_pb.MessageType_COMMITTED
+	case quorum.Announce:
+		msgType = msg_pb.MessageType_PREPARED
+	}
+
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msgType,
+		Request: &msg_pb.Message_Consensus{
+			Consensus: &msg_pb.ConsensusRequest{},
+		},
+	}
+
+	consensusMsg := message.GetConsensus()
+	consensus.populateMessageFields(consensusMsg)
+	consensusMsg.Payload = consensus.blockHeader
+
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
+	if err != nil {
+		utils.Logger().Info().
+			Str("phase", p.String()).
+			Str("reason", err.Error()).
+			Msg("Failed to sign and marshal consensus message")
+	}
+
+	return &LeaderNetworkMessage{
+		Phase:                      p,
+		Bytes:                      proto.ConstructConsensusMessage(marshaledMessage),
+		OptionalAggregateSignature: nil,
+	}
+}
+
 // Constructs the announce message
 func (consensus *Consensus) constructAnnounceMessage() []byte {
 	message := &msg_pb.Message{
@@ -50,7 +96,9 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	buffer := bytes.Buffer{}
 
 	// 96 bytes aggregated signature
-	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
+	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Announce))
+	// TODO Finish refactoring with this API
+	// aggSig := consensus.Decider.AggregateVotes(quorum.Announce)
 	buffer.Write(aggSig.Serialize())
 
 	// Bitmap
