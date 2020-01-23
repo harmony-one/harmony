@@ -830,11 +830,13 @@ Loop:
 					Int("retryCount", retryCount).
 					Msg("[SYNC] ProcessStateSync failed. Retrying ...")
 
-				ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
+				// Track the peer sync config(s) that failed node sync here to exclude it on successive retries
+				trackFailedPeer := func(configPeer *SyncPeerConfig) (brk bool) {
 					ss.syncConfig.failedPeers = append(ss.syncConfig.failedPeers, configPeer)
 					brk = true
 					return
-				})
+				}
+				ss.syncConfig.ForEachPeer(trackFailedPeer)
 				retryCount++
 			}
 
