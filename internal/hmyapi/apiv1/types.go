@@ -215,8 +215,12 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 	switch stakingTxType {
 	case "CreateValidator":
 		msg := message.(types2.CreateValidator)
+		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
+		if err != nil {
+			return nil
+		}
 		fields = map[string]interface{}{
-			"validatorAddress":   msg.ValidatorAddress,
+			"validatorAddress":   validatorAddress,
 			"name":               msg.Description.Name,
 			"commissionRate":     (*hexutil.Big)(msg.CommissionRates.Rate.Int),
 			"maxCommissionRate":  (*hexutil.Big)(msg.CommissionRates.MaxRate.Int),
@@ -232,8 +236,12 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 		}
 	case "EditValidator":
 		msg := message.(types2.EditValidator)
+		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
+		if err != nil {
+			return nil
+		}
 		fields = map[string]interface{}{
-			"validatorAddress":   msg.ValidatorAddress,
+			"validatorAddress":   validatorAddress,
 			"commisionRate":      (*hexutil.Big)(msg.CommissionRate.Int),
 			"name":               msg.Description.Name,
 			"minSelfDelegation":  (*hexutil.Big)(msg.MinSelfDelegation),
@@ -247,21 +255,41 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 		}
 	case "CollectRewards":
 		msg := message.(types2.CollectRewards)
+		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
+		if err != nil {
+			return nil
+		}
 		fields = map[string]interface{}{
-			"delegatorAddress": msg.DelegatorAddress,
+			"delegatorAddress": delegatorAddress,
 		}
 	case "Delegate":
 		msg := message.(types2.Delegate)
+		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
+		if err != nil {
+			return nil
+		}
+		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
+		if err != nil {
+			return nil
+		}
 		fields = map[string]interface{}{
-			"delegatorAddress": msg.DelegatorAddress,
-			"validatorAddress": msg.ValidatorAddress,
+			"delegatorAddress": delegatorAddress,
+			"validatorAddress": validatorAddress,
 			"amount":           (*hexutil.Big)(msg.Amount),
 		}
 	case "Undelegate":
 		msg := message.(types2.Undelegate)
+		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
+		if err != nil {
+			return nil
+		}
+		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
+		if err != nil {
+			return nil
+		}
 		fields = map[string]interface{}{
-			"delegatorAddress": msg.DelegatorAddress,
-			"validatorAddress": msg.ValidatorAddress,
+			"delegatorAddress": delegatorAddress,
+			"validatorAddress": validatorAddress,
 			"amount":           (*hexutil.Big)(msg.Amount),
 		}
 	}
