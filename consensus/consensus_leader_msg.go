@@ -46,8 +46,8 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	// add block content in prepared message for slow validators to catchup
 	consensusMsg.Block = consensus.block
 
-	//// Payload
-	buffer := bytes.NewBuffer([]byte{})
+	// Payload
+	buffer := bytes.Buffer{}
 
 	// 96 bytes aggregated signature
 	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
@@ -57,7 +57,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	buffer.Write(consensus.prepareBitmap.Bitmap)
 
 	consensusMsg.Payload = buffer.Bytes()
-	//// END Payload
+	// END Payload
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
@@ -80,7 +80,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	consensus.populateMessageFields(consensusMsg)
 
 	//// Payload
-	buffer := bytes.NewBuffer([]byte{})
+	buffer := bytes.Buffer{}
 
 	// 96 bytes aggregated signature
 	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Commit))
@@ -90,7 +90,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	buffer.Write(consensus.commitBitmap.Bitmap)
 
 	consensusMsg.Payload = buffer.Bytes()
-	//// END Payload
+	// END Payload
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
