@@ -362,7 +362,7 @@ func (s *PublicTransactionPoolAPI) GetCurrentTransactionErrorSink() []types.RPCT
 	return s.b.GetCurrentTransactionErrorSink()
 }
 
-// GetCurrentTransactionErrorSink ..
+// GetCurrentStakingErrorSink ..
 func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
 	return s.b.GetCurrentStakingErrorSink()
 }
