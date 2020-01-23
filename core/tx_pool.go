@@ -222,27 +222,30 @@ type TxPool struct {
 
 	wg sync.WaitGroup // for shutdown sync
 
+	txnErrorSink func([]types.RPCTransactionError)
+
 	homestead bool
 }
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
-func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain) *TxPool {
+func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain, txnErrorSink func([]types.RPCTransactionError)) *TxPool {
 	// Sanitize the input to ensure no vulnerable gas prices are set
 	config = (&config).sanitize()
 
 	// Create the transaction pool with its initial settings
 	pool := &TxPool{
-		config:      config,
-		chainconfig: chainconfig,
-		chain:       chain,
-		signer:      types.NewEIP155Signer(chainconfig.ChainID),
-		pending:     make(map[common.Address]*txList),
-		queue:       make(map[common.Address]*txList),
-		beats:       make(map[common.Address]time.Time),
-		all:         newTxLookup(),
-		chainHeadCh: make(chan ChainHeadEvent, chainHeadChanSize),
-		gasPrice:    new(big.Int).SetUint64(config.PriceLimit),
+		config:       config,
+		chainconfig:  chainconfig,
+		chain:        chain,
+		signer:       types.NewEIP155Signer(chainconfig.ChainID),
+		pending:      make(map[common.Address]*txList),
+		queue:        make(map[common.Address]*txList),
+		beats:        make(map[common.Address]time.Time),
+		all:          newTxLookup(),
+		chainHeadCh:  make(chan ChainHeadEvent, chainHeadChanSize),
+		gasPrice:     new(big.Int).SetUint64(config.PriceLimit),
+		txnErrorSink: txnErrorSink,
 	}
 	pool.locals = newAccountSet(pool.signer)
 	for _, addr := range config.Locals {
@@ -860,6 +863,13 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	// Try to inject the transaction and update any state
 	replace, err := pool.add(tx, local)
 	if err != nil {
+		pool.txnErrorSink([]types.RPCTransactionError{
+			{
+				TxHashID:             tx.Hash().Hex(),
+				TimestampOfRejection: time.Now().Unix(),
+				ErrMessage:           err.Error(),
+			},
+		})
 		return err
 	}
 	// If we added a new transaction, run promotion checks and return
@@ -884,12 +894,20 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) []error {
 	// Add the batch of transaction, tracking the accepted ones
 	dirty := make(map[common.Address]struct{})
 	errs := make([]error, len(txs))
+	var erroredTxns []types.RPCTransactionError
 
 	for i, tx := range txs {
 		var replace bool
 		if replace, errs[i] = pool.add(tx, local); errs[i] == nil && !replace {
 			from, _ := types.Sender(pool.signer, tx) // already validated
 			dirty[from] = struct{}{}
+		}
+		if errs[i] != nil {
+			erroredTxns = append(erroredTxns, types.RPCTransactionError{
+				TxHashID:             tx.Hash().Hex(),
+				TimestampOfRejection: time.Now().Unix(),
+				ErrMessage:           errs[i].Error(),
+			})
 		}
 	}
 	// Only reprocess the internal state if something was actually added
@@ -900,6 +918,8 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) []error {
 		}
 		pool.promoteExecutables(addrs)
 	}
+
+	pool.txnErrorSink(erroredTxns)
 	return errs
 }
 
@@ -1155,6 +1175,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 func (pool *TxPool) demoteUnexecutables() {
 	// Iterate over all accounts and demote any non-executable transactions
 	logger := utils.Logger().With().Stack().Logger()
+	var erroredTxns []types.RPCTransactionError
 
 	for addr, list := range pool.pending {
 		nonce := pool.currentState.GetNonce(addr)
@@ -1163,6 +1184,11 @@ func (pool *TxPool) demoteUnexecutables() {
 		for _, tx := range list.Forward(nonce) {
 			hash := tx.Hash()
 			logger.Warn().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
+			erroredTxns = append(erroredTxns, types.RPCTransactionError{
+				TxHashID:             hash.Hex(),
+				TimestampOfRejection: time.Now().Unix(),
+				ErrMessage:           "old pending transaction",
+			})
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 		}
@@ -1171,6 +1197,11 @@ func (pool *TxPool) demoteUnexecutables() {
 		for _, tx := range drops {
 			hash := tx.Hash()
 			logger.Warn().Str("hash", hash.Hex()).Msg("Removed unpayable pending transaction")
+			erroredTxns = append(erroredTxns, types.RPCTransactionError{
+				TxHashID:             hash.Hex(),
+				TimestampOfRejection: time.Now().Unix(),
+				ErrMessage:           "unpayable pending transaction",
+			})
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			pendingNofundsCounter.Inc(1)
@@ -1178,6 +1209,11 @@ func (pool *TxPool) demoteUnexecutables() {
 		for _, tx := range invalids {
 			hash := tx.Hash()
 			logger.Warn().Str("hash", hash.Hex()).Msg("Demoting pending transaction")
+			erroredTxns = append(erroredTxns, types.RPCTransactionError{
+				TxHashID:             hash.Hex(),
+				TimestampOfRejection: time.Now().Unix(),
+				ErrMessage:           "unpayable pending transaction",
+			})
 			pool.enqueueTx(hash, tx)
 		}
 		// If there's a gap in front, alert (should never happen) and postpone all transactions
@@ -1185,6 +1221,11 @@ func (pool *TxPool) demoteUnexecutables() {
 			for _, tx := range list.Cap(0) {
 				hash := tx.Hash()
 				logger.Error().Str("hash", hash.Hex()).Msg("Demoting invalidated transaction")
+				erroredTxns = append(erroredTxns, types.RPCTransactionError{
+					TxHashID:             hash.Hex(),
+					TimestampOfRejection: time.Now().Unix(),
+					ErrMessage:           "invalid transaction",
+				})
 				pool.enqueueTx(hash, tx)
 			}
 		}
@@ -1193,6 +1234,8 @@ func (pool *TxPool) demoteUnexecutables() {
 			delete(pool.pending, addr)
 			delete(pool.beats, addr)
 		}
+
+		pool.txnErrorSink(erroredTxns)
 	}
 }
 
