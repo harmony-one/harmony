@@ -205,7 +205,7 @@ func main() {
 	genesis := gspec.MustCommit(database)
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine(), vm.Config{}, nil)
 
-	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain)
+	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain, func([]types.RPCTransactionError) {})
 
 	backend := &testWorkerBackend{
 		db:     database,
