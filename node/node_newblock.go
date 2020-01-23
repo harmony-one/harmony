@@ -88,15 +88,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	node.Worker.UpdateCurrent(coinbase)
-	if err := node.Worker.CommitTransactions(pending, coinbase,
-		func(payload []types.RPCTransactionError) {
-			node.errorSink.Lock()
-			for i := range payload {
-				node.errorSink.failedTxns.Value = payload[i]
-				node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
-			}
-			node.errorSink.Unlock()
-		}); err != nil {
+	if err := node.Worker.CommitTransactions(pending, coinbase); err != nil {
 		ctxerror.Log15(utils.GetLogger().Error,
 			ctxerror.New("cannot commit transactions").
 				WithCause(err))
