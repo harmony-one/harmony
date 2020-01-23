@@ -295,6 +295,11 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 	return transactions, nil
 }
 
+// GetCurrentTransactionErrorSink ..
+func (s *PublicTransactionPoolAPI) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+	return s.b.GetCurrentTransactionErrorSink()
+}
+
 // GetCXReceiptByHash returns the transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash common.Hash) *RPCCXReceipt {
 	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.b.ChainDb(), hash); cx != nil {
