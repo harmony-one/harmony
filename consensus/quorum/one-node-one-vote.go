@@ -133,7 +133,7 @@ func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
 }
 
 func (v *uniformVoteWeight) ResetPrepareAndCommitVotes() {
-	v.reset([]Phase{Prepare, Commit})
+	v.reset([]Phase{Announce, Commit})
 }
 
 func (v *uniformVoteWeight) ResetViewChangeVotes() {

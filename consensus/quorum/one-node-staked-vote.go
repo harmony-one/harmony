@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
 
@@ -41,7 +40,6 @@ type stakedVoteWeight struct {
 	SignatureReader
 	DependencyInjectionWriter
 	DependencyInjectionReader
-	slash.ThresholdDecider
 	roster    votepower.Roster
 	ballotBox box
 }
@@ -92,13 +90,12 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug boo
 	}
 	return (*currentTotalPower).GT(threshold)
 }
-
 func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, error) {
 	w := shard.BlsPublicKey{}
 	members := v.Participants()
 	ballot := func() *voteBox {
 		switch p {
-		case Prepare:
+		case Announce:
 			return v.ballotBox.Prepare
 		case Commit:
 			return v.ballotBox.Commit
@@ -208,16 +205,6 @@ func (v *stakedVoteWeight) ToggleActive(k *bls.PublicKey) bool {
 	return v.roster.Voters[w].IsActive
 }
 
-func (v *stakedVoteWeight) ShouldSlash(key shard.BlsPublicKey) bool {
-	s, _ := v.ShardIDProvider()()
-	switch s {
-	case shard.BeaconChainShardID:
-		return v.SlashThresholdMet(key)
-	default:
-		return false
-	}
-}
-
 func (v *stakedVoteWeight) JSON() string {
 	s, _ := v.ShardIDProvider()()
 	voterCount := len(v.roster.Voters)
@@ -293,7 +280,7 @@ func newBallotBox() box {
 }
 
 func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
-	v.reset([]Phase{Prepare, Commit})
+	v.reset([]Phase{Announce, Commit})
 	v.ballotBox.Prepare = newBox()
 	v.ballotBox.Commit = newBox()
 }
