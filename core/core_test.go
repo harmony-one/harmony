@@ -14,9 +14,9 @@ func TestIsEpochBlock(t *testing.T) {
 	block2 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(0)).Header(), nil, nil, nil, nil)
 	block3 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(344064)).Header(), nil, nil, nil, nil)
 	block4 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(77)).Header(), nil, nil, nil, nil)
-	block5 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(78)).Header(), nil, nil, nil, nil)
+	block5 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(450)).Header(), nil, nil, nil, nil)
 	block6 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(188)).Header(), nil, nil, nil, nil)
-	block7 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(189)).Header(), nil, nil, nil, nil)
+	block7 := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(451)).Header(), nil, nil, nil, nil)
 	tests := []struct {
 		schedule shardingconfig.Schedule
 		block    *types.Block
@@ -55,7 +55,7 @@ func TestIsEpochBlock(t *testing.T) {
 		{
 			shardingconfig.TestnetSchedule,
 			block7,
-			true,
+			false,
 		},
 	}
 	for i, test := range tests {
