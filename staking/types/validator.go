@@ -34,10 +34,12 @@ var (
 	errMinSelfDelegationTooSmall = errors.New("min_self_delegation has to be greater than 1 ONE")
 	errInvalidMaxTotalDelegation = errors.New("max_total_delegation can not be less than min_self_delegation")
 	errCommissionRateTooLarge    = errors.New("commission rate and change rate can not be larger than max commission rate")
-	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
+	errInvalidCommissionRate     = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
 	errNeedAtLeastOneSlotKey     = errors.New("need at least one slot key")
 	errBLSKeysNotMatchSigs       = errors.New("bls keys and corresponding signatures could not be verified")
-	errNilMinSelfDelegation      = errors.New("nil min self delegation")
+	errNilMinSelfDelegation      = errors.New("min self delegation must be specified")
+	errSlotKeyToAddExist         = errors.New("slot key to add already exists")
+	errSlotKeyToRemoveNotFound   = errors.New("slot key to remove not found")
 )
 
 // ValidatorWrapper contains validator and its delegation information
@@ -227,19 +229,19 @@ func (w *ValidatorWrapper) SanityCheck() error {
 
 	if w.Validator.Rate.LT(zeroPercent) || w.Validator.Rate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidComissionRate, "rate:%s", w.Validator.Rate.String(),
+			errInvalidCommissionRate, "rate:%s", w.Validator.Rate.String(),
 		)
 	}
 
 	if w.Validator.MaxRate.LT(zeroPercent) || w.Validator.MaxRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidComissionRate, "rate:%s", w.Validator.MaxRate.String(),
+			errInvalidCommissionRate, "rate:%s", w.Validator.MaxRate.String(),
 		)
 	}
 
 	if w.Validator.MaxChangeRate.LT(zeroPercent) || w.Validator.MaxChangeRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidComissionRate, "rate:%s", w.Validator.MaxChangeRate.String(),
+			errInvalidCommissionRate, "rate:%s", w.Validator.MaxChangeRate.String(),
 		)
 	}
 
@@ -433,6 +435,8 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		// we found key to be removed
 		if index >= 0 {
 			validator.SlotPubKeys = append(validator.SlotPubKeys[:index], validator.SlotPubKeys[index+1:]...)
+		} else {
+			return errSlotKeyToRemoveNotFound
 		}
 	}
 
@@ -449,6 +453,8 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 				return err
 			}
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
+		} else {
+			return errSlotKeyToAddExist
 		}
 	}
 	return nil
