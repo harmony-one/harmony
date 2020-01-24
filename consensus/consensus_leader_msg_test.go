@@ -66,8 +66,12 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	consensus.Decider.AddSignature(quorum.Prepare, leaderPubKey, leaderPriKey.Sign(message))
-	consensus.Decider.AddSignature(quorum.Prepare, validatorPubKey, validatorPriKey.Sign(message))
+	consensus.Decider.AddSignature(
+		quorum.Prepare, leaderPubKey, leaderPriKey.Sign(message), leaderPubKey, 9999,
+	)
+	consensus.Decider.AddSignature(
+		quorum.Prepare, validatorPubKey, validatorPriKey.Sign(message), leaderPubKey, 9999,
+	)
 	// According to RJ these failures are benign.
 	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))

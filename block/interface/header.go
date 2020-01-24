@@ -228,4 +228,12 @@ type Header interface {
 
 	// Copy returns a copy of the header.
 	Copy() Header
+
+	// Slashes is the RLP-encoded form of []slash.Record,
+	// The returned slice is a copy; the caller may do anything with it
+	Slashes() []byte
+
+	// SetSlashes sets the RLP-encoded form of slashes
+	// It stores a copy; the caller may freely modify the original.
+	SetSlashes(newSlashes []byte)
 }

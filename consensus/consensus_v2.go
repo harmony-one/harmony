@@ -111,9 +111,13 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.block = encodedBlock
 	consensus.blockHeader = encodedBlockHeader
 	msgToSend := consensus.constructAnnounceMessage()
+	// TODO Finish using this refactored way
+	// msgToSend := consensus.construct(quorum.Announce)
 
 	// save announce message to FBFTLog
+	// msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend.Bytes)
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
+
 	// TODO(chao): don't unmarshall the message here and direclty pass the original object.
 	msg := &msg_pb.Message{}
 	_ = protobuf.Unmarshal(msgPayload, msg)
@@ -134,7 +138,11 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	// Leader sign the block hash itself
 	consensus.Decider.AddSignature(
-		quorum.Prepare, consensus.PubKey, consensus.priKey.SignHash(consensus.blockHash[:]),
+		quorum.Prepare,
+		consensus.PubKey,
+		consensus.priKey.SignHash(consensus.blockHash[:]),
+		consensus.LeaderPubKey,
+		consensus.blockNum,
 	)
 	if err := consensus.prepareBitmap.SetKey(consensus.PubKey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[Announce] Leader prepareBitmap SetKey failed")
@@ -302,8 +310,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	consensus.prepare()
-
-	return
 }
 
 // tryPrepare will try to send prepare message
@@ -408,7 +414,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
-	consensus.Decider.AddSignature(quorum.Prepare, validatorPubKey, &sign)
+	consensus.Decider.AddSignature(
+		quorum.Prepare, validatorPubKey, &sign, consensus.LeaderPubKey, consensus.blockNum,
+	)
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
@@ -439,7 +447,11 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
 		consensus.Decider.AddSignature(
-			quorum.Commit, consensus.PubKey, consensus.priKey.SignHash(commitPayload),
+			quorum.Commit,
+			consensus.PubKey,
+			consensus.priKey.SignHash(commitPayload),
+			consensus.LeaderPubKey,
+			consensus.blockNum,
 		)
 
 		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
@@ -471,7 +483,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			Msg("[OnPrepare] Switching phase")
 		consensus.switchPhase(FBFTCommit, true)
 	}
-	return
 }
 
 func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
@@ -751,7 +762,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).
 		Logger()
 	logger.Info().Msg("[OnCommit] Received new commit message")
-	consensus.Decider.AddSignature(quorum.Commit, validatorPubKey, &sign)
+	consensus.Decider.AddSignature(
+		quorum.Commit, validatorPubKey, &sign, consensus.LeaderPubKey, consensus.blockNum,
+	)
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnCommit] commitBitmap.SetKey failed")
@@ -808,6 +821,7 @@ func (consensus *Consensus) finalizeCommits() {
 			Msg("[FinalizeCommits] Cannot find block by hash")
 		return
 	}
+
 	consensus.tryCatchup()
 	if consensus.blockNum-beforeCatchupNum != 1 {
 		consensus.getLogger().Warn().
@@ -1080,13 +1094,14 @@ func (consensus *Consensus) tryCatchup() {
 }
 
 // Start waits for the next new block and run consensus
-func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan struct{}, stoppedChan chan struct{}, startChannel chan struct{}) {
+func (consensus *Consensus) Start(
+	blockChannel chan *types.Block, stopChan, stoppedChan, startChannel chan struct{},
+) {
 	go func() {
 		toStart := false
 		isInitialLeader := consensus.IsLeader()
 		if isInitialLeader {
 			consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Waiting for consensus start")
-
 			// send a signal to indicate it's ready to run consensus
 			// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
 			go func() {
