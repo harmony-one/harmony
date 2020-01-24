@@ -11,14 +11,16 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// LeaderNetworkMessage ..
+// LeaderNetworkMessage is a message intended to be
+// created only by the leader for distribution to
+// all the other quorum members.
 type LeaderNetworkMessage struct {
 	Phase                      quorum.Phase
 	Bytes                      []byte
 	OptionalAggregateSignature *bls.Sign
 }
 
-// TODO Finish refactoring other three message constructions folded into this function.
+// TODO(Edgar) Finish refactoring other three message constructions folded into this function.
 func (consensus *Consensus) construct(p quorum.Phase) *LeaderNetworkMessage {
 
 	msgType := msg_pb.MessageType_ANNOUNCE
@@ -97,7 +99,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 
 	// 96 bytes aggregated signature
 	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Announce))
-	// TODO Finish refactoring with this API
+	// TODO(Edgar) Finish refactoring with this API
 	// aggSig := consensus.Decider.AggregateVotes(quorum.Announce)
 	buffer.Write(aggSig.Serialize())
 

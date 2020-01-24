@@ -24,10 +24,10 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	Identity       shard.BlsPublicKey `json:"bls-public-key"`
-	LeaderForRound shard.BlsPublicKey `json:"leader-when-signed"`
-	Height         uint64             `json:"block-height"`
-	Signature      *bls.Sign          `json:"signature"`
+	SignerPubKey      shard.BlsPublicKey `json:"bls-public-key"`
+	BlockLeader       shard.BlsPublicKey `json:"leader-when-signed"`
+	BlockHeightHeight uint64             `json:"block-height"`
+	Signature         *bls.Sign          `json:"signature"`
 }
 
 // Round is a round of voting in any FBFT phase
