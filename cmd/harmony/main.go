@@ -401,8 +401,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.State = node.NodeWaitToJoin
 
 	// update consensus information based on the blockchain
-	mode := currentConsensus.UpdateConsensusInformation()
-	currentConsensus.SetMode(mode)
+	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
 
 	// Watching currentNode and currentConsensus.
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
@@ -429,7 +428,10 @@ func main() {
 	}
 
 	nodeconfig.SetPublicRPC(*publicRPC)
-	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
+	nodeconfig.SetVersion(
+		fmt.Sprintf("Harmony (C) 2020. %v, version %v-%v (%v %v)",
+			path.Base(os.Args[0]), version, commit, builtBy, builtAt),
+	)
 	if *versionFlag {
 		printVersion()
 	}
@@ -503,9 +505,12 @@ func main() {
 	currentNode.SetSyncFreq(*syncFreq)
 	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
 
-	if nodeConfig.ShardID != shard.BeaconChainShardID && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
-		utils.Logger().Info().Uint32("shardID", currentNode.Blockchain().ShardID()).Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
-		go currentNode.SupportBeaconSyncing()
+	if nodeConfig.ShardID != shard.BeaconChainShardID &&
+		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+		utils.Logger().Info().
+			Uint32("shardID", currentNode.Blockchain().ShardID()).
+			Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
+		currentNode.SupportBeaconSyncing()
 	}
 
 	if uint64(*doRevertBefore) != 0 && uint64(*revertTo) != 0 {

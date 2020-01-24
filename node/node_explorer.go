@@ -89,7 +89,11 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		// Add the block into FBFT log.
 		node.Consensus.FBFTLog.AddBlock(blockObj)
 		// Try to search for MessageType_COMMITTED message from pbft log.
-		msgs := node.Consensus.FBFTLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_COMMITTED, blockObj.NumberU64(), blockObj.Hash())
+		msgs := node.Consensus.FBFTLog.GetMessagesByTypeSeqHash(
+			msg_pb.MessageType_COMMITTED,
+			blockObj.NumberU64(),
+			blockObj.Hash(),
+		)
 		// If found, then add the new block into blockchain db.
 		if len(msgs) > 0 {
 			node.AddNewBlockForExplorer(blockObj)
