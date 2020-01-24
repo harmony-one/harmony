@@ -62,7 +62,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 
 // ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
 func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
-	if node.NodeConfig.ShardID == 0 {
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		pendingCLs, err := node.Blockchain().ReadPendingCrossLinks()
 		if err == nil && len(pendingCLs) >= maxPendingCrossLinkSize {
 			utils.Logger().Debug().
