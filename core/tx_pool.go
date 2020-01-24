@@ -18,13 +18,14 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -604,30 +605,32 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// Heuristic limit, reject transactions over 32KB to prevent DOS attacks
 	if tx.Size() > 32*1024 {
-		return ErrOversizedData
+		return errors.WithMessagef(ErrOversizedData, "transaction size is %s", tx.Size().String())
 	}
 	// Transactions can't be negative. This may never happen using RLP decoded
 	// transactions but may occur if you create a transaction using the RPC.
 	if tx.Value().Sign() < 0 {
-		return ErrNegativeValue
+		return errors.WithMessagef(ErrNegativeValue, "transaction value is %s", tx.Value().String())
 	}
 	// Ensure the transaction doesn't exceed the current block limit gas.
 	if pool.currentMaxGas < tx.Gas() {
-		return ErrGasLimit
+		return errors.WithMessagef(ErrGasLimit, "transaction gas is %d", tx.Gas())
 	}
 	// Make sure the transaction is signed properly
 	from, err := types.Sender(pool.signer, tx)
 	if err != nil {
-		return ErrInvalidSender
+		return errors.WithMessagef(ErrInvalidSender, "transaction sender is %v", from)
 	}
 	// Drop non-local transactions under our own minimal accepted gas price
 	local = local || pool.locals.contains(from) // account may be local even if the transaction arrived from the network
 	if !local && pool.gasPrice.Cmp(tx.GasPrice()) > 0 {
-		return ErrUnderpriced
+		gasPrice := new(big.Float).SetInt64(tx.GasPrice().Int64())
+		gasPrice = gasPrice.Mul(gasPrice, new(big.Float).SetFloat64(1e-9)) // Gas-price is in Nano
+		return errors.WithMessagef(ErrUnderpriced, "transaction gas-price is %.18f ONE", gasPrice)
 	}
 	// Ensure the transaction adheres to nonce ordering
 	if pool.currentState.GetNonce(from) > tx.Nonce() {
-		return ErrNonceTooLow
+		return errors.WithMessagef(ErrNonceTooLow, "transaction nonce is %d", tx.Nonce())
 	}
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
@@ -639,7 +642,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return err
 	}
 	if tx.Gas() < intrGas {
-		return ErrIntrinsicGas
+		return errors.WithMessagef(ErrIntrinsicGas, "transaction gas is %d", tx.Gas())
 	}
 	return nil
 }
@@ -670,12 +673,14 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	if uint64(pool.all.Count()) >= pool.config.GlobalSlots+pool.config.GlobalQueue {
 		// If the new transaction is underpriced, don't accept it
 		if !local && pool.priced.Underpriced(tx, pool.locals) {
+			gasPrice := new(big.Float).SetInt64(tx.GasPrice().Int64())
+			gasPrice = gasPrice.Mul(gasPrice, new(big.Float).SetFloat64(1e-9)) // Gas-price is in Nano
 			logger.Warn().
 				Str("hash", hash.Hex()).
 				Str("price", tx.GasPrice().String()).
 				Msg("Discarding underpriced transaction")
 			underpricedTxCounter.Inc(1)
-			return false, ErrUnderpriced
+			return false, errors.WithMessagef(ErrUnderpriced, "transaction gas-price is %.18f ONE in full transaction pool", gasPrice)
 		}
 		// New transaction is better than our worse ones, make room for it
 		drop := pool.priced.Discard(pool.all.Count()-int(pool.config.GlobalSlots+pool.config.GlobalQueue-1), pool.locals)
@@ -695,7 +700,7 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 		inserted, old := list.Add(tx, pool.config.PriceBump)
 		if !inserted {
 			pendingDiscardCounter.Inc(1)
-			return false, ErrReplaceUnderpriced
+			return false, errors.WithMessage(ErrReplaceUnderpriced, "existing transaction price was not bumped enough")
 		}
 		// New transaction is better, replace old one
 		if old != nil {
@@ -831,14 +836,14 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 // the sender as a local one in the mean time, ensuring it goes around the local
 // pricing constraints.
 func (pool *TxPool) AddLocal(tx *types.Transaction) error {
-	return pool.addTx(tx, !pool.config.NoLocals)
+	return errors.Cause(pool.addTx(tx, !pool.config.NoLocals))
 }
 
 // AddRemote enqueues a single transaction into the pool if it is valid. If the
 // sender is not among the locally tracked ones, full pricing constraints will
 // apply.
 func (pool *TxPool) AddRemote(tx *types.Transaction) error {
-	return pool.addTx(tx, false)
+	return errors.Cause(pool.addTx(tx, false))
 }
 
 // AddLocals enqueues a batch of transactions into the pool if they are valid,
@@ -861,15 +866,18 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	defer pool.mu.Unlock()
 
 	// Try to inject the transaction and update any state
+	isKnownTx := pool.all.Get(tx.Hash()) != nil
 	replace, err := pool.add(tx, local)
 	if err != nil {
-		pool.txnErrorSink([]types.RPCTransactionError{
-			{
-				TxHashID:             tx.Hash().Hex(),
-				TimestampOfRejection: time.Now().Unix(),
-				ErrMessage:           err.Error(),
-			},
-		})
+		if !isKnownTx {
+			pool.txnErrorSink([]types.RPCTransactionError{
+				{
+					TxHashID:             tx.Hash().Hex(),
+					TimestampOfRejection: time.Now().Unix(),
+					ErrMessage:           err.Error(),
+				},
+			})
+		}
 		return err
 	}
 	// If we added a new transaction, run promotion checks and return
@@ -898,11 +906,12 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) []error {
 
 	for i, tx := range txs {
 		var replace bool
+		isKnownTx := pool.all.Get(tx.Hash()) != nil
 		if replace, errs[i] = pool.add(tx, local); errs[i] == nil && !replace {
 			from, _ := types.Sender(pool.signer, tx) // already validated
 			dirty[from] = struct{}{}
 		}
-		if errs[i] != nil {
+		if errs[i] != nil && !isKnownTx {
 			erroredTxns = append(erroredTxns, types.RPCTransactionError{
 				TxHashID:             tx.Hash().Hex(),
 				TimestampOfRejection: time.Now().Unix(),
@@ -1184,11 +1193,13 @@ func (pool *TxPool) demoteUnexecutables() {
 		for _, tx := range list.Forward(nonce) {
 			hash := tx.Hash()
 			logger.Warn().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
-			erroredTxns = append(erroredTxns, types.RPCTransactionError{
-				TxHashID:             hash.Hex(),
-				TimestampOfRejection: time.Now().Unix(),
-				ErrMessage:           "old pending transaction",
-			})
+			if pool.chain.CurrentBlock().Transaction(hash) == nil {
+				erroredTxns = append(erroredTxns, types.RPCTransactionError{
+					TxHashID:             hash.Hex(),
+					TimestampOfRejection: time.Now().Unix(),
+					ErrMessage:           fmt.Sprintf("old transaction, nonce %d is too low", nonce),
+				})
+			}
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 		}
@@ -1200,7 +1211,8 @@ func (pool *TxPool) demoteUnexecutables() {
 			erroredTxns = append(erroredTxns, types.RPCTransactionError{
 				TxHashID:             hash.Hex(),
 				TimestampOfRejection: time.Now().Unix(),
-				ErrMessage:           "unpayable pending transaction",
+				ErrMessage: fmt.Sprintf("unpayable transaction, out of gas or "+
+					"balance of %d cannot pay cost of %d", tx.Value(), tx.Cost()),
 			})
 			pool.all.Remove(hash)
 			pool.priced.Removed()
@@ -1212,7 +1224,7 @@ func (pool *TxPool) demoteUnexecutables() {
 			erroredTxns = append(erroredTxns, types.RPCTransactionError{
 				TxHashID:             hash.Hex(),
 				TimestampOfRejection: time.Now().Unix(),
-				ErrMessage:           "unpayable pending transaction",
+				ErrMessage:           "demoting pending transaction",
 			})
 			pool.enqueueTx(hash, tx)
 		}
@@ -1224,7 +1236,7 @@ func (pool *TxPool) demoteUnexecutables() {
 				erroredTxns = append(erroredTxns, types.RPCTransactionError{
 					TxHashID:             hash.Hex(),
 					TimestampOfRejection: time.Now().Unix(),
-					ErrMessage:           "invalid transaction",
+					ErrMessage:           "demoting invalid transaction",
 				})
 				pool.enqueueTx(hash, tx)
 			}
