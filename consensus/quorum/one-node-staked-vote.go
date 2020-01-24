@@ -110,7 +110,7 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 	for i := range members {
 		w.FromLibBLSPublicKey(members[i])
 		if _, didVote := ballot.voters[w]; !didVote &&
-			v.ReadSignature(p, members[i]) != nil {
+			v.ReadBallot(p, members[i]) != nil {
 			err := w.FromLibBLSPublicKey(members[i])
 			if err != nil {
 				return nil, err

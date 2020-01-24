@@ -383,6 +383,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				consensus.priKey.SignHash(commitPayload),
 				consensus.LeaderPubKey,
 				consensus.blockNum,
+				consensus.blockHash,
 			)
 
 			if err = consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
