@@ -360,25 +360,23 @@ func (h *Header) CrossLinks() []byte {
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetCrossLinks(newCrossLinks []byte) {
-	if len(newCrossLinks) > 0 {
-		h.Logger(utils.Logger()).Warn().
-			Hex("crossLinks", newCrossLinks).
-			Msg("cannot store cross-chain links in V1 header")
-	}
+	h.Logger(utils.Logger()).Warn().
+		Hex("crossLinks", newCrossLinks).
+		Msg("cannot store cross-chain links in V1 header")
 }
 
 // Slashes ..
 func (h *Header) Slashes() []byte {
+	h.Logger(utils.Logger()).Error().
+		Msg("No slashes in V1 header")
 	return nil
 }
 
 // SetSlashes ..
 func (h *Header) SetSlashes(newSlashes []byte) {
-	if len(newSlashes) > 0 {
-		h.Logger(utils.Logger()).Warn().
-			Hex("slashes", newSlashes).
-			Msg("cannot store slashes in V1 header")
-	}
+	h.Logger(utils.Logger()).Error().
+		Hex("slashes", newSlashes).
+		Msg("cannot store slashes in V1 header")
 }
 
 // field type overrides for gencodec

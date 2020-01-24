@@ -364,6 +364,8 @@ func (h *Header) SetShardState(newShardState []byte) {
 //
 // The returned slice is a copy; the caller may do anything with it.
 func (h *Header) CrossLinks() []byte {
+	h.Logger(utils.Logger()).Error().
+		Msg("No crosslinks in V0 header")
 	return nil
 }
 
@@ -372,25 +374,25 @@ func (h *Header) CrossLinks() []byte {
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetCrossLinks(newCrossLinks []byte) {
-	if len(newCrossLinks) > 0 {
-		h.Logger(utils.Logger()).Warn().
-			Hex("crossLinks", newCrossLinks).
-			Msg("cannot store cross-chain links in V0 header")
-	}
+	h.Logger(utils.Logger()).Warn().
+		Hex("crossLinks", newCrossLinks).
+		Msg("cannot store cross-chain links in V0 header")
 }
 
-// Slashes ..
+// Slashes is the RLP-encoded form of []slash.Record,
+// The returned slice is a copy; the caller may do anything with it
 func (h *Header) Slashes() []byte {
+	h.Logger(utils.Logger()).Error().
+		Msg("No slashes in V0 header")
 	return nil
 }
 
-// SetSlashes ..
+// SetSlashes sets the RLP-encoded form of slashes
+// It stores a copy; the caller may freely modify the original.
 func (h *Header) SetSlashes(newSlashes []byte) {
-	if len(newSlashes) > 0 {
-		h.Logger(utils.Logger()).Warn().
-			Hex("slashes", newSlashes).
-			Msg("cannot store slashes in V0 header")
-	}
+	h.Logger(utils.Logger()).Error().
+		Hex("slashes", newSlashes).
+		Msg("cannot store slashes in V0 header")
 }
 
 // field type overrides for gencodec
