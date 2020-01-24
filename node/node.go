@@ -560,15 +560,17 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
 	node.startConsensus = make(chan struct{})
 	go node.bootstrapConsensus()
-	// Broadcast double-signers
-	go func() {
-		for {
-			select {
-			case doubleSign := <-node.Consensus.SlashChan:
-				node.BroadcastSlash(&doubleSign)
+	// Broadcast double-signers reported by consensus
+	if node.Consensus != nil {
+		go func() {
+			for {
+				select {
+				case doubleSign := <-node.Consensus.SlashChan:
+					go node.BroadcastSlash(&doubleSign)
+				}
 			}
-		}
-	}()
+		}()
+	}
 	return &node
 }
 

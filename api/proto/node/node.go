@@ -6,17 +6,16 @@ import (
 	"fmt"
 	"log"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	peer "github.com/libp2p/go-libp2p-peer"
-
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/staking/slash"
+	staking "github.com/harmony-one/harmony/staking/types"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -99,8 +98,18 @@ type BlockMessageType int
 const (
 	Sync BlockMessageType = iota
 
-	CrossLink // used for crosslink from beacon chain to shard chain
-	Receipt   // cross-shard transaction receipts
+	CrossLink      // used for crosslink from beacon chain to shard chain
+	Receipt        // cross-shard transaction receipts
+	SlashCandidate // A report of a double-signing event
+)
+
+var (
+	// B suffix means Byte
+	nodeB  = byte(proto.Node)
+	blockB = byte(Block)
+	slashB = byte(SlashCandidate)
+	// H suffix means header
+	slashH = []byte{nodeB, blockB, slashB}
 )
 
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
@@ -141,7 +150,7 @@ func ConstructTransactionListMessageAccount(transactions types.Transactions) []b
 }
 
 // ConstructStakingTransactionListMessageAccount constructs serialized staking transactions in account model
-func ConstructStakingTransactionListMessageAccount(transactions types2.StakingTransactions) []byte {
+func ConstructStakingTransactionListMessageAccount(transactions staking.StakingTransactions) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
 	byteBuffer.WriteByte(byte(Staking))
 	byteBuffer.WriteByte(byte(Send))
@@ -163,6 +172,15 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 
 	blocksData, _ := rlp.EncodeToBytes(blocks)
 	byteBuffer.Write(blocksData)
+	return byteBuffer.Bytes()
+}
+
+// ConstructSlashMessage ..
+func ConstructSlashMessage(witness *slash.Record) []byte {
+	byteBuffer := bytes.Buffer{}
+	byteBuffer.Write(slashH)
+	slashData, _ := rlp.EncodeToBytes(witness)
+	byteBuffer.Write(slashData)
 	return byteBuffer.Bytes()
 }
 
