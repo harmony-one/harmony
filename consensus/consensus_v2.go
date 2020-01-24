@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/harmony-one/vdf/src/vdf_go"
 )
 
@@ -143,6 +145,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 		consensus.priKey.SignHash(consensus.blockHash[:]),
 		consensus.LeaderPubKey,
 		consensus.blockNum,
+		FPBTMsg.BlockHash,
 	)
 	if err := consensus.prepareBitmap.SetKey(consensus.PubKey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[Announce] Leader prepareBitmap SetKey failed")
@@ -384,7 +387,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		Str("validatorPubKey", validatorPubKey.SerializeToHexStr()).Logger()
 
 	// proceed only when the message is not received before
-	signed := consensus.Decider.ReadSignature(quorum.Prepare, validatorPubKey)
+	signed := consensus.Decider.ReadBallot(quorum.Prepare, validatorPubKey)
 	if signed != nil {
 		logger.Debug().
 			Msg("[OnPrepare] Already Received prepare message from the validator")
@@ -415,7 +418,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
 	consensus.Decider.AddSignature(
-		quorum.Prepare, validatorPubKey, &sign, consensus.LeaderPubKey, consensus.blockNum,
+		quorum.Prepare, validatorPubKey, &sign,
+		consensus.LeaderPubKey, consensus.blockNum,
+		recvMsg.BlockHash,
 	)
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
@@ -452,6 +457,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			consensus.priKey.SignHash(commitPayload),
 			consensus.LeaderPubKey,
 			consensus.blockNum,
+			FBFTMsg.BlockHash,
 		)
 
 		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
@@ -731,28 +737,24 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	commitBitmap := consensus.commitBitmap
-	// proceed only when the message is not received before
-	signed := consensus.Decider.ReadSignature(quorum.Commit, validatorPubKey)
-
-	if signed != nil {
-		logger.Debug().
-			Msg("[OnCommit] Already received commit message from the validator")
-		return
-	}
 
 	// has to be called before verifying signature
 	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 	// Verify the signature on commitPayload is correct
 	var sign bls.Sign
-	err = sign.Deserialize(commitSig)
-	if err != nil {
+	if err := sign.Deserialize(commitSig); err != nil {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return
 	}
+
 	blockNumHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
 	commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
-	logger = logger.With().Uint64("MsgViewID", recvMsg.ViewID).Uint64("MsgBlockNum", recvMsg.BlockNum).Logger()
+	logger = logger.With().
+		Uint64("MsgViewID", recvMsg.ViewID).
+		Uint64("MsgBlockNum", recvMsg.BlockNum).
+		Logger()
+
 	if !sign.VerifyHash(recvMsg.SenderPubkey, commitPayload) {
 		logger.Error().Msg("[OnCommit] Cannot verify commit message")
 		return
@@ -762,8 +764,42 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).
 		Logger()
 	logger.Info().Msg("[OnCommit] Received new commit message")
+
+	// proceed only when the message is not received before
+	if signed := consensus.Decider.ReadBallot(
+		quorum.Commit, validatorPubKey,
+	); signed != nil {
+		logger.Debug().
+			Msg("[OnCommit] Already received commit message from the validator")
+		// If signer already signed, and the block height is the same, then we
+		// need to verify the block hash, and if block hash is different, then
+		// that is a clear case of double signing
+		if h1, h2 :=
+			signed.BlockHash,
+			recvMsg.BlockHash; signed.BlockHeight == recvMsg.BlockNum &&
+			bytes.Compare(h1.Bytes(), h2.Bytes()) != 0 {
+			go func() {
+				consensus.slashChan <- slash.Record{
+					BlockHash:   h2,
+					BlockNumber: big.NewInt(int64(signed.BlockHeight)),
+					// Is this aggregate signature now or later of everyone writing the slash?
+					Signature: [96]byte{}, // (aggregated) signature
+					Bitmap:    nil,        // corresponding bitmap mask for agg signature
+					ShardID:   consensus.ShardID,
+					Epoch:     big.NewInt(int64(consensus.epoch)),
+					// So when we accept, is it just the first one who reported and won gets the
+					// bonus?
+					Beneficiary: consensus.SelfAddress, // the reporter who will get rewarded
+				}
+			}()
+		}
+
+		return
+	}
+
 	consensus.Decider.AddSignature(
-		quorum.Commit, validatorPubKey, &sign, consensus.LeaderPubKey, consensus.blockNum,
+		quorum.Commit, validatorPubKey, &sign,
+		consensus.LeaderPubKey, consensus.blockNum, recvMsg.BlockHash,
 	)
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
