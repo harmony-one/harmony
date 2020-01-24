@@ -6,11 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// Reporter reports slashes
-type Reporter interface {
-	Report(Record)
-}
-
 // Record is an proof of a slashing made by a witness of a double-signing event
 type Record struct {
 	BlockHash   common.Hash

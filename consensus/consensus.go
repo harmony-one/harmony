@@ -128,7 +128,7 @@ type Consensus struct {
 	// last node block reward for metrics
 	lastBlockReward *big.Int
 	// Have a dedicated reader thread pull from this chan, like in node
-	slashChan chan slash.Record
+	SlashChan chan slash.Record
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
@@ -211,7 +211,7 @@ func New(
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
-	consensus.slashChan = make(chan slash.Record)
+	consensus.SlashChan = make(chan slash.Record)
 	consensus.commitFinishChan = make(chan uint64)
 	consensus.ReadySignal = make(chan struct{})
 	consensus.lastBlockReward = big.NewInt(0)
