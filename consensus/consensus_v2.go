@@ -779,7 +779,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			recvMsg.BlockHash; signed.BlockHeight == recvMsg.BlockNum &&
 			bytes.Compare(h1.Bytes(), h2.Bytes()) != 0 {
 			go func() {
-				consensus.slashChan <- slash.Record{
+				consensus.SlashChan <- slash.Record{
 					BlockHash:   h2,
 					BlockNumber: big.NewInt(int64(signed.BlockHeight)),
 					// Is this aggregate signature now or later of everyone writing the slash?
