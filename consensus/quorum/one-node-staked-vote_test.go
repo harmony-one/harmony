@@ -135,11 +135,11 @@ func TestEvenNodes(t *testing.T) {
 	}
 	// Sign all Staker nodes
 	// Prepare
-	sign(stakedVote, sKeys[reg], Announce)
-	achieved := stakedVote.IsQuorumAchieved(Announce)
+	sign(stakedVote, sKeys[reg], Prepare)
+	achieved := stakedVote.IsQuorumAchieved(Prepare)
 	if achieved {
 		t.Errorf("[IsQuorumAchieved] Phase: %s, QuorumAchieved: %s, Expected: false (All Staker nodes = 32%%)",
-			Announce, strconv.FormatBool(achieved))
+			Prepare, strconv.FormatBool(achieved))
 	}
 	// Commit
 	sign(stakedVote, sKeys[reg], Commit)
@@ -163,11 +163,11 @@ func TestEvenNodes(t *testing.T) {
 	}
 
 	// Sign all Harmony Nodes
-	sign(stakedVote, sKeys[hmy], Announce)
-	achieved = stakedVote.IsQuorumAchieved(Announce)
+	sign(stakedVote, sKeys[hmy], Prepare)
+	achieved = stakedVote.IsQuorumAchieved(Prepare)
 	if !achieved {
 		t.Errorf("[IsQuorumAchieved] Phase: %s, QuorumAchieved: %s, Expected: true (All nodes = 100%%)",
-			Announce, strconv.FormatBool(achieved))
+			Prepare, strconv.FormatBool(achieved))
 	}
 	// Commit
 	sign(stakedVote, sKeys[hmy], Commit)
@@ -202,11 +202,11 @@ func Test33HarmonyNodes(t *testing.T) {
 	}
 	// Sign all Harmony Nodes, 0 Staker Nodes
 	// Prepare
-	sign(stakedVote, sKeys, Announce)
-	achieved := stakedVote.IsQuorumAchieved(Announce)
+	sign(stakedVote, sKeys, Prepare)
+	achieved := stakedVote.IsQuorumAchieved(Prepare)
 	if !achieved {
 		t.Errorf("[IsQuorumAchieved] Phase: %s, QuorumAchieved: %s, Expected: true (All Harmony nodes = 68%%)",
-			Announce, strconv.FormatBool(achieved))
+			Prepare, strconv.FormatBool(achieved))
 	}
 	// Commit
 	sign(stakedVote, sKeys, Commit)

@@ -95,7 +95,7 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 	members := v.Participants()
 	ballot := func() *voteBox {
 		switch p {
-		case Announce:
+		case Prepare:
 			return v.ballotBox.Prepare
 		case Commit:
 			return v.ballotBox.Commit
@@ -280,7 +280,7 @@ func newBallotBox() box {
 }
 
 func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
-	v.reset([]Phase{Announce, Commit})
+	v.reset([]Phase{Prepare, Commit})
 	v.ballotBox.Prepare = newBox()
 	v.ballotBox.Commit = newBox()
 }

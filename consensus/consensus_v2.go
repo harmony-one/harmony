@@ -138,7 +138,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	// Leader sign the block hash itself
 	consensus.Decider.AddSignature(
-		quorum.Announce,
+		quorum.Prepare,
 		consensus.PubKey,
 		consensus.priKey.SignHash(consensus.blockHash[:]),
 		consensus.LeaderPubKey,
@@ -384,14 +384,14 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		Str("validatorPubKey", validatorPubKey.SerializeToHexStr()).Logger()
 
 	// proceed only when the message is not received before
-	signed := consensus.Decider.ReadSignature(quorum.Announce, validatorPubKey)
+	signed := consensus.Decider.ReadSignature(quorum.Prepare, validatorPubKey)
 	if signed != nil {
 		logger.Debug().
 			Msg("[OnPrepare] Already Received prepare message from the validator")
 		return
 	}
 
-	if consensus.Decider.IsQuorumAchieved(quorum.Announce) {
+	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		// already have enough signatures
 		logger.Debug().Msg("[OnPrepare] Received Additional Prepare Message")
 		return
@@ -411,11 +411,11 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	logger = logger.With().
-		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Announce)).
+		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
 	consensus.Decider.AddSignature(
-		quorum.Announce, validatorPubKey, &sign, consensus.LeaderPubKey, consensus.blockNum,
+		quorum.Prepare, validatorPubKey, &sign, consensus.LeaderPubKey, consensus.blockNum,
 	)
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
@@ -423,7 +423,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.Decider.IsQuorumAchieved(quorum.Announce) {
+	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 		// Construct and broadcast prepared message
 		msgToSend, aggSig := consensus.constructPreparedMessage()

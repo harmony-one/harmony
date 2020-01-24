@@ -14,8 +14,8 @@ import (
 type Phase byte
 
 const (
-	// Announce ..
-	Announce Phase = iota
+	// Prepare ..
+	Prepare Phase = iota
 	// Commit ..
 	Commit
 	// ViewChange ..
@@ -23,9 +23,9 @@ const (
 )
 
 var phaseNames = map[Phase]string{
-	Announce:   "Announce",
-	Commit:     "Commit",
-	ViewChange: "ViewChange",
+	Prepare:    "Prepare",
+	Commit:     "Prepare",
+	ViewChange: "Commit",
 }
 
 func (p Phase) String() string {
@@ -195,7 +195,7 @@ func (s *cIdentities) ParticipantsCount() int64 {
 
 func (s *cIdentities) SignersCount(p Phase) int64 {
 	switch p {
-	case Announce:
+	case Prepare:
 		return int64(len(s.announcement.BallotBox))
 	case Commit:
 		return int64(len(s.commit.BallotBox))
@@ -220,7 +220,7 @@ func (s *cIdentities) AddSignature(
 	}
 
 	switch p {
-	case Announce:
+	case Prepare:
 		s.announcement.BallotBox[hex] = ballot
 	case Commit:
 		s.commit.BallotBox[hex] = ballot
@@ -232,7 +232,7 @@ func (s *cIdentities) AddSignature(
 func (s *cIdentities) reset(ps []Phase) {
 	for i := range ps {
 		switch m := votepower.NewRound(); ps[i] {
-		case Announce:
+		case Prepare:
 			s.announcement = m
 		case Commit:
 			s.commit = m
@@ -251,7 +251,7 @@ func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
 	hex := PubKey.SerializeToHexStr()
 
 	switch p {
-	case Announce:
+	case Prepare:
 		ballotBox = s.announcement.BallotBox
 	case Commit:
 		ballotBox = s.commit.BallotBox
@@ -269,7 +269,7 @@ func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
 func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
 	var m map[string]*votepower.Ballot
 	switch p {
-	case Announce:
+	case Prepare:
 		m = s.announcement.BallotBox
 	case Commit:
 		m = s.commit.BallotBox

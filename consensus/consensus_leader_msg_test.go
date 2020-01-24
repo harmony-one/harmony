@@ -67,10 +67,10 @@ func TestConstructPreparedMessage(test *testing.T) {
 
 	message := "test string"
 	consensus.Decider.AddSignature(
-		quorum.Announce, leaderPubKey, leaderPriKey.Sign(message), leaderPubKey, 9999,
+		quorum.Prepare, leaderPubKey, leaderPriKey.Sign(message), leaderPubKey, 9999,
 	)
 	consensus.Decider.AddSignature(
-		quorum.Announce, validatorPubKey, validatorPriKey.Sign(message), leaderPubKey, 9999,
+		quorum.Prepare, validatorPubKey, validatorPriKey.Sign(message), leaderPubKey, 9999,
 	)
 	// According to RJ these failures are benign.
 	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {

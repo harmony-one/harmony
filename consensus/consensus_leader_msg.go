@@ -28,7 +28,7 @@ func (consensus *Consensus) construct(p quorum.Phase) *LeaderNetworkMessage {
 	switch p {
 	case quorum.Commit:
 		msgType = msg_pb.MessageType_COMMITTED
-	case quorum.Announce:
+	case quorum.Prepare:
 		msgType = msg_pb.MessageType_PREPARED
 	}
 
@@ -98,7 +98,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	buffer := bytes.Buffer{}
 
 	// 96 bytes aggregated signature
-	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Announce))
+	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
 	// TODO(Edgar) Finish refactoring with this API
 	// aggSig := consensus.Decider.AggregateVotes(quorum.Announce)
 	buffer.Write(aggSig.Serialize())
