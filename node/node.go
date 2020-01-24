@@ -36,7 +36,6 @@ import (
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -526,7 +525,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
-		chain.Engine.SetSlasher(node.Consensus.Decider.(slash.Slasher))
 		chain.Engine.SetBeaconchain(beaconChain)
 
 		// the sequence number is the next block number to be added in consensus protocol, which is

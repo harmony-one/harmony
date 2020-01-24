@@ -18,7 +18,6 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
-	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
 
@@ -94,8 +93,7 @@ func whatPercentStakedNow(
 // reward. The total reward consists of the static block reward
 func AccumulateRewards(
 	bc engine.ChainReader, state *state.DB, header *block.Header,
-	rewarder reward.Distributor, slasher slash.Slasher,
-	beaconChain engine.ChainReader,
+	rewarder reward.Distributor, beaconChain engine.ChainReader,
 ) (*big.Int, error) {
 	blockNum := header.Number().Uint64()
 
