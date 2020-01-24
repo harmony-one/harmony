@@ -5,9 +5,9 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/api/proto"
-	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // PublicHarmonyAPI provides an API to access Harmony related information.
@@ -46,33 +46,38 @@ func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*big.Int, error) {
 
 // NodeMetadata captures select metadata of the RPC answering node
 type NodeMetadata struct {
-	BLSPublicKey string `json:"blskey"`
-	Version      string `json:"version"`
-	NetworkType  string `json:"network"`
-	ChainID      string `json:"chainid"`
-	IsLeader     bool   `json:"is-leader"`
-	ShardID      uint32 `json:"shard-id"`
+	BLSPublicKey   string             `json:"blskey"`
+	Version        string             `json:"version"`
+	NetworkType    string             `json:"network"`
+	ChainConfig    params.ChainConfig `json:"chain-config"`
+	IsLeader       bool               `json:"is-leader"`
+	ShardID        uint32             `json:"shard-id"`
+	CurrentEpoch   uint64             `json:"current-epoch"`
+	BlocksPerEpoch *uint64            `json:"blocks-per-epoch,omitempty"`
+	Role           string             `json:"role"`
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
 func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 	cfg := nodeconfig.GetDefaultConfig()
+	header := s.b.CurrentBlock().Header()
+	var blockEpoch *uint64
+
+	if header.ShardID() == shard.BeaconChainShardID {
+		sched := shard.Schedule.InstanceForEpoch(header.Epoch())
+		b := sched.BlocksPerEpoch()
+		blockEpoch = &b
+	}
+
 	return NodeMetadata{
 		cfg.ConsensusPubKey.SerializeToHexStr(),
 		nodeconfig.GetVersion(),
 		string(cfg.GetNetworkType()),
-		s.b.ChainConfig().ChainID.String(),
+		*s.b.ChainConfig(),
 		s.b.IsLeader(),
 		s.b.GetShardID(),
+		header.Epoch().Uint64(),
+		blockEpoch,
+		cfg.Role().String(),
 	}
-}
-
-// GetCurrentTransactionErrorSink ..
-func (s *PublicHarmonyAPI) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
-	return s.b.GetCurrentTransactionErrorSink()
-}
-
-// GetCurrentStakingErrorSink ..
-func (s *PublicHarmonyAPI) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
-	return s.b.GetCurrentStakingErrorSink()
 }
