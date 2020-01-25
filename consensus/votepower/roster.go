@@ -1,6 +1,7 @@
 package votepower
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"sort"
 
@@ -29,6 +30,17 @@ type Ballot struct {
 	BlockHeight  uint64             `json:"block-height"`
 	BlockHash    common.Hash        `json:"block-hash"`
 	Signature    *bls.Sign          `json:"signature"`
+}
+
+// BallotResults are a completed round of votes
+type BallotResults struct {
+	Signature [shard.BLSSignatureSizeInBytes]byte // (aggregated) signature
+	Bitmap    []byte                              // corresponding bitmap mask for agg signature
+}
+
+// EncodePair returns hex encoded tuple (signature, bitmap)
+func (b BallotResults) EncodePair() (string, string) {
+	return hex.EncodeToString(b.Signature[:]), hex.EncodeToString(b.Bitmap[:])
 }
 
 // Round is a round of voting in any FBFT phase

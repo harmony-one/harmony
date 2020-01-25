@@ -15,6 +15,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -779,14 +780,15 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			recvMsg.BlockHash; signed.BlockHeight == recvMsg.BlockNum &&
 			bytes.Compare(h1.Bytes(), h2.Bytes()) != 0 {
 			go func() {
+				// TODO(Edgar) Compute the aggregate vote, bitmap
 				consensus.SlashChan <- slash.Record{
 					BlockHash:   h2,
 					BlockNumber: big.NewInt(int64(signed.BlockHeight)),
 					// Is this aggregate signature now or later of everyone writing the slash?
-					Signature: [96]byte{}, // (aggregated) signature
-					Bitmap:    nil,        // corresponding bitmap mask for agg signature
-					ShardID:   consensus.ShardID,
-					Epoch:     big.NewInt(int64(consensus.epoch)),
+					Signature:       votepower.BallotResults{},
+					DoubleSignature: votepower.BallotResults{},
+					ShardID:         consensus.ShardID,
+					Epoch:           big.NewInt(int64(consensus.epoch)),
 					// So when we accept, is it just the first one who reported and won gets the
 					// bonus?
 					Beneficiary: consensus.SelfAddress, // the reporter who will get rewarded
