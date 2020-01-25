@@ -296,23 +296,13 @@ func (e *engineImpl) Finalize(
 		if err != nil {
 			return nil, nil, ctxerror.New("[Finalize] failed to read shard state").WithCause(err)
 		}
-		processed := make(map[common.Address]struct{})
-		for i := range newShardState.Shards {
-			shard := newShardState.Shards[i]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-						wrapper := state.GetStakingInfo(slot.EcdsaAddress)
-						wrapper.LastEpochInCommittee = newShardState.Epoch
-
-						if err := state.UpdateStakingInfo(slot.EcdsaAddress, wrapper); err != nil {
-							return nil, nil, ctxerror.New("[Finalize] failed update validator info").WithCause(err)
-						}
-					}
-				}
+		for _, external := range newShardState.ExternalValidators() {
+			wrapper := state.GetStakingInfo(external)
+			wrapper.LastEpochInCommittee = newShardState.Epoch
+			if err := state.UpdateStakingInfo(external, wrapper); err != nil {
+				return nil, nil, ctxerror.New(
+					"[Finalize] failed update validator info",
+				).WithCause(err)
 			}
 		}
 	}
