@@ -41,7 +41,9 @@ func TestAddNewBlock(t *testing.T) {
 		txs, stks, common.Address{},
 		func([]staking.RPCTransactionError) {},
 	)
-	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
+	block, _ := node.Worker.FinalizeNewBlock(
+		[]byte{}, []byte{}, 0, common.Address{}, nil, nil, nil,
+	)
 
 	_, err = node.Blockchain().InsertChain([]*types.Block{block}, true)
 	if err != nil {
@@ -77,7 +79,9 @@ func TestVerifyNewBlock(t *testing.T) {
 		txs, stks, common.Address{},
 		func([]staking.RPCTransactionError) {},
 	)
-	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
+	block, _ := node.Worker.FinalizeNewBlock(
+		[]byte{}, []byte{}, 0, common.Address{}, nil, nil, nil,
+	)
 
 	if err := node.VerifyNewBlock(block); err != nil {
 		t.Error("New block is not verified successfully:", err)
