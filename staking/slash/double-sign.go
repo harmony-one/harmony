@@ -1,28 +1,27 @@
 package slash
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // Record is an proof of a slashing made by a witness of a double-signing event
 type Record struct {
-	BlockHash   common.Hash
-	BlockNumber *big.Int `json:"block-number"`
-	// TODO Add the signature of the double sign as well, had it happened.
-	Signature       [shard.BLSSignatureSizeInBytes]byte // (aggregated) signature
-	DoubleSignature [shard.BLSSignatureSizeInBytes]byte
-	Bitmap          []byte         // corresponding bitmap mask for agg signature
+	BlockHash       common.Hash
+	BlockNumber     *big.Int `json:"block-number"`
+	Signature       votepower.BallotResults
+	DoubleSignature votepower.BallotResults
 	ShardID         uint32         `json:"shard-id"`
 	Epoch           *big.Int       `json:"epoch"`
 	Beneficiary     common.Address // the reporter who will get rewarded
 }
+
+// TODO(Edgar) Implement Verify and Apply
 
 // Verify checks that the signature is valid
 func Verify(candidate *Record) error {
@@ -36,21 +35,28 @@ func Apply(state *state.DB, slashes []byte) error {
 
 // MarshalJSON ..
 func (r *Record) MarshalJSON() ([]byte, error) {
+	type sig struct {
+		AggregateSig string `json:"aggregated-signature"`
+		Bitmap       string `json:"bitmap"`
+	}
+
 	type rec struct {
 		Record,
 		BlockHash string `json:"block-hash"`
-		Signature       string `json:"signature"`
-		DoubleSignature string `json:"double-signature"`
-		Bitmap          string `json:"bitmap"`
+		Signature       sig
+		DoubleSignature sig
 		Beneficiary     string `json:"beneficiary"`
 	}
 	one, err := common2.AddressToBech32(r.Beneficiary)
+
 	if err != nil {
+		sigP, bitmapP := r.Signature.EncodePair()
+		sigD, bitmapD := r.DoubleSignature.EncodePair()
+
 		return json.Marshal(rec{
+			Signature:       sig{sigP, bitmapP},
+			DoubleSignature: sig{sigD, bitmapD},
 			BlockHash:       r.BlockHash.Hex(),
-			Signature:       hex.EncodeToString(r.Signature[:]),
-			DoubleSignature: hex.EncodeToString(r.DoubleSignature[:]),
-			Bitmap:          hex.EncodeToString(r.Bitmap),
 			Beneficiary:     one,
 		})
 	}
