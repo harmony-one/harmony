@@ -2209,7 +2209,7 @@ func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
 	if cached, ok := bc.pendingSlashingCandidates.Get(pendingSCCacheKey); ok {
 		bytes = cached.([]byte)
 	} else {
-		bytes, err := rawdb.ReadPendingCrossLinks(bc.db)
+		bytes, err := rawdb.ReadPendingSlashingCandidates(bc.db)
 		if err != nil || len(bytes) == 0 {
 			utils.Logger().Info().Err(err).
 				Int("dataLen", len(bytes)).
