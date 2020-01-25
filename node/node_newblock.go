@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -86,18 +87,23 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		err         error
 	)
 
-	node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
+	currentHeader := node.Worker.GetCurrentHeader()
+	isBeacon := node.NodeConfig.ShardID == shard.BeaconChainShardID
+	isCrossLinkEra := node.Blockchain().Config().IsCrossLink(currentHeader.Epoch())
+	isPreStakingEra := node.Blockchain().Config().IsPreStaking(currentHeader.Epoch())
+	isStakingEra := node.Blockchain().Config().IsStaking(currentHeader.Epoch())
+	currentHeader.SetCoinbase(coinbase)
 
 	// After staking, all coinbase will be the address of bls pub key
-	if header := node.Worker.GetCurrentHeader(); node.Blockchain().Config().IsStaking(header.Epoch()) {
+	if isStakingEra {
 		addr := common.Address{}
 		blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
 		addr.SetBytes(blsPubKeyBytes[:])
 		coinbase = addr // coinbase will be the bls address
-		header.SetCoinbase(coinbase)
+		currentHeader.SetCoinbase(coinbase)
 	}
 
-	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(node.Worker.GetCurrentHeader())
+	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(currentHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +118,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// TODO: integrate staking transaction into tx pool
 	pendingStakingTransactions := staking.StakingTransactions{}
 	// Only process staking transactions after pre-staking epoch happened.
-	if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
+	if isPreStakingEra {
 		node.pendingStakingTxMutex.Lock()
 		for _, tx := range node.pendingStakingTransactions {
 			pendingStakingTransactions = append(pendingStakingTransactions, tx)
@@ -144,36 +150,65 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
-	// Prepare cross links
-	var crossLinksToPropose types.CrossLinks
+	// Prepare cross links and slashes
+	var (
+		crossLinksToPropose types.CrossLinks
+		slashingToPropose   []slash.Record
+	)
 
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
-		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
+	if isBeacon && isCrossLinkEra {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
-
 		if err == nil {
 			for _, pending := range allPending {
 				if err = node.VerifyCrossLink(pending); err != nil {
 					continue
 				}
-				exist, err := node.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
+				exist, err := node.Blockchain().ReadCrossLink(
+					pending.ShardID(), pending.BlockNum(),
+				)
 				if err == nil || exist != nil {
 					continue
 				}
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
-			utils.Logger().Debug().Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
+			utils.Logger().Debug().
+				Int("proposed-count", len(crossLinksToPropose)).
+				Int("from-pending-count", len(allPending)).
+				Msg("[proposeNewBlock] Proposed crosslinks from pending crosslinks")
 		} else {
-			utils.Logger().Error().Err(err).Msgf("[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
+			utils.Logger().Debug().
+				Int("pending", len(allPending)).
+				Str("reason", err.Error()).
+				Msg("[proposeNewBlock] Unable to Read PendingCrossLinks")
 		}
 	}
 
-	// Bump up signers counts
-	state, header := node.Worker.GetCurrentState(), node.Blockchain().CurrentHeader()
-	if epoch := header.Epoch(); node.Blockchain().Config().IsStaking(epoch) {
+	if isBeacon && isCrossLinkEra {
+		allPending, err := node.Blockchain().ReadPendingSlashingCandidates()
+		if err != nil {
+			utils.Logger().Debug().
+				Int("pending", len(allPending)).
+				Str("reason", err.Error()).
+				Msg("[proposeNewBlock] Unable to ReadPendingSlashingCandidates")
+		} else {
+			for i := range allPending {
+				if err := slash.Verify(&allPending[i]); err == nil {
+					slashingToPropose = append(slashingToPropose, allPending[i])
+				}
+			}
+		}
+	}
 
-		if header.ShardID() == shard.BeaconChainShardID {
-			superCommittee, err := node.Blockchain().ReadShardState(header.Epoch())
+	utils.Logger().Info().
+		Int("count", len(slashingToPropose)).
+		Msg("verified slashes for new block proposal")
+
+	// Bump up signers counts
+	state := node.Worker.GetCurrentState()
+	if isStakingEra {
+
+		if currentHeader.ShardID() == shard.BeaconChainShardID {
+			superCommittee, err := node.Blockchain().ReadShardState(currentHeader.Epoch())
 			processed := make(map[common.Address]struct{})
 
 			if err != nil {
@@ -193,14 +228,14 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 				}
 			}
 			if err := availability.IncrementValidatorSigningCounts(
-				node.Blockchain(), header, header.ShardID(), state, processed,
+				node.Blockchain(), currentHeader, currentHeader.ShardID(), state, processed,
 			); err != nil {
 				return nil, err
 			}
 
 			// kick out the inactive validators so they won't come up in the auction as possible
 			// candidates in the following call to SuperCommitteeForNextEpoch
-			if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+			if shard.Schedule.IsLastBlock(currentHeader.Number().Uint64()) {
 				if err := availability.SetInactiveUnavailableValidators(
 					node.Blockchain(), state, processed,
 				); err != nil {
@@ -216,7 +251,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Prepare shard state
 	shardState := new(shard.State)
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
-		node.Beaconchain(), node.Worker.GetCurrentHeader(), false,
+		node.Beaconchain(), currentHeader, false,
 	); err != nil {
 		return nil, err
 	}
@@ -228,7 +263,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 	return node.Worker.FinalizeNewBlock(
-		sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState,
+		sig, mask, node.Consensus.GetViewID(),
+		coinbase, crossLinksToPropose, shardState,
+		slashingToPropose,
 	)
 }
 

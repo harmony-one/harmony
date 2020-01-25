@@ -266,7 +266,9 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 	msg := proto_node.ConstructStakingTransactionListMessageAccount(staking.StakingTransactions{stakingTx})
 
-	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(0)) // broadcast to beacon chain
+	shardGroupID := nodeconfig.NewGroupIDByShardID(
+		nodeconfig.ShardID(shard.BeaconChainShardID),
+	) // broadcast to beacon chain
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcastStaking")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
