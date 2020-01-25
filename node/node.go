@@ -490,7 +490,17 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		node.recentTxsStats = make(types.RecentTxsStats)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
+		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain,
+			func(payload []types.RPCTransactionError) {
+				if len(payload) > 0 {
+					node.errorSink.Lock()
+					for i := range payload {
+						node.errorSink.failedTxns.Value = payload[i]
+						node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
+					}
+					node.errorSink.Unlock()
+				}
+			})
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 

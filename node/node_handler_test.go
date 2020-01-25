@@ -35,8 +35,7 @@ func TestAddNewBlock(t *testing.T) {
 	node := New(host, consensus, testDBFactory, false)
 
 	txs := make(map[common.Address]types.Transactions)
-	node.Worker.CommitTransactions(txs, common.Address{},
-		func([]types.RPCTransactionError) {})
+	node.Worker.CommitTransactions(txs, common.Address{})
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
 	err = node.AddNewBlock(block)
@@ -68,8 +67,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	node := New(host, consensus, testDBFactory, false)
 
 	txs := make(map[common.Address]types.Transactions)
-	node.Worker.CommitTransactions(txs, common.Address{},
-		func([]types.RPCTransactionError) {})
+	node.Worker.CommitTransactions(txs, common.Address{})
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
 	if err := node.VerifyNewBlock(block); err != nil {
