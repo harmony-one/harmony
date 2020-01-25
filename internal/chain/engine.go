@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
@@ -264,6 +265,13 @@ func (e *engineImpl) Finalize(
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
+	// Apply the slashes, invariant: assume been verified as legit slash by this point
+	if isBeaconChain && isNewEpoch && inStakingEra {
+		if err := slash.Apply(state, header.Slashes()); err != nil {
+			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
+		}
+	}
+
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
 	if isBeaconChain && isNewEpoch && inStakingEra {
