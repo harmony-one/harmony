@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -25,6 +26,11 @@ type Record struct {
 
 // Verify checks that the signature is valid
 func Verify(candidate *Record) error {
+	return nil
+}
+
+// Apply ..
+func Apply(state *state.DB, slashes []byte) error {
 	return nil
 }
 

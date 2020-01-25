@@ -287,8 +287,13 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		pendingCXReceipts = append(pendingCXReceipts, v)
 	}
 
-	sort.Slice(pendingCXReceipts, func(i, j int) bool {
-		return pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID || (pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID && pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
+	sort.SliceStable(pendingCXReceipts, func(i, j int) bool {
+		shardCMP := pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID
+		shardEQ := pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID
+		blockCMP := pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(
+			pendingCXReceipts[j].MerkleProof.BlockNum,
+		) == -1
+		return shardCMP || (shardEQ && blockCMP)
 	})
 
 	m := make(map[common.Hash]bool)
