@@ -2205,6 +2205,10 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 
 // ReadPendingSlashingCandidates retrieves pending slashing candidates
 func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
+	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
+		return []slash.Record{}, nil
+	}
+
 	bytes := []byte{}
 	if cached, ok := bc.pendingSlashingCandidates.Get(pendingSCCacheKey); ok {
 		bytes = cached.([]byte)
@@ -2227,6 +2231,11 @@ func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
 
 // WritePendingSlashingCandidates saves the pending slashing candidates
 func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) error {
+	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
+		utils.Logger().Debug().Msg("Writing slashing candidates in prior to staking epoch")
+		return nil
+	}
+
 	bytes, err := rlp.EncodeToBytes(candidates)
 	if err != nil {
 		utils.Logger().Error().Msg("[WritePendingSlashingCandidates] Failed to encode pending slashing candidates")
