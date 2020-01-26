@@ -105,11 +105,22 @@ const (
 
 var (
 	// B suffix means Byte
-	nodeB  = byte(proto.Node)
-	blockB = byte(Block)
-	slashB = byte(SlashCandidate)
+	nodeB      = byte(proto.Node)
+	blockB     = byte(Block)
+	slashB     = byte(SlashCandidate)
+	txnB       = byte(Transaction)
+	sendB      = byte(Send)
+	stakingB   = byte(Staking)
+	syncB      = byte(Sync)
+	crossLinkB = byte(CrossLink)
+	receiptB   = byte(Receipt)
 	// H suffix means header
-	slashH = []byte{nodeB, blockB, slashB}
+	slashH           = []byte{nodeB, blockB, slashB}
+	transactionListH = []byte{nodeB, txnB, sendB}
+	stakingTxnListH  = []byte{nodeB, stakingB, sendB}
+	syncH            = []byte{nodeB, blockB, syncB}
+	crossLinkH       = []byte{nodeB, blockB, crossLinkB}
+	cxReceiptH       = []byte{nodeB, blockB, receiptB}
 )
 
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
@@ -136,10 +147,8 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
 func ConstructTransactionListMessageAccount(transactions types.Transactions) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(Send))
-
+	byteBuffer := bytes.Buffer{}
+	byteBuffer.Write(transactionListH)
 	txs, err := rlp.EncodeToBytes(transactions)
 	if err != nil {
 		log.Fatal(err)
@@ -150,10 +159,11 @@ func ConstructTransactionListMessageAccount(transactions types.Transactions) []b
 }
 
 // ConstructStakingTransactionListMessageAccount constructs serialized staking transactions in account model
-func ConstructStakingTransactionListMessageAccount(transactions staking.StakingTransactions) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Staking))
-	byteBuffer.WriteByte(byte(Send))
+func ConstructStakingTransactionListMessageAccount(
+	transactions staking.StakingTransactions,
+) []byte {
+	byteBuffer := bytes.Buffer{}
+	byteBuffer.Write(stakingTxnListH)
 
 	txs, err := rlp.EncodeToBytes(transactions)
 	if err != nil {
@@ -166,10 +176,8 @@ func ConstructStakingTransactionListMessageAccount(transactions staking.StakingT
 
 // ConstructBlocksSyncMessage constructs blocks sync message to send blocks to other nodes
 func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(Sync))
-
+	byteBuffer := bytes.Buffer{}
+	byteBuffer.Write(syncH)
 	blocksData, _ := rlp.EncodeToBytes(blocks)
 	byteBuffer.Write(blocksData)
 	return byteBuffer.Bytes()
@@ -186,10 +194,8 @@ func ConstructSlashMessage(witness *slash.Record) []byte {
 
 // ConstructCrossLinkMessage constructs cross link message to send to beacon chain
 func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(CrossLink))
-
+	byteBuffer := bytes.Buffer{}
+	byteBuffer.Write(crossLinkH)
 	crosslinks := []types.CrossLink{}
 	for _, header := range headers {
 		if header.Number().Uint64() <= 1 || !bc.Config().IsCrossLink(header.Epoch()) {
@@ -210,13 +216,13 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 // ConstructCXReceiptsProof constructs cross shard receipts and related proof including
 // merkle proof, blockHeader and  commitSignatures
 func ConstructCXReceiptsProof(cxReceiptsProof *types.CXReceiptsProof) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(Receipt))
+	byteBuffer := bytes.Buffer{}
+	byteBuffer.Write(cxReceiptH)
 	by, err := rlp.EncodeToBytes(cxReceiptsProof)
 
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[ConstructCXReceiptsProof] Encode CXReceiptsProof Error")
+		const msg = "[ConstructCXReceiptsProof] Encode CXReceiptsProof Error"
+		utils.Logger().Error().Err(err).Msg(msg)
 		return []byte{}
 	}
 	byteBuffer.Write(by)
