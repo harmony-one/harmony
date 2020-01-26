@@ -101,16 +101,24 @@ func BallotResult(
 	return parentCommittee.Slots, payable, missing, err
 }
 
+func fromSlice(only []common.Address) map[common.Address]struct{} {
+	onlyConsider := map[common.Address]struct{}{}
+	for i := range only {
+		onlyConsider[only[i]] = struct{}{}
+	}
+	return onlyConsider
+}
+
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
 	chain engine.ChainReader, header *block.Header,
-	shardID uint32, state *state.DB, onlyConsider map[common.Address]struct{},
+	shardID uint32, state *state.DB, only []common.Address,
 ) error {
 	_, signers, _, err := BallotResult(chain, header, shardID)
 	if err != nil {
 		return err
 	}
-
+	onlyConsider := fromSlice(only)
 	epoch, one := chain.CurrentHeader().Epoch(), big.NewInt(1)
 
 	for i := range signers {
@@ -142,7 +150,7 @@ func IncrementValidatorSigningCounts(
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
 	bc engine.ChainReader, state *state.DB,
-	onlyConsider map[common.Address]struct{},
+	only []common.Address,
 ) error {
 
 	addrs, err := bc.ReadActiveValidatorList()
@@ -150,7 +158,11 @@ func SetInactiveUnavailableValidators(
 		return err
 	}
 
-	one, now := big.NewInt(1), bc.CurrentHeader().Epoch()
+	one, now, onlyConsider :=
+		big.NewInt(1),
+		bc.CurrentHeader().Epoch(),
+		fromSlice(only)
+
 	for i := range addrs {
 
 		if _, ok := onlyConsider[addrs[i]]; !ok {

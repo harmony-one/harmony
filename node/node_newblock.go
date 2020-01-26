@@ -87,12 +87,11 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		err         error
 	)
 
-	currentHeader := node.Worker.GetCurrentHeader()
+	workingHeader := node.Worker.GetCurrentHeader()
 	isBeacon := node.NodeConfig.ShardID == shard.BeaconChainShardID
-	isCrossLinkEra := node.Blockchain().Config().IsCrossLink(currentHeader.Epoch())
-	isPreStakingEra := node.Blockchain().Config().IsPreStaking(currentHeader.Epoch())
-	isStakingEra := node.Blockchain().Config().IsStaking(currentHeader.Epoch())
-	currentHeader.SetCoinbase(coinbase)
+	isCrossLinkEra := node.Blockchain().Config().IsCrossLink(workingHeader.Epoch())
+	isPreStakingEra := node.Blockchain().Config().IsPreStaking(workingHeader.Epoch())
+	isStakingEra := node.Blockchain().Config().IsStaking(workingHeader.Epoch())
 
 	// After staking, all coinbase will be the address of bls pub key
 	if isStakingEra {
@@ -100,10 +99,11 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		blsPubKeyBytes := node.Consensus.PubKey.GetAddress()
 		addr.SetBytes(blsPubKeyBytes[:])
 		coinbase = addr // coinbase will be the bls address
-		currentHeader.SetCoinbase(coinbase)
 	}
 
-	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(currentHeader)
+	workingHeader.SetCoinbase(coinbase)
+
+	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(workingHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -204,31 +204,20 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		Msg("verified slashes for new block proposal")
 
 	// Bump up signers counts
-	state := node.Worker.GetCurrentState()
+	state, currentHeader := node.Worker.GetCurrentState(), node.Blockchain().CurrentHeader()
 	if isStakingEra {
 
 		if currentHeader.ShardID() == shard.BeaconChainShardID {
 			superCommittee, err := node.Blockchain().ReadShardState(currentHeader.Epoch())
-			processed := make(map[common.Address]struct{})
+			processed := superCommittee.ExternalValidators()
 
 			if err != nil {
 				return nil, err
 			}
 
-			for j := range superCommittee.Shards {
-				shard := superCommittee.Shards[j]
-				for j := range shard.Slots {
-					slot := shard.Slots[j]
-					if slot.EffectiveStake != nil { // For external validator
-						_, ok := processed[slot.EcdsaAddress]
-						if !ok {
-							processed[slot.EcdsaAddress] = struct{}{}
-						}
-					}
-				}
-			}
 			if err := availability.IncrementValidatorSigningCounts(
-				node.Blockchain(), currentHeader, currentHeader.ShardID(), state, processed,
+				node.Blockchain(), currentHeader,
+				currentHeader.ShardID(), state, processed,
 			); err != nil {
 				return nil, err
 			}
