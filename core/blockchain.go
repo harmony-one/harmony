@@ -2223,7 +2223,7 @@ func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
 	}
 	cls := []slash.Record{}
 	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
-		utils.Logger().Error().Err(err).Msg("Invalid pending crosslink RLP decoding")
+		utils.Logger().Error().Err(err).Msg("Invalid pending slashing candidates RLP decoding")
 		return nil, err
 	}
 	return cls, nil
@@ -2238,14 +2238,15 @@ func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) 
 
 	bytes, err := rlp.EncodeToBytes(candidates)
 	if err != nil {
-		utils.Logger().Error().Msg("[WritePendingSlashingCandidates] Failed to encode pending slashing candidates")
+		const msg = "[WritePendingSlashingCandidates] Failed to encode pending slashing candidates"
+		utils.Logger().Error().Msg(msg)
 		return err
 	}
 	if err := rawdb.WritePendingSlashingCandidates(bc.db, bytes); err != nil {
 		return err
 	}
 	if by, err := rlp.EncodeToBytes(candidates); err == nil {
-		bc.pendingCrossLinksCache.Add(pendingCLCacheKey, by)
+		bc.pendingSlashingCandidates.Add(pendingSCCacheKey, by)
 	}
 	return nil
 
