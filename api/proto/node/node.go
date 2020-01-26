@@ -147,8 +147,7 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
 func ConstructTransactionListMessageAccount(transactions types.Transactions) []byte {
-	byteBuffer := bytes.Buffer{}
-	byteBuffer.Write(transactionListH)
+	byteBuffer := bytes.NewBuffer(transactionListH)
 	txs, err := rlp.EncodeToBytes(transactions)
 	if err != nil {
 		log.Fatal(err)
@@ -162,9 +161,7 @@ func ConstructTransactionListMessageAccount(transactions types.Transactions) []b
 func ConstructStakingTransactionListMessageAccount(
 	transactions staking.StakingTransactions,
 ) []byte {
-	byteBuffer := bytes.Buffer{}
-	byteBuffer.Write(stakingTxnListH)
-
+	byteBuffer := bytes.NewBuffer(stakingTxnListH)
 	txs, err := rlp.EncodeToBytes(transactions)
 	if err != nil {
 		log.Fatal(err)
@@ -176,8 +173,7 @@ func ConstructStakingTransactionListMessageAccount(
 
 // ConstructBlocksSyncMessage constructs blocks sync message to send blocks to other nodes
 func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
-	byteBuffer := bytes.Buffer{}
-	byteBuffer.Write(syncH)
+	byteBuffer := bytes.NewBuffer(syncH)
 	blocksData, _ := rlp.EncodeToBytes(blocks)
 	byteBuffer.Write(blocksData)
 	return byteBuffer.Bytes()
@@ -185,8 +181,7 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 
 // ConstructSlashMessage ..
 func ConstructSlashMessage(witness *slash.Record) []byte {
-	byteBuffer := bytes.Buffer{}
-	byteBuffer.Write(slashH)
+	byteBuffer := bytes.NewBuffer(slashH)
 	slashData, _ := rlp.EncodeToBytes(witness)
 	byteBuffer.Write(slashData)
 	return byteBuffer.Bytes()
@@ -194,8 +189,7 @@ func ConstructSlashMessage(witness *slash.Record) []byte {
 
 // ConstructCrossLinkMessage constructs cross link message to send to beacon chain
 func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
-	byteBuffer := bytes.Buffer{}
-	byteBuffer.Write(crossLinkH)
+	byteBuffer := bytes.NewBuffer(crossLinkH)
 	crosslinks := []types.CrossLink{}
 	for _, header := range headers {
 		if header.Number().Uint64() <= 1 || !bc.Config().IsCrossLink(header.Epoch()) {
@@ -216,10 +210,8 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 // ConstructCXReceiptsProof constructs cross shard receipts and related proof including
 // merkle proof, blockHeader and  commitSignatures
 func ConstructCXReceiptsProof(cxReceiptsProof *types.CXReceiptsProof) []byte {
-	byteBuffer := bytes.Buffer{}
-	byteBuffer.Write(cxReceiptH)
+	byteBuffer := bytes.NewBuffer(cxReceiptH)
 	by, err := rlp.EncodeToBytes(cxReceiptsProof)
-
 	if err != nil {
 		const msg = "[ConstructCXReceiptsProof] Encode CXReceiptsProof Error"
 		utils.Logger().Error().Err(err).Msg(msg)
