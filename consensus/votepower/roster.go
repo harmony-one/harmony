@@ -34,8 +34,8 @@ type Ballot struct {
 
 // BallotResults are a completed round of votes
 type BallotResults struct {
-	Signature [shard.BLSSignatureSizeInBytes]byte // (aggregated) signature
-	Bitmap    []byte                              // corresponding bitmap mask for agg signature
+	Signature shard.BLSSignature // (aggregated) signature
+	Bitmap    []byte             // corresponding bitmap mask for agg signature
 }
 
 // EncodePair returns hex encoded tuple (signature, bitmap)

@@ -35,8 +35,8 @@ type State struct {
 // BlsPublicKey defines the bls public key
 type BlsPublicKey [PublicKeySizeInBytes]byte
 
-// BlsSignature defines the bls signature
-type BlsSignature [BLSSignatureSizeInBytes]byte
+// BLSSignature defines the bls signature
+type BLSSignature [BLSSignatureSizeInBytes]byte
 
 // Slot represents node id (BLS address)
 type Slot struct {
