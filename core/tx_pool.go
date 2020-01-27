@@ -873,13 +873,7 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	replace, err := pool.add(tx, local)
 	if err != nil {
 		if errors.Cause(err) != ErrKnownTransaction {
-			pool.txnErrorSink([]types.RPCTransactionError{
-				{
-					TxHashID:             tx.Hash().Hex(),
-					TimestampOfRejection: time.Now().Unix(),
-					ErrMessage:           err.Error(),
-				},
-			})
+			pool.txnErrorSink([]types.RPCTransactionError{*types.NewRPCTransactionError(tx.Hash(), err)})
 		}
 		return err
 	}
@@ -914,11 +908,7 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) []error {
 			dirty[from] = struct{}{}
 		}
 		if errs[i] != nil && errors.Cause(errs[i]) != ErrKnownTransaction {
-			erroredTxns = append(erroredTxns, types.RPCTransactionError{
-				TxHashID:             tx.Hash().Hex(),
-				TimestampOfRejection: time.Now().Unix(),
-				ErrMessage:           errs[i].Error(),
-			})
+			erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), errs[i]))
 		}
 	}
 	// Only reprocess the internal state if something was actually added
@@ -1031,11 +1021,8 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			hash := tx.Hash()
 			logger.Warn().Str("hash", hash.Hex()).Msg("Removed old queued transaction")
 			if pool.chain.CurrentBlock().Transaction(hash) == nil {
-				erroredTxns = append(erroredTxns, types.RPCTransactionError{
-					TxHashID:             hash.Hex(),
-					TimestampOfRejection: time.Now().Unix(),
-					ErrMessage:           fmt.Sprintf("old transaction, nonce %d is too low", nonce),
-				})
+				err := fmt.Errorf("old transaction, nonce %d is too low", nonce)
+				erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 			}
 			pool.all.Remove(hash)
 			pool.priced.Removed()
@@ -1045,12 +1032,8 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		for _, tx := range drops {
 			hash := tx.Hash()
 			logger.Warn().Str("hash", hash.Hex()).Msg("Removed unpayable queued transaction")
-			erroredTxns = append(erroredTxns, types.RPCTransactionError{
-				TxHashID:             hash.Hex(),
-				TimestampOfRejection: time.Now().Unix(),
-				ErrMessage: fmt.Sprintf("unpayable transaction, out of gas or "+
-					"balance of %d cannot pay cost of %d", tx.Value(), tx.Cost()),
-			})
+			err := fmt.Errorf("unpayable transaction, out of gas or balance of %d cannot pay cost of %d", tx.Value(), tx.Cost())
+			erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			queuedNofundsCounter.Inc(1)
@@ -1068,11 +1051,8 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			for _, tx := range list.Cap(int(pool.config.AccountQueue)) {
 				hash := tx.Hash()
 				logger.Warn().Str("hash", hash.Hex()).Msg("Removed cap-exceeding queued transaction")
-				erroredTxns = append(erroredTxns, types.RPCTransactionError{
-					TxHashID:             hash.Hex(),
-					TimestampOfRejection: time.Now().Unix(),
-					ErrMessage:           fmt.Sprintf("exceeds cap for queued transactions for account %s", addr.String()),
-				})
+				err := fmt.Errorf("exceeds cap for queued transactions for account %s", addr.String())
+				erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 				pool.all.Remove(hash)
 				pool.priced.Removed()
 				queuedRateLimitCounter.Inc(1)
@@ -1120,11 +1100,8 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 						list := pool.pending[offenders[i]]
 						for _, tx := range list.Cap(list.Len() - 1) {
 							hash := tx.Hash()
-							erroredTxns = append(erroredTxns, types.RPCTransactionError{
-								TxHashID:             hash.Hex(),
-								TimestampOfRejection: time.Now().Unix(),
-								ErrMessage:           "fairness-exceeding pending transaction",
-							})
+							err := fmt.Errorf("fairness-exceeding pending transaction")
+							erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 							pool.all.Remove(hash)
 							pool.priced.Removed()
 
@@ -1147,11 +1124,8 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 					for _, tx := range list.Cap(list.Len() - 1) {
 						// Drop the transaction from the global pools too
 						hash := tx.Hash()
-						erroredTxns = append(erroredTxns, types.RPCTransactionError{
-							TxHashID:             hash.Hex(),
-							TimestampOfRejection: time.Now().Unix(),
-							ErrMessage:           "fairness-exceeding pending transaction",
-						})
+						err := fmt.Errorf("fairness-exceeding pending transaction")
+						erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 						pool.all.Remove(hash)
 						pool.priced.Removed()
 
@@ -1192,11 +1166,8 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			// Drop all transactions if they are less than the overflow
 			if size := uint64(list.Len()); size <= drop {
 				for _, tx := range list.Flatten() {
-					erroredTxns = append(erroredTxns, types.RPCTransactionError{
-						TxHashID:             tx.Hash().Hex(),
-						TimestampOfRejection: time.Now().Unix(),
-						ErrMessage:           "exceeds global cap for queued transactions",
-					})
+					err := fmt.Errorf("exceeds global cap for queued transactions")
+					erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 					pool.removeTx(tx.Hash(), true)
 				}
 				drop -= size
@@ -1206,11 +1177,8 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			// Otherwise drop only last few transactions
 			txs := list.Flatten()
 			for i := len(txs) - 1; i >= 0 && drop > 0; i-- {
-				erroredTxns = append(erroredTxns, types.RPCTransactionError{
-					TxHashID:             txs[i].Hash().Hex(),
-					TimestampOfRejection: time.Now().Unix(),
-					ErrMessage:           "exceeds global cap for queued transactions",
-				})
+				err := fmt.Errorf("exceeds global cap for queued transactions")
+				erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(txs[i].Hash(), err))
 				pool.removeTx(txs[i].Hash(), true)
 				drop--
 				queuedRateLimitCounter.Inc(1)
@@ -1237,11 +1205,8 @@ func (pool *TxPool) demoteUnexecutables() {
 			hash := tx.Hash()
 			logger.Warn().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
 			if pool.chain.CurrentBlock().Transaction(hash) == nil {
-				erroredTxns = append(erroredTxns, types.RPCTransactionError{
-					TxHashID:             hash.Hex(),
-					TimestampOfRejection: time.Now().Unix(),
-					ErrMessage:           fmt.Sprintf("old transaction, nonce %d is too low", nonce),
-				})
+				err := fmt.Errorf("old transaction, nonce %d is too low", nonce)
+				erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 			}
 			pool.all.Remove(hash)
 			pool.priced.Removed()
@@ -1251,12 +1216,8 @@ func (pool *TxPool) demoteUnexecutables() {
 		for _, tx := range drops {
 			hash := tx.Hash()
 			logger.Warn().Str("hash", hash.Hex()).Msg("Removed unpayable pending transaction")
-			erroredTxns = append(erroredTxns, types.RPCTransactionError{
-				TxHashID:             hash.Hex(),
-				TimestampOfRejection: time.Now().Unix(),
-				ErrMessage: fmt.Sprintf("unpayable transaction, out of gas or "+
-					"balance of %d cannot pay cost of %d", tx.Value(), tx.Cost()),
-			})
+			err := fmt.Errorf("unpayable transaction, out of gas or balance of %d cannot pay cost of %d", tx.Value(), tx.Cost())
+			erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			pendingNofundsCounter.Inc(1)
@@ -1264,11 +1225,8 @@ func (pool *TxPool) demoteUnexecutables() {
 		for _, tx := range invalids {
 			hash := tx.Hash()
 			logger.Warn().Str("hash", hash.Hex()).Msg("Demoting pending transaction")
-			erroredTxns = append(erroredTxns, types.RPCTransactionError{
-				TxHashID:             hash.Hex(),
-				TimestampOfRejection: time.Now().Unix(),
-				ErrMessage:           "demoting pending transaction",
-			})
+			err := fmt.Errorf("demoting pending transaction")
+			erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 			pool.enqueueTx(hash, tx)
 		}
 		// If there's a gap in front, alert (should never happen) and postpone all transactions
@@ -1276,11 +1234,8 @@ func (pool *TxPool) demoteUnexecutables() {
 			for _, tx := range list.Cap(0) {
 				hash := tx.Hash()
 				logger.Error().Str("hash", hash.Hex()).Msg("Demoting invalidated transaction")
-				erroredTxns = append(erroredTxns, types.RPCTransactionError{
-					TxHashID:             hash.Hex(),
-					TimestampOfRejection: time.Now().Unix(),
-					ErrMessage:           "demoting invalid transaction",
-				})
+				err := fmt.Errorf("demoting invalid transaction")
+				erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 				pool.enqueueTx(hash, tx)
 			}
 		}
