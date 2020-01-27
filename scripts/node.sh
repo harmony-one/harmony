@@ -452,6 +452,10 @@ any_new_binaries() {
    outdir="${1}"
    mkdir -p "${outdir}"
    curl -L https://harmony.one/pubkey -o "${outdir}/harmony_pubkey.pem"
+   if ! grep -q "BEGIN\ PUBLIC\ KEY" "${outdir}/harmony_pubkey.pem"; then
+      msg "failed to downloaded harmony public signing key"
+      return 1
+   fi
    curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
    if diff $outdir/md5sum.txt.new md5sum.txt
    then
