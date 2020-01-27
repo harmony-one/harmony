@@ -584,7 +584,7 @@ func (node *Node) CalculateInitShardState() (err error) {
 	}
 
 	for _, key := range pubKeys {
-		if key.IsEqual(node.Consensus.PubKey) {
+		if node.Consensus.PubKey.Contains(key) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).

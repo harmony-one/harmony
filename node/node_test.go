@@ -15,6 +15,7 @@ import (
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/drand"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -35,7 +36,7 @@ func TestNewNode(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -202,7 +203,7 @@ func TestAddPeers(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -252,7 +253,7 @@ func TestAddBeaconPeer(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

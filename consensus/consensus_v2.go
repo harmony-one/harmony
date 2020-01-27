@@ -103,7 +103,12 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	consensus.block = encodedBlock
 	consensus.blockHeader = encodedBlockHeader
-	msgToSend := consensus.constructAnnounceMessage()
+	key, err := consensus.GetConsensusLeaderPrivateKey()
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("[Announce] Node not a leader")
+		return
+	}
+	msgToSend := consensus.constructAnnounceMessage(key)
 
 	// save announce message to FBFTLog
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
@@ -126,12 +131,14 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.FBFTLog.AddBlock(block)
 
 	// Leader sign the block hash itself
-	consensus.Decider.AddSignature(
-		quorum.Prepare, consensus.PubKey, consensus.priKey.SignHash(consensus.blockHash[:]),
-	)
-	if err := consensus.prepareBitmap.SetKey(consensus.PubKey, true); err != nil {
-		utils.Logger().Warn().Err(err).Msg("[Announce] Leader prepareBitmap SetKey failed")
-		return
+	for i, key := range consensus.PubKey.PublicKey {
+		consensus.Decider.AddSignature(
+			quorum.Prepare, key, consensus.priKey.PrivateKey[i].SignHash(consensus.blockHash[:]),
+		)
+		if err := consensus.prepareBitmap.SetKey(key, true); err != nil {
+			utils.Logger().Warn().Err(err).Msg("[Announce] Leader prepareBitmap SetKey failed")
+			return
+		}
 	}
 
 	// Construct broadcast p2p message
@@ -290,16 +297,19 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 // tryPrepare will try to send prepare message
 func (consensus *Consensus) prepare() {
-	// Construct and send prepare message
-	msgToSend := consensus.constructPrepareMessage()
-	// TODO: this will not return immediatey, may block
+	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+	for i, key := range consensus.PubKey.PublicKey {
+		// Construct and send prepare message
+		msgToSend := consensus.constructPrepareMessage(key, consensus.priKey.PrivateKey[i])
+		// TODO: this will not return immediatey, may block
 
-	if err := consensus.msgSender.SendWithoutRetry([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-		utils.Logger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
-	} else {
-		utils.Logger().Info().
-			Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
-			Msg("[OnAnnounce] Sent Prepare Message!!")
+		if err := consensus.msgSender.SendWithoutRetry(groupID, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+			utils.Logger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
+		} else {
+			utils.Logger().Info().
+				Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
+				Msg("[OnAnnounce] Sent Prepare Message!!")
+		}
 	}
 	utils.Logger().Debug().
 		Str("From", consensus.phase.String()).
@@ -398,7 +408,12 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 		// Construct and broadcast prepared message
-		msgToSend, aggSig := consensus.constructPreparedMessage()
+		leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("[OnPrepare] leader not found")
+			return
+		}
+		msgToSend, aggSig := consensus.constructPreparedMessage(leaderPriKey)
 		consensus.aggregatedPrepareSig = aggSig
 
 		//leader adds prepared message to log
@@ -416,13 +431,15 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
-		consensus.Decider.AddSignature(
-			quorum.Commit, consensus.PubKey, consensus.priKey.SignHash(commitPayload),
-		)
+		for i, key := range consensus.PubKey.PublicKey {
+			consensus.Decider.AddSignature(
+				quorum.Commit, key, consensus.priKey.PrivateKey[i].SignHash(commitPayload),
+			)
 
-		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
-			utils.Logger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
-			return
+			if err := consensus.commitBitmap.SetKey(key, true); err != nil {
+				utils.Logger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
+				return
+			}
 		}
 
 		if err := consensus.msgSender.SendWithRetry(
@@ -612,22 +629,25 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
 	commitPayload := append(blockNumBytes, consensus.blockHash[:]...)
-	msgToSend := consensus.constructCommitMessage(commitPayload)
+	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 
-	// TODO: genesis account node delay for 1 second, this is a temp fix for allows FN nodes to earning reward
-	if consensus.delayCommit > 0 {
-		time.Sleep(consensus.delayCommit)
+	for i, key := range consensus.PubKey.PublicKey {
+		msgToSend := consensus.constructCommitMessage(commitPayload, key, consensus.priKey.PrivateKey[i])
+
+		// TODO: genesis account node delay for 1 second, this is a temp fix for allows FN nodes to earning reward
+		if consensus.delayCommit > 0 {
+			time.Sleep(consensus.delayCommit)
+		}
+
+		if err := consensus.msgSender.SendWithoutRetry(groupID, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+			utils.Logger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
+		} else {
+			utils.Logger().Info().
+				Uint64("blockNum", consensus.blockNum).
+				Hex("blockHash", consensus.blockHash[:]).
+				Msg("[OnPrepared] Sent Commit Message!!")
+		}
 	}
-
-	if err := consensus.msgSender.SendWithoutRetry([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-		utils.Logger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
-	} else {
-		utils.Logger().Info().
-			Uint64("blockNum", consensus.blockNum).
-			Hex("blockHash", consensus.blockHash[:]).
-			Msg("[OnPrepared] Sent Commit Message!!")
-	}
-
 	utils.Logger().Debug().
 		Str("From", consensus.phase.String()).
 		Str("To", FBFTCommit.String()).
@@ -764,7 +784,12 @@ func (consensus *Consensus) finalizeCommits() {
 
 	beforeCatchupNum := consensus.blockNum
 	// Construct committed message
-	msgToSend, aggSig := consensus.constructCommittedMessage()
+	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("[FinalizeCommits] leader not found")
+		return
+	}
+	msgToSend, aggSig := consensus.constructCommittedMessage(leaderPriKey, consensus.LeaderPubKey)
 	consensus.aggregatedCommitSig = aggSig // this may not needed
 
 	// leader adds committed message to log
@@ -830,7 +855,7 @@ func (consensus *Consensus) finalizeCommits() {
 		Uint64("blockNum", block.NumberU64()).
 		Uint64("ViewId", block.Header().ViewID().Uint64()).
 		Str("blockHash", block.Hash().String()).
-		Int("index", consensus.Decider.IndexOf(consensus.PubKey)).
+		Int("index", consensus.Decider.IndexOf(consensus.LeaderPubKey)).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 	// Print to normal log too
 	utils.GetLogInstance().Info("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!", "BlockNum", block.NumberU64())
@@ -1245,7 +1270,8 @@ func (consensus *Consensus) Start(blockChannel chan *types.Block, stopChan chan 
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
 func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockNumbers []uint64) []uint64 {
-	sk := vrf_bls.NewVRFSigner(consensus.priKey)
+	key, _ := consensus.GetConsensusLeaderPrivateKey() // TODO: handle err
+	sk := vrf_bls.NewVRFSigner(key)
 	blockHash := [32]byte{}
 	previousHeader := consensus.ChainReader.GetHeaderByNumber(newBlock.NumberU64() - 1)
 	previousHash := previousHeader.Hash()

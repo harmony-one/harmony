@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -62,6 +63,16 @@ const (
 var version string
 var publicRPC bool // enable public RPC access
 
+// MultiBlsPrivateKey stores the bls secret keys that belongs to the node
+type MultiBlsPrivateKey struct {
+	PrivateKey []*bls.SecretKey
+}
+
+// MultiBlsPublicKey stores the bls public keys that belongs to the node
+type MultiBlsPublicKey struct {
+	PublicKey []*bls.PublicKey
+}
+
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
@@ -81,8 +92,8 @@ type ConfigType struct {
 	StringRole      string
 	StakingPriKey   *ecdsa.PrivateKey
 	P2pPriKey       p2p_crypto.PrivKey
-	ConsensusPriKey *bls.SecretKey
-	ConsensusPubKey *bls.PublicKey
+	ConsensusPriKey *MultiBlsPrivateKey
+	ConsensusPubKey *MultiBlsPublicKey
 
 	// Database directory
 	DBDir string
@@ -253,4 +264,60 @@ func SetPublicRPC(v bool) {
 // GetPublicRPC get the boolean value of public RPC access
 func GetPublicRPC() bool {
 	return publicRPC
+}
+
+// SerializeToHexStr wrapper
+func (multiKey MultiBlsPublicKey) SerializeToHexStr() string {
+	var builder strings.Builder
+	for _, pubKey := range multiKey.PublicKey {
+		builder.WriteString(pubKey.SerializeToHexStr())
+	}
+	return builder.String()
+}
+
+// Contains wrapper
+func (multiKey MultiBlsPublicKey) Contains(pubKey *bls.PublicKey) bool {
+	for _, key := range multiKey.PublicKey {
+		if key.IsEqual(pubKey) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetPublicKey wrapper
+func (multiKey MultiBlsPrivateKey) GetPublicKey() *MultiBlsPublicKey {
+	pubKeys := make([]*bls.PublicKey, len(multiKey.PrivateKey))
+	for i, key := range multiKey.PrivateKey {
+		pubKeys[i] = key.GetPublicKey()
+	}
+	return &MultiBlsPublicKey{PublicKey: pubKeys}
+}
+
+// GetMultiBlsPrivateKey creates a MultiBlsPrivateKey using bls.SecretKey
+func GetMultiBlsPrivateKey(key *bls.SecretKey) *MultiBlsPrivateKey {
+	return &MultiBlsPrivateKey{PrivateKey: []*bls.SecretKey{key}}
+}
+
+// GetMultiBlsPublicKey creates a MultiBlsPublicKey using bls.PublicKey
+func GetMultiBlsPublicKey(key *bls.PublicKey) *MultiBlsPublicKey {
+	return &MultiBlsPublicKey{PublicKey: []*bls.PublicKey{key}}
+}
+
+// AppendPubKey appends a PublicKey to MultiBlsPublicKey
+func AppendPubKey(multiKey *MultiBlsPublicKey, key *bls.PublicKey) {
+	if multiKey != nil {
+		multiKey.PublicKey = append(multiKey.PublicKey, key)
+	} else {
+		multiKey = &MultiBlsPublicKey{PublicKey: []*bls.PublicKey{key}}
+	}
+}
+
+// AppendPriKey appends a SecretKey to MultiBlsPrivateKey
+func AppendPriKey(multiKey *MultiBlsPrivateKey, key *bls.SecretKey) {
+	if multiKey != nil {
+		multiKey.PrivateKey = append(multiKey.PrivateKey, key)
+	} else {
+		multiKey = &MultiBlsPrivateKey{PrivateKey: []*bls.SecretKey{key}}
+	}
 }

@@ -26,7 +26,7 @@ func TestAddNewBlock(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -59,7 +59,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
