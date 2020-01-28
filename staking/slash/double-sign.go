@@ -1,9 +1,8 @@
 package slash
 
 import (
-	"encoding/json"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/shard"
@@ -13,10 +12,12 @@ import (
 type Record struct {
 	Offender shard.BlsPublicKey
 	Signed   struct {
-		Header *block.Header
+		Header    *block.Header
+		Signature *bls.Sign
 	} `json:"signed"`
 	DoubleSigned struct {
-		Header *block.Header
+		Header    *block.Header
+		Signature *bls.Sign
 	} `json:"double-signed"`
 	Beneficiary common.Address // the reporter who will get rewarded
 }
@@ -31,9 +32,4 @@ func Verify(candidate *Record) error {
 // Apply ..
 func Apply(state *state.DB, slashes []byte) error {
 	return nil
-}
-
-// MarshalJSON ..
-func (r *Record) MarshalJSON() ([]byte, error) {
-	return json.Marshal(r)
 }
