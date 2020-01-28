@@ -23,6 +23,7 @@ import (
 	"io"
 	"math/big"
 	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -38,6 +39,15 @@ type RPCTransactionError struct {
 	TxHashID             string `json:"tx-hash-id"`
 	TimestampOfRejection int64  `json:"time-at-rejection"`
 	ErrMessage           string `json:"error-message"`
+}
+
+// NewRPCTransactionError ...
+func NewRPCTransactionError(hash common.Hash, err error) *RPCTransactionError {
+	return &RPCTransactionError{
+		TxHashID:             hash.String(),
+		TimestampOfRejection: time.Now().Unix(),
+		ErrMessage:           err.Error(),
+	}
 }
 
 // no go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
