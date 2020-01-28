@@ -11,6 +11,54 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
+// LeaderNetworkMessage is a message intended to be
+// created only by the leader for distribution to
+// all the other quorum members.
+type LeaderNetworkMessage struct {
+	Phase                      quorum.Phase
+	Bytes                      []byte
+	OptionalAggregateSignature *bls.Sign
+}
+
+// TODO(Edgar) Finish refactoring other three message constructions folded into this function.
+func (consensus *Consensus) construct(p quorum.Phase) *LeaderNetworkMessage {
+
+	msgType := msg_pb.MessageType_ANNOUNCE
+
+	switch p {
+	case quorum.Commit:
+		msgType = msg_pb.MessageType_COMMITTED
+	case quorum.Prepare:
+		msgType = msg_pb.MessageType_PREPARED
+	}
+
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msgType,
+		Request: &msg_pb.Message_Consensus{
+			Consensus: &msg_pb.ConsensusRequest{},
+		},
+	}
+
+	consensusMsg := message.GetConsensus()
+	consensus.populateMessageFields(consensusMsg)
+	consensusMsg.Payload = consensus.blockHeader
+
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
+	if err != nil {
+		utils.Logger().Info().
+			Str("phase", p.String()).
+			Str("reason", err.Error()).
+			Msg("Failed to sign and marshal consensus message")
+	}
+
+	return &LeaderNetworkMessage{
+		Phase:                      p,
+		Bytes:                      proto.ConstructConsensusMessage(marshaledMessage),
+		OptionalAggregateSignature: nil,
+	}
+}
+
 // Constructs the announce message
 func (consensus *Consensus) constructAnnounceMessage() []byte {
 	message := &msg_pb.Message{
@@ -46,18 +94,20 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	// add block content in prepared message for slow validators to catchup
 	consensusMsg.Block = consensus.block
 
-	//// Payload
-	buffer := bytes.NewBuffer([]byte{})
+	// Payload
+	buffer := bytes.Buffer{}
 
 	// 96 bytes aggregated signature
 	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
+	// TODO(Edgar) Finish refactoring with this API
+	// aggSig := consensus.Decider.AggregateVotes(quorum.Announce)
 	buffer.Write(aggSig.Serialize())
 
 	// Bitmap
 	buffer.Write(consensus.prepareBitmap.Bitmap)
 
 	consensusMsg.Payload = buffer.Bytes()
-	//// END Payload
+	// END Payload
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
@@ -80,7 +130,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	consensus.populateMessageFields(consensusMsg)
 
 	//// Payload
-	buffer := bytes.NewBuffer([]byte{})
+	buffer := bytes.Buffer{}
 
 	// 96 bytes aggregated signature
 	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Commit))
@@ -90,7 +140,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	buffer.Write(consensus.commitBitmap.Bitmap)
 
 	consensusMsg.Payload = buffer.Bytes()
-	//// END Payload
+	// END Payload
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {

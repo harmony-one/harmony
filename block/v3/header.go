@@ -71,6 +71,7 @@ type headerFields struct {
 	Vdf                 []byte   `json:"vdf"`
 	ShardState          []byte   `json:"shardState"`
 	CrossLinks          []byte   `json:"crossLink"`
+	Slashes             []byte   `json:slashes`
 }
 
 // ParentHash is the header hash of the parent block.  For the genesis block
@@ -368,6 +369,16 @@ func (h *Header) CrossLinks() []byte {
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetCrossLinks(newCrossLinks []byte) {
 	h.fields.CrossLinks = append(newCrossLinks[:0:0], newCrossLinks...)
+}
+
+// Slashes ..
+func (h *Header) Slashes() []byte {
+	return append(h.fields.Slashes[:0:0], h.fields.Slashes...)
+}
+
+// SetSlashes ..
+func (h *Header) SetSlashes(newSlashes []byte) {
+	h.fields.Slashes = append(newSlashes[:0:0], newSlashes...)
 }
 
 // field type overrides for gencodec

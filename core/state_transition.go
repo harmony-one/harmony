@@ -389,22 +389,28 @@ func (st *StateTransition) applyCreateValidatorTx(createValidator *staking.Creat
 		return err
 	}
 
-	delegations := []staking.Delegation{
+	zero := big.NewInt(0)
+	wrapper := staking.ValidatorWrapper{}
+	wrapper.Validator = *v
+	wrapper.Delegations = []staking.Delegation{
 		staking.NewDelegation(v.Address, createValidator.Amount),
 	}
-	wrapper := staking.ValidatorWrapper{*v, delegations}
+	wrapper.Snapshot.Epoch = st.evm.EpochNumber
+	wrapper.Snapshot.NumBlocksSigned = zero
+	wrapper.Snapshot.NumBlocksToSign = zero
 
 	if err := st.state.UpdateStakingInfo(v.Address, &wrapper); err != nil {
 		return err
 	}
 
 	st.state.SetValidatorFlag(v.Address)
-
 	st.state.SubBalance(v.Address, createValidator.Amount)
 	return nil
 }
 
-func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValidator, blockNum *big.Int) error {
+func (st *StateTransition) applyEditValidatorTx(
+	editValidator *staking.EditValidator, blockNum *big.Int,
+) error {
 	if !st.state.IsValidator(editValidator.ValidatorAddress) {
 		return errValidatorNotExist
 	}
@@ -424,7 +430,7 @@ func (st *StateTransition) applyEditValidatorTx(editValidator *staking.EditValid
 	if err != nil {
 		return err
 	}
-	rateAtBeginningOfEpoch := snapshotValidator.Rate
+	rateAtBeginningOfEpoch := snapshotValidator.Validator.Rate
 
 	if rateAtBeginningOfEpoch.IsNil() || (!newRate.IsNil() && !rateAtBeginningOfEpoch.Equal(newRate)) {
 		wrapper.Validator.UpdateHeight = blockNum

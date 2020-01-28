@@ -25,38 +25,30 @@ const (
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	Decider quorum.Decider
-
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
 	phase FBFTPhase
 	// current indicates what state a node is in
 	current State
-
 	// epoch: current epoch number
 	epoch uint64
-
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
 	// channel to receive consensus message
 	MsgChan chan []byte
-
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
-
 	// Consensus rounds whose commit phase finished
 	commitFinishChan chan uint64
-
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
-
 	// Commits collected from validators.
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
-
 	// Commits collected from view change
 	// for each viewID, we need keep track of corresponding sigs and bitmap
 	// until one of the viewID has enough votes (>=2f+1)
@@ -73,29 +65,21 @@ type Consensus struct {
 	viewIDBitmap map[uint64]*bls_cosi.Mask
 	m1Payload    []byte     // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 	vcLock       sync.Mutex // mutex for view change
-
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader *core.BlockChain
-
 	// map of nodeID to validator Peer object
 	validators sync.Map // key is the hex string of the blsKey, value is p2p.Peer
-
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
-	MinPeers int
-
+	MinPeers   int
 	pubKeyLock sync.Mutex
-
 	// private/public keys of current node
-	priKey *bls.SecretKey
-	PubKey *bls.PublicKey
-
+	priKey      *bls.SecretKey
+	PubKey      *bls.PublicKey
 	SelfAddress common.Address
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
-
-	viewID uint64
-
+	viewID       uint64
 	// Blockhash - 32 byte
 	blockHash [32]byte
 	// Block to run consensus on
@@ -108,13 +92,10 @@ type Consensus struct {
 	ShardID uint32
 	// whether to ignore viewID check
 	ignoreViewIDCheck bool
-
 	// global consensus mutex
 	mutex sync.Mutex
-
 	// consensus information update mutex
 	infoMutex sync.Mutex
-
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
@@ -122,13 +103,10 @@ type Consensus struct {
 	OnConsensusDone func(*types.Block, []byte)
 	// The verifier func passed from Node object
 	BlockVerifier func(*types.Block) error
-
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
-
 	// will trigger state syncing when blockNum is low
 	blockNumLowChan chan struct{}
-
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
 	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -136,22 +114,16 @@ type Consensus struct {
 	// bytes are the seed for deriving VDF
 	RndChannel  chan [vdfAndSeedSize]byte
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
-
-	uniqueIDInstance *utils.UniqueValidatorID
-
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 	// MessageSender takes are of sending consensus message and the corresponding retry logic.
 	msgSender *MessageSender
-
 	// Used to convey to the consensus main loop that block syncing has finished.
 	syncReadyChan chan struct{}
 	// Used to convey to the consensus main loop that node is out of sync
 	syncNotReadyChan chan struct{}
-
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
-
 	// last node block reward for metrics
 	lastBlockReward *big.Int
 }
@@ -241,7 +213,6 @@ func New(
 	consensus.lastBlockReward = big.NewInt(0)
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
-	consensus.uniqueIDInstance = utils.GetUniqueValidatorIDInstance()
 	memprofiling.GetMemProfiling().Add("consensus.FBFTLog", consensus.FBFTLog)
 	return &consensus, nil
 }

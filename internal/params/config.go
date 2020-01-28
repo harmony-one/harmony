@@ -114,24 +114,28 @@ type TrustedCheckpoint struct {
 // that any network, identified by its genesis block, can have its own
 // set of configuration options.
 type ChainConfig struct {
-	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
+	// ChainId identifies the current chain and is used for replay protection
+	ChainID *big.Int `json:"chain-id"`
 
 	// CrossTxEpoch is the epoch where cross-shard transaction starts being
 	// processed.
-	CrossTxEpoch *big.Int `json:"crossTxEpoch,omitempty"`
+	CrossTxEpoch *big.Int `json:"cross-tx-epoch,omitempty"`
 
 	// CrossLinkEpoch is the epoch where beaconchain starts containing
 	// cross-shard links.
-	CrossLinkEpoch *big.Int `json:"crossLinkEpoch,omitempty"`
+	CrossLinkEpoch *big.Int `json:"cross-link-epoch,omitempty"`
 
 	// StakingEpoch is the epoch when shard assign takes staking into account
-	StakingEpoch *big.Int `json:"stakingEpoch,omitempty"`
+	StakingEpoch *big.Int `json:"staking-epoch,omitempty"`
 
 	// PreStakingEpoch is the epoch we allow staking transactions
-	PreStakingEpoch *big.Int `json:"preStakingEpoch,omitempty"`
+	PreStakingEpoch *big.Int `json:"prestaking-epoch,omitempty"`
 
-	EIP155Epoch *big.Int `json:"eip155Epoch,omitempty"` // EIP155 hard fork epoch (include EIP158 too)
-	S3Epoch     *big.Int `json:"s3Epoch,omitempty"`     // S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
+	// EIP155 hard fork epoch (include EIP158 too)
+	EIP155Epoch *big.Int `json:"eip155-epoch,omitempty"`
+
+	// S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
+	S3Epoch *big.Int `json:"s3-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.

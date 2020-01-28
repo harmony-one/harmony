@@ -57,6 +57,9 @@ type ChainReader interface {
 	//ReadBlockRewardAccumulator is the block-reward given for block number
 	ReadBlockRewardAccumulator(uint64) (*big.Int, error)
 
+	// ReadValidatorStats retrieves the running stats for a validator
+	ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error)
+
 	//SuperCommitteeForNextEpoch calculates the next epoch's supper committee
 	// isVerify flag is to indicate which stage to call this function: true (verification stage), false(propose stage)
 	SuperCommitteeForNextEpoch(beacon ChainReader, header *block.Header, isVerify bool) (*shard.State, error)

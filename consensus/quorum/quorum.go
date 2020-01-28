@@ -8,8 +8,6 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
-	// "github.com/harmony-one/harmony/staking/effective"
 )
 
 // Phase is a phase that needs quorum to proceed
@@ -25,7 +23,7 @@ const (
 )
 
 var phaseNames = map[Phase]string{
-	Prepare:    "Announce",
+	Prepare:    "Prepare",
 	Commit:     "Prepare",
 	ViewChange: "Commit",
 }
@@ -73,7 +71,10 @@ type ParticipantTracker interface {
 // SignatoryTracker ..
 type SignatoryTracker interface {
 	ParticipantTracker
-	AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign)
+	AddSignature(
+		p Phase, PubKey *bls.PublicKey,
+		sig *bls.Sign, roundLeader *bls.PublicKey, roundNumber uint64,
+	)
 	// Caller assumes concurrency protection
 	SignersCount(Phase) int64
 	reset([]Phase)
@@ -85,6 +86,8 @@ type SignatureReader interface {
 	ReadAllSignatures(Phase) []*bls.Sign
 	ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign
 	TwoThirdsSignersCount() int64
+	// 96 bytes aggregated signature
+	AggregateVotes(p Phase) *bls.Sign
 }
 
 // DependencyInjectionWriter ..
@@ -108,7 +111,6 @@ type WithJSONDump interface {
 type Decider interface {
 	SignatureReader
 	DependencyInjectionWriter
-	slash.Slasher
 	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
 	SetVoters(shard.SlotList, bool) (*TallyResult, error)
@@ -126,18 +128,22 @@ type Decider interface {
 // and values are BLS private key signed signatures
 type cIdentities struct {
 	// Public keys of the committee including leader and validators
-	publicKeys []*bls.PublicKey
-	prepare    map[string]*bls.Sign
-	commit     map[string]*bls.Sign
+	publicKeys   []*bls.PublicKey
+	announcement *votepower.Round
+	commit       *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
-	viewID      map[string]*bls.Sign
+	viewID      *votepower.Round
 	seenCounter map[[shard.PublicKeySizeInBytes]byte]int
 }
 
 type depInject struct {
 	shardIDProvider   func() (uint32, error)
 	publicKeyProvider func() (*bls.PublicKey, error)
+}
+
+func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
+	return bls_cosi.AggregateSig(s.ReadAllSignatures(p))
 }
 
 func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
@@ -175,11 +181,6 @@ func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
 }
 
-func (s *cIdentities) SlashThresholdMet(key shard.BlsPublicKey) bool {
-	s.seenCounter[key]++
-	return s.seenCounter[key] == slash.UnavailabilityInConsecutiveBlockSigning
-}
-
 func (s *cIdentities) DumpParticipants() []string {
 	keys := make([]string, len(s.publicKeys))
 	for i := range s.publicKeys {
@@ -195,34 +196,44 @@ func (s *cIdentities) ParticipantsCount() int64 {
 func (s *cIdentities) SignersCount(p Phase) int64 {
 	switch p {
 	case Prepare:
-		return int64(len(s.prepare))
+		return int64(len(s.announcement.BallotBox))
 	case Commit:
-		return int64(len(s.commit))
+		return int64(len(s.commit.BallotBox))
 	case ViewChange:
-		return int64(len(s.viewID))
+		return int64(len(s.viewID.BallotBox))
 	default:
 		return 0
 
 	}
 }
 
-func (s *cIdentities) AddSignature(p Phase, PubKey *bls.PublicKey, sig *bls.Sign) {
+func (s *cIdentities) AddSignature(
+	p Phase, PubKey *bls.PublicKey,
+	sig *bls.Sign, roundLeader *bls.PublicKey, roundNumber uint64,
+) {
 	hex := PubKey.SerializeToHexStr()
+	ballot := &votepower.Ballot{
+		*shard.FromLibBLSPublicKeyUnsafe(PubKey),
+		*shard.FromLibBLSPublicKeyUnsafe(roundLeader),
+		roundNumber,
+		sig,
+	}
+
 	switch p {
 	case Prepare:
-		s.prepare[hex] = sig
+		s.announcement.BallotBox[hex] = ballot
 	case Commit:
-		s.commit[hex] = sig
+		s.commit.BallotBox[hex] = ballot
 	case ViewChange:
-		s.viewID[hex] = sig
+		s.viewID.BallotBox[hex] = ballot
 	}
 }
 
 func (s *cIdentities) reset(ps []Phase) {
 	for i := range ps {
-		switch m := map[string]*bls.Sign{}; ps[i] {
+		switch m := votepower.NewRound(); ps[i] {
 		case Prepare:
-			s.prepare = m
+			s.announcement = m
 		case Commit:
 			s.commit = m
 		case ViewChange:
@@ -236,47 +247,49 @@ func (s *cIdentities) TwoThirdsSignersCount() int64 {
 }
 
 func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
-	m := map[string]*bls.Sign{}
+	var ballotBox map[string]*votepower.Ballot
 	hex := PubKey.SerializeToHexStr()
 
 	switch p {
 	case Prepare:
-		m = s.prepare
+		ballotBox = s.announcement.BallotBox
 	case Commit:
-		m = s.commit
+		ballotBox = s.commit.BallotBox
 	case ViewChange:
-		m = s.viewID
+		ballotBox = s.viewID.BallotBox
 	}
 
-	payload, ok := m[hex]
+	payload, ok := ballotBox[hex]
 	if !ok {
 		return nil
 	}
-	return payload
+	return payload.Signature
 }
 
 func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
-	m := map[string]*bls.Sign{}
+	var m map[string]*votepower.Ballot
 	switch p {
 	case Prepare:
-		m = s.prepare
+		m = s.announcement.BallotBox
 	case Commit:
-		m = s.commit
+		m = s.commit.BallotBox
 	case ViewChange:
-		m = s.viewID
+		m = s.viewID.BallotBox
 	}
 	sigs := make([]*bls.Sign, 0, len(m))
 	for _, value := range m {
-		sigs = append(sigs, value)
+		sigs = append(sigs, value.Signature)
 	}
 	return sigs
 }
 
 func newMapBackedSignatureReader() *cIdentities {
 	return &cIdentities{
-		[]*bls.PublicKey{}, map[string]*bls.Sign{},
-		map[string]*bls.Sign{}, map[string]*bls.Sign{},
-		map[[shard.PublicKeySizeInBytes]byte]int{},
+		publicKeys:   []*bls.PublicKey{},
+		announcement: votepower.NewRound(),
+		commit:       votepower.NewRound(),
+		viewID:       votepower.NewRound(),
+		seenCounter:  map[[shard.PublicKeySizeInBytes]byte]int{},
 	}
 }
 
@@ -317,7 +330,6 @@ func NewDecider(p Policy) Decider {
 			c.SignatureReader,
 			c.DependencyInjectionWriter,
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
-			c.SignatureReader.(slash.ThresholdDecider),
 			*votepower.NewRoster(),
 			newBallotBox(),
 		}
