@@ -130,7 +130,6 @@ func fundFaucetContract(chain *core.BlockChain) {
 	err := contractworker.CommitTransactions(
 		txmap, nil, testUserAddress,
 		func([]staking.RPCTransactionError) {},
-		func([]types.RPCTransactionError) {},
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -173,7 +172,6 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	err = contractworker.CommitTransactions(
 		txmap, nil, testUserAddress,
 		func([]staking.RPCTransactionError) {},
-		func([]types.RPCTransactionError) {},
 	)
 	if err != nil {
 		fmt.Println(err)

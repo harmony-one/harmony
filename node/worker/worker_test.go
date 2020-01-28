@@ -81,7 +81,6 @@ func TestCommitTransactions(t *testing.T) {
 	err := worker.CommitTransactions(
 		txs, nil, testBankAddress,
 		func([]staking.RPCTransactionError) {},
-		func([]types.RPCTransactionError) {},
 	)
 	if err != nil {
 		t.Error(err)
