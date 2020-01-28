@@ -59,7 +59,10 @@ func (node *Node) receiveGroupMessage(
 	}
 }
 
-func (node *Node) processSkippedMsgType(cat proto_node.BlockMessageType, content []byte) {
+// some messages have uninteresting fields in header, slash, receipt and crosslink are
+// such messages. This function assumes that input bytes are a slice which already
+// past those not relevant header bytes.
+func (node *Node) processSkippedMsgTypeByteValue(cat proto_node.BlockMessageType, content []byte) {
 	switch cat {
 	case proto_node.SlashCandidate:
 		node.processSlashCandidateMessage(content)
@@ -78,7 +81,7 @@ func (node *Node) processSkippedMsgType(cat proto_node.BlockMessageType, content
 	default:
 		utils.Logger().Error().
 			Int("message-iota-value", int(cat)).
-			Msg("Invariant usage of processSkippedMsgType violated")
+			Msg("Invariant usage of processSkippedMsgTypeByteValue violated")
 	}
 }
 
@@ -171,7 +174,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 				proto_node.Receipt,
 				proto_node.CrossLink:
 				// skip first byte which is blockMsgType
-				node.processSkippedMsgType(blockMsgType, msgPayload[1:])
+				node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 			}
 		case proto_node.PING:
 			node.pingMessageHandler(msgPayload, sender)
