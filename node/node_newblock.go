@@ -131,14 +131,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 			}
 			node.errorSink.Unlock()
 		},
-		func(payload []types.RPCTransactionError) {
-			node.errorSink.Lock()
-			for i := range payload {
-				node.errorSink.failedTxns.Value = payload[i]
-				node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
-			}
-			node.errorSink.Unlock()
-		},
 	); err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 		return nil, err

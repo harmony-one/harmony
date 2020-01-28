@@ -40,7 +40,6 @@ func TestAddNewBlock(t *testing.T) {
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 		func([]staking.RPCTransactionError) {},
-		func([]types.RPCTransactionError) {},
 	)
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
@@ -77,7 +76,6 @@ func TestVerifyNewBlock(t *testing.T) {
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 		func([]staking.RPCTransactionError) {},
-		func([]types.RPCTransactionError) {},
 	)
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
