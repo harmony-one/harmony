@@ -142,7 +142,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 		quorum.Prepare,
 		consensus.PubKey,
 		consensus.priKey.SignHash(consensus.blockHash[:]),
-		block.Header(),
+		nil,
 	)
 	if err := consensus.prepareBitmap.SetKey(consensus.PubKey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[Announce] Leader prepareBitmap SetKey failed")
@@ -414,16 +414,8 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
-	block := types.Block{}
 
-	if err := rlp.DecodeBytes(recvMsg.Block, &block); err != nil {
-		consensus.getLogger().Err(err).Msg("rlp recode block failed")
-		return
-	}
-
-	consensus.Decider.AddSignature(
-		quorum.Prepare, validatorPubKey, &sign, block.Header(),
-	)
+	consensus.Decider.AddSignature(quorum.Prepare, validatorPubKey, &sign, nil)
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
@@ -453,11 +445,18 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
+		header := block.Header{}
+
+		if err := rlp.DecodeBytes(consensus.blockHeader, &header); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("could not rlp decode header")
+			return
+		}
+
 		consensus.Decider.AddSignature(
 			quorum.Commit,
 			consensus.PubKey,
 			consensus.priKey.SignHash(commitPayload),
-			block.Header(),
+			&header,
 		)
 
 		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
