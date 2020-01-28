@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -347,7 +349,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		Msg("[onViewChange]")
 
 	// received enough view change messages, change state to normal consensus
-	if consensus.Decider.IsQuorumAchievedByMask(consensus.viewIDBitmap[recvMsg.ViewID], true) {
+	if consensus.Decider.IsQuorumAchievedByMask(
+		consensus.viewIDBitmap[recvMsg.ViewID], true,
+	) {
 		consensus.current.SetMode(Normal)
 		consensus.LeaderPubKey = consensus.PubKey
 		consensus.ResetState()
@@ -377,13 +381,18 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			blockNumBytes := make([]byte, 8)
 			binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
 			commitPayload := append(blockNumBytes, consensus.blockHash[:]...)
+			block := types.Block{}
+
+			if err = rlp.DecodeBytes(recvMsg.Block, &block); err != nil {
+				consensus.getLogger().Warn().Msg("[OnPrepared] Unparseable block header data")
+				return
+			}
+
 			consensus.Decider.AddSignature(
 				quorum.Commit,
 				consensus.PubKey,
 				consensus.priKey.SignHash(commitPayload),
-				consensus.LeaderPubKey,
-				consensus.blockNum,
-				consensus.blockHash,
+				block.Header(),
 			)
 
 			if err = consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
@@ -400,7 +409,14 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Int("payloadSize", len(consensus.m1Payload)).
 			Hex("M1Payload", consensus.m1Payload).
 			Msg("[onViewChange] Sent NewView Message")
-		consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_NEWVIEW, []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+		consensus.msgSender.SendWithRetry(
+			consensus.blockNum,
+			msg_pb.MessageType_NEWVIEW,
+			[]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+			},
+			host.ConstructP2pMessage(byte(17), msgToSend),
+		)
 
 		consensus.viewID = recvMsg.ViewID
 		consensus.ResetViewChangeState()
