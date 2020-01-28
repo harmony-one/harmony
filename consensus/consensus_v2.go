@@ -741,7 +741,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// has to be called before verifying signature
 	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 	// Verify the signature on commitPayload is correct
-	var sign bls.Sign
+	sign := bls.Sign{}
 	if err := sign.Deserialize(commitSig); err != nil {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return
@@ -786,14 +786,16 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		areViewIDsEqual := signed.Header.ViewID().Uint64() == recvMsg.ViewID
 		areHeadersEqual := bytes.Compare(
 			signed.Header.Hash().Bytes(), recvMsg.BlockHash.Bytes(),
-		) != 0
+		) == 0
 
 		if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
 			go func() {
 				s := slash.Record{}
 				s.Offender = *shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
 				s.Signed.Header = signed.Header
+				s.Signed.Signature = signed.Signature
 				s.DoubleSigned.Header = blk.Header()
+				s.DoubleSigned.Signature = &sign
 				consensus.SlashChan <- s
 			}()
 		}
