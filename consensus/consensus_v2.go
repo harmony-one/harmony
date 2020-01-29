@@ -21,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/harmony-one/vdf/src/vdf_go"
 )
 
@@ -142,7 +141,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 		quorum.Prepare,
 		consensus.PubKey,
 		consensus.priKey.SignHash(consensus.blockHash[:]),
-		nil,
+		consensus.LeaderPubKey,
+		consensus.blockNum,
+		FPBTMsg.BlockHash,
 	)
 	if err := consensus.prepareBitmap.SetKey(consensus.PubKey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[Announce] Leader prepareBitmap SetKey failed")
@@ -414,8 +415,11 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
-
-	consensus.Decider.AddSignature(quorum.Prepare, validatorPubKey, &sign, nil)
+	consensus.Decider.AddSignature(
+		quorum.Prepare, validatorPubKey, &sign,
+		consensus.LeaderPubKey, consensus.blockNum,
+		recvMsg.BlockHash,
+	)
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
@@ -445,18 +449,13 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
-		header := block.Header{}
-
-		if err := rlp.DecodeBytes(consensus.blockHeader, &header); err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("could not rlp decode header")
-			return
-		}
-
 		consensus.Decider.AddSignature(
 			quorum.Commit,
 			consensus.PubKey,
 			consensus.priKey.SignHash(commitPayload),
-			&header,
+			consensus.LeaderPubKey,
+			consensus.blockNum,
+			FBFTMsg.BlockHash,
 		)
 
 		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
@@ -552,9 +551,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	// check validity of block
 	block := recvMsg.Block
-	blockObj := types.Block{}
-
-	if err = rlp.DecodeBytes(block, &blockObj); err != nil {
+	var blockObj types.Block
+	err = rlp.DecodeBytes(block, &blockObj)
+	if err != nil {
 		consensus.getLogger().Warn().
 			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -740,7 +739,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// has to be called before verifying signature
 	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 	// Verify the signature on commitPayload is correct
-	sign := bls.Sign{}
+	var sign bls.Sign
 	if err := sign.Deserialize(commitSig); err != nil {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return
@@ -764,13 +763,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		Logger()
 	logger.Info().Msg("[OnCommit] Received new commit message")
 
-	blk := types.Block{}
-
-	if err := rlp.DecodeBytes(recvMsg.Block, &blk); err != nil {
-		logger.Debug().Msg("cant decode block for slash record creation")
-		return
-	}
-
 	// proceed only when the message is not received before
 	if signed := consensus.Decider.ReadBallot(
 		quorum.Commit, validatorPubKey,
@@ -780,28 +772,25 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		// If signer already signed, and the block height is the same, then we
 		// need to verify the block hash, and if block hash is different, then
 		// that is a clear case of double signing
+		// if h1, h2 :=
+		// 	signed.BlockHash,
+		// 	recvMsg.BlockHash; signed.BlockHeight == recvMsg.BlockNum &&
+		// 	bytes.Compare(h1.Bytes(), h2.Bytes()) != 0 {
+		// 	go func() {
+		// 		s := slash.Record{}
+		// 		// TODO(Edgar) Compute the aggregate vote, bitmap
+		// 		consensus.SlashChan <- s
 
-		areHeightsEqual := signed.Header.Number().Uint64() == recvMsg.BlockNum
-		areViewIDsEqual := signed.Header.ViewID().Uint64() == recvMsg.ViewID
-		areHeadersEqual := bytes.Compare(
-			signed.Header.Hash().Bytes(), recvMsg.BlockHash.Bytes(),
-		) == 0
+		// 	}()
+		// }
 
-		if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
-			go func() {
-				s := slash.Record{}
-				s.Offender = *shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
-				s.Signed.Header = signed.Header
-				s.Signed.Signature = signed.Signature
-				s.DoubleSigned.Header = blk.Header()
-				s.DoubleSigned.Signature = &sign
-				consensus.SlashChan <- s
-			}()
-		}
 		return
 	}
 
-	consensus.Decider.AddSignature(quorum.Commit, validatorPubKey, &sign, blk.Header())
+	consensus.Decider.AddSignature(
+		quorum.Commit, validatorPubKey, &sign,
+		consensus.LeaderPubKey, consensus.blockNum, recvMsg.BlockHash,
+	)
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnCommit] commitBitmap.SetKey failed")
