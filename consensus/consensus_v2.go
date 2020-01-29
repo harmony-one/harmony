@@ -316,10 +316,16 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 // tryPrepare will try to send prepare message
 func (consensus *Consensus) prepare() {
 	// Construct and send prepare message
-	msgToSend := consensus.constructPrepareMessage()
-	// TODO: this will not return immediatey, may block
+	network := consensus.construct(msg_pb.MessageType_PREPARE)
+	msgToSend := network.Bytes
 
-	if err := consensus.msgSender.SendWithoutRetry([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+	// TODO: this will not return immediatey, may block
+	if err := consensus.msgSender.SendWithoutRetry(
+		[]nodeconfig.GroupID{
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+		},
+		host.ConstructP2pMessage(byte(17), msgToSend),
+	); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
 	} else {
 		consensus.getLogger().Info().

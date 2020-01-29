@@ -11,52 +11,50 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// LeaderNetworkMessage is a message intended to be
+// NetworkMessage is a message intended to be
 // created only by the leader for distribution to
 // all the other quorum members.
-type LeaderNetworkMessage struct {
-	Phase                      quorum.Phase
+type NetworkMessage struct {
+	Phase                      msg_pb.MessageType
 	Bytes                      []byte
 	OptionalAggregateSignature *bls.Sign
 }
 
-// TODO(Edgar) Finish refactoring other three message constructions folded into this function.
-func (consensus *Consensus) construct(p quorum.Phase) *LeaderNetworkMessage {
-
-	msgType := msg_pb.MessageType_ANNOUNCE
-
-	switch p {
-	case quorum.Commit:
-		msgType = msg_pb.MessageType_COMMITTED
-	case quorum.Prepare:
-		msgType = msg_pb.MessageType_PREPARED
-	}
-
+func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
+	// Assume a default of prepare
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
-		Type:        msgType,
+		Type:        msg_pb.MessageType_PREPARE,
 		Request: &msg_pb.Message_Consensus{
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
 	}
 
+	// If not prepared then set it to be whatever it is
+	if p != msg_pb.MessageType_PREPARE {
+		message.Type = p
+	}
+
 	consensusMsg := message.GetConsensus()
 	consensus.populateMessageFields(consensusMsg)
-	consensusMsg.Payload = consensus.blockHeader
+
+	// 96 byte of bls signature
+	sign := consensus.priKey.SignHash(consensusMsg.BlockHash)
+	if sign != nil {
+		consensusMsg.Payload = sign.Serialize()
+	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.Logger().Info().
-			Str("phase", p.String()).
-			Str("reason", err.Error()).
-			Msg("Failed to sign and marshal consensus message")
+		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Prepare message")
 	}
 
-	return &LeaderNetworkMessage{
+	return &NetworkMessage{
 		Phase:                      p,
 		Bytes:                      proto.ConstructConsensusMessage(marshaledMessage),
 		OptionalAggregateSignature: nil,
 	}
+
 }
 
 // Constructs the announce message
@@ -107,7 +105,6 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	buffer.Write(consensus.prepareBitmap.Bitmap)
 
 	consensusMsg.Payload = buffer.Bytes()
-	// END Payload
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
