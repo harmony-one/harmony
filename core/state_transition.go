@@ -492,10 +492,9 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 				if delegateBalance.Cmp(big.NewInt(0)) > 0 {
 					stateDB.SubBalance(delegate.DelegatorAddress, delegateBalance)
 					return nil
-				} else {
-					// This shouldn't really happen
-					return errInsufficientBalanceForStake
 				}
+				// This shouldn't really happen
+				return errInsufficientBalanceForStake
 			}
 			return errors.Wrapf(
 				errInsufficientBalanceForStake,
