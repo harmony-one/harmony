@@ -330,13 +330,14 @@ func (node *Node) AddPendingStakingTransaction(
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 // This is only called from SDK.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
-	// TODO: everyone should record txns, not just leader
-	if node.Consensus.IsLeader() && newTx.ShardID() == node.NodeConfig.ShardID {
+	if newTx.ShardID() == node.NodeConfig.ShardID {
 		node.addPendingTransactions(types.Transactions{newTx})
-	} else {
-		utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
-		node.tryBroadcast(newTx)
+		if node.NodeConfig.Role() != nodeconfig.ExplorerNode {
+			return
+		}
 	}
+	utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
+	node.tryBroadcast(newTx)
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
@@ -501,7 +502,17 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
+		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain,
+			func(payload []types.RPCTransactionError) {
+				if len(payload) > 0 {
+					node.errorSink.Lock()
+					for i := range payload {
+						node.errorSink.failedTxns.Value = payload[i]
+						node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
+					}
+					node.errorSink.Unlock()
+				}
+			})
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
