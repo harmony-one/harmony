@@ -435,21 +435,13 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 		// Construct and broadcast prepared message
-		msgToSend, aggSig := consensus.constructPreparedMessage()
+		network := consensus.construct(msg_pb.MessageType_PREPARED)
+		msgToSend, FBFTMsg, aggSig :=
+			network.Bytes,
+			network.FBFTMsg,
+			network.OptionalAggregateSignature
+
 		consensus.aggregatedPrepareSig = aggSig
-
-		//leader adds prepared message to log
-		// TODO(chao): don't unmarshall the payload again
-		msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
-		msg := &msg_pb.Message{}
-		_ = protobuf.Unmarshal(msgPayload, msg)
-		FBFTMsg, err := ParseFBFTMessage(msg)
-
-		if err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] Unable to parse pbft message")
-			return
-		}
-
 		consensus.FBFTLog.AddMessage(FBFTMsg)
 		// Leader add commit phase signature
 		blockNumHash := make([]byte, 8)

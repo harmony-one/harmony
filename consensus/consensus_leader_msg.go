@@ -17,6 +17,7 @@ import (
 type NetworkMessage struct {
 	Phase                      msg_pb.MessageType
 	Bytes                      []byte
+	FBFTMsg                    *FBFTMessage
 	OptionalAggregateSignature *bls.Sign
 }
 
@@ -38,10 +39,27 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 	consensusMsg := message.GetConsensus()
 	consensus.populateMessageFields(consensusMsg)
 
-	// 96 byte of bls signature
-	sign := consensus.priKey.SignHash(consensusMsg.BlockHash)
-	if sign != nil {
-		consensusMsg.Payload = sign.Serialize()
+	// Do the signing, 96 byte of bls signature
+	switch p {
+	case msg_pb.MessageType_PREPARED:
+		consensusMsg.Block = consensus.block
+		// Payload
+		buffer := bytes.Buffer{}
+		// 96 bytes aggregated signature
+		aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
+		// TODO(Edgar) Finish refactoring with this API
+		// aggSig := consensus.Decider.AggregateVotes(quorum.Announce)
+		buffer.Write(aggSig.Serialize())
+		// Bitmap
+		buffer.Write(consensus.prepareBitmap.Bitmap)
+		consensusMsg.Payload = buffer.Bytes()
+
+	case msg_pb.MessageType_PREPARE:
+		sign := consensus.priKey.SignHash(consensusMsg.BlockHash)
+		if sign != nil {
+			consensusMsg.Payload = sign.Serialize()
+		}
+
 	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
@@ -49,9 +67,16 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Prepare message")
 	}
 
+	FBFTMsg, err2 := ParseFBFTMessage(message)
+
+	if err2 != nil {
+		utils.Logger().Error().Err(err).Msg("failed to deal with the fbft message")
+	}
+
 	return &NetworkMessage{
 		Phase:                      p,
 		Bytes:                      proto.ConstructConsensusMessage(marshaledMessage),
+		FBFTMsg:                    FBFTMsg,
 		OptionalAggregateSignature: nil,
 	}
 
@@ -75,42 +100,6 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Announce message")
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
-}
-
-// Construct the prepared message, returning prepared message in bytes.
-func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
-	message := &msg_pb.Message{
-		ServiceType: msg_pb.ServiceType_CONSENSUS,
-		Type:        msg_pb.MessageType_PREPARED,
-		Request: &msg_pb.Message_Consensus{
-			Consensus: &msg_pb.ConsensusRequest{},
-		},
-	}
-
-	consensusMsg := message.GetConsensus()
-	consensus.populateMessageFields(consensusMsg)
-	// add block content in prepared message for slow validators to catchup
-	consensusMsg.Block = consensus.block
-
-	// Payload
-	buffer := bytes.Buffer{}
-
-	// 96 bytes aggregated signature
-	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
-	// TODO(Edgar) Finish refactoring with this API
-	// aggSig := consensus.Decider.AggregateVotes(quorum.Announce)
-	buffer.Write(aggSig.Serialize())
-
-	// Bitmap
-	buffer.Write(consensus.prepareBitmap.Bitmap)
-
-	consensusMsg.Payload = buffer.Bytes()
-
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Prepared message")
-	}
-	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }
 
 // Construct the committed message, returning committed message in bytes.
