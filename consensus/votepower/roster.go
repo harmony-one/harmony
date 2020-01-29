@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -20,6 +21,25 @@ var (
 	// ErrVotingPowerNotEqualOne ..
 	ErrVotingPowerNotEqualOne = errors.New("voting power not equal to one")
 )
+
+// Ballot is a vote cast by a validator
+type Ballot struct {
+	SignerPubKey      shard.BlsPublicKey `json:"bls-public-key"`
+	BlockLeader       shard.BlsPublicKey `json:"leader-when-signed"`
+	BlockHeightHeight uint64             `json:"block-height"`
+	Signature         *bls.Sign          `json:"signature"`
+}
+
+// Round is a round of voting in any FBFT phase
+type Round struct {
+	AggregatedVote *bls.Sign
+	BallotBox      map[string]*Ballot
+}
+
+// NewRound ..
+func NewRound() *Round {
+	return &Round{AggregatedVote: nil, BallotBox: map[string]*Ballot{}}
+}
 
 type stakedVoter struct {
 	IsActive         bool               `json:"is-active"`

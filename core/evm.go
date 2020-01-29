@@ -19,14 +19,12 @@ package core
 import (
 	"math/big"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
-
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // ChainContext supports retrieving headers and consensus parameters from the
@@ -39,10 +37,10 @@ type ChainContext interface {
 	GetHeader(common.Hash, uint64) *block.Header
 
 	// ReadDelegationsByDelegator returns the validators list of a delegator
-	ReadDelegationsByDelegator(common.Address) ([]types2.DelegationIndex, error)
+	ReadDelegationsByDelegator(common.Address) ([]staking.DelegationIndex, error)
 
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
-	ReadValidatorSnapshot(common.Address) (*types2.ValidatorWrapper, error)
+	ReadValidatorSnapshot(common.Address) (*staking.ValidatorWrapper, error)
 }
 
 // NewEVMContext creates a new context for use in the EVM.

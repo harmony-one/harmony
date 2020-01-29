@@ -273,12 +273,6 @@ func AppendIfMissing(slice []common.Address, addr common.Address) []common.Addre
 	return append(slice, addr)
 }
 
-// Fatal prints the given message onto stderr, then exits with status 1.
-func Fatal(format string, args ...interface{}) {
-	_, _ = fmt.Fprintf(os.Stderr, format, args...)
-	os.Exit(1)
-}
-
 // PrintError prints the given error in the extended format (%+v) onto stderr.
 func PrintError(err error) {
 	_, _ = fmt.Fprintf(os.Stderr, "%+v\n", err)

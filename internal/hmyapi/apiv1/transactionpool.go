@@ -1,4 +1,4 @@
-package hmyapi
+package apiv1
 
 import (
 	"context"
@@ -343,6 +343,16 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 		transactions[i] = newRPCPendingTransaction(pending[i])
 	}
 	return transactions, nil
+}
+
+// GetCurrentTransactionErrorSink ..
+func (s *PublicTransactionPoolAPI) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+	return s.b.GetCurrentTransactionErrorSink()
+}
+
+// GetCurrentStakingErrorSink ..
+func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
+	return s.b.GetCurrentStakingErrorSink()
 }
 
 // GetCXReceiptByHash returns the transaction for the given hash

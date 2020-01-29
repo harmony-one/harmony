@@ -213,6 +213,16 @@ func (pk BlsPublicKey) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// FromLibBLSPublicKeyUnsafe could give back nil, use only in cases when
+// have invariant that return value won't be nil
+func FromLibBLSPublicKeyUnsafe(key *bls.PublicKey) *BlsPublicKey {
+	result := &BlsPublicKey{}
+	if err := result.FromLibBLSPublicKey(key); err != nil {
+		return nil
+	}
+	return result
+}
+
 // FromLibBLSPublicKey replaces the key contents with the given key,
 func (pk *BlsPublicKey) FromLibBLSPublicKey(key *bls.PublicKey) error {
 	bytes := key.Serialize()

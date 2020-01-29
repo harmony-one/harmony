@@ -1,16 +1,11 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
-	"net"
-	"net/http"
 	"os"
 	"path"
 	"runtime"
@@ -35,7 +30,6 @@ import (
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/libp2pctl"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -126,12 +120,6 @@ var (
 	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
 	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
-	// libp2p control interface
-	libp2pctlFlag         = flag.Bool("libp2pctl", false, "Enable libp2p control interface")
-	libp2pctlPortFlag     = flag.String("libp2pctl_port", "4000", "libp2pctl port number (default: 4000)")
-	libp2pctlCertFlag     = flag.String("libp2pctl_cert", "harmony-libp2pctl-cert.pem", "libp2pctl HTTPS certificate filename (default: harmony-libp2pctl.crt)")
-	libp2pctlKeyFlag      = flag.String("libp2pctl_key", "harmony-libp2pctl-key.pem", "libp2pctl HTTPS private key filename (default: harmony-libp2pctl.key)")
-	libp2pctlClientCAFlag = flag.String("libp2pct_client_ca", "harmony-libp2pctl-client-ca.pem", "libp2pctl HTTPS client CA (default: harmony-libp2pctl-ca.pem)")
 )
 
 func initSetup() {
@@ -413,8 +401,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.State = node.NodeWaitToJoin
 
 	// update consensus information based on the blockchain
-	mode := currentConsensus.UpdateConsensusInformation()
-	currentConsensus.SetMode(mode)
+	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
 
 	// Watching currentNode and currentConsensus.
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
@@ -441,7 +428,10 @@ func main() {
 	}
 
 	nodeconfig.SetPublicRPC(*publicRPC)
-	nodeconfig.SetVersion(fmt.Sprintf("Harmony (C) 2019. %v, version %v-%v (%v %v)", path.Base(os.Args[0]), version, commit, builtBy, builtAt))
+	nodeconfig.SetVersion(
+		fmt.Sprintf("Harmony (C) 2020. %v, version %v-%v (%v %v)",
+			path.Base(os.Args[0]), version, commit, builtBy, builtAt),
+	)
 	if *versionFlag {
 		printVersion()
 	}
@@ -515,9 +505,12 @@ func main() {
 	currentNode.SetSyncFreq(*syncFreq)
 	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
 
-	if nodeConfig.ShardID != shard.BeaconChainShardID && currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
-		utils.Logger().Info().Uint32("shardID", currentNode.Blockchain().ShardID()).Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
-		go currentNode.SupportBeaconSyncing()
+	if nodeConfig.ShardID != shard.BeaconChainShardID &&
+		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+		utils.Logger().Info().
+			Uint32("shardID", currentNode.Blockchain().ShardID()).
+			Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
+		currentNode.SupportBeaconSyncing()
 	}
 
 	if uint64(*doRevertBefore) != 0 && uint64(*revertTo) != 0 {
@@ -566,43 +559,6 @@ func main() {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("StartRPC failed")
-	}
-
-	if *libp2pctlFlag {
-		port, err := net.LookupPort("tcp", *libp2pctlPortFlag)
-		if err != nil {
-			utils.FatalErrMsg(err, "cannot parse -libp2pctl_port %#v",
-				*libp2pctlPortFlag)
-		}
-		cert, err := tls.LoadX509KeyPair(*libp2pctlCertFlag, *libp2pctlKeyFlag)
-		if err != nil {
-			utils.FatalErrMsg(err, "cannot load libp2pctl TLS cert/key")
-		}
-		clientCAPEM, err := ioutil.ReadFile(*libp2pctlClientCAFlag)
-		if err != nil {
-			utils.FatalErrMsg(err, "cannot load libp2pctl client CA %s",
-				*libp2pctlClientCAFlag)
-		}
-		clientCAs := x509.NewCertPool()
-		if !clientCAs.AppendCertsFromPEM(clientCAPEM) {
-			utils.Fatal("no libp2pctl client CA in %s", *libp2pctlClientCAFlag)
-		}
-		tlsConfig := tls.Config{
-			Certificates: []tls.Certificate{cert},
-			ClientAuth:   tls.RequireAndVerifyClientCert,
-			ClientCAs:    clientCAs,
-		}
-		listenAddr := &net.TCPAddr{Port: port}
-		listener, err := net.ListenTCP("tcp", listenAddr)
-		if err != nil {
-			utils.FatalErrMsg(err, "cannot listen on libp2pctl port %d",
-				port)
-		}
-		tlsListener := tls.NewListener(listener, &tlsConfig)
-		ctl := libp2pctl.New(myHost.GetP2PHost())
-		go func() { _ = http.Serve(tlsListener, ctl.Handler()) }()
-		utils.Logger().Info().Interface("listenAddr", listenAddr).
-			Msg("started libp2pctl")
 	}
 
 	// Run additional node collectors
