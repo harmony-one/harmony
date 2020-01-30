@@ -105,8 +105,8 @@ var (
 	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
 	devnetHarmonySize = flag.Int("dn_hmy_size", -1, "number of Harmony-operated nodes per shard for -network_type=devnet; negative (default) means equal to -dn_shard_size")
 	// logConn logs incoming/outgoing connections
-	logConn        = flag.Bool("log_conn", false, "log incoming/outgoing connections")
-	keystoreDir    = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
+	logConn     = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 
 	// Use a separate log file to log libp2p traces
 	logP2P = flag.Bool("log_p2p", false, "log libp2p debug info")
