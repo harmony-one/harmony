@@ -49,7 +49,7 @@ type BlockArgs struct {
 	InclStaking bool     `json:"inclStaking"`
 }
 
-// GetBlockByNumber returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full detail, 
+// GetBlockByNumber returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full detail,
 // otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true it shows block signers for this block in list of one addresses.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr uint64, blockArgs BlockArgs) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
