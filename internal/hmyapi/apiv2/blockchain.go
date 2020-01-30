@@ -464,7 +464,7 @@ func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
 	if s.b.IsBeaconChainExplorerNode() {
 		return s.b.GetMedianRawStakeSnapshot(), nil
 	}
-	return big.NewInt(0), errNotExplorerNode
+	return nil, errNotExplorerNode
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
