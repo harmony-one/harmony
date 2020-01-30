@@ -73,8 +73,8 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
-func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) int {
-	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr uint64) int {
+	if block, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
 		return len(block.Transactions())
 	}
 	return 0
@@ -89,8 +89,8 @@ func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Co
 }
 
 // GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
-func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index uint64) *RPCTransaction {
-	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr uint64, index uint64) *RPCTransaction {
+	if block, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
 		return newRPCTransactionFromBlockIndex(block, index)
 	}
 	return nil
@@ -138,8 +138,8 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Conte
 }
 
 // GetStakingTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
-func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index uint64) *RPCStakingTransaction {
-	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockNumberAndIndex(ctx context.Context, blockNr uint64, index uint64) *RPCStakingTransaction {
+	if block, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
 		return newRPCStakingTransactionFromBlockIndex(block, index)
 	}
 	return nil
@@ -154,10 +154,10 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockHashAndIndex(ctx 
 }
 
 // GetTransactionCount returns the number of transactions the given address has sent for the given block number
-func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr string, blockNr rpc.BlockNumber) (uint64, error) {
+func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr string, blockNr uint64) (uint64, error) {
 	address := internal_common.ParseAddr(addr)
 	// Ask transaction pool for the nonce which includes pending transactions
-	if blockNr == rpc.PendingBlockNumber {
+	if rpc.BlockNumber(blockNr) == rpc.PendingBlockNumber {
 		nonce, err := s.b.GetPoolNonce(ctx, address)
 		if err != nil {
 			return 0, err
@@ -165,7 +165,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr
 		return nonce, nil
 	}
 	// Resolve block number and use its state to ask for the nonce
-	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(blockNr))
 	if state == nil || err != nil {
 		return 0, err
 	}
