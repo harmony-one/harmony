@@ -498,11 +498,11 @@ var (
 
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
 // explorer node
-func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (uint64, error) {
+func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
 	if s.b.IsBeaconChainExplorerNode() {
-		return s.GetMedianRawStakeSnapshot()
+		return s.b.GetMedianRawStakeSnapshot(), nil
 	}
-	return 0, errNotExplorerNode
+	return big.NewInt(0), errNotExplorerNode
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
