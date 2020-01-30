@@ -55,6 +55,12 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr uint
 	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
 	blockArgs.InclTx = true
 	if block != nil {
+		if blockArgs.WithSigners {
+			blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNr)
+			if err != nil {
+				return nil, err
+			}
+		}
 		response, err := RPCMarshalBlock(block, blockArgs)
 		if err == nil && rpc.BlockNumber(blockNr) == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
@@ -74,6 +80,12 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 	block, err := s.b.GetBlock(ctx, blockHash)
 	blockArgs.InclTx = true
 	if block != nil {
+		if blockArgs.WithSigners {
+			blockArgs.Signers, err = s.GetBlockSigners(ctx, block.NumberU64())
+			if err != nil {
+				return nil, err
+			}
+		}
 		return RPCMarshalBlock(block, blockArgs)
 	}
 	return nil, err
