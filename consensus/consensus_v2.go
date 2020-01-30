@@ -110,22 +110,8 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	consensus.block = encodedBlock
 	consensus.blockHeader = encodedBlockHeader
-	msgToSend := consensus.constructAnnounceMessage()
-	// TODO Finish using this refactored way
-	// msgToSend := consensus.construct(quorum.Announce)
-
-	// save announce message to FBFTLog
-	// msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend.Bytes)
-	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
-
-	// TODO(chao): don't unmarshall the message here and direclty pass the original object.
-	msg := &msg_pb.Message{}
-	_ = protobuf.Unmarshal(msgPayload, msg)
-	FPBTMsg, err := ParseFBFTMessage(msg)
-	if err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[Announce] Unable to parse FPBT message")
-		return
-	}
+	network := consensus.construct(msg_pb.MessageType_ANNOUNCE)
+	msgToSend, FPBTMsg := network.Bytes, network.FBFTMsg
 
 	// TODO(chao): review FPBT log data structure
 	consensus.FBFTLog.AddMessage(FPBTMsg)

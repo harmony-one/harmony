@@ -59,7 +59,8 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 		if sign != nil {
 			consensusMsg.Payload = sign.Serialize()
 		}
-
+	case msg_pb.MessageType_ANNOUNCE:
+		consensusMsg.Payload = consensus.blockHeader
 	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
@@ -80,26 +81,6 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 		OptionalAggregateSignature: nil,
 	}
 
-}
-
-// Constructs the announce message
-func (consensus *Consensus) constructAnnounceMessage() []byte {
-	message := &msg_pb.Message{
-		ServiceType: msg_pb.ServiceType_CONSENSUS,
-		Type:        msg_pb.MessageType_ANNOUNCE,
-		Request: &msg_pb.Message_Consensus{
-			Consensus: &msg_pb.ConsensusRequest{},
-		},
-	}
-	consensusMsg := message.GetConsensus()
-	consensus.populateMessageFields(consensusMsg)
-	consensusMsg.Payload = consensus.blockHeader
-
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Announce message")
-	}
-	return proto.ConstructConsensusMessage(marshaledMessage)
 }
 
 // Construct the committed message, returning committed message in bytes.
