@@ -29,19 +29,10 @@ func TestConstructPrepareMessage(test *testing.T) {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	msgBytes := consensus.constructPrepareMessage()
-	msgBytes, err = proto.GetConsensusMessagePayload(msgBytes)
+	_, err = consensus.construct(msg_pb.MessageType_PREPARE)
+
 	if err != nil {
 		test.Error("Error when getting consensus message", "error", err)
-	}
-
-	msg := &msg_pb.Message{}
-	if err := protobuf.Unmarshal(msgBytes, msg); err != nil {
-		test.Error("Can not parse the message", err)
-	} else {
-		if msg.GetConsensus() == nil {
-			test.Error("Wrong message")
-		}
 	}
 }
 

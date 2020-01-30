@@ -3,10 +3,8 @@ package consensus
 import (
 	"testing"
 
-	protobuf "github.com/golang/protobuf/proto"
-	"github.com/harmony-one/harmony/api/proto"
+	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -32,15 +30,9 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	}
 	consensus.blockHash = [32]byte{}
 
-	message := &msg_pb.Message{}
-	msgBytes := consensus.constructAnnounceMessage()
-	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
-
-	if err := protobuf.Unmarshal(msgPayload, message); err != nil {
-		test.Errorf("Error when creating announce message")
-	}
-	if message.Type != msg_pb.MessageType_ANNOUNCE {
-		test.Error("it did not created announce message")
+	_, err = consensus.construct(msg_pb.MessageType_ANNOUNCE)
+	if err != nil {
+		test.Fatalf("could not construct announce: %v", err)
 	}
 }
 
@@ -71,13 +63,17 @@ func TestConstructPreparedMessage(test *testing.T) {
 		quorum.Prepare,
 		leaderPubKey,
 		leaderPriKey.Sign(message),
-		&block.Header{},
+		leaderPubKey,
+		9999,
+		common.Hash{},
 	)
 	consensus.Decider.AddSignature(
 		quorum.Prepare,
 		validatorPubKey,
 		validatorPriKey.Sign(message),
-		&block.Header{},
+		validatorPubKey,
+		9999,
+		common.Hash{},
 	)
 	// According to RJ these failures are benign.
 	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {
@@ -87,14 +83,11 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
 	}
 
-	msgBytes, _ := consensus.constructPreparedMessage()
-	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
-
-	msg := &msg_pb.Message{}
-	if err = protobuf.Unmarshal(msgPayload, msg); err != nil {
+	network, err := consensus.construct(msg_pb.MessageType_PREPARED)
+	if err != nil {
 		test.Errorf("Error when creating prepared message")
 	}
-	if msg.Type != msg_pb.MessageType_PREPARED {
+	if network.Phase != msg_pb.MessageType_PREPARED {
 		test.Error("it did not created prepared message")
 	}
 }

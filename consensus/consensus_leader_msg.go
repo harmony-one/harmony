@@ -21,7 +21,7 @@ type NetworkMessage struct {
 	OptionalAggregateSignature *bls.Sign
 }
 
-func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
+func (consensus *Consensus) construct(p msg_pb.MessageType) (*NetworkMessage, error) {
 	// Assume a default of prepare
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
@@ -72,12 +72,14 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Prepare message")
+		return nil, err
 	}
 
 	FBFTMsg, err2 := ParseFBFTMessage(message)
 
 	if err2 != nil {
 		utils.Logger().Error().Err(err).Msg("failed to deal with the fbft message")
+		return nil, err
 	}
 
 	return &NetworkMessage{
@@ -85,7 +87,7 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 		Bytes:                      proto.ConstructConsensusMessage(marshaledMessage),
 		FBFTMsg:                    FBFTMsg,
 		OptionalAggregateSignature: aggSig,
-	}
+	}, nil
 
 }
 

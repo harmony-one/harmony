@@ -109,7 +109,10 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	consensus.block = encodedBlock
 	consensus.blockHeader = encodedBlockHeader
-	network := consensus.construct(msg_pb.MessageType_ANNOUNCE)
+	network, err := consensus.construct(msg_pb.MessageType_ANNOUNCE)
+	if err != nil {
+		// TODO ERROR
+	}
 	msgToSend, FPBTMsg := network.Bytes, network.FBFTMsg
 
 	// TODO(chao): review FPBT log data structure
@@ -171,8 +174,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
 		} else {
 			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
-			return
 		}
+		return
 	}
 
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
@@ -306,7 +309,10 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 // tryPrepare will try to send prepare message
 func (consensus *Consensus) prepare() {
 	// Construct and send prepare message
-	network := consensus.construct(msg_pb.MessageType_PREPARE)
+	network, err := consensus.construct(msg_pb.MessageType_PREPARE)
+	if err != nil {
+		// TODO Error
+	}
 	msgToSend := network.Bytes
 
 	// TODO: this will not return immediatey, may block
@@ -341,8 +347,8 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
 		} else {
 			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
-			return
 		}
+		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnPrepare] Failed to verify sender's signature")
@@ -429,7 +435,10 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 		// Construct and broadcast prepared message
-		network := consensus.construct(msg_pb.MessageType_PREPARED)
+		network, err := consensus.construct(msg_pb.MessageType_PREPARED)
+		if err != nil {
+			// TODO Error
+		}
 		msgToSend, FBFTMsg, aggSig :=
 			network.Bytes,
 			network.FBFTMsg,
@@ -493,8 +502,8 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
 		} else {
 			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
-			return
 		}
+		return
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
 		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
@@ -681,8 +690,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
 		} else {
 			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
-			return
 		}
+		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Failed to verify sender's signature")
@@ -823,7 +832,10 @@ func (consensus *Consensus) finalizeCommits() {
 		Msg("[Finalizing] Finalizing Block")
 	beforeCatchupNum := consensus.blockNum
 	// Construct committed message
-	network := consensus.construct(msg_pb.MessageType_COMMITTED)
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED)
+	if err != nil {
+		// TODO ERROR
+	}
 	msgToSend, aggSig, FBFTMsg :=
 		network.Bytes,
 		network.OptionalAggregateSignature,
@@ -907,8 +919,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
 		} else {
 			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
-			return
 		}
+		return
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
 		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
