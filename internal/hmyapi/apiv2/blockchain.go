@@ -49,50 +49,14 @@ type BlockArgs struct {
 	InclStaking bool     `json:"inclStaking"`
 }
 
-// GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
-// transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
-func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
-	block, err := s.b.BlockByNumber(ctx, blockNr)
-	if block != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
-		response, err := RPCMarshalBlock(block, blockArgs)
-		if err == nil && blockNr == rpc.PendingBlockNumber {
-			// Pending blocks need to nil out a few fields
-			for _, field := range []string{"hash", "nonce", "miner"} {
-				response[field] = nil
-			}
-		}
-		return response, err
-	}
-	return nil, err
-}
-
-// GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
-// detail, otherwise only the transaction hash is returned.
-func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
-	block, err := s.b.GetBlock(ctx, blockHash)
-	if block != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
-		return RPCMarshalBlock(block, blockArgs)
-	}
-	return nil, err
-}
-
-// GetBlockByNumberNew returns the requested block. When blockNr is -1 the chain head is returned. When fullTx in blockArgs is true all
-// transactions in the block are returned in full detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
-// it shows block signers for this block in list of one addresses.
-func (s *PublicBlockChainAPI) GetBlockByNumberNew(ctx context.Context, blockNr rpc.BlockNumber, blockArgs BlockArgs) (map[string]interface{}, error) {
-	block, err := s.b.BlockByNumber(ctx, blockNr)
+// GetBlockByNumber returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full detail, 
+// otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true it shows block signers for this block in list of one addresses.
+func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr uint64, blockArgs BlockArgs) (map[string]interface{}, error) {
+	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
 	blockArgs.InclTx = true
-	if blockArgs.WithSigners {
-		blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNr)
-		if err != nil {
-			return nil, err
-		}
-	}
 	if block != nil {
 		response, err := RPCMarshalBlock(block, blockArgs)
-		if err == nil && blockNr == rpc.PendingBlockNumber {
+		if err == nil && rpc.BlockNumber(blockNr) == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
 			for _, field := range []string{"hash", "nonce", "miner"} {
 				response[field] = nil
@@ -103,18 +67,12 @@ func (s *PublicBlockChainAPI) GetBlockByNumberNew(ctx context.Context, blockNr r
 	return nil, err
 }
 
-// GetBlockByHashNew returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full
+// GetBlockByHash returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
 // it shows block signers for this block in list of one addresses.
-func (s *PublicBlockChainAPI) GetBlockByHashNew(ctx context.Context, blockHash common.Hash, blockArgs BlockArgs) (map[string]interface{}, error) {
+func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, blockArgs BlockArgs) (map[string]interface{}, error) {
 	block, err := s.b.GetBlock(ctx, blockHash)
 	blockArgs.InclTx = true
-	if blockArgs.WithSigners {
-		blockArgs.Signers, err = s.GetBlockSigners(ctx, rpc.BlockNumber(block.NumberU64()))
-		if err != nil {
-			return nil, err
-		}
-	}
 	if block != nil {
 		return RPCMarshalBlock(block, blockArgs)
 	}
