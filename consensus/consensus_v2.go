@@ -125,13 +125,11 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.FBFTLog.AddBlock(block)
 
 	// Leader sign the block hash itself
-	consensus.Decider.AddSignature(
+	consensus.Decider.SubmitVote(
 		quorum.Prepare,
 		consensus.PubKey,
 		consensus.priKey.SignHash(consensus.blockHash[:]),
-		consensus.LeaderPubKey,
-		consensus.blockNum,
-		FPBTMsg.BlockHash,
+		nil,
 	)
 	if err := consensus.prepareBitmap.SetKey(consensus.PubKey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[Announce] Leader prepareBitmap SetKey failed")
@@ -421,10 +419,8 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
-	consensus.Decider.AddSignature(
-		quorum.Prepare, validatorPubKey, &sign,
-		consensus.LeaderPubKey, consensus.blockNum,
-		recvMsg.BlockHash,
+	consensus.Decider.SubmitVote(
+		quorum.Prepare, validatorPubKey, &sign, nil,
 	)
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
@@ -450,13 +446,12 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
-		consensus.Decider.AddSignature(
+		consensus.Decider.SubmitVote(
 			quorum.Commit,
 			consensus.PubKey,
 			consensus.priKey.SignHash(commitPayload),
-			consensus.LeaderPubKey,
-			consensus.blockNum,
-			FBFTMsg.BlockHash,
+			// TODO This one needs the header!
+			nil,
 		)
 
 		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
@@ -787,7 +782,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		// 	bytes.Compare(h1.Bytes(), h2.Bytes()) != 0 {
 		// 	go func() {
 		// 		s := slash.Record{}
+
 		// 		// TODO(Edgar) Compute the aggregate vote, bitmap
+		// 		consensus.SlashChan <- s
+
 		// 		consensus.SlashChan <- s
 
 		// 	}()
@@ -796,9 +794,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.Decider.AddSignature(
-		quorum.Commit, validatorPubKey, &sign,
-		consensus.LeaderPubKey, consensus.blockNum, recvMsg.BlockHash,
+	consensus.Decider.SubmitVote(
+		// TODO Need real block header for Commit
+		quorum.Commit, validatorPubKey, &sign, nil,
 	)
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {

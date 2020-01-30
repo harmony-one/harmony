@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -105,7 +104,7 @@ func sign(d Decider, k secretKeyMap, p Phase) {
 		pubKey := v.GetPublicKey()
 		sig := v.Sign(msg)
 		// TODO Make upstream test provide meaningful test values
-		d.AddSignature(p, pubKey, sig, &block.Header{})
+		d.SubmitVote(p, pubKey, sig, nil)
 	}
 }
 

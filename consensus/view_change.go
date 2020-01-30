@@ -377,13 +377,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			blockNumBytes := make([]byte, 8)
 			binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
 			commitPayload := append(blockNumBytes, consensus.blockHash[:]...)
-			consensus.Decider.AddSignature(
+			consensus.Decider.SubmitVote(
 				quorum.Commit,
 				consensus.PubKey,
 				consensus.priKey.SignHash(commitPayload),
-				consensus.LeaderPubKey,
-				consensus.blockNum,
-				consensus.blockHash,
+				// TODO Need real block header here
+				nil,
 			)
 
 			if err = consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {

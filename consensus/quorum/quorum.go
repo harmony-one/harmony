@@ -3,8 +3,8 @@ package quorum
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
@@ -72,10 +72,9 @@ type ParticipantTracker interface {
 // SignatoryTracker ..
 type SignatoryTracker interface {
 	ParticipantTracker
-	AddSignature(
+	SubmitVote(
 		p Phase, PubKey *bls.PublicKey,
-		sig *bls.Sign, roundLeader *bls.PublicKey,
-		roundNumber uint64, blockHash common.Hash,
+		sig *bls.Sign, optHeader *block.Header,
 	)
 	// Caller assumes concurrency protection
 	SignersCount(Phase) int64
@@ -205,21 +204,16 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 	}
 }
 
-func (s *cIdentities) AddSignature(
+func (s *cIdentities) SubmitVote(
 	p Phase, PubKey *bls.PublicKey,
-	sig *bls.Sign, roundLeader *bls.PublicKey, roundNumber uint64,
-	blockHash common.Hash,
+	sig *bls.Sign, optHeader *block.Header,
 ) {
 
-	ballot := &votepower.Ballot{}
-	ballot.Signature = sig
-	// ballot := &votepower.Ballot{
-	// 	SignerPubKey: *shard.FromLibBLSPublicKeyUnsafe(PubKey),
-	// 	BlockLeader:  *shard.FromLibBLSPublicKeyUnsafe(roundLeader),
-	// 	BlockHeight:  roundNumber,
-	// 	BlockHash:    blockHash,
-	// 	Signature:    sig,
-	// }
+	ballot := &votepower.Ballot{
+		SignerPubKey: *shard.FromLibBLSPublicKeyUnsafe(PubKey),
+		Signature:    sig,
+		OptHeader:    optHeader,
+	}
 
 	switch hex := PubKey.SerializeToHexStr(); p {
 	case Prepare:

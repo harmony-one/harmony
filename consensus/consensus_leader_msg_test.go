@@ -3,7 +3,6 @@ package consensus
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -59,22 +58,13 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	consensus.Decider.AddSignature(
-		quorum.Prepare,
-		leaderPubKey,
-		leaderPriKey.Sign(message),
-		leaderPubKey,
-		9999,
-		common.Hash{},
+	consensus.Decider.SubmitVote(
+		quorum.Prepare, leaderPubKey, leaderPriKey.Sign(message), nil,
 	)
-	consensus.Decider.AddSignature(
-		quorum.Prepare,
-		validatorPubKey,
-		validatorPriKey.Sign(message),
-		validatorPubKey,
-		9999,
-		common.Hash{},
+	consensus.Decider.SubmitVote(
+		quorum.Prepare, validatorPubKey, validatorPriKey.Sign(message), nil,
 	)
+
 	// According to RJ these failures are benign.
 	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
