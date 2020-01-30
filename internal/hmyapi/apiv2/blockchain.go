@@ -80,20 +80,20 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 }
 
 // GetBlocks method returns blocks in range blockStart, blockEnd just like GetBlockByNumber but all at once.
-func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart rpc.BlockNumber, blockEnd rpc.BlockNumber, blockArgs BlockArgs) ([]map[string]interface{}, error) {
+func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart, blockEnd uint64, blockArgs BlockArgs) ([]map[string]interface{}, error) {
 	result := make([]map[string]interface{}, 0)
 	for i := blockStart; i <= blockEnd; i++ {
-		block, err := s.b.BlockByNumber(ctx, i)
+		block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(i))
 		blockArgs.InclTx = true
 		if blockArgs.WithSigners {
-			blockArgs.Signers, err = s.GetBlockSigners(ctx, rpc.BlockNumber(i))
+			blockArgs.Signers, err = s.GetBlockSigners(ctx, i)
 			if err != nil {
 				return nil, err
 			}
 		}
 		if block != nil {
 			rpcBlock, err := RPCMarshalBlock(block, blockArgs)
-			if err == nil && i == rpc.PendingBlockNumber {
+			if err == nil && rpc.BlockNumber(i) == rpc.PendingBlockNumber {
 				// Pending blocks need to nil out a few fields
 				for _, field := range []string{"hash", "nonce", "miner"} {
 					rpcBlock[field] = nil
@@ -135,15 +135,15 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 }
 
 // GetBlockSigners returns signers for a particular block.
-func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) ([]string, error) {
-	if uint64(blockNr) == 0 || uint64(blockNr) >= uint64(s.BlockNumber()) {
+func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr uint64) ([]string, error) {
+	if blockNr == 0 || blockNr >= uint64(s.BlockNumber()) {
 		return make([]string, 0), nil
 	}
-	block, err := s.b.BlockByNumber(ctx, blockNr)
+	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
 	if err != nil {
 		return nil, err
 	}
-	blockWithSigners, err := s.b.BlockByNumber(ctx, blockNr+1)
+	blockWithSigners, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr+1))
 	if err != nil {
 		return nil, err
 	}
@@ -183,15 +183,15 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 }
 
 // IsBlockSigner returns true if validator with address signed blockNr block.
-func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.BlockNumber, address string) (bool, error) {
-	if uint64(blockNr) == 0 || uint64(blockNr) >= uint64(s.BlockNumber()) {
+func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr uint64, address string) (bool, error) {
+	if blockNr == 0 || blockNr >= uint64(s.BlockNumber()) {
 		return false, nil
 	}
-	block, err := s.b.BlockByNumber(ctx, blockNr)
+	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
 	if err != nil {
 		return false, err
 	}
-	blockWithSigners, err := s.b.BlockByNumber(ctx, blockNr+1)
+	blockWithSigners, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr+1))
 	if err != nil {
 		return false, err
 	}
@@ -238,7 +238,7 @@ func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address strin
 		lastBlock = blockHeight - defaultBlocksPeriod + 1
 	}
 	for i := lastBlock; i <= blockHeight; i++ {
-		signed, err := s.IsBlockSigner(ctx, rpc.BlockNumber(i), address)
+		signed, err := s.IsBlockSigner(ctx, i, address)
 		if err == nil && signed {
 			totalSigned++
 		}
@@ -287,9 +287,9 @@ func (s *PublicBlockChainAPI) GetShardID(ctx context.Context) (int, error) {
 }
 
 // GetCode returns the code stored at the given address in the state for the given block number.
-func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNr uint64) (hexutil.Bytes, error) {
 	address := internal_common.ParseAddr(addr)
-	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(blockNr))
 	if state == nil || err != nil {
 		return nil, err
 	}
@@ -300,9 +300,9 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNr 
 // GetStorageAt returns the storage from the state at the given address, key and
 // block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
 // numbers are also allowed.
-func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key string, blockNr uint64) (hexutil.Bytes, error) {
 	address := internal_common.ParseAddr(addr)
-	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(blockNr))
 	if state == nil || err != nil {
 		return nil, err
 	}
@@ -310,11 +310,8 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 	return res[:], state.Error()
 }
 
-// GetBalance returns the amount of Nano for the given address in the state of the
-// given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
-// block numbers are also allowed.
-func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*big.Int, error) {
-	// TODO: currently only get latest balance. Will add complete logic later.
+// GetBalance returns the amount of Nano for the given address in the state.
+func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string) (*big.Int, error) {
 	addr := internal_common.ParseAddr(address)
 	return s.b.GetBalance(addr)
 }
