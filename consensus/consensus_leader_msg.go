@@ -12,7 +12,7 @@ import (
 )
 
 // NetworkMessage is a message intended to be
-// created only by the leader for distribution to
+// created only for distribution to
 // all the other quorum members.
 type NetworkMessage struct {
 	Phase                      msg_pb.MessageType
@@ -25,19 +25,16 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 	// Assume a default of prepare
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
-		Type:        msg_pb.MessageType_PREPARE,
+		Type:        p,
 		Request: &msg_pb.Message_Consensus{
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
 	}
 
-	// If not prepared then set it to be whatever it is
-	if p != msg_pb.MessageType_PREPARE {
-		message.Type = p
-	}
-
 	consensusMsg := message.GetConsensus()
 	consensus.populateMessageFields(consensusMsg)
+
+	var aggSig *bls.Sign
 
 	// Do the signing, 96 byte of bls signature
 	switch p {
@@ -46,7 +43,7 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 		// Payload
 		buffer := bytes.Buffer{}
 		// 96 bytes aggregated signature
-		aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
+		aggSig = bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
 		// TODO(Edgar) Finish refactoring with this API
 		// aggSig := consensus.Decider.AggregateVotes(quorum.Announce)
 		buffer.Write(aggSig.Serialize())
@@ -59,6 +56,15 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 		if sign != nil {
 			consensusMsg.Payload = sign.Serialize()
 		}
+
+	case msg_pb.MessageType_COMMITTED:
+		buffer := bytes.Buffer{}
+		// 96 bytes aggregated signature
+		aggSig = bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Commit))
+		buffer.Write(aggSig.Serialize())
+		// Bitmap
+		buffer.Write(consensus.commitBitmap.Bitmap)
+		consensusMsg.Payload = buffer.Bytes()
 	case msg_pb.MessageType_ANNOUNCE:
 		consensusMsg.Payload = consensus.blockHeader
 	}
@@ -78,7 +84,7 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) *NetworkMessage {
 		Phase:                      p,
 		Bytes:                      proto.ConstructConsensusMessage(marshaledMessage),
 		FBFTMsg:                    FBFTMsg,
-		OptionalAggregateSignature: nil,
+		OptionalAggregateSignature: aggSig,
 	}
 
 }

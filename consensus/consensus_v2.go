@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -168,9 +167,14 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
-		return
+		if err == errValidNotInCommittee {
+			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
+		} else {
+			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
+			return
+		}
 	}
+
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
 		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
 		consensus.getLogger().Warn().
@@ -333,8 +337,12 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[OnPrepare] VerifySenderKey failed")
-		return
+		if err == errValidNotInCommittee {
+			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
+		} else {
+			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
+			return
+		}
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnPrepare] Failed to verify sender's signature")
@@ -481,8 +489,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Debug().Err(err).Msg("[OnPrepared] VerifySenderKey failed")
-		return
+		if err == errValidNotInCommittee {
+			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
+		} else {
+			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
+			return
+		}
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
 		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
@@ -665,8 +677,12 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Debug().Msgf("[OnCommit] VerifySenderKey Failed %s", err.Error())
-		return
+		if err == errValidNotInCommittee {
+			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
+		} else {
+			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
+			return
+		}
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Failed to verify sender's signature")
@@ -805,23 +821,15 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.getLogger().Info().
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
 		Msg("[Finalizing] Finalizing Block")
-
 	beforeCatchupNum := consensus.blockNum
 	// Construct committed message
-	msgToSend, aggSig := consensus.constructCommittedMessage()
+	network := consensus.construct(msg_pb.MessageType_COMMITTED)
+	msgToSend, aggSig, FBFTMsg :=
+		network.Bytes,
+		network.OptionalAggregateSignature,
+		network.FBFTMsg
 	consensus.aggregatedCommitSig = aggSig // this may not needed
-
-	// leader adds committed message to log
-	msgPayload, _ := proto.GetConsensusMessagePayload(msgToSend)
-	msg := &msg_pb.Message{}
-	_ = protobuf.Unmarshal(msgPayload, msg)
-	pbftMsg, err := ParseFBFTMessage(msg)
-	if err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[FinalizeCommits] Unable to parse pbft message")
-		return
-	}
-	consensus.FBFTLog.AddMessage(pbftMsg)
-
+	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// find correct block content
 	curBlockHash := consensus.blockHash
 	block := consensus.FBFTLog.GetBlockByHash(curBlockHash)
@@ -840,7 +848,7 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 
-	consensus.ChainReader.WriteLastCommits(pbftMsg.Payload)
+	consensus.ChainReader.WriteLastCommits(FBFTMsg.Payload)
 
 	// if leader success finalize the block, send committed message to validators
 	if err := consensus.msgSender.SendWithRetry(
@@ -895,8 +903,12 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[OnCommitted] verifySenderKey failed")
-		return
+		if err == errValidNotInCommittee {
+			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
+		} else {
+			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
+			return
+		}
 	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
 		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
