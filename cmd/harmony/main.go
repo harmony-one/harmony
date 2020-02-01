@@ -321,8 +321,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	blacklist, err := setupBlacklist()
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Blacklist error: %s\n", err.Error())
-		os.Exit(1)
+		utils.Logger().Warn().Msgf("Blacklist error: %s", err.Error())
 	}
 
 	// Current node.
