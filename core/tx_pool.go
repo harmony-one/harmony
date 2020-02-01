@@ -35,6 +35,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -83,6 +84,12 @@ var (
 	// ErrKnownTransaction is returned if a transaction that is already in the pool
 	// attempting to be added to the pool.
 	ErrKnownTransaction = errors.New("known transaction")
+
+	// ErrBlacklistFrom is returned if a transaction's from/source address is blacklisted
+	ErrBlacklistFrom = errors.New("`from` address of transaction is blacklisted")
+
+	// ErrBlacklistto is returned if a transaction's to/destination address is blacklisted
+	ErrBlacklistTo = errors.New("`to` address of transaction is blacklisted")
 )
 
 var (
@@ -145,6 +152,8 @@ type TxPoolConfig struct {
 	GlobalQueue  uint64 // Maximum number of non-executable transaction slots for all accounts
 
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
+
+	Blacklist *map[common.Address]bool // Set of accounts that cannot be a part of any transaction
 }
 
 // DefaultTxPoolConfig contains the default configurations for the transaction
@@ -162,6 +171,8 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	GlobalQueue:  1024,
 
 	Lifetime: 3 * time.Hour,
+
+	Blacklist: &map[common.Address]bool{},
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -189,6 +200,11 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 			Msg("Sanitizing invalid txpool price bump")
 		conf.PriceBump = DefaultTxPoolConfig.PriceBump
 	}
+	if conf.Blacklist == nil {
+		utils.Logger().Warn().Msg("Sanitizing nil blacklist set")
+		conf.Blacklist = DefaultTxPoolConfig.Blacklist
+	}
+
 	return conf
 }
 
@@ -622,7 +638,23 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// Make sure the transaction is signed properly
 	from, err := types.Sender(pool.signer, tx)
 	if err != nil {
-		return errors.WithMessagef(ErrInvalidSender, "transaction sender is %v", from)
+		if b32, err := hmyCommon.AddressToBech32(from); err == nil {
+			return errors.WithMessagef(ErrInvalidSender, "transaction sender is %s", b32)
+		}
+		return ErrInvalidSender
+	}
+	// Make sure transaction does not have blacklisted addresses
+	if (*pool.config.Blacklist)[from] {
+		if b32, err := hmyCommon.AddressToBech32(from); err == nil {
+			return errors.WithMessagef(ErrBlacklistFrom, "transaction sender is %s", b32)
+		}
+		return ErrBlacklistFrom
+	}
+	if tx.To() != nil && (*pool.config.Blacklist)[*tx.To()] {
+		if b32, err := hmyCommon.AddressToBech32(*tx.To()); err == nil {
+			return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s", b32)
+		}
+		return ErrBlacklistTo
 	}
 	// Drop non-local transactions under our own minimal accepted gas price
 	local = local || pool.locals.contains(from) // account may be local even if the transaction arrived from the network
