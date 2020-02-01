@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -74,7 +74,7 @@ type SignatoryTracker interface {
 	ParticipantTracker
 	SubmitVote(
 		p Phase, PubKey *bls.PublicKey,
-		sig *bls.Sign, optHeader *block.Header,
+		sig *bls.Sign, optSerializedBlock []byte,
 	)
 	// Caller assumes concurrency protection
 	SignersCount(Phase) int64
@@ -206,13 +206,17 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 
 func (s *cIdentities) SubmitVote(
 	p Phase, PubKey *bls.PublicKey,
-	sig *bls.Sign, optHeader *block.Header,
+	sig *bls.Sign, optSerializedBlock []byte,
 ) {
 
+	if p != Commit && optSerializedBlock != nil && len(optSerializedBlock) != 0 {
+		utils.Logger().Debug().Str("phase", p.String()).Msg("non-commit phase has non-nil, non-empty block")
+	}
+
 	ballot := &votepower.Ballot{
-		SignerPubKey: *shard.FromLibBLSPublicKeyUnsafe(PubKey),
-		Signature:    sig,
-		OptHeader:    optHeader,
+		SignerPubKey:       *shard.FromLibBLSPublicKeyUnsafe(PubKey),
+		Signature:          sig,
+		OptSerializedBlock: optSerializedBlock,
 	}
 
 	switch hex := PubKey.SerializeToHexStr(); p {

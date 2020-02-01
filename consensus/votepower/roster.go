@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -26,9 +25,9 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	SignerPubKey shard.BlsPublicKey `json:"bls-public-key"`
-	Signature    *bls.Sign          `json:"signature"`
-	OptHeader    *block.Header      `json:"opt-block-header"`
+	SignerPubKey       shard.BlsPublicKey `json:"bls-public-key"`
+	Signature          *bls.Sign          `json:"signature"`
+	OptSerializedBlock []byte             `json:"opt-rlp-encoded-block"`
 }
 
 // BallotResults are a completed round of votes
@@ -219,7 +218,6 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 	roster.OurVotingPowerTotalPercentage = ourPercentage
 	roster.TheirVotingPowerTotalPercentage = theirPercentage
 	return roster, nil
-
 }
 
 // NewRoster ..

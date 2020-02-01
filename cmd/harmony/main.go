@@ -327,8 +327,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	currentNode := node.New(myHost, currentConsensus, chainDBFactory, *isArchival)
-	// temp test
-	*webHookYamlPath = "/home/edgar/go/src/github.com/harmony-one/harmony/webhooks.yaml"
 	if p := *webHookYamlPath; p != "" {
 		config, err := slash.NewDoubleSignWebHooksFromPath(p)
 		if err != nil {

@@ -43,9 +43,7 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) (*NetworkMessage, er
 		// Payload
 		buffer := bytes.Buffer{}
 		// 96 bytes aggregated signature
-		aggSig = bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Prepare))
-		// TODO(Edgar) Finish refactoring with this API
-		// aggSig := consensus.Decider.AggregateVotes(quorum.Announce)
+		aggSig = consensus.Decider.AggregateVotes(quorum.Prepare)
 		buffer.Write(aggSig.Serialize())
 		// Bitmap
 		buffer.Write(consensus.prepareBitmap.Bitmap)
@@ -60,7 +58,7 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) (*NetworkMessage, er
 	case msg_pb.MessageType_COMMITTED:
 		buffer := bytes.Buffer{}
 		// 96 bytes aggregated signature
-		aggSig = bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Commit))
+		aggSig = consensus.Decider.AggregateVotes(quorum.Commit)
 		buffer.Write(aggSig.Serialize())
 		// Bitmap
 		buffer.Write(consensus.commitBitmap.Bitmap)

@@ -40,14 +40,17 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	// which are message types specifically for a node acting as leader
 	switch {
 	case (consensus.current.Mode() == ViewChanging) &&
-		(msg.Type == msg_pb.MessageType_PREPARE || msg.Type == msg_pb.MessageType_COMMIT):
+		(msg.Type == msg_pb.MessageType_PREPARE ||
+			msg.Type == msg_pb.MessageType_COMMIT):
 		return
 	case consensus.current.Mode() == Listening:
 		return
 	}
 
-	if msg.Type == msg_pb.MessageType_VIEWCHANGE || msg.Type == msg_pb.MessageType_NEWVIEW {
-		if msg.GetViewchange() != nil && msg.GetViewchange().ShardId != consensus.ShardID {
+	if msg.Type == msg_pb.MessageType_VIEWCHANGE ||
+		msg.Type == msg_pb.MessageType_NEWVIEW {
+		if msg.GetViewchange() != nil &&
+			msg.GetViewchange().ShardId != consensus.ShardID {
 			consensus.getLogger().Warn().
 				Uint32("myShardId", consensus.ShardID).
 				Uint32("receivedShardId", msg.GetViewchange().ShardId).
@@ -55,7 +58,8 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 			return
 		}
 	} else {
-		if msg.GetConsensus() != nil && msg.GetConsensus().ShardId != consensus.ShardID {
+		if msg.GetConsensus() != nil &&
+			msg.GetConsensus().ShardId != consensus.ShardID {
 			consensus.getLogger().Warn().
 				Uint32("myShardId", consensus.ShardID).
 				Uint32("receivedShardId", msg.GetConsensus().ShardId).
@@ -132,7 +136,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 		nil,
 	)
 	if err := consensus.prepareBitmap.SetKey(consensus.PubKey, true); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[Announce] Leader prepareBitmap SetKey failed")
+		consensus.getLogger().Warn().Err(err).Msg(
+			"[Announce] Leader prepareBitmap SetKey failed",
+		)
 		return
 	}
 
@@ -169,7 +175,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == errValidNotInCommittee {
-			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
+			consensus.getLogger().Info().
+				Msg("[OnAnnounce] sender key not in this slot's subcommittee")
 		} else {
 			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
 		}
@@ -185,7 +192,9 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] Failed to verify leader signature")
+		consensus.getLogger().Error().Err(err).Msg(
+			"[OnAnnounce] Failed to verify leader signature",
+		)
 		return
 	}
 
@@ -202,8 +211,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	// TODO: think about just sending the block hash instead of the header.
 	encodedHeader := recvMsg.Payload
 	header := new(block.Header)
-	err = rlp.DecodeBytes(encodedHeader, header)
-	if err != nil {
+	if err := rlp.DecodeBytes(encodedHeader, header); err != nil {
 		consensus.getLogger().Warn().
 			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -211,7 +219,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.BlockNum < consensus.blockNum || recvMsg.BlockNum != header.Number().Uint64() {
+	if recvMsg.BlockNum < consensus.blockNum ||
+		recvMsg.BlockNum != header.Number().Uint64() {
 		consensus.getLogger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("hdrBlockNum", header.Number().Uint64()).
@@ -272,7 +281,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		consensus.getLogger().Debug().
 			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
 			Msg("[OnAnnounce] Announce message received again")
-		//return
 	}
 
 	consensus.getLogger().Debug().
@@ -286,9 +294,11 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 	consensus.blockHash = recvMsg.BlockHash
 
-	// we have already added message and block, skip check viewID and send prepare message if is in ViewChanging mode
+	// we have already added message and block, skip check viewID
+	// and send prepare message if is in ViewChanging mode
 	if consensus.current.Mode() == ViewChanging {
-		consensus.getLogger().Debug().Msg("[OnAnnounce] Still in ViewChanging Mode, Exiting !!")
+		consensus.getLogger().Debug().
+			Msg("[OnAnnounce] Still in ViewChanging Mode, Exiting !!")
 		return
 	}
 
@@ -342,14 +352,18 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == errValidNotInCommittee {
-			consensus.getLogger().Info().Msg("[OnAnnounce] sender key not in this slot's subcommittee")
+			consensus.getLogger().Info().Msg(
+				"[OnAnnounce] sender key not in this slot's subcommittee",
+			)
 		} else {
 			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
 		}
 		return
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[OnPrepare] Failed to verify sender's signature")
+		consensus.getLogger().Error().Err(err).Msg(
+			"[OnPrepare] Failed to verify sender's signature",
+		)
 		return
 	}
 
