@@ -88,7 +88,7 @@ var (
 	// ErrBlacklistFrom is returned if a transaction's from/source address is blacklisted
 	ErrBlacklistFrom = errors.New("`from` address of transaction is blacklisted")
 
-	// ErrBlacklistto is returned if a transaction's to/destination address is blacklisted
+	// ErrBlacklistTo is returned if a transaction's to/destination address is blacklisted
 	ErrBlacklistTo = errors.New("`to` address of transaction is blacklisted")
 )
 
