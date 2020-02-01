@@ -7,7 +7,6 @@ import (
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -87,37 +86,4 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) (*NetworkMessage, er
 		OptionalAggregateSignature: aggSig,
 	}, nil
 
-}
-
-// Construct the committed message, returning committed message in bytes.
-func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
-	message := &msg_pb.Message{
-		ServiceType: msg_pb.ServiceType_CONSENSUS,
-		Type:        msg_pb.MessageType_COMMITTED,
-		Request: &msg_pb.Message_Consensus{
-			Consensus: &msg_pb.ConsensusRequest{},
-		},
-	}
-
-	consensusMsg := message.GetConsensus()
-	consensus.populateMessageFields(consensusMsg)
-
-	//// Payload
-	buffer := bytes.Buffer{}
-
-	// 96 bytes aggregated signature
-	aggSig := bls_cosi.AggregateSig(consensus.Decider.ReadAllSignatures(quorum.Commit))
-	buffer.Write(aggSig.Serialize())
-
-	// Bitmap
-	buffer.Write(consensus.commitBitmap.Bitmap)
-
-	consensusMsg.Payload = buffer.Bytes()
-	// END Payload
-
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Committed message")
-	}
-	return proto.ConstructConsensusMessage(marshaledMessage), aggSig
 }

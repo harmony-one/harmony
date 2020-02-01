@@ -1029,7 +1029,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	return
 }
 
-// LastCommitSig returns the byte array of aggregated commit signature and bitmap of last block
+// LastCommitSig returns the byte array of aggregated
+// commit signature and bitmap of last block
 func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 	if consensus.blockNum <= 1 {
 		return nil, nil, nil
@@ -1059,9 +1060,6 @@ func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 // try to catch up if fall behind
 func (consensus *Consensus) tryCatchup() {
 	consensus.getLogger().Info().Msg("[TryCatchup] commit new blocks")
-	//	if consensus.phase != Commit && consensus.mode.Mode() == Normal {
-	//		return
-	//	}
 	currentBlockNum := consensus.blockNum
 	for {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum)
@@ -1093,7 +1091,9 @@ func (consensus *Consensus) tryCatchup() {
 		}
 		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
 
-		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(msg_pb.MessageType_PREPARED, msgs[0].BlockNum, msgs[0].BlockHash)
+		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
+			msg_pb.MessageType_PREPARED, msgs[0].BlockNum, msgs[0].BlockHash,
+		)
 		msg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 		if msg == nil {
 			break
