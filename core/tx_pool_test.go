@@ -19,7 +19,6 @@ package core
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -287,24 +286,21 @@ func TestBlacklistedTransactions(t *testing.T) {
 	(*DefaultTxPoolConfig.Blacklist)[bannedFromAcc] = false
 	(*DefaultTxPoolConfig.Blacklist)[bannedToAcc] = true
 	err := pool.AddRemotes([]*types.Transaction{badTx})
-	errCause := errors.Cause(err[0])
-	if errCause != ErrBlacklistTo {
-		t.Error("expected", ErrBlacklistTo, "got", errCause)
+	if err[0] != ErrBlacklistTo {
+		t.Error("expected", ErrBlacklistTo, "got", err[0])
 	}
 
 	(*DefaultTxPoolConfig.Blacklist)[bannedFromAcc] = true
 	(*DefaultTxPoolConfig.Blacklist)[bannedToAcc] = false
 	err = pool.AddRemotes([]*types.Transaction{badTx})
-	errCause = errors.Cause(err[0])
-	if errCause != ErrBlacklistFrom {
-		t.Error("expected", ErrBlacklistFrom, "got", errCause)
+	if err[0] != ErrBlacklistFrom {
+		t.Error("expected", ErrBlacklistFrom, "got", err[0])
 	}
 
 	// to acc is same for bad and good tx, so keep off blacklist for valid tx check
 	err = pool.AddRemotes([]*types.Transaction{goodTx})
-	errCause = errors.Cause(err[0])
-	if errCause != nil {
-		t.Error("expected", nil, "got", errCause)
+	if err[0] != nil {
+		t.Error("expected", nil, "got", err[0])
 	}
 
 	// cleanup blacklist config for other tests

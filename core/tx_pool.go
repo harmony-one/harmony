@@ -892,7 +892,11 @@ func (pool *TxPool) AddLocals(txs []*types.Transaction) []error {
 // If the senders are not among the locally tracked ones, full pricing constraints
 // will apply.
 func (pool *TxPool) AddRemotes(txs []*types.Transaction) []error {
-	return pool.addTxs(txs, false)
+	errs := []error{}
+	for _, err := range pool.addTxs(txs, false) {
+		errs = append(errs, errors.Cause(err))
+	}
+	return errs
 }
 
 // addTx enqueues a single transaction into the pool if it is valid.
