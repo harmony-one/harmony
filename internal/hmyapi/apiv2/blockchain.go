@@ -45,15 +45,14 @@ type BlockArgs struct {
 	InclStaking bool     `json:"inclStaking"`
 }
 
-// GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx in blockArgs is true all
-// transactions in the block are returned in full detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
-// it shows block signers for this block in list of one addresses.
-func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, blockArgs BlockArgs) (map[string]interface{}, error) {
-	block, err := s.b.BlockByNumber(ctx, blockNr)
+// GetBlockByNumber returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full detail,
+// otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true it shows block signers for this block in list of one addresses.
+func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr uint64, blockArgs BlockArgs) (map[string]interface{}, error) {
+	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
 	blockArgs.InclTx = true
 	if block != nil {
 		response, err := RPCMarshalBlock(block, blockArgs)
-		if err == nil && blockNr == rpc.PendingBlockNumber {
+		if err == nil && rpc.BlockNumber(blockNr) == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
 			for _, field := range []string{"hash", "nonce", "miner"} {
 				response[field] = nil
@@ -121,9 +120,9 @@ func (s *PublicBlockChainAPI) GetShardID(ctx context.Context) (int, error) {
 }
 
 // GetCode returns the code stored at the given address in the state for the given block number.
-func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNr uint64) (hexutil.Bytes, error) {
 	address := internal_common.ParseAddr(addr)
-	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(blockNr))
 	if state == nil || err != nil {
 		return nil, err
 	}
@@ -134,9 +133,9 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNr 
 // GetStorageAt returns the storage from the state at the given address, key and
 // block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
 // numbers are also allowed.
-func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key string, blockNr uint64) (hexutil.Bytes, error) {
 	address := internal_common.ParseAddr(addr)
-	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(blockNr))
 	if state == nil || err != nil {
 		return nil, err
 	}
@@ -144,11 +143,8 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 	return res[:], state.Error()
 }
 
-// GetBalance returns the amount of Nano for the given address in the state of the
-// given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
-// block numbers are also allowed.
-func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*big.Int, error) {
-	// TODO: currently only get latest balance. Will add complete logic later.
+// GetBalance returns the amount of Nano for the given address in the state.
+func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string) (*big.Int, error) {
 	addr := internal_common.ParseAddr(address)
 	return s.b.GetBalance(addr)
 }
