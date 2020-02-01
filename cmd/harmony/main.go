@@ -4,12 +4,14 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -120,6 +122,8 @@ var (
 	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
 	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
+	// Blacklist of addresses
+	blacklistPath = flag.String("blacklist", "./blacklist.txt", "Path to blacklist file.")
 )
 
 func initSetup() {
@@ -315,9 +319,15 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentConsensus.DisableViewChangeForTestingOnly()
 	}
 
+	blacklist, err := setupBlacklist()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Blacklist error: %s\n", err.Error())
+		os.Exit(1)
+	}
+
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, *isArchival)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
@@ -407,6 +417,27 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
 	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
 	return currentNode
+}
+
+func setupBlacklist() (*map[ethCommon.Address]bool, error) {
+	if _, err := os.Stat(*blacklistPath); os.IsNotExist(err) {
+		return nil, errors.New(fmt.Sprintf("blacklist file not found at `%s`", *blacklistPath))
+	}
+	dat, err := ioutil.ReadFile(*blacklistPath)
+	if err != nil {
+		return nil, err
+	}
+	addrMap := make(map[ethCommon.Address]bool)
+	for _, line := range strings.Split(string(dat), "\n") {
+		if len(line) != 0 { // blacklist file may have trailing empty string line
+			addr, err := common.Bech32ToAddress(line)
+			if err != nil {
+				return nil, err
+			}
+			addrMap[addr] = true
+		}
+	}
+	return &addrMap, nil
 }
 
 func main() {
