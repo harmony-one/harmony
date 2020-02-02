@@ -122,6 +122,7 @@ options:
    -z             run in staking mode
    -y             run in legacy, foundational-node mode (default)
    -M             support multi-key mode (default: off)
+   -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./blacklist.txt)
 
 examples:
@@ -173,12 +174,14 @@ download_harmony_db=false
 public_rpc=false
 staking_mode=false
 multi_key=false
+archival=false
 blacklist=./blacklist.txt
+archival=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MB: opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAB: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -210,6 +213,7 @@ do
       exit 0 ;;
    z) staking_mode=true;;
    y) staking_mode=false;;
+   A) archival=true;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -661,6 +665,9 @@ do
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
       -blacklist="${blacklist}"
+   )
+   args+=(
+      -is_archival="${archival}"
    )
    if ! ${multi_key}; then
       args+=(

@@ -1,10 +1,11 @@
 package hostv2
 
-//go:generate mockgen -source hostv2.go -destination=mock/hostv2_mock.go
+//go:generate mockgen -source=hostv2.go -package=hostv2 -destination=hostv2_mock_for_test.go
 
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -34,16 +35,45 @@ const (
 	//numOutgoing = 16
 )
 
-// pubsub captures the pubsub interface we expect from libp2p.
-type pubsub interface {
-	Publish(topic string, data []byte) error
-	Subscribe(topic string, opts ...libp2p_pubsub.SubOpt) (*libp2p_pubsub.Subscription, error)
+// topicHandle is a pubsub topic handle.
+type topicHandle interface {
+	Publish(ctx context.Context, data []byte) error
+	Subscribe() (subscription, error)
+}
+
+type topicHandleImpl struct {
+	t *libp2p_pubsub.Topic
+}
+
+func (th topicHandleImpl) Publish(ctx context.Context, data []byte) error {
+	return th.t.Publish(ctx, data)
+}
+
+func (th topicHandleImpl) Subscribe() (subscription, error) {
+	return th.t.Subscribe()
+}
+
+type topicJoiner interface {
+	JoinTopic(topic string) (topicHandle, error)
+}
+
+type topicJoinerImpl struct {
+	pubsub *libp2p_pubsub.PubSub
+}
+
+func (tj topicJoinerImpl) JoinTopic(topic string) (topicHandle, error) {
+	th, err := tj.pubsub.Join(topic)
+	if err != nil {
+		return nil, err
+	}
+	return topicHandleImpl{th}, nil
 }
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
 	h      libp2p_host.Host
-	pubsub pubsub
+	joiner topicJoiner
+	joined map[string]topicHandle
 	self   p2p.Peer
 	priKey libp2p_crypto.PrivKey
 	lock   sync.Mutex
@@ -55,16 +85,36 @@ type HostV2 struct {
 	logger *zerolog.Logger
 }
 
+func (host *HostV2) getTopic(topic string) (topicHandle, error) {
+	host.lock.Lock()
+	defer host.lock.Unlock()
+	if t, ok := host.joined[topic]; ok {
+		return t, nil
+	} else if t, err := host.joiner.JoinTopic(topic); err != nil {
+		return nil, errors.Wrapf(err, "cannot join pubsub topic %x", topic)
+	} else {
+		host.joined[topic] = t
+		return t, nil
+	}
+}
+
 // SendMessageToGroups sends a message to one or more multicast groups.
-func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
-	var error error
+// It returns a nil error if and only if it has succeeded to schedule the given
+// message for sending.
+func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) (err error) {
 	for _, group := range groups {
-		err := host.pubsub.Publish(string(group), msg)
-		if err != nil {
-			error = err
+		t, e := host.getTopic(string(group))
+		if e != nil {
+			err = e
+			continue
+		}
+		e = t.Publish(context.Background(), msg)
+		if e != nil {
+			err = e
+			continue
 		}
 	}
-	return error
+	return err
 }
 
 // subscription captures the subscription interface we expect from libp2p.
@@ -105,9 +155,13 @@ func (r *GroupReceiverImpl) Receive(ctx context.Context) (
 func (host *HostV2) GroupReceiver(group nodeconfig.GroupID) (
 	receiver p2p.GroupReceiver, err error,
 ) {
-	sub, err := host.pubsub.Subscribe(string(group))
+	t, err := host.getTopic(string(group))
 	if err != nil {
 		return nil, err
+	}
+	sub, err := t.Subscribe()
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot subscribe to topic %x", group)
 	}
 	return &GroupReceiverImpl{sub: sub}, nil
 }
@@ -173,8 +227,16 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
-	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost)
-	// pubsub, err := libp2p_pubsub.NewFloodSub(ctx, p2pHost)
+	traceFile := os.Getenv("P2P_TRACEFILE")
+	var options = make([]libp2p_pubsub.Option, 0, 0)
+	// increase the peer outbound queue size from default 32 to 64
+	options = append(options, libp2p_pubsub.WithPeerOutboundQueueSize(64))
+
+	if len(traceFile) > 0 {
+		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
+		options = append(options, libp2p_pubsub.WithEventTracer(tracer))
+	}
+	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p pubsub")
 	}
@@ -185,7 +247,8 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 	// has to save the private key for host
 	h := &HostV2{
 		h:      p2pHost,
-		pubsub: pubsub,
+		joiner: topicJoinerImpl{pubsub},
+		joined: map[string]topicHandle{},
 		self:   *self,
 		priKey: priKey,
 		logger: &subLogger,

@@ -122,31 +122,31 @@ func GetAPIs(b Backend) []rpc.API {
 			Public:    true, // FIXME: change to false once IPC implemented
 		},
 		{
-			Namespace: "hmy_v2",
+			Namespace: "hmyv2",
 			Version:   "1.0",
 			Service:   apiv2.NewPublicHarmonyAPI(b),
 			Public:    true,
 		},
 		{
-			Namespace: "hmy_v2",
+			Namespace: "hmyv2",
 			Version:   "1.0",
 			Service:   apiv2.NewPublicBlockChainAPI(b),
 			Public:    true,
 		},
 		{
-			Namespace: "hmy_v2",
+			Namespace: "hmyv2",
 			Version:   "1.0",
 			Service:   apiv2.NewPublicTransactionPoolAPI(b, nonceLockV2),
 			Public:    true,
 		},
 		{
-			Namespace: "hmy_v2",
+			Namespace: "hmyv2",
 			Version:   "1.0",
 			Service:   apiv2.NewPublicAccountAPI(b.AccountManager()),
 			Public:    true,
 		},
 		{
-			Namespace: "hmy_v2",
+			Namespace: "hmyv2",
 			Version:   "1.0",
 			Service:   apiv2.NewDebugAPI(b),
 			Public:    true, // FIXME: change to false once IPC implemented
