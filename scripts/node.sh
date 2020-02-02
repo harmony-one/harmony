@@ -122,6 +122,7 @@ options:
    -z             run in staking mode
    -y             run in legacy, foundational-node mode (default)
    -M             support multi-key mode (default: off)
+   -A             enable archival node mode (default: off)
 
 examples:
 
@@ -172,11 +173,12 @@ download_harmony_db=false
 public_rpc=false
 staking_mode=false
 multi_key=false
+archival=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:M opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MA opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -207,6 +209,7 @@ do
       exit 0 ;;
    z) staking_mode=true;;
    y) staking_mode=false;;
+   A) archival=true;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -657,6 +660,9 @@ do
       -is_genesis
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
+   )
+   args+=(
+      -is_archival="${archival}"
    )
    if ! ${multi_key}; then
       args+=(
