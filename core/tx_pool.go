@@ -892,11 +892,7 @@ func (pool *TxPool) AddLocals(txs []*types.Transaction) []error {
 // If the senders are not among the locally tracked ones, full pricing constraints
 // will apply.
 func (pool *TxPool) AddRemotes(txs []*types.Transaction) []error {
-	errs := []error{}
-	for _, err := range pool.addTxs(txs, false) {
-		errs = append(errs, errors.Cause(err))
-	}
-	return errs
+	return pool.addTxs(txs, false)
 }
 
 // addTx enqueues a single transaction into the pool if it is valid.
@@ -937,14 +933,15 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) []error {
 	erroredTxns := []types.RPCTransactionError{}
 
 	for i, tx := range txs {
-		var replace bool
-		if replace, errs[i] = pool.add(tx, local); errs[i] == nil && !replace {
+		replace, err := pool.add(tx, local)
+		if err == nil && !replace {
 			from, _ := types.Sender(pool.signer, tx) // already validated
 			dirty[from] = struct{}{}
 		}
-		if errs[i] != nil && errors.Cause(errs[i]) != ErrKnownTransaction {
-			erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), errs[i]))
+		if err != nil && err != ErrKnownTransaction {
+			erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 		}
+		errs[i] = errors.Cause(err)
 	}
 	// Only reprocess the internal state if something was actually added
 	if len(dirty) > 0 {
