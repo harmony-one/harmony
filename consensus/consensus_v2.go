@@ -113,7 +113,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	consensus.block = encodedBlock
 	consensus.blockHeader = encodedBlockHeader
-	network, err := consensus.construct(msg_pb.MessageType_ANNOUNCE)
+	network, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil)
 	if err != nil {
 		// TODO ERROR
 	}
@@ -317,7 +317,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 // tryPrepare will try to send prepare message
 func (consensus *Consensus) prepare() {
 	// Construct and send prepare message
-	network, err := consensus.construct(msg_pb.MessageType_PREPARE)
+	network, err := consensus.construct(msg_pb.MessageType_PREPARE, nil)
 	if err != nil {
 		// TODO Error
 	}
@@ -445,7 +445,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 		// Construct and broadcast prepared message
-		network, err := consensus.construct(msg_pb.MessageType_PREPARED)
+		network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
 		if err != nil {
 			// TODO Error
 		}
@@ -656,20 +656,24 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if bytes.Compare(consensus.blockHash[:], emptyHash[:]) == 0 {
 		copy(consensus.blockHash[:], blockHash[:])
 	}
-
-	// Construct and send the commit message
-	// TODO: should only sign on block hash
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
-	commitPayload := append(blockNumBytes, consensus.blockHash[:]...)
-	msgToSend := consensus.constructCommitMessage(commitPayload)
+	network, _ := consensus.construct(
+		// TODO: should only sign on block hash
+		msg_pb.MessageType_COMMIT, append(blockNumBytes, consensus.blockHash[:]...),
+	)
+	msgToSend := network.Bytes
 
 	// TODO: genesis account node delay for 1 second, this is a temp fix for allows FN nodes to earning reward
 	if consensus.delayCommit > 0 {
 		time.Sleep(consensus.delayCommit)
 	}
 
-	if err := consensus.msgSender.SendWithoutRetry([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+	if err := consensus.msgSender.SendWithoutRetry(
+		[]nodeconfig.GroupID{
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+		host.ConstructP2pMessage(byte(17), msgToSend),
+	); err != nil {
 		consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
 	} else {
 		consensus.getLogger().Info().
@@ -683,8 +687,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Str("To", FBFTCommit.String()).
 		Msg("[OnPrepared] Switching phase")
 	consensus.switchPhase(FBFTCommit, true)
-
-	return
 }
 
 // TODO: move it to consensus_leader.go later
@@ -844,7 +846,7 @@ func (consensus *Consensus) finalizeCommits() {
 		Msg("[Finalizing] Finalizing Block")
 	beforeCatchupNum := consensus.blockNum
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED)
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil)
 	if err != nil {
 		// TODO ERROR
 	}

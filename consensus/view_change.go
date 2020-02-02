@@ -533,11 +533,16 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		// Construct and send the commit message
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
-		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
-		msgToSend := consensus.constructCommitMessage(commitPayload)
-
+		network, _ := consensus.construct(
+			msg_pb.MessageType_COMMIT, append(blockNumHash, consensus.blockHash[:]...),
+		)
+		msgToSend := network.Bytes
 		consensus.getLogger().Info().Msg("onNewView === commit")
-		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+		consensus.host.SendMessageToGroups(
+			[]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+			host.ConstructP2pMessage(byte(17), msgToSend),
+		)
 		consensus.getLogger().Debug().
 			Str("From", consensus.phase.String()).
 			Str("To", FBFTCommit.String()).

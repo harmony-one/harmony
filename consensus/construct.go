@@ -20,8 +20,9 @@ type NetworkMessage struct {
 	OptionalAggregateSignature *bls.Sign
 }
 
-func (consensus *Consensus) construct(p msg_pb.MessageType) (*NetworkMessage, error) {
-	// Assume a default of prepare
+func (consensus *Consensus) construct(
+	p msg_pb.MessageType, payloadForSignOverride []byte,
+) (*NetworkMessage, error) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        p,
@@ -47,13 +48,14 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) (*NetworkMessage, er
 		// Bitmap
 		buffer.Write(consensus.prepareBitmap.Bitmap)
 		consensusMsg.Payload = buffer.Bytes()
-
 	case msg_pb.MessageType_PREPARE:
-		sign := consensus.priKey.SignHash(consensusMsg.BlockHash)
-		if sign != nil {
-			consensusMsg.Payload = sign.Serialize()
+		if s := consensus.priKey.SignHash(consensusMsg.BlockHash); s != nil {
+			consensusMsg.Payload = s.Serialize()
 		}
-
+	case msg_pb.MessageType_COMMIT:
+		if s := consensus.priKey.SignHash(payloadForSignOverride); s != nil {
+			consensusMsg.Payload = s.Serialize()
+		}
 	case msg_pb.MessageType_COMMITTED:
 		buffer := bytes.Buffer{}
 		// 96 bytes aggregated signature
@@ -85,5 +87,4 @@ func (consensus *Consensus) construct(p msg_pb.MessageType) (*NetworkMessage, er
 		FBFTMsg:                    FBFTMsg,
 		OptionalAggregateSignature: aggSig,
 	}, nil
-
 }

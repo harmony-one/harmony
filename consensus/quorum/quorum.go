@@ -210,7 +210,8 @@ func (s *cIdentities) SubmitVote(
 ) {
 
 	if p != Commit && optSerializedBlock != nil && len(optSerializedBlock) != 0 {
-		utils.Logger().Debug().Str("phase", p.String()).Msg("non-commit phase has non-nil, non-empty block")
+		utils.Logger().Debug().Str("phase", p.String()).
+			Msg("non-commit phase has non-nil, non-empty block")
 	}
 
 	ballot := &votepower.Ballot{
