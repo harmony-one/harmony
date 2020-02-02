@@ -464,8 +464,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			quorum.Commit,
 			consensus.PubKey,
 			consensus.priKey.SignHash(commitPayload),
-			// TODO This one needs the header!
-			nil,
+			consensus.block,
 		)
 
 		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
@@ -811,8 +810,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	consensus.Decider.SubmitVote(
-		// TODO Need real block header for Commit
-		quorum.Commit, validatorPubKey, &sign, nil,
+		quorum.Commit, validatorPubKey, &sign, consensus.block,
 	)
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
