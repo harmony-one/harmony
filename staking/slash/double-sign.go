@@ -22,6 +22,23 @@ type Record struct {
 	Beneficiary common.Address // the reporter who will get rewarded
 }
 
+// NewRecord ..
+func NewRecord(
+	offender shard.BlsPublicKey,
+	signedHeader, doubleSignedHeader *block.Header,
+	signedSignature, doubleSignedSignature *bls.Sign,
+	beneficiary common.Address,
+) Record {
+	r := Record{}
+	r.Offender = offender
+	r.Signed.Header = signedHeader
+	r.Signed.Signature = signedSignature
+	r.DoubleSigned.Header = doubleSignedHeader
+	r.DoubleSigned.Signature = doubleSignedSignature
+	r.Beneficiary = beneficiary
+	return r
+}
+
 // TODO(Edgar) Implement Verify and Apply
 
 // Verify checks that the signature is valid

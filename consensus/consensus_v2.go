@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/harmony-one/vdf/src/vdf_go"
 )
 
@@ -498,6 +499,74 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 }
 
+func (consensus *Consensus) onCommitSanityChecks(recvMsg *FBFTMessage) bool {
+	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
+		consensus.getLogger().Debug().
+			Uint64("MsgViewID", recvMsg.ViewID).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", consensus.blockNum).
+			Str("ValidatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
+			Msg("[OnCommit] BlockNum/viewID not match")
+		return false
+	}
+
+	if !consensus.FBFTLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
+		consensus.getLogger().Debug().
+			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", consensus.blockNum).
+			Msg("[OnCommit] Cannot find matching blockhash")
+		return false
+	}
+
+	if !consensus.FBFTLog.HasMatchingPrepared(consensus.blockNum, recvMsg.BlockHash) {
+		consensus.getLogger().Debug().
+			Hex("blockHash", recvMsg.BlockHash[:]).
+			Uint64("blockNum", consensus.blockNum).
+			Msg("[OnCommit] Cannot find matching prepared message")
+		return false
+	}
+	return true
+}
+
+func (consensus *Consensus) onPreparedSanityChecks(blockObj *types.Block, recvMsg *FBFTMessage) bool {
+	if blockObj.NumberU64() != recvMsg.BlockNum ||
+		recvMsg.BlockNum < consensus.blockNum {
+		consensus.getLogger().Warn().
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", blockObj.NumberU64()).
+			Msg("[OnPrepared] BlockNum not match")
+		return false
+	}
+	if blockObj.Header().Hash() != recvMsg.BlockHash {
+		consensus.getLogger().Warn().
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
+			Str("blockObjHash", blockObj.Header().Hash().Hex()).
+			Msg("[OnPrepared] BlockHash not match")
+		return false
+	}
+	if consensus.current.Mode() == Normal {
+		err := chain.Engine.VerifyHeader(consensus.ChainReader, blockObj.Header(), true)
+		if err != nil {
+			consensus.getLogger().Error().
+				Err(err).
+				Str("inChain", consensus.ChainReader.CurrentHeader().Number().String()).
+				Str("MsgBlockNum", blockObj.Header().Number().String()).
+				Msg("[OnPrepared] Block header is not verified successfully")
+			return false
+		}
+		if consensus.BlockVerifier == nil {
+			// do nothing
+		} else if err := consensus.BlockVerifier(blockObj); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
+			return false
+		}
+	}
+
+	return true
+}
+
 func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.getLogger().Debug().Msg("[OnPrepared] Received Prepared message")
 	if consensus.IsLeader() && consensus.current.Mode() == Normal {
@@ -563,49 +632,18 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	// check validity of block
-	block := recvMsg.Block
 	var blockObj types.Block
-	err = rlp.DecodeBytes(block, &blockObj)
-	if err != nil {
+	if err := rlp.DecodeBytes(recvMsg.Block, &blockObj); err != nil {
 		consensus.getLogger().Warn().
 			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnPrepared] Unparseable block header data")
 		return
 	}
-	if blockObj.NumberU64() != recvMsg.BlockNum || recvMsg.BlockNum < consensus.blockNum {
-		consensus.getLogger().Warn().
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", blockObj.NumberU64()).
-			Msg("[OnPrepared] BlockNum not match")
+	// let this handle it own logs
+	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
 		return
 	}
-	if blockObj.Header().Hash() != recvMsg.BlockHash {
-		consensus.getLogger().Warn().
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
-			Str("blockObjHash", blockObj.Header().Hash().Hex()).
-			Msg("[OnPrepared] BlockHash not match")
-		return
-	}
-	if consensus.current.Mode() == Normal {
-		err := chain.Engine.VerifyHeader(consensus.ChainReader, blockObj.Header(), true)
-		if err != nil {
-			consensus.getLogger().Error().
-				Err(err).
-				Str("inChain", consensus.ChainReader.CurrentHeader().Number().String()).
-				Str("MsgBlockNum", blockObj.Header().Number().String()).
-				Msg("[OnPrepared] Block header is not verified successfully")
-			return
-		}
-		if consensus.BlockVerifier == nil {
-			// do nothing
-		} else if err := consensus.BlockVerifier(&blockObj); err != nil {
-			consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
-			return
-		}
-	}
-
 	consensus.FBFTLog.AddBlock(&blockObj)
 	recvMsg.Block = []byte{} // save memory space
 	consensus.FBFTLog.AddMessage(recvMsg)
@@ -641,11 +679,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
-	// add block field
-	blockPayload := make([]byte, len(block))
-	copy(blockPayload[:], block[:])
-	consensus.block = blockPayload
-
+	consensus.block = append(recvMsg.Payload[0:0], recvMsg.Payload...)
 	// add preparedSig field
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
@@ -663,7 +697,8 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	)
 	msgToSend := network.Bytes
 
-	// TODO: genesis account node delay for 1 second, this is a temp fix for allows FN nodes to earning reward
+	// TODO: genesis account node delay for 1 second,
+	// this is a temp fix for allows FN nodes to earning reward
 	if consensus.delayCommit > 0 {
 		time.Sleep(consensus.delayCommit)
 	}
@@ -714,30 +749,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
-		consensus.getLogger().Debug().
-			Uint64("MsgViewID", recvMsg.ViewID).
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
-			Str("ValidatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
-			Msg("[OnCommit] BlockNum/viewID not match")
-		return
-	}
-
-	if !consensus.FBFTLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
-		consensus.getLogger().Debug().
-			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[OnCommit] Cannot find matching blockhash")
-		return
-	}
-
-	if !consensus.FBFTLog.HasMatchingPrepared(consensus.blockNum, recvMsg.BlockHash) {
-		consensus.getLogger().Debug().
-			Hex("blockHash", recvMsg.BlockHash[:]).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[OnCommit] Cannot find matching prepared message")
+	// let it handle its own logs
+	if !consensus.onCommitSanityChecks(recvMsg) {
 		return
 	}
 
@@ -754,6 +767,54 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	commitBitmap := consensus.commitBitmap
+
+	if alreadyCastBallot := consensus.Decider.ReadBallot(
+		quorum.Commit, validatorPubKey,
+	); alreadyCastBallot != nil {
+		logger.Debug().
+			Msg("[OnCommit] Already received commit message from the validator")
+
+		var signed, received types.Block
+		if err := rlp.DecodeBytes(
+			alreadyCastBallot.OptSerializedBlock, &signed,
+		); err != nil {
+			// TODO Some log
+
+		}
+
+		areHeightsEqual := signed.Header().Number().Uint64() == recvMsg.BlockNum
+		areViewIDsEqual := signed.Header().ViewID().Uint64() == recvMsg.ViewID
+		areHeadersEqual := bytes.Compare(
+			signed.Header().Hash().Bytes(), recvMsg.BlockHash.Bytes(),
+		) == 0
+
+		// If signer already signed, and the block height is the same, then we
+		// need to verify the block hash, and if block hash is different, then
+		// that is a clear case of double signing
+		if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
+			// TODO
+			if err := rlp.DecodeBytes(recvMsg.Block, &received); err != nil {
+				// TODO Some log
+				return
+			}
+
+			var doubleSign bls.Sign
+			if err := doubleSign.Deserialize(recvMsg.Payload); err != nil {
+				logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
+				return
+			}
+
+			go func() {
+				consensus.SlashChan <- slash.NewRecord(
+					*shard.FromLibBLSPublicKeyUnsafe(validatorPubKey),
+					signed.Header(), received.Header(),
+					alreadyCastBallot.Signature, &doubleSign,
+					consensus.SelfAddress,
+				)
+			}()
+		}
+		return
+	}
 
 	// has to be called before verifying signature
 	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
@@ -783,31 +844,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	logger.Info().Msg("[OnCommit] Received new commit message")
 
 	// proceed only when the message is not received before
-	if signed := consensus.Decider.ReadBallot(
-		quorum.Commit, validatorPubKey,
-	); signed != nil {
-		logger.Debug().
-			Msg("[OnCommit] Already received commit message from the validator")
-		// If signer already signed, and the block height is the same, then we
-		// need to verify the block hash, and if block hash is different, then
-		// that is a clear case of double signing
-		// if h1, h2 :=
-		// 	signed.BlockHash,
-		// 	recvMsg.BlockHash; signed.BlockHeight == recvMsg.BlockNum &&
-		// 	bytes.Compare(h1.Bytes(), h2.Bytes()) != 0 {
-		// 	go func() {
-		// 		s := slash.Record{}
-
-		// 		// TODO(Edgar) Compute the aggregate vote, bitmap
-		// 		consensus.SlashChan <- s
-
-		// 		consensus.SlashChan <- s
-
-		// 	}()
-		// }
-
-		return
-	}
 
 	consensus.Decider.SubmitVote(
 		quorum.Commit, validatorPubKey, &sign, consensus.block,
