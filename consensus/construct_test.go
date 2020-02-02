@@ -29,7 +29,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	}
 	consensus.blockHash = [32]byte{}
 
-	_, err = consensus.construct(msg_pb.MessageType_ANNOUNCE)
+	_, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil)
 	if err != nil {
 		test.Fatalf("could not construct announce: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
 	}
 
-	network, err := consensus.construct(msg_pb.MessageType_PREPARED)
+	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
 	if err != nil {
 		test.Errorf("Error when creating prepared message")
 	}
