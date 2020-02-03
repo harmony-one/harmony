@@ -37,8 +37,8 @@ var (
 	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
 	errNeedAtLeastOneSlotKey     = errors.New("need at least one slot key")
 	errBLSKeysNotMatchSigs       = errors.New("bls keys and corresponding signatures could not be verified")
-	errNilMinSelfDelegation      = errors.New("nil min self delegation")
-	errNilMaxTotalDelegation      = errors.New("nil max total delegation")
+	errNilMinSelfDelegation      = errors.New("MinSelfDelegation can not be nil")
+	errNilMaxTotalDelegation     = errors.New("MaxTotalDelegation can not be nil")
 )
 
 // ValidatorWrapper contains validator and its delegation information
