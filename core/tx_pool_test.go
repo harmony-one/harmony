@@ -262,7 +262,7 @@ func TestInvalidTransactions(t *testing.T) {
 }
 
 func TestBlacklistedTransactions(t *testing.T) {
-	// DO NOT parallelize, test will add accounts to tx pool config used by other tests.
+	// DO NOT parallelize, test will add accounts to tx pool config.
 
 	// Create the pool
 	pool, _ := setupTxPool()
@@ -283,15 +283,14 @@ func TestBlacklistedTransactions(t *testing.T) {
 	pool.currentState.AddBalance(bannedFromAcc, big.NewInt(50100))
 	pool.currentState.AddBalance(goodFromAcc, big.NewInt(50100))
 
-	(*DefaultTxPoolConfig.Blacklist)[bannedFromAcc] = false
-	(*DefaultTxPoolConfig.Blacklist)[bannedToAcc] = true
+	(*DefaultTxPoolConfig.Blacklist)[bannedToAcc] = struct{}{}
 	err := pool.AddRemotes([]*types.Transaction{badTx})
 	if err[0] != ErrBlacklistTo {
 		t.Error("expected", ErrBlacklistTo, "got", err[0])
 	}
 
-	(*DefaultTxPoolConfig.Blacklist)[bannedFromAcc] = true
-	(*DefaultTxPoolConfig.Blacklist)[bannedToAcc] = false
+	delete(*DefaultTxPoolConfig.Blacklist, bannedToAcc)
+	(*DefaultTxPoolConfig.Blacklist)[bannedFromAcc] = struct{}{}
 	err = pool.AddRemotes([]*types.Transaction{badTx})
 	if err[0] != ErrBlacklistFrom {
 		t.Error("expected", ErrBlacklistFrom, "got", err[0])
@@ -304,7 +303,7 @@ func TestBlacklistedTransactions(t *testing.T) {
 	}
 
 	// cleanup blacklist config for other tests
-	DefaultTxPoolConfig.Blacklist = &map[common.Address]bool{}
+	DefaultTxPoolConfig.Blacklist = &map[common.Address]struct{}{}
 }
 
 func TestTransactionQueue(t *testing.T) {

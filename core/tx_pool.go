@@ -86,10 +86,10 @@ var (
 	ErrKnownTransaction = errors.New("known transaction")
 
 	// ErrBlacklistFrom is returned if a transaction's from/source address is blacklisted
-	ErrBlacklistFrom = errors.New("`from` address of transaction is blacklisted")
+	ErrBlacklistFrom = errors.New("`from` address of transaction in blacklist")
 
 	// ErrBlacklistTo is returned if a transaction's to/destination address is blacklisted
-	ErrBlacklistTo = errors.New("`to` address of transaction is blacklisted")
+	ErrBlacklistTo = errors.New("`to` address of transaction in blacklist")
 )
 
 var (
@@ -153,7 +153,7 @@ type TxPoolConfig struct {
 
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
 
-	Blacklist *map[common.Address]bool // Set of accounts that cannot be a part of any transaction
+	Blacklist *map[common.Address]struct{} // Set of accounts that cannot be a part of any transaction
 }
 
 // DefaultTxPoolConfig contains the default configurations for the transaction
@@ -172,7 +172,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 
 	Lifetime: 3 * time.Hour,
 
-	Blacklist: &map[common.Address]bool{},
+	Blacklist: &map[common.Address]struct{}{},
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -644,17 +644,20 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrInvalidSender
 	}
 	// Make sure transaction does not have blacklisted addresses
-	if (*pool.config.Blacklist)[from] {
+	if _, exists := (*pool.config.Blacklist)[from]; exists {
 		if b32, err := hmyCommon.AddressToBech32(from); err == nil {
 			return errors.WithMessagef(ErrBlacklistFrom, "transaction sender is %s", b32)
 		}
 		return ErrBlacklistFrom
 	}
-	if tx.To() != nil && (*pool.config.Blacklist)[*tx.To()] {
-		if b32, err := hmyCommon.AddressToBech32(*tx.To()); err == nil {
-			return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s", b32)
+	// Make sure transaction does not burn funds by sending funds to blacklisted address
+	if tx.To() != nil {
+		if _, exists := (*pool.config.Blacklist)[*tx.To()]; exists {
+			if b32, err := hmyCommon.AddressToBech32(*tx.To()); err == nil {
+				return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s", b32)
+			}
+			return ErrBlacklistTo
 		}
-		return ErrBlacklistTo
 	}
 	// Drop non-local transactions under our own minimal accepted gas price
 	local = local || pool.locals.contains(from) // account may be local even if the transaction arrived from the network
@@ -871,14 +874,14 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 // the sender as a local one in the mean time, ensuring it goes around the local
 // pricing constraints.
 func (pool *TxPool) AddLocal(tx *types.Transaction) error {
-	return errors.Cause(pool.addTx(tx, !pool.config.NoLocals))
+	return pool.addTx(tx, !pool.config.NoLocals)
 }
 
 // AddRemote enqueues a single transaction into the pool if it is valid. If the
 // sender is not among the locally tracked ones, full pricing constraints will
 // apply.
 func (pool *TxPool) AddRemote(tx *types.Transaction) error {
-	return errors.Cause(pool.addTx(tx, false))
+	return pool.addTx(tx, false)
 }
 
 // AddLocals enqueues a batch of transactions into the pool if they are valid,
@@ -903,10 +906,11 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	// Try to inject the transaction and update any state
 	replace, err := pool.add(tx, local)
 	if err != nil {
-		if errors.Cause(err) != ErrKnownTransaction {
+		errCause := errors.Cause(err)
+		if errCause != ErrKnownTransaction {
 			pool.txnErrorSink([]types.RPCTransactionError{*types.NewRPCTransactionError(tx.Hash(), err)})
 		}
-		return err
+		return errCause
 	}
 	// If we added a new transaction, run promotion checks and return
 	if !replace {
