@@ -152,7 +152,7 @@ var (
 	doRevertBefore = flag.Int("do_revert_before", -1, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", -1, "The revert will rollback all blocks until and including block number revert_to")
 	// Blacklist of addresses
-	blacklistPath = flag.String("blacklist", "./blacklist.txt", "Path to blacklist file.")
+	blacklistPath = flag.String("blacklist", "", "Path to newline delimited file of blacklisted wallet addresses")
 )
 
 func initSetup() {
@@ -430,22 +430,20 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	return currentNode
 }
 
-func setupBlacklist() (*map[ethCommon.Address]bool, error) {
-	if _, err := os.Stat(*blacklistPath); os.IsNotExist(err) {
-		return nil, errors.New(fmt.Sprintf("blacklist file not found at `%s`", *blacklistPath))
-	}
+func setupBlacklist() (*map[ethCommon.Address]struct{}, error) {
+	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", *blacklistPath)
 	dat, err := ioutil.ReadFile(*blacklistPath)
 	if err != nil {
 		return nil, err
 	}
-	addrMap := make(map[ethCommon.Address]bool)
+	addrMap := make(map[ethCommon.Address]struct{})
 	for _, line := range strings.Split(string(dat), "\n") {
 		if len(line) != 0 { // blacklist file may have trailing empty string line
 			addr, err := common.Bech32ToAddress(line)
 			if err != nil {
 				return nil, err
 			}
-			addrMap[addr] = true
+			addrMap[addr] = struct{}{}
 		}
 	}
 	return &addrMap, nil
