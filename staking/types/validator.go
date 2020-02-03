@@ -38,6 +38,7 @@ var (
 	errNeedAtLeastOneSlotKey     = errors.New("need at least one slot key")
 	errBLSKeysNotMatchSigs       = errors.New("bls keys and corresponding signatures could not be verified")
 	errNilMinSelfDelegation      = errors.New("nil min self delegation")
+	errNilMaxTotalDelegation      = errors.New("nil max total delegation")
 )
 
 // ValidatorWrapper contains validator and its delegation information
@@ -180,6 +181,10 @@ func (w *ValidatorWrapper) SanityCheck() error {
 		return errNilMinSelfDelegation
 	}
 
+	if w.Validator.MaxTotalDelegation == nil {
+		return errNilMaxTotalDelegation
+	}
+
 	// MinSelfDelegation must be >= 1 ONE
 	if w.Validator.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
 		return errors.Wrapf(
@@ -204,7 +209,7 @@ func (w *ValidatorWrapper) SanityCheck() error {
 	}
 
 	// Only enforce rules on MaxTotalDelegation is it's > 0; 0 means no limit for max total delegation
-	if w.Validator.MaxTotalDelegation != nil && w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) > 0 {
+	if w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) > 0 {
 		// MaxTotalDelegation must not be less than MinSelfDelegation
 		if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
@@ -397,7 +402,6 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 }
 
 // UpdateValidatorFromEditMsg updates validator from EditValidator message
-// TODO check the validity of the fields of edit message
 func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error {
 	if validator.Address != edit.ValidatorAddress {
 		return errAddressNotMatch
@@ -415,11 +419,11 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		validator.Rate = *edit.CommissionRate
 	}
 
-	if edit.MinSelfDelegation != nil && edit.MinSelfDelegation.Cmp(big.NewInt(0)) != 0 {
+	if edit.MinSelfDelegation != nil {
 		validator.MinSelfDelegation = edit.MinSelfDelegation
 	}
 
-	if edit.MaxTotalDelegation != nil && edit.MaxTotalDelegation.Cmp(big.NewInt(0)) != 0 {
+	if edit.MaxTotalDelegation != nil {
 		validator.MaxTotalDelegation = edit.MaxTotalDelegation
 	}
 
