@@ -288,8 +288,8 @@ func UnmarshalValidator(by []byte) (*Validator, error) {
 
 // UpdateDescription returns a new Description object with d1 as the base and the fields that's not empty in d2 updated
 // accordingly. An error is returned if the resulting description fields have invalid length.
-func UpdateDescription(d1, d2 *Description) (Description, error) {
-	newDesc := *d1
+func UpdateDescription(d1, d2 Description) (Description, error) {
+	newDesc := d1
 	if d2.Name != "" {
 		newDesc.Name = d2.Name
 	}
@@ -406,14 +406,12 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 	if validator.Address != edit.ValidatorAddress {
 		return errAddressNotMatch
 	}
-	if edit.Description != nil {
-		desc, err := UpdateDescription(&validator.Description, edit.Description)
-		if err != nil {
-			return err
-		}
-
-		validator.Description = desc
+	desc, err := UpdateDescription(validator.Description, edit.Description)
+	if err != nil {
+		return err
 	}
+
+	validator.Description = desc
 
 	if edit.CommissionRate != nil {
 		validator.Rate = *edit.CommissionRate

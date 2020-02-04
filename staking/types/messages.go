@@ -67,7 +67,7 @@ type CreateValidator struct {
 // EditValidator - type for edit existing validator
 type EditValidator struct {
 	ValidatorAddress   common.Address      `json:"validator_address"`
-	Description        *Description        `json:"description" rlp:"nil"`
+	Description                            `json:"description"`
 	CommissionRate     *numeric.Dec        `json:"commission_rate" rlp:"nil"`
 	MinSelfDelegation  *big.Int            `json:"min_self_delegation" rlp:"nil"`
 	MaxTotalDelegation *big.Int            `json:"max_total_delegation" rlp:"nil"`
@@ -131,8 +131,7 @@ func (v CreateValidator) Copy() StakeMsg {
 // Copy deep copy of the interface
 func (v EditValidator) Copy() StakeMsg {
 	v1 := v
-	desc := *v.Description
-	v1.Description = &desc
+	v1.Description = v.Description
 	return v1
 }
 
