@@ -66,8 +66,8 @@ type CreateValidator struct {
 
 // EditValidator - type for edit existing validator
 type EditValidator struct {
-	ValidatorAddress   common.Address      `json:"validator_address"`
-	Description                            `json:"description"`
+	ValidatorAddress   common.Address `json:"validator_address"`
+	Description        `json:"description"`
 	CommissionRate     *numeric.Dec        `json:"commission_rate" rlp:"nil"`
 	MinSelfDelegation  *big.Int            `json:"min_self_delegation" rlp:"nil"`
 	MaxTotalDelegation *big.Int            `json:"max_total_delegation" rlp:"nil"`
