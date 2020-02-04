@@ -493,16 +493,16 @@ func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformati
 }
 
 var (
-	errNotExplorerNode = errors.New("cannot call this rpc on non beaconchain explorer node")
+	errNotBeaconChainShard = errors.New("cannot call this rpc on non beaconchain node")
 )
 
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
-	if s.b.IsBeaconChainExplorerNode() {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetMedianRawStakeSnapshot(), nil
 	}
-	return nil, errNotExplorerNode
+	return nil, errNotBeaconChainShard
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
