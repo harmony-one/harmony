@@ -83,11 +83,11 @@ type HeaderInformation struct {
 
 // RPCDelegation represents a particular delegation to a validator
 type RPCDelegation struct {
-	ValidatorAddress string            `json:"validator_address" yaml:"validator_address"`
-	DelegatorAddress string            `json:"delegator_address" yaml:"delegator_address"`
-	Amount           *big.Int          `json:"amount" yaml:"amount"`
-	Reward           *big.Int          `json:"reward" yaml:"reward"`
-	Undelegations    []RPCUndelegation `json:"Undelegations" yaml:"Undelegations"`
+	ValidatorAddress string            `json:"validator_address"`
+	DelegatorAddress string            `json:"delegator_address"`
+	Amount           *big.Int          `json:"amount"`
+	Reward           *big.Int          `json:"reward"`
+	Undelegations    []RPCUndelegation `json:"Undelegations"`
 }
 
 // RPCUndelegation represents one undelegation entry

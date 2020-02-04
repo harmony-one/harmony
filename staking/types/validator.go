@@ -19,8 +19,8 @@ import (
 
 // Define validator staking related const
 const (
-	MaxNameLength            = 70
-	MaxIdentityLength        = 3000
+	MaxNameLength            = 140
+	MaxIdentityLength        = 140
 	MaxWebsiteLength         = 140
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
@@ -37,13 +37,14 @@ var (
 	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
 	errNeedAtLeastOneSlotKey     = errors.New("need at least one slot key")
 	errBLSKeysNotMatchSigs       = errors.New("bls keys and corresponding signatures could not be verified")
-	errNilMinSelfDelegation      = errors.New("nil min self delegation")
+	errNilMinSelfDelegation      = errors.New("MinSelfDelegation can not be nil")
+	errNilMaxTotalDelegation     = errors.New("MaxTotalDelegation can not be nil")
 )
 
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
-	Validator   `json:"validator" yaml:"validator" rlp:"nil"`
-	Delegations []Delegation `json:"delegations" yaml:"delegations" rlp:"nil"`
+	Validator   `json:"validator"`
+	Delegations []Delegation `json:"delegations"`
 
 	Snapshot struct {
 		Epoch *big.Int
@@ -180,6 +181,10 @@ func (w *ValidatorWrapper) SanityCheck() error {
 		return errNilMinSelfDelegation
 	}
 
+	if w.Validator.MaxTotalDelegation == nil {
+		return errNilMaxTotalDelegation
+	}
+
 	// MinSelfDelegation must be >= 1 ONE
 	if w.Validator.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
 		return errors.Wrapf(
@@ -204,7 +209,7 @@ func (w *ValidatorWrapper) SanityCheck() error {
 	}
 
 	// Only enforce rules on MaxTotalDelegation is it's > 0; 0 means no limit for max total delegation
-	if w.Validator.MaxTotalDelegation != nil && w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) > 0 {
+	if w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) > 0 {
 		// MaxTotalDelegation must not be less than MinSelfDelegation
 		if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
@@ -262,11 +267,11 @@ func (w *ValidatorWrapper) SanityCheck() error {
 
 // Description - some possible IRL connections
 type Description struct {
-	Name            string `json:"name" yaml:"name"`                         // name
-	Identity        string `json:"identity" yaml:"identity"`                 // optional identity signature (ex. UPort or Keybase)
-	Website         string `json:"website" yaml:"website"`                   // optional website link
-	SecurityContact string `json:"security_contact" yaml:"security_contact"` // optional security contact info
-	Details         string `json:"details" yaml:"details"`                   // optional details
+	Name            string `json:"name"`             // name
+	Identity        string `json:"identity"`         // optional identity signature (ex. UPort or Keybase)
+	Website         string `json:"website"`          // optional website link
+	SecurityContact string `json:"security_contact"` // optional security contact info
+	Details         string `json:"details"`          // optional details
 }
 
 // MarshalValidator marshals the validator object
@@ -281,27 +286,27 @@ func UnmarshalValidator(by []byte) (*Validator, error) {
 	return decoded, err
 }
 
-// NewDescription returns a new Description with the provided values.
-func NewDescription(name, identity, website, securityContact, details string) Description {
-	return Description{
-		Name:            name,
-		Identity:        identity,
-		Website:         website,
-		SecurityContact: securityContact,
-		Details:         details,
+// UpdateDescription returns a new Description object with d1 as the base and the fields that's not empty in d2 updated
+// accordingly. An error is returned if the resulting description fields have invalid length.
+func UpdateDescription(d1, d2 Description) (Description, error) {
+	newDesc := d1
+	if d2.Name != "" {
+		newDesc.Name = d2.Name
 	}
-}
+	if d2.Identity != "" {
+		newDesc.Identity = d2.Identity
+	}
+	if d2.Website != "" {
+		newDesc.Website = d2.Website
+	}
+	if d2.SecurityContact != "" {
+		newDesc.SecurityContact = d2.SecurityContact
+	}
+	if d2.Details != "" {
+		newDesc.Details = d2.Details
+	}
 
-// UpdateDescription updates the fields of a given description. An error is
-// returned if the resulting description contains an invalid length.
-func UpdateDescription(d2 *Description) (Description, error) {
-	return NewDescription(
-		d2.Name,
-		d2.Identity,
-		d2.Website,
-		d2.SecurityContact,
-		d2.Details,
-	).EnsureLength()
+	return newDesc.EnsureLength()
 }
 
 // EnsureLength ensures the length of a validator's description.
@@ -343,7 +348,7 @@ func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BlsSignature
 	}
 
 	for i := 0; i < len(pubKeys); i++ {
-		if err := verifyBLSKey(pubKeys[i], pubKeySigs[i]); err != nil {
+		if err := verifyBLSKey(&pubKeys[i], &pubKeySigs[i]); err != nil {
 			return err
 		}
 	}
@@ -351,7 +356,7 @@ func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BlsSignature
 	return nil
 }
 
-func verifyBLSKey(pubKey shard.BlsPublicKey, pubKeySig shard.BlsSignature) error {
+func verifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BlsSignature) error {
 	if len(pubKeySig) == 0 {
 		return errBLSKeysNotMatchSigs
 	}
@@ -377,7 +382,7 @@ func verifyBLSKey(pubKey shard.BlsPublicKey, pubKeySig shard.BlsSignature) error
 
 // CreateValidatorFromNewMsg creates validator from NewValidator message
 func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Validator, error) {
-	desc, err := UpdateDescription(val.Description)
+	desc, err := val.Description.EnsureLength()
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +393,6 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 		return nil, err
 	}
 
-	// TODO: a new validator should have a minimum of 1 token as self delegation, and that should be added as a delegation entry here.
 	v := Validator{
 		val.ValidatorAddress, pubKeys,
 		new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, true,
@@ -398,29 +402,26 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 }
 
 // UpdateValidatorFromEditMsg updates validator from EditValidator message
-// TODO check the validity of the fields of edit message
 func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error {
 	if validator.Address != edit.ValidatorAddress {
 		return errAddressNotMatch
 	}
-	if edit.Description != nil {
-		desc, err := UpdateDescription(edit.Description)
-		if err != nil {
-			return err
-		}
-
-		validator.Description = desc
+	desc, err := UpdateDescription(validator.Description, edit.Description)
+	if err != nil {
+		return err
 	}
+
+	validator.Description = desc
 
 	if edit.CommissionRate != nil {
 		validator.Rate = *edit.CommissionRate
 	}
 
-	if edit.MinSelfDelegation != nil && edit.MinSelfDelegation.Cmp(big.NewInt(0)) != 0 {
+	if edit.MinSelfDelegation != nil {
 		validator.MinSelfDelegation = edit.MinSelfDelegation
 	}
 
-	if edit.MaxTotalDelegation != nil && edit.MaxTotalDelegation.Cmp(big.NewInt(0)) != 0 {
+	if edit.MaxTotalDelegation != nil {
 		validator.MaxTotalDelegation = edit.MaxTotalDelegation
 	}
 
@@ -447,7 +448,7 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 			}
 		}
 		if !found {
-			if err := verifyBLSKey(*edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
+			if err := verifyBLSKey(edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
 				return err
 			}
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
