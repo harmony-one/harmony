@@ -208,28 +208,25 @@ func (w *ValidatorWrapper) SanityCheck() error {
 		}
 	}
 
-	// Only enforce rules on MaxTotalDelegation is it's > 0; 0 means no limit for max total delegation
-	if w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) > 0 {
-		// MaxTotalDelegation must not be less than MinSelfDelegation
-		if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
-			return errors.Wrapf(
-				errInvalidMaxTotalDelegation,
-				"max-total-delegation %s min-self-delegation %s",
-				w.Validator.MaxTotalDelegation.String(),
-				w.Validator.MinSelfDelegation.String(),
-			)
-		}
+	// MaxTotalDelegation must not be less than MinSelfDelegation
+	if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
+		return errors.Wrapf(
+			errInvalidMaxTotalDelegation,
+			"max-total-delegation %s min-self-delegation %s",
+			w.Validator.MaxTotalDelegation.String(),
+			w.Validator.MinSelfDelegation.String(),
+		)
+	}
 
-		totalDelegation := w.TotalDelegation()
-		// Total delegation must be <= MaxTotalDelegation
-		if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
-			return errors.Wrapf(
-				errInvalidTotalDelegation,
-				"total %s max-total %s",
-				totalDelegation.String(),
-				w.Validator.MaxTotalDelegation.String(),
-			)
-		}
+	totalDelegation := w.TotalDelegation()
+	// Total delegation must be <= MaxTotalDelegation
+	if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
+		return errors.Wrapf(
+			errInvalidTotalDelegation,
+			"total %s max-total %s",
+			totalDelegation.String(),
+			w.Validator.MaxTotalDelegation.String(),
+		)
 	}
 
 	if w.Validator.Rate.LT(zeroPercent) || w.Validator.Rate.GT(hundredPercent) {
@@ -417,11 +414,11 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		validator.Rate = *edit.CommissionRate
 	}
 
-	if edit.MinSelfDelegation != nil {
+	if edit.MinSelfDelegation != nil && edit.MinSelfDelegation.Sign() != 0 {
 		validator.MinSelfDelegation = edit.MinSelfDelegation
 	}
 
-	if edit.MaxTotalDelegation != nil {
+	if edit.MaxTotalDelegation != nil && edit.MaxTotalDelegation.Sign() != 0 {
 		validator.MaxTotalDelegation = edit.MaxTotalDelegation
 	}
 
