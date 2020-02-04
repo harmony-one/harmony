@@ -39,6 +39,9 @@ var (
 	errBLSKeysNotMatchSigs       = errors.New("bls keys and corresponding signatures could not be verified")
 	errNilMinSelfDelegation      = errors.New("MinSelfDelegation can not be nil")
 	errNilMaxTotalDelegation     = errors.New("MaxTotalDelegation can not be nil")
+	errSlotKeyToRemoveNotFound   = errors.New("slot key to remove not found")
+	errSlotKeyToAddExists        = errors.New("slot key to add already exists")
+	errDuplicateSlotKeys         = errors.New("slot keys can not have duplicates")
 )
 
 // ValidatorWrapper contains validator and its delegation information
@@ -259,6 +262,14 @@ func (w *ValidatorWrapper) SanityCheck() error {
 		)
 	}
 
+	allKeys := map[shard.BlsPublicKey]struct{}{}
+	for i := range w.Validator.SlotPubKeys {
+		if _, ok := allKeys[w.Validator.SlotPubKeys[i]]; !ok {
+			allKeys[w.Validator.SlotPubKeys[i]] = struct{}{}
+		} else {
+			return errDuplicateSlotKeys
+		}
+	}
 	return nil
 }
 
@@ -433,6 +444,8 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		// we found key to be removed
 		if index >= 0 {
 			validator.SlotPubKeys = append(validator.SlotPubKeys[:index], validator.SlotPubKeys[index+1:]...)
+		} else {
+			return errSlotKeyToRemoveNotFound
 		}
 	}
 
@@ -449,6 +462,8 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 				return err
 			}
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
+		} else {
+			return errSlotKeyToAddExists
 		}
 	}
 
