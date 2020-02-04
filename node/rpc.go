@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -83,12 +82,6 @@ func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
 		}
 	})
 	return result
-}
-
-// IsBeaconChainExplorerNode ..
-func (node *Node) IsBeaconChainExplorerNode() bool {
-	return node.NodeConfig.Role() == nodeconfig.ExplorerNode &&
-		node.Consensus.ShardID == shard.BeaconChainShardID
 }
 
 // StartRPC start RPC service

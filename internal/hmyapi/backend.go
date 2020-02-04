@@ -81,7 +81,6 @@ type Backend interface {
 	GetShardState() (*shard.State, error)
 	GetCurrentStakingErrorSink() []staking.RPCTransactionError
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
-	IsBeaconChainExplorerNode() bool
 	GetMedianRawStakeSnapshot() *big.Int
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 }
