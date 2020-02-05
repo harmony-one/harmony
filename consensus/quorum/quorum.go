@@ -84,7 +84,7 @@ type SignatoryTracker interface {
 // SignatureReader ..
 type SignatureReader interface {
 	SignatoryTracker
-	ReadAllSignatures(Phase) []*bls.Sign
+	ReadAllBallots(Phase) []*votepower.Ballot
 	ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ballot
 	TwoThirdsSignersCount() int64
 	// 96 bytes aggregated signature
@@ -143,7 +143,12 @@ type depInject struct {
 }
 
 func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
-	return bls_cosi.AggregateSig(s.ReadAllSignatures(p))
+	ballots := s.ReadAllBallots(p)
+	sigs := make([]*bls.Sign, 0, len(ballots))
+	for _, ballot := range ballots {
+		sigs = append(sigs, ballot.Signature)
+	}
+	return bls_cosi.AggregateSig(sigs)
 }
 
 func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
@@ -208,7 +213,6 @@ func (s *cIdentities) SubmitVote(
 	p Phase, PubKey *bls.PublicKey,
 	sig *bls.Sign, optSerializedBlock []byte,
 ) {
-
 	if p != Commit && optSerializedBlock != nil && len(optSerializedBlock) != 0 {
 		utils.Logger().Debug().Str("phase", p.String()).
 			Msg("non-commit phase has non-nil, non-empty block")
@@ -217,7 +221,7 @@ func (s *cIdentities) SubmitVote(
 	ballot := &votepower.Ballot{
 		SignerPubKey:       *shard.FromLibBLSPublicKeyUnsafe(PubKey),
 		Signature:          sig,
-		OptSerializedBlock: optSerializedBlock,
+		OptSerializedBlock: optSerializedBlock[:],
 	}
 
 	switch hex := PubKey.SerializeToHexStr(); p {
@@ -267,7 +271,7 @@ func (s *cIdentities) ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ball
 	return payload
 }
 
-func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
+func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 	var m map[string]*votepower.Ballot
 	switch p {
 	case Prepare:
@@ -277,11 +281,11 @@ func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
 	case ViewChange:
 		m = s.viewChange.BallotBox
 	}
-	sigs := make([]*bls.Sign, 0, len(m))
-	for _, value := range m {
-		sigs = append(sigs, value.Signature)
+	ballots := make([]*votepower.Ballot, 0, len(m))
+	for _, ballot := range m {
+		ballots = append(ballots, ballot)
 	}
-	return sigs
+	return ballots
 }
 
 func newBallotsBackedSignatureReader() *cIdentities {

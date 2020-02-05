@@ -208,7 +208,6 @@ func (v *stakedVoteWeight) ToggleActive(k *bls.PublicKey) bool {
 func (v *stakedVoteWeight) JSON() string {
 	s, _ := v.ShardIDProvider()()
 	voterCount := len(v.roster.Voters)
-
 	type u struct {
 		IsHarmony      bool   `json:"is-harmony-slot"`
 		Identity       string `json:"bls-public-key"`
