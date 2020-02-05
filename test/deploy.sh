@@ -24,69 +24,12 @@ else
    touch .hmy/blspass.txt
 fi
 
-function check_result() {
-   err=false
-
-   echo "====== WALLET BALANCES ======" > $RESULT_FILE
-   $ROOT/bin/wallet -p local balances --address $ACC1  >> $RESULT_FILE
-   $ROOT/bin/wallet -p local balances --address $ACC2  >> $RESULT_FILE
-   $ROOT/bin/wallet -p local balances --address $ACC3  >> $RESULT_FILE
-   echo "====== RESULTS ======" >> $RESULT_FILE
-
-   TEST_ACC1=$($ROOT/bin/wallet -p local balances --address $ACC1 | grep 'Shard 0' | grep -oE 'nonce:.[0-9]+' | awk ' { print $2 } ')
-   TEST_ACC2=$($ROOT/bin/wallet -p local balances --address $ACC2 | grep 'Shard 1' | grep -oE 'nonce:.[0-9]+' | awk ' { print $2 } ')
-   BAL0_ACC3=$($ROOT/bin/wallet -p local balances --address $ACC3 | grep 'Shard 0' | grep -oE '[0-9]\.[0-9]+,' | awk -F\. ' { print $1 } ')
-   BAL1_ACC3=$($ROOT/bin/wallet -p local balances --address $ACC3 | grep 'Shard 1' | grep -oE '[0-9]\.[0-9]+,' | awk -F\. ' { print $1 } ')
-
-   if [[ $TEST_ACC1 -ne $NUM_TEST || $TEST_ACC2 -ne $NUM_TEST ]]; then
-      echo -e "FAIL number of nonce. Expected Result: $NUM_TEST.\nAccount1:$TEST_ACC1\nAccount2:$TEST_ACC2\n" >> $RESULT_FILE
-      err=true
-   fi
-   if [[ $BAL0_ACC3 -ne 1 || $BAL1_ACC3 -ne 1 ]]; then
-      echo "FAIL balance of $ACC3. Expected Result: 1.\nShard0:$BAL0_ACC3\nShard1:$BAL1_ACC3\n" >> $RESULT_FILE
-      err=true
-   fi
-
-   $err || echo "PASS" >> $RESULT_FILE
-}
-
 function cleanup() {
    "${progdir}/kill_node.sh"
 }
 
 function cleanup_and_result() {
    "${ROOT}/test/kill_node.sh" 2> /dev/null
-   [ -e $RESULT_FILE ] && cat $RESULT_FILE
-}
-
-function debug_staking() {
-   source "$(go env GOPATH)/src/github.com/harmony-one/harmony/scripts/setup_bls_build_flags.sh"
-   hmy_gosdk="$(go env GOPATH)/src/github.com/harmony-one/go-sdk"
-   hmy_bin="${hmy_gosdk}/hmy"
-   hmy_ops="/tmp/harmony-ops"
-   keystore="${hmy_ops}/test-automation/api-tests/LocalnetValidatorKeys"
-
-   rm -rf $hmy_ops
-   git clone https://github.com/harmony-one/harmony-ops.git $hmy_ops
-
-   if [ ! -d "${hmy_gosdk}" ]; then
-     git clone https://github.com/harmony-one/go-sdk.git $hmy_gosdk
-   fi
-   if [ ! -f "${hmy_bin}" ]; then
-     make -C $hmy_gosdk
-   fi
-
-   hmy_version=$($hmy_bin version 2>&1 >/dev/null)
-   if [[ "${hmy_version:32:3}" -lt "135" ]]; then
-     echo "Aborting staking tests since CLI version is out of date."
-     return
-   fi
-
-   python3 -m pip install pyhmy
-   python3 -m pip install requests
-   python3 "${hmy_ops}/test-automation/api-tests/test.py" --keystore $keystore \
-            --cli_path $hmy_bin --test_dir "${hmy_ops}/test-automation/api-tests/tests/"  \
-            --rpc_endpoint_src="http://localhost:9500/" --rpc_endpoint_dst="http://localhost:9501/" --ignore_regression_test
 }
 
 trap cleanup_and_result SIGINT SIGTERM
@@ -98,7 +41,6 @@ function usage {
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
-   -t             disable wallet test (default: $DOTEST)
    -D duration    test run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
@@ -106,7 +48,7 @@ USAGE: $ME [OPTIONS] config_file_name [extra args to node]
    -N network     network type (default: $NETWORK)
    -B             don't build the binary
 
-This script will build all the binaries and start harmony and txgen based on the configuration file.
+This script will build all the binaries and start harmony based on the configuration file.
 
 EXAMPLES:
 
@@ -120,7 +62,6 @@ EOU
 DEFAULT_DURATION_NOSYNC=60
 DEFAULT_DURATION_SYNC=200
 
-DOTEST=true
 DURATION=
 MIN=3
 SHARDS=2
@@ -128,14 +69,10 @@ DRYRUN=
 SYNC=true
 NETWORK=localnet
 NUM_TEST=10
-ACC1=one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj
-ACC2=one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg
-ACC3=one1r4zyyjqrulf935a479sgqlpa78kz7zlcg2jfen
 
 while getopts "htD:m:s:nBN:" option; do
    case $option in
       h) usage ;;
-      t) DOTEST=false ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
@@ -182,7 +119,6 @@ log_folder="tmp_log/log-$t"
 
 mkdir -p $log_folder
 LOG_FILE=$log_folder/r.log
-RESULT_FILE=$log_folder/result.txt
 
 echo "launching boot node ..."
 $DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
@@ -220,24 +156,6 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   esac
   i=$((i+1))
 done < $config
-
-if [ "$DOTEST" == "true" ]; then
-   # debug_staking
-   echo "waiting for some block rewards"
-   sleep 60
-   i=1
-   echo "launching wallet cross shard transfer test"
-   while [ $i -le $NUM_TEST ]; do
-      "${ROOT}/bin/wallet" -p local transfer --from $ACC1 --to $ACC3 --shardID 0 --toShardID 1 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
-      "${ROOT}/bin/wallet" -p local transfer --from $ACC2 --to $ACC3 --shardID 1 --toShardID 0 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
-      sleep 25
-      i=$((i+1))
-   done
-   echo "waiting for the result"
-   sleep 20
-   check_result
-   [ -e $RESULT_FILE ] && cat $RESULT_FILE
-fi
 
 sleep $DURATION
 
