@@ -20,6 +20,7 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -632,4 +633,12 @@ func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.C
 		}, nil
 	}
 	return nil, nil
+}
+
+// GetCurrentUtilityMetrics ..
+func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetCurrentUtilityMetrics()
+	}
+	return nil, errNotBeaconChainShard
 }

@@ -261,6 +261,51 @@ func TestInvalidTransactions(t *testing.T) {
 	}
 }
 
+func TestBlacklistedTransactions(t *testing.T) {
+	// DO NOT parallelize, test will add accounts to tx pool config.
+
+	// Create the pool
+	pool, _ := setupTxPool()
+	defer pool.Stop()
+
+	// Create testing keys
+	bannedFromKey, _ := crypto.GenerateKey()
+	goodFromKey, _ := crypto.GenerateKey()
+
+	// Create testing transactions
+	badTx := transaction(0, 25000, bannedFromKey)
+	goodTx := transaction(0, 25000, goodFromKey)
+	bannedFromAcc, _ := deriveSender(badTx)
+	bannedToAcc := *badTx.To()
+	goodFromAcc, _ := deriveSender(goodTx)
+
+	// Fund from accounts
+	pool.currentState.AddBalance(bannedFromAcc, big.NewInt(50100))
+	pool.currentState.AddBalance(goodFromAcc, big.NewInt(50100))
+
+	(*DefaultTxPoolConfig.Blacklist)[bannedToAcc] = struct{}{}
+	err := pool.AddRemotes([]*types.Transaction{badTx})
+	if err[0] != ErrBlacklistTo {
+		t.Error("expected", ErrBlacklistTo, "got", err[0])
+	}
+
+	delete(*DefaultTxPoolConfig.Blacklist, bannedToAcc)
+	(*DefaultTxPoolConfig.Blacklist)[bannedFromAcc] = struct{}{}
+	err = pool.AddRemotes([]*types.Transaction{badTx})
+	if err[0] != ErrBlacklistFrom {
+		t.Error("expected", ErrBlacklistFrom, "got", err[0])
+	}
+
+	// to acc is same for bad and good tx, so keep off blacklist for valid tx check
+	err = pool.AddRemotes([]*types.Transaction{goodTx})
+	if err[0] != nil {
+		t.Error("expected", nil, "got", err[0])
+	}
+
+	// cleanup blacklist config for other tests
+	DefaultTxPoolConfig.Blacklist = &map[common.Address]struct{}{}
+}
+
 func TestTransactionQueue(t *testing.T) {
 	t.Parallel()
 
