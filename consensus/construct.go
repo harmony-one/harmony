@@ -20,8 +20,12 @@ type NetworkMessage struct {
 	OptionalAggregateSignature *bls.Sign
 }
 
+// construct is the single creation point of messages intended for the wire.
+// The trailing callback provides a hook for custom mutation so call can control
+// extra nuance on the network message, it is called after the BFT specific logic
 func (consensus *Consensus) construct(
 	p msg_pb.MessageType, payloadForSignOverride []byte,
+	customMutation func(*msg_pb.ConsensusRequest),
 ) (*NetworkMessage, error) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
@@ -54,6 +58,7 @@ func (consensus *Consensus) construct(
 		}
 	case msg_pb.MessageType_COMMIT:
 		if s := consensus.priKey.SignHash(payloadForSignOverride); s != nil {
+			consensusMsg.Block = consensus.block
 			consensusMsg.Payload = s.Serialize()
 		}
 	case msg_pb.MessageType_COMMITTED:
@@ -66,6 +71,10 @@ func (consensus *Consensus) construct(
 		consensusMsg.Payload = buffer.Bytes()
 	case msg_pb.MessageType_ANNOUNCE:
 		consensusMsg.Payload = consensus.blockHeader
+	}
+
+	if customMutation != nil {
+		customMutation(consensusMsg)
 	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)

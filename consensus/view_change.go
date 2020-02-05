@@ -534,7 +534,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 		network, _ := consensus.construct(
-			msg_pb.MessageType_COMMIT, append(blockNumHash, consensus.blockHash[:]...),
+			msg_pb.MessageType_COMMIT,
+			append(blockNumHash, consensus.blockHash[:]...),
+			nil,
 		)
 		msgToSend := network.Bytes
 		consensus.getLogger().Info().Msg("onNewView === commit")
