@@ -213,8 +213,14 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
 		return
 	}
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	consensus.FBFTLog.AddBlock(&blockObj)
-	consensus.block = append(recvMsg.Block[0:0], recvMsg.Block...)
+	// add block field
+	blockPayload := make([]byte, len(recvMsg.Block))
+	copy(blockPayload[:], recvMsg.Block[:])
+	consensus.block = blockPayload
 	recvMsg.Block = []byte{} // save memory space
 	consensus.FBFTLog.AddMessage(recvMsg)
 	consensus.getLogger().Debug().
@@ -222,9 +228,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Hex("blockHash", recvMsg.BlockHash[:]).
 		Msg("[OnPrepared] Prepared message and block added")
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	consensus.tryCatchup()
 	if consensus.current.Mode() == ViewChanging {
