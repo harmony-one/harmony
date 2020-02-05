@@ -16,8 +16,12 @@ import (
 
 var (
 	measure                    = new(big.Int).Div(big.NewInt(2), big.NewInt(3))
-	errValidatorEpochDeviation = errors.New("validator snapshot epoch not exactly one epoch behind")
-	errNegativeSign            = errors.New("impossible period of signing")
+	errValidatorEpochDeviation = errors.New(
+		"validator snapshot epoch not exactly one epoch behind",
+	)
+	errNegativeSign = errors.New("impossible period of signing")
+	// ErrDivByZero ..
+	ErrDivByZero = errors.New("toSign of availability cannot be 0, mistake in protocol")
 )
 
 // BlockSigners ..
@@ -214,6 +218,10 @@ func SetInactiveUnavailableValidators(
 				errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
 				stats.NumBlocksToSign.String(), snapToSign.String(),
 			)
+		}
+
+		if toSign.Cmp(common.Big0) == 0 {
+			return ErrDivByZero
 		}
 
 		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
