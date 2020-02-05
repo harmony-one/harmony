@@ -116,13 +116,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -P             enable public rpc end point (default:off)
    -v             print out the version of the node.sh
    -V             print out the version of the Harmony binary
-<<<<<<< HEAD
-=======
-   -z             run in staking mode
-   -y             run in legacy, foundational-node mode (default)
-   -M             support multi-key mode (default: off)
-   -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./blacklist.txt)
->>>>>>> a339f266... [node.sh] Add blacklist file specification option
+   -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
 
 examples:
 
@@ -168,8 +162,7 @@ node_type=validator
 shard_id=1
 download_harmony_db=false
 public_rpc=false
-multi_key=false
-blacklist=./blacklist.txt
+blacklist=./.hmy/blacklist.txt
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
