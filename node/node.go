@@ -449,7 +449,7 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus,
-	chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
+	chainDBFactory shardchain.DBFactory, blacklist *map[common.Address]struct{}, isArchival bool) *Node {
 	node := Node{}
 	const sinkSize = 4096
 	node.errorSink = struct {
@@ -502,7 +502,9 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain,
+		txPoolConfig := core.DefaultTxPoolConfig
+		txPoolConfig.Blacklist = blacklist
+		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain,
 			func(payload []types.RPCTransactionError) {
 				if len(payload) > 0 {
 					node.errorSink.Lock()
