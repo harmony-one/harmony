@@ -635,7 +635,7 @@ func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.C
 	return nil, nil
 }
 
-// GetCurrentUtilityMetrics, only available for shard 0.
+// GetCurrentUtilityMetrics ..
 func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetCurrentUtilityMetrics()

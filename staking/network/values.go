@@ -32,7 +32,7 @@ func (u UtilityMetric) MarshalJSON() ([]byte, error) {
 	enc.Adjustment = u.Adjustment
 	return json.Marshal(&enc)
 }
-	
+
 // NewUtilityMetricSnapshot ..
 func NewUtilityMetricSnapshot(beaconchain engine.ChainReader) (*UtilityMetric, error) {
 	soFarDoledOut, percentageStaked, err := WhatPercentStakedNow(

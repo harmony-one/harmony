@@ -21,8 +21,8 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/staking/network"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
