@@ -19,10 +19,12 @@ package core
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 
@@ -83,7 +85,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // transition, such as amount of used gas, the receipt roots and the state root
 // itself. ValidateState returns a database batch if the validation was a success
 // otherwise nil and an error is returned.
-func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *state.DB, receipts types.Receipts, cxReceipts types.CXReceipts, usedGas uint64) error {
+func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.DB, receipts types.Receipts, cxReceipts types.CXReceipts, usedGas uint64) error {
 	header := block.Header()
 	if block.GasUsed() != usedGas {
 		return fmt.Errorf("invalid gas used (remote: %d local: %d)", block.GasUsed(), usedGas)
@@ -91,7 +93,9 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	// Validate the received block's bloom with the one derived from the generated receipts.
 	// For valid blocks this should always validate to true.
 	rbloom := types.CreateBloom(receipts)
-	if rbloom != header.Bloom() {
+	// Beacon chain block 1213181 is a one-off block with empty bloom which is expected to be non-empty.
+	// Skip the validation for it to avoid failure.
+	if rbloom != header.Bloom() && (block.NumberU64() != 1213181 || block.ShardID() != 0) {
 		return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.Bloom(), rbloom)
 	}
 	// Tre receipt Trie's root (R = (Tr [[H1, R1], ... [Hn, R1]]))
@@ -113,7 +117,9 @@ func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *stat
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
 	if root := statedb.IntermediateRoot(v.config.IsS3(header.Epoch())); header.Root() != root {
-		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root(), root)
+		dump, _ := rlp.EncodeToBytes(header)
+		const msg = "invalid merkle root (remote: %x local: %x, rlp dump %s)"
+		return fmt.Errorf(msg, header.Root(), root, hex.EncodeToString(dump))
 	}
 	return nil
 }
