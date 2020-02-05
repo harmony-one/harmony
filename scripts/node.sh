@@ -123,7 +123,7 @@ options:
    -y             run in legacy, foundational-node mode (default)
    -M             support multi-key mode (default: off)
    -A             enable archival node mode (default: off)
-   -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./blacklist.txt)
+   -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
 
 examples:
 
@@ -175,7 +175,7 @@ public_rpc=false
 staking_mode=false
 multi_key=false
 archival=false
-blacklist=./blacklist.txt
+blacklist=./.hmy/blacklist.txt
 archival=false
 ${BLSKEYFILE=}
 
