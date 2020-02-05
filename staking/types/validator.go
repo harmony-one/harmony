@@ -364,7 +364,7 @@ func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BLSSignature
 	return nil
 }
 
-func verifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BlsSignature) error {
+func verifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BLSSignature) error {
 	if len(pubKeySig) == 0 {
 		return errBLSKeysNotMatchSigs
 	}

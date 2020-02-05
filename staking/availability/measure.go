@@ -165,7 +165,7 @@ func IncrementValidatorSigningCounts(
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
 	bc engine.ChainReader, state *state.DB,
-	only []common.Address,
+	onlyConsider map[common.Address]struct{},
 ) error {
 	addrs, err := bc.ReadActiveValidatorList()
 	if err != nil {
