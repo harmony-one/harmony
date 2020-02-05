@@ -50,7 +50,6 @@ type NodeAPI interface {
 	IsCurrentlyLeader() bool
 	ErroredStakingTransactionSink() []staking.RPCTransactionError
 	ErroredTransactionSink() []types.RPCTransactionError
-	IsBeaconChainExplorerNode() bool
 	PendingCXReceipts() []*types.CXReceiptsProof
 }
 

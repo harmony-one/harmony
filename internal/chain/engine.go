@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -312,6 +313,12 @@ func (e *engineImpl) Finalize(
 					"[Finalize] failed update validator info",
 				).WithCause(err)
 			}
+		}
+	}
+
+	if isBeaconChain && isNewEpoch && inStakingEra {
+		if err := availability.Apply(chain, state); err != nil {
+			return nil, nil, err
 		}
 	}
 
