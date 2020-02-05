@@ -246,6 +246,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 		return err
 	}
 
+	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
 	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(block, state, bc.vmConfig)
 	if err != nil {
@@ -253,8 +254,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 		return err
 	}
 
-	err = bc.Validator().ValidateState(block, bc.CurrentBlock(), state, receipts, cxReceipts, usedGas)
-	if err != nil {
+	if err := bc.Validator().ValidateState(block, state, receipts, cxReceipts, usedGas); err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
@@ -1476,8 +1476,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Validate the state using the default validator
-		err = bc.Validator().ValidateState(block, parent, state, receipts, cxReceipts, usedGas)
-		if err != nil {
+		if err := bc.Validator().ValidateState(
+			block, state, receipts, cxReceipts, usedGas,
+		); err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
 		}
