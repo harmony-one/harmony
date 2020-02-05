@@ -17,22 +17,6 @@ type UtilityMetric struct {
 	Adjustment              numeric.Dec
 }
 
-// MarshalJSON for UtilityMetric.
-func (u UtilityMetric) MarshalJSON() ([]byte, error) {
-	type UtilityMetric struct {
-		AccumulatorSnapshot     *big.Int    `json:"accumulator"`
-		CurrentStakedPercentage numeric.Dec `json:"staked-percentage"`
-		Deviation               numeric.Dec `json:"deviation"`
-		Adjustment              numeric.Dec `json:"adjustment"`
-	}
-	var enc UtilityMetric
-	enc.AccumulatorSnapshot = u.AccumulatorSnapshot
-	enc.CurrentStakedPercentage = u.CurrentStakedPercentage
-	enc.Deviation = u.Deviation
-	enc.Adjustment = u.Adjustment
-	return json.Marshal(&enc)
-}
-
 // NewUtilityMetricSnapshot ..
 func NewUtilityMetricSnapshot(beaconchain engine.ChainReader) (*UtilityMetric, error) {
 	soFarDoledOut, percentageStaked, err := WhatPercentStakedNow(
