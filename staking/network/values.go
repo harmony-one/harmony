@@ -1,7 +1,6 @@
 package network
 
 import (
-	"encoding/json"
 	"math/big"
 	"time"
 
