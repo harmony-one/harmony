@@ -110,7 +110,7 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 	for i := range members {
 		w.FromLibBLSPublicKey(members[i])
 		if _, didVote := ballot.voters[w]; !didVote &&
-			v.ReadSignature(p, members[i]) != nil {
+			v.ReadBallot(p, members[i]) != nil {
 			err := w.FromLibBLSPublicKey(members[i])
 			if err != nil {
 				return nil, err
@@ -208,7 +208,6 @@ func (v *stakedVoteWeight) ToggleActive(k *bls.PublicKey) bool {
 func (v *stakedVoteWeight) JSON() string {
 	s, _ := v.ShardIDProvider()()
 	voterCount := len(v.roster.Voters)
-
 	type u struct {
 		IsHarmony      bool   `json:"is-harmony-slot"`
 		Identity       string `json:"bls-public-key"`

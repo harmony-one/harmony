@@ -59,6 +59,32 @@ func (node *Node) receiveGroupMessage(
 	}
 }
 
+// some messages have uninteresting fields in header, slash, receipt and crosslink are
+// such messages. This function assumes that input bytes are a slice which already
+// past those not relevant header bytes.
+func (node *Node) processSkippedMsgTypeByteValue(cat proto_node.BlockMessageType, content []byte) {
+	switch cat {
+	case proto_node.SlashCandidate:
+		node.processSlashCandidateMessage(content)
+	case proto_node.Receipt:
+		utils.Logger().Debug().Msg("NET: received message: Node/Receipt")
+		node.ProcessReceiptMessage(content)
+	case proto_node.CrossLink:
+		// only beacon chain will accept the header from other shards
+		utils.Logger().Debug().
+			Uint32("shardID", node.NodeConfig.ShardID).
+			Msg("NET: received message: Node/CrossLink")
+		if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+			return
+		}
+		node.ProcessCrossLinkMessage(content)
+	default:
+		utils.Logger().Error().
+			Int("message-iota-value", int(cat)).
+			Msg("Invariant usage of processSkippedMsgTypeByteValue violated")
+	}
+}
+
 // HandleMessage parses the message and dispatch the actions.
 func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 	msgCategory, err := proto.GetMessageCategory(content)
@@ -116,8 +142,8 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 				utils.Logger().Debug().Msgf("Invalid block message size")
 				return
 			}
-			blockMsgType := proto_node.BlockMessageType(msgPayload[0])
-			switch blockMsgType {
+
+			switch blockMsgType := proto_node.BlockMessageType(msgPayload[0]); blockMsgType {
 			case proto_node.Sync:
 				utils.Logger().Debug().Msg("NET: received message: Node/Sync")
 				var blocks []*types.Block
@@ -143,19 +169,12 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						node.Client.UpdateBlocks(blocks)
 					}
 				}
-
-			case proto_node.CrossLink:
-				// only beacon chain will accept the header from other shards
-				utils.Logger().Debug().Uint32("shardID", node.NodeConfig.ShardID).Msg("NET: received message: Node/CrossLink")
-				if node.NodeConfig.ShardID != 0 {
-					return
-				}
-				node.ProcessCrossLinkMessage(msgPayload[1:]) // skip first byte which is blockMsgType
-
-			case proto_node.Receipt:
-				utils.Logger().Debug().Msg("NET: received message: Node/Receipt")
-				node.ProcessReceiptMessage(msgPayload[1:]) // skip first byte which is blockMsgType
-
+			case
+				proto_node.SlashCandidate,
+				proto_node.Receipt,
+				proto_node.CrossLink:
+				// skip first byte which is blockMsgType
+				node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 			}
 		case proto_node.PING:
 			node.pingMessageHandler(msgPayload, sender)
@@ -222,7 +241,24 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // BroadcastSlash ..
 func (node *Node) BroadcastSlash(witness *slash.Record) {
-	//
+	// no point to broadcast the crosslink if we aren't even in the right epoch yet
+	if !node.Blockchain().Config().IsCrossLink(
+		node.Blockchain().CurrentHeader().Epoch(),
+	) {
+		return
+	}
+
+	// Send it to beaconchain if I'm shardchain, otherwise just add it to pending
+	if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+		node.host.SendMessageToGroups(
+			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
+			host.ConstructP2pMessage(
+				byte(0),
+				proto_node.ConstructSlashMessage(witness)),
+		)
+	} else {
+		node.Blockchain().AddPendingSlashingCandidate(witness)
+	}
 }
 
 // BroadcastCrossLink is called by consensus leader to send the new header as cross link to beacon chain.

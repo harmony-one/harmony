@@ -104,7 +104,7 @@ func sign(d Decider, k secretKeyMap, p Phase) {
 		pubKey := v.GetPublicKey()
 		sig := v.Sign(msg)
 		// TODO Make upstream test provide meaningful test values
-		d.AddSignature(p, pubKey, sig, pubKey, 99999)
+		d.SubmitVote(p, pubKey, sig, nil)
 	}
 }
 

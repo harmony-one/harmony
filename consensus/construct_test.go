@@ -3,8 +3,6 @@ package consensus
 import (
 	"testing"
 
-	protobuf "github.com/golang/protobuf/proto"
-	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -30,16 +28,8 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-
-	message := &msg_pb.Message{}
-	msgBytes := consensus.constructAnnounceMessage()
-	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
-
-	if err := protobuf.Unmarshal(msgPayload, message); err != nil {
-		test.Errorf("Error when creating announce message")
-	}
-	if message.Type != msg_pb.MessageType_ANNOUNCE {
-		test.Error("it did not created announce message")
+	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil); err != nil {
+		test.Fatalf("could not construct announce: %v", err)
 	}
 }
 
@@ -66,12 +56,13 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	consensus.Decider.AddSignature(
-		quorum.Prepare, leaderPubKey, leaderPriKey.Sign(message), leaderPubKey, 9999,
+	consensus.Decider.SubmitVote(
+		quorum.Prepare, leaderPubKey, leaderPriKey.Sign(message), nil,
 	)
-	consensus.Decider.AddSignature(
-		quorum.Prepare, validatorPubKey, validatorPriKey.Sign(message), leaderPubKey, 9999,
+	consensus.Decider.SubmitVote(
+		quorum.Prepare, validatorPubKey, validatorPriKey.Sign(message), nil,
 	)
+
 	// According to RJ these failures are benign.
 	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
@@ -80,14 +71,11 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
 	}
 
-	msgBytes, _ := consensus.constructPreparedMessage()
-	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
-
-	msg := &msg_pb.Message{}
-	if err = protobuf.Unmarshal(msgPayload, msg); err != nil {
+	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
+	if err != nil {
 		test.Errorf("Error when creating prepared message")
 	}
-	if msg.Type != msg_pb.MessageType_PREPARED {
+	if network.Phase != msg_pb.MessageType_PREPARED {
 		test.Error("it did not created prepared message")
 	}
 }
