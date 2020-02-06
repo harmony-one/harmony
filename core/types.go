@@ -34,7 +34,7 @@ type Validator interface {
 
 	// ValidateState validates the given statedb and optionally the receipts and
 	// gas used.
-	ValidateState(block, parent *types.Block, state *state.DB, receipts types.Receipts, cxs types.CXReceipts, usedGas uint64) error
+	ValidateState(block *types.Block, state *state.DB, receipts types.Receipts, cxs types.CXReceipts, usedGas uint64) error
 
 	// ValidateHeader checks whether a header conforms to the consensus rules of a
 	// given engine. Verifying the seal may be done optionally here, or explicitly

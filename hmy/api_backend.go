@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -427,12 +428,12 @@ func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionErro
 	return b.hmy.nodeAPI.ErroredTransactionSink()
 }
 
-// IsBeaconChainExplorerNode ..
-func (b *APIBackend) IsBeaconChainExplorerNode() bool {
-	return b.hmy.nodeAPI.IsBeaconChainExplorerNode()
-}
-
 // GetPendingCXReceipts ..
 func (b *APIBackend) GetPendingCXReceipts() []*types.CXReceiptsProof {
 	return b.hmy.nodeAPI.PendingCXReceipts()
+}
+
+// GetCurrentUtilityMetrics ..
+func (b *APIBackend) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
+	return network.NewUtilityMetricSnapshot(b.hmy.BlockChain())
 }

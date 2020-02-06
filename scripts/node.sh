@@ -122,6 +122,8 @@ options:
    -z             run in staking mode
    -y             run in legacy, foundational-node mode (default)
    -M             support multi-key mode (default: off)
+   -A             enable archival node mode (default: off)
+   -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
 
 examples:
 
@@ -158,7 +160,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blacklist
 start_clean=false
 loop=true
 run_as_root=true
@@ -172,11 +174,14 @@ download_harmony_db=false
 public_rpc=false
 staking_mode=false
 multi_key=false
+archival=false
+blacklist=./.hmy/blacklist.txt
+archival=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:M opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAB: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -201,12 +206,14 @@ do
    a) db_file_to_dl="${OPTARG}";;
    U) upgrade_rel="${OPTARG}";;
    P) public_rpc=true;;
+   B) blacklist="${OPTARG}";;
    v) msg "version: $version"
       exit 0 ;;
    V) LD_LIBRARY_PATH=. ./harmony -version
       exit 0 ;;
    z) staking_mode=true;;
    y) staking_mode=false;;
+   A) archival=true;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -687,6 +694,10 @@ do
       -is_genesis
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
+      -blacklist="${blacklist}"
+   )
+   args+=(
+      -is_archival="${archival}"
    )
    if ! ${multi_key}; then
       args+=(

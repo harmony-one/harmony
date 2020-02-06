@@ -246,6 +246,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 		return err
 	}
 
+	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
 	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(block, state, bc.vmConfig)
 	if err != nil {
@@ -253,8 +254,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 		return err
 	}
 
-	err = bc.Validator().ValidateState(block, bc.CurrentBlock(), state, receipts, cxReceipts, usedGas)
-	if err != nil {
+	if err := bc.Validator().ValidateState(block, state, receipts, cxReceipts, usedGas); err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
@@ -1157,6 +1157,48 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	//// Shard State and Validator Update
 	header := block.Header()
+	if len(header.ShardState()) > 0 {
+		// Write shard state for the new epoch
+		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
+		shardState, err := block.Header().GetShardState()
+		if err == nil && shardState.Epoch != nil && bc.chainConfig.IsStaking(shardState.Epoch) {
+			// After staking, the epoch will be decided by the epoch in the shard state.
+			epoch = new(big.Int).Set(shardState.Epoch)
+		}
+
+		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
+		if err != nil {
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
+			return NonStatTy, err
+		}
+
+		// Find all the active validator addresses and store them in db
+		allActiveValidators := []common.Address{}
+		processed := make(map[common.Address]struct{})
+		for i := range newShardState.Shards {
+			shard := newShardState.Shards[i]
+			for j := range shard.Slots {
+				slot := shard.Slots[j]
+				if slot.EffectiveStake != nil { // For external validator
+					_, ok := processed[slot.EcdsaAddress]
+					if !ok {
+						processed[slot.EcdsaAddress] = struct{}{}
+						allActiveValidators = append(allActiveValidators, shard.Slots[j].EcdsaAddress)
+					}
+				}
+			}
+		}
+
+		// Update active validators
+		if err := bc.WriteActiveValidatorList(allActiveValidators); err != nil {
+			return NonStatTy, err
+		}
+
+		// Update snapshots for all validators
+		if err := bc.UpdateValidatorSnapshots(); err != nil {
+			return NonStatTy, err
+		}
+	}
 
 	// Do bookkeeping for new staking txns
 	for _, tx := range block.StakingTransactions() {
@@ -1216,49 +1258,6 @@ func (bc *BlockChain) WriteBlockWithState(
 		} else {
 			// block reward never accumulate before staking
 			bc.WriteBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
-		}
-	}
-
-	if len(header.ShardState()) > 0 {
-		// Write shard state for the new epoch
-		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
-		shardState, err := block.Header().GetShardState()
-		if err == nil && shardState.Epoch != nil && bc.chainConfig.IsStaking(shardState.Epoch) {
-			// After staking, the epoch will be decided by the epoch in the shard state.
-			epoch = new(big.Int).Set(shardState.Epoch)
-		}
-
-		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
-		if err != nil {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
-			return NonStatTy, err
-		}
-
-		// Find all the active validator addresses and store them in db
-		allActiveValidators := []common.Address{}
-		processed := make(map[common.Address]struct{})
-		for i := range newShardState.Shards {
-			shard := newShardState.Shards[i]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-						allActiveValidators = append(allActiveValidators, shard.Slots[j].EcdsaAddress)
-					}
-				}
-			}
-		}
-
-		// Update active validators
-		if err := bc.WriteActiveValidatorList(allActiveValidators); err != nil {
-			return NonStatTy, err
-		}
-
-		// Update snapshots for all validators
-		if err := bc.UpdateValidatorSnapshots(); err != nil {
-			return NonStatTy, err
 		}
 	}
 
@@ -1477,8 +1476,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Validate the state using the default validator
-		err = bc.Validator().ValidateState(block, parent, state, receipts, cxReceipts, usedGas)
-		if err != nil {
+		if err := bc.Validator().ValidateState(
+			block, state, receipts, cxReceipts, usedGas,
+		); err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
 		}

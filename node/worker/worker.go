@@ -53,7 +53,6 @@ func (w *Worker) CommitTransactions(
 	pendingNormal map[common.Address]types.Transactions,
 	pendingStaking staking.StakingTransactions, coinbase common.Address,
 	stkingTxErrorSink func([]staking.RPCTransactionError),
-	txnErrorSink func([]types.RPCTransactionError),
 ) error {
 
 	if w.current.gasPool == nil {
@@ -62,7 +61,6 @@ func (w *Worker) CommitTransactions(
 
 	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
 	coalescedLogs := []*types.Log{}
-	erroredTxns := []types.RPCTransactionError{}
 	erroredStakingTxns := []staking.RPCTransactionError{}
 	// NORMAL
 	for {
@@ -96,11 +94,7 @@ func (w *Worker) CommitTransactions(
 		}
 
 		logs, err := w.commitTransaction(tx, coinbase)
-		if err != nil {
-			erroredTxns = append(erroredTxns, types.RPCTransactionError{
-				tx.Hash().Hex(), time.Now().Unix(), err.Error(),
-			})
-		}
+
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
 		case core.ErrGasLimitReached:
@@ -156,7 +150,6 @@ func (w *Worker) CommitTransactions(
 	}
 	// Here call the error functions
 	stkingTxErrorSink(erroredStakingTxns)
-	txnErrorSink(erroredTxns)
 
 	utils.Logger().Info().
 		Int("newTxns", len(w.current.txs)).
