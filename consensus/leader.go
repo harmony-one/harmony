@@ -34,7 +34,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	consensus.block = encodedBlock
 	consensus.blockHeader = encodedBlockHeader
-	network, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, nil)
+	network, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil)
 	if err != nil {
 		// TODO ERROR
 	}
@@ -166,7 +166,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 		// Construct and broadcast prepared message
-		network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, nil)
+		network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
 		if err != nil {
 			// TODO Error
 		}

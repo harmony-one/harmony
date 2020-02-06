@@ -131,7 +131,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) prepare() {
-	network, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, nil)
+	network, err := consensus.construct(msg_pb.MessageType_PREPARE, nil)
 	if err != nil {
 		// TODO Error
 	}
@@ -267,7 +267,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		// TODO: should only sign on block hash
 		msg_pb.MessageType_COMMIT,
 		append(blockNumBytes, consensus.blockHash[:]...),
-		nil,
 	)
 	msgToSend := network.Bytes
 

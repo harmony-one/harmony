@@ -25,7 +25,6 @@ type NetworkMessage struct {
 // extra nuance on the network message, it is called after the BFT specific logic
 func (consensus *Consensus) construct(
 	p msg_pb.MessageType, payloadForSignOverride []byte,
-	customMutation func(*msg_pb.ConsensusRequest),
 ) (*NetworkMessage, error) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
@@ -73,20 +72,20 @@ func (consensus *Consensus) construct(
 		consensusMsg.Payload = consensus.blockHeader
 	}
 
-	if customMutation != nil {
-		customMutation(consensusMsg)
-	}
-
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Prepare message")
+		utils.Logger().Error().Err(err).
+			Str("phase", p.String()).
+			Msg("Failed to sign and marshal consensus message")
 		return nil, err
 	}
 
 	FBFTMsg, err2 := ParseFBFTMessage(message)
 
 	if err2 != nil {
-		utils.Logger().Error().Err(err).Msg("failed to deal with the fbft message")
+		utils.Logger().Error().Err(err).
+			Str("phase", p.String()).
+			Msg("failed to deal with the FBFT message")
 		return nil, err
 	}
 

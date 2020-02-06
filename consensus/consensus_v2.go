@@ -110,9 +110,11 @@ func (consensus *Consensus) finalizeCommits() {
 		Msg("[Finalizing] Finalizing Block")
 	beforeCatchupNum := consensus.blockNum
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, nil)
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil)
 	if err != nil {
-		// TODO ERROR
+		consensus.getLogger().Warn().Err(err).
+			Msg("[FinalizeCommits] Unable to construct Committed message")
+		return
 	}
 	msgToSend, aggSig, FBFTMsg :=
 		network.Bytes,
