@@ -4,12 +4,14 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -123,9 +125,11 @@ var (
 	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
 	publicRPC       = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
 	// Bad block revert
-	doRevertBefore  = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
-	revertTo        = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
-	revertBeacon    = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
+	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
+	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
+	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
+	// Blacklist of addresses
+	blacklistPath   = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
 	webHookYamlPath = flag.String(
 		"webhook_yaml", "", "path for yaml config reporting double signing",
 	)
@@ -324,9 +328,16 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentConsensus.DisableViewChangeForTestingOnly()
 	}
 
+	blacklist, err := setupBlacklist()
+	if err != nil {
+		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
+	}
+
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, *isArchival)
+
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
+
 	if p := *webHookYamlPath; p != "" {
 		config, err := slash.NewDoubleSignWebHooksFromPath(p)
 		if err != nil {
@@ -432,6 +443,26 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
 	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
 	return currentNode
+}
+
+func setupBlacklist() (*map[ethCommon.Address]struct{}, error) {
+	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", *blacklistPath)
+	dat, err := ioutil.ReadFile(*blacklistPath)
+	if err != nil {
+		return nil, err
+	}
+	addrMap := make(map[ethCommon.Address]struct{})
+	for _, line := range strings.Split(string(dat), "\n") {
+		if len(line) != 0 { // blacklist file may have trailing empty string line
+			b32 := strings.TrimSpace(strings.Split(string(line), "#")[0])
+			addr, err := common.Bech32ToAddress(b32)
+			if err != nil {
+				return nil, err
+			}
+			addrMap[addr] = struct{}{}
+		}
+	}
+	return &addrMap, nil
 }
 
 func main() {
