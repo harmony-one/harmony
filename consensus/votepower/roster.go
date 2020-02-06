@@ -1,6 +1,7 @@
 package votepower
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"sort"
 
@@ -24,10 +25,20 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	SignerPubKey      shard.BlsPublicKey `json:"bls-public-key"`
-	BlockLeader       shard.BlsPublicKey `json:"leader-when-signed"`
-	BlockHeightHeight uint64             `json:"block-height"`
-	Signature         *bls.Sign          `json:"signature"`
+	SignerPubKey       shard.BlsPublicKey `json:"bls-public-key"`
+	Signature          *bls.Sign          `json:"signature"`
+	OptSerializedBlock []byte             `json:"opt-rlp-encoded-block"`
+}
+
+// BallotResults are a completed round of votes
+type BallotResults struct {
+	Signature shard.BLSSignature // (aggregated) signature
+	Bitmap    []byte             // corresponding bitmap mask for agg signature
+}
+
+// EncodePair returns hex encoded tuple (signature, bitmap)
+func (b BallotResults) EncodePair() (string, string) {
+	return hex.EncodeToString(b.Signature[:]), hex.EncodeToString(b.Bitmap[:])
 }
 
 // Round is a round of voting in any FBFT phase
@@ -207,7 +218,6 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 	roster.OurVotingPowerTotalPercentage = ourPercentage
 	roster.TheirVotingPowerTotalPercentage = theirPercentage
 	return roster, nil
-
 }
 
 // NewRoster ..

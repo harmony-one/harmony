@@ -40,7 +40,7 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, testDBFactory, false)
+	node := New(host, consensus, testDBFactory, nil, false)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}
@@ -209,7 +209,7 @@ func TestAddPeers(t *testing.T) {
 	}
 	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
-	node := New(host, consensus, testDBFactory, false)
+	node := New(host, consensus, testDBFactory, nil, false)
 	node.DRand = dRand
 	r1 := node.AddPeers(peers1)
 	e1 := 2
@@ -259,7 +259,7 @@ func TestAddBeaconPeer(t *testing.T) {
 	}
 	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
-	node := New(host, consensus, testDBFactory, false)
+	node := New(host, consensus, testDBFactory, nil, false)
 	node.DRand = dRand
 	for _, p := range peers1 {
 		ret := node.AddBeaconPeer(p)
