@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 	"sort"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -27,7 +28,12 @@ import (
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
 type APIBackend struct {
-	hmy *Harmony
+	hmy              *Harmony
+	MedianStakeCache struct {
+		Mut            sync.Mutex
+		BlockHeight    int64
+		MedianRawStake *big.Int
+	}
 }
 
 // ChainDb ...
@@ -318,22 +324,23 @@ func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Valid
 }
 
 var (
-	two                = big.NewInt(2)
-	medianRawStake     = big.NewInt(0)
-	totalStaking       = big.NewInt(0)
-	stakingBlockHeight = rpc.BlockNumber(0)
+	two = big.NewInt(2)
 )
 
 // GetMedianRawStakeSnapshot ..
 func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
-	if stakingBlockHeight == rpc.LatestBlockNumber {
-		return medianRawStake
+	b.MedianStakeCache.Mut.Lock()
+	if b.MedianStakeCache.BlockHeight != -1 && b.MedianStakeCache.BlockHeight > int64(rpc.LatestBlockNumber)-20 {
+		defer b.MedianStakeCache.Mut.Unlock()
+		return b.MedianStakeCache.MedianRawStake
 	}
-	stakingBlockHeight = rpc.LatestBlockNumber
+	b.MedianStakeCache.Mut.Unlock()
 	candidates := b.hmy.BlockChain().ValidatorCandidates()
 	if len(candidates) == 0 {
-		medianRawStake = big.NewInt(0)
-		return medianRawStake
+		b.MedianStakeCache.Mut.Lock()
+		defer b.MedianStakeCache.Mut.Unlock()
+		b.MedianStakeCache.MedianRawStake = big.NewInt(0)
+		return b.MedianStakeCache.MedianRawStake
 	}
 	stakes := []*big.Int{}
 	for i := range candidates {
@@ -355,36 +362,18 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 	}
 
 	const isEven = 0
+
+	b.MedianStakeCache.Mut.Lock()
+	defer b.MedianStakeCache.Mut.Unlock()
 	switch l := len(stakes); l % 2 {
 	case isEven:
 		left := stakes[(l/2)-1]
 		right := stakes[l/2]
-		medianRawStake = new(big.Int).Div(new(big.Int).Add(left, right), two)
+		b.MedianStakeCache.MedianRawStake = new(big.Int).Div(new(big.Int).Add(left, right), two)
 	default:
-		medianRawStake = stakes[l/2]
+		b.MedianStakeCache.MedianRawStake = stakes[l/2]
 	}
-	return medianRawStake
-}
-
-// GetTotalStaking ..
-func (b *APIBackend) GetTotalStaking() *big.Int {
-	if stakingBlockHeight == rpc.LatestBlockNumber {
-		return totalStaking
-	}
-	stakingBlockHeight = rpc.LatestBlockNumber
-	candidates := b.hmy.BlockChain().ValidatorCandidates()
-	stakes := big.NewInt(0)
-	for i := range candidates {
-		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
-		stake := big.NewInt(0)
-		validator.GetAddress()
-		for i := range validator.Delegations {
-			stake.Add(stake, validator.Delegations[i].Amount)
-		}
-		stakes.Add(stakes, stake)
-	}
-	totalStaking = stakes
-	return totalStaking
+	return b.MedianStakeCache.MedianRawStake
 }
 
 // GetValidatorStats returns the stats of validator
