@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/bloombits"
@@ -74,7 +75,16 @@ func New(
 		networkID:      1, // TODO(ricl): this should be from config
 		shardID:        shardID,
 	}
-	hmy.APIBackend = &APIBackend{hmy}
+	hmy.APIBackend = &APIBackend{hmy: hmy,
+		MedianStakeCache: struct {
+			sync.Mutex
+			BlockHeight    int64
+			MedianRawStake *big.Int
+		}{
+			BlockHeight:    -1,
+			MedianRawStake: big.NewInt(0),
+		},
+	}
 	return hmy, nil
 }
 

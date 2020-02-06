@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 	"sort"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -27,7 +28,12 @@ import (
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
 type APIBackend struct {
-	hmy *Harmony
+	hmy              *Harmony
+	MedianStakeCache struct {
+		sync.Mutex
+		BlockHeight    int64
+		MedianRawStake *big.Int
+	}
 }
 
 // ChainDb ...
@@ -321,11 +327,18 @@ var (
 	two = big.NewInt(2)
 )
 
-// GetMedianRawStakeSnapshot  ..
+// GetMedianRawStakeSnapshot ..
 func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
+	b.MedianStakeCache.Lock()
+	defer b.MedianStakeCache.Unlock()
+	if b.MedianStakeCache.BlockHeight != -1 && b.MedianStakeCache.BlockHeight > int64(rpc.LatestBlockNumber)-20 {
+		return b.MedianStakeCache.MedianRawStake
+	}
 	candidates := b.hmy.BlockChain().ValidatorCandidates()
 	if len(candidates) == 0 {
-		return big.NewInt(0)
+		b.MedianStakeCache.Lock()
+		b.MedianStakeCache.MedianRawStake = big.NewInt(0)
+		return b.MedianStakeCache.MedianRawStake
 	}
 	stakes := []*big.Int{}
 	for i := range candidates {
@@ -347,14 +360,16 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 	}
 
 	const isEven = 0
+
 	switch l := len(stakes); l % 2 {
 	case isEven:
 		left := stakes[(l/2)-1]
 		right := stakes[l/2]
-		return new(big.Int).Div(new(big.Int).Add(left, right), two)
+		b.MedianStakeCache.MedianRawStake = new(big.Int).Div(new(big.Int).Add(left, right), two)
 	default:
-		return stakes[l/2]
+		b.MedianStakeCache.MedianRawStake = stakes[l/2]
 	}
+	return b.MedianStakeCache.MedianRawStake
 }
 
 // GetValidatorStats returns the stats of validator
