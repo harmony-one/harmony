@@ -167,55 +167,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
-	// Bump up signers counts
-	_, header := node.Worker.GetCurrentState(), node.Blockchain().CurrentHeader()
-	if epoch := header.Epoch(); node.Blockchain().Config().IsStaking(epoch) {
-
-		if header.ShardID() == shard.BeaconChainShardID {
-			superCommittee, err := node.Blockchain().ReadShardState(header.Epoch())
-			processed := make(map[common.Address]struct{})
-
-			if err != nil {
-				return nil, err
-			}
-
-			for j := range superCommittee.Shards {
-				shard := superCommittee.Shards[j]
-				for j := range shard.Slots {
-					slot := shard.Slots[j]
-					if slot.EffectiveStake != nil { // For external validator
-						_, ok := processed[slot.EcdsaAddress]
-						if !ok {
-							processed[slot.EcdsaAddress] = struct{}{}
-						}
-					}
-				}
-			}
-
-			// TODO(Edgar) Need to uncomment and fix, unknown why enabling
-			// this code causes merkle root verification issues
-
-			// if err := availability.IncrementValidatorSigningCounts(
-			// 	node.Blockchain(), header, header.ShardID(), state, processed,
-			// ); err != nil {
-			// 	return nil, err
-			// }
-
-			// // kick out the inactive validators so they won't come up in the auction as possible
-			// // candidates in the following call to SuperCommitteeForNextEpoch
-			// if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
-			// 	fmt.Println("hit the last block condition")
-			// 	if err := availability.SetInactiveUnavailableValidators(
-			// 		node.Blockchain(), state, processed,
-			// 	); err != nil {
-			// 		return nil, err
-			// 	}
-			// }
-		} else {
-			// TODO Handle shard chain
-		}
-	}
-
 	// Prepare shard state
 	shardState := new(shard.State)
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
