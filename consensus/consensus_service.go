@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -25,7 +24,12 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+)
+
+var (
+	errValidNotInCommittee = errors.New("slot signer not this slot's subcommittee")
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -262,7 +266,7 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey
 	}
 
 	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, fmt.Errorf("Validator %s is not in committee", senderKey.SerializeToHexStr())
+		return nil, errValidNotInCommittee
 	}
 	return senderKey, nil
 }
@@ -275,7 +279,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 	}
 
 	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, fmt.Errorf("Validator %s is not in committee", senderKey.SerializeToHexStr())
+		return nil, errValidNotInCommittee
 	}
 	return senderKey, nil
 }

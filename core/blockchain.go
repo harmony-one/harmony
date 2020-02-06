@@ -50,6 +50,7 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -79,9 +80,15 @@ const (
 	validatorListByDelegatorCacheLimit = 1024
 	pendingCrossLinksCacheLimit        = 2
 	blockAccumulatorCacheLimit         = 256
+	pendingSlashingCandidateCacheLimit = 2
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
+)
+
+const (
+	pendingCLCacheKey = "pendingCLs"
+	pendingSCCacheKey = "pendingSCs"
 )
 
 // CacheConfig contains the configuration values for the trie caching/pruning
@@ -123,10 +130,11 @@ type BlockChain struct {
 	scope         event.SubscriptionScope
 	genesisBlock  *types.Block
 
-	mu                     sync.RWMutex // global mutex for locking chain operations
-	chainmu                sync.RWMutex // blockchain insertion lock
-	procmu                 sync.RWMutex // block processor lock
-	pendingCrossLinksMutex sync.RWMutex // pending crosslinks lock
+	mu                          sync.RWMutex // global mutex for locking chain operations
+	chainmu                     sync.RWMutex // blockchain insertion lock
+	procmu                      sync.RWMutex // block processor lock
+	pendingCrossLinksMutex      sync.RWMutex // pending crosslinks lock
+	pendingSlashingCandidatesMU sync.RWMutex // pending slashing candidates
 
 	checkpoint       int          // checkpoint counts towards the new checkpoint
 	currentBlock     atomic.Value // Current head of the block chain
@@ -148,6 +156,7 @@ type BlockChain struct {
 	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
 	pendingCrossLinksCache        *lru.Cache // Cache of last pending crosslinks
 	blockAccumulatorCache         *lru.Cache // Cache of block accumulators
+	pendingSlashingCandidates     *lru.Cache // Cache of last pending slashing candidates
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -190,6 +199,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
+	pendingSlashingCandidateCache, _ := lru.New(pendingSlashingCandidateCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:                   chainConfig,
@@ -213,6 +223,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		validatorListCache:            validatorListCache,
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
+		pendingSlashingCandidates:     pendingSlashingCandidateCache,
 		blockAccumulatorCache:         blockAccumulatorCache,
 		engine:                        engine,
 		vmConfig:                      vmConfig,
@@ -2192,10 +2203,59 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 	return crossLink, err
 }
 
+// ReadPendingSlashingCandidates retrieves pending slashing candidates
+func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
+	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
+		return []slash.Record{}, nil
+	}
+
+	bytes := []byte{}
+	if cached, ok := bc.pendingSlashingCandidates.Get(pendingSCCacheKey); ok {
+		bytes = cached.([]byte)
+	} else {
+		bytes, err := rawdb.ReadPendingSlashingCandidates(bc.db)
+		if err != nil || len(bytes) == 0 {
+			utils.Logger().Info().Err(err).
+				Int("dataLen", len(bytes)).
+				Msg("ReadPendingSlashingCandidates")
+			return nil, err
+		}
+	}
+	cls := []slash.Record{}
+	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
+		utils.Logger().Error().Err(err).Msg("Invalid pending slashing candidates RLP decoding")
+		return nil, err
+	}
+	return cls, nil
+}
+
+// WritePendingSlashingCandidates saves the pending slashing candidates
+func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) error {
+	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
+		utils.Logger().Debug().Msg("Writing slashing candidates in prior to staking epoch")
+		return nil
+	}
+
+	bytes, err := rlp.EncodeToBytes(candidates)
+	if err != nil {
+		const msg = "[WritePendingSlashingCandidates] Failed to encode pending slashing candidates"
+		utils.Logger().Error().Msg(msg)
+		return err
+	}
+	if err := rawdb.WritePendingSlashingCandidates(bc.db, bytes); err != nil {
+		return err
+	}
+	if by, err := rlp.EncodeToBytes(candidates); err == nil {
+		bc.pendingSlashingCandidates.Add(pendingSCCacheKey, by)
+	}
+	return nil
+
+}
+
 // ReadPendingCrossLinks retrieves pending crosslinks
 func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 	bytes := []byte{}
-	if cached, ok := bc.pendingCrossLinksCache.Get("pendingCLs"); ok {
+	if cached, ok := bc.pendingCrossLinksCache.Get(pendingCLCacheKey); ok {
 		bytes = cached.([]byte)
 	} else {
 		bytes, err := rawdb.ReadPendingCrossLinks(bc.db)
@@ -2241,9 +2301,26 @@ func (bc *BlockChain) WritePendingCrossLinks(crossLinks []types.CrossLink) error
 	}
 	by, err := rlp.EncodeToBytes(cls)
 	if err == nil {
-		bc.pendingCrossLinksCache.Add("pendingCLs", by)
+		bc.pendingCrossLinksCache.Add(pendingCLCacheKey, by)
 	}
 	return nil
+
+}
+
+// AddPendingSlashingCandidate  appends pending slashing candidates
+func (bc *BlockChain) AddPendingSlashingCandidate(candidate *slash.Record) (int, error) {
+	bc.pendingSlashingCandidatesMU.Lock()
+	defer bc.pendingSlashingCandidatesMU.Unlock()
+
+	cls, err := bc.ReadPendingSlashingCandidates()
+	if err != nil || len(cls) == 0 {
+		err := bc.WritePendingSlashingCandidates([]slash.Record{*candidate})
+		return 1, err
+	}
+	cls = append(cls, *candidate)
+	err = bc.WritePendingSlashingCandidates(cls)
+	return len(cls), err
+
 }
 
 // AddPendingCrossLinks appends pending crosslinks
