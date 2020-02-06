@@ -334,7 +334,6 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 	if b.MedianStakeCache.BlockHeight != -1 && b.MedianStakeCache.BlockHeight > int64(rpc.LatestBlockNumber)-20 {
 		return b.MedianStakeCache.MedianRawStake
 	}
-	b.MedianStakeCache.Unlock()
 	candidates := b.hmy.BlockChain().ValidatorCandidates()
 	if len(candidates) == 0 {
 		b.MedianStakeCache.Lock()
@@ -362,7 +361,6 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 
 	const isEven = 0
 
-	b.MedianStakeCache.Lock()
 	switch l := len(stakes); l % 2 {
 	case isEven:
 		left := stakes[(l/2)-1]
