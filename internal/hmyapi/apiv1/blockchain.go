@@ -644,11 +644,12 @@ func doEstimateGas(ctx context.Context, b Backend, args CallArgs, gasCap *big.In
 		hi  uint64
 		cap uint64
 	)
+	blockNum := rpc.LatestBlockNumber
 	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas {
 		hi = uint64(*args.Gas)
 	} else {
 		// Retrieve the block to act as the gas ceiling
-		block, err := b.BlockByNumber(ctx, rpc.LatestBlockNumber)
+		block, err := b.BlockByNumber(ctx, blockNum)
 		if err != nil {
 			return 0, err
 		}
@@ -668,7 +669,7 @@ func doEstimateGas(ctx context.Context, b Backend, args CallArgs, gasCap *big.In
 	executable := func(gas uint64) bool {
 		args.Gas = (*hexutil.Uint64)(&gas)
 
-		_, _, failed, err := doCall(ctx, b, args, rpc.PendingBlockNumber, vm.Config{}, 0, gasCap)
+		_, _, failed, err := doCall(ctx, b, args, blockNum, vm.Config{}, 0, big.NewInt(int64(cap)))
 		if err != nil || failed {
 			return false
 		}
