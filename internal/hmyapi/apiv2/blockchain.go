@@ -2,6 +2,7 @@ package apiv2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/harmony-one/harmony/common/denominations"
@@ -17,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -273,4 +275,217 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformation {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
 	return newHeaderInformation(header)
+}
+
+var (
+	errNotBeaconChainShard = errors.New("cannot call this rpc on non beaconchain node")
+)
+
+// GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
+// explorer node
+func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetMedianRawStakeSnapshot(), nil
+	}
+	return nil, errNotBeaconChainShard
+}
+
+// GetAllValidatorAddresses returns all validator addresses.
+func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
+	addresses := []string{}
+	for _, addr := range s.b.GetAllValidatorAddresses() {
+		oneAddr, _ := internal_common.AddressToBech32(addr)
+		addresses = append(addresses, oneAddr)
+	}
+	return addresses, nil
+}
+
+// GetActiveValidatorAddresses returns active validator addresses.
+func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]string, error) {
+	addresses := []string{}
+	for _, addr := range s.b.GetActiveValidatorAddresses() {
+		oneAddr, _ := internal_common.AddressToBech32(addr)
+		addresses = append(addresses, oneAddr)
+	}
+	return addresses, nil
+}
+
+// GetValidatorMetrics ..
+func (s *PublicBlockChainAPI) GetValidatorMetrics(ctx context.Context, address string) (*staking.ValidatorStats, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	stats := s.b.GetValidatorStats(validatorAddress)
+	if stats == nil {
+		return nil, fmt.Errorf("validator stats not found: %s", validatorAddress.Hex())
+	}
+	return stats, nil
+}
+
+// GetValidatorInformation returns information about a validator.
+func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (*staking.Validator, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	validator := s.b.GetValidatorInformation(validatorAddress)
+	if validator == nil {
+		return nil, fmt.Errorf("validator not found: %s", validatorAddress.Hex())
+	}
+	return validator, nil
+}
+
+// GetDelegationsByDelegator returns list of delegations for a delegator address.
+func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, address string) ([]*RPCDelegation, error) {
+	delegatorAddress := internal_common.ParseAddr(address)
+	validators, delegations := s.b.GetDelegationsByDelegator(delegatorAddress)
+	result := []*RPCDelegation{}
+	for i := range delegations {
+		delegation := delegations[i]
+
+		undelegations := []RPCUndelegation{}
+
+		for j := range delegation.Undelegations {
+			undelegations = append(undelegations, RPCUndelegation{
+				delegation.Undelegations[j].Amount,
+				delegation.Undelegations[j].Epoch,
+			})
+		}
+		valAddr, _ := internal_common.AddressToBech32(validators[i])
+		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
+		result = append(result, &RPCDelegation{
+			valAddr,
+			delAddr,
+			delegation.Amount,
+			delegation.Reward,
+			undelegations,
+		})
+	}
+	return result, nil
+}
+
+// GetDelegationsByValidator returns list of delegations for a validator address.
+func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, address string) ([]*RPCDelegation, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	delegations := s.b.GetDelegationsByValidator(validatorAddress)
+	result := make([]*RPCDelegation, 0)
+	for _, delegation := range delegations {
+
+		undelegations := []RPCUndelegation{}
+
+		for j := range delegation.Undelegations {
+			undelegations = append(undelegations, RPCUndelegation{
+				delegation.Undelegations[j].Amount,
+				delegation.Undelegations[j].Epoch,
+			})
+		}
+		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
+		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
+		result = append(result, &RPCDelegation{
+			valAddr,
+			delAddr,
+			delegation.Amount,
+			delegation.Reward,
+			undelegations,
+		})
+	}
+	return result, nil
+}
+
+// GetDelegationByDelegatorAndValidator returns a delegation for delegator and validator.
+func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.Context, address string, validator string) (*RPCDelegation, error) {
+	delegatorAddress := internal_common.ParseAddr(address)
+	validatorAddress := internal_common.ParseAddr(validator)
+	validators, delegations := s.b.GetDelegationsByDelegator(delegatorAddress)
+	for i := range delegations {
+		if validators[i] != validatorAddress {
+			continue
+		}
+		delegation := delegations[i]
+
+		undelegations := []RPCUndelegation{}
+
+		for j := range delegation.Undelegations {
+			undelegations = append(undelegations, RPCUndelegation{
+				delegation.Undelegations[j].Amount,
+				delegation.Undelegations[j].Epoch,
+			})
+		}
+		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
+		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
+		return &RPCDelegation{
+			valAddr,
+			delAddr,
+			delegation.Amount,
+			delegation.Reward,
+			undelegations,
+		}, nil
+	}
+	return nil, nil
+}
+
+// doEstimateGas ..
+func doEstimateGas(ctx context.Context, b Backend, args CallArgs, gasCap *big.Int) (hexutil.Uint64, error) {
+	// Binary search the gas requirement, as it may be higher than the amount used
+	var (
+		lo  uint64 = params.TxGas - 1
+		hi  uint64
+		cap uint64
+	)
+	blockNum := rpc.LatestBlockNumber
+	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas {
+		hi = uint64(*args.Gas)
+	} else {
+		// Retrieve the block to act as the gas ceiling
+		block, err := b.BlockByNumber(ctx, blockNum)
+		if err != nil {
+			return 0, err
+		}
+		hi = block.GasLimit()
+	}
+	if gasCap != nil && hi > gasCap.Uint64() {
+		// log.Warn("Caller gas above allowance, capping", "requested", hi, "cap", gasCap)
+		hi = gasCap.Uint64()
+	}
+	cap = hi
+
+	// Use zero-address if none other is available
+	if args.From == nil {
+		args.From = &common.Address{}
+	}
+	// Create a helper to check if a gas allowance results in an executable transaction
+	executable := func(gas uint64) bool {
+		args.Gas = (*hexutil.Uint64)(&gas)
+
+		_, _, failed, err := doCall(ctx, b, args, blockNum, vm.Config{}, 0, big.NewInt(int64(cap)))
+		if err != nil || failed {
+			return false
+		}
+		return true
+	}
+	// Execute the binary search and hone in on an executable gas limit
+	for lo+1 < hi {
+		mid := (hi + lo) / 2
+		if !executable(mid) {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	// Reject the transaction as invalid if it still fails at the highest allowance
+	if hi == cap {
+		if !executable(hi) {
+			return 0, fmt.Errorf("gas required exceeds allowance (%d) or always failing transaction", cap)
+		}
+	}
+	return hexutil.Uint64(hi), nil
+}
+
+// EstimateGas returns an estimate of the amount of gas needed to execute the
+// given transaction against the current pending block.
+func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (hexutil.Uint64, error) {
+	return doEstimateGas(ctx, s.b, args, nil)
+}
+
+// GetCurrentUtilityMetrics ..
+func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetCurrentUtilityMetrics()
+	}
+	return nil, errNotBeaconChainShard
 }
