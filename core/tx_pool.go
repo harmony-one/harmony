@@ -35,6 +35,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -83,6 +84,12 @@ var (
 	// ErrKnownTransaction is returned if a transaction that is already in the pool
 	// attempting to be added to the pool.
 	ErrKnownTransaction = errors.New("known transaction")
+
+	// ErrBlacklistFrom is returned if a transaction's from/source address is blacklisted
+	ErrBlacklistFrom = errors.New("`from` address of transaction in blacklist")
+
+	// ErrBlacklistTo is returned if a transaction's to/destination address is blacklisted
+	ErrBlacklistTo = errors.New("`to` address of transaction in blacklist")
 )
 
 var (
@@ -145,6 +152,8 @@ type TxPoolConfig struct {
 	GlobalQueue  uint64 // Maximum number of non-executable transaction slots for all accounts
 
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
+
+	Blacklist *map[common.Address]struct{} // Set of accounts that cannot be a part of any transaction
 }
 
 // DefaultTxPoolConfig contains the default configurations for the transaction
@@ -162,6 +171,8 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	GlobalQueue:  1024,
 
 	Lifetime: 3 * time.Hour,
+
+	Blacklist: &map[common.Address]struct{}{},
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -189,6 +200,11 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 			Msg("Sanitizing invalid txpool price bump")
 		conf.PriceBump = DefaultTxPoolConfig.PriceBump
 	}
+	if conf.Blacklist == nil {
+		utils.Logger().Warn().Msg("Sanitizing nil blacklist set")
+		conf.Blacklist = DefaultTxPoolConfig.Blacklist
+	}
+
 	return conf
 }
 
@@ -622,7 +638,26 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// Make sure the transaction is signed properly
 	from, err := types.Sender(pool.signer, tx)
 	if err != nil {
-		return errors.WithMessagef(ErrInvalidSender, "transaction sender is %v", from)
+		if b32, err := hmyCommon.AddressToBech32(from); err == nil {
+			return errors.WithMessagef(ErrInvalidSender, "transaction sender is %s", b32)
+		}
+		return ErrInvalidSender
+	}
+	// Make sure transaction does not have blacklisted addresses
+	if _, exists := (*pool.config.Blacklist)[from]; exists {
+		if b32, err := hmyCommon.AddressToBech32(from); err == nil {
+			return errors.WithMessagef(ErrBlacklistFrom, "transaction sender is %s", b32)
+		}
+		return ErrBlacklistFrom
+	}
+	// Make sure transaction does not burn funds by sending funds to blacklisted address
+	if tx.To() != nil {
+		if _, exists := (*pool.config.Blacklist)[*tx.To()]; exists {
+			if b32, err := hmyCommon.AddressToBech32(*tx.To()); err == nil {
+				return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s", b32)
+			}
+			return ErrBlacklistTo
+		}
 	}
 	// Drop non-local transactions under our own minimal accepted gas price
 	local = local || pool.locals.contains(from) // account may be local even if the transaction arrived from the network
@@ -839,14 +874,14 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 // the sender as a local one in the mean time, ensuring it goes around the local
 // pricing constraints.
 func (pool *TxPool) AddLocal(tx *types.Transaction) error {
-	return errors.Cause(pool.addTx(tx, !pool.config.NoLocals))
+	return pool.addTx(tx, !pool.config.NoLocals)
 }
 
 // AddRemote enqueues a single transaction into the pool if it is valid. If the
 // sender is not among the locally tracked ones, full pricing constraints will
 // apply.
 func (pool *TxPool) AddRemote(tx *types.Transaction) error {
-	return errors.Cause(pool.addTx(tx, false))
+	return pool.addTx(tx, false)
 }
 
 // AddLocals enqueues a batch of transactions into the pool if they are valid,
@@ -871,10 +906,11 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	// Try to inject the transaction and update any state
 	replace, err := pool.add(tx, local)
 	if err != nil {
-		if errors.Cause(err) != ErrKnownTransaction {
+		errCause := errors.Cause(err)
+		if errCause != ErrKnownTransaction {
 			pool.txnErrorSink([]types.RPCTransactionError{*types.NewRPCTransactionError(tx.Hash(), err)})
 		}
-		return err
+		return errCause
 	}
 	// If we added a new transaction, run promotion checks and return
 	if !replace {
@@ -901,14 +937,15 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) []error {
 	erroredTxns := []types.RPCTransactionError{}
 
 	for i, tx := range txs {
-		var replace bool
-		if replace, errs[i] = pool.add(tx, local); errs[i] == nil && !replace {
+		replace, err := pool.add(tx, local)
+		if err == nil && !replace {
 			from, _ := types.Sender(pool.signer, tx) // already validated
 			dirty[from] = struct{}{}
 		}
-		if errs[i] != nil && errors.Cause(errs[i]) != ErrKnownTransaction {
-			erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), errs[i]))
+		if err != nil && err != ErrKnownTransaction {
+			erroredTxns = append(erroredTxns, *types.NewRPCTransactionError(tx.Hash(), err))
 		}
+		errs[i] = errors.Cause(err)
 	}
 	// Only reprocess the internal state if something was actually added
 	if len(dirty) > 0 {
