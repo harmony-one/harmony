@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/binary"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p/host"
-	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
 )
 
 func (consensus *Consensus) announce(block *types.Block) {
@@ -36,7 +33,10 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.blockHeader = encodedBlockHeader
 	network, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil)
 	if err != nil {
-		// TODO ERROR
+		consensus.getLogger().Err(err).
+			Str("message-type", msg_pb.MessageType_ANNOUNCE.String()).
+			Msg("failed constructing message")
+		return
 	}
 	msgToSend, FPBTMsg := network.Bytes, network.FBFTMsg
 
@@ -168,7 +168,10 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		// Construct and broadcast prepared message
 		network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
 		if err != nil {
-			// TODO Error
+			consensus.getLogger().Err(err).
+				Str("message-type", msg_pb.MessageType_PREPARED.String()).
+				Msg("failed constructing message")
+			return
 		}
 		msgToSend, FBFTMsg, aggSig :=
 			network.Bytes,
@@ -227,7 +230,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	// let it handle its own logs (TEMP DISABLE while testing double sign)
+	// let it handle its own logs
+	// TODO(Edgar)(TEMP DISABLE while testing double sign)
 	if !consensus.onCommitSanityChecks(recvMsg) {
 		return
 	}
@@ -237,53 +241,55 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	validatorPubKey, commitSig, commitBitmap :=
 		recvMsg.SenderPubkey, recvMsg.Payload, consensus.commitBitmap
+	logger := consensus.getLogger().With().
+		Str("validatorPubKey", validatorPubKey.SerializeToHexStr()).Logger()
 
 	if alreadyCastBallot := consensus.Decider.ReadBallot(
 		quorum.Commit, validatorPubKey,
 	); alreadyCastBallot != nil {
-
-		var signed, received *types.Block
-		if err := rlp.DecodeBytes(
-			alreadyCastBallot.OptSerializedBlock, &signed,
-		); err != nil {
-			// TODO handle
-		}
-
-		areHeightsEqual := signed.Header().Number().Uint64() == recvMsg.BlockNum
-		areViewIDsEqual := signed.Header().ViewID().Uint64() == recvMsg.ViewID
-		areHeadersEqual := bytes.Compare(
-			signed.Hash().Bytes(), recvMsg.BlockHash.Bytes(),
-		) == 0
-
-		// If signer already signed, and the block height is the same, then we
-		// need to verify the block hash, and if block hash is different, then
-		// that is a clear case of double signing
-		if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
-			// TODO
-			if err := rlp.DecodeBytes(recvMsg.Block, &received); err != nil {
-				// TODO Some log
-				return
-			}
-
-			var doubleSign bls.Sign
-			if err := doubleSign.Deserialize(recvMsg.Payload); err != nil {
-				return
-			}
-
-			go func() {
-				consensus.SlashChan <- slash.NewRecord(
-					*shard.FromLibBLSPublicKeyUnsafe(validatorPubKey),
-					signed.Header(), received.Header(),
-					alreadyCastBallot.Signature, &doubleSign,
-					consensus.SelfAddress,
-				)
-			}()
-		}
+		logger.Debug().Msg("voter already cast commit message")
 		return
-	}
 
-	logger := consensus.getLogger().With().
-		Str("validatorPubKey", validatorPubKey.SerializeToHexStr()).Logger()
+		// TODO(Edgar) Still working out double sign
+		// var signed, received *types.Block
+		// if err := rlp.DecodeBytes(
+		// 	alreadyCastBallot.OptSerializedBlock, &signed,
+		// ); err != nil {
+		// 	// TODO handle
+		// }
+
+		// areHeightsEqual := signed.Header().Number().Uint64() == recvMsg.BlockNum
+		// areViewIDsEqual := signed.Header().ViewID().Uint64() == recvMsg.ViewID
+		// areHeadersEqual := bytes.Compare(
+		// 	signed.Hash().Bytes(), recvMsg.BlockHash.Bytes(),
+		// ) == 0
+
+		// // If signer already signed, and the block height is the same, then we
+		// // need to verify the block hash, and if block hash is different, then
+		// // that is a clear case of double signing
+		// if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
+		// 	// TODO
+		// 	if err := rlp.DecodeBytes(recvMsg.Block, &received); err != nil {
+		// 		// TODO Some log
+		// 		return
+		// 	}
+
+		// 	var doubleSign bls.Sign
+		// 	if err := doubleSign.Deserialize(recvMsg.Payload); err != nil {
+		// 		return
+		// 	}
+
+		// 	go func() {
+		// 		consensus.SlashChan <- slash.NewRecord(
+		// 			*shard.FromLibBLSPublicKeyUnsafe(validatorPubKey),
+		// 			signed.Header(), received.Header(),
+		// 			alreadyCastBallot.Signature, &doubleSign,
+		// 			consensus.SelfAddress,
+		// 		)
+		// 	}()
+		// }
+		// return
+	}
 
 	// has to be called before verifying signature
 	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)

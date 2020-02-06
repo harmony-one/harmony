@@ -381,7 +381,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				quorum.Commit,
 				consensus.PubKey,
 				consensus.priKey.SignHash(commitPayload),
-				// TODO Need real block header here
 				nil,
 			)
 
@@ -533,10 +532,14 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		// Construct and send the commit message
 		blockNumHash := make([]byte, 8)
 		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
-		network, _ := consensus.construct(
+		network, err := consensus.construct(
 			msg_pb.MessageType_COMMIT,
 			append(blockNumHash, consensus.blockHash[:]...),
 		)
+		if err != nil {
+			consensus.getLogger().Err(err).Msg("could not create commit message")
+			return
+		}
 		msgToSend := network.Bytes
 		consensus.getLogger().Info().Msg("onNewView === commit")
 		consensus.host.SendMessageToGroups(

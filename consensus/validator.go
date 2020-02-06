@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -133,7 +132,10 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 func (consensus *Consensus) prepare() {
 	network, err := consensus.construct(msg_pb.MessageType_PREPARE, nil)
 	if err != nil {
-		// TODO Error
+		consensus.getLogger().Err(err).
+			Str("message-type", msg_pb.MessageType_PREPARE.String()).
+			Msg("could not construct message")
+		return
 	}
 	msgToSend := network.Bytes
 
@@ -273,7 +275,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	// TODO: genesis account node delay for 1 second,
 	// this is a temp fix for allows FN nodes to earning reward
 	if consensus.delayCommit > 0 {
-		fmt.Println("Delay commit is", consensus.delayCommit)
 		time.Sleep(consensus.delayCommit)
 	}
 
