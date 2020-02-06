@@ -23,7 +23,7 @@ var (
 // PublicKeySizeInBytes ..
 const (
 	PublicKeySizeInBytes    = 48
-	BlsSignatureSizeInBytes = 96
+	BLSSignatureSizeInBytes = 96
 )
 
 // State is the collection of all committees
@@ -35,8 +35,8 @@ type State struct {
 // BlsPublicKey defines the bls public key
 type BlsPublicKey [PublicKeySizeInBytes]byte
 
-// BlsSignature defines the bls signature
-type BlsSignature [BlsSignatureSizeInBytes]byte
+// BLSSignature defines the bls signature
+type BLSSignature [BLSSignatureSizeInBytes]byte
 
 // Slot represents node id (BLS address)
 type Slot struct {
@@ -133,6 +133,31 @@ func EncodeWrapper(shardState State, isStaking bool) ([]byte, error) {
 	}
 
 	return data, err
+}
+
+// ExternalValidators returns only the staking era,
+// external validators aka non-harmony nodes
+func (ss *State) ExternalValidators() []common.Address {
+	processed := make(map[common.Address]struct{})
+	for i := range ss.Shards {
+		shard := ss.Shards[i]
+		for j := range shard.Slots {
+			slot := shard.Slots[j]
+			if slot.EffectiveStake != nil { // For external validator
+				_, ok := processed[slot.EcdsaAddress]
+				if !ok {
+					processed[slot.EcdsaAddress] = struct{}{}
+
+				}
+			}
+		}
+	}
+	slice, i := make([]common.Address, len(processed)), 0
+	for key := range processed {
+		slice[i] = key
+		i++
+	}
+	return slice
 }
 
 // JSON produces a non-pretty printed JSON string of the SuperCommittee

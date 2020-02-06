@@ -223,16 +223,13 @@ func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	pbftMsg := FBFTMessage{}
 	pbftMsg.MessageType = msg.GetType()
 	consensusMsg := msg.GetConsensus()
-
 	pbftMsg.ViewID = consensusMsg.ViewId
 	pbftMsg.BlockNum = consensusMsg.BlockNum
-	pbftMsg.BlockHash = common.Hash{}
 	copy(pbftMsg.BlockHash[:], consensusMsg.BlockHash[:])
 	pbftMsg.Payload = make([]byte, len(consensusMsg.Payload))
 	copy(pbftMsg.Payload[:], consensusMsg.Payload[:])
 	pbftMsg.Block = make([]byte, len(consensusMsg.Block))
 	copy(pbftMsg.Block[:], consensusMsg.Block[:])
-
 	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
 	if err != nil {
 		return nil, err

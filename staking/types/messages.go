@@ -60,7 +60,7 @@ type CreateValidator struct {
 	MinSelfDelegation  *big.Int             `json:"min_self_delegation"`
 	MaxTotalDelegation *big.Int             `json:"max_total_delegation"`
 	SlotPubKeys        []shard.BlsPublicKey `json:"slot_pub_keys"`
-	SlotKeySigs        []shard.BlsSignature `json:"slot_key_sigs"`
+	SlotKeySigs        []shard.BLSSignature `json:"slot_key_sigs"`
 	Amount             *big.Int             `json:"amount"`
 }
 
@@ -73,7 +73,7 @@ type EditValidator struct {
 	MaxTotalDelegation *big.Int            `json:"max_total_delegation" rlp:"nil"`
 	SlotKeyToRemove    *shard.BlsPublicKey `json:"slot_key_to_remove" rlp:"nil"`
 	SlotKeyToAdd       *shard.BlsPublicKey `json:"slot_key_to_add" rlp:"nil"`
-	SlotKeyToAddSig    *shard.BlsSignature `json:"slot_key_to_add_sig" rlp:"nil"`
+	SlotKeyToAddSig    *shard.BLSSignature `json:"slot_key_to_add_sig" rlp:"nil"`
 	Active             *bool               `json:"active" rlp:"nil"`
 }
 

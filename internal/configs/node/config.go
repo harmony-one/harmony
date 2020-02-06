@@ -12,6 +12,7 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/pkg/errors"
 )
@@ -88,6 +89,9 @@ type ConfigType struct {
 	DBDir            string
 	networkType      NetworkType
 	shardingSchedule shardingconfig.Schedule
+	WebHooks         struct {
+		DoubleSigning *slash.DoubleSignWebHooks
+	}
 }
 
 // configs is a list of node configuration.
