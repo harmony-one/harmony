@@ -30,7 +30,7 @@ import (
 type APIBackend struct {
 	hmy              *Harmony
 	MedianStakeCache struct {
-		Mut            sync.Mutex
+		sync.Mutex
 		BlockHeight    int64
 		MedianRawStake *big.Int
 	}
@@ -329,16 +329,15 @@ var (
 
 // GetMedianRawStakeSnapshot ..
 func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
-	b.MedianStakeCache.Mut.Lock()
+	b.MedianStakeCache.Lock()
+	defer b.MedianStakeCache.Unlock()
 	if b.MedianStakeCache.BlockHeight != -1 && b.MedianStakeCache.BlockHeight > int64(rpc.LatestBlockNumber)-20 {
-		defer b.MedianStakeCache.Mut.Unlock()
 		return b.MedianStakeCache.MedianRawStake
 	}
-	b.MedianStakeCache.Mut.Unlock()
+	b.MedianStakeCache.Unlock()
 	candidates := b.hmy.BlockChain().ValidatorCandidates()
 	if len(candidates) == 0 {
-		b.MedianStakeCache.Mut.Lock()
-		defer b.MedianStakeCache.Mut.Unlock()
+		b.MedianStakeCache.Lock()
 		b.MedianStakeCache.MedianRawStake = big.NewInt(0)
 		return b.MedianStakeCache.MedianRawStake
 	}
@@ -363,8 +362,7 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 
 	const isEven = 0
 
-	b.MedianStakeCache.Mut.Lock()
-	defer b.MedianStakeCache.Mut.Unlock()
+	b.MedianStakeCache.Lock()
 	switch l := len(stakes); l % 2 {
 	case isEven:
 		left := stakes[(l/2)-1]

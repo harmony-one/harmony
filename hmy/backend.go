@@ -77,7 +77,7 @@ func New(
 	}
 	hmy.APIBackend = &APIBackend{hmy: hmy,
 		MedianStakeCache: struct {
-			Mut            sync.Mutex
+			sync.Mutex
 			BlockHeight    int64
 			MedianRawStake *big.Int
 		}{
