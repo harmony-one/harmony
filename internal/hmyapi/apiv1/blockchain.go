@@ -636,8 +636,8 @@ func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.C
 	return nil, nil
 }
 
-// DoEstimateGas ..
-func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash uint64, gasCap *big.Int) (hexutil.Uint64, error) {
+// doEstimateGas ..
+func doEstimateGas(ctx context.Context, b Backend, args CallArgs, gasCap *big.Int) (hexutil.Uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
 		lo  uint64 = params.TxGas - 1
@@ -648,7 +648,10 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash 
 		hi = uint64(*args.Gas)
 	} else {
 		// Retrieve the block to act as the gas ceiling
-		block := types.Block{}
+		block, err := b.BlockByNumber(ctx, rpc.LatestBlockNumber)
+		if err != nil {
+			return 0, err
+		}
 		hi = block.GasLimit()
 	}
 	if gasCap != nil && hi > gasCap.Uint64() {
@@ -657,14 +660,6 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash 
 	}
 	cap = hi
 
-	// Set sender address or use a default if none specified
-	if args.From == nil {
-		if wallets := b.AccountManager().Wallets(); len(wallets) > 0 {
-			if accounts := wallets[0].Accounts(); len(accounts) > 0 {
-				args.From = &accounts[0].Address
-			}
-		}
-	}
 	// Use zero-address if none other is available
 	if args.From == nil {
 		args.From = &common.Address{}
@@ -700,7 +695,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash 
 // EstimateGas returns an estimate of the amount of gas needed to execute the
 // given transaction against the current pending block.
 func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (hexutil.Uint64, error) {
-	return DoEstimateGas(ctx, s.b, args, 199, s.b.RPCGasCap())
+	return doEstimateGas(ctx, s.b, args, nil)
 }
 
 // GetCurrentUtilityMetrics ..
