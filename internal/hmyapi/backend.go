@@ -85,6 +85,7 @@ type Backend interface {
 	GetMedianRawStakeSnapshot() *big.Int
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
+	GetTotalStaking() *big.Int
 }
 
 // GetAPIs returns all the APIs.

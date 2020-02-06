@@ -318,14 +318,22 @@ func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Valid
 }
 
 var (
-	two = big.NewInt(2)
+	two                = big.NewInt(2)
+	medianRawStake     = big.NewInt(0)
+	totalStaking       = big.NewInt(0)
+	stakingBlockHeight = rpc.BlockNumber(0)
 )
 
-// GetMedianRawStakeSnapshot  ..
+// GetMedianRawStakeSnapshot ..
 func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
+	if stakingBlockHeight == rpc.LatestBlockNumber {
+		return medianRawStake
+	}
+	stakingBlockHeight = rpc.LatestBlockNumber
 	candidates := b.hmy.BlockChain().ValidatorCandidates()
 	if len(candidates) == 0 {
-		return big.NewInt(0)
+		medianRawStake = big.NewInt(0)
+		return medianRawStake
 	}
 	stakes := []*big.Int{}
 	for i := range candidates {
@@ -351,10 +359,32 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 	case isEven:
 		left := stakes[(l/2)-1]
 		right := stakes[l/2]
-		return new(big.Int).Div(new(big.Int).Add(left, right), two)
+		medianRawStake = new(big.Int).Div(new(big.Int).Add(left, right), two)
 	default:
-		return stakes[l/2]
+		medianRawStake = stakes[l/2]
 	}
+	return medianRawStake
+}
+
+// GetTotalStaking ..
+func (b *APIBackend) GetTotalStaking() *big.Int {
+	if stakingBlockHeight == rpc.LatestBlockNumber {
+		return totalStaking
+	}
+	stakingBlockHeight = rpc.LatestBlockNumber
+	candidates := b.hmy.BlockChain().ValidatorCandidates()
+	stakes := big.NewInt(0)
+	for i := range candidates {
+		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
+		stake := big.NewInt(0)
+		validator.GetAddress()
+		for i := range validator.Delegations {
+			stake.Add(stake, validator.Delegations[i].Amount)
+		}
+		stakes.Add(stakes, stake)
+	}
+	totalStaking = stakes
+	return totalStaking
 }
 
 // GetValidatorStats returns the stats of validator

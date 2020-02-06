@@ -19,6 +19,7 @@ import (
 	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -544,6 +545,26 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 		return nil, fmt.Errorf("validator not found: %s", validatorAddress.Hex())
 	}
 	return validator, nil
+}
+
+// GetStake returns validator current stake.s
+func (s *PublicBlockChainAPI) GetStake(address string) (numeric.Dec, error) {
+	validatorAddress := internal_common.ParseAddr(address)
+	validator := s.b.GetValidatorStats(validatorAddress)
+	if validator == nil {
+		return numeric.NewDec(0), fmt.Errorf("validator not found: %s", validatorAddress.Hex())
+	}
+	return validator.TotalEffectiveStake, nil
+}
+
+// GetTotalStaking returns total staking by validators.
+func (s *PublicBlockChainAPI) GetTotalStaking() *big.Int {
+	return s.b.GetTotalStaking()
+}
+
+// GetTotalSupply returns current total ONE supply.
+func (s *PublicBlockChainAPI) GetTotalSupply() *big.Int {
+	return big.NewInt(0)
 }
 
 // GetDelegationsByDelegator returns list of delegations for a delegator address.
