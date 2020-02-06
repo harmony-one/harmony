@@ -4,12 +4,14 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -35,6 +37,9 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
+
+	golog "github.com/ipfs/go-log"
+	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Version string variables
@@ -102,8 +107,12 @@ var (
 	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
 	devnetHarmonySize = flag.Int("dn_hmy_size", -1, "number of Harmony-operated nodes per shard for -network_type=devnet; negative (default) means equal to -dn_shard_size")
 	// logConn logs incoming/outgoing connections
-	logConn        = flag.Bool("log_conn", false, "log incoming/outgoing connections")
-	keystoreDir    = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
+	logConn     = flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
+
+	// Use a separate log file to log libp2p traces
+	logP2P = flag.Bool("log_p2p", false, "log libp2p debug info")
+
 	initialAccount = &genesis.DeployAccount{}
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
@@ -120,6 +129,8 @@ var (
 	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
 	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
+	// Blacklist of addresses
+	blacklistPath = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
 )
 
 func initSetup() {
@@ -315,9 +326,14 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentConsensus.DisableViewChangeForTestingOnly()
 	}
 
+	blacklist, err := setupBlacklist()
+	if err != nil {
+		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
+	}
+
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, *isArchival)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
@@ -407,6 +423,26 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
 	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
 	return currentNode
+}
+
+func setupBlacklist() (*map[ethCommon.Address]struct{}, error) {
+	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", *blacklistPath)
+	dat, err := ioutil.ReadFile(*blacklistPath)
+	if err != nil {
+		return nil, err
+	}
+	addrMap := make(map[ethCommon.Address]struct{})
+	for _, line := range strings.Split(string(dat), "\n") {
+		if len(line) != 0 { // blacklist file may have trailing empty string line
+			b32 := strings.TrimSpace(strings.Split(string(line), "#")[0])
+			addr, err := common.Bech32ToAddress(b32)
+			if err != nil {
+				return nil, err
+			}
+			addrMap[addr] = struct{}{}
+		}
+	}
+	return &addrMap, nil
 }
 
 func main() {
@@ -550,6 +586,19 @@ func main() {
 	if *enableMemProfiling {
 		memprofiling.GetMemProfiling().Start()
 	}
+
+	if *logP2P {
+		f, err := os.OpenFile(path.Join(*logFolder, "libp2p.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to open libp2p.log. %v\n", err)
+		} else {
+			defer f.Close()
+			backend1 := gologging.NewLogBackend(f, "", 0)
+			gologging.SetBackend(backend1)
+			golog.SetAllLoggers(gologging.DEBUG) // Change to DEBUG for extra info
+		}
+	}
+
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 

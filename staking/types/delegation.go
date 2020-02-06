@@ -22,10 +22,10 @@ const (
 // owned by one delegator, and is associated with the voting power of one
 // validator.
 type Delegation struct {
-	DelegatorAddress common.Address `json:"delegator_address" yaml:"delegator_address"`
-	Amount           *big.Int       `json:"amount" yaml:"amount"`
-	Reward           *big.Int       `json:"reward" yaml:"reward"`
-	Undelegations    []Undelegation `json:"undelegations" yaml:"undelegations"`
+	DelegatorAddress common.Address `json:"delegator_address"`
+	Amount           *big.Int       `json:"amount"`
+	Reward           *big.Int       `json:"reward"`
+	Undelegations    []Undelegation `json:"undelegations"`
 }
 
 // Undelegation represents one undelegation entry

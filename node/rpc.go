@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -34,11 +33,11 @@ var (
 	wsHandler        *rpc.Server
 	httpEndpoint     = ""
 	wsEndpoint       = ""
-	httpModules      = []string{"hmy", "hmy_v2", "net", "net_v2", "explorer"}
+	httpModules      = []string{"hmy", "hmyv2", "net", "netv2", "explorer"}
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
 	httpOrigins      = []string{"*"}
-	wsModules        = []string{"hmy", "hmy_v2", "net", "net_v2", "web3"}
+	wsModules        = []string{"hmy", "hmyv2", "net", "netv2", "web3"}
 	wsOrigins        = []string{"*"}
 	harmony          *hmy.Harmony
 )
@@ -83,12 +82,6 @@ func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
 		}
 	})
 	return result
-}
-
-// IsBeaconChainExplorerNode ..
-func (node *Node) IsBeaconChainExplorerNode() bool {
-	return node.NodeConfig.Role() == nodeconfig.ExplorerNode &&
-		node.Consensus.ShardID == shard.BeaconChainShardID
 }
 
 // StartRPC start RPC service
@@ -211,7 +204,7 @@ func (node *Node) APIs() []rpc.API {
 			Public:    true,
 		},
 		{
-			Namespace: "net_v2",
+			Namespace: "netv2",
 			Version:   "1.0",
 			Service:   apiv2.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
 			Public:    true,

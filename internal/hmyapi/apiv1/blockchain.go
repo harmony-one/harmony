@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -494,16 +495,16 @@ func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformati
 }
 
 var (
-	errNotExplorerNode = errors.New("cannot call this rpc on non beaconchain explorer node")
+	errNotBeaconChainShard = errors.New("cannot call this rpc on non beaconchain node")
 )
 
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
 // explorer node
-func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (uint64, error) {
-	if s.b.IsBeaconChainExplorerNode() {
-		return s.GetMedianRawStakeSnapshot()
+func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetMedianRawStakeSnapshot(), nil
 	}
-	return 0, errNotExplorerNode
+	return nil, errNotBeaconChainShard
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
@@ -700,4 +701,12 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash 
 // given transaction against the current pending block.
 func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (hexutil.Uint64, error) {
 	return DoEstimateGas(ctx, s.b, args, 199, s.b.RPCGasCap())
+}
+
+// GetCurrentUtilityMetrics ..
+func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetCurrentUtilityMetrics()
+	}
+	return nil, errNotBeaconChainShard
 }

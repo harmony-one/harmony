@@ -16,8 +16,12 @@ import (
 
 var (
 	measure                    = new(big.Int).Div(big.NewInt(2), big.NewInt(3))
-	errValidatorEpochDeviation = errors.New("validator snapshot epoch not exactly one epoch behind")
-	errNegativeSign            = errors.New("impossible period of signing")
+	errValidatorEpochDeviation = errors.New(
+		"validator snapshot epoch not exactly one epoch behind",
+	)
+	errNegativeSign = errors.New("impossible period of signing")
+	// ErrDivByZero ..
+	ErrDivByZero = errors.New("toSign of availability cannot be 0, mistake in protocol")
 )
 
 // BlockSigners ..
@@ -67,7 +71,8 @@ func BlockSigners(
 	return payable, missing, nil
 }
 
-// BallotResult ..
+// BallotResult returns
+// (parentCommittee.Slots, payable, missing, err)
 func BallotResult(
 	bc engine.ChainReader, header *block.Header, shardID uint32,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
@@ -97,25 +102,20 @@ func BallotResult(
 		)
 	}
 
-	payable, missing, err := BlockSigners(header.LastCommitBitmap(), parentCommittee)
+	payable, missing, err := BlockSigners(
+		header.LastCommitBitmap(), parentCommittee,
+	)
 	return parentCommittee.Slots, payable, missing, err
 }
 
-// IncrementValidatorSigningCounts ..
-func IncrementValidatorSigningCounts(
-	chain engine.ChainReader, header *block.Header,
-	shardID uint32, state *state.DB, onlyConsider map[common.Address]struct{},
+func bumpCount(
+	chain engine.ChainReader,
+	state *state.DB, onlyConsider map[common.Address]struct{},
+	signers shard.SlotList, didSign bool,
 ) error {
-	_, signers, _, err := BallotResult(chain, header, shardID)
-	if err != nil {
-		return err
-	}
-
-	epoch, one := chain.CurrentHeader().Epoch(), big.NewInt(1)
-
+	epoch := chain.CurrentHeader().Epoch()
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
-
 		if _, ok := onlyConsider[addr]; !ok {
 			continue
 		}
@@ -123,15 +123,38 @@ func IncrementValidatorSigningCounts(
 		if err != nil {
 			return err
 		}
-
-		wrapper.Snapshot.NumBlocksToSign.Add(wrapper.Snapshot.NumBlocksToSign, one)
-		wrapper.Snapshot.NumBlocksSigned.Add(wrapper.Snapshot.NumBlocksSigned, one)
+		wrapper.Snapshot.NumBlocksToSign.Add(
+			wrapper.Snapshot.NumBlocksToSign, common.Big1,
+		)
+		if didSign {
+			wrapper.Snapshot.NumBlocksSigned.Add(
+				wrapper.Snapshot.NumBlocksSigned, common.Big1,
+			)
+		}
 		wrapper.Snapshot.Epoch = epoch
 		if err := state.UpdateStakingInfo(addr, wrapper); err != nil {
 			return err
 		}
 	}
+	return nil
+}
 
+// IncrementValidatorSigningCounts ..
+func IncrementValidatorSigningCounts(
+	chain engine.ChainReader, header *block.Header,
+	shardID uint32, state *state.DB, onlyConsider map[common.Address]struct{},
+) error {
+	_, signers, missing, err := BallotResult(chain, header, shardID)
+
+	if err != nil {
+		return err
+	}
+	if err := bumpCount(chain, state, onlyConsider, signers, true); err != nil {
+		return err
+	}
+	if err := bumpCount(chain, state, onlyConsider, missing, false); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -144,13 +167,12 @@ func SetInactiveUnavailableValidators(
 	bc engine.ChainReader, state *state.DB,
 	onlyConsider map[common.Address]struct{},
 ) error {
-
 	addrs, err := bc.ReadActiveValidatorList()
 	if err != nil {
 		return err
 	}
 
-	one, now := big.NewInt(1), bc.CurrentHeader().Epoch()
+	now := bc.CurrentHeader().Epoch()
 	for i := range addrs {
 
 		if _, ok := onlyConsider[addrs[i]]; !ok {
@@ -174,7 +196,7 @@ func SetInactiveUnavailableValidators(
 		snapSigned := snapshot.Snapshot.NumBlocksSigned
 		snapToSign := snapshot.Snapshot.NumBlocksToSign
 
-		if diff := new(big.Int).Sub(now, snapEpoch); diff.Cmp(one) != 0 {
+		if d := new(big.Int).Sub(now, snapEpoch); d.Cmp(common.Big1) != 0 {
 			return errors.Wrapf(
 				errValidatorEpochDeviation, "bc %s, snapshot %s",
 				now.String(), snapEpoch.String(),
@@ -196,6 +218,10 @@ func SetInactiveUnavailableValidators(
 				errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
 				stats.NumBlocksToSign.String(), snapToSign.String(),
 			)
+		}
+
+		if toSign.Cmp(common.Big0) == 0 {
+			return ErrDivByZero
 		}
 
 		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
