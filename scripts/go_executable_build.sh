@@ -15,7 +15,7 @@ PUBBUCKET=pub.harmony.one
 REL=
 GOOS=linux
 GOARCH=amd64
-FOLDER=/${WHOAMI:-$USER}
+FOLDER=${WHOAMI:-$USER}
 RACE=
 VERBOSE=
 DEBUG=false
@@ -97,6 +97,11 @@ function build_only
    BUILTBY=${USER}@
    local build=$1
 
+   if [[ "$STATIC" == "true" && "$GOOS" == "darwin" ]]; then
+      echo "static build only supported on Linux platform"
+      exit 2
+   fi
+
    set -e
 
    for bin in "${!SRC[@]}"; do
@@ -120,14 +125,19 @@ function build_only
          fi
       fi
    done
-   pushd $BINDIR
-   for lib in "${!LIB[@]}"; do
-      if [ -e ${LIB[$lib]} ]; then
-         cp -pf ${LIB[$lib]} .
-      fi
-   done
 
-   $MD5 "${!SRC[@]}" "${!LIB[@]}" > md5sum.txt
+   pushd $BINDIR
+   if [ "$STATIC" == "true" ]; then
+      $MD5 "${!SRC[@]}" > md5sum.txt
+   else
+      for lib in "${!LIB[@]}"; do
+         if [ -e ${LIB[$lib]} ]; then
+            cp -pf ${LIB[$lib]} .
+         fi
+      done
+
+      $MD5 "${!SRC[@]}" "${!LIB[@]}" > md5sum.txt
+   fi
    popd
 }
 
@@ -139,19 +149,25 @@ function upload
       AWSCLI+=" --profile $PROFILE"
    fi
 
+	if [ "$STATIC" == "true" ]; then
+		FOLDER=${FOLDER}/static
+	fi
+
    for bin in "${!SRC[@]}"; do
-      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}$FOLDER/$bin --acl public-read
+		[ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}/${FOLDER}/$bin --acl public-read
    done
 
-   for lib in "${!LIB[@]}"; do
-      if [ -e ${LIB[$lib]} ]; then
-         $AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}$FOLDER/$lib --acl public-read
-      else
-         echo "!! MISSING ${LIB[$lib]} !!"
-      fi
-   done
+	if [ "$STATIC" != "true" ]; then
+		for lib in "${!LIB[@]}"; do
+			if [ -e ${LIB[$lib]} ]; then
+				$AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}/$FOLDER/$lib --acl public-read
+			else
+				echo "!! MISSING ${LIB[$lib]} !!"
+			fi
+		done
+	fi
 
-   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
+	[ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
 
 function release
@@ -174,6 +190,10 @@ function release
          return ;;
    esac
 
+	if [ "$STATIC" == "true" ]; then
+		FOLDER=${FOLDER}/static
+	fi
+
    for bin in "${!SRC[@]}"; do
       if [ -e $BINDIR/$bin ]; then
          $AWSCLI s3 cp $BINDIR/$bin s3://${PUBBUCKET}/$FOLDER/$bin --acl public-read
@@ -182,13 +202,15 @@ function release
       fi
    done
 
-   for lib in "${!LIB[@]}"; do
-      if [ -e ${LIB[$lib]} ]; then
-         $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$FOLDER/$lib --acl public-read
-      else
-         echo "!! MISSING ${LIB[$lib]} !!"
-      fi
-   done
+	if [ "$STATIC" != "true" ]; then
+		for lib in "${!LIB[@]}"; do
+			if [ -e ${LIB[$lib]} ]; then
+				$AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$FOLDER/$lib --acl public-read
+			else
+				echo "!! MISSING ${LIB[$lib]} !!"
+			fi
+		done
+	fi
 
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${PUBBUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
