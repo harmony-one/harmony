@@ -70,35 +70,31 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		return
 	}
 
-	onAnnounceYes :=
-		!(consensus.IsLeader() && consensus.current.Mode() == Normal)
-	onPreparedYes := onAnnounceYes
-	onCommittedYes := onPreparedYes
-
-	onPrepareYes := consensus.IsLeader()
-	onCommitYes := onPrepareYes
+	intendedForValidator, intendedForLeader :=
+		!(consensus.IsLeader() && consensus.current.Mode() == Normal),
+		consensus.IsLeader()
 
 	switch t := msg.Type; true {
 	// Handle validator intended messages first
 	case t == msg_pb.MessageType_ANNOUNCE &&
-		onAnnounceYes &&
+		intendedForValidator &&
 		consensus.validatorSanityChecks(msg):
 		consensus.onAnnounce(msg)
 	case t == msg_pb.MessageType_PREPARED &&
-		onPreparedYes &&
+		intendedForValidator &&
 		consensus.validatorSanityChecks(msg):
 		consensus.onPrepared(msg)
 	case t == msg_pb.MessageType_COMMITTED &&
-		onCommittedYes &&
+		intendedForValidator &&
 		consensus.validatorSanityChecks(msg):
 		consensus.onCommitted(msg)
 	// Handle leader intended messages now
 	case t == msg_pb.MessageType_PREPARE &&
-		onPrepareYes &&
+		intendedForLeader &&
 		consensus.leaderSanityChecks(msg):
 		consensus.onPrepare(msg)
 	case t == msg_pb.MessageType_COMMIT &&
-		onCommitYes &&
+		intendedForLeader &&
 		consensus.leaderSanityChecks(msg):
 		consensus.onCommit(msg)
 	case t == msg_pb.MessageType_VIEWCHANGE:
