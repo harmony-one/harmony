@@ -1,8 +1,10 @@
 package worker
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
+	"sort"
 	"time"
 
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -20,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -310,7 +313,7 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 // FinalizeNewBlock generate a new block for the next consensus round.
 func (w *Worker) FinalizeNewBlock(
 	sig []byte, signers []byte, viewID uint64, coinbase common.Address,
-	crossLinks types.CrossLinks, shardState *shard.State,
+	crossLinks types.CrossLinks, shardState *shard.State, doubleSigners []slash.Record,
 ) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		sig2 := w.current.header.LastCommitSignature()
@@ -320,6 +323,21 @@ func (w *Worker) FinalizeNewBlock(
 	}
 	w.current.header.SetCoinbase(coinbase)
 	w.current.header.SetViewID(new(big.Int).SetUint64(viewID))
+
+	// Slashes
+	if d := doubleSigners; d != nil && len(d) != 0 {
+		// Enforce order, reproducibility
+		sort.SliceStable(d,
+			func(i, j int) bool {
+				return bytes.Compare(
+					d[i].Beneficiary.Bytes(), d[j].Beneficiary.Bytes(),
+				) == -1
+			},
+		)
+		if rlpBytes, err := rlp.EncodeToBytes(d); err == nil {
+			w.current.header.SetSlashes(rlpBytes)
+		}
+	}
 
 	// Cross Links
 	if crossLinks != nil && len(crossLinks) != 0 {
@@ -360,7 +378,6 @@ func (w *Worker) FinalizeNewBlock(
 	}
 
 	state := w.current.state.Copy()
-
 	copyHeader := types.CopyHeader(w.current.header)
 	// TODO: feed coinbase into here so the proposer gets extra rewards.
 	block, _, err := w.engine.Finalize(

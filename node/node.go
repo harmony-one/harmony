@@ -36,7 +36,6 @@ import (
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -267,7 +266,9 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 	msg := proto_node.ConstructStakingTransactionListMessageAccount(staking.StakingTransactions{stakingTx})
 
-	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(0)) // broadcast to beacon chain
+	shardGroupID := nodeconfig.NewGroupIDByShardID(
+		nodeconfig.ShardID(shard.BeaconChainShardID),
+	) // broadcast to beacon chain
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcastStaking")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
@@ -528,7 +529,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
-		chain.Engine.SetSlasher(node.Consensus.Decider.(slash.Slasher))
 		chain.Engine.SetBeaconchain(beaconChain)
 
 		// the sequence number is the next block number to be added in consensus protocol, which is
@@ -564,6 +564,17 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 	node.peerRegistrationRecord = make(map[string]*syncConfig)
 	node.startConsensus = make(chan struct{})
 	go node.bootstrapConsensus()
+	// Broadcast double-signers reported by consensus
+	if node.Consensus != nil {
+		go func() {
+			for {
+				select {
+				case doubleSign := <-node.Consensus.SlashChan:
+					go node.BroadcastSlash(&doubleSign)
+				}
+			}
+		}()
+	}
 	return &node
 }
 
