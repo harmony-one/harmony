@@ -1185,24 +1185,9 @@ func (bc *BlockChain) WriteBlockWithState(
 		}
 
 		// Find all the active validator addresses and store them in db
-		allActiveValidators := []common.Address{}
-		processed := make(map[common.Address]struct{})
-		for i := range newShardState.Shards {
-			shard := newShardState.Shards[i]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-						allActiveValidators = append(allActiveValidators, shard.Slots[j].EcdsaAddress)
-					}
-				}
-			}
-		}
-
-		// Update active validators
-		if err := bc.WriteActiveValidatorList(allActiveValidators); err != nil {
+		if err := bc.WriteActiveValidatorList(
+			newShardState.ExternalValidators(),
+		); err != nil {
 			return NonStatTy, err
 		}
 
