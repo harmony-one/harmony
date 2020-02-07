@@ -1252,7 +1252,10 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
-			// TODO Write the validator individual reward this round
+			// TODO Delete from DB when have the reward from 2048 blocks ago
+			for _, rewarded := range payout.ReadRewarded() {
+				rawdb.WriteValidatorRewards(batch, &rewarded)
+			}
 			bc.UpdateBlockRewardAccumulator(payout.ReadTotalPayout(), block.Number().Uint64())
 		} else {
 			// block reward never accumulate before staking

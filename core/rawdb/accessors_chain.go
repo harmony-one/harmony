@@ -822,8 +822,8 @@ func ReadValidatorRewardByBlockNumber(
 	return &record, nil
 }
 
-// WriteValidatorRewardByBlockNumber ..
-func WriteValidatorRewardByBlockNumber(
+// WriteValidatorRewards ..
+func WriteValidatorRewards(
 	db DatabaseWriter, record *votepower.VoterReward,
 ) error {
 	data, err := rlp.EncodeToBytes(record)

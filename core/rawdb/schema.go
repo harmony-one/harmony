@@ -91,8 +91,7 @@ var (
 	epochVdfBlockNumberPrefix = []byte("epoch-vdf-block-number")
 
 	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
-	BloomBitsIndexPrefix = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
-
+	BloomBitsIndexPrefix               = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
 	preimageCounter                    = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter                 = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 	currentRewardGivenOutPrefix        = []byte("blk-rwd-")
