@@ -163,8 +163,8 @@ func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
 // TotalDelegation - return the total amount of token in delegation
 func (w *ValidatorWrapper) TotalDelegation() *big.Int {
 	total := big.NewInt(0)
-	for _, entry := range w.Delegations {
-		total.Add(total, entry.Amount)
+	for entry := range w.Delegations {
+		total.Add(total, w.Delegations[entry].Amount)
 	}
 	return total
 }

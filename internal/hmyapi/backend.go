@@ -18,7 +18,7 @@ import (
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/network"
+	"github.com/harmony-one/harmony/staking/economics"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -84,7 +84,7 @@ type Backend interface {
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
 	GetMedianRawStakeSnapshot() *big.Int
 	GetPendingCXReceipts() []*types.CXReceiptsProof
-	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
+	GetCurrentUtilityMetrics() (*economics.UtilityMetric, error)
 }
 
 // GetAPIs returns all the APIs.

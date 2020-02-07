@@ -22,7 +22,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/network"
+	"github.com/harmony-one/harmony/staking/economics"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -453,6 +453,6 @@ func (b *APIBackend) GetPendingCXReceipts() []*types.CXReceiptsProof {
 }
 
 // GetCurrentUtilityMetrics ..
-func (b *APIBackend) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
-	return network.NewUtilityMetricSnapshot(b.hmy.BlockChain())
+func (b *APIBackend) GetCurrentUtilityMetrics() (*economics.UtilityMetric, error) {
+	return economics.NewUtilityMetricSnapshot(b.hmy.BlockChain())
 }

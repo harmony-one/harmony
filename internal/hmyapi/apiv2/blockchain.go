@@ -21,7 +21,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/network"
+	"github.com/harmony-one/harmony/staking/economics"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -669,7 +669,7 @@ func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (h
 }
 
 // GetCurrentUtilityMetrics ..
-func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
+func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*economics.UtilityMetric, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetCurrentUtilityMetrics()
 	}
