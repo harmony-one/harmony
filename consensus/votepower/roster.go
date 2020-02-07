@@ -3,6 +3,7 @@ package votepower
 import (
 	"encoding/hex"
 	"encoding/json"
+	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -39,6 +40,13 @@ type BallotResults struct {
 // EncodePair returns hex encoded tuple (signature, bitmap)
 func (b BallotResults) EncodePair() (string, string) {
 	return hex.EncodeToString(b.Signature[:]), hex.EncodeToString(b.Bitmap[:])
+}
+
+// VoterReward ..
+type VoterReward struct {
+	Validator    common.Address
+	BlockNumber  uint64
+	EarnedReward *big.Int
 }
 
 // Round is a round of voting in any FBFT phase

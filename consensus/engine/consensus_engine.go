@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
@@ -13,6 +14,13 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
+
+// Reward ..
+type Reward interface {
+	ReadBlockNumber() uint64
+	ReadRewarded() []votepower.VoterReward
+	ReadTotalPayout() *big.Int
+}
 
 // ChainReader defines a small collection of methods needed to access the local
 // blockchain during header and/or uncle verification.
@@ -61,7 +69,9 @@ type ChainReader interface {
 
 	//SuperCommitteeForNextEpoch calculates the next epoch's supper committee
 	// isVerify flag is to indicate which stage to call this function: true (verification stage), false(propose stage)
-	SuperCommitteeForNextEpoch(beacon ChainReader, header *block.Header, isVerify bool) (*shard.State, error)
+	SuperCommitteeForNextEpoch(
+		beacon ChainReader, header *block.Header, isVerify bool,
+	) (*shard.State, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.
@@ -120,7 +130,7 @@ type Engine interface {
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
-	) (*types.Block, *big.Int, error)
+	) (*types.Block, Reward, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.

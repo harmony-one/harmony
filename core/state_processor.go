@@ -31,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/economics"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -45,7 +46,9 @@ type StateProcessor struct {
 }
 
 // NewStateProcessor initialises a new StateProcessor.
-func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consensus_engine.Engine) *StateProcessor {
+func NewStateProcessor(
+	config *params.ChainConfig, bc *BlockChain, engine consensus_engine.Engine,
+) *StateProcessor {
 	return &StateProcessor{
 		config: config,
 		bc:     bc,
@@ -61,7 +64,7 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.Config) (
-	types.Receipts, types.CXReceipts, []*types.Log, uint64, *big.Int, error,
+	types.Receipts, types.CXReceipts, []*types.Log, uint64, *economics.Produced, error,
 ) {
 	var (
 		receipts types.Receipts
@@ -82,7 +85,9 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, cxReceipt, _, err := ApplyTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
+		receipt, cxReceipt, _, err := ApplyTransaction(
+			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+		)
 		if err != nil {
 			return nil, nil, nil, 0, nil, err
 		}
@@ -97,8 +102,9 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	L := len(block.Transactions())
 	for i, tx := range block.StakingTransactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
-		receipt, _, err :=
-			ApplyStakingTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
+		receipt, _, err := ApplyStakingTransaction(
+			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+		)
 
 		if err != nil {
 			return nil, nil, nil, 0, nil, err
@@ -116,12 +122,17 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_, payout, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, outcxs, incxs, block.StakingTransactions())
+	_, payoutRecord, err := p.engine.Finalize(
+		p.bc, header, statedb, block.Transactions(),
+		receipts, outcxs, incxs, block.StakingTransactions(),
+	)
 	if err != nil {
 		return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 
-	return receipts, outcxs, allLogs, *usedGas, payout, nil
+	return receipts, outcxs, allLogs, *usedGas, &economics.Produced{
+		payoutRecord.ReadBlockNumber(), nil, nil,
+	}, nil
 }
 
 // return true if it is valid

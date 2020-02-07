@@ -50,6 +50,7 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/economics"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
@@ -1035,7 +1036,7 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 // WriteBlockWithState writes the block and all associated state to the database.
 func (bc *BlockChain) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
-	cxReceipts []*types.CXReceipt, payout *big.Int, state *state.DB,
+	cxReceipts []*types.CXReceipt, payout *economics.Produced, state *state.DB,
 ) (status WriteStatus, err error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
@@ -1265,10 +1266,11 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
-			bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
+			// TODO Write the validator individual reward this round
+			bc.UpdateBlockRewardAccumulator(payout.TotalPayout, block.Number().Uint64())
 		} else {
 			// block reward never accumulate before staking
-			bc.WriteBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
+			bc.WriteBlockRewardAccumulator(common.Big0, block.Number().Uint64())
 		}
 	}
 
@@ -1480,7 +1482,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(block, state, bc.vmConfig)
+		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(
+			block, state, bc.vmConfig,
+		)
+
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1496,7 +1501,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		proctime := time.Since(bstart)
 
 		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, payout, state)
+		status, err := bc.WriteBlockWithState(
+			block, receipts, cxReceipts, payout, state,
+		)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}

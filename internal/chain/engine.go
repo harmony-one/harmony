@@ -3,7 +3,6 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -253,11 +252,12 @@ func (e *engineImpl) Finalize(
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
-) (*types.Block, *big.Int, error) {
+
+) (*types.Block, engine.Reward, error) {
 
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	payout, err := AccumulateRewards(
+	payoutRecord, err := AccumulateRewards(
 		chain, state, header, e.Rewarder(), e.Beaconchain(),
 	)
 	if err != nil {
@@ -323,7 +323,7 @@ func (e *engineImpl) Finalize(
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
-	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
+	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payoutRecord, nil
 }
 
 // QuorumForBlock returns the quorum for the given block header.

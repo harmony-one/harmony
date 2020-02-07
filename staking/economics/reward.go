@@ -3,11 +3,13 @@ package economics
 import (
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 )
@@ -15,6 +17,28 @@ import (
 const (
 	numBlocksPerYear = 300_000_000
 )
+
+// Produced is a record rewards given out after a successful round of consensus
+type Produced struct {
+	BlockNumber uint64
+	Rewarded    []votepower.VoterReward
+	TotalPayout *big.Int
+}
+
+// ReadBlockNumber ..
+func (p *Produced) ReadBlockNumber() uint64 {
+	return p.BlockNumber
+}
+
+// ReadRewarded ..
+func (p *Produced) ReadRewarded() []votepower.VoterReward {
+	return p.Rewarded
+}
+
+// ReadTotalPayout ..
+func (p *Produced) ReadTotalPayout() *big.Int {
+	return p.TotalPayout
+}
 
 var (
 	// BlockReward is the block reward, to be split evenly among block signers.
@@ -34,9 +58,12 @@ var (
 	blocksPerYear          = numeric.NewDec(numBlocksPerYear)
 	// ErrPayoutNotEqualBlockReward ..
 	ErrPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
-	// NoReward ..
-	NoReward = common.Big0
 )
+
+// NewNoReward ..
+func NewNoReward(blockNum uint64) *Produced {
+	return &Produced{blockNum, nil, common.Big0}
+}
 
 func adjust(amount numeric.Dec) numeric.Dec {
 	return amount.MulTruncate(
@@ -117,4 +144,20 @@ func Snapshot(
 		Str("currently-staked", stakedNow.String()).
 		Msg("Computed how much staked right now")
 	return soFarDoledOut, rates, &percentage, nil
+}
+
+// NewUtilityMetricSnapshot ..
+func NewUtilityMetricSnapshot(
+	beaconchain engine.ChainReader,
+) (*UtilityMetric, error) {
+	soFarDoledOut, computedAPRs, percentageStaked, err := Snapshot(
+		beaconchain, time.Now().Unix(), true,
+	)
+	if err != nil {
+		return nil, err
+	}
+	howMuchOff, adjustBy := Adjustment(*percentageStaked)
+	return &UtilityMetric{
+		soFarDoledOut, *percentageStaked, howMuchOff, adjustBy, computedAPRs,
+	}, nil
 }

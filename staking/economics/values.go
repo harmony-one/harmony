@@ -3,10 +3,8 @@ package economics
 import (
 	"encoding/json"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/consensus/engine"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
 )
@@ -31,7 +29,6 @@ func (c *ComputedAPR) MarshalJSON() ([]byte, error) {
 	wrap.APR = c.APR
 	wrap.Validator = common2.MustAddressToBech32(c.Validator)
 	return json.Marshal(wrap)
-
 }
 
 // UtilityMetric ..
@@ -41,20 +38,4 @@ type UtilityMetric struct {
 	Deviation               numeric.Dec   `json:"current-percent-network-deviation"`
 	Adjustment              numeric.Dec   `json:"reward-bonus"`
 	ActiveValidatorsAPR     []ComputedAPR `json:"active-validators-apr"`
-}
-
-// NewUtilityMetricSnapshot ..
-func NewUtilityMetricSnapshot(
-	beaconchain engine.ChainReader,
-) (*UtilityMetric, error) {
-	soFarDoledOut, computedAPRs, percentageStaked, err := Snapshot(
-		beaconchain, time.Now().Unix(), true,
-	)
-	if err != nil {
-		return nil, err
-	}
-	howMuchOff, adjustBy := Adjustment(*percentageStaked)
-	return &UtilityMetric{
-		soFarDoledOut, *percentageStaked, howMuchOff, adjustBy, computedAPRs,
-	}, nil
 }
