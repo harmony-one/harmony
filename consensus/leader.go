@@ -121,6 +121,8 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] No Matching Announce message")
 		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
+		// NOTE: Corner case during ViewChange, Leader potentially not have matching Announce
+		//       If Leader receives majority consensus on Prepare, Leader should not be able to block consensus in this case
 		//return
 	}
 

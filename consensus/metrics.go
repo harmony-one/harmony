@@ -3,10 +3,10 @@ package consensus
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
+	"strings"
+	"time"
 
-	"contrib.go.opencensus.io/exporter/prometheus"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto/message"
 
@@ -46,45 +46,88 @@ var (
 
 var ConsensusViews = []*view.View{
 	&view.View{
+		Name:        "ReceivedMessages",
 		Measure:     ReceivedMessages,
 		TagKeys:     []tag.Key{KeyMessageType, KeyBlsKey},
 		Aggregation: view.Count(),
 	},
 	&view.View{
+		Name:        "ReceivedMessageErrors",
 		Measure:     ReceivedMessageErrors,
 		TagKeys:     []tag.Key{KeyMessageType, KeyBlsKey, KeyErrorMsg},
 		Aggregation: view.Count(),
 	},
 	&view.View{
+		Name:        "ReceivedBytes",
 		Measure:     ReceivedBytes,
 		TagKeys:     []tag.Key{KeyMessageType, KeyBlsKey},
 		Aggregation: defaultBytesDistribution,
 	},
 	&view.View{
+		Name:        "InboundRequestLatency",
 		Measure:     InboundRequestLatency,
 		TagKeys:     []tag.Key{KeyMessageType, KeyBlsKey},
 		Aggregation: defaultMillisecondsDistribution,
 	},
 	&view.View{
+		Name:        "OutboundRequestLatency",
 		Measure:     OutboundRequestLatency,
 		TagKeys:     []tag.Key{KeyMessageType, KeyBlsKey},
 		Aggregation: defaultMillisecondsDistribution,
 	},
 	&view.View{
+		Name:        "SentMessages",
 		Measure:     SentMessages,
 		TagKeys:     []tag.Key{KeyMessageType, KeyBlsKey},
 		Aggregation: view.Count(),
 	},
 	&view.View{
+		Name:        "SentMessageErrors",
 		Measure:     SentMessageErrors,
 		TagKeys:     []tag.Key{KeyMessageType, KeyBlsKey, KeyErrorMsg},
 		Aggregation: view.Count(),
 	},
 	&view.View{
+		Name:        "SentBytes",
 		Measure:     SentBytes,
 		TagKeys:     []tag.Key{KeyMessageType, KeyBlsKey},
 		Aggregation: defaultBytesDistribution,
 	},
+}
+
+type ConcensusMetrics struct {
+	NumSent           []MessageDataPoint   `json:"sentMessages"`
+	BytesSentHist     []HistogramDataPoint `json:"sentBytes"`
+	NumSentErrors     []ErrorDataPoint     `json:"sentErrors"`
+	NumReceived	      []MessageDataPoint   `json:"receivedMessages"`
+	BytesReceivedHist []HistogramDataPoint `json:"receivedBytes"`
+	NumReceivedErrors []ErrorDataPoint     `json:"receivedErrors"`
+}
+
+type MessageDataPoint struct {
+	MessageType string `json:"messageType"`
+	BlsKey      string `json:"blsKey"`
+}
+
+type ErrorDataPoint struct {
+	MessageType  string `json:"messageType"`
+	BlsKey       string `json:"blsKey"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+}
+
+type HistogramDataPoint struct {
+	Bucket string `json:"bucket"`
+	Value  string `json:"count"`
+}
+
+type printExporter struct {}
+
+func (pe *printExporter) ExportView(vd *view.Data) {
+	fmt.Println("Consensus Metrics")
+	for i, row := range vd.Rows {
+		fmt.Printf("\tRow: %#d: %#v\n", i, row)
+	}
+  fmt.Printf("StartTime: %s EndTime: %s\n\n", vd.Start.Round(0), vd.End.Round(0))
 }
 
 // Testing code && Remove before merge
@@ -93,19 +136,8 @@ func init() {
 		fmt.Fprintf(os.Stderr, "Failed to register the views: %v\n", err)
 		os.Exit(1)
 	}
-	pe, err := prometheus.NewExporter(prometheus.Options{
-		Namespace: "harmony",
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create the Prometheus stats exporter: %v", err)
-	}
-	go func() {
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", pe)
-		if err := http.ListenAndServe(":8888", mux); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to run Prometheus scrape endpoint: %v", err)
-		}
-	}()
+	view.RegisterExporter(new(printExporter))
+	view.SetReportingPeriod(60 * time.Second)
 }
 
 func incrementReceivedMessages(msg *message.Message, pubKey string) {
@@ -173,4 +205,26 @@ func incrementSentErrors(phase, pubKey string) {
 		},
 		SentMessageErrors.M(1),
 	)
+}
+
+func GetConsensusMetrics() {
+	data := ConsensusMetrics{}
+	for i, v := range ConsensusViews {
+		if strings.HasSuffix(v.Name, "Latency") {
+			continue
+		} else if strings.HasSuffix(v.Name, "Bytes") {
+			byteData := HistogramMetrics{}
+
+		} else if strings.HasSuffix(v.Name, "Errors") {
+			// Process Errors
+		} else {
+			messageData := []MessageDataPoint{}
+			// Process data
+			if strings.HasPrefix(v.Name, "Sent") {
+				data.NumSent = messageData
+			} else {
+				data.NumReceived = messageData
+			}
+		}
+	}
 }
