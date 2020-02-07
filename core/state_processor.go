@@ -130,9 +130,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 
-	return receipts, outcxs, allLogs, *usedGas, &economics.Produced{
-		payoutRecord.ReadBlockNumber(), nil, nil,
-	}, nil
+	produced := economics.NewProduced(
+		payoutRecord.ReadBlockNumber(), payoutRecord.ReadRewarded(), payoutRecord.ReadTotalPayout(),
+	)
+	return receipts, outcxs, allLogs, *usedGas, produced, nil
 }
 
 // return true if it is valid

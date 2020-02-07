@@ -1246,13 +1246,14 @@ func (bc *BlockChain) WriteBlockWithState(
 
 		//clean/update local database cache after crosslink inserted into blockchain
 		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
-		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
+		const msg = "DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v"
+		utils.Logger().Debug().Msgf(msg, len(*crossLinks), num, err)
 	}
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
 			// TODO Write the validator individual reward this round
-			bc.UpdateBlockRewardAccumulator(payout.TotalPayout, block.Number().Uint64())
+			bc.UpdateBlockRewardAccumulator(payout.ReadTotalPayout(), block.Number().Uint64())
 		} else {
 			// block reward never accumulate before staking
 			bc.WriteBlockRewardAccumulator(common.Big0, block.Number().Uint64())

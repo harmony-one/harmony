@@ -222,11 +222,11 @@ func AccumulateRewards(
 				i++
 			}
 
-			return &economics.Produced{
-				BlockNumber: blockNum,
-				Rewarded:    rewardRecord,
-				TotalPayout: newRewards,
-			}, nil
+			return economics.NewProduced(
+				blockNum,
+				rewardRecord,
+				newRewards,
+			), nil
 		}
 		return economics.NewNoReward(blockNum), nil
 	}
@@ -281,9 +281,9 @@ func AccumulateRewards(
 		Str("TotalAmount", totalAmount.String()).
 		Msg("[Block Reward] Successfully paid out block reward")
 
-	return &economics.Produced{
-			blockNum,
-			[]votepower.VoterReward{},
-			totalAmount},
-		nil
+	return economics.NewProduced(
+		blockNum,
+		[]votepower.VoterReward{},
+		totalAmount,
+	), nil
 }
