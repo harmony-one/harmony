@@ -34,7 +34,7 @@ var (
 	errMinSelfDelegationTooSmall = errors.New("min_self_delegation has to be greater than 1 ONE")
 	errInvalidMaxTotalDelegation = errors.New("max_total_delegation can not be less than min_self_delegation")
 	errCommissionRateTooLarge    = errors.New("commission rate and change rate can not be larger than max commission rate")
-	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
+	errInvalidCommissionRate     = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
 	errNeedAtLeastOneSlotKey     = errors.New("need at least one slot key")
 	errBLSKeysNotMatchSigs       = errors.New("bls keys and corresponding signatures could not be verified")
 	errNilMinSelfDelegation      = errors.New("MinSelfDelegation can not be nil")
@@ -234,19 +234,19 @@ func (w *ValidatorWrapper) SanityCheck() error {
 
 	if w.Validator.Rate.LT(zeroPercent) || w.Validator.Rate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidComissionRate, "rate:%s", w.Validator.Rate.String(),
+			errInvalidCommissionRate, "rate:%s", w.Validator.Rate.String(),
 		)
 	}
 
 	if w.Validator.MaxRate.LT(zeroPercent) || w.Validator.MaxRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidComissionRate, "rate:%s", w.Validator.MaxRate.String(),
+			errInvalidCommissionRate, "rate:%s", w.Validator.MaxRate.String(),
 		)
 	}
 
 	if w.Validator.MaxChangeRate.LT(zeroPercent) || w.Validator.MaxChangeRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidComissionRate, "rate:%s", w.Validator.MaxChangeRate.String(),
+			errInvalidCommissionRate, "rate:%s", w.Validator.MaxChangeRate.String(),
 		)
 	}
 
