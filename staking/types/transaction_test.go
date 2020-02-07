@@ -32,7 +32,7 @@ func CreateTestNewTransaction() (*StakingTransaction, error) {
 		maxRate, _ := numeric.NewDecFromStr("1")
 		maxChangeRate, _ := numeric.NewDecFromStr("0.5")
 		return DirectiveCreateValidator, CreateValidator{
-			Description: &Description{
+			Description: Description{
 				Name:            "SuperHero",
 				Identity:        "YouWouldNotKnow",
 				Website:         "Secret Website",

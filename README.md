@@ -190,6 +190,14 @@ Tx Generator:
 ./scripts/go_executable_build.sh txgen
 ```
 
+### Harmony docs and guides
+
+https://docs.harmony.one
+
+### API guides
+
+https://docs.harmony.one/home/developers/api
+
 ## Usage
 
 You may build the src/harmony.go locally and run local test.

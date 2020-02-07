@@ -6,17 +6,16 @@ import (
 	"fmt"
 	"log"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	peer "github.com/libp2p/go-libp2p-peer"
-
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/staking/slash"
+	staking "github.com/harmony-one/harmony/staking/types"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -99,8 +98,29 @@ type BlockMessageType int
 const (
 	Sync BlockMessageType = iota
 
-	CrossLink // used for crosslink from beacon chain to shard chain
-	Receipt   // cross-shard transaction receipts
+	CrossLink      // used for crosslink from beacon chain to shard chain
+	Receipt        // cross-shard transaction receipts
+	SlashCandidate // A report of a double-signing event
+)
+
+var (
+	// B suffix means Byte
+	nodeB      = byte(proto.Node)
+	blockB     = byte(Block)
+	slashB     = byte(SlashCandidate)
+	txnB       = byte(Transaction)
+	sendB      = byte(Send)
+	stakingB   = byte(Staking)
+	syncB      = byte(Sync)
+	crossLinkB = byte(CrossLink)
+	receiptB   = byte(Receipt)
+	// H suffix means header
+	slashH           = []byte{nodeB, blockB, slashB}
+	transactionListH = []byte{nodeB, txnB, sendB}
+	stakingTxnListH  = []byte{nodeB, stakingB, sendB}
+	syncH            = []byte{nodeB, blockB, syncB}
+	crossLinkH       = []byte{nodeB, blockB, crossLinkB}
+	cxReceiptH       = []byte{nodeB, blockB, receiptB}
 )
 
 // SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
@@ -127,10 +147,7 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
 func ConstructTransactionListMessageAccount(transactions types.Transactions) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Transaction))
-	byteBuffer.WriteByte(byte(Send))
-
+	byteBuffer := bytes.NewBuffer(transactionListH)
 	txs, err := rlp.EncodeToBytes(transactions)
 	if err != nil {
 		log.Fatal(err)
@@ -141,11 +158,10 @@ func ConstructTransactionListMessageAccount(transactions types.Transactions) []b
 }
 
 // ConstructStakingTransactionListMessageAccount constructs serialized staking transactions in account model
-func ConstructStakingTransactionListMessageAccount(transactions types2.StakingTransactions) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Staking))
-	byteBuffer.WriteByte(byte(Send))
-
+func ConstructStakingTransactionListMessageAccount(
+	transactions staking.StakingTransactions,
+) []byte {
+	byteBuffer := bytes.NewBuffer(stakingTxnListH)
 	txs, err := rlp.EncodeToBytes(transactions)
 	if err != nil {
 		log.Fatal(err)
@@ -157,21 +173,23 @@ func ConstructStakingTransactionListMessageAccount(transactions types2.StakingTr
 
 // ConstructBlocksSyncMessage constructs blocks sync message to send blocks to other nodes
 func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(Sync))
-
+	byteBuffer := bytes.NewBuffer(syncH)
 	blocksData, _ := rlp.EncodeToBytes(blocks)
 	byteBuffer.Write(blocksData)
 	return byteBuffer.Bytes()
 }
 
+// ConstructSlashMessage ..
+func ConstructSlashMessage(witness *slash.Record) []byte {
+	byteBuffer := bytes.NewBuffer(slashH)
+	slashData, _ := rlp.EncodeToBytes(witness)
+	byteBuffer.Write(slashData)
+	return byteBuffer.Bytes()
+}
+
 // ConstructCrossLinkMessage constructs cross link message to send to beacon chain
 func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(CrossLink))
-
+	byteBuffer := bytes.NewBuffer(crossLinkH)
 	crosslinks := []types.CrossLink{}
 	for _, header := range headers {
 		if header.Number().Uint64() <= 1 || !bc.Config().IsCrossLink(header.Epoch()) {
@@ -192,13 +210,11 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 // ConstructCXReceiptsProof constructs cross shard receipts and related proof including
 // merkle proof, blockHeader and  commitSignatures
 func ConstructCXReceiptsProof(cxReceiptsProof *types.CXReceiptsProof) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(Block))
-	byteBuffer.WriteByte(byte(Receipt))
+	byteBuffer := bytes.NewBuffer(cxReceiptH)
 	by, err := rlp.EncodeToBytes(cxReceiptsProof)
-
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[ConstructCXReceiptsProof] Encode CXReceiptsProof Error")
+		const msg = "[ConstructCXReceiptsProof] Encode CXReceiptsProof Error"
+		utils.Logger().Error().Err(err).Msg(msg)
 		return []byte{}
 	}
 	byteBuffer.Write(by)

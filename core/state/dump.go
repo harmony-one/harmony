@@ -23,6 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	common2 "github.com/harmony-one/harmony/internal/common"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // DumpAccount ...
@@ -55,31 +57,41 @@ func (db *DB) RawDump() Dump {
 		if err := rlp.DecodeBytes(it.Value, &data); err != nil {
 			panic(err)
 		}
-
 		obj := newObject(nil, common.BytesToAddress(addr), data)
+		var wrapper staking.ValidatorWrapper
+		wrap := ""
+		if err := rlp.DecodeBytes(obj.Code(db.db), &wrapper); err != nil {
+			//
+		} else {
+			marsh, err := json.Marshal(wrapper)
+			if err == nil {
+				wrap = string(marsh)
+			}
+		}
+
 		account := DumpAccount{
 			Balance:  data.Balance.String(),
 			Nonce:    data.Nonce,
 			Root:     common.Bytes2Hex(data.Root[:]),
 			CodeHash: common.Bytes2Hex(data.CodeHash),
-			Code:     common.Bytes2Hex(obj.Code(db.db)),
+			Code:     wrap,
 			Storage:  make(map[string]string),
 		}
 		storageIt := trie.NewIterator(obj.getTrie(db.db).NodeIterator(nil))
 		for storageIt.Next() {
 			account.Storage[common.Bytes2Hex(db.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(storageIt.Value)
 		}
-		dump.Accounts[common.Bytes2Hex(addr)] = account
+		dump.Accounts[common2.MustAddressToBech32(common.BytesToAddress(addr))] = account
 	}
 	return dump
 }
 
 // Dump ...
-func (db *DB) Dump() []byte {
+func (db *DB) Dump() string {
 	json, err := json.MarshalIndent(db.RawDump(), "", "    ")
 	if err != nil {
 		fmt.Println("dump err", err)
 	}
 
-	return json
+	return string(json)
 }

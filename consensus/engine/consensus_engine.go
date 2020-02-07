@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -106,12 +105,6 @@ type Engine interface {
 
 	// SetRewarder assigns the Distributor used in block reward
 	SetRewarder(reward.Distributor)
-
-	// Slasher handles slashing accounts due to inavailibility or double-signing
-	Slasher() slash.Slasher
-
-	// SetSlasher assigns the slasher used
-	SetSlasher(slash.Slasher)
 
 	// Beaconchain provides the handle for Beaconchain
 	Beaconchain() ChainReader
