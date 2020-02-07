@@ -4,12 +4,14 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -149,6 +151,8 @@ var (
 	// Bad block revert
 	doRevertBefore = flag.Int("do_revert_before", -1, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", -1, "The revert will rollback all blocks until and including block number revert_to")
+	// Blacklist of addresses
+	blacklistPath = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
 )
 
 func initSetup() {
@@ -325,9 +329,14 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentConsensus.DisableViewChangeForTestingOnly()
 	}
 
+	blacklist, err := setupBlacklist()
+	if err != nil {
+		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
+	}
+
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, *isArchival)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
@@ -419,6 +428,26 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
 	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
 	return currentNode
+}
+
+func setupBlacklist() (*map[ethCommon.Address]struct{}, error) {
+	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", *blacklistPath)
+	dat, err := ioutil.ReadFile(*blacklistPath)
+	if err != nil {
+		return nil, err
+	}
+	addrMap := make(map[ethCommon.Address]struct{})
+	for _, line := range strings.Split(string(dat), "\n") {
+		if len(line) != 0 { // blacklist file may have trailing empty string line
+			b32 := strings.TrimSpace(strings.Split(string(line), "#")[0])
+			addr, err := common.Bech32ToAddress(b32)
+			if err != nil {
+				return nil, err
+			}
+			addrMap[addr] = struct{}{}
+		}
+	}
+	return &addrMap, nil
 }
 
 func main() {

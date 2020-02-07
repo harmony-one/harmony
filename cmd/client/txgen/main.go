@@ -102,7 +102,7 @@ func setUpTXGen() *node.Node {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensusObj, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil, decider)
 	chainDBFactory := &shardchain.MemDBFactory{}
-	txGen := node.New(myhost, consensusObj, chainDBFactory, false) //Changed it : no longer archival node.
+	txGen := node.New(myhost, consensusObj, chainDBFactory, nil, false) //Changed it : no longer archival node.
 	txGen.Client = client.NewClient(txGen.GetHost(), uint32(shardID))
 	consensusObj.ChainReader = txGen.Blockchain()
 	genesisShardingConfig := core.ShardingSchedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
