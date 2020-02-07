@@ -23,8 +23,11 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnAnnounce] Unparseable leader message")
+		incrementReceivedErrors(msg.GetType().String(), errSender)
 		return
 	}
+
+	incrementReceivedMessages(msg, recvMsg.SenderPubkey.SerializeToHexStr())
 
 	// verify validity of block header object
 	// TODO: think about just sending the block hash instead of the header.
@@ -35,6 +38,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnAnnounce] Unparseable block header data")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -45,6 +49,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			Uint64("hdrBlockNum", header.Number().Uint64()).
 			Uint64("consensuBlockNum", consensus.blockNum).
 			Msg("[OnAnnounce] BlockNum does not match")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -54,6 +59,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			Str("inChain", consensus.ChainReader.CurrentHeader().Number().String()).
 			Str("MsgBlockNum", header.Number().String()).
 			Msg("[OnAnnounce] Block content is not verified successfully")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -89,6 +95,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).
 				Str("LeaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
 				Msg("[OnAnnounce] Leader is malicious")
+			incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 			if consensus.current.Mode() == ViewChanging {
 				viewID := consensus.current.ViewID()
 				consensus.startViewChange(viewID + 1)
@@ -123,6 +130,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 				Uint64("MsgViewID", recvMsg.ViewID).
 				Uint64("MsgBlockNum", recvMsg.BlockNum).
 				Msg("[OnAnnounce] ViewID check failed")
+			incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		}
 		return
 	}
@@ -135,6 +143,7 @@ func (consensus *Consensus) prepare() {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_PREPARE.String()).
 			Msg("could not construct message")
+		incrementSentErrors(msg_pb.MessageType_PREPARE.String(), consensus.PubKey.SerializeToHexStr())
 		return
 	}
 	msgToSend := network.Bytes
@@ -147,10 +156,12 @@ func (consensus *Consensus) prepare() {
 		host.ConstructP2pMessage(byte(17), msgToSend),
 	); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
+		incrementSentErrors(msg_pb.MessageType_PREPARE.String(), consensus.PubKey.SerializeToHexStr())
 	} else {
 		consensus.getLogger().Info().
 			Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
 			Msg("[OnAnnounce] Sent Prepare Message!!")
+		incrementSentMessages(msgToSend, msg_pb.MessageType_PREPARE.String(), consensus.PubKey.SerializeToHexStr())
 	}
 	consensus.getLogger().Debug().
 		Str("From", consensus.phase.String()).
@@ -165,8 +176,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnPrepared] Unparseable validator message")
+		incrementReceivedErrors(msg.GetType().String(), errSender)
 		return
 	}
+
+	incrementReceivedMessages(msg, recvMsg.SenderPubkey.SerializeToHexStr())
+
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -183,6 +198,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!!")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -199,6 +215,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Msg("[OnPrepared] failed to verify multi signature for prepare phase")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -209,6 +226,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnPrepared] Unparseable block header data")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 	// let this handle it own logs
@@ -243,6 +261,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 				Uint64("MsgViewID", recvMsg.ViewID).
 				Uint64("MsgBlockNum", recvMsg.BlockNum).
 				Msg("[OnPrepared] ViewID check failed")
+			incrementSentErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		}
 		return
 	}
@@ -284,11 +303,13 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		host.ConstructP2pMessage(byte(17), msgToSend),
 	); err != nil {
 		consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
+		incrementSentErrors(msg_pb.MessageType_COMMIT.String(), consensus.PubKey.SerializeToHexStr())
 	} else {
 		consensus.getLogger().Info().
 			Uint64("blockNum", consensus.blockNum).
 			Hex("blockHash", consensus.blockHash[:]).
 			Msg("[OnPrepared] Sent Commit Message!!")
+		incrementSentMessages(msgToSend, msg_pb.MessageType_COMMIT.String(), consensus.PubKey.SerializeToHexStr())
 	}
 
 	consensus.getLogger().Debug().
@@ -302,8 +323,11 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
+		incrementReceivedErrors(msg.GetType().String(), errSender)
 		return
 	}
+
+	incrementReceivedMessages(msg, recvMsg.SenderPubkey.SerializeToHexStr())
 
 	if recvMsg.BlockNum < consensus.blockNum {
 		consensus.getLogger().Info().
@@ -316,6 +340,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -332,6 +357,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Error().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnCommitted] Failed to verify the multi signature for commit phase")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 

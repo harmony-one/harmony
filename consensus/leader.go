@@ -21,11 +21,13 @@ func (consensus *Consensus) announce(block *types.Block) {
 	encodedBlock, err := rlp.EncodeToBytes(block)
 	if err != nil {
 		consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
+		incrementSentErrors(msg_pb.MessageType_ANNOUNCE.String(), consensus.PubKey.SerializeToHexStr())
 		return
 	}
 	encodedBlockHeader, err := rlp.EncodeToBytes(block.Header())
 	if err != nil {
 		consensus.getLogger().Debug().Msg("[Announce] Failed encoding block header")
+		incrementSentErrors(msg_pb.MessageType_ANNOUNCE.String(), consensus.PubKey.SerializeToHexStr())
 		return
 	}
 
@@ -36,6 +38,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_ANNOUNCE.String()).
 			Msg("failed constructing message")
+		incrementSentErrors(msg_pb.MessageType_ANNOUNCE.String(), consensus.PubKey.SerializeToHexStr())
 		return
 	}
 	msgToSend, FPBTMsg := network.Bytes, network.FBFTMsg
@@ -57,9 +60,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 		nil,
 	)
 	if err := consensus.prepareBitmap.SetKey(consensus.PubKey, true); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg(
-			"[Announce] Leader prepareBitmap SetKey failed",
-		)
+		consensus.getLogger().Warn().Err(err).
+			Msg("[Announce] Leader prepareBitmap SetKey failed")
+		incrementSentErrors(msg_pb.MessageType_ANNOUNCE.String(), consensus.PubKey.SerializeToHexStr())
 		return
 	}
 
@@ -73,11 +76,13 @@ func (consensus *Consensus) announce(block *types.Block) {
 				nodeconfig.ShardID(consensus.ShardID),
 			))).
 			Msg("[Announce] Cannot send announce message")
+		incrementSentErrors(msg_pb.MessageType_ANNOUNCE.String(), consensus.PubKey.SerializeToHexStr())
 	} else {
 		consensus.getLogger().Info().
 			Str("blockHash", block.Hash().Hex()).
 			Uint64("blockNum", block.NumberU64()).
 			Msg("[Announce] Sent Announce Message!!")
+		incrementSentMessages(msgToSend, msg_pb.MessageType_ANNOUNCE.String(), consensus.PubKey.SerializeToHexStr())
 	}
 
 	consensus.getLogger().Debug().
@@ -91,8 +96,11 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnPrepare] Unparseable validator message")
+		incrementReceivedErrors(msg.GetType().String(), errSender)
 		return
 	}
+
+	incrementReceivedMessages(msg, recvMsg.SenderPubkey.SerializeToHexStr())
 
 	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
 		consensus.getLogger().Debug().
@@ -100,6 +108,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] Message ViewId or BlockNum not match")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -111,6 +120,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] No Matching Announce message")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		//return
 	}
 
@@ -143,10 +153,12 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Msg("[OnPrepare] Failed to deserialize bls signature")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 	if !sign.VerifyHash(recvMsg.SenderPubkey, consensus.blockHash[:]) {
 		consensus.getLogger().Error().Msg("[OnPrepare] Received invalid BLS signature")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -160,6 +172,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -171,6 +184,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			consensus.getLogger().Err(err).
 				Str("message-type", msg_pb.MessageType_PREPARED.String()).
 				Msg("failed constructing message")
+			incrementSentErrors(msg_pb.MessageType_PREPARED.String(), consensus.PubKey.SerializeToHexStr())
 			return
 		}
 		msgToSend, FBFTMsg, aggSig :=
@@ -193,6 +207,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
 			consensus.getLogger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
+			incrementSentErrors(msg_pb.MessageType_PREPARED.String(), consensus.PubKey.SerializeToHexStr())
 			return
 		}
 
@@ -204,11 +219,13 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			host.ConstructP2pMessage(byte(17), msgToSend),
 		); err != nil {
 			consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
+			incrementSentErrors(msg_pb.MessageType_PREPARED.String(), consensus.PubKey.SerializeToHexStr())
 		} else {
 			consensus.getLogger().Debug().
 				Hex("blockHash", consensus.blockHash[:]).
 				Uint64("blockNum", consensus.blockNum).
 				Msg("[OnPrepare] Sent Prepared Message!!")
+			incrementSentMessages(msgToSend, msg_pb.MessageType_PREPARED.String(), consensus.PubKey.SerializeToHexStr())
 		}
 		consensus.msgSender.StopRetry(msg_pb.MessageType_ANNOUNCE)
 		// Stop retry committed msg of last consensus
@@ -224,11 +241,13 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	recvMsg, err := ParseFBFTMessage(msg)
-
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Parse pbft message failed")
+		incrementReceivedErrors(msg.GetType().String(), errSender)
 		return
 	}
+
+	incrementReceivedMessages(msg, recvMsg.SenderPubkey.SerializeToHexStr())
 
 	// let it handle its own logs
 	// TODO(Edgar)(TEMP DISABLE while testing double sign)
@@ -248,6 +267,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		quorum.Commit, validatorPubKey,
 	); alreadyCastBallot != nil {
 		logger.Debug().Msg("voter already cast commit message")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 
 		// TODO(Edgar) Still working out double sign
@@ -297,6 +317,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	var sign bls.Sign
 	if err := sign.Deserialize(commitSig); err != nil {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -310,6 +331,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	if !sign.VerifyHash(recvMsg.SenderPubkey, commitPayload) {
 		logger.Error().Msg("[OnCommit] Cannot verify commit message")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 
@@ -324,6 +346,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnCommit] commitBitmap.SetKey failed")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return
 	}
 

@@ -26,6 +26,7 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	msg := &msg_pb.Message{}
 	if err := protobuf.Unmarshal(payload, msg); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("Failed to unmarshal message payload.")
+		incrementReceivedErrors(errMessage, errSender)
 		return
 	}
 

@@ -15,12 +15,14 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		} else {
 			consensus.getLogger().Error().Err(err).Msg("VerifySenderKey failed")
 		}
+		incrementReceivedErrors(msg.GetType().String(), errSender)
 		return false
 	}
 
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
 		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
 		consensus.getLogger().Warn().Msg("[OnPrepared] SenderKey not match leader PubKey")
+		incrementReceivedErrors(msg.GetType().String(), senderKey. SerializeToHexStr())
 		return false
 	}
 
@@ -28,6 +30,7 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		consensus.getLogger().Error().Err(err).Msg(
 			"Failed to verify sender's signature",
 		)
+		incrementReceivedErrors(msg.GetType().String(), senderKey.SerializeToHexStr())
 		return false
 	}
 
@@ -42,14 +45,16 @@ func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
 				"[OnAnnounce] sender key not in this slot's subcommittee",
 			)
 		} else {
-			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] erifySenderKey failed")
+			consensus.getLogger().Error().Err(err).Msg("[OnAnnounce] VerifySenderKey failed")
 		}
+		incrementReceivedErrors(msg.GetType().String(), errSender)
 		return false
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
 		consensus.getLogger().Error().Err(err).Msg(
 			"[OnPrepare] Failed to verify sender's signature",
 		)
+		incrementReceivedErrors(msg.GetType().String(), senderKey.SerializeToHexStr())
 		return false
 	}
 
@@ -66,6 +71,7 @@ func (consensus *Consensus) onCommitSanityChecks(
 			Uint64("blockNum", consensus.blockNum).
 			Str("ValidatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
 			Msg("[OnCommit] BlockNum/viewID not match")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return false
 	}
 
@@ -75,6 +81,7 @@ func (consensus *Consensus) onCommitSanityChecks(
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnCommit] Cannot find matching blockhash")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return false
 	}
 
@@ -83,6 +90,7 @@ func (consensus *Consensus) onCommitSanityChecks(
 			Hex("blockHash", recvMsg.BlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnCommit] Cannot find matching prepared message")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return false
 	}
 	return true
@@ -97,6 +105,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", blockObj.NumberU64()).
 			Msg("[OnPrepared] BlockNum not match")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return false
 	}
 	if blockObj.Header().Hash() != recvMsg.BlockHash {
@@ -105,6 +114,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
 			Str("blockObjHash", blockObj.Header().Hash().Hex()).
 			Msg("[OnPrepared] BlockHash not match")
+		incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 		return false
 	}
 	if consensus.current.Mode() == Normal {
@@ -115,12 +125,14 @@ func (consensus *Consensus) onPreparedSanityChecks(
 				Str("inChain", consensus.ChainReader.CurrentHeader().Number().String()).
 				Str("MsgBlockNum", blockObj.Header().Number().String()).
 				Msg("[OnPrepared] Block header is not verified successfully")
+			incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 			return false
 		}
 		if consensus.BlockVerifier == nil {
 			// do nothing
 		} else if err := consensus.BlockVerifier(blockObj); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
+			incrementReceivedErrors(recvMsg.MessageType.String(), recvMsg.SenderPubkey.SerializeToHexStr())
 			return false
 		}
 	}
