@@ -150,7 +150,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blacklist
+unset upgrade_rel public_rpc blacklist
 start_clean=false
 loop=true
 run_as_root=true
