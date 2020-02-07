@@ -11,22 +11,24 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 )
 
-type computedAPR struct {
+// ComputedAPR ..
+type ComputedAPR struct {
 	Validator        common.Address
 	TotalStakedToken *big.Int    `json:"total-staked-token"`
 	StakeRatio       numeric.Dec `json:"stake-ratio"`
-	ComputedAPR      numeric.Dec `json:"computed-apr"`
+	APR              numeric.Dec `json:"computed-apr"`
 }
 
-func (c *computedAPR) MarshalJSON() ([]byte, error) {
+// MarshalJSON ..
+func (c *ComputedAPR) MarshalJSON() ([]byte, error) {
 	type t struct {
-		computedAPR
+		ComputedAPR
 		Validator string `json:"earning-account"`
 	}
 	wrap := t{}
 	wrap.TotalStakedToken = c.TotalStakedToken
 	wrap.StakeRatio = c.StakeRatio
-	wrap.ComputedAPR = c.ComputedAPR
+	wrap.APR = c.APR
 	wrap.Validator = common2.MustAddressToBech32(c.Validator)
 	return json.Marshal(wrap)
 
@@ -38,7 +40,7 @@ type UtilityMetric struct {
 	CurrentStakedPercentage numeric.Dec   `json:"current-percent-token-staked"`
 	Deviation               numeric.Dec   `json:"current-percent-network-deviation"`
 	Adjustment              numeric.Dec   `json:"reward-bonus"`
-	ActiveValidatorsAPR     []computedAPR `json:"active-validators-apr"`
+	ActiveValidatorsAPR     []ComputedAPR `json:"active-validators-apr"`
 }
 
 // NewUtilityMetricSnapshot ..

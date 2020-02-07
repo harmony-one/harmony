@@ -23,7 +23,6 @@ var (
 	BaseStakedReward = numeric.NewDecFromBigInt(new(big.Int).Mul(
 		big.NewInt(18), big.NewInt(denominations.One),
 	))
-	// BlockRewardStakedCase is the baseline block reward in staked case -
 	totalTokens = numeric.NewDecFromBigInt(
 		new(big.Int).Mul(big.NewInt(12_600_000_000), big.NewInt(denominations.One)),
 	)
@@ -60,9 +59,9 @@ func Snapshot(
 	beaconchain engine.ChainReader,
 	timestamp int64,
 	includeAPRs bool,
-) (*big.Int, []computedAPR, *numeric.Dec, error) {
+) (*big.Int, []ComputedAPR, *numeric.Dec, error) {
 	stakedNow, rates, junk :=
-		numeric.ZeroDec(), []computedAPR{}, numeric.ZeroDec()
+		numeric.ZeroDec(), []ComputedAPR{}, numeric.ZeroDec()
 	// Only active validators' stake is counted in
 	// stake ratio because only their stake is under slashing risk
 	active, err := beaconchain.ReadActiveValidatorList()
@@ -70,7 +69,7 @@ func Snapshot(
 		return nil, nil, nil, err
 	}
 	if includeAPRs {
-		rates = make([]computedAPR, len(active))
+		rates = make([]ComputedAPR, len(active))
 	}
 	soFarDoledOut, err := beaconchain.ReadBlockRewardAccumulator(
 		beaconchain.CurrentHeader().Number().Uint64(),
@@ -90,7 +89,7 @@ func Snapshot(
 		total := wrapper.TotalDelegation()
 		stakedNow = stakedNow.Add(numeric.NewDecFromBigInt(total))
 		if includeAPRs {
-			rates[i] = computedAPR{active[i], total, junk, numeric.ZeroDec()}
+			rates[i] = ComputedAPR{active[i], total, junk, numeric.ZeroDec()}
 		}
 	}
 
@@ -106,7 +105,7 @@ func Snapshot(
 		if reward := BaseStakedReward.Sub(
 			rates[i].StakeRatio.Sub(targetStakedPercentage).Mul(potentialAdjust),
 		); reward.GT(zero) {
-			rates[i].ComputedAPR = blocksPerYear.Mul(reward).Quo(stakedNow)
+			rates[i].APR = blocksPerYear.Mul(reward).Quo(stakedNow)
 		}
 
 	}
