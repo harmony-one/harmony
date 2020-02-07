@@ -42,11 +42,17 @@ func (b BallotResults) EncodePair() (string, string) {
 	return hex.EncodeToString(b.Signature[:]), hex.EncodeToString(b.Bitmap[:])
 }
 
+// ShardReward ..
+type ShardReward struct {
+	ShardID      uint32
+	EarnedReward *big.Int
+}
+
 // VoterReward ..
 type VoterReward struct {
-	Validator    common.Address
-	BlockNumber  uint64
-	EarnedReward *big.Int
+	Validator   common.Address
+	BlockNumber uint64
+	ByShards    []ShardReward
 }
 
 // Round is a round of voting in any FBFT phase

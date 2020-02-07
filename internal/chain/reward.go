@@ -21,6 +21,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+type slotPayable struct {
+	payout  numeric.Dec
+	payee   common.Address
+	shardID uint32
+	bucket  int
+	index   int
+}
+
 func ballotResultBeaconchain(
 	bc engine.ChainReader, header *block.Header,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
@@ -76,6 +84,8 @@ func AccumulateRewards(
 
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		members, payable, _, err := ballotResultBeaconchain(beaconChain, header)
+		allRewards := make(map[common.Address]map[uint32]*big.Int, len(payable))
+
 		if err != nil {
 			return economics.NewNoReward(blockNum), err
 		}
@@ -97,7 +107,10 @@ func AccumulateRewards(
 				due := defaultReward.Mul(
 					voter.EffectivePercent.Quo(votepower.StakersShare),
 				).RoundInt()
-				newRewards = new(big.Int).Add(newRewards, due)
+				newRewards.Add(newRewards, due)
+				allRewards[voter.EarningAccount] = map[uint32]*big.Int{
+					shard.BeaconChainShardID: new(big.Int).Set(due),
+				}
 				state.AddReward(snapshot, due)
 			}
 		}
@@ -105,18 +118,9 @@ func AccumulateRewards(
 		// Handle rewards for shardchain
 		if cxLinks := header.CrossLinks(); len(cxLinks) != 0 {
 			crossLinks := types.CrossLinks{}
-			err := rlp.DecodeBytes(cxLinks, &crossLinks)
-			if err != nil {
+			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
 				return economics.NewNoReward(blockNum), err
 			}
-
-			type slotPayable struct {
-				payout numeric.Dec
-				payee  common.Address
-				bucket int
-				index  int
-			}
-
 			allPayables := []slotPayable{}
 
 			for i := range crossLinks {
@@ -133,7 +137,9 @@ func AccumulateRewards(
 
 				subComm := shardState.FindCommitteeByID(cxLink.ShardID())
 				// _ are the missing signers, later for slashing
-				payableSigners, _, err := availability.BlockSigners(cxLink.Bitmap(), subComm)
+				payableSigners, _, err := availability.BlockSigners(
+					cxLink.Bitmap(), subComm,
+				)
 
 				if err != nil {
 					return economics.NewNoReward(blockNum), err
@@ -143,6 +149,7 @@ func AccumulateRewards(
 				if err != nil {
 					return economics.NewNoReward(blockNum), err
 				}
+
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
 					if !voter.IsHarmonyNode && !voter.EffectivePercent.IsZero() {
@@ -151,14 +158,14 @@ func AccumulateRewards(
 						)
 						to := voter.EarningAccount
 						allPayables = append(allPayables, slotPayable{
-							payout: due,
-							payee:  to,
-							bucket: i,
-							index:  j,
+							payout:  due,
+							payee:   to,
+							shardID: cxLink.ShardID(),
+							bucket:  i,
+							index:   j,
 						})
 					}
 				}
-
 			}
 
 			resultsHandle := make([][]slotPayable, len(crossLinks))
@@ -180,22 +187,44 @@ func AccumulateRewards(
 				)
 			}
 
-			// Finally do the pay
+			// Finally do the pay and record the payouts
 			for bucket := range resultsHandle {
 				for payThem := range resultsHandle[bucket] {
-					snapshot, err := bc.ReadValidatorSnapshot(resultsHandle[bucket][payThem].payee)
+					addr := resultsHandle[bucket][payThem].payee
+					shardID := resultsHandle[bucket][payThem].shardID
+					snapshot, err := bc.ReadValidatorSnapshot(addr)
 					if err != nil {
 						return economics.NewNoReward(blockNum), err
 					}
 					due := resultsHandle[bucket][payThem].payout.TruncateInt()
-					newRewards = new(big.Int).Add(newRewards, due)
+					newRewards.Add(newRewards, due)
+
+					if current, exists := allRewards[addr][shardID]; exists {
+						current.Add(current, due)
+					} else {
+						allRewards[addr][shardID] = new(big.Int).Set(due)
+					}
+
 					state.AddReward(snapshot, due)
 				}
 			}
 
+			rewardRecord, i := make([]votepower.VoterReward, len(allRewards)), 0
+
+			for validator, payout := range allRewards {
+				rewardRecord[i] = votepower.VoterReward{
+					validator, blockNum, []votepower.ShardReward{},
+				}
+				bookie := rewardRecord[i].ByShards
+				for shardID, reward := range payout {
+					bookie = append(bookie, votepower.ShardReward{shardID, reward})
+				}
+				i++
+			}
+
 			return &economics.Produced{
 				BlockNumber: blockNum,
-				Rewarded:    []votepower.VoterReward{},
+				Rewarded:    rewardRecord,
 				TotalPayout: newRewards,
 			}, nil
 		}
