@@ -3,7 +3,6 @@ package economics
 import (
 	"errors"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/common/denominations"
@@ -149,20 +148,4 @@ func Snapshot(
 		Str("currently-staked", stakedNow.String()).
 		Msg("Computed how much staked right now")
 	return soFarDoledOut, rates, &percentage, nil
-}
-
-// NewUtilityMetricSnapshot ..
-func NewUtilityMetricSnapshot(
-	beaconchain engine.ChainReader,
-) (*UtilityMetric, error) {
-	soFarDoledOut, computedAPRs, percentageStaked, err := Snapshot(
-		beaconchain, time.Now().Unix(), true,
-	)
-	if err != nil {
-		return nil, err
-	}
-	howMuchOff, adjustBy := Adjustment(*percentageStaked)
-	return &UtilityMetric{
-		soFarDoledOut, *percentageStaked, howMuchOff, adjustBy, computedAPRs,
-	}, nil
 }
