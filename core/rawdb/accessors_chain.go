@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -779,7 +780,9 @@ func ReadDelegationsByDelegator(db DatabaseReader, delegator common.Address) ([]
 }
 
 // WriteDelegationsByDelegator stores the list of validators delegated by a delegator
-func WriteDelegationsByDelegator(db DatabaseWriter, delegator common.Address, indices []staking.DelegationIndex) error {
+func WriteDelegationsByDelegator(
+	db DatabaseWriter, delegator common.Address, indices []staking.DelegationIndex,
+) error {
 	bytes, err := rlp.EncodeToBytes(indices)
 	if err != nil {
 		utils.Logger().Error().Msg("[writeDelegationsByDelegator] Failed to encode")
@@ -802,4 +805,35 @@ func ReadBlockRewardAccumulator(db DatabaseReader, number uint64) (*big.Int, err
 // WriteBlockRewardAccumulator ..
 func WriteBlockRewardAccumulator(db DatabaseWriter, newAccum *big.Int, number uint64) error {
 	return db.Put(blockRewardAccumKey(number), newAccum.Bytes())
+}
+
+// ReadValidatorRewardByBlockNumber ..
+func ReadValidatorRewardByBlockNumber(
+	db DatabaseReader, validator common.Address, number uint64,
+) (*votepower.VoterReward, error) {
+	data, err := db.Get(stakedValidatorRewardByBlockKey(validator, number))
+	if err != nil {
+		return nil, err
+	}
+	record := votepower.VoterReward{}
+	if err := rlp.DecodeBytes(data, &record); err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
+
+// WriteValidatorRewardByBlockNumber ..
+func WriteValidatorRewardByBlockNumber(
+	db DatabaseWriter, record *votepower.VoterReward,
+) error {
+	data, err := rlp.EncodeToBytes(record)
+	if err != nil {
+		return err
+	}
+	if err := db.Put(stakedValidatorRewardByBlockKey(
+		record.Validator, record.BlockNumber,
+	), data); err != nil {
+		return err
+	}
+	return nil
 }
