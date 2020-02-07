@@ -212,7 +212,8 @@ func (w *ValidatorWrapper) SanityCheck() error {
 	}
 
 	// MaxTotalDelegation must not be less than MinSelfDelegation
-	if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
+	if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 &&
+		w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) != 0 {
 		return errors.Wrapf(
 			errInvalidMaxTotalDelegation,
 			"max-total-delegation %s min-self-delegation %s",
@@ -223,7 +224,8 @@ func (w *ValidatorWrapper) SanityCheck() error {
 
 	totalDelegation := w.TotalDelegation()
 	// Total delegation must be <= MaxTotalDelegation
-	if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
+	if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 &&
+		w.Validator.MaxTotalDelegation.Cmp(big.NewInt(0)) != 0 {
 		return errors.Wrapf(
 			errInvalidTotalDelegation,
 			"total %s max-total %s",
