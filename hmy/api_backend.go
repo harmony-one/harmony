@@ -220,8 +220,12 @@ func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 }
 
 // GetBalance returns balance of an given address.
-func (b *APIBackend) GetBalance(address common.Address) (*big.Int, error) {
-	return b.hmy.nodeAPI.GetBalanceOfAddress(address)
+func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error) {
+	state, _, err := b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	return state.GetBalance(address), state.Error()
 }
 
 // GetTransactionsHistory returns list of transactions hashes of address.
