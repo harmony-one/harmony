@@ -57,7 +57,6 @@ func (consensus *Consensus) construct(
 		}
 	case msg_pb.MessageType_COMMIT:
 		if s := consensus.priKey.SignHash(payloadForSignOverride); s != nil {
-			consensusMsg.Block = consensus.block
 			consensusMsg.Payload = s.Serialize()
 		}
 	case msg_pb.MessageType_COMMITTED:
@@ -69,7 +68,7 @@ func (consensus *Consensus) construct(
 		buffer.Write(consensus.commitBitmap.Bitmap)
 		consensusMsg.Payload = buffer.Bytes()
 	case msg_pb.MessageType_ANNOUNCE:
-		consensusMsg.Payload = consensus.blockHeader
+		consensusMsg.Payload = consensus.blockHash[:]
 	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)

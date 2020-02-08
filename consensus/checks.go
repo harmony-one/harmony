@@ -88,6 +88,36 @@ func (consensus *Consensus) onCommitSanityChecks(
 	return true
 }
 
+func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) {
+	logMsgs := consensus.FBFTLog.GetMessagesByTypeSeqView(
+		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
+	)
+	if len(logMsgs) > 0 {
+		if logMsgs[0].BlockHash != recvMsg.BlockHash &&
+			logMsgs[0].SenderPubkey.IsEqual(recvMsg.SenderPubkey) {
+			consensus.getLogger().Debug().
+				Str("logMsgSenderKey", logMsgs[0].SenderPubkey.SerializeToHexStr()).
+				Str("logMsgBlockHash", logMsgs[0].BlockHash.Hex()).
+				Str("recvMsg.SenderPubkey", recvMsg.SenderPubkey.SerializeToHexStr()).
+				Uint64("recvMsg.BlockNum", recvMsg.BlockNum).
+				Uint64("recvMsg.ViewID", recvMsg.ViewID).
+				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).
+				Str("LeaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
+				Msg("[OnAnnounce] Leader is malicious")
+			if consensus.current.Mode() == ViewChanging {
+				viewID := consensus.current.ViewID()
+				consensus.startViewChange(viewID + 1)
+			} else {
+				consensus.startViewChange(consensus.viewID + 1)
+			}
+		}
+		consensus.getLogger().Debug().
+			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
+			Msg("[OnAnnounce] Announce message received again")
+	}
+
+}
+
 func (consensus *Consensus) onPreparedSanityChecks(
 	blockObj *types.Block, recvMsg *FBFTMessage,
 ) bool {
