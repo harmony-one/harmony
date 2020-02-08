@@ -24,7 +24,10 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.onAnnounceSanityChecks(recvMsg)
+	// NOTE let it handle its own logs
+	if !consensus.onAnnounceSanityChecks(recvMsg) {
+		return
+	}
 
 	consensus.getLogger().Debug().
 		Uint64("MsgViewID", recvMsg.ViewID).

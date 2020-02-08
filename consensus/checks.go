@@ -88,7 +88,7 @@ func (consensus *Consensus) onCommitSanityChecks(
 	return true
 }
 
-func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) {
+func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 	logMsgs := consensus.FBFTLog.GetMessagesByTypeSeqView(
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
 	)
@@ -115,7 +115,17 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) {
 			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
 			Msg("[OnAnnounce] Announce message received again")
 	}
+	return consensus.isRightBlockNumCheck(recvMsg)
+}
 
+func (consensus *Consensus) isRightBlockNumCheck(recvMsg *FBFTMessage) bool {
+	if recvMsg.BlockNum != consensus.blockNum {
+		consensus.getLogger().Debug().
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Msg("Wrong BlockNum Received, ignoring!")
+		return false
+	}
+	return true
 }
 
 func (consensus *Consensus) onPreparedSanityChecks(
