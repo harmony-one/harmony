@@ -52,6 +52,14 @@ export GO111MODULE=on
 ```
 Note : Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
 
+## Harmony docs and guides
+
+https://docs.harmony.one
+
+## API guides
+
+https://docs.harmony.one/home/developers/api
+
 ### Build all executables
 
 You can run the script `./scripts/go_executable_build.sh` to build all the executables.
