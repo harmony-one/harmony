@@ -35,25 +35,23 @@ func (c *ComputedAPR) MarshalJSON() ([]byte, error) {
 
 // UtilityMetric ..
 type UtilityMetric struct {
-	AccumulatorSnapshot     *big.Int      `json:"total-block-reward-accum"`
-	CurrentStakedPercentage numeric.Dec   `json:"current-percent-token-staked"`
-	Deviation               numeric.Dec   `json:"current-percent-network-deviation"`
-	Adjustment              numeric.Dec   `json:"reward-bonus"`
-	ActiveValidatorsAPR     []ComputedAPR `json:"active-validators-apr"`
+	*Snapshot
+	Deviation  numeric.Dec `json:"current-percent-network-deviation"`
+	Adjustment numeric.Dec `json:"reward-bonus"`
 }
 
 // NewUtilityMetricSnapshot ..
 func NewUtilityMetricSnapshot(
 	beaconchain engine.ChainReader,
 ) (*UtilityMetric, error) {
-	soFarDoledOut, computedAPRs, percentageStaked, err := Snapshot(
+	snapshot, err := NewSnapshot(
 		beaconchain, time.Now().Unix(), true,
 	)
 	if err != nil {
 		return nil, err
 	}
-	howMuchOff, adjustBy := Adjustment(*percentageStaked)
+	howMuchOff, adjustBy := Adjustment(*snapshot.StakedPercentage)
 	return &UtilityMetric{
-		soFarDoledOut, *percentageStaked, howMuchOff, adjustBy, computedAPRs,
+		snapshot, howMuchOff, adjustBy,
 	}, nil
 }

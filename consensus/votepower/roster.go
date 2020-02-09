@@ -55,6 +55,12 @@ type VoterReward struct {
 	ByShards    []ShardReward
 }
 
+// RewardAccumulation ..
+type RewardAccumulation struct {
+	NetworkTotalPayout *big.Int `json:"total-block-reward-accum"`
+	ValidatorReward    []VoterReward
+}
+
 // Round is a round of voting in any FBFT phase
 type Round struct {
 	AggregatedVote *bls.Sign

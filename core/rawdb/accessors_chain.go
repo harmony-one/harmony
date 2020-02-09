@@ -794,46 +794,28 @@ func WriteDelegationsByDelegator(
 }
 
 // ReadBlockRewardAccumulator ..
-func ReadBlockRewardAccumulator(db DatabaseReader, number uint64) (*big.Int, error) {
+func ReadBlockRewardAccumulator(
+	db DatabaseReader, number uint64,
+) (*votepower.RewardAccumulation, error) {
 	data, err := db.Get(blockRewardAccumKey(number))
 	if err != nil {
 		return nil, err
 	}
-	return new(big.Int).SetBytes(data), nil
+	var rewarded votepower.RewardAccumulation
+	if err := rlp.DecodeBytes(data, &rewarded); err != nil {
+		return nil, err
+	}
+
+	return &rewarded, nil
 }
 
 // WriteBlockRewardAccumulator ..
-func WriteBlockRewardAccumulator(db DatabaseWriter, newAccum *big.Int, number uint64) error {
-	return db.Put(blockRewardAccumKey(number), newAccum.Bytes())
-}
-
-// ReadValidatorRewardByBlockNumber ..
-func ReadValidatorRewardByBlockNumber(
-	db DatabaseReader, validator common.Address, number uint64,
-) (*votepower.VoterReward, error) {
-	data, err := db.Get(stakedValidatorRewardByBlockKey(validator, number))
-	if err != nil {
-		return nil, err
-	}
-	record := votepower.VoterReward{}
-	if err := rlp.DecodeBytes(data, &record); err != nil {
-		return nil, err
-	}
-	return &record, nil
-}
-
-// WriteValidatorRewards ..
-func WriteValidatorRewards(
-	db DatabaseWriter, record *votepower.VoterReward,
+func WriteBlockRewardAccumulator(
+	db DatabaseWriter, newAccum []votepower.VoterReward, number uint64,
 ) error {
-	data, err := rlp.EncodeToBytes(record)
+	data, err := rlp.EncodeToBytes(newAccum)
 	if err != nil {
 		return err
 	}
-	if err := db.Put(stakedValidatorRewardByBlockKey(
-		record.Validator, record.BlockNumber,
-	), data); err != nil {
-		return err
-	}
-	return nil
+	return db.Put(blockRewardAccumKey(number), data)
 }

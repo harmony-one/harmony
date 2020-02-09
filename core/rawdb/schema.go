@@ -91,11 +91,10 @@ var (
 	epochVdfBlockNumberPrefix = []byte("epoch-vdf-block-number")
 
 	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
-	BloomBitsIndexPrefix               = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
-	preimageCounter                    = metrics.NewRegisteredCounter("db/preimage/total", nil)
-	preimageHitCounter                 = metrics.NewRegisteredCounter("db/preimage/hits", nil)
-	currentRewardGivenOutPrefix        = []byte("blk-rwd-")
-	stakedValidatorRewardByBlockPrefix = []byte("rwd-vldr")
+	BloomBitsIndexPrefix        = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
+	preimageCounter             = metrics.NewRegisteredCounter("db/preimage/total", nil)
+	preimageHitCounter          = metrics.NewRegisteredCounter("db/preimage/hits", nil)
+	currentRewardGivenOutPrefix = []byte("blk-rwd-")
 )
 
 // TxLookupEntry is a positional metadata to help looking up the data content of
@@ -203,14 +202,6 @@ func crosslinkKey(shardID uint32, blockNum uint64) []byte {
 	binary.BigEndian.PutUint64(sbKey[4:], blockNum)
 	key := append(prefix, sbKey...)
 	return key
-}
-
-func stakedValidatorRewardByBlockKey(
-	validator common.Address, blockNum uint64,
-) []byte {
-	return append(append(
-		stakedValidatorRewardByBlockPrefix, encodeBlockNumber(blockNum)...,
-	), validator.Bytes()...)
 }
 
 func delegatorValidatorListKey(delegator common.Address) []byte {

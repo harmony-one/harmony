@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1229,7 +1230,8 @@ func (bc *BlockChain) WriteBlockWithState(
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
 		if err != nil {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cannot parse cross links")
+			header.Logger(utils.Logger()).Warn().Err(err).
+				Msg("[insertChain/crosslinks] cannot parse cross links")
 			return NonStatTy, err
 		}
 		if !crossLinks.IsSorted() {
@@ -1239,7 +1241,9 @@ func (bc *BlockChain) WriteBlockWithState(
 		for _, crossLink := range *crossLinks {
 			// Process crosslink
 			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
-				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
+				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).
+					Uint32("shardID", crossLink.ShardID()).
+					Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
 			}
 			bc.LastContinuousCrossLink(crossLink)
 		}
@@ -1252,14 +1256,14 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
-			// TODO Delete from DB when have the reward from 2048 blocks ago
-			for _, rewarded := range payout.ReadRewarded() {
-				rawdb.WriteValidatorRewards(batch, &rewarded)
-			}
-			bc.UpdateBlockRewardAccumulator(payout.ReadTotalPayout(), block.Number().Uint64())
+			bc.UpdateBlockRewardAccumulator(
+				payout.ReadRewarded(), block.Number().Uint64(),
+			)
 		} else {
 			// block reward never accumulate before staking
-			bc.WriteBlockRewardAccumulator(common.Big0, block.Number().Uint64())
+			bc.WriteBlockRewardAccumulator(
+				[]votepower.VoterReward{}, block.Number().Uint64(),
+			)
 		}
 	}
 
@@ -2803,38 +2807,80 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	return nil
 }
 
+var (
+	errE = errors.New("before staking")
+)
+
 // ReadBlockRewardAccumulator must only be called on beaconchain
-func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
+func (bc *BlockChain) ReadBlockRewardAccumulator(
+	number uint64,
+) (*votepower.RewardAccumulation, error) {
 	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
-		return big.NewInt(0), nil
+		return nil, errE
 	}
 	if cached, ok := bc.blockAccumulatorCache.Get(number); ok {
-		return cached.(*big.Int), nil
+		return cached.(*votepower.RewardAccumulation), nil
 	}
 	return rawdb.ReadBlockRewardAccumulator(bc.db, number)
 }
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
-func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
-	err := rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
+func (bc *BlockChain) WriteBlockRewardAccumulator(
+	rewarded []votepower.VoterReward, number uint64,
+) error {
+	err := rawdb.WriteBlockRewardAccumulator(bc.db, rewarded, number)
 	if err != nil {
 		return err
 	}
-	bc.blockAccumulatorCache.Add(number, reward)
+	bc.blockAccumulatorCache.Add(number, rewarded)
 	return nil
 }
 
 //UpdateBlockRewardAccumulator ..
 // Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int, number uint64) error {
+func (bc *BlockChain) UpdateBlockRewardAccumulator(
+	rewarded []votepower.VoterReward, number uint64,
+) error {
 	current, err := bc.ReadBlockRewardAccumulator(number - 1)
+	newWinners := []votepower.VoterReward{}
 	if err != nil {
 		// one-off fix for pangaea, return after pangaea enter staking.
-		current = big.NewInt(0)
-		bc.WriteBlockRewardAccumulator(current, number)
+		bc.WriteBlockRewardAccumulator(newWinners, number)
 	}
-	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
+	rewardsSoFar := current.ValidatorReward
+	// Sort by address, then can do binary search
+	sort.SliceStable(rewardsSoFar, func(i, j int) bool {
+		return bytes.Compare(
+			rewardsSoFar[i].Validator.Bytes(),
+			rewardsSoFar[j].Validator.Bytes(),
+		) == -1
+	})
+
+	for i := range rewarded {
+		lookingFor := rewarded[i].Validator.Bytes()
+		if k :=
+			sort.Search(len(rewardsSoFar), func(j int) bool {
+				return bytes.Compare(rewardsSoFar[j].Validator.Bytes(), lookingFor) >= 0
+			}); k < len(rewardsSoFar) &&
+			bytes.Compare(rewardsSoFar[k].Validator.Bytes(), lookingFor) == 0 {
+			// found them, now update
+			for shard := range rewardsSoFar[k].ByShards {
+				for rewardedShard := range rewarded[i].ByShards {
+					if s1, s2 :=
+						rewardsSoFar[k].ByShards[shard],
+						rewarded[i].ByShards[rewardedShard]; s1.ShardID == s2.ShardID {
+						s1.EarnedReward.Add(s1.EarnedReward, s2.EarnedReward)
+					}
+				}
+			}
+			// TODO Bump up network rewards as well
+		} else {
+			newWinners = append(newWinners, rewardsSoFar[i])
+		}
+	}
+
+	return bc.WriteBlockRewardAccumulator(append(rewarded, newWinners...), number)
 }
 
 // Note this should read from the state of current block in concern (root == newBlock.root)

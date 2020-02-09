@@ -22,10 +22,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -283,7 +283,11 @@ func (cr *fakeChainReader) ReadValidatorInformation(addr common.Address) (*staki
 func (cr *fakeChainReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) ReadBlockRewardAccumulator(uint64) (*big.Int, error)         { return nil, nil }
+func (cr *fakeChainReader) ReadBlockRewardAccumulator(
+	uint64,
+) (*votepower.RewardAccumulation, error) {
+	return nil, nil
+}
 func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) *big.Int { return nil }
 func (cr *fakeChainReader) ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error) {
 	return nil, nil

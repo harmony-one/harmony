@@ -84,20 +84,28 @@ func Adjustment(percentageStaked numeric.Dec) (numeric.Dec, numeric.Dec) {
 	return howMuchOff, adjustBy
 }
 
-// Snapshot returns
-// (soFarDoledOut, stakedNow, stakedPercentage, error)
-func Snapshot(
+// Snapshot ..
+type Snapshot struct {
+	Rewards          *votepower.RewardAccumulation `json:"accumulated-rewards"`
+	APR              []ComputedAPR                 `json:"active-validators-apr"`
+	StakedPercentage *numeric.Dec                  `json:"current-percent-token-staked"`
+}
+
+// NewSnapshot returns a record with metrics on
+// the network accumulated rewards,
+// and by validator.
+func NewSnapshot(
 	beaconchain engine.ChainReader,
 	timestamp int64,
 	includeAPRs bool,
-) (*big.Int, []ComputedAPR, *numeric.Dec, error) {
+) (*Snapshot, error) {
 	stakedNow, rates, junk :=
 		numeric.ZeroDec(), []ComputedAPR{}, numeric.ZeroDec()
 	// Only active validators' stake is counted in
 	// stake ratio because only their stake is under slashing risk
 	active, err := beaconchain.ReadActiveValidatorList()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	if includeAPRs {
 		rates = make([]ComputedAPR, len(active))
@@ -107,15 +115,15 @@ func Snapshot(
 	)
 
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	dole := numeric.NewDecFromBigInt(soFarDoledOut)
+	dole := numeric.NewDecFromBigInt(soFarDoledOut.NetworkTotalPayout)
 
 	for i := range active {
 		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		}
 		total := wrapper.TotalDelegation()
 		stakedNow = stakedNow.Add(numeric.NewDecFromBigInt(total))
@@ -132,13 +140,11 @@ func Snapshot(
 		rates[i].StakeRatio = numeric.NewDecFromBigInt(
 			rates[i].TotalStakedToken,
 		).Quo(circulatingSupply)
-
 		if reward := BaseStakedReward.Sub(
 			rates[i].StakeRatio.Sub(targetStakedPercentage).Mul(potentialAdjust),
 		); reward.GT(zero) {
 			rates[i].APR = blocksPerYear.Mul(reward).Quo(stakedNow)
 		}
-
 	}
 
 	percentage := stakedNow.Quo(circulatingSupply)
@@ -147,5 +153,5 @@ func Snapshot(
 		Str("staked-percentage", percentage.String()).
 		Str("currently-staked", stakedNow.String()).
 		Msg("Computed how much staked right now")
-	return soFarDoledOut, rates, &percentage, nil
+	return &Snapshot{soFarDoledOut, rates, &percentage}, nil
 }

@@ -61,8 +61,8 @@ type ChainReader interface {
 	// Methods needed for EPoS committee assignment calculation
 	committee.StakingCandidatesReader
 
-	//ReadBlockRewardAccumulator is the block-reward given for block number
-	ReadBlockRewardAccumulator(uint64) (*big.Int, error)
+	//ReadBlockRewardAccumulator is the block-reward accumulated, given block number height
+	ReadBlockRewardAccumulator(uint64) (*votepower.RewardAccumulation, error)
 
 	// ReadValidatorStats retrieves the running stats for a validator
 	ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error)

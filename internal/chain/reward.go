@@ -60,16 +60,16 @@ func AccumulateRewards(
 		defaultReward := economics.BaseStakedReward
 
 		// TODO Use cached result in off-chain db instead of full computation
-		_, _, percentageStaked, err := economics.Snapshot(
+		snapshot, err := economics.NewSnapshot(
 			beaconChain, header.Time().Int64(), false,
 		)
 		if err != nil {
 			return economics.NewNoReward(blockNum), err
 		}
-		howMuchOff, adjustBy := economics.Adjustment(*percentageStaked)
+		howMuchOff, adjustBy := economics.Adjustment(*snapshot.StakedPercentage)
 		defaultReward = defaultReward.Add(adjustBy)
 		utils.Logger().Info().
-			Str("percentage-token-staked", percentageStaked.String()).
+			Str("percentage-token-staked", snapshot.StakedPercentage.String()).
 			Str("how-much-off", howMuchOff.String()).
 			Str("adjusting-by", adjustBy.String()).
 			Str("block-reward", defaultReward.String()).
