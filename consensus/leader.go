@@ -164,60 +164,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
-		logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
-		// Construct and broadcast prepared message
-		network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
-		if err != nil {
-			consensus.getLogger().Err(err).
-				Str("message-type", msg_pb.MessageType_PREPARED.String()).
-				Msg("failed constructing message")
+		if err := consensus.didReachPrepareQuorum(); err != nil {
 			return
 		}
-		msgToSend, FBFTMsg, aggSig :=
-			network.Bytes,
-			network.FBFTMsg,
-			network.OptionalAggregateSignature
-
-		consensus.aggregatedPrepareSig = aggSig
-		consensus.FBFTLog.AddMessage(FBFTMsg)
-		// Leader add commit phase signature
-		blockNumHash := make([]byte, 8)
-		binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
-		commitPayload := append(blockNumHash, consensus.blockHash[:]...)
-		consensus.Decider.SubmitVote(
-			quorum.Commit,
-			consensus.PubKey,
-			consensus.priKey.SignHash(commitPayload),
-			consensus.block[:],
-		)
-
-		if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
-			consensus.getLogger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
-			return
-		}
-
-		if err := consensus.msgSender.SendWithRetry(
-			consensus.blockNum,
-			msg_pb.MessageType_PREPARED, []nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-			},
-			host.ConstructP2pMessage(byte(17), msgToSend),
-		); err != nil {
-			consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
-		} else {
-			consensus.getLogger().Debug().
-				Hex("blockHash", consensus.blockHash[:]).
-				Uint64("blockNum", consensus.blockNum).
-				Msg("[OnPrepare] Sent Prepared Message!!")
-		}
-		consensus.msgSender.StopRetry(msg_pb.MessageType_ANNOUNCE)
-		// Stop retry committed msg of last consensus
-		consensus.msgSender.StopRetry(msg_pb.MessageType_COMMITTED)
-
-		consensus.getLogger().Debug().
-			Str("From", consensus.phase.String()).
-			Str("To", FBFTCommit.String()).
-			Msg("[OnPrepare] Switching phase")
 		consensus.switchPhase(FBFTCommit, true)
 	}
 }
