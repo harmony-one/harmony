@@ -1255,7 +1255,12 @@ func (bc *BlockChain) WriteBlockWithState(
 	}
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		bc.UpdateBlockRewardAccumulator(payout)
+		if bc.chainConfig.IsStaking(block.Epoch()) {
+			bc.UpdateBlockRewardAccumulator(payout)
+		} else {
+			// block reward never accumulate before staking
+			bc.WriteBlockRewardAccumulator(economics.NewNoReward(block.Number().Uint64()))
+		}
 	}
 
 	/////////////////////////// END
