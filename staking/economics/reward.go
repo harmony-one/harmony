@@ -20,13 +20,12 @@ const (
 // Produced is a record rewards given out after a successful round of consensus
 type Produced struct {
 	blockNumber uint64
-	rewarded    []votepower.VoterReward
-	totalPayout *big.Int
+	accum       votepower.RewardAccumulation
 }
 
 // NewProduced ..
 func NewProduced(b uint64, r []votepower.VoterReward, t *big.Int) *Produced {
-	return &Produced{b, r, t}
+	return &Produced{b, votepower.RewardAccumulation{t, r}}
 }
 
 // ReadBlockNumber ..
@@ -36,12 +35,12 @@ func (p *Produced) ReadBlockNumber() uint64 {
 
 // ReadRewarded ..
 func (p *Produced) ReadRewarded() []votepower.VoterReward {
-	return p.rewarded
+	return p.accum.ValidatorReward
 }
 
 // ReadTotalPayout ..
 func (p *Produced) ReadTotalPayout() *big.Int {
-	return p.totalPayout
+	return p.accum.NetworkTotalPayout
 }
 
 var (
@@ -66,7 +65,7 @@ var (
 
 // NewNoReward ..
 func NewNoReward(blockNum uint64) *Produced {
-	return &Produced{blockNum, nil, common.Big0}
+	return &Produced{blockNum, votepower.RewardAccumulation{common.Big0, nil}}
 }
 
 func adjust(amount numeric.Dec) numeric.Dec {

@@ -29,6 +29,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/economics"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -811,11 +812,11 @@ func ReadBlockRewardAccumulator(
 
 // WriteBlockRewardAccumulator ..
 func WriteBlockRewardAccumulator(
-	db DatabaseWriter, newAccum []votepower.VoterReward, number uint64,
+	db DatabaseWriter, stats *economics.Produced,
 ) error {
-	data, err := rlp.EncodeToBytes(newAccum)
+	data, err := rlp.EncodeToBytes(stats)
 	if err != nil {
 		return err
 	}
-	return db.Put(blockRewardAccumKey(number), data)
+	return db.Put(blockRewardAccumKey(stats.ReadBlockNumber()), data)
 }

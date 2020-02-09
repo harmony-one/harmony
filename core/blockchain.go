@@ -1255,16 +1255,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	}
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		if bc.chainConfig.IsStaking(block.Epoch()) {
-			bc.UpdateBlockRewardAccumulator(
-				payout.ReadRewarded(), block.Number().Uint64(),
-			)
-		} else {
-			// block reward never accumulate before staking
-			bc.WriteBlockRewardAccumulator(
-				[]votepower.VoterReward{}, block.Number().Uint64(),
-			)
-		}
+		bc.UpdateBlockRewardAccumulator(payout)
 	}
 
 	/////////////////////////// END
@@ -2812,9 +2803,7 @@ var (
 )
 
 // ReadBlockRewardAccumulator must only be called on beaconchain
-func (bc *BlockChain) ReadBlockRewardAccumulator(
-	number uint64,
-) (*votepower.RewardAccumulation, error) {
+func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*votepower.RewardAccumulation, error) {
 	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
 		return nil, errE
 	}
@@ -2826,27 +2815,23 @@ func (bc *BlockChain) ReadBlockRewardAccumulator(
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
-func (bc *BlockChain) WriteBlockRewardAccumulator(
-	rewarded []votepower.VoterReward, number uint64,
-) error {
-	err := rawdb.WriteBlockRewardAccumulator(bc.db, rewarded, number)
-	if err != nil {
+func (bc *BlockChain) WriteBlockRewardAccumulator(rewarded *economics.Produced) error {
+	if err := rawdb.WriteBlockRewardAccumulator(bc.db, rewarded); err != nil {
 		return err
 	}
-	bc.blockAccumulatorCache.Add(number, rewarded)
+	bc.blockAccumulatorCache.Add(rewarded.ReadBlockNumber(), rewarded.ReadRewarded())
 	return nil
 }
 
 //UpdateBlockRewardAccumulator ..
 // Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateBlockRewardAccumulator(
-	rewarded []votepower.VoterReward, number uint64,
-) error {
-	current, err := bc.ReadBlockRewardAccumulator(number - 1)
+func (bc *BlockChain) UpdateBlockRewardAccumulator(rewarded *economics.Produced) error {
+	current, err := bc.ReadBlockRewardAccumulator(rewarded.ReadBlockNumber() - 1)
 	newWinners := []votepower.VoterReward{}
 	if err != nil {
 		// one-off fix for pangaea, return after pangaea enter staking.
-		bc.WriteBlockRewardAccumulator(newWinners, number)
+		bc.WriteBlockRewardAccumulator(economics.NewNoReward(rewarded.ReadBlockNumber()))
+		return err
 	}
 	rewardsSoFar := current.ValidatorReward
 	// Sort by address, then can do binary search
@@ -2857,8 +2842,11 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(
 		) == -1
 	})
 
-	for i := range rewarded {
-		lookingFor := rewarded[i].Validator.Bytes()
+	newlyRewarded, existingTotal := rewarded.ReadRewarded(), rewarded.ReadTotalPayout()
+	existingTotal.Add(existingTotal, rewarded.ReadTotalPayout())
+
+	for i := range newlyRewarded {
+		lookingFor := newlyRewarded[i].Validator.Bytes()
 		if k :=
 			sort.Search(len(rewardsSoFar), func(j int) bool {
 				return bytes.Compare(rewardsSoFar[j].Validator.Bytes(), lookingFor) >= 0
@@ -2866,10 +2854,10 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(
 			bytes.Compare(rewardsSoFar[k].Validator.Bytes(), lookingFor) == 0 {
 			// found them, now update
 			for shard := range rewardsSoFar[k].ByShards {
-				for rewardedShard := range rewarded[i].ByShards {
+				for rewardedShard := range newlyRewarded[i].ByShards {
 					if s1, s2 :=
 						rewardsSoFar[k].ByShards[shard],
-						rewarded[i].ByShards[rewardedShard]; s1.ShardID == s2.ShardID {
+						newlyRewarded[i].ByShards[rewardedShard]; s1.ShardID == s2.ShardID {
 						s1.EarnedReward.Add(s1.EarnedReward, s2.EarnedReward)
 					}
 				}
@@ -2880,11 +2868,17 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(
 		}
 	}
 
-	return bc.WriteBlockRewardAccumulator(append(rewarded, newWinners...), number)
+	return bc.WriteBlockRewardAccumulator(economics.NewProduced(
+		rewarded.ReadBlockNumber(),
+		append(rewardsSoFar, newWinners...),
+		existingTotal,
+	))
 }
 
 // Note this should read from the state of current block in concern (root == newBlock.root)
-func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress common.Address, root common.Hash) error {
+func (bc *BlockChain) addDelegationIndex(
+	delegatorAddress, validatorAddress common.Address, root common.Hash,
+) error {
 	// Get existing delegations
 	delegations, err := bc.ReadDelegationsByDelegator(delegatorAddress)
 	if err != nil {

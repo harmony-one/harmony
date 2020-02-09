@@ -30,8 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/ethdb"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
-	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/staking/economics"
 
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
@@ -308,7 +308,7 @@ func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
 	if err != nil {
 		panic(err)
 	}
-	rawdb.WriteBlockRewardAccumulator(db, []votepower.VoterReward{}, 0)
+	rawdb.WriteBlockRewardAccumulator(db, economics.NewNoReward(0))
 	return block
 }
 
