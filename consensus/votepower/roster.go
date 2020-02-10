@@ -103,8 +103,8 @@ func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
 					)
 					for i := range payload.BLSPublicKeysOwned {
 						if payload.BLSPublicKeysOwned[i].ShardID == roster.ShardID {
-							payload.BLSPublicKeysOwned[roster.ShardID].Keys = append(
-								payload.BLSPublicKeysOwned[roster.ShardID].Keys, key,
+							payload.BLSPublicKeysOwned[i].Keys = append(
+								payload.BLSPublicKeysOwned[i].Keys, key,
 							)
 						}
 					}
