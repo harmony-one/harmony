@@ -2832,7 +2832,6 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(rewarded *economics.Produced)
 	if err != nil {
 		// one-off fix for pangaea, return after pangaea enter staking.
 		bc.WriteBlockRewardAccumulator(economics.NewNoReward(rewarded.ReadBlockNumber()))
-		return err
 	}
 	rewardsSoFar := current.ValidatorReward
 	// Sort by address, then can do binary search
@@ -2863,7 +2862,6 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(rewarded *economics.Produced)
 					}
 				}
 			}
-			// TODO Bump up network rewards as well
 		} else {
 			newWinners = append(newWinners, rewardsSoFar[i])
 		}
