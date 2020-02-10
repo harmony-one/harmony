@@ -3,18 +3,17 @@ package economics
 import (
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
-)
-
-const (
-	numBlocksPerYear = 300_000_000
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Produced is a record rewards given out after a successful round of consensus
@@ -48,6 +47,11 @@ func (p *Produced) ReadTotalPayout() *big.Int {
 	return p.accum.NetworkTotalPayout
 }
 
+const (
+	nanoSecondsInYear = time.Nanosecond * 3.154e+16
+	initSupply        = 12_600_000_000
+)
+
 var (
 	// BlockReward is the block reward, to be split evenly among block signers.
 	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
@@ -56,17 +60,33 @@ var (
 		big.NewInt(18), big.NewInt(denominations.One),
 	))
 	totalTokens = numeric.NewDecFromBigInt(
-		new(big.Int).Mul(big.NewInt(12_600_000_000), big.NewInt(denominations.One)),
+		new(big.Int).Mul(big.NewInt(initSupply), big.NewInt(denominations.One)),
 	)
 	targetStakedPercentage = numeric.MustNewDecFromStr("0.35")
 	dynamicAdjust          = numeric.MustNewDecFromStr("0.4")
 	oneHundred             = numeric.NewDec(100)
 	potentialAdjust        = oneHundred.Mul(dynamicAdjust)
 	zero                   = numeric.ZeroDec()
-	blocksPerYear          = numeric.NewDec(numBlocksPerYear)
 	// ErrPayoutNotEqualBlockReward ..
 	ErrPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
+	// ErrNotTwoEpochsPastStaking ..
+	ErrNotTwoEpochsPastStaking = errors.New("two epochs ago was not >= staking epoch")
+	oneYear                    = big.NewInt(int64(nanoSecondsInYear))
 )
+
+// ExpectedValueBlocksPerYear ..
+func ExpectedValueBlocksPerYear(
+	oneEpochAgo, twoEpochAgo *block.Header, blocksPerEpoch int64,
+) (numeric.Dec, error) {
+	oneTAgo, twoTAgo := oneEpochAgo.Time(), twoEpochAgo.Time()
+	diff := new(big.Int).Sub(twoTAgo, oneTAgo)
+	// impossibility but keep sane
+	if diff.Sign() == -1 {
+		return numeric.ZeroDec(), errors.New("time stamp diff cannot be negative")
+	}
+	avgBlockTimePerEpoch := new(big.Int).Div(diff, big.NewInt(blocksPerEpoch))
+	return numeric.NewDecFromBigInt(new(big.Int).Div(oneYear, avgBlockTimePerEpoch)), nil
+}
 
 // NewNoReward ..
 func NewNoReward(blockNum uint64) *Produced {
@@ -103,6 +123,22 @@ func NewSnapshot(
 	timestamp int64,
 	includeAPRs bool,
 ) (*Snapshot, error) {
+	headerNow := beaconchain.CurrentHeader()
+	blockNow := headerNow.Number().Uint64()
+	blocksPerEpoch := shard.Schedule.BlocksPerEpoch()
+	oneEpochAgo := beaconchain.GetHeaderByNumber(blockNow - blocksPerEpoch)
+	twoEpochAgo := beaconchain.GetHeaderByNumber(blockNow - (blocksPerEpoch * 2))
+
+	if !beaconchain.Config().IsStaking(twoEpochAgo.Header.Epoch()) {
+		return nil, ErrNotTwoEpochsPastStaking
+	}
+
+	soFarDoledOut, err := beaconchain.ReadBlockRewardAccumulator(blockNow)
+
+	if err != nil {
+		return nil, err
+	}
+
 	stakedNow, rates, junk :=
 		numeric.ZeroDec(), []ComputedAPR{}, numeric.ZeroDec()
 	// Only active validators' stake is counted in
@@ -111,15 +147,9 @@ func NewSnapshot(
 	if err != nil {
 		return nil, err
 	}
+
 	if includeAPRs {
 		rates = make([]ComputedAPR, len(active))
-	}
-	soFarDoledOut, err := beaconchain.ReadBlockRewardAccumulator(
-		beaconchain.CurrentHeader().Number().Uint64(),
-	)
-
-	if err != nil {
-		return nil, err
 	}
 
 	dole := numeric.NewDecFromBigInt(soFarDoledOut.NetworkTotalPayout)
@@ -140,14 +170,18 @@ func NewSnapshot(
 		reward.PercentageForTimeStamp(timestamp),
 	).Add(dole)
 
-	for i := range rates {
-		rates[i].StakeRatio = numeric.NewDecFromBigInt(
-			rates[i].TotalStakedToken,
-		).Quo(circulatingSupply)
-		if reward := BaseStakedReward.Sub(
-			rates[i].StakeRatio.Sub(targetStakedPercentage).Mul(potentialAdjust),
-		); reward.GT(zero) {
-			rates[i].APR = blocksPerYear.Mul(reward).Quo(stakedNow)
+	if blocksPerYear, err := ExpectedValueBlocksPerYear(
+		oneEpochAgo, twoEpochAgo, int64(blocksPerEpoch),
+	); includeAPRs && err != nil {
+		for i := range rates {
+			rates[i].StakeRatio = numeric.NewDecFromBigInt(
+				rates[i].TotalStakedToken,
+			).Quo(circulatingSupply)
+			if reward := BaseStakedReward.Sub(
+				rates[i].StakeRatio.Sub(targetStakedPercentage).Mul(potentialAdjust),
+			); reward.GT(zero) {
+				rates[i].APR = blocksPerYear.Mul(reward).Quo(stakedNow)
+			}
 		}
 	}
 
