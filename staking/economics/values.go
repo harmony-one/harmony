@@ -44,8 +44,8 @@ type UtilityMetric struct {
 func NewUtilityMetricSnapshot(
 	beaconchain engine.ChainReader,
 ) (*UtilityMetric, error) {
-	snapshot, err := NewSnapshot(
-		beaconchain, time.Now().Unix(), true,
+	snapshot, err := NewSnapshotWithAPRs(
+		beaconchain, time.Now().Unix(),
 	)
 	if err != nil {
 		return nil, err

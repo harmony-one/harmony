@@ -60,8 +60,8 @@ func AccumulateRewards(
 		defaultReward := economics.BaseStakedReward
 
 		// TODO Use cached result in off-chain db instead of full computation
-		snapshot, err := economics.NewSnapshot(
-			beaconChain, header.Time().Int64(), false,
+		snapshot, err := economics.NewSnapshotWithOutAPRs(
+			beaconChain, header.Time().Int64(),
 		)
 		if err != nil {
 			return economics.NewNoReward(blockNum), err

@@ -1,7 +1,6 @@
 package economics
 
 import (
-	"errors"
 	"math/big"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/pkg/errors"
 )
 
 // Produced is a record rewards given out after a successful round of consensus
@@ -69,9 +69,8 @@ var (
 	zero                   = numeric.ZeroDec()
 	// ErrPayoutNotEqualBlockReward ..
 	ErrPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
-	// ErrNotTwoEpochsPastStaking ..
-	ErrNotTwoEpochsPastStaking = errors.New("two epochs ago was not >= staking epoch")
-	oneYear                    = big.NewInt(int64(nanoSecondsInYear))
+	errNotTwoEpochsPastStaking   = errors.New("two epochs ago was not >= staking epoch")
+	oneYear                      = big.NewInt(int64(nanoSecondsInYear))
 )
 
 // ExpectedValueBlocksPerYear ..
@@ -115,10 +114,26 @@ type Snapshot struct {
 	StakedPercentage *numeric.Dec                  `json:"current-percent-token-staked"`
 }
 
-// NewSnapshot returns a record with metrics on
+// NewSnapshotWithAPRs ..
+func NewSnapshotWithAPRs(
+	beaconchain engine.ChainReader,
+	timestamp int64,
+) (*Snapshot, error) {
+	return newSnapshot(beaconchain, timestamp, true)
+}
+
+// NewSnapshotWithOutAPRs ..
+func NewSnapshotWithOutAPRs(
+	beaconchain engine.ChainReader,
+	timestamp int64,
+) (*Snapshot, error) {
+	return newSnapshot(beaconchain, timestamp, false)
+}
+
+// newSnapshot returns a record with metrics on
 // the network accumulated rewards,
 // and by validator.
-func NewSnapshot(
+func newSnapshot(
 	beaconchain engine.ChainReader,
 	timestamp int64,
 	includeAPRs bool,
@@ -129,8 +144,13 @@ func NewSnapshot(
 	oneEpochAgo := beaconchain.GetHeaderByNumber(blockNow - blocksPerEpoch)
 	twoEpochAgo := beaconchain.GetHeaderByNumber(blockNow - (blocksPerEpoch * 2))
 
-	if !beaconchain.Config().IsStaking(twoEpochAgo.Header.Epoch()) {
-		return nil, ErrNotTwoEpochsPastStaking
+	if then := twoEpochAgo.Header.Epoch(); !beaconchain.Config().IsStaking(then) {
+		return nil, errors.Wrapf(
+			errNotTwoEpochsPastStaking,
+			"two epochs ago %s, staking epoch %s",
+			then.String(),
+			beaconchain.Config().StakingEpoch.String(),
+		)
 	}
 
 	soFarDoledOut, err := beaconchain.ReadBlockRewardAccumulator(blockNow)
