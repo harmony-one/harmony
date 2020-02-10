@@ -3,7 +3,6 @@ package economics
 import (
 	"encoding/json"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/consensus/engine"
@@ -45,7 +44,7 @@ func NewUtilityMetricSnapshot(
 	beaconchain engine.ChainReader,
 ) (*UtilityMetric, error) {
 	snapshot, err := NewSnapshotWithAPRs(
-		beaconchain, time.Now().Unix(),
+		beaconchain, beaconchain.CurrentHeader(),
 	)
 	if err != nil {
 		return nil, err

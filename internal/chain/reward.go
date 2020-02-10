@@ -56,20 +56,18 @@ func AccumulateRewards(
 	//// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-
 		defaultReward := economics.BaseStakedReward
-
 		// TODO Use cached result in off-chain db instead of full computation
-		snapshot, err := economics.NewSnapshotWithOutAPRs(
+		_, percentageStaked, err := economics.WhatPercentStakedNow(
 			beaconChain, header.Time().Int64(),
 		)
 		if err != nil {
 			return economics.NewNoReward(blockNum), err
 		}
-		howMuchOff, adjustBy := economics.Adjustment(*snapshot.StakedPercentage)
+		howMuchOff, adjustBy := economics.Adjustment(*percentageStaked)
 		defaultReward = defaultReward.Add(adjustBy)
 		utils.Logger().Info().
-			Str("percentage-token-staked", snapshot.StakedPercentage.String()).
+			Str("percentage-token-staked", percentageStaked.String()).
 			Str("how-much-off", howMuchOff.String()).
 			Str("adjusting-by", adjustBy.String()).
 			Str("block-reward", defaultReward.String()).
@@ -81,7 +79,6 @@ func AccumulateRewards(
 		}
 
 		newRewards := big.NewInt(0)
-
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		members, payable, _, err := ballotResultBeaconchain(beaconChain, header)
 		allRewards := make(map[common.Address]map[uint32]*big.Int, len(payable))

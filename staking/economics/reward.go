@@ -1,7 +1,9 @@
 package economics
 
 import (
+	"bytes"
 	"math/big"
+	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -116,38 +118,75 @@ type Snapshot struct {
 
 // NewSnapshotWithAPRs ..
 func NewSnapshotWithAPRs(
-	beaconchain engine.ChainReader,
-	timestamp int64,
+	beaconchain engine.ChainReader, header *block.Header,
 ) (*Snapshot, error) {
-	return newSnapshot(beaconchain, timestamp, true)
+	return newSnapshot(beaconchain, header, true)
 }
 
 // NewSnapshotWithOutAPRs ..
 func NewSnapshotWithOutAPRs(
+	beaconchain engine.ChainReader, header *block.Header,
+) (*Snapshot, error) {
+	return newSnapshot(beaconchain, header, false)
+}
+
+// WhatPercentStakedNow ..
+func WhatPercentStakedNow(
 	beaconchain engine.ChainReader,
 	timestamp int64,
-) (*Snapshot, error) {
-	return newSnapshot(beaconchain, timestamp, false)
+) (*big.Int, *numeric.Dec, error) {
+	stakedNow := numeric.ZeroDec()
+	// Only active validators' stake is counted in stake ratio because only their stake is under slashing risk
+	active, err := beaconchain.ReadActiveValidatorList()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	soFarDoledOut, err := beaconchain.ReadBlockRewardAccumulator(
+		beaconchain.CurrentHeader().Number().Uint64(),
+	)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dole := numeric.NewDecFromBigInt(soFarDoledOut.NetworkTotalPayout)
+
+	for i := range active {
+		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
+		if err != nil {
+			return nil, nil, err
+		}
+		stakedNow = stakedNow.Add(
+			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
+		)
+	}
+	percentage := stakedNow.Quo(totalTokens.Mul(
+		reward.PercentageForTimeStamp(timestamp),
+	).Add(dole))
+	utils.Logger().Info().
+		Str("so-far-doled-out", dole.String()).
+		Str("staked-percentage", percentage.String()).
+		Str("currently-staked", stakedNow.String()).
+		Msg("Computed how much staked right now")
+	return soFarDoledOut.NetworkTotalPayout, &percentage, nil
 }
 
 // newSnapshot returns a record with metrics on
 // the network accumulated rewards,
 // and by validator.
 func newSnapshot(
-	beaconchain engine.ChainReader,
-	timestamp int64,
-	includeAPRs bool,
+	beaconchain engine.ChainReader, header *block.Header, includeAPRs bool,
 ) (*Snapshot, error) {
-	headerNow := beaconchain.CurrentHeader()
-	blockNow := headerNow.Number().Uint64()
+	blockNow := header.Number().Uint64()
 	blocksPerEpoch := shard.Schedule.BlocksPerEpoch()
 	oneEpochAgo := beaconchain.GetHeaderByNumber(blockNow - blocksPerEpoch)
 	twoEpochAgo := beaconchain.GetHeaderByNumber(blockNow - (blocksPerEpoch * 2))
 
-	if !beaconchain.Config().IsStaking(headerNow.Epoch()) {
+	if !beaconchain.Config().IsStaking(header.Epoch()) {
 		return nil, errors.Errorf(
 			"current epoch %s, staking epoch %s",
-			headerNow.Epoch().String(),
+			header.Epoch().String(),
 			beaconchain.Config().StakingEpoch.String(),
 		)
 	}
@@ -181,30 +220,58 @@ func newSnapshot(
 		total := wrapper.TotalDelegation()
 		stakedNow = stakedNow.Add(numeric.NewDecFromBigInt(total))
 		if includeAPRs {
-			rates[i] = ComputedAPR{active[i], total, junk, numeric.ZeroDec()}
+			rates[i] = ComputedAPR{
+				Validator:        active[i],
+				TotalStakedToken: total,
+				// these two last fields meant to be mutated later.
+				StakeRatio: junk,
+				APR:        numeric.ZeroDec(),
+			}
 		}
 	}
 
 	circulatingSupply := totalTokens.Mul(
-		reward.PercentageForTimeStamp(timestamp),
+		reward.PercentageForTimeStamp(header.Time().Int64()),
 	).Add(dole)
 
 	if oneEpochAgo != nil && twoEpochAgo != nil {
 		if blocksPerYear, err := ExpectedValueBlocksPerYear(
 			oneEpochAgo, twoEpochAgo, int64(blocksPerEpoch),
 		); includeAPRs && err != nil {
+			rewardsSoFar := soFarDoledOut.ValidatorReward
+			soFarCount := len(rewardsSoFar)
+
+			sort.SliceStable(rewardsSoFar, func(i, j int) bool {
+				return bytes.Compare(
+					rewardsSoFar[i].Validator.Bytes(),
+					rewardsSoFar[j].Validator.Bytes(),
+				) == -1
+			})
+
 			for i := range rates {
-				rates[i].StakeRatio = numeric.NewDecFromBigInt(
-					rates[i].TotalStakedToken,
-				).Quo(circulatingSupply)
-				if reward := BaseStakedReward.Sub(
-					rates[i].StakeRatio.Sub(targetStakedPercentage).Mul(potentialAdjust),
-				); reward.GT(zero) {
-					rates[i].APR = blocksPerYear.Mul(reward).Quo(stakedNow)
+				lookingFor := rates[i].Validator.Bytes()
+				if k :=
+					sort.Search(soFarCount, func(j int) bool {
+						return bytes.Compare(rewardsSoFar[j].Validator.Bytes(), lookingFor) >= 0
+					}); k < soFarCount &&
+					bytes.Compare(rewardsSoFar[k].Validator.Bytes(), lookingFor) == 0 {
+
+					rates[i].StakeRatio = numeric.NewDecFromBigInt(
+						rates[i].TotalStakedToken,
+					).Quo(circulatingSupply)
+
+					validatorRewardAccum, networkWideReward := rewardsSoFar[k], new(big.Int)
+
+					for _, shardReward := range validatorRewardAccum.ByShards {
+						networkWideReward.Add(networkWideReward, shardReward.EarnedReward)
+					}
+
+					rates[i].APR = blocksPerYear.Mul(
+						numeric.NewDecFromBigInt(networkWideReward),
+					).Quo(stakedNow)
 				}
 			}
 		}
-
 	}
 
 	percentage := stakedNow.Quo(circulatingSupply)

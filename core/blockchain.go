@@ -2834,6 +2834,8 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(rewarded *economics.Produced)
 		bc.WriteBlockRewardAccumulator(economics.NewNoReward(rewarded.ReadBlockNumber()))
 	}
 	rewardsSoFar := current.ValidatorReward
+	soFarCount := len(rewardsSoFar)
+
 	// Sort by address, then can do binary search
 	sort.SliceStable(rewardsSoFar, func(i, j int) bool {
 		return bytes.Compare(
@@ -2848,9 +2850,9 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(rewarded *economics.Produced)
 	for i := range newlyRewarded {
 		lookingFor := newlyRewarded[i].Validator.Bytes()
 		if k :=
-			sort.Search(len(rewardsSoFar), func(j int) bool {
+			sort.Search(soFarCount, func(j int) bool {
 				return bytes.Compare(rewardsSoFar[j].Validator.Bytes(), lookingFor) >= 0
-			}); k < len(rewardsSoFar) &&
+			}); k < soFarCount &&
 			bytes.Compare(rewardsSoFar[k].Validator.Bytes(), lookingFor) == 0 {
 			// found them, now update
 			for shard := range rewardsSoFar[k].ByShards {
