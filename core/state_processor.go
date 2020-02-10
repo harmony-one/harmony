@@ -131,7 +131,9 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	}
 
 	produced := economics.NewProduced(
-		payoutRecord.ReadBlockNumber(), payoutRecord.ReadRewarded(), payoutRecord.ReadTotalPayout(),
+		payoutRecord.ReadBlockNumber(),
+		payoutRecord.ReadValidatorRewards(),
+		payoutRecord.ReadTotalPayout(),
 	)
 	return receipts, outcxs, allLogs, *usedGas, produced, nil
 }

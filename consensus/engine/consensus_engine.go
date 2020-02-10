@@ -18,7 +18,7 @@ import (
 // Reward ..
 type Reward interface {
 	ReadBlockNumber() uint64
-	ReadRewarded() []votepower.VoterReward
+	ReadValidatorRewards() []votepower.ValidatorReward
 	ReadTotalPayout() *big.Int
 	Read() *votepower.RewardAccumulation
 }

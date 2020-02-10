@@ -2828,12 +2828,12 @@ func (bc *BlockChain) WriteBlockRewardAccumulator(rewarded *economics.Produced) 
 // Note: this should only be called within the blockchain insertBlock process.
 func (bc *BlockChain) UpdateBlockRewardAccumulator(rewarded *economics.Produced) error {
 	current, err := bc.ReadBlockRewardAccumulator(rewarded.ReadBlockNumber() - 1)
-	newWinners := []votepower.VoterReward{}
+	newWinners := []votepower.ValidatorReward{}
 	if err != nil {
 		// one-off fix for pangaea, return after pangaea enter staking.
 		bc.WriteBlockRewardAccumulator(economics.NewNoReward(rewarded.ReadBlockNumber()))
 	}
-	rewardsSoFar := current.ValidatorReward
+	rewardsSoFar := current.ValidatorRewards
 	soFarCount := len(rewardsSoFar)
 
 	// Sort by address, then can do binary search
@@ -2844,7 +2844,8 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(rewarded *economics.Produced)
 		) == -1
 	})
 
-	newlyRewarded, existingTotal := rewarded.ReadRewarded(), rewarded.ReadTotalPayout()
+	newlyRewarded, existingTotal :=
+		rewarded.ReadValidatorRewards(), rewarded.ReadTotalPayout()
 	existingTotal.Add(existingTotal, rewarded.ReadTotalPayout())
 
 	for i := range newlyRewarded {

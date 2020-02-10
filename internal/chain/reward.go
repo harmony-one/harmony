@@ -206,10 +206,10 @@ func AccumulateRewards(
 				}
 			}
 
-			rewardRecord, i := make([]votepower.VoterReward, len(allRewards)), 0
+			rewardRecord, i := make([]votepower.ValidatorReward, len(allRewards)), 0
 
 			for validator, payout := range allRewards {
-				rewardRecord[i] = votepower.VoterReward{
+				rewardRecord[i] = votepower.ValidatorReward{
 					validator, blockNum, []votepower.ShardReward{},
 				}
 				bookie := rewardRecord[i].ByShards
@@ -280,7 +280,7 @@ func AccumulateRewards(
 
 	return economics.NewProduced(
 		blockNum,
-		[]votepower.VoterReward{},
+		[]votepower.ValidatorReward{},
 		totalAmount,
 	), nil
 }

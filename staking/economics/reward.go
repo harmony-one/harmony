@@ -25,7 +25,7 @@ type Produced struct {
 }
 
 // NewProduced ..
-func NewProduced(b uint64, r []votepower.VoterReward, t *big.Int) *Produced {
+func NewProduced(b uint64, r []votepower.ValidatorReward, t *big.Int) *Produced {
 	return &Produced{b, votepower.RewardAccumulation{t, r}}
 }
 
@@ -39,9 +39,9 @@ func (p *Produced) Read() *votepower.RewardAccumulation {
 	return &p.accum
 }
 
-// ReadRewarded ..
-func (p *Produced) ReadRewarded() []votepower.VoterReward {
-	return p.accum.ValidatorReward
+// ReadValidatorRewards ..
+func (p *Produced) ReadValidatorRewards() []votepower.ValidatorReward {
+	return p.accum.ValidatorRewards
 }
 
 // ReadTotalPayout ..
@@ -238,7 +238,7 @@ func newSnapshot(
 		if blocksPerYear, err := ExpectedValueBlocksPerYear(
 			oneEpochAgo, twoEpochAgo, int64(blocksPerEpoch),
 		); includeAPRs && err != nil {
-			rewardsSoFar := soFarDoledOut.ValidatorReward
+			rewardsSoFar := soFarDoledOut.ValidatorRewards
 			soFarCount := len(rewardsSoFar)
 
 			sort.SliceStable(rewardsSoFar, func(i, j int) bool {

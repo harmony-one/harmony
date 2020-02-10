@@ -48,8 +48,8 @@ type ShardReward struct {
 	EarnedReward *big.Int
 }
 
-// VoterReward ..
-type VoterReward struct {
+// ValidatorReward ..
+type ValidatorReward struct {
 	Validator   common.Address
 	BlockNumber uint64
 	ByShards    []ShardReward
@@ -57,13 +57,13 @@ type VoterReward struct {
 
 // RewardAccumulation ..
 type RewardAccumulation struct {
-	NetworkTotalPayout *big.Int      `json:"total-block-reward-accum"`
-	ValidatorReward    []VoterReward `json:"validator-rewards"`
+	NetworkTotalPayout *big.Int          `json:"total-block-reward-accum"`
+	ValidatorRewards   []ValidatorReward `json:"validator-rewards"`
 }
 
 var (
 	// EmptyReward ..
-	EmptyReward = RewardAccumulation{big.NewInt(0), []VoterReward{}}
+	EmptyReward = RewardAccumulation{big.NewInt(0), []ValidatorReward{}}
 )
 
 // Round is a round of voting in any FBFT phase
