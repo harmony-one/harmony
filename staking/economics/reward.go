@@ -144,11 +144,10 @@ func newSnapshot(
 	oneEpochAgo := beaconchain.GetHeaderByNumber(blockNow - blocksPerEpoch)
 	twoEpochAgo := beaconchain.GetHeaderByNumber(blockNow - (blocksPerEpoch * 2))
 
-	if then := twoEpochAgo.Header.Epoch(); !beaconchain.Config().IsStaking(then) {
-		return nil, errors.Wrapf(
-			errNotTwoEpochsPastStaking,
-			"two epochs ago %s, staking epoch %s",
-			then.String(),
+	if !beaconchain.Config().IsStaking(headerNow.Epoch()) {
+		return nil, errors.Errorf(
+			"current epoch %s, staking epoch %s",
+			headerNow.Epoch().String(),
 			beaconchain.Config().StakingEpoch.String(),
 		)
 	}
@@ -190,19 +189,22 @@ func newSnapshot(
 		reward.PercentageForTimeStamp(timestamp),
 	).Add(dole)
 
-	if blocksPerYear, err := ExpectedValueBlocksPerYear(
-		oneEpochAgo, twoEpochAgo, int64(blocksPerEpoch),
-	); includeAPRs && err != nil {
-		for i := range rates {
-			rates[i].StakeRatio = numeric.NewDecFromBigInt(
-				rates[i].TotalStakedToken,
-			).Quo(circulatingSupply)
-			if reward := BaseStakedReward.Sub(
-				rates[i].StakeRatio.Sub(targetStakedPercentage).Mul(potentialAdjust),
-			); reward.GT(zero) {
-				rates[i].APR = blocksPerYear.Mul(reward).Quo(stakedNow)
+	if oneEpochAgo != nil && twoEpochAgo != nil {
+		if blocksPerYear, err := ExpectedValueBlocksPerYear(
+			oneEpochAgo, twoEpochAgo, int64(blocksPerEpoch),
+		); includeAPRs && err != nil {
+			for i := range rates {
+				rates[i].StakeRatio = numeric.NewDecFromBigInt(
+					rates[i].TotalStakedToken,
+				).Quo(circulatingSupply)
+				if reward := BaseStakedReward.Sub(
+					rates[i].StakeRatio.Sub(targetStakedPercentage).Mul(potentialAdjust),
+				); reward.GT(zero) {
+					rates[i].APR = blocksPerYear.Mul(reward).Quo(stakedNow)
+				}
 			}
 		}
+
 	}
 
 	percentage := stakedNow.Quo(circulatingSupply)
