@@ -20,10 +20,14 @@ const (
 	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
 )
 
-// WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
+// WaitForConsensusReadyV2 listen for the readiness signal
+// from consensus and generate new block for consensus.
 // only leader will receive the ready signal
-// TODO: clean pending transactions for validators; or validators not prepare pending transactions
-func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{}) {
+// TODO: clean pending transactions for validators;
+// or validators not prepare pending transactions
+func (node *Node) WaitForConsensusReadyV2(
+	readySignal, stopChan, stoppedChan chan struct{},
+) {
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
@@ -53,16 +57,14 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
-					newBlock, err := node.proposeNewBlock()
-
-					if err == nil {
+					if newBlock, err := node.proposeNewBlock(); err == nil {
 						utils.Logger().Debug().
 							Uint64("blockNum", newBlock.NumberU64()).
 							Int("numTxs", newBlock.Transactions().Len()).
 							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 							Msg("=========Successfully Proposed New Block==========")
-
-						// Set deadline will be BlockPeriod from now at this place. Announce stage happens right after this.
+						// Set deadline will be BlockPeriod from now at this place.
+						// Announce stage happens right after this.
 						deadline = time.Now().Add(node.BlockPeriod)
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
@@ -79,7 +81,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 func (node *Node) proposeNewBlock() (*types.Block, error) {
 	node.Worker.UpdateCurrent()
 
-	// Update worker's current header and state data in preparation to propose/process new transactions
+	// Update worker's current header and state
+	// data in preparation to propose/process new transactions
 	var (
 		coinbase    = node.Consensus.SelfAddress
 		beneficiary = coinbase
