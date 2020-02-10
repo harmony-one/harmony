@@ -57,8 +57,8 @@ type VoterReward struct {
 
 // RewardAccumulation ..
 type RewardAccumulation struct {
-	NetworkTotalPayout *big.Int `json:"total-block-reward-accum"`
-	ValidatorReward    []VoterReward
+	NetworkTotalPayout *big.Int      `json:"total-block-reward-accum"`
+	ValidatorReward    []VoterReward `json:"validator-rewards"`
 }
 
 var (
