@@ -61,6 +61,11 @@ type RewardAccumulation struct {
 	ValidatorReward    []VoterReward
 }
 
+var (
+	// EmptyReward ..
+	EmptyReward = RewardAccumulation{big.NewInt(0), []VoterReward{}}
+)
+
 // Round is a round of voting in any FBFT phase
 type Round struct {
 	AggregatedVote *bls.Sign
