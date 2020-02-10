@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -31,12 +32,12 @@ func (node *Node) WaitForConsensusReadyV2(
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
-
-		utils.Logger().Debug().
-			Msg("Waiting for Consensus ready")
-		// TODO: make local net start faster
-		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
-
+		utils.Logger().Debug().Msg("Waiting for Consensus ready")
+		if node.NodeConfig.GetNetworkType() == nodeconfig.Localnet {
+			time.Sleep(10 * time.Second) // Wait for other nodes to be ready (test-only)
+		} else {
+			time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
+		}
 		// Set up the very first deadline.
 		deadline := time.Now().Add(node.BlockPeriod)
 		for {
