@@ -128,8 +128,8 @@ func (v *Validator) MarshalJSON() ([]byte, error) {
 	type t struct {
 		Address            string      `json:"one-address"`
 		SlotPubKeys        []string    `json:"bls-public-keys"`
-		MinSelfDelegation  uint64      `json:"min-self-delegation"`
-		MaxTotalDelegation uint64      `json:"max-total-delegation"`
+		MinSelfDelegation  string      `json:"min-self-delegation"`
+		MaxTotalDelegation string      `json:"max-total-delegation"`
 		Active             bool        `json:"active"`
 		Commission         Commission  `json:"commission"`
 		Description        Description `json:"description"`
@@ -142,8 +142,8 @@ func (v *Validator) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t{
 		Address:            common2.MustAddressToBech32(v.Address),
 		SlotPubKeys:        slots,
-		MinSelfDelegation:  v.MinSelfDelegation.Uint64(),
-		MaxTotalDelegation: v.MaxTotalDelegation.Uint64(),
+		MinSelfDelegation:  v.MinSelfDelegation.String(),
+		MaxTotalDelegation: v.MaxTotalDelegation.String(),
 		Active:             v.Active,
 		Commission:         v.Commission,
 		Description:        v.Description,
