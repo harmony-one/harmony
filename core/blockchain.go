@@ -2820,7 +2820,7 @@ func (bc *BlockChain) WriteBlockRewardAccumulator(rewarded *economics.Produced) 
 	if err := rawdb.WriteBlockRewardAccumulator(bc.db, rewarded); err != nil {
 		return err
 	}
-	bc.blockAccumulatorCache.Add(rewarded.ReadBlockNumber(), rewarded.ReadRewarded())
+	bc.blockAccumulatorCache.Add(rewarded.ReadBlockNumber(), rewarded.Read())
 	return nil
 }
 

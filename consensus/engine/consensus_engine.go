@@ -20,6 +20,7 @@ type Reward interface {
 	ReadBlockNumber() uint64
 	ReadRewarded() []votepower.VoterReward
 	ReadTotalPayout() *big.Int
+	Read() *votepower.RewardAccumulation
 }
 
 // ChainReader defines a small collection of methods needed to access the local

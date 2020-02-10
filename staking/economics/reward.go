@@ -33,6 +33,11 @@ func (p *Produced) ReadBlockNumber() uint64 {
 	return p.blockNumber
 }
 
+// Read ..
+func (p *Produced) Read() *votepower.RewardAccumulation {
+	return &p.accum
+}
+
 // ReadRewarded ..
 func (p *Produced) ReadRewarded() []votepower.VoterReward {
 	return p.accum.ValidatorReward
