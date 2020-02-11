@@ -108,9 +108,13 @@ if [ "$NODE_RPC" == "true" ]; then
   )
 fi
 
-msg "harmony ${args[@]}"
+if [ -n "$NODE_EXTRA_OPTIONS" ]; then
+  extra_args="$NODE_EXTRA_OPTIONS"
+fi
+
+msg "harmony ${args[@]} $extra_args"
 ls -al ${keydir}
 
-harmony "${args[@]}"
+harmony "${args[@]} $extra_args"
 
 # vim: ai ts=2 sw=2 et sts=2 ft=sh

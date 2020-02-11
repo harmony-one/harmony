@@ -22,6 +22,7 @@ options:
   -n network  : network type
   -z dns_zone : dns zone
   -d db_dir   : harmony db directory
+  -X "extra"  : extra parameters to docker 'run' script
 
   -k          : kill running node
   -h          : print this message
@@ -46,13 +47,14 @@ fi
 
 kill_only=
 
-while getopts "t:p:d:kh" opt; do
+while getopts "t:p:d:khX:" opt; do
   case "$opt" in
     t) tag="$OPTARG"
        DOCKER_IMAGE=$DOCKER_REPO:$tag;;
     p) port_base="$OPTARG";;
     d) db_dir="$OPTARG";;
     k) kill_only="true";;
+    X) extra="$OPTARG";;
     *) usage;;
   esac
 done
@@ -113,6 +115,7 @@ docker run -it -d \
   -e NODE_PORT=$port_base \
   -e NODE_BLSKEY=$BLSKEY \
   -e NODE_BLSPASS=$BLSPASS \
+  -e NODE_EXTRA_OPTIONS="$extra" \
   -v $(realpath ${db_dir}/harmony_db_0):/harmony/harmony_db_0 \
   -v $(realpath ${db_dir}/harmony_db_1):/harmony/harmony_db_1 \
   -v $(realpath ${db_dir}/harmony_db_2):/harmony/harmony_db_2 \
