@@ -93,11 +93,13 @@ type Message interface {
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error) {
+func IntrinsicGas(data []byte, contractCreation, homestead, isValidatorCreation bool) (uint64, error) {
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if contractCreation && homestead {
 		gas = params.TxGasContractCreation
+	} else if isValidatorCreation {
+		gas = params.TxGasValidatorCreation
 	} else {
 		gas = params.TxGas
 	}
@@ -217,7 +219,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, contractCreation, homestead)
+	gas, err := IntrinsicGas(st.data, contractCreation, homestead, false)
 	if err != nil {
 		return nil, 0, false, err
 	}
@@ -292,7 +294,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	// Pay intrinsic gas
 	// TODO: propose staking-specific formula for staking transaction
-	gas, err := IntrinsicGas(st.data, false, homestead)
+	gas, err := IntrinsicGas(st.data, false, homestead, msg.Type() == types.StakeCreateVal)
 	// TODO Remove this logging
 	utils.Logger().Info().Uint64("Using", gas).Msg("Gas cost of staking transaction being processed")
 
@@ -307,7 +309,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 
 	switch msg.Type() {
-	case types.StakeNewVal:
+	case types.StakeCreateVal:
 		stkMsg := &staking.CreateValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
