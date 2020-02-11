@@ -338,9 +338,9 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 	if b.MedianStakeCache.BlockHeight != -1 && b.MedianStakeCache.BlockHeight > int64(rpc.LatestBlockNumber)-20 {
 		return b.MedianStakeCache.MedianRawStake
 	}
+	b.MedianStakeCache.BlockHeight = int64(rpc.LatestBlockNumber)
 	candidates := b.hmy.BlockChain().ValidatorCandidates()
 	if len(candidates) == 0 {
-		b.MedianStakeCache.Lock()
 		b.MedianStakeCache.MedianRawStake = big.NewInt(0)
 		return b.MedianStakeCache.MedianRawStake
 	}
@@ -348,7 +348,6 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 	for i := range candidates {
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
 		stake := big.NewInt(0)
-		validator.GetAddress()
 		for i := range validator.Delegations {
 			stake.Add(stake, validator.Delegations[i].Amount)
 		}
@@ -363,10 +362,8 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 		stakes = stakes[:320]
 	}
 
-	const isEven = 0
-
 	switch l := len(stakes); l % 2 {
-	case isEven:
+	case 0:
 		left := stakes[(l/2)-1]
 		right := stakes[l/2]
 		b.MedianStakeCache.MedianRawStake = new(big.Int).Div(new(big.Int).Add(left, right), two)
