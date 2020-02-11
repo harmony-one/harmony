@@ -439,7 +439,7 @@ func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) (err e
 			"epoch", epoch,
 		).WithCause(err)
 	}
-	utils.Logger().Info().Str("epoch", epoch.String()).Int("numShards", len(data)).Msg("wrote sharding state")
+	utils.Logger().Info().Str("epoch", epoch.String()).Int("size", len(data)).Msg("wrote sharding state")
 	return nil
 }
 
@@ -461,7 +461,7 @@ func WriteLastCommits(
 		return ctxerror.New("cannot write last commits").WithCause(err)
 	}
 	utils.Logger().Info().
-		Int("numShards", len(data)).
+		Int("size", len(data)).
 		Msg("wrote last commits")
 	return nil
 }

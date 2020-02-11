@@ -711,3 +711,13 @@ func (node *Node) SetSyncFreq(syncFreq int) {
 func (node *Node) SetBeaconSyncFreq(syncFreq int) {
 	node.beaconSyncFreq = syncFreq
 }
+
+// ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.
+func (node *Node) ShutDown() {
+	node.Blockchain().Stop()
+	node.Beaconchain().Stop()
+	node.StopServices()
+	node.stopHTTP()
+	fmt.Printf("Exiting node program...")
+	os.Exit(0)
+}

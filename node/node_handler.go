@@ -154,7 +154,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						Msg("block sync")
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
-					if node.Blockchain().ShardID() != 0 {
+					if node.Blockchain().ShardID() != 0 && node.NodeConfig.Role() != nodeconfig.ExplorerNode {
 						for _, block := range blocks {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().

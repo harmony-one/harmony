@@ -8,10 +8,12 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"os/signal"
 	"path"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -78,7 +80,7 @@ var (
 	// isGenesis indicates this node is a genesis node
 	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
-	isArchival = flag.Bool("is_archival", true, "false makes node faster by turning caching off")
+	isArchival = flag.Bool("is_archival", false, "false will enable cached state pruning")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
 	// nodeType indicates the type of the node: validator, explorer
@@ -635,6 +637,26 @@ func main() {
 	if currentNode.NodeConfig.GetMetricsFlag() {
 		go currentNode.CollectMetrics()
 	}
+
+	// Prepare for graceful shutdown from os signals
+	osSignal := make(chan os.Signal)
+	signal.Notify(osSignal, os.Interrupt, os.Kill, syscall.SIGTERM)
+	go func() {
+		for {
+			select {
+			case sig := <-osSignal:
+				if sig == os.Kill || sig == syscall.SIGTERM {
+					fmt.Printf("Got %s signal. Gracefully shutting down...\n", sig)
+					currentNode.ShutDown()
+				}
+				if sig == os.Interrupt {
+					fmt.Printf("Got %s signal. Dumping state to DB...\n", sig)
+					currentNode.Blockchain().Stop()
+					currentNode.Beaconchain().Stop()
+				}
+			}
+		}
+	}()
 
 	currentNode.StartServer()
 }
