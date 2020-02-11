@@ -91,10 +91,13 @@ var (
 	epochVdfBlockNumberPrefix = []byte("epoch-vdf-block-number")
 
 	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
-	BloomBitsIndexPrefix        = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
-	preimageCounter             = metrics.NewRegisteredCounter("db/preimage/total", nil)
+	BloomBitsIndexPrefix = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
+	preimageCounter      = metrics.NewRegisteredCounter("db/preimage/total", nil)
+
 	preimageHitCounter          = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 	currentRewardGivenOutPrefix = []byte("blk-rwd-")
+	// key is prefix + validator address+ epoch
+	validatorRewardByEpochPrefix = []byte("vldr-rwd-")
 )
 
 // TxLookupEntry is a positional metadata to help looking up the data content of
@@ -252,4 +255,11 @@ func validatorStatsKey(addr common.Address) []byte {
 
 func blockRewardAccumKey(number uint64) []byte {
 	return append(currentRewardGivenOutPrefix, encodeBlockNumber(number)...)
+}
+
+func validatorRewardAccumKey(addr common.Address, epoch uint64) []byte {
+	return append(
+		currentRewardGivenOutPrefix,
+		append(addr.Bytes(), encodeBlockNumber(epoch)...)...,
+	)
 }

@@ -29,7 +29,6 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/economics"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -781,9 +780,7 @@ func ReadDelegationsByDelegator(db DatabaseReader, delegator common.Address) ([]
 }
 
 // WriteDelegationsByDelegator stores the list of validators delegated by a delegator
-func WriteDelegationsByDelegator(
-	db DatabaseWriter, delegator common.Address, indices []staking.DelegationIndex,
-) error {
+func WriteDelegationsByDelegator(db DatabaseWriter, delegator common.Address, indices []staking.DelegationIndex) error {
 	bytes, err := rlp.EncodeToBytes(indices)
 	if err != nil {
 		utils.Logger().Error().Msg("[writeDelegationsByDelegator] Failed to encode")
@@ -795,28 +792,42 @@ func WriteDelegationsByDelegator(
 }
 
 // ReadBlockRewardAccumulator ..
-func ReadBlockRewardAccumulator(
-	db DatabaseReader, number uint64,
-) (*votepower.RewardAccumulation, error) {
+func ReadBlockRewardAccumulator(db DatabaseReader, number uint64) (*big.Int, error) {
 	data, err := db.Get(blockRewardAccumKey(number))
 	if err != nil {
 		return nil, err
 	}
-	var rewarded votepower.RewardAccumulation
+	return new(big.Int).SetBytes(data), nil
+}
+
+// WriteBlockRewardAccumulator ..
+func WriteBlockRewardAccumulator(db DatabaseWriter, newAccum *big.Int, number uint64) error {
+	return db.Put(blockRewardAccumKey(number), newAccum.Bytes())
+}
+
+// ReadValidatorRewardAccumulator ..
+func ReadValidatorRewardAccumulator(
+	db DatabaseReader, addr common.Address, epoch *big.Int,
+) (*votepower.ValidatorReward, error) {
+	data, err := db.Get(validatorRewardAccumKey(addr, epoch.Uint64()))
+	if err != nil {
+		return nil, err
+	}
+	var rewarded []votepower.ShardReward
 	if err := rlp.DecodeBytes(data, &rewarded); err != nil {
 		return nil, err
 	}
 
-	return &rewarded, nil
+	return &votepower.ValidatorReward{addr, rewarded}, nil
 }
 
-// WriteBlockRewardAccumulator ..
-func WriteBlockRewardAccumulator(
-	db DatabaseWriter, stats *economics.Produced,
+// WriteValidatorRewardAccumulator ..
+func WriteValidatorRewardAccumulator(
+	db DatabaseWriter, epoch *big.Int, record *votepower.ValidatorReward,
 ) error {
-	data, err := rlp.EncodeToBytes(stats)
+	data, err := rlp.EncodeToBytes(record.ByShards)
 	if err != nil {
 		return err
 	}
-	return db.Put(blockRewardAccumKey(stats.ReadBlockNumber()), data)
+	return db.Put(validatorRewardAccumKey(record.Address, epoch.Uint64()), data)
 }

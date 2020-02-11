@@ -50,9 +50,8 @@ type ShardReward struct {
 
 // ValidatorReward ..
 type ValidatorReward struct {
-	Validator   common.Address
-	BlockNumber uint64
-	ByShards    []ShardReward
+	Address  common.Address
+	ByShards []ShardReward
 }
 
 // RewardAccumulation ..

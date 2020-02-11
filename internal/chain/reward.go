@@ -208,9 +208,9 @@ func AccumulateRewards(
 
 			rewardRecord, i := make([]votepower.ValidatorReward, len(allRewards)), 0
 
-			for validator, payout := range allRewards {
+			for addr, payout := range allRewards {
 				rewardRecord[i] = votepower.ValidatorReward{
-					validator, blockNum, []votepower.ShardReward{},
+					addr, []votepower.ShardReward{},
 				}
 				bookie := rewardRecord[i].ByShards
 				for shardID, reward := range payout {

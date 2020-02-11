@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -138,27 +137,27 @@ type BlockChain struct {
 	pendingCrossLinksMutex      sync.RWMutex // pending crosslinks lock
 	pendingSlashingCandidatesMU sync.RWMutex // pending slashing candidates
 
-	checkpoint       int          // checkpoint counts towards the new checkpoint
-	currentBlock     atomic.Value // Current head of the block chain
-	currentFastBlock atomic.Value // Current head of the fast-sync chain (may be above the block chain!)
-
-	stateCache                    state.Database // State database to reuse between imports (contains state cache)
-	bodyCache                     *lru.Cache     // Cache for the most recent block bodies
-	bodyRLPCache                  *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
-	receiptsCache                 *lru.Cache     // Cache for the most recent receipts per block
-	blockCache                    *lru.Cache     // Cache for the most recent entire blocks
-	futureBlocks                  *lru.Cache     // future blocks are blocks added for later processing
-	shardStateCache               *lru.Cache
-	lastCommitsCache              *lru.Cache
-	epochCache                    *lru.Cache // Cache epoch number → first block number
-	randomnessCache               *lru.Cache // Cache for vrf/vdf
-	validatorCache                *lru.Cache // Cache for validator info
-	validatorStatsCache           *lru.Cache // Cache for validator stats
-	validatorListCache            *lru.Cache // Cache of validator list
-	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
-	pendingCrossLinksCache        *lru.Cache // Cache of last pending crosslinks
-	blockAccumulatorCache         *lru.Cache // Cache of block accumulators
-	pendingSlashingCandidates     *lru.Cache // Cache of last pending slashing candidates
+	checkpoint                      int            // checkpoint counts towards the new checkpoint
+	currentBlock                    atomic.Value   // Current head of the block chain
+	currentFastBlock                atomic.Value   // Current head of the fast-sync chain (may be above the block chain!)
+	stateCache                      state.Database // State database to reuse between imports (contains state cache)
+	bodyCache                       *lru.Cache     // Cache for the most recent block bodies
+	bodyRLPCache                    *lru.Cache     // Cache for the most recent block bodies in RLP encoded format
+	receiptsCache                   *lru.Cache     // Cache for the most recent receipts per block
+	blockCache                      *lru.Cache     // Cache for the most recent entire blocks
+	futureBlocks                    *lru.Cache     // future blocks are blocks added for later processing
+	shardStateCache                 *lru.Cache
+	lastCommitsCache                *lru.Cache
+	epochCache                      *lru.Cache // Cache epoch number → first block number
+	randomnessCache                 *lru.Cache // Cache for vrf/vdf
+	validatorCache                  *lru.Cache // Cache for validator info
+	validatorStatsCache             *lru.Cache // Cache for validator stats
+	validatorListCache              *lru.Cache // Cache of validator list
+	validatorListByDelegatorCache   *lru.Cache // Cache of validator list by delegator
+	pendingCrossLinksCache          *lru.Cache // Cache of last pending crosslinks
+	blockAccumulatorCache           *lru.Cache // Cache of block accumulators
+	validatorRewardAccumulatorCache *lru.Cache // Cache of block accumulators
+	pendingSlashingCandidates       *lru.Cache // Cache of last pending slashing candidates
 
 	quit    chan struct{} // blockchain quit channel
 	running int32         // running must be called atomically
@@ -201,35 +200,37 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
+	validatorRewardAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
 	pendingSlashingCandidateCache, _ := lru.New(pendingSlashingCandidateCacheLimit)
 
 	bc := &BlockChain{
-		chainConfig:                   chainConfig,
-		cacheConfig:                   cacheConfig,
-		db:                            db,
-		triegc:                        prque.New(nil),
-		stateCache:                    state.NewDatabase(db),
-		quit:                          make(chan struct{}),
-		shouldPreserve:                shouldPreserve,
-		bodyCache:                     bodyCache,
-		bodyRLPCache:                  bodyRLPCache,
-		receiptsCache:                 receiptsCache,
-		blockCache:                    blockCache,
-		futureBlocks:                  futureBlocks,
-		shardStateCache:               shardCache,
-		lastCommitsCache:              commitsCache,
-		epochCache:                    epochCache,
-		randomnessCache:               randomnessCache,
-		validatorCache:                validatorCache,
-		validatorStatsCache:           validatorStatsCache,
-		validatorListCache:            validatorListCache,
-		validatorListByDelegatorCache: validatorListByDelegatorCache,
-		pendingCrossLinksCache:        pendingCrossLinksCache,
-		pendingSlashingCandidates:     pendingSlashingCandidateCache,
-		blockAccumulatorCache:         blockAccumulatorCache,
-		engine:                        engine,
-		vmConfig:                      vmConfig,
-		badBlocks:                     badBlocks,
+		chainConfig:                     chainConfig,
+		cacheConfig:                     cacheConfig,
+		db:                              db,
+		triegc:                          prque.New(nil),
+		stateCache:                      state.NewDatabase(db),
+		quit:                            make(chan struct{}),
+		shouldPreserve:                  shouldPreserve,
+		bodyCache:                       bodyCache,
+		bodyRLPCache:                    bodyRLPCache,
+		receiptsCache:                   receiptsCache,
+		blockCache:                      blockCache,
+		futureBlocks:                    futureBlocks,
+		shardStateCache:                 shardCache,
+		lastCommitsCache:                commitsCache,
+		epochCache:                      epochCache,
+		randomnessCache:                 randomnessCache,
+		validatorCache:                  validatorCache,
+		validatorStatsCache:             validatorStatsCache,
+		validatorListCache:              validatorListCache,
+		validatorListByDelegatorCache:   validatorListByDelegatorCache,
+		pendingCrossLinksCache:          pendingCrossLinksCache,
+		pendingSlashingCandidates:       pendingSlashingCandidateCache,
+		blockAccumulatorCache:           blockAccumulatorCache,
+		validatorRewardAccumulatorCache: validatorRewardAccumulatorCache,
+		engine:                          engine,
+		vmConfig:                        vmConfig,
+		badBlocks:                       badBlocks,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -1186,6 +1187,7 @@ func (bc *BlockChain) WriteBlockWithState(
 		}
 
 		// Find all the active validator addresses and store them in db
+		// Update active validators
 		if err := bc.WriteActiveValidatorList(
 			newShardState.ExternalValidators(),
 		); err != nil {
@@ -1230,8 +1232,7 @@ func (bc *BlockChain) WriteBlockWithState(
 		crossLinks := &types.CrossLinks{}
 		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
 		if err != nil {
-			header.Logger(utils.Logger()).Warn().Err(err).
-				Msg("[insertChain/crosslinks] cannot parse cross links")
+			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cannot parse cross links")
 			return NonStatTy, err
 		}
 		if !crossLinks.IsSorted() {
@@ -1241,25 +1242,34 @@ func (bc *BlockChain) WriteBlockWithState(
 		for _, crossLink := range *crossLinks {
 			// Process crosslink
 			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
-				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).
-					Uint32("shardID", crossLink.ShardID()).
-					Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
+				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
 			}
 			bc.LastContinuousCrossLink(crossLink)
 		}
 
 		//clean/update local database cache after crosslink inserted into blockchain
 		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
-		const msg = "DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v"
-		utils.Logger().Debug().Msgf(msg, len(*crossLinks), num, err)
+		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
 	}
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
-			bc.UpdateBlockRewardAccumulator(payout)
+			if err := bc.UpdateBlockRewardAccumulator(
+				payout.ReadTotalPayout(), block.Number().Uint64(),
+			); err != nil {
+				utils.Logger().Debug().Msgf("block accumulator update issue %s", err.Error())
+			}
+			for _, validator := range payout.ReadValidatorRewards() {
+				if err := bc.UpdateValidatorRewardAccumulator(
+					block.Epoch(), &validator,
+				); err != nil {
+					//
+				}
+			}
 		} else {
 			// block reward never accumulate before staking
-			bc.WriteBlockRewardAccumulator(economics.NewNoReward(block.Number().Uint64()))
+			bc.WriteBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
+			bc.WriteValidatorRewardAccumulator(block.Epoch(), &votepower.ValidatorReward{})
 		}
 	}
 
@@ -1471,10 +1481,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(
-			block, state, bc.vmConfig,
-		)
-
+		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1490,9 +1497,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		proctime := time.Since(bstart)
 
 		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(
-			block, receipts, cxReceipts, payout, state,
-		)
+		status, err := bc.WriteBlockWithState(block, receipts, cxReceipts, payout, state)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
@@ -2803,84 +2808,8 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	return nil
 }
 
-// ReadBlockRewardAccumulator must only be called on beaconchain
-func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*votepower.RewardAccumulation, error) {
-	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
-		return &votepower.EmptyReward, nil
-	}
-	if cached, ok := bc.blockAccumulatorCache.Get(number); ok {
-		return cached.(*votepower.RewardAccumulation), nil
-	}
-	return rawdb.ReadBlockRewardAccumulator(bc.db, number)
-}
-
-// WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
-// Note: this should only be called once during staking launch.
-func (bc *BlockChain) WriteBlockRewardAccumulator(rewarded *economics.Produced) error {
-	if err := rawdb.WriteBlockRewardAccumulator(bc.db, rewarded); err != nil {
-		return err
-	}
-	bc.blockAccumulatorCache.Add(rewarded.ReadBlockNumber(), rewarded.Read())
-	return nil
-}
-
-//UpdateBlockRewardAccumulator ..
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateBlockRewardAccumulator(rewarded *economics.Produced) error {
-	current, err := bc.ReadBlockRewardAccumulator(rewarded.ReadBlockNumber() - 1)
-	newWinners := []votepower.ValidatorReward{}
-	if err != nil {
-		// one-off fix for pangaea, return after pangaea enter staking.
-		bc.WriteBlockRewardAccumulator(economics.NewNoReward(rewarded.ReadBlockNumber()))
-	}
-	rewardsSoFar := current.ValidatorRewards
-	soFarCount := len(rewardsSoFar)
-
-	// Sort by address, then can do binary search
-	sort.SliceStable(rewardsSoFar, func(i, j int) bool {
-		return bytes.Compare(
-			rewardsSoFar[i].Validator.Bytes(),
-			rewardsSoFar[j].Validator.Bytes(),
-		) == -1
-	})
-
-	newlyRewarded, existingTotal :=
-		rewarded.ReadValidatorRewards(), rewarded.ReadTotalPayout()
-	existingTotal.Add(existingTotal, rewarded.ReadTotalPayout())
-
-	for i := range newlyRewarded {
-		lookingFor := newlyRewarded[i].Validator.Bytes()
-		if k :=
-			sort.Search(soFarCount, func(j int) bool {
-				return bytes.Compare(rewardsSoFar[j].Validator.Bytes(), lookingFor) >= 0
-			}); k < soFarCount &&
-			bytes.Compare(rewardsSoFar[k].Validator.Bytes(), lookingFor) == 0 {
-			// found them, now update
-			for shard := range rewardsSoFar[k].ByShards {
-				for rewardedShard := range newlyRewarded[i].ByShards {
-					if s1, s2 :=
-						rewardsSoFar[k].ByShards[shard],
-						newlyRewarded[i].ByShards[rewardedShard]; s1.ShardID == s2.ShardID {
-						s1.EarnedReward.Add(s1.EarnedReward, s2.EarnedReward)
-					}
-				}
-			}
-		} else {
-			newWinners = append(newWinners, rewardsSoFar[i])
-		}
-	}
-
-	return bc.WriteBlockRewardAccumulator(economics.NewProduced(
-		rewarded.ReadBlockNumber(),
-		append(rewardsSoFar, newWinners...),
-		existingTotal,
-	))
-}
-
 // Note this should read from the state of current block in concern (root == newBlock.root)
-func (bc *BlockChain) addDelegationIndex(
-	delegatorAddress, validatorAddress common.Address, root common.Hash,
-) error {
+func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress common.Address, root common.Hash) error {
 	// Get existing delegations
 	delegations, err := bc.ReadDelegationsByDelegator(delegatorAddress)
 	if err != nil {

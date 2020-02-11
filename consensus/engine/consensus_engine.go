@@ -63,7 +63,10 @@ type ChainReader interface {
 	committee.StakingCandidatesReader
 
 	//ReadBlockRewardAccumulator is the block-reward accumulated, given block number height
-	ReadBlockRewardAccumulator(uint64) (*votepower.RewardAccumulation, error)
+	ReadBlockRewardAccumulator(uint64) (*big.Int, error)
+
+	//ReadBlockRewardAccumulator is the block-reward accumulated, given block number height
+	ReadValidatorRewardAccumulator(epoch *big.Int, addr common.Address) (*votepower.ValidatorReward, error)
 
 	// ReadValidatorStats retrieves the running stats for a validator
 	ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error)
