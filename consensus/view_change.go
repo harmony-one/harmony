@@ -121,8 +121,8 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.current.SetViewID(viewID)
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
 
-	diff := viewID - consensus.viewID
-	duration := time.Duration(int64(diff) * int64(viewChangeDuration))
+	diff := int64(viewID - consensus.viewID)
+	duration := time.Duration(diff * diff * int64(viewChangeDuration))
 	utils.Logger().Info().
 		Uint64("ViewChangingID", viewID).
 		Dur("timeoutDuration", duration).
