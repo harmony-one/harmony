@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -639,12 +640,12 @@ func main() {
 
 	// Prepare for graceful shutdown from os signals
 	osSignal := make(chan os.Signal)
-	signal.Notify(osSignal, os.Interrupt, os.Kill)
+	signal.Notify(osSignal, os.Interrupt, os.Kill, syscall.SIGTERM)
 	go func() {
 		for {
 			select {
 			case sig := <-osSignal:
-				if sig == os.Kill {
+				if sig == os.Kill || sig == syscall.SIGTERM {
 					fmt.Printf("Got %s signal. Gracefully shutting down...\n", sig)
 					currentNode.ShutDown()
 				}
