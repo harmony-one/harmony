@@ -1,9 +1,8 @@
 package economics
 
 import (
-	"bytes"
+	"fmt"
 	"math/big"
-	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -75,8 +74,8 @@ var (
 	oneYear                      = big.NewInt(int64(nanoSecondsInYear))
 )
 
-// ExpectedValueBlocksPerYear ..
-func ExpectedValueBlocksPerYear(
+// ExpectedNumBlocksPerYear ..
+func ExpectedNumBlocksPerYear(
 	oneEpochAgo, twoEpochAgo *block.Header, blocksPerEpoch int64,
 ) (numeric.Dec, error) {
 	oneTAgo, twoTAgo := oneEpochAgo.Time(), twoEpochAgo.Time()
@@ -150,7 +149,7 @@ func WhatPercentStakedNow(
 		return nil, nil, err
 	}
 
-	dole := numeric.NewDecFromBigInt(soFarDoledOut.NetworkTotalPayout)
+	dole := numeric.NewDecFromBigInt(soFarDoledOut)
 
 	for i := range active {
 		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
@@ -169,7 +168,7 @@ func WhatPercentStakedNow(
 		Str("staked-percentage", percentage.String()).
 		Str("currently-staked", stakedNow.String()).
 		Msg("Computed how much staked right now")
-	return soFarDoledOut.NetworkTotalPayout, &percentage, nil
+	return soFarDoledOut, &percentage, nil
 }
 
 // newSnapshot returns a record with metrics on
@@ -210,7 +209,7 @@ func newSnapshot(
 		rates = make([]ComputedAPR, len(active))
 	}
 
-	dole := numeric.NewDecFromBigInt(soFarDoledOut.NetworkTotalPayout)
+	dole := numeric.NewDecFromBigInt(soFarDoledOut)
 
 	for i := range active {
 		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
@@ -235,42 +234,43 @@ func newSnapshot(
 	).Add(dole)
 
 	if oneEpochAgo != nil && twoEpochAgo != nil {
-		if blocksPerYear, err := ExpectedValueBlocksPerYear(
+		if blocksPerYear, err := ExpectedNumBlocksPerYear(
 			oneEpochAgo, twoEpochAgo, int64(blocksPerEpoch),
 		); includeAPRs && err != nil {
-			rewardsSoFar := soFarDoledOut.ValidatorRewards
-			soFarCount := len(rewardsSoFar)
+			fmt.Println("something foo", blocksPerYear)
+			// rewardsSoFar := soFarDoledOut.ValidatorRewards
+			// soFarCount := len(rewardsSoFar)
 
-			sort.SliceStable(rewardsSoFar, func(i, j int) bool {
-				return bytes.Compare(
-					rewardsSoFar[i].Validator.Bytes(),
-					rewardsSoFar[j].Validator.Bytes(),
-				) == -1
-			})
+			// sort.SliceStable(rewardsSoFar, func(i, j int) bool {
+			// 	return bytes.Compare(
+			// 		rewardsSoFar[i].Validator.Bytes(),
+			// 		rewardsSoFar[j].Validator.Bytes(),
+			// 	) == -1
+			// })
 
-			for i := range rates {
-				lookingFor := rates[i].Validator.Bytes()
-				if k :=
-					sort.Search(soFarCount, func(j int) bool {
-						return bytes.Compare(rewardsSoFar[j].Validator.Bytes(), lookingFor) >= 0
-					}); k < soFarCount &&
-					bytes.Compare(rewardsSoFar[k].Validator.Bytes(), lookingFor) == 0 {
+			// for i := range rates {
+			// 	lookingFor := rates[i].Validator.Bytes()
+			// 	if k :=
+			// 		sort.Search(soFarCount, func(j int) bool {
+			// 			return bytes.Compare(rewardsSoFar[j].Validator.Bytes(), lookingFor) >= 0
+			// 		}); k < soFarCount &&
+			// 		bytes.Compare(rewardsSoFar[k].Validator.Bytes(), lookingFor) == 0 {
 
-					rates[i].StakeRatio = numeric.NewDecFromBigInt(
-						rates[i].TotalStakedToken,
-					).Quo(circulatingSupply)
+			// 		rates[i].StakeRatio = numeric.NewDecFromBigInt(
+			// 			rates[i].TotalStakedToken,
+			// 		).Quo(circulatingSupply)
 
-					validatorRewardAccum, networkWideReward := rewardsSoFar[k], new(big.Int)
+			// 		validatorRewardAccum, networkWideReward := rewardsSoFar[k], new(big.Int)
 
-					for _, shardReward := range validatorRewardAccum.ByShards {
-						networkWideReward.Add(networkWideReward, shardReward.EarnedReward)
-					}
+			// 		for _, shardReward := range validatorRewardAccum.ByShards {
+			// 			networkWideReward.Add(networkWideReward, shardReward.EarnedReward)
+			// 		}
 
-					rates[i].APR = blocksPerYear.Mul(
-						numeric.NewDecFromBigInt(networkWideReward),
-					).Quo(stakedNow)
-				}
-			}
+			// 		rates[i].APR = blocksPerYear.Mul(
+			// 			numeric.NewDecFromBigInt(networkWideReward),
+			// 		).Quo(stakedNow)
+			// 	}
+			// }
 		}
 	}
 
@@ -280,5 +280,5 @@ func newSnapshot(
 		Str("staked-percentage", percentage.String()).
 		Str("currently-staked", stakedNow.String()).
 		Msg("Computed how much staked right now")
-	return &Snapshot{soFarDoledOut, rates, &percentage}, nil
+	return &Snapshot{nil, rates, &percentage}, nil
 }
