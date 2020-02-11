@@ -50,7 +50,7 @@ const (
 	SameShardTx     TransactionType = iota
 	SubtractionOnly                 // only subtract tokens from source shard account
 	InvalidTx
-	StakeNewVal
+	StakeCreateVal
 	StakeEditVal
 	Delegate
 	Undelegate
@@ -58,7 +58,7 @@ const (
 )
 
 // StakingTypeMap is the map from staking type to transactionType
-var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveCreateValidator: StakeNewVal,
+var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveCreateValidator: StakeCreateVal,
 	staking.DirectiveEditValidator: StakeEditVal, staking.DirectiveDelegate: Delegate,
 	staking.DirectiveUndelegate: Undelegate, staking.DirectiveCollectRewards: CollectRewards}
 
@@ -95,7 +95,7 @@ func (txType TransactionType) String() string {
 		return "SubtractionOnly"
 	} else if txType == InvalidTx {
 		return "InvalidTx"
-	} else if txType == StakeNewVal {
+	} else if txType == StakeCreateVal {
 		return "StakeNewValidator"
 	} else if txType == StakeEditVal {
 		return "StakeEditValidator"

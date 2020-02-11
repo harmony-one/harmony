@@ -235,7 +235,7 @@ func processStressTestCommand() {
 	// default inputData
 	data := make([]byte, 0)
 
-	gasLimit, _ := core.IntrinsicGas(data, false, true)
+	gasLimit, _ := core.IntrinsicGas(data, false, true, false)
 
 	gasPrice := 0
 	gasPriceBigInt := big.NewInt(int64(gasPrice))

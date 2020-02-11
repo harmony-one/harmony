@@ -765,7 +765,7 @@ func processTransferCommand() {
 
 	amountBigInt := big.NewInt(int64(amount * denominations.Nano))
 	amountBigInt = amountBigInt.Mul(amountBigInt, big.NewInt(denominations.Nano))
-	gas, err := core.IntrinsicGas(inputData, false, true)
+	gas, err := core.IntrinsicGas(inputData, false, true, false)
 	if err != nil {
 		fmt.Printf("cannot calculate required gas: %v\n", err)
 		return
