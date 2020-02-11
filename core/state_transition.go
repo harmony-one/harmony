@@ -39,8 +39,8 @@ var (
 	errValidatorExist              = errors.New("staking validator already exists")
 	errValidatorNotExist           = errors.New("staking validator does not exist")
 	errNoDelegationToUndelegate    = errors.New("no delegation to undelegate")
-	errCommissionRateChangeTooFast = errors.New("commission rate can not be changed more than MaxChangeRate within the same epoch")
-	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than MaxCommissionRate")
+	errCommissionRateChangeTooFast = errors.New("change on commission rate can not be more than max change rate within the same epoch")
+	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than maximum commission rate")
 	errNoRewardsToCollect          = errors.New("no rewards to collect")
 	errNegativeAmount              = errors.New("amount can not be negative")
 )
@@ -491,11 +491,16 @@ func (st *StateTransition) applyDelegateTx(delegate *staking.Delegate) error {
 				delegation.Amount.Add(delegation.Amount, delegate.Amount)
 				err := stateDB.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
 
-				// Secondly, if all locked token are used, try use the balance.
-				if err == nil && delegateBalance.Cmp(big.NewInt(0)) > 0 {
-					stateDB.SubBalance(delegate.DelegatorAddress, delegateBalance)
+				if err != nil {
+					return err
 				}
-				return err
+				// Secondly, if all locked token are used, try use the balance.
+				if delegateBalance.Cmp(big.NewInt(0)) > 0 {
+					stateDB.SubBalance(delegate.DelegatorAddress, delegateBalance)
+					return nil
+				}
+				// This shouldn't really happen
+				return errInsufficientBalanceForStake
 			}
 			return errors.Wrapf(
 				errInsufficientBalanceForStake,

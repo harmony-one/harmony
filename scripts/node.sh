@@ -248,6 +248,15 @@ testnet)
   network_type=testnet
   dns_zone=p.hmny.io
   ;;
+staking)
+  bootnodes=(
+    /ip4/54.86.126.90/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/52.40.84.2/tcp/9867/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
+  )
+  REL=testnet
+  network_type=testnet
+  dns_zone=os.hmny.io
+  ;;
 devnet)
   bootnodes=(
     /ip4/52.40.84.2/tcp/9870/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
@@ -315,6 +324,20 @@ verify_checksum() {
    return 0
 }
 
+verify_signature() {
+   local dir file 
+   dir="${1}"
+   file="${dir}/${2}"
+   sigfile="${dir}/${2}.sig"
+
+   result=$(openssl dgst -sha256 -verify "${outdir}/harmony_pubkey.pem" -signature "${sigfile}" "${file}" 2>&1)
+   echo ${result}
+   if  [[ ${result} != "Verified OK" ]]; then
+	   return 1
+   fi
+   return 0
+}
+
 download_binaries() {
    local outdir status
    ${do_not_download} && return 0
@@ -330,6 +353,17 @@ download_binaries() {
          return ${status}
          ;;
       esac
+
+      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin}.sig -o "${outdir}/${bin}.sig" || status=$?
+      case "${status}" in
+      0) ;;
+      *)
+         msg "cannot download ${bin}.sig (status ${status})"
+         return ${status}
+         ;;
+      esac
+
+      verify_signature "${outdir}" "${bin}" || return $?
       verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
       msg "downloaded ${bin}"
    done
@@ -433,6 +467,11 @@ any_new_binaries() {
    ${do_not_download} && return 0
    outdir="${1}"
    mkdir -p "${outdir}"
+   curl -L https://harmony.one/pubkey -o "${outdir}/harmony_pubkey.pem"
+   if ! grep -q "BEGIN\ PUBLIC\ KEY" "${outdir}/harmony_pubkey.pem"; then
+      msg "failed to downloaded harmony public signing key"
+      return 1
+   fi
    curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
    if diff $outdir/md5sum.txt.new md5sum.txt
    then

@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/staking/slash"
 )
 
 const (
@@ -126,6 +127,8 @@ type Consensus struct {
 	disableViewChange bool
 	// last node block reward for metrics
 	lastBlockReward *big.Int
+	// Have a dedicated reader thread pull from this chan, like in node
+	SlashChan chan slash.Record
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
@@ -208,6 +211,7 @@ func New(
 	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
+	consensus.SlashChan = make(chan slash.Record)
 	consensus.commitFinishChan = make(chan uint64)
 	consensus.ReadySignal = make(chan struct{})
 	consensus.lastBlockReward = big.NewInt(0)

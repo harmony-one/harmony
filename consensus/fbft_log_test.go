@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	protobuf "github.com/golang/protobuf/proto"
-	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -14,7 +13,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-func constructAnnounceMessage(t *testing.T) []byte {
+func constructAnnounceMessage(t *testing.T) (*NetworkMessage, error) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
@@ -29,10 +28,7 @@ func constructAnnounceMessage(t *testing.T) []byte {
 		t.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-
-	msgBytes := consensus.constructAnnounceMessage()
-	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
-	return msgPayload
+	return consensus.construct(msg_pb.MessageType_ANNOUNCE, nil)
 }
 
 func getConsensusMessage(payload []byte) (*msg_pb.Message, error) {
@@ -42,18 +38,6 @@ func getConsensusMessage(payload []byte) (*msg_pb.Message, error) {
 		return nil, err
 	}
 	return msg, nil
-}
-
-func TestParseFBFTMessage(t *testing.T) {
-	payload := constructAnnounceMessage(t)
-	msg, err := getConsensusMessage(payload)
-	if err != nil {
-		t.Error("create consensus message error")
-	}
-	_, err = ParseFBFTMessage(msg)
-	if err != nil {
-		t.Error("unable to parse FBFTMessage")
-	}
 }
 
 func TestGetMessagesByTypeSeqViewHash(t *testing.T) {

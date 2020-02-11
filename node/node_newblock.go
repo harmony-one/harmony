@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -144,7 +145,10 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare cross links
-	var crossLinksToPropose types.CrossLinks
+	var (
+		slashingToPropose   []slash.Record
+		crossLinksToPropose types.CrossLinks
+	)
 
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
@@ -182,7 +186,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 	return node.Worker.FinalizeNewBlock(
-		sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState,
+		sig, mask, node.Consensus.GetViewID(),
+		coinbase, crossLinksToPropose, shardState,
+		slashingToPropose,
 	)
 }
 
@@ -204,8 +210,13 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		pendingCXReceipts = append(pendingCXReceipts, v)
 	}
 
-	sort.Slice(pendingCXReceipts, func(i, j int) bool {
-		return pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID || (pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID && pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
+	sort.SliceStable(pendingCXReceipts, func(i, j int) bool {
+		shardCMP := pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID
+		shardEQ := pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID
+		blockCMP := pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(
+			pendingCXReceipts[j].MerkleProof.BlockNum,
+		) == -1
+		return shardCMP || (shardEQ && blockCMP)
 	})
 
 	m := make(map[common.Hash]bool)

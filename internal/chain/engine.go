@@ -29,12 +29,11 @@ import (
 
 type engineImpl struct {
 	d      reward.Distributor
-	s      slash.Slasher
 	beacon engine.ChainReader
 }
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{nil, nil, nil}
+var Engine = &engineImpl{nil, nil}
 
 // Rewarder handles the distribution of block rewards
 func (e *engineImpl) Rewarder() reward.Distributor {
@@ -46,21 +45,11 @@ func (e *engineImpl) SetRewarder(d reward.Distributor) {
 	e.d = d
 }
 
-// Slasher handles slashing accounts due to inavailibility or double-signing
-func (e *engineImpl) Slasher() slash.Slasher {
-	return e.s
-}
-
-// SetSlasher assigns the slasher used
-func (e *engineImpl) SetSlasher(s slash.Slasher) {
-	e.s = s
-}
-
 func (e *engineImpl) Beaconchain() engine.ChainReader {
 	return e.beacon
 }
 
-// SetSlasher assigns the slasher used
+// SetBeaconchain assigns the beaconchain handle used
 func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
 	e.beacon = beaconchain
 }
@@ -269,7 +258,7 @@ func (e *engineImpl) Finalize(
 	// Accumulate any block and uncle rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewards(
-		chain, state, header, e.Rewarder(), e.Slasher(), e.Beaconchain(),
+		chain, state, header, e.Rewarder(), e.Beaconchain(),
 	)
 	if err != nil {
 		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
@@ -277,6 +266,13 @@ func (e *engineImpl) Finalize(
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
+	// Apply the slashes, invariant: assume been verified as legit slash by this point
+	if isBeaconChain && isNewEpoch && inStakingEra {
+		if err := slash.Apply(state, header.Slashes()); err != nil {
+			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
+		}
+	}
+
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
 	if isBeaconChain && isNewEpoch && inStakingEra {
@@ -309,23 +305,13 @@ func (e *engineImpl) Finalize(
 		if err != nil {
 			return nil, nil, ctxerror.New("[Finalize] failed to read shard state").WithCause(err)
 		}
-		processed := make(map[common.Address]struct{})
-		for i := range newShardState.Shards {
-			shard := newShardState.Shards[i]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-						wrapper := state.GetStakingInfo(slot.EcdsaAddress)
-						wrapper.LastEpochInCommittee = newShardState.Epoch
-
-						if err := state.UpdateStakingInfo(slot.EcdsaAddress, wrapper); err != nil {
-							return nil, nil, ctxerror.New("[Finalize] failed update validator info").WithCause(err)
-						}
-					}
-				}
+		for _, external := range newShardState.ExternalValidators() {
+			wrapper := state.GetStakingInfo(external)
+			wrapper.LastEpochInCommittee = newShardState.Epoch
+			if err := state.UpdateStakingInfo(external, wrapper); err != nil {
+				return nil, nil, ctxerror.New(
+					"[Finalize] failed update validator info",
+				).WithCause(err)
 			}
 		}
 	}
