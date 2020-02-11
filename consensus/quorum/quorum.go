@@ -6,6 +6,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -24,8 +25,8 @@ const (
 
 var phaseNames = map[Phase]string{
 	Prepare:    "Prepare",
-	Commit:     "Prepare",
-	ViewChange: "Commit",
+	Commit:     "Commit",
+	ViewChange: "viewChange",
 }
 
 func (p Phase) String() string {
@@ -71,9 +72,9 @@ type ParticipantTracker interface {
 // SignatoryTracker ..
 type SignatoryTracker interface {
 	ParticipantTracker
-	AddSignature(
+	SubmitVote(
 		p Phase, PubKey *bls.PublicKey,
-		sig *bls.Sign, roundLeader *bls.PublicKey, roundNumber uint64,
+		sig *bls.Sign, optSerializedBlock []byte,
 	)
 	// Caller assumes concurrency protection
 	SignersCount(Phase) int64
@@ -83,8 +84,8 @@ type SignatoryTracker interface {
 // SignatureReader ..
 type SignatureReader interface {
 	SignatoryTracker
-	ReadAllSignatures(Phase) []*bls.Sign
-	ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign
+	ReadAllBallots(Phase) []*votepower.Ballot
+	ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ballot
 	TwoThirdsSignersCount() int64
 	// 96 bytes aggregated signature
 	AggregateVotes(p Phase) *bls.Sign
@@ -128,13 +129,12 @@ type Decider interface {
 // and values are BLS private key signed signatures
 type cIdentities struct {
 	// Public keys of the committee including leader and validators
-	publicKeys   []*bls.PublicKey
-	announcement *votepower.Round
-	commit       *votepower.Round
+	publicKeys []*bls.PublicKey
+	prepare    *votepower.Round
+	commit     *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
-	viewID      *votepower.Round
-	seenCounter map[[shard.PublicKeySizeInBytes]byte]int
+	viewChange *votepower.Round
 }
 
 type depInject struct {
@@ -143,7 +143,12 @@ type depInject struct {
 }
 
 func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
-	return bls_cosi.AggregateSig(s.ReadAllSignatures(p))
+	ballots := s.ReadAllBallots(p)
+	sigs := make([]*bls.Sign, 0, len(ballots))
+	for _, ballot := range ballots {
+		sigs = append(sigs, ballot.Signature)
+	}
+	return bls_cosi.AggregateSig(sigs)
 }
 
 func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
@@ -171,12 +176,9 @@ func (s *cIdentities) Participants() []*bls.PublicKey {
 }
 
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
-	// TODO - might need to put reset of seen counter in separate method
-	s.seenCounter = make(map[[shard.PublicKeySizeInBytes]byte]int, len(pubKeys))
 	for i := range pubKeys {
 		k := shard.BlsPublicKey{}
 		k.FromLibBLSPublicKey(pubKeys[i])
-		s.seenCounter[k] = 0
 	}
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
 }
@@ -196,36 +198,39 @@ func (s *cIdentities) ParticipantsCount() int64 {
 func (s *cIdentities) SignersCount(p Phase) int64 {
 	switch p {
 	case Prepare:
-		return int64(len(s.announcement.BallotBox))
+		return int64(len(s.prepare.BallotBox))
 	case Commit:
 		return int64(len(s.commit.BallotBox))
 	case ViewChange:
-		return int64(len(s.viewID.BallotBox))
+		return int64(len(s.viewChange.BallotBox))
 	default:
 		return 0
 
 	}
 }
 
-func (s *cIdentities) AddSignature(
+func (s *cIdentities) SubmitVote(
 	p Phase, PubKey *bls.PublicKey,
-	sig *bls.Sign, roundLeader *bls.PublicKey, roundNumber uint64,
+	sig *bls.Sign, optSerializedBlock []byte,
 ) {
-	hex := PubKey.SerializeToHexStr()
-	ballot := &votepower.Ballot{
-		*shard.FromLibBLSPublicKeyUnsafe(PubKey),
-		*shard.FromLibBLSPublicKeyUnsafe(roundLeader),
-		roundNumber,
-		sig,
+	if p != Commit && optSerializedBlock != nil && len(optSerializedBlock) != 0 {
+		utils.Logger().Debug().Str("phase", p.String()).
+			Msg("non-commit phase has non-nil, non-empty block")
 	}
 
-	switch p {
+	ballot := &votepower.Ballot{
+		SignerPubKey:       *shard.FromLibBLSPublicKeyUnsafe(PubKey),
+		Signature:          sig,
+		OptSerializedBlock: optSerializedBlock[:],
+	}
+
+	switch hex := PubKey.SerializeToHexStr(); p {
 	case Prepare:
-		s.announcement.BallotBox[hex] = ballot
+		s.prepare.BallotBox[hex] = ballot
 	case Commit:
 		s.commit.BallotBox[hex] = ballot
 	case ViewChange:
-		s.viewID.BallotBox[hex] = ballot
+		s.viewChange.BallotBox[hex] = ballot
 	}
 }
 
@@ -233,11 +238,11 @@ func (s *cIdentities) reset(ps []Phase) {
 	for i := range ps {
 		switch m := votepower.NewRound(); ps[i] {
 		case Prepare:
-			s.announcement = m
+			s.prepare = m
 		case Commit:
 			s.commit = m
 		case ViewChange:
-			s.viewID = m
+			s.viewChange = m
 		}
 	}
 }
@@ -246,50 +251,49 @@ func (s *cIdentities) TwoThirdsSignersCount() int64 {
 	return s.ParticipantsCount()*2/3 + 1
 }
 
-func (s *cIdentities) ReadSignature(p Phase, PubKey *bls.PublicKey) *bls.Sign {
+func (s *cIdentities) ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ballot {
 	var ballotBox map[string]*votepower.Ballot
 	hex := PubKey.SerializeToHexStr()
 
 	switch p {
 	case Prepare:
-		ballotBox = s.announcement.BallotBox
+		ballotBox = s.prepare.BallotBox
 	case Commit:
 		ballotBox = s.commit.BallotBox
 	case ViewChange:
-		ballotBox = s.viewID.BallotBox
+		ballotBox = s.viewChange.BallotBox
 	}
 
 	payload, ok := ballotBox[hex]
 	if !ok {
 		return nil
 	}
-	return payload.Signature
+	return payload
 }
 
-func (s *cIdentities) ReadAllSignatures(p Phase) []*bls.Sign {
+func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 	var m map[string]*votepower.Ballot
 	switch p {
 	case Prepare:
-		m = s.announcement.BallotBox
+		m = s.prepare.BallotBox
 	case Commit:
 		m = s.commit.BallotBox
 	case ViewChange:
-		m = s.viewID.BallotBox
+		m = s.viewChange.BallotBox
 	}
-	sigs := make([]*bls.Sign, 0, len(m))
-	for _, value := range m {
-		sigs = append(sigs, value.Signature)
+	ballots := make([]*votepower.Ballot, 0, len(m))
+	for _, ballot := range m {
+		ballots = append(ballots, ballot)
 	}
-	return sigs
+	return ballots
 }
 
-func newMapBackedSignatureReader() *cIdentities {
+func newBallotsBackedSignatureReader() *cIdentities {
 	return &cIdentities{
-		publicKeys:   []*bls.PublicKey{},
-		announcement: votepower.NewRound(),
-		commit:       votepower.NewRound(),
-		viewID:       votepower.NewRound(),
-		seenCounter:  map[[shard.PublicKeySizeInBytes]byte]int{},
+		publicKeys: []*bls.PublicKey{},
+		prepare:    votepower.NewRound(),
+		commit:     votepower.NewRound(),
+		viewChange: votepower.NewRound(),
 	}
 }
 
@@ -317,7 +321,7 @@ func (d *depInject) MyPublicKey() func() (*bls.PublicKey, error) {
 
 // NewDecider ..
 func NewDecider(p Policy) Decider {
-	signatureStore := newMapBackedSignatureReader()
+	signatureStore := newBallotsBackedSignatureReader()
 	deps := &depInject{}
 	c := &composite{deps, deps, signatureStore}
 	switch p {

@@ -4,19 +4,21 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
+	"os/signal"
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/pkg/errors"
-
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -35,8 +37,9 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
-
+	"github.com/harmony-one/harmony/staking/slash"
 	golog "github.com/ipfs/go-log"
+	"github.com/pkg/errors"
 	gologging "github.com/whyrusleeping/go-logging"
 )
 
@@ -77,7 +80,7 @@ var (
 	// isGenesis indicates this node is a genesis node
 	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
-	isArchival = flag.Bool("is_archival", true, "false makes node faster by turning caching off")
+	isArchival = flag.Bool("is_archival", false, "false will enable cached state pruning")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
 	// nodeType indicates the type of the node: validator, explorer
@@ -127,6 +130,11 @@ var (
 	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
 	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
+	// Blacklist of addresses
+	blacklistPath   = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
+	webHookYamlPath = flag.String(
+		"webhook_yaml", "", "path for yaml config reporting double signing",
+	)
 )
 
 func initSetup() {
@@ -322,9 +330,26 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentConsensus.DisableViewChangeForTestingOnly()
 	}
 
+	blacklist, err := setupBlacklist()
+	if err != nil {
+		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
+	}
+
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, *isArchival)
+
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
+
+	if p := *webHookYamlPath; p != "" {
+		config, err := slash.NewDoubleSignWebHooksFromPath(p)
+		if err != nil {
+			fmt.Fprintf(
+				os.Stderr, "ERROR provided yaml path %s but yaml found is illegal", p,
+			)
+			os.Exit(1)
+		}
+		currentNode.NodeConfig.WebHooks.DoubleSigning = config
+	}
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
@@ -355,14 +380,20 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
 	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
 
-	currentNode.NodeConfig.SetBeaconGroupID(nodeconfig.NewGroupIDByShardID(0))
+	currentNode.NodeConfig.SetBeaconGroupID(
+		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
+	)
 
 	switch *nodeType {
 	case "explorer":
 		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
-		currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(*shardID)))
-		currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(*shardID)))
+		currentNode.NodeConfig.SetShardGroupID(
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(*shardID)),
+		)
+		currentNode.NodeConfig.SetClientGroupID(
+			nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(*shardID)),
+		)
 	case "validator":
 		nodeconfig.SetDefaultRole(nodeconfig.Validator)
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
@@ -414,6 +445,26 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
 	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
 	return currentNode
+}
+
+func setupBlacklist() (*map[ethCommon.Address]struct{}, error) {
+	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", *blacklistPath)
+	dat, err := ioutil.ReadFile(*blacklistPath)
+	if err != nil {
+		return nil, err
+	}
+	addrMap := make(map[ethCommon.Address]struct{})
+	for _, line := range strings.Split(string(dat), "\n") {
+		if len(line) != 0 { // blacklist file may have trailing empty string line
+			b32 := strings.TrimSpace(strings.Split(string(line), "#")[0])
+			addr, err := common.Bech32ToAddress(b32)
+			if err != nil {
+				return nil, err
+			}
+			addrMap[addr] = struct{}{}
+		}
+	}
+	return &addrMap, nil
 }
 
 func main() {
@@ -586,6 +637,26 @@ func main() {
 	if currentNode.NodeConfig.GetMetricsFlag() {
 		go currentNode.CollectMetrics()
 	}
+
+	// Prepare for graceful shutdown from os signals
+	osSignal := make(chan os.Signal)
+	signal.Notify(osSignal, os.Interrupt, os.Kill, syscall.SIGTERM)
+	go func() {
+		for {
+			select {
+			case sig := <-osSignal:
+				if sig == os.Kill || sig == syscall.SIGTERM {
+					fmt.Printf("Got %s signal. Gracefully shutting down...\n", sig)
+					currentNode.ShutDown()
+				}
+				if sig == os.Interrupt {
+					fmt.Printf("Got %s signal. Dumping state to DB...\n", sig)
+					currentNode.Blockchain().Stop()
+					currentNode.Beaconchain().Stop()
+				}
+			}
+		}
+	}()
 
 	currentNode.StartServer()
 }

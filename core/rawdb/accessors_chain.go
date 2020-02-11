@@ -439,7 +439,7 @@ func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) (err e
 			"epoch", epoch,
 		).WithCause(err)
 	}
-	utils.Logger().Info().Str("epoch", epoch.String()).Int("numShards", len(data)).Msg("wrote sharding state")
+	utils.Logger().Info().Str("epoch", epoch.String()).Int("size", len(data)).Msg("wrote sharding state")
 	return nil
 }
 
@@ -461,7 +461,7 @@ func WriteLastCommits(
 		return ctxerror.New("cannot write last commits").WithCause(err)
 	}
 	utils.Logger().Info().
-		Int("numShards", len(data)).
+		Int("size", len(data)).
 		Msg("wrote last commits")
 	return nil
 }
@@ -539,6 +539,21 @@ func WritePendingCrossLinks(db DatabaseWriter, bytes []byte) error {
 // DeletePendingCrossLinks stores last pending crosslinks into database.
 func DeletePendingCrossLinks(db DatabaseDeleter) error {
 	return db.Delete(pendingCrosslinkKey)
+}
+
+// ReadPendingSlashingCandidates retrieves last pending slashing candidates
+func ReadPendingSlashingCandidates(db DatabaseReader) ([]byte, error) {
+	return db.Get(pendingSlashingKey)
+}
+
+// WritePendingSlashingCandidates stores last pending slashing candidates into database.
+func WritePendingSlashingCandidates(db DatabaseWriter, bytes []byte) error {
+	return db.Put(pendingSlashingKey, bytes)
+}
+
+// DeletePendingSlashingCandidates stores last pending slashing candidates into database.
+func DeletePendingSlashingCandidates(db DatabaseDeleter) error {
+	return db.Delete(pendingSlashingKey)
 }
 
 // ReadCXReceipts retrieves all the transactions of receipts given destination shardID, number and blockHash

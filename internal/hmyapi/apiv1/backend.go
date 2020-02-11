@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -59,7 +60,7 @@ type Backend interface {
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
 	// Get balance
-	GetBalance(address common.Address) (*big.Int, error)
+	GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error)
 	// Get validators for a particular epoch
 	GetValidators(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
@@ -81,4 +82,5 @@ type Backend interface {
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
 	GetMedianRawStakeSnapshot() *big.Int
 	GetPendingCXReceipts() []*types.CXReceiptsProof
+	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
 }

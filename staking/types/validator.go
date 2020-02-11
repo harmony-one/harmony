@@ -34,7 +34,7 @@ var (
 	errMinSelfDelegationTooSmall = errors.New("min_self_delegation has to be greater than 1 ONE")
 	errInvalidMaxTotalDelegation = errors.New("max_total_delegation can not be less than min_self_delegation")
 	errCommissionRateTooLarge    = errors.New("commission rate and change rate can not be larger than max commission rate")
-	errInvalidComissionRate      = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
+	errInvalidCommissionRate     = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
 	errNeedAtLeastOneSlotKey     = errors.New("need at least one slot key")
 	errBLSKeysNotMatchSigs       = errors.New("bls keys and corresponding signatures could not be verified")
 	errNilMinSelfDelegation      = errors.New("MinSelfDelegation can not be nil")
@@ -128,8 +128,8 @@ func (v *Validator) MarshalJSON() ([]byte, error) {
 	type t struct {
 		Address            string      `json:"one-address"`
 		SlotPubKeys        []string    `json:"bls-public-keys"`
-		MinSelfDelegation  uint64      `json:"min-self-delegation"`
-		MaxTotalDelegation uint64      `json:"max-total-delegation"`
+		MinSelfDelegation  string      `json:"min-self-delegation"`
+		MaxTotalDelegation string      `json:"max-total-delegation"`
 		Active             bool        `json:"active"`
 		Commission         Commission  `json:"commission"`
 		Description        Description `json:"description"`
@@ -142,8 +142,8 @@ func (v *Validator) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t{
 		Address:            common2.MustAddressToBech32(v.Address),
 		SlotPubKeys:        slots,
-		MinSelfDelegation:  v.MinSelfDelegation.Uint64(),
-		MaxTotalDelegation: v.MaxTotalDelegation.Uint64(),
+		MinSelfDelegation:  v.MinSelfDelegation.String(),
+		MaxTotalDelegation: v.MaxTotalDelegation.String(),
 		Active:             v.Active,
 		Commission:         v.Commission,
 		Description:        v.Description,
@@ -234,19 +234,19 @@ func (w *ValidatorWrapper) SanityCheck() error {
 
 	if w.Validator.Rate.LT(zeroPercent) || w.Validator.Rate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidComissionRate, "rate:%s", w.Validator.Rate.String(),
+			errInvalidCommissionRate, "rate:%s", w.Validator.Rate.String(),
 		)
 	}
 
 	if w.Validator.MaxRate.LT(zeroPercent) || w.Validator.MaxRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidComissionRate, "rate:%s", w.Validator.MaxRate.String(),
+			errInvalidCommissionRate, "rate:%s", w.Validator.MaxRate.String(),
 		)
 	}
 
 	if w.Validator.MaxChangeRate.LT(zeroPercent) || w.Validator.MaxChangeRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidComissionRate, "rate:%s", w.Validator.MaxChangeRate.String(),
+			errInvalidCommissionRate, "rate:%s", w.Validator.MaxChangeRate.String(),
 		)
 	}
 
@@ -350,7 +350,7 @@ func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 // GetMinSelfDelegation returns the minimum amount the validator must stake
 func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
 
-func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BlsSignature) error {
+func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BLSSignature) error {
 	if len(pubKeys) != len(pubKeySigs) {
 		return errBLSKeysNotMatchSigs
 	}
@@ -364,7 +364,7 @@ func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BlsSignature
 	return nil
 }
 
-func verifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BlsSignature) error {
+func verifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BLSSignature) error {
 	if len(pubKeySig) == 0 {
 		return errBLSKeysNotMatchSigs
 	}

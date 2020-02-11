@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -144,7 +145,10 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare cross links
-	var crossLinksToPropose types.CrossLinks
+	var (
+		slashingToPropose   []slash.Record
+		crossLinksToPropose types.CrossLinks
+	)
 
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
@@ -167,55 +171,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
-	// Bump up signers counts
-	_, header := node.Worker.GetCurrentState(), node.Blockchain().CurrentHeader()
-	if epoch := header.Epoch(); node.Blockchain().Config().IsStaking(epoch) {
-
-		if header.ShardID() == shard.BeaconChainShardID {
-			superCommittee, err := node.Blockchain().ReadShardState(header.Epoch())
-			processed := make(map[common.Address]struct{})
-
-			if err != nil {
-				return nil, err
-			}
-
-			for j := range superCommittee.Shards {
-				shard := superCommittee.Shards[j]
-				for j := range shard.Slots {
-					slot := shard.Slots[j]
-					if slot.EffectiveStake != nil { // For external validator
-						_, ok := processed[slot.EcdsaAddress]
-						if !ok {
-							processed[slot.EcdsaAddress] = struct{}{}
-						}
-					}
-				}
-			}
-
-			// TODO(Edgar) Need to uncomment and fix, unknown why enabling
-			// this code causes merkle root verification issues
-
-			// if err := availability.IncrementValidatorSigningCounts(
-			// 	node.Blockchain(), header, header.ShardID(), state, processed,
-			// ); err != nil {
-			// 	return nil, err
-			// }
-
-			// // kick out the inactive validators so they won't come up in the auction as possible
-			// // candidates in the following call to SuperCommitteeForNextEpoch
-			// if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
-			// 	fmt.Println("hit the last block condition")
-			// 	if err := availability.SetInactiveUnavailableValidators(
-			// 		node.Blockchain(), state, processed,
-			// 	); err != nil {
-			// 		return nil, err
-			// 	}
-			// }
-		} else {
-			// TODO Handle shard chain
-		}
-	}
-
 	// Prepare shard state
 	shardState := new(shard.State)
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
@@ -231,7 +186,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 	return node.Worker.FinalizeNewBlock(
-		sig, mask, node.Consensus.GetViewID(), coinbase, crossLinksToPropose, shardState,
+		sig, mask, node.Consensus.GetViewID(),
+		coinbase, crossLinksToPropose, shardState,
+		slashingToPropose,
 	)
 }
 
@@ -253,8 +210,13 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		pendingCXReceipts = append(pendingCXReceipts, v)
 	}
 
-	sort.Slice(pendingCXReceipts, func(i, j int) bool {
-		return pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID || (pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID && pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(pendingCXReceipts[j].MerkleProof.BlockNum) < 0)
+	sort.SliceStable(pendingCXReceipts, func(i, j int) bool {
+		shardCMP := pendingCXReceipts[i].MerkleProof.ShardID < pendingCXReceipts[j].MerkleProof.ShardID
+		shardEQ := pendingCXReceipts[i].MerkleProof.ShardID == pendingCXReceipts[j].MerkleProof.ShardID
+		blockCMP := pendingCXReceipts[i].MerkleProof.BlockNum.Cmp(
+			pendingCXReceipts[j].MerkleProof.BlockNum,
+		) == -1
+		return shardCMP || (shardEQ && blockCMP)
 	})
 
 	m := make(map[common.Hash]bool)

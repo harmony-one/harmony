@@ -125,14 +125,19 @@ function build_only
          fi
       fi
    done
-   pushd $BINDIR
-   for lib in "${!LIB[@]}"; do
-      if [ -e ${LIB[$lib]} ]; then
-         cp -pf ${LIB[$lib]} .
-      fi
-   done
 
-   $MD5 "${!SRC[@]}" "${!LIB[@]}" > md5sum.txt
+   pushd $BINDIR
+   if [ "$STATIC" == "true" ]; then
+      $MD5 "${!SRC[@]}" > md5sum.txt
+   else
+      for lib in "${!LIB[@]}"; do
+         if [ -e ${LIB[$lib]} ]; then
+            cp -pf ${LIB[$lib]} .
+         fi
+      done
+
+      $MD5 "${!SRC[@]}" "${!LIB[@]}" > md5sum.txt
+   fi
    popd
 }
 
