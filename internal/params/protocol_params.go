@@ -7,7 +7,8 @@ const (
 	MinGasLimit uint64 = 5000 // Minimum the gas limit may ever be.
 	// GenesisGasLimit ...
 	GenesisGasLimit uint64 = 4712388 // Gas limit of the Genesis block.
-
+	// TestGenesisGasLimit ..
+	TestGenesisGasLimit uint64 = 10712388 // A Gas limit in testing of the Genesis block.
 	// MaximumExtraDataSize ...
 	MaximumExtraDataSize uint64 = 32 // Maximum size extra data may be after Genesis.
 	// ExpByteGas ...

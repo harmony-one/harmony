@@ -18,22 +18,21 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"sort"
-
-	"github.com/harmony-one/harmony/numeric"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-
 	"github.com/harmony-one/harmony/core/types"
+	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/staking"
 	stk "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 type revision struct {
@@ -248,7 +247,9 @@ func (db *DB) GetCodeSize(addr common.Address) int {
 	if stateObject.code != nil {
 		return len(stateObject.code)
 	}
-	size, err := db.db.ContractCodeSize(stateObject.addrHash, common.BytesToHash(stateObject.CodeHash()))
+	size, err := db.db.ContractCodeSize(
+		stateObject.addrHash, common.BytesToHash(stateObject.CodeHash()),
+	)
 	if err != nil {
 		db.setError(err)
 	}
@@ -684,23 +685,34 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	return root, err
 }
 
-// GetStakingInfo returns staking information of a given validator (including delegation info)
-func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
+var (
+	errAddressNotPresent = errors.New("address not present in state")
+)
+
+// ValidatorWrapper  ..
+func (db *DB) ValidatorWrapper(
+	addr common.Address,
+) (*stk.ValidatorWrapper, error) {
 	by := db.GetCode(addr)
 	if len(by) == 0 {
-		return nil
+		return nil, errAddressNotPresent
 	}
 	val := stk.ValidatorWrapper{}
-	err := rlp.DecodeBytes(by, &val)
-	if err != nil {
-		fmt.Printf("GetStakingInfo unable to decode: %v\n", err)
-		return nil
+	if err := rlp.DecodeBytes(by, &val); err != nil {
+		return nil, errors.Wrapf(
+			err,
+			"could not decode for %s",
+			common2.MustAddressToBech32(addr),
+		)
 	}
-	return &val
+	return &val, nil
 }
 
-// UpdateStakingInfo update staking information of a given validator (including delegation info)
-func (db *DB) UpdateStakingInfo(addr common.Address, val *stk.ValidatorWrapper) error {
+// UpdateValidatorWrapper updates staking information of
+// a given validator (including delegation info)
+func (db *DB) UpdateValidatorWrapper(
+	addr common.Address, val *stk.ValidatorWrapper,
+) error {
 	if err := val.SanityCheck(); err != nil {
 		return err
 	}
@@ -710,7 +722,6 @@ func (db *DB) UpdateStakingInfo(addr common.Address, val *stk.ValidatorWrapper) 
 		return err
 	}
 	db.SetCode(addr, by)
-
 	return nil
 }
 
@@ -737,9 +748,9 @@ func (db *DB) IsValidator(addr common.Address) bool {
 func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 	rewardPool := big.NewInt(0).Set(reward)
 
-	curValidator := db.GetStakingInfo(snapshot.Validator.Address)
-	if curValidator == nil {
-		return errors.New("failed to distribute rewards: validator does not exist")
+	curValidator, err := db.ValidatorWrapper(snapshot.Validator.Address)
+	if err != nil {
+		return errors.Wrapf(err, "failed to distribute rewards: validator does not exist")
 	}
 
 	// Payout commission
@@ -762,10 +773,11 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 		rewardPool.Sub(rewardPool, rewardInt)
 	}
 
-	// The last remaining bit belongs to the validator (remember the validator's self delegation is always at index 0)
-	if rewardPool.Cmp(big.NewInt(0)) > 0 {
+	// The last remaining bit belongs to the validator (remember the validator's self delegation is
+	// always at index 0)
+	if rewardPool.Cmp(common.Big0) > 0 {
 		curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, rewardPool)
 	}
 
-	return db.UpdateStakingInfo(curValidator.Validator.Address, curValidator)
+	return db.UpdateValidatorWrapper(curValidator.Validator.Address, curValidator)
 }

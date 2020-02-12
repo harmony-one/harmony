@@ -3,6 +3,7 @@ package consensus
 import (
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -57,10 +58,16 @@ func TestConstructPreparedMessage(test *testing.T) {
 
 	message := "test string"
 	consensus.Decider.SubmitVote(
-		quorum.Prepare, leaderPubKey, leaderPriKey.Sign(message), nil,
+		quorum.Prepare,
+		leaderPubKey,
+		leaderPriKey.Sign(message),
+		common.BytesToHash(consensus.blockHash[:]),
 	)
 	consensus.Decider.SubmitVote(
-		quorum.Prepare, validatorPubKey, validatorPriKey.Sign(message), nil,
+		quorum.Prepare,
+		validatorPubKey,
+		validatorPriKey.Sign(message),
+		common.BytesToHash(consensus.blockHash[:]),
 	)
 
 	// According to RJ these failures are benign.

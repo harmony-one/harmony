@@ -115,11 +115,6 @@ func WritePendingSlashingCandidates(db DatabaseWriter, bytes []byte) error {
 	return db.Put(pendingSlashingKey, bytes)
 }
 
-// DeletePendingSlashingCandidates stores last pending slashing candidates into database.
-func DeletePendingSlashingCandidates(db DatabaseDeleter) error {
-	return db.Delete(pendingSlashingKey)
-}
-
 // ReadCXReceipts retrieves all the transactions of receipts given destination shardID, number and blockHash
 func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash) (types.CXReceipts, error) {
 	data, err := db.Get(cxReceiptKey(shardID, number, hash))
@@ -246,11 +241,11 @@ func WriteValidatorStats(
 }
 
 // ReadValidatorList retrieves staking validator by its address
-// Return only active validators if activeOnly==true, otherwise, return all validators
-func ReadValidatorList(db DatabaseReader, activeOnly bool) ([]common.Address, error) {
+// Return only elected validators if electedOnly==true, otherwise, return all validators
+func ReadValidatorList(db DatabaseReader, electedOnly bool) ([]common.Address, error) {
 	key := validatorListKey
-	if activeOnly {
-		key = activeValidatorListKey
+	if electedOnly {
+		key = electedValidatorListKey
 	}
 	data, err := db.Get(key)
 	if err != nil || len(data) == 0 {
@@ -265,11 +260,11 @@ func ReadValidatorList(db DatabaseReader, activeOnly bool) ([]common.Address, er
 }
 
 // WriteValidatorList stores staking validator's information by its address
-// Writes only for active validators if activeOnly==true, otherwise, writes for all validators
-func WriteValidatorList(db DatabaseWriter, addrs []common.Address, activeOnly bool) error {
+// Writes only for elected validators if electedOnly==true, otherwise, writes for all validators
+func WriteValidatorList(db DatabaseWriter, addrs []common.Address, electedOnly bool) error {
 	key := validatorListKey
-	if activeOnly {
-		key = activeValidatorListKey
+	if electedOnly {
+		key = electedValidatorListKey
 	}
 
 	bytes, err := rlp.EncodeToBytes(addrs)

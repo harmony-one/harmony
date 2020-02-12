@@ -55,9 +55,9 @@ func VerifyAndCreateValidatorFromMsg(
 	wrapper.Delegations = []staking.Delegation{
 		staking.NewDelegation(v.Address, msg.Amount),
 	}
-	wrapper.Snapshot.Epoch = epoch
-	wrapper.Snapshot.NumBlocksSigned = big.NewInt(0)
-	wrapper.Snapshot.NumBlocksToSign = big.NewInt(0)
+	zero := big.NewInt(0)
+	wrapper.Counters.NumBlocksSigned = zero
+	wrapper.Counters.NumBlocksToSign = zero
 	if err := wrapper.SanityCheck(); err != nil {
 		return nil, err
 	}
@@ -83,9 +83,9 @@ func VerifyAndEditValidatorFromMsg(
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
 		return nil, errValidatorNotExist
 	}
-	wrapper := stateDB.GetStakingInfo(msg.ValidatorAddress)
-	if wrapper == nil {
-		return nil, errValidatorNotExist
+	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress)
+	if err != nil {
+		return nil, err
 	}
 	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, msg); err != nil {
 		return nil, err
@@ -133,9 +133,9 @@ func VerifyAndDelegateFromMsg(
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
 		return nil, nil, errValidatorNotExist
 	}
-	wrapper := stateDB.GetStakingInfo(msg.ValidatorAddress)
-	if wrapper == nil {
-		return nil, nil, errValidatorNotExist
+	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress)
+	if err != nil {
+		return nil, nil, err
 	}
 	// Check for redelegation
 	for i := range wrapper.Delegations {
@@ -203,16 +203,20 @@ func VerifyAndUndelegateFromMsg(
 	if epoch == nil {
 		return nil, errEpochMissing
 	}
+
 	if msg.Amount.Sign() == -1 {
 		return nil, errNegativeAmount
 	}
+
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
 		return nil, errValidatorNotExist
 	}
-	wrapper := stateDB.GetStakingInfo(msg.ValidatorAddress)
-	if wrapper == nil {
-		return nil, errValidatorNotExist
+
+	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress)
+	if err != nil {
+		return nil, err
 	}
+
 	for i := range wrapper.Delegations {
 		delegation := &wrapper.Delegations[i]
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
@@ -243,9 +247,9 @@ func VerifyAndCollectRewardsFromDelegation(
 	totalRewards := big.NewInt(0)
 	for i := range delegations {
 		delegation := &delegations[i]
-		wrapper := stateDB.GetStakingInfo(delegation.ValidatorAddress)
-		if wrapper == nil {
-			return nil, nil, errValidatorNotExist
+		wrapper, err := stateDB.ValidatorWrapper(delegation.ValidatorAddress)
+		if err != nil {
+			return nil, nil, err
 		}
 		if uint64(len(wrapper.Delegations)) > delegation.Index {
 			delegation := &wrapper.Delegations[delegation.Index]

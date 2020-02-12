@@ -10,13 +10,12 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // Constants of proposing a new block
 const (
-	PeriodicBlock         = 200 * time.Millisecond
+	PeriodicBlock         = 20 * time.Millisecond
 	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
 )
 
@@ -49,6 +48,9 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						continue
 					}
 
+					// Start counting for block time before block proposal.
+					tmpDeadline := time.Now().Add(node.BlockPeriod)
+
 					utils.Logger().Debug().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
@@ -62,8 +64,9 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 							Msg("=========Successfully Proposed New Block==========")
 
-						// Set deadline will be BlockPeriod from now at this place. Announce stage happens right after this.
-						deadline = time.Now().Add(node.BlockPeriod)
+						// Set deadline only if block proposal is successful, otherwise, we should
+						// immediately start retrying block proposal
+						deadline = tmpDeadline
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
 						break
@@ -121,7 +124,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 					pendingStakingTxs = append(pendingStakingTxs, stakingTx)
 				}
 			} else {
-				utils.Logger().Err(types.ErrUnknownPoolTxType).Msg("Failed to parse pending transactions")
+				utils.Logger().Err(types.ErrUnknownPoolTxType).
+					Msg("Failed to parse pending transactions")
 				return nil, types.ErrUnknownPoolTxType
 			}
 		}
@@ -145,30 +149,52 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
-	// Prepare cross links
-	var (
-		slashingToPropose   []slash.Record
-		crossLinksToPropose types.CrossLinks
-	)
+	// Prepare cross links and slashings messages
+	var crossLinksToPropose types.CrossLinks
 
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
-		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
+	isBeaconchainInCrossLinkEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch())
+
+	isBeaconchainInStakingEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch())
+
+	if isBeaconchainInCrossLinkEra {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
-
+		invalidToDelete := []types.CrossLink{}
 		if err == nil {
 			for _, pending := range allPending {
-				if err = node.VerifyCrossLink(pending); err != nil {
-					continue
-				}
 				exist, err := node.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
 				if err == nil || exist != nil {
+					invalidToDelete = append(invalidToDelete, pending)
+					utils.Logger().Debug().
+						AnErr("[proposeNewBlock] pending crosslink is already committed onchain", err)
+					continue
+				}
+				if err = node.VerifyCrossLink(pending); err != nil {
+					invalidToDelete = append(invalidToDelete, pending)
+					utils.Logger().Debug().
+						AnErr("[proposeNewBlock] pending crosslink verification failed", err)
 					continue
 				}
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
-			utils.Logger().Debug().Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
+			utils.Logger().Debug().
+				Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
+					len(crossLinksToPropose), len(allPending),
+				)
 		} else {
-			utils.Logger().Error().Err(err).Msgf("[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
+			utils.Logger().Error().Err(err).Msgf(
+				"[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
+				len(allPending),
+			)
+		}
+		node.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete)
+	}
+
+	if isBeaconchainInStakingEra {
+		// this one will set a meaningful w.current.slashes
+		if err := node.Worker.CollectAndVerifySlashes(); err != nil {
+			return nil, err
 		}
 	}
 
@@ -186,10 +212,10 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 		return nil, err
 	}
+
 	return node.Worker.FinalizeNewBlock(
 		sig, mask, node.Consensus.GetViewID(),
 		coinbase, crossLinksToPropose, shardState,
-		slashingToPropose,
 	)
 }
 

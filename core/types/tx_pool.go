@@ -27,7 +27,7 @@ type PoolTransaction interface {
 	Data() []byte
 	GasPrice() *big.Int
 	Gas() uint64
-	Cost() *big.Int
+	Cost() (*big.Int, error)
 	Value() *big.Int
 	EncodeRLP(w io.Writer) error
 	DecodeRLP(s *rlp.Stream) error

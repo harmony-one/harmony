@@ -113,7 +113,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
-	if !consensus.Decider.IsQuorumAchievedByMask(mask, true) {
+	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 		consensus.getLogger().Warn().
 			Msgf("[OnPrepared] Quorum Not achieved")
 		return
@@ -193,7 +193,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
 	networkMessage, _ := consensus.construct(
-		// TODO: should only sign on block hash
 		msg_pb.MessageType_COMMIT,
 		append(blockNumBytes, consensus.blockHash[:]...),
 	)
@@ -229,12 +228,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return
 	}
-
-	if recvMsg.BlockNum < consensus.blockNum {
-		consensus.getLogger().Info().
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[OnCommitted] Received Old Blocks!!")
+	// NOTE let it handle its own logs
+	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
 	}
 
@@ -244,7 +239,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	if !consensus.Decider.IsQuorumAchievedByMask(mask, true) {
+	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 		consensus.getLogger().Warn().
 			Msgf("[OnCommitted] Quorum Not achieved")
 		return

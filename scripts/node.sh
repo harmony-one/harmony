@@ -125,6 +125,7 @@ options:
    -M             support multi-key mode (default: off)
    -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
+   -I             use statically linked Harmony binary
 
 examples:
 
@@ -177,12 +178,13 @@ staking_mode=false
 multi_key=false
 archival=false
 blacklist=./.hmy/blacklist.txt
+static=false
 verify=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAB:Y opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAIB:Y opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -204,6 +206,7 @@ do
    t) network=devnet;;
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
+   I) static=true;;
    a) db_file_to_dl="${OPTARG}";;
    U) upgrade_rel="${OPTARG}";;
    P) public_rpc=true;;
@@ -289,6 +292,9 @@ if [ "$OS" == "Darwin" ]; then
 fi
 if [ "$OS" == "Linux" ]; then
    FOLDER=release/linux-x86_64/$REL/
+   if [ "$static" == "true" ]; then
+      FOLDER=release/linux-x86_64/$REL/static/
+   fi
 fi
 
 extract_checksum() {

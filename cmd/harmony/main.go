@@ -291,6 +291,17 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 
 	nodeConfig.DBDir = *dbDir
 
+	if p := *webHookYamlPath; p != "" {
+		config, err := slash.NewDoubleSignWebHooksFromPath(p)
+		if err != nil {
+			fmt.Fprintf(
+				os.Stderr, "yaml path is bad: %s", p,
+			)
+			os.Exit(1)
+		}
+		nodeConfig.WebHooks.DoubleSigning = config
+	}
+
 	return nodeConfig, nil
 }
 
@@ -338,18 +349,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
-
-	if p := *webHookYamlPath; p != "" {
-		config, err := slash.NewDoubleSignWebHooksFromPath(p)
-		if err != nil {
-			fmt.Fprintf(
-				os.Stderr, "ERROR provided yaml path %s but yaml found is illegal", p,
-			)
-			os.Exit(1)
-		}
-		currentNode.NodeConfig.WebHooks.DoubleSigning = config
-	}
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, true)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:

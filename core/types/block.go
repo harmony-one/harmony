@@ -19,6 +19,7 @@ package types
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math/big"
 	"reflect"
@@ -216,6 +217,17 @@ type Block struct {
 	// inter-peer block relay.
 	ReceivedAt   time.Time
 	ReceivedFrom interface{}
+}
+
+func (b *Block) String() string {
+	m := b.Header()
+	return fmt.Sprintf(
+		"[ViewID:%d Num:%d BlockHash:%s]",
+		m.ViewID(),
+		m.Number(),
+		m.Hash().Hex(),
+	)
+
 }
 
 // SetLastCommitSig sets the last block's commit group signature.

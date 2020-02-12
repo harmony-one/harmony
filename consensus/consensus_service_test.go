@@ -37,8 +37,9 @@ func TestPopulateMessageFields(t *testing.T) {
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
 	}
-	consensusMsg := msg.GetConsensus()
-	consensus.populateMessageFields(consensusMsg)
+	consensusMsg := consensus.populateMessageFields(
+		msg.GetConsensus(), consensus.blockHash[:],
+	)
 
 	if consensusMsg.ViewId != 2 {
 		t.Errorf("Consensus ID is not populated correctly")

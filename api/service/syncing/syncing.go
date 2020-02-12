@@ -572,9 +572,17 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 
 	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msgf("[SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d", block.NumberU64(), block.ShardID())
+		utils.Logger().Error().
+			Err(err).
+			Msgf(
+				"[SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d",
+				block.NumberU64(),
+				block.ShardID(),
+			)
 
-		utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back current block!")
+		utils.Logger().Debug().
+			Interface("block", bc.CurrentBlock()).
+			Msg("[SYNC] UpdateBlockAndStatus: Rolling back current block!")
 		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 		return err
 	}
@@ -584,7 +592,10 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		Str("blockHex", block.Hash().Hex()).
 		Msg("[SYNC] UpdateBlockAndStatus: new block added to blockchain")
 	for i, tx := range block.StakingTransactions() {
-		utils.Logger().Error().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
+		utils.Logger().Info().
+			Msgf(
+				"StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage(),
+			)
 	}
 	return nil
 }

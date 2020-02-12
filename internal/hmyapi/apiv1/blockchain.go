@@ -536,7 +536,7 @@ func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
 // explorer node
 func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return s.b.GetMedianRawStakeSnapshot(), nil
+		return s.b.GetMedianRawStakeSnapshot()
 	}
 	return nil, errNotBeaconChainShard
 }
@@ -551,10 +551,10 @@ func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
 	return addresses, nil
 }
 
-// GetActiveValidatorAddresses returns active validator addresses.
-func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]string, error) {
+// GetElectedValidatorAddresses returns elected validator addresses.
+func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 	addresses := []string{}
-	for _, addr := range s.b.GetActiveValidatorAddresses() {
+	for _, addr := range s.b.GetElectedValidatorAddresses() {
 		oneAddr, _ := internal_common.AddressToBech32(addr)
 		addresses = append(addresses, oneAddr)
 	}
@@ -573,7 +573,7 @@ func (s *PublicBlockChainAPI) GetValidatorMetrics(ctx context.Context, address s
 }
 
 // GetValidatorInformation returns information about a validator.
-func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (*staking.Validator, error) {
+func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (*staking.ValidatorWrapper, error) {
 	validatorAddress := internal_common.ParseAddr(address)
 	validator := s.b.GetValidatorInformation(validatorAddress)
 	if validator == nil {
@@ -585,13 +585,13 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 
 // GetAllValidatorInformation returns information about all validators.
 // If page is -1, return all instead of `validatorsPageSize` elements.
-func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, page int) ([]*staking.Validator, error) {
+func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, page int) ([]*staking.ValidatorWrapper, error) {
 	if page < -1 {
-		return make([]*staking.Validator, 0), nil
+		return make([]*staking.ValidatorWrapper, 0), nil
 	}
 	addresses := s.b.GetAllValidatorAddresses()
 	if page != -1 && len(addresses) <= page*validatorsPageSize {
-		return make([]*staking.Validator, 0), nil
+		return make([]*staking.ValidatorWrapper, 0), nil
 	}
 	validatorsNum := len(addresses)
 	start := 0
@@ -602,7 +602,7 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, pa
 			validatorsNum = len(addresses) - start
 		}
 	}
-	validators := make([]*staking.Validator, validatorsNum)
+	validators := make([]*staking.ValidatorWrapper, validatorsNum)
 	for i := start; i < start+validatorsNum; i++ {
 		validators[i-start] = s.b.GetValidatorInformation(addresses[i])
 		if validators[i-start] == nil {
