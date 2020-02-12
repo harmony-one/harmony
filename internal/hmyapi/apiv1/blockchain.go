@@ -536,7 +536,8 @@ func (s *PublicBlockChainAPI) GetValidatorMetrics(ctx context.Context, address s
 	validatorAddress := internal_common.ParseAddr(address)
 	stats := s.b.GetValidatorStats(validatorAddress)
 	if stats == nil {
-		return nil, fmt.Errorf("validator stats not found: %s", validatorAddress.Hex())
+		addr, _ := internal_common.AddressToBech32(validatorAddress)
+		return nil, fmt.Errorf("validator stats not found: %s", addr)
 	}
 	return stats, nil
 }
@@ -546,7 +547,8 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 	validatorAddress := internal_common.ParseAddr(address)
 	validator := s.b.GetValidatorInformation(validatorAddress)
 	if validator == nil {
-		return nil, fmt.Errorf("validator not found: %s", validatorAddress.Hex())
+		addr, _ := internal_common.AddressToBech32(validatorAddress)
+		return nil, fmt.Errorf("validator not found: %s", addr)
 	}
 	return validator, nil
 }
