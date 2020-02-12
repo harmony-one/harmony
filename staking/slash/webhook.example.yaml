@@ -1,0 +1,10 @@
+web-hooks:
+  # node will call these webhooks
+  notice-double-sign: http://localhost:5430/on-notice-double-sign
+  this-node-double-signed: http://localhost:5430/on-this-node-double-signed
+
+
+malicious:
+    # outside will tr
+  validator-public-key: 2d61379e44a772e5757e27ee2b3874254f56073e6bd226eb8b160371cc3c18b8c4977bd3dcb71fd57dc62bf0e143fd08
+  trigger-double-sign: http://localhost:7777/trigger-next-double-sign
