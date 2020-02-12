@@ -14,7 +14,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	logger := utils.Logger()
 	logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 	// Construct and broadcast prepared message
-	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
+	networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, nil)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_PREPARED.String()).
@@ -22,9 +22,9 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		return err
 	}
 	msgToSend, FBFTMsg, aggSig :=
-		network.Bytes,
-		network.FBFTMsg,
-		network.OptionalAggregateSignature
+		networkMessage.Bytes,
+		networkMessage.FBFTMsg,
+		networkMessage.OptionalAggregateSignature
 
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.FBFTLog.AddMessage(FBFTMsg)
@@ -33,14 +33,10 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
 	commitPayload := append(blockNumHash, consensus.blockHash[:]...)
 
-	// so by this point, everyone has committed to the blockhash of this block
-	// in prepare and so this is the actual block.
-
 	consensus.Decider.SubmitVote(
 		quorum.Commit,
 		consensus.PubKey,
 		consensus.priKey.SignHash(commitPayload),
-		consensus.block[:],
 	)
 
 	if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {

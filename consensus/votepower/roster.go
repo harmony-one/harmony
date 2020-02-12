@@ -3,6 +3,7 @@ package votepower
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -25,9 +26,8 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	SignerPubKey       shard.BlsPublicKey `json:"bls-public-key"`
-	Signature          *bls.Sign          `json:"signature"`
-	OptSerializedBlock []byte             `json:"opt-rlp-encoded-block"`
+	SignerPubKey shard.BlsPublicKey `json:"bls-public-key"`
+	Signature    *bls.Sign          `json:"signature"`
 }
 
 // BallotResults are a completed round of votes
@@ -45,6 +45,14 @@ func (b BallotResults) EncodePair() (string, string) {
 type Round struct {
 	AggregatedVote *bls.Sign
 	BallotBox      map[string]*Ballot
+}
+
+func (b *Ballot) String() string {
+	return fmt.Sprintf(
+		"[PubKey: %s Signature: %s]",
+		b.SignerPubKey.Hex(),
+		b.Signature.SerializeToHexStr(),
+	)
 }
 
 // NewRound ..

@@ -110,7 +110,7 @@ func (consensus *Consensus) finalizeCommits() {
 		Msg("[Finalizing] Finalizing Block")
 	beforeCatchupNum := consensus.blockNum
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil)
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, nil)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[FinalizeCommits] Unable to construct Committed message")
@@ -140,7 +140,11 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 
-	consensus.ChainReader.WriteLastCommits(FBFTMsg.Payload)
+	if err := consensus.ChainReader.WriteLastCommits(FBFTMsg.Payload); err != nil {
+		consensus.getLogger().Err(err).
+			Msg("[FinalizeCommits] could not write last commits")
+		return
+	}
 
 	// if leader success finalize the block, send committed message to validators
 	if err := consensus.msgSender.SendWithRetry(
@@ -486,10 +490,14 @@ func (consensus *Consensus) Start(
 }
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
-func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockNumbers []uint64) []uint64 {
+func (consensus *Consensus) GenerateVrfAndProof(
+	newBlock *types.Block, vrfBlockNumbers []uint64,
+) []uint64 {
 	sk := vrf_bls.NewVRFSigner(consensus.priKey)
 	blockHash := [32]byte{}
-	previousHeader := consensus.ChainReader.GetHeaderByNumber(newBlock.NumberU64() - 1)
+	previousHeader := consensus.ChainReader.GetHeaderByNumber(
+		newBlock.NumberU64() - 1,
+	)
 	previousHash := previousHeader.Hash()
 	copy(blockHash[:], previousHash[:])
 

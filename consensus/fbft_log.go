@@ -39,6 +39,17 @@ type FBFTMessage struct {
 	M3Bitmap      *bls_cosi.Mask
 }
 
+// String ..
+func (m *FBFTMessage) String() string {
+	return fmt.Sprintf(
+		"[Type:%s ViewID:%d Num:%d BlockHash:%s]",
+		m.MessageType.String(),
+		m.ViewID,
+		m.BlockNum,
+		m.BlockHash.Hex(),
+	)
+}
+
 // NewFBFTLog returns new instance of FBFTLog
 func NewFBFTLog() *FBFTLog {
 	blocks := mapset.NewSet()

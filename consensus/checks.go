@@ -56,8 +56,7 @@ func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
 	return true
 }
 
-func (consensus *Consensus) onCommitSanityChecks(
-	recvMsg *FBFTMessage,
+func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 ) bool {
 	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
 		consensus.getLogger().Debug().
@@ -68,24 +67,23 @@ func (consensus *Consensus) onCommitSanityChecks(
 			Msg("[OnCommit] BlockNum/viewID not match")
 		return false
 	}
-
-	if !consensus.FBFTLog.HasMatchingAnnounce(consensus.blockNum, recvMsg.BlockHash) {
-		consensus.getLogger().Debug().
-			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[OnCommit] Cannot find matching blockhash")
-		return false
-	}
-
-	if !consensus.FBFTLog.HasMatchingPrepared(consensus.blockNum, recvMsg.BlockHash) {
-		consensus.getLogger().Debug().
-			Hex("blockHash", recvMsg.BlockHash[:]).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[OnCommit] Cannot find matching prepared message")
-		return false
-	}
 	return true
+}
+
+func (consensus *Consensus) couldThisBeADoubleSigner(
+	recvMsg *FBFTMessage,
+) bool {
+	num, hash, now := consensus.blockNum, recvMsg.BlockHash, consensus.blockNum
+	suspicious := !consensus.FBFTLog.HasMatchingAnnounce(num, hash) ||
+		!consensus.FBFTLog.HasMatchingPrepared(num, hash)
+	if suspicious {
+		consensus.getLogger().Debug().
+			Str("message", recvMsg.String()).
+			Uint64("block-on-consensus", now).
+			Msg("possible double signer")
+		return true
+	}
+	return false
 }
 
 func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {

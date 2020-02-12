@@ -60,22 +60,6 @@ func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error
 	return vdfBytes, seed, nil
 }
 
-// Populates the common basic fields for all consensus message.
-func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusRequest) {
-	request.ViewId = consensus.viewID
-	request.BlockNum = consensus.blockNum
-	request.ShardId = consensus.ShardID
-
-	// 32 byte block hash
-	request.BlockHash = consensus.blockHash[:]
-
-	// sender address
-	request.SenderPubkey = consensus.PubKey.Serialize()
-	consensus.getLogger().Debug().
-		Str("senderKey", consensus.PubKey.SerializeToHexStr()).
-		Msg("[populateMessageFields]")
-}
-
 // Signs the consensus message and returns the marshaled message.
 func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message) ([]byte, error) {
 	err := consensus.signConsensusMessage(message)
@@ -213,14 +197,24 @@ func (consensus *Consensus) ResetState() {
 
 // Returns a string representation of this consensus
 func (consensus *Consensus) String() string {
-	var duty string
+	duty := ""
 	if consensus.IsLeader() {
-		duty = "LDR" // leader
+		duty = "leader"
 	} else {
-		duty = "VLD" // validator
+		duty = "validator"
 	}
-	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v]",
-		duty, consensus.PubKey.SerializeToHexStr(), consensus.ShardID)
+
+	return fmt.Sprintf(
+		"[Duty:%s Pub:%s ShardID:%v Block:%s Header:%s Num:%d View:%d Shard:%d]",
+		duty,
+		consensus.PubKey.SerializeToHexStr(),
+		consensus.ShardID,
+		hex.EncodeToString(consensus.block),
+		hex.EncodeToString(consensus.blockHeader),
+		consensus.blockNum,
+		consensus.viewID,
+		consensus.ShardID,
+	)
 }
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
@@ -356,7 +350,7 @@ func (consensus *Consensus) SetEpochNum(epoch uint64) {
 func (consensus *Consensus) ReadSignatureBitmapPayload(
 	recvPayload []byte, offset int,
 ) (*bls.Sign, *bls_cosi.Mask, error) {
-	if offset+96 > len(recvPayload) {
+	if offset+shard.BLSSignatureSizeInBytes > len(recvPayload) {
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	sigAndBitmapPayload := recvPayload[offset:]

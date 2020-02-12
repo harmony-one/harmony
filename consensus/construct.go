@@ -20,11 +20,25 @@ type NetworkMessage struct {
 	OptionalAggregateSignature *bls.Sign
 }
 
+// Populates the common basic fields for all consensus message.
+func (consensus *Consensus) populateMessageFields(
+	request *msg_pb.ConsensusRequest, blockHash []byte,
+) *msg_pb.ConsensusRequest {
+	request.ViewId = consensus.viewID
+	request.BlockNum = consensus.blockNum
+	request.ShardId = consensus.ShardID
+	// 32 byte block hash
+	request.BlockHash = blockHash
+	// sender address
+	request.SenderPubkey = consensus.PubKey.Serialize()
+	return request
+}
+
 // construct is the single creation point of messages intended for the wire.
 // The trailing callback provides a hook for custom mutation so call can control
 // extra nuance on the network message, it is called after the BFT specific logic
 func (consensus *Consensus) construct(
-	p msg_pb.MessageType, payloadForSignOverride []byte,
+	p msg_pb.MessageType, payloadForSignOverride, blockHash []byte,
 ) (*NetworkMessage, error) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
@@ -33,11 +47,22 @@ func (consensus *Consensus) construct(
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
 	}
+	var (
+		consensusMsg *msg_pb.ConsensusRequest
+		aggSig       *bls.Sign
+	)
 
-	consensusMsg := message.GetConsensus()
-	consensus.populateMessageFields(consensusMsg)
-
-	var aggSig *bls.Sign
+	// if caller provided no special payload,
+	// then let the blockhash be the default off of consensus
+	if len(payloadForSignOverride) == 0 {
+		consensusMsg = consensus.populateMessageFields(
+			message.GetConsensus(), consensus.blockHash[:],
+		)
+	} else {
+		consensusMsg = consensus.populateMessageFields(
+			message.GetConsensus(), blockHash[:],
+		)
+	}
 
 	// Do the signing, 96 byte of bls signature
 	switch p {
@@ -70,7 +95,7 @@ func (consensus *Consensus) construct(
 	case msg_pb.MessageType_ANNOUNCE:
 		consensusMsg.Payload = consensus.blockHash[:]
 	}
-
+	// TODO check that message is 96 bytes?
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
 		utils.Logger().Error().Err(err).

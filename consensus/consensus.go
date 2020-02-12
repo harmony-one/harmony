@@ -214,7 +214,7 @@ func New(
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.commitFinishChan = make(chan uint64)
 	consensus.ReadySignal = make(chan struct{})
-	consensus.lastBlockReward = big.NewInt(0)
+	consensus.lastBlockReward = common.Big0
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	memprofiling.GetMemProfiling().Add("consensus.FBFTLog", consensus.FBFTLog)

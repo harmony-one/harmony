@@ -381,7 +381,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				quorum.Commit,
 				consensus.PubKey,
 				consensus.priKey.SignHash(commitPayload),
-				nil,
 			)
 
 			if err = consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
@@ -535,6 +534,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		network, err := consensus.construct(
 			msg_pb.MessageType_COMMIT,
 			append(blockNumHash, consensus.blockHash[:]...),
+			consensus.blockHash[:],
 		)
 		if err != nil {
 			consensus.getLogger().Err(err).Msg("could not create commit message")
