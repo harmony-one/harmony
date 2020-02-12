@@ -49,7 +49,7 @@ type Round struct {
 
 func (b *Ballot) String() string {
 	return fmt.Sprintf(
-		"[PubKey: %s Signature: %s]",
+		"[PubKey:%s Signature:%s]",
 		b.SignerPubKey.Hex(),
 		b.Signature.SerializeToHexStr(),
 	)

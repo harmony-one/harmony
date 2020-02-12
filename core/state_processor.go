@@ -115,8 +115,13 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		}
 	}
 
+	// TODO verify and apply the slashes
+	// slashRecords := header.Slashes()
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_, payout, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, outcxs, incxs, block.StakingTransactions())
+	_, payout, err := p.engine.Finalize(
+		p.bc, header, statedb, block.Transactions(),
+		receipts, outcxs, incxs, block.StakingTransactions(), nil,
+	)
 	if err != nil {
 		return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}

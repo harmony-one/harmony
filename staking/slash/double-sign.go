@@ -1,6 +1,8 @@
 package slash
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
@@ -36,10 +38,10 @@ func NewRecord(
 	}
 }
 
-// TODO(Edgar) Implement Verify and Apply
-
 // Verify checks that the signature is valid
 func Verify(candidate *Record) error {
+	fmt.Println("need to verify the slash", candidate)
+
 	return nil
 }
 

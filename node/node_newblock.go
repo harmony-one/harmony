@@ -1,6 +1,7 @@
 package node
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -180,13 +181,10 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	if isBeaconchainInCrossLinkEra {
-		allSlashing, err := node.Blockchain().ReadPendingSlashingCandidates()
-		if err == nil {
-			for i := range allSlashing {
-				slashingToPropose = append(slashingToPropose, allSlashing[i])
-			}
+		if slashingToPropose, err = node.Worker.VerifyAndEncodeSlashes(); err != nil {
+			return nil, err
 		}
-		utils.Logger().Info().Msgf("sent %d slashing record", len(allSlashing))
+		fmt.Println("should be non-nil slashes, right", slashingToPropose)
 	}
 
 	// Prepare shard state

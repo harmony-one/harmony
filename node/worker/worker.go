@@ -33,10 +33,11 @@ type environment struct {
 	gasPool    *core.GasPool // available gas used to pack transactions
 	header     *block.Header
 	txs        []*types.Transaction
-	stakingTxs staking.StakingTransactions
+	stakingTxs []*staking.StakingTransaction
 	receipts   []*types.Receipt
 	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
 	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
+	slashes    []slash.Record
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -300,6 +301,39 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 	return w.current.incxs
 }
 
+// VerifyAndEncodeSlashes ..
+func (w *Worker) VerifyAndEncodeSlashes() ([]slash.Record, error) {
+	allSlashing, err := w.chain.ReadPendingSlashingCandidates()
+	if d := allSlashing; err == nil && len(d) > 0 {
+		slashingToPropose := []slash.Record{}
+		// Enforce order, reproducibility
+		sort.SliceStable(d,
+			func(i, j int) bool {
+				return bytes.Compare(
+					d[i].Beneficiary.Bytes(), d[j].Beneficiary.Bytes(),
+				) == -1
+			},
+		)
+
+		for i := range d {
+			if err := slash.Verify(&d[i]); err == nil {
+				slashingToPropose = append(slashingToPropose, d[i])
+			}
+		}
+		w.current.slashes = slashingToPropose
+		rlpBytes, err := rlp.EncodeToBytes(d)
+		if err != nil {
+			return nil, err
+		}
+		w.current.header.SetSlashes(rlpBytes)
+		fmt.Printf("set into propose headers %d slashing record\n", len(slashingToPropose))
+		utils.Logger().Info().Msgf("set into propose headers %d slashing record", len(slashingToPropose))
+		return slashingToPropose, nil
+	}
+
+	return []slash.Record{}, nil
+}
+
 // FinalizeNewBlock generate a new block for the next consensus round.
 func (w *Worker) FinalizeNewBlock(
 	sig []byte, signers []byte, viewID uint64, coinbase common.Address,
@@ -314,23 +348,8 @@ func (w *Worker) FinalizeNewBlock(
 	w.current.header.SetCoinbase(coinbase)
 	w.current.header.SetViewID(new(big.Int).SetUint64(viewID))
 
-	// Slashes
-	if d := doubleSigners; d != nil && len(d) != 0 {
-		// Enforce order, reproducibility
-		sort.SliceStable(d,
-			func(i, j int) bool {
-				return bytes.Compare(
-					d[i].Beneficiary.Bytes(), d[j].Beneficiary.Bytes(),
-				) == -1
-			},
-		)
-		if rlpBytes, err := rlp.EncodeToBytes(d); err == nil {
-			w.current.header.SetSlashes(rlpBytes)
-		}
-	}
-
 	// Cross Links
-	if crossLinks != nil && len(crossLinks) != 0 {
+	if len(crossLinks) > 0 {
 		crossLinks.Sort()
 		crossLinkData, err := rlp.EncodeToBytes(crossLinks)
 		if err == nil {
@@ -345,6 +364,15 @@ func (w *Worker) FinalizeNewBlock(
 		}
 	} else {
 		utils.Logger().Debug().Msg("Zero crosslinks to finalize")
+	}
+
+	if len(doubleSigners) > 0 {
+		if data, err := rlp.EncodeToBytes(doubleSigners); err == nil {
+			w.current.header.SetSlashes(data)
+		} else {
+			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed slashes")
+			return nil, err
+		}
 	}
 
 	// Shard State
@@ -373,6 +401,7 @@ func (w *Worker) FinalizeNewBlock(
 	block, _, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
+		w.current.slashes,
 	)
 	if err != nil {
 		return nil, ctxerror.New("cannot finalize block").WithCause(err)

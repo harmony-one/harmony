@@ -578,8 +578,17 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		h.Malicious != nil &&
 		node.Consensus.PubKey.SerializeToHexStr() == h.Malicious.ValidatorPublicKey {
 		go slash.NewMaliciousHandler(func() {
-			fmt.Println("enabling double signing behavior at ", time.Now().Format(time.RFC3339))
-			node.Consensus.DoDoubleSign = true
+			epoch := node.Blockchain().CurrentHeader().Epoch()
+			if node.Blockchain().Config().IsStaking(epoch) {
+				fmt.Println(
+					"enabling double signing behavior at",
+					time.Now().Format(time.RFC3339),
+					node.Consensus,
+				)
+				node.Consensus.DoDoubleSign = true
+				return
+			}
+			fmt.Println("Current epoch isn't staking yet-->", epoch)
 		})
 	}
 	return &node

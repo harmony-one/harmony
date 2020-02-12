@@ -225,13 +225,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			msg_pb.MessageType_COMMIT, append(blockNumBytes, cpy...), cpy,
 		)
 		msgToSend := network.Bytes
-
-		fmt.Println(
-			"here is the double sign",
-			"\n",
-			hex.EncodeToString(cpy),
-		)
-
 		if err := consensus.msgSender.SendWithoutRetry(
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
@@ -240,7 +233,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			fmt.Println("ERROR Sending out the double sign")
 		} else {
 			fmt.Println(
-				"sent out the double sign, disabling double signing behavior at ",
+				"sent out the double sign, disabling double signing behavior at",
 				time.Now().Format(time.RFC3339),
 				network.FBFTMsg,
 			)
@@ -261,12 +254,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return
 	}
-
-	if recvMsg.BlockNum < consensus.blockNum {
-		consensus.getLogger().Info().
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[OnCommitted] Received Old Blocks!!")
+	// NOTE let it handle its own logs
+	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
 	}
 

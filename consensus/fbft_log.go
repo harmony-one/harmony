@@ -42,11 +42,13 @@ type FBFTMessage struct {
 // String ..
 func (m *FBFTMessage) String() string {
 	return fmt.Sprintf(
-		"[Type:%s ViewID:%d Num:%d BlockHash:%s]",
+		"[Type:%s ViewID:%d Num:%d BlockHash:%s Sender:%s Leader:%s]",
 		m.MessageType.String(),
 		m.ViewID,
 		m.BlockNum,
 		m.BlockHash.Hex(),
+		m.SenderPubkey.SerializeToHexStr(),
+		m.LeaderPubkey.SerializeToHexStr(),
 	)
 }
 

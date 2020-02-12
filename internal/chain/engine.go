@@ -253,6 +253,7 @@ func (e *engineImpl) Finalize(
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+	doubleSigners []slash.Record,
 ) (*types.Block, *big.Int, error) {
 
 	// Accumulate any block and uncle rewards and commit the final state root
