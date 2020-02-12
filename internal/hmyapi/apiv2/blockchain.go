@@ -516,6 +516,16 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 	return validator, nil
 }
 
+// GetAllValidatorInformation returns information about all validators.
+func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context) []*staking.Validator {
+	addresses := s.b.GetAllValidatorAddresses()
+	validators := make([]*staking.Validator, len(addresses))
+	for i, address := range addresses {
+		validators[i] = s.b.GetValidatorInformation(address)
+	}
+	return validators
+}
+
 // GetDelegationsByDelegator returns list of delegations for a delegator address.
 func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, address string) ([]*RPCDelegation, error) {
 	delegatorAddress := internal_common.ParseAddr(address)
