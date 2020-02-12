@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -95,13 +96,13 @@ type SignatureReader interface {
 // DependencyInjectionWriter ..
 type DependencyInjectionWriter interface {
 	SetShardIDProvider(func() (uint32, error))
-	SetMyPublicKeyProvider(func() (*bls.PublicKey, error))
+	SetMyPublicKeyProvider(func() (*multibls.PublicKey, error))
 }
 
 // DependencyInjectionReader ..
 type DependencyInjectionReader interface {
 	ShardIDProvider() func() (uint32, error)
-	MyPublicKey() func() (*bls.PublicKey, error)
+	MyPublicKey() func() (*multibls.PublicKey, error)
 }
 
 // Decider ..
@@ -151,7 +152,7 @@ type cIdentities struct {
 
 type depInject struct {
 	shardIDProvider   func() (uint32, error)
-	publicKeyProvider func() (*bls.PublicKey, error)
+	publicKeyProvider func() (*multibls.PublicKey, error)
 }
 
 func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
@@ -323,11 +324,11 @@ func (d *depInject) ShardIDProvider() func() (uint32, error) {
 	return d.shardIDProvider
 }
 
-func (d *depInject) SetMyPublicKeyProvider(p func() (*bls.PublicKey, error)) {
+func (d *depInject) SetMyPublicKeyProvider(p func() (*multibls.PublicKey, error)) {
 	d.publicKeyProvider = p
 }
 
-func (d *depInject) MyPublicKey() func() (*bls.PublicKey, error) {
+func (d *depInject) MyPublicKey() func() (*multibls.PublicKey, error) {
 	return d.publicKeyProvider
 }
 

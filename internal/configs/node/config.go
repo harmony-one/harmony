@@ -8,9 +8,9 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
@@ -83,8 +83,8 @@ type ConfigType struct {
 	PushgatewayPort string  // metrics pushgateway prometheus port
 	StringRole      string
 	P2pPriKey       p2p_crypto.PrivKey
-	ConsensusPriKey *bls.SecretKey
-	ConsensusPubKey *bls.PublicKey
+	ConsensusPriKey *multibls.PrivateKey
+	ConsensusPubKey *multibls.PublicKey
 	// Database directory
 	DBDir            string
 	networkType      NetworkType
@@ -280,7 +280,8 @@ func SetShardingSchedule(schedule shardingconfig.Schedule) {
 // consensus key.
 func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
 	var pubKey shard.BlsPublicKey
-	if err := pubKey.FromLibBLSPublicKey(conf.ConsensusPubKey); err != nil {
+	// all keys belong to same shard
+	if err := pubKey.FromLibBLSPublicKey(conf.ConsensusPubKey.PublicKey[0]); err != nil {
 		return 0, errors.Wrapf(err,
 			"cannot convert libbls public key %s to internal form",
 			conf.ConsensusPubKey.SerializeToHexStr())

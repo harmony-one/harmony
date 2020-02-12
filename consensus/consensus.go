@@ -14,14 +14,18 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/staking/slash"
+	"github.com/pkg/errors"
 )
 
 const (
 	vdFAndProofSize = 516 // size of VDF and Proof
 	vdfAndSeedSize  = 548 // size of VDF/Proof and Seed
 )
+
+var errLeaderPriKeyNotFound = errors.New("getting leader private key from consensus public keys failed")
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
@@ -75,9 +79,9 @@ type Consensus struct {
 	MinPeers   int
 	pubKeyLock sync.Mutex
 	// private/public keys of current node
-	priKey      *bls.SecretKey
-	PubKey      *bls.PublicKey
-	SelfAddress common.Address
+	priKey        *multibls.PrivateKey
+	PubKey        *multibls.PublicKey
+	SelfAddresses map[string]common.Address
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 	viewID       uint64
@@ -173,11 +177,26 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 	return consensus.lastBlockReward
 }
 
+// GetLeaderPrivateKey returns leader private key if node is the leader
+func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls.PublicKey) (*bls.SecretKey, error) {
+	for i, key := range consensus.PubKey.PublicKey {
+		if key.IsEqual(leaderKey) {
+			return consensus.priKey.PrivateKey[i], nil
+		}
+	}
+	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
+}
+
+// GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
+func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, error) {
+	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey)
+}
+
 // TODO: put shardId into chain reader's chain config
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey,
+	host p2p.Host, shard uint32, leader p2p.Peer, multiBlsPriKey *multibls.PrivateKey,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 	consensus := Consensus{}
@@ -194,9 +213,9 @@ func New(
 	consensus.consensusTimeout = createTimeout()
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
-	if blsPriKey != nil {
-		consensus.priKey = blsPriKey
-		consensus.PubKey = blsPriKey.GetPublicKey()
+	if multiBlsPriKey != nil {
+		consensus.priKey = multiBlsPriKey
+		consensus.PubKey = multiBlsPriKey.GetPublicKey()
 		utils.Logger().Info().
 			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
 	} else {

@@ -43,12 +43,14 @@ func (node *Node) UpdateTxPoolSizeForMetrics(txPoolSize uint64) {
 
 // UpdateBalanceForMetrics uppdates node balance for metrics service.
 func (node *Node) UpdateBalanceForMetrics() {
-	curBalance, err := node.GetBalanceOfAddress(node.Consensus.SelfAddress)
-	if err != nil {
-		return
+	for _, addr := range node.Consensus.SelfAddresses {
+		curBalance, err := node.GetBalanceOfAddress(addr)
+		if err != nil {
+			return
+		}
+		utils.Logger().Info().Msgf("Updating metrics node balance %d", curBalance.Uint64())
+		metrics.UpdateNodeBalance(curBalance)
 	}
-	utils.Logger().Info().Msgf("Updating metrics node balance %d", curBalance.Uint64())
-	metrics.UpdateNodeBalance(curBalance)
 }
 
 // UpdateLastConsensusTimeForMetrics uppdates last consensus reached time for metrics service.

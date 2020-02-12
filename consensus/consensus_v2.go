@@ -109,8 +109,13 @@ func (consensus *Consensus) finalizeCommits() {
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
 		Msg("[Finalizing] Finalizing Block")
 	beforeCatchupNum := consensus.blockNum
+	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+	if err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[FinalizeCommits] leader not found")
+		return
+	}
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil)
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, leaderPriKey.GetPublicKey(), leaderPriKey)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[FinalizeCommits] Unable to construct Committed message")
@@ -182,7 +187,7 @@ func (consensus *Consensus) finalizeCommits() {
 		Uint64("epochNum", block.Epoch().Uint64()).
 		Uint64("ViewId", block.Header().ViewID().Uint64()).
 		Str("blockHash", block.Hash().String()).
-		Int("index", consensus.Decider.IndexOf(consensus.PubKey)).
+		Int("index", consensus.Decider.IndexOf(consensus.LeaderPubKey)).
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
@@ -491,10 +496,15 @@ func (consensus *Consensus) Start(
 }
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
-func (consensus *Consensus) GenerateVrfAndProof(
-	newBlock *types.Block, vrfBlockNumbers []uint64,
-) []uint64 {
-	sk := vrf_bls.NewVRFSigner(consensus.priKey)
+func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockNumbers []uint64) []uint64 {
+	key, err := consensus.GetConsensusLeaderPrivateKey()
+	if err != nil {
+		consensus.getLogger().Error().
+			Err(err).
+			Msg("[GenerateVrfAndProof] VRF generation error")
+		return vrfBlockNumbers
+	}
+	sk := vrf_bls.NewVRFSigner(key)
 	blockHash := [32]byte{}
 	previousHeader := consensus.ChainReader.GetHeaderByNumber(
 		newBlock.NumberU64() - 1,

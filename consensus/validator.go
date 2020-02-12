@@ -58,26 +58,27 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) prepare() {
-	networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil)
-	if err != nil {
-		consensus.getLogger().Err(err).
-			Str("message-type", msg_pb.MessageType_PREPARE.String()).
-			Msg("could not construct message")
-		return
-	}
+	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+	for i, key := range consensus.PubKey.PublicKey {
+		networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, key, consensus.priKey.PrivateKey[i])
+		if err != nil {
+			consensus.getLogger().Err(err).
+				Str("message-type", msg_pb.MessageType_PREPARE.String()).
+				Msg("could not construct message")
+			return
+		}
 
-	// TODO: this will not return immediatey, may block
-	if err := consensus.msgSender.SendWithoutRetry(
-		[]nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		},
-		host.ConstructP2pMessage(byte(17), networkMessage.Bytes),
-	); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
-	} else {
-		consensus.getLogger().Info().
-			Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
-			Msg("[OnAnnounce] Sent Prepare Message!!")
+		// TODO: this will not return immediatey, may block
+		if err := consensus.msgSender.SendWithoutRetry(
+			groupID,
+			host.ConstructP2pMessage(byte(17), networkMessage.Bytes),
+		); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
+		} else {
+			consensus.getLogger().Info().
+				Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
+				Msg("[OnAnnounce] Sent Prepare Message!!")
+		}
 	}
 	consensus.getLogger().Debug().
 		Str("From", consensus.phase.String()).
@@ -192,29 +193,32 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
-	networkMessage, _ := consensus.construct(
-		msg_pb.MessageType_COMMIT,
-		append(blockNumBytes, consensus.blockHash[:]...),
-	)
-	// TODO: genesis account node delay for 1 second,
-	// this is a temp fix for allows FN nodes to earning reward
-	if consensus.delayCommit > 0 {
-		time.Sleep(consensus.delayCommit)
-	}
+	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+	for i, key := range consensus.PubKey.PublicKey {
+		networkMessage, _ := consensus.construct(
+			// TODO: should only sign on block hash
+			msg_pb.MessageType_COMMIT,
+			append(blockNumBytes, consensus.blockHash[:]...),
+			key, consensus.priKey.PrivateKey[i],
+		)
+		// TODO: genesis account node delay for 1 second,
+		// this is a temp fix for allows FN nodes to earning reward
+		if consensus.delayCommit > 0 {
+			time.Sleep(consensus.delayCommit)
+		}
 
-	if err := consensus.msgSender.SendWithoutRetry(
-		[]nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
-		host.ConstructP2pMessage(byte(17), networkMessage.Bytes),
-	); err != nil {
-		consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
-	} else {
-		consensus.getLogger().Info().
-			Uint64("blockNum", consensus.blockNum).
-			Hex("blockHash", consensus.blockHash[:]).
-			Msg("[OnPrepared] Sent Commit Message!!")
+		if err := consensus.msgSender.SendWithoutRetry(
+			groupID,
+			host.ConstructP2pMessage(byte(17), networkMessage.Bytes),
+		); err != nil {
+			consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
+		} else {
+			consensus.getLogger().Info().
+				Uint64("blockNum", consensus.blockNum).
+				Hex("blockHash", consensus.blockHash[:]).
+				Msg("[OnPrepared] Sent Commit Message!!")
+		}
 	}
-
 	consensus.getLogger().Debug().
 		Str("From", consensus.phase.String()).
 		Str("To", FBFTCommit.String()).

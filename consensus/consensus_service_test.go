@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/shard"
@@ -23,7 +24,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	blsPriKey := bls.RandPrivateKey()
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, blsPriKey, decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -37,9 +38,9 @@ func TestPopulateMessageFields(t *testing.T) {
 			Consensus: &msg_pb.ConsensusRequest{},
 		},
 	}
-	consensusMsg := consensus.populateMessageFields(
-		msg.GetConsensus(), consensus.blockHash[:],
-	)
+
+	consensusMsg := consensus.populateMessageFields(msg.GetConsensus(), consensus.blockHash[:],
+		blsPriKey.GetPublicKey())
 
 	if consensusMsg.ViewId != 2 {
 		t.Errorf("Consensus ID is not populated correctly")
@@ -60,8 +61,9 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -70,7 +72,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	msg := &msg_pb.Message{}
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg, blsPriKey)
 
 	if err != nil || len(marshaledMessage) == 0 {
 		t.Errorf("Failed to sign and marshal the message: %s", err)
@@ -88,8 +90,9 @@ func TestSetViewID(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

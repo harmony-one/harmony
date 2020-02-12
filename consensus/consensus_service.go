@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
@@ -61,13 +62,11 @@ var (
 )
 
 // Signs the consensus message and returns the marshaled message.
-func (consensus *Consensus) signAndMarshalConsensusMessage(
-	message *msg_pb.Message,
-) ([]byte, error) {
-	if err := consensus.signConsensusMessage(message); err != nil {
+func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message,
+	priKey *bls.SecretKey) ([]byte, error) {
+	if err := consensus.signConsensusMessage(message, priKey); err != nil {
 		return empty, err
 	}
-
 	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
 		return empty, err
@@ -121,14 +120,15 @@ func NewFaker() *Consensus {
 }
 
 // Sign on the hash of the message
-func (consensus *Consensus) signMessage(message []byte) []byte {
+func (consensus *Consensus) signMessage(message []byte, priKey *bls.SecretKey) []byte {
 	hash := hash.Keccak256(message)
-	signature := consensus.priKey.SignHash(hash[:])
+	signature := priKey.SignHash(hash[:])
 	return signature.Serialize()
 }
 
 // Sign on the consensus message signature field.
-func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message) error {
+func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
+	priKey *bls.SecretKey) error {
 	message.Signature = nil
 	// TODO: use custom serialization method rather than protobuf
 	marshaledMessage, err := protobuf.Marshal(message)
@@ -136,7 +136,7 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message) error 
 		return err
 	}
 	// 64 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage)
+	signature := consensus.signMessage(marshaledMessage, priKey)
 	message.Signature = signature
 	return nil
 }
@@ -381,7 +381,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 		txHashes = append(txHashes, hex.EncodeToString(txHash[:]))
 	}
 	metrics := map[string]interface{}{
-		"key":             hex.EncodeToString(consensus.PubKey.Serialize()),
+		"key":             hex.EncodeToString(consensus.LeaderPubKey.Serialize()),
 		"tps":             tps,
 		"txCount":         numOfTxs,
 		"nodeCount":       consensus.Decider.ParticipantsCount() + 1,
@@ -480,7 +480,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		decider.SetShardIDProvider(func() (uint32, error) {
 			return consensus.ShardID, nil
 		})
-		decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return consensus.PubKey, nil
 		})
 		consensus.Decider = decider
@@ -577,15 +577,15 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 	}
 
-	for i := range pubKeys {
+	for _, key := range pubKeys {
 		// in committee
-		if pubKeys[i].IsEqual(consensus.PubKey) {
+		if consensus.PubKey.Contains(key) {
 			if hasError {
 				return Syncing
 			}
 
 			// If the leader changed and I myself become the leader
-			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.LeaderPubKey.IsEqual(consensus.PubKey) {
+			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.IsLeader() {
 				go func() {
 					utils.Logger().Debug().
 						Str("myKey", consensus.PubKey.SerializeToHexStr()).
@@ -605,8 +605,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
-		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
+	for _, key := range consensus.PubKey.PublicKey {
+		if key.IsEqual(consensus.LeaderPubKey) {
+			return true
+		}
 	}
 	return false
 }

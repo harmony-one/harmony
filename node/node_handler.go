@@ -417,7 +417,7 @@ func (node *Node) PostConsensusProcessing(
 	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
 	// TODO: refactor the asynchronous calls to separate go routine.
 	node.lastConsensusTime = time.Now().Unix()
-	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
+	if node.Consensus.IsLeader() {
 		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)
 		}
