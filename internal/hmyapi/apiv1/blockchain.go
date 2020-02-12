@@ -560,7 +560,7 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, pa
 		return make([]*staking.Validator, 0)
 	}
 	addresses := s.b.GetAllValidatorAddresses()
-	if page != -1 && len(addresses) <= page * validatorsPageSize {
+	if page != -1 && len(addresses) <= page*validatorsPageSize {
 		return make([]*staking.Validator, 0)
 	}
 	validatorsNum := len(addresses)
@@ -568,14 +568,14 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, pa
 	if page != -1 {
 		validatorsNum = validatorsPageSize
 		start = page * validatorsPageSize
-		if len(addresses) - start < validatorsPageSize {
+		if len(addresses)-start < validatorsPageSize {
 			validatorsNum = len(addresses) - start
 		} else {
 			validatorsNum = validatorsPageSize
 		}
 	}
 	validators := make([]*staking.Validator, validatorsNum)
-	for i := start; i < start + validatorsNum; i++ {
+	for i := start; i < start+validatorsNum; i++ {
 		validators[i] = s.b.GetValidatorInformation(addresses[i])
 	}
 	return validators
