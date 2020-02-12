@@ -3,6 +3,7 @@
 BLSKEY=
 BLSPASS=
 
+ports=9000,6000,9500,9800
 port_base=9000
 tag=latest
 db_dir=db
@@ -17,17 +18,17 @@ function usage()
 usage: $(basename $0) options blskey blspass
 
 options:
-  -t tag      : tag of the image, default: $tag
-  -p base_port: base port, default: $port_base
-  -n network  : network type
-  -z dns_zone : dns zone
-  -d db_dir   : harmony db directory
+  -t tag                      : tag of the image, default: $tag
+  -p base,sync,rpc,wss        : all port setting, default: $ports
+  -n network                  : network type
+  -z dns_zone                 : dns zone
+  -d db_dir                   : harmony db directory
 
-  -k          : kill running node
-  -h          : print this message
+  -k                          : kill running node
+  -h                          : print this message
 
-  blskey        : blskey file name, keyfile
-  blspass       : blspass file name, passphase in file
+  blskey                      : blskey file name, keyfile
+  blspass                     : blspass file name, passphase in file
 
 examples:
 
@@ -50,7 +51,8 @@ while getopts "t:p:d:kh" opt; do
   case "$opt" in
     t) tag="$OPTARG"
        DOCKER_IMAGE=$DOCKER_REPO:$tag;;
-    p) port_base="$OPTARG";;
+    p) ports="$OPTARG"
+      ;;
     d) db_dir="$OPTARG";;
     k) kill_only="true";;
     *) usage;;
@@ -72,13 +74,18 @@ if [ -z "$BLSPASS" ]; then
   usage
 fi
 
-if [ "$port_base" -lt 4000 ]; then
-  echo "port base cannot be less than 4000"
+port_base=$(echo $ports | cut -f1 -d,)
+port_sync=$(echo $ports | cut -f2 -d,)
+port_rpc=$(echo $ports | cut -f3 -d,)
+port_wss=$(echo $ports | cut -f4 -d,)
+
+if [ "$port_base" -lt 8000 ]; then
+  echo "port base cannot be less than 8000"
   exit 1
 fi
 
-if [ "$port_base" -gt 59900 ]; then
-  echo "port base cannot be greater than 59900"
+if [ "$port_base" -gt 64000 ]; then
+  echo "port base cannot be greater than 64000"
   exit 1
 fi
 
@@ -94,10 +101,6 @@ if [ "$kill_only" = "true" ]; then
   exit
 fi
 
-port_ss=$(( $port_base - 3000 ))
-port_rpc=$(( $port_base + 500 ))
-port_wss=$(( $port_base + 800 ))
-
 # Pull latest image
 echo "Pull latest node image"
 docker pull $DOCKER_IMAGE >/dev/null
@@ -107,9 +110,15 @@ mkdir -p ${db_dir}/harmony_db_1
 mkdir -p ${db_dir}/harmony_db_2
 mkdir -p ${db_dir}/harmony_db_3
 
+echo 'Port mapping'
+echo 9000 =\> $port_base
+echo 6000 =\> $port_sync
+echo 9500 =\> $port_rpc
+echo 9800 =\> $port_wss
+
 docker run -it -d \
   --name harmony-$tag-$port_base \
-  -p $port_base:$port_base -p $port_ss:$port_ss -p $port_rpc:$port_rpc -p $port_wss:$port_wss \
+  -p 9000:$port_base -p 6000:$port_sync -p 9500:$port_rpc -p 9800:$port_wss \
   -e NODE_PORT=$port_base \
   -e NODE_BLSKEY=$BLSKEY \
   -e NODE_BLSPASS=$BLSPASS \

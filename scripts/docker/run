@@ -80,7 +80,7 @@ function setup_env
 myip
 
 # setup runtime environment
-setup_env
+# setup_env
 
 keydir=/harmony/.hmy
 
