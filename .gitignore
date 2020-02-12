@@ -79,3 +79,5 @@ db-127.0.0.1-*
 # dht storage
 .dht
 .dht-*
+webhook.server.js
+webhook.yaml

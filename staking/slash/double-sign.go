@@ -8,18 +8,17 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
+type pair struct {
+	Header    *block.Header `json:"header"`
+	Signature *bls.Sign     `json:"signature"`
+}
+
 // Record is an proof of a slashing made by a witness of a double-signing event
 type Record struct {
-	Offender shard.BlsPublicKey
-	Signed   struct {
-		Header    *block.Header
-		Signature *bls.Sign
-	} `json:"signed"`
-	DoubleSigned struct {
-		Header    *block.Header
-		Signature *bls.Sign
-	} `json:"double-signed"`
-	Beneficiary common.Address // the reporter who will get rewarded
+	Offender     shard.BlsPublicKey `json:"offender"`
+	Signed       pair               `json:"signed"`
+	DoubleSigned pair               `json:"double-signed"`
+	Beneficiary  common.Address     `json:"beneficiary"` // the reporter who will get rewarded
 }
 
 // NewRecord ..
@@ -29,14 +28,12 @@ func NewRecord(
 	signedSignature, doubleSignedSignature *bls.Sign,
 	beneficiary common.Address,
 ) Record {
-	r := Record{}
-	r.Offender = offender
-	r.Signed.Header = signedHeader
-	r.Signed.Signature = signedSignature
-	r.DoubleSigned.Header = doubleSignedHeader
-	r.DoubleSigned.Signature = doubleSignedSignature
-	r.Beneficiary = beneficiary
-	return r
+	return Record{
+		offender,
+		pair{signedHeader, signedSignature},
+		pair{doubleSignedHeader, doubleSignedSignature},
+		beneficiary,
+	}
 }
 
 // TODO(Edgar) Implement Verify and Apply

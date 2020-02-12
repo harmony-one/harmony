@@ -248,6 +248,11 @@ func (node *Node) BroadcastSlash(witness *slash.Record) {
 		return
 	}
 
+	if hooks := node.NodeConfig.WebHooks.DoubleSigning; hooks != nil {
+		url := hooks.WebHooks.OnNoticeDoubleSign
+		go func() { slash.DoPost(url, witness) }()
+	}
+
 	// Send it to beaconchain if I'm shardchain, otherwise just add it to pending
 	if node.NodeConfig.ShardID != shard.BeaconChainShardID {
 		node.host.SendMessageToGroups(

@@ -150,9 +150,10 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		slashingToPropose   []slash.Record
 		crossLinksToPropose types.CrossLinks
 	)
+	isBeaconchainInCrossLinkEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch())
 
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
-		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
+	if isBeaconchainInCrossLinkEra {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
 
 		if err == nil {
@@ -166,10 +167,26 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 				}
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
-			utils.Logger().Debug().Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
+			utils.Logger().Debug().
+				Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
+					len(crossLinksToPropose), len(allPending),
+				)
 		} else {
-			utils.Logger().Error().Err(err).Msgf("[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
+			utils.Logger().Error().Err(err).Msgf(
+				"[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
+				len(allPending),
+			)
 		}
+	}
+
+	if isBeaconchainInCrossLinkEra {
+		allSlashing, err := node.Blockchain().ReadPendingSlashingCandidates()
+		if err == nil {
+			for i := range allSlashing {
+				slashingToPropose = append(slashingToPropose, allSlashing[i])
+			}
+		}
+		utils.Logger().Info().Msgf("sent %d slashing record", len(allSlashing))
 	}
 
 	// Prepare shard state

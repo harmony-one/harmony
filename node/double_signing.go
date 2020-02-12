@@ -20,5 +20,6 @@ func (node *Node) processSlashCandidateMessage(msgPayload []byte) {
 			Msg("unable to decode slash candidate message")
 		return
 	}
+
 	node.Blockchain().AddPendingSlashingCandidate(&candidate)
 }

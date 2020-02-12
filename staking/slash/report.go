@@ -1,7 +1,10 @@
 package slash
 
 import (
+	"bytes"
+	"encoding/json"
 	"io/ioutil"
+	"net/http"
 
 	"gopkg.in/yaml.v2"
 )
@@ -25,4 +28,19 @@ func NewDoubleSignWebHooksFromPath(yamlPath string) (*DoubleSignWebHooks, error)
 		return nil, err
 	}
 	return &t, nil
+}
+
+// DoPost is a fire and forget helper
+func DoPost(url string, record *Record) error {
+	payload, err := json.Marshal(record)
+
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	return resp.Body.Close()
 }
