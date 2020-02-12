@@ -577,9 +577,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 	if h := node.NodeConfig.WebHooks.DoubleSigning; h != nil &&
 		h.Malicious != nil &&
 		node.Consensus.PubKey.SerializeToHexStr() == h.Malicious.ValidatorPublicKey {
-		go slash.NewMaliciousHandler("hello world")
+		go slash.NewMaliciousHandler(func() {
+			fmt.Println("enabling double signing behavior at ", time.Now().Format(time.RFC3339))
+			node.Consensus.DoDoubleSign = true
+		})
 	}
-
 	return &node
 }
 

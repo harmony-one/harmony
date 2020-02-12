@@ -51,14 +51,11 @@ func DoPost(url string, record *Record) error {
 }
 
 // NewMaliciousHandler ..
-func NewMaliciousHandler(url string) {
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("triggered yay")
-	}
-	http.HandleFunc("/trigger-next-double-sign", handler)
-
+func NewMaliciousHandler(cb func()) {
+	http.HandleFunc("/trigger-next-double-sign", func(w http.ResponseWriter, r *http.Request) {
+		cb()
+	})
 	if err := http.ListenAndServe(":7777", nil); err != nil {
 		fmt.Println("why this died", err.Error())
 	}
-
 }

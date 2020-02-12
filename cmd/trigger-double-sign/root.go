@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -23,8 +24,15 @@ func baseRequest(node string) ([]byte, error) {
 	requestBody, _ := json.Marshal(map[string]interface{}{
 		"test": "payload",
 	})
+
+	fmt.Printf(
+		"Sent %s URL: %s, Request Body: %s\n\n",
+		time.Now().Format(time.RFC3339),
+		node,
+		string(requestBody),
+	)
+
 	resp, err := http.Post(node, "application/json", bytes.NewBuffer(requestBody))
-	fmt.Printf("URL: %s, Request Body: %s\n\n", node, string(requestBody))
 	if err != nil {
 		return nil, err
 	}
