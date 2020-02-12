@@ -675,7 +675,8 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {
 		return ErrInsufficientFunds
 	}
-	intrGas, err := IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead)
+	// TODO(Daniel): add support for staking txn - create validator
+	intrGas, err := IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, false)
 	if err != nil {
 		return err
 	}
