@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/values"
 	"github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -23,8 +24,9 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
@@ -32,7 +34,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := &msg_pb.Message{}
-	msgBytes := consensus.constructAnnounceMessage()
+	msgBytes := consensus.constructAnnounceMessage(blsPriKey)
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
 
 	if err := protobuf.Unmarshal(msgPayload, message); err != nil {
@@ -56,8 +58,9 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, values.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
@@ -76,7 +79,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
 	}
 
-	msgBytes, _ := consensus.constructPreparedMessage()
+	msgBytes, _ := consensus.constructPreparedMessage(blsPriKey)
 	msgPayload, _ := proto.GetConsensusMessagePayload(msgBytes)
 
 	msg := &msg_pb.Message{}
