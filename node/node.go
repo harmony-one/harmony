@@ -36,6 +36,7 @@ import (
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -572,6 +573,13 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 			}
 		}()
 	}
+
+	if h := node.NodeConfig.WebHooks.DoubleSigning; h != nil &&
+		h.Malicious != nil &&
+		node.Consensus.PubKey.SerializeToHexStr() == h.Malicious.ValidatorPublicKey {
+		go slash.NewMaliciousHandler("hello world")
+	}
+
 	return &node
 }
 

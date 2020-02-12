@@ -3,6 +3,7 @@ package slash
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -11,10 +12,14 @@ import (
 
 // DoubleSignWebHooks ..
 type DoubleSignWebHooks struct {
-	WebHooks struct {
+	WebHooks *struct {
 		OnNoticeDoubleSign     string `yaml:"notice-double-sign"`
 		OnThisNodeDoubleSigned string `yaml:"this-node-double-signed"`
 	} `yaml:"web-hooks"`
+	Malicious *struct {
+		ValidatorPublicKey string `yaml:"validator-public-key"`
+		TriggerDoubleSign  string `yaml:"trigger-double-sign"`
+	} `yaml:"malicious"`
 }
 
 // NewDoubleSignWebHooksFromPath ..
@@ -43,4 +48,17 @@ func DoPost(url string, record *Record) error {
 		return err
 	}
 	return resp.Body.Close()
+}
+
+// NewMaliciousHandler ..
+func NewMaliciousHandler(url string) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("triggered yay")
+	}
+	http.HandleFunc("/trigger-next-double-sign", handler)
+
+	if err := http.ListenAndServe(":7777", nil); err != nil {
+		fmt.Println("why this died", err.Error())
+	}
+
 }
