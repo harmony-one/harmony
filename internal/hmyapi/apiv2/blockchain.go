@@ -29,6 +29,7 @@ const (
 	defaultGasPrice     = denominations.Nano
 	defaultFromAddress  = "0x0000000000000000000000000000000000000000"
 	defaultBlocksPeriod = 15000
+	validatorsPageSize  = 100
 )
 
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
@@ -519,11 +520,28 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 }
 
 // GetAllValidatorInformation returns information about all validators.
-func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context) []*staking.Validator {
+func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, page int) []*staking.Validator {
+	if page < -1 {
+		return make([]*staking.Validator, 0)
+	}
 	addresses := s.b.GetAllValidatorAddresses()
-	validators := make([]*staking.Validator, len(addresses))
-	for i, address := range addresses {
-		validators[i] = s.b.GetValidatorInformation(address)
+	if page != -1 && len(addresses) <= page*validatorsPageSize {
+		return make([]*staking.Validator, 0)
+	}
+	validatorsNum := len(addresses)
+	start := 0
+	if page != -1 {
+		validatorsNum = validatorsPageSize
+		start = page * validatorsPageSize
+		if len(addresses)-start < validatorsPageSize {
+			validatorsNum = len(addresses) - start
+		} else {
+			validatorsNum = validatorsPageSize
+		}
+	}
+	validators := make([]*staking.Validator, validatorsNum)
+	for i := start; i < start+validatorsNum; i++ {
+		validators[i] = s.b.GetValidatorInformation(addresses[i])
 	}
 	return validators
 }
