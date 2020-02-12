@@ -4,6 +4,7 @@ import (
 	"container/ring"
 	"crypto/ecdsa"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -682,4 +683,14 @@ func (node *Node) SetSyncFreq(syncFreq int) {
 // SetBeaconSyncFreq sets the syncing frequency in the loop
 func (node *Node) SetBeaconSyncFreq(syncFreq int) {
 	node.beaconSyncFreq = syncFreq
+}
+
+// ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.
+func (node *Node) ShutDown() {
+	node.Blockchain().Stop()
+	node.Beaconchain().Stop()
+	node.StopServices()
+	node.stopHTTP()
+	fmt.Printf("Exiting node program...")
+	os.Exit(0)
 }
