@@ -92,7 +92,7 @@ var (
 	// beaconSyncFreq indicates beaconchain sync frequency
 	beaconSyncFreq = flag.Int("beacon_sync_freq", 60, "unit in seconds")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
-	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
+	blockPeriod    = flag.Int("block_period", 2, "how long in second the leader waits to propose a new block.")
 	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
 	// staking indicates whether the node is operating in staking mode.
 	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
@@ -254,6 +254,10 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	return pubKey
 }
 
+const (
+	defaultWebHookPath = "./staking/slash/webhook.example.yaml"
+)
+
 func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	var err error
 
@@ -290,6 +294,18 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	}
 
 	nodeConfig.DBDir = *dbDir
+	*webHookYamlPath = defaultWebHookPath
+
+	if p := *webHookYamlPath; p != "" {
+		config, err := slash.NewDoubleSignWebHooksFromPath(p)
+		if err != nil {
+			fmt.Fprintf(
+				os.Stderr, "ERROR provided yaml path %s but yaml found is illegal", p,
+			)
+			os.Exit(1)
+		}
+		nodeConfig.WebHooks.DoubleSigning = config
+	}
 
 	return nodeConfig, nil
 }
@@ -339,17 +355,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
 	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
-
-	if p := *webHookYamlPath; p != "" {
-		config, err := slash.NewDoubleSignWebHooksFromPath(p)
-		if err != nil {
-			fmt.Fprintf(
-				os.Stderr, "ERROR provided yaml path %s but yaml found is illegal", p,
-			)
-			os.Exit(1)
-		}
-		currentNode.NodeConfig.WebHooks.DoubleSigning = config
-	}
 
 	switch {
 	case *networkType == nodeconfig.Localnet:

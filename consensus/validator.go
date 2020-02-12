@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -58,7 +59,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) prepare() {
-	networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil)
+	networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, nil)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_PREPARE.String()).
@@ -193,10 +194,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
 	networkMessage, _ := consensus.construct(
-		// TODO: should only sign on block hash
 		msg_pb.MessageType_COMMIT,
 		append(blockNumBytes, consensus.blockHash[:]...),
+		consensus.blockHash[:],
 	)
+
 	// TODO: genesis account node delay for 1 second,
 	// this is a temp fix for allows FN nodes to earning reward
 	if consensus.delayCommit > 0 {
@@ -214,6 +216,36 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Uint64("blockNum", consensus.blockNum).
 			Hex("blockHash", consensus.blockHash[:]).
 			Msg("[OnPrepared] Sent Commit Message!!")
+	}
+
+	if consensus.DoDoubleSign {
+		cpy := append(consensus.blockHash[0:0], consensus.blockHash[:]...)
+		cpy[0] = byte(29)
+		network, _ := consensus.construct(
+			msg_pb.MessageType_COMMIT, append(blockNumBytes, cpy...), cpy,
+		)
+		msgToSend := network.Bytes
+
+		fmt.Println(
+			"here is the double sign",
+			"\n",
+			hex.EncodeToString(cpy),
+		)
+
+		if err := consensus.msgSender.SendWithoutRetry(
+			[]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+			host.ConstructP2pMessage(byte(17), msgToSend),
+		); err != nil {
+			fmt.Println("ERROR Sending out the double sign")
+		} else {
+			fmt.Println(
+				"sent out the double sign, disabling double signing behavior at ",
+				time.Now().Format(time.RFC3339),
+				network.FBFTMsg,
+			)
+			consensus.DoDoubleSign = false
+		}
 	}
 
 	consensus.getLogger().Debug().
