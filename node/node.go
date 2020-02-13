@@ -315,9 +315,6 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 func (node *Node) AddPendingStakingTransaction(newStakingTx *staking.StakingTransaction) {
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
-		if node.NodeConfig.Role() != nodeconfig.ExplorerNode {
-			return
-		}
 	}
 	utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
 	node.tryBroadcastStaking(newStakingTx)
@@ -328,9 +325,6 @@ func (node *Node) AddPendingStakingTransaction(newStakingTx *staking.StakingTran
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	if newTx.ShardID() == node.NodeConfig.ShardID {
 		node.addPendingTransactions(types.Transactions{newTx})
-		if node.NodeConfig.Role() != nodeconfig.ExplorerNode {
-			return
-		}
 	}
 	utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
 	node.tryBroadcast(newTx)
