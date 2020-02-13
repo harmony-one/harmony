@@ -115,10 +115,6 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 	if tx != nil {
 		return newRPCTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
 	}
-	// No finalized transaction, try to retrieve it from the pool
-	if tx = s.b.GetPoolTransaction(hash); tx != nil {
-		return newRPCPendingTransaction(tx)
-	}
 	// Transaction unknown, return as such
 	return nil
 }
@@ -134,6 +130,7 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Conte
 	if stx != nil {
 		return newRPCStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
 	}
+	// Transaction unknown, return as such
 	return nil
 }
 
@@ -330,17 +327,17 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	return fields, nil
 }
 
-// PendingTransactions returns the transactions that are in the transaction pool
+// PendingTransactions returns the plain transactions that are in the transaction pool
 // and have a from address that is one of the accounts this node manages.
 func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
 	pending, err := s.b.GetPoolTransactions()
 	if err != nil {
 		return nil, err
 	}
-	accounts := make(map[common.Address]struct{})
+	managedAccounts := make(map[common.Address]struct{})
 	for _, wallet := range s.b.AccountManager().Wallets() {
 		for _, account := range wallet.Accounts() {
-			accounts[account.Address] = struct{}{}
+			managedAccounts[account.Address] = struct{}{}
 		}
 	}
 	transactions := make([]*RPCTransaction, 0, len(pending))
@@ -349,9 +346,48 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 		if tx.Protected() {
 			signer = types.NewEIP155Signer(tx.ChainID())
 		}
-		from, _ := types.Sender(signer, tx)
-		if _, exists := accounts[from]; exists {
-			transactions = append(transactions, newRPCPendingTransaction(tx))
+		from, _ := types.PoolTransactionSender(signer, tx)
+		if _, exists := managedAccounts[from]; exists {
+			if plainTx, ok := tx.(*types.Transaction); ok {
+				transactions = append(transactions, newRPCPendingTransaction(plainTx))
+			} else if _, ok := tx.(*staking.StakingTransaction); ok {
+				continue // Do not return staking transactions here
+			} else {
+				return nil, types.ErrUnknownPoolTxType
+			}
+		}
+	}
+	return transactions, nil
+}
+
+// PendingStakingTransactions returns the staking transactions that are in the transaction pool
+// and have a from address that is one of the accounts this node manages.
+func (s *PublicTransactionPoolAPI) PendingStakingTransactions() ([]*RPCStakingTransaction, error) {
+	pending, err := s.b.GetPoolTransactions()
+	if err != nil {
+		return nil, err
+	}
+	managedAccounts := make(map[common.Address]struct{})
+	for _, wallet := range s.b.AccountManager().Wallets() {
+		for _, account := range wallet.Accounts() {
+			managedAccounts[account.Address] = struct{}{}
+		}
+	}
+	transactions := make([]*RPCStakingTransaction, 0, len(pending))
+	for _, tx := range pending {
+		var signer types.Signer = types.HomesteadSigner{}
+		if tx.Protected() {
+			signer = types.NewEIP155Signer(tx.ChainID())
+		}
+		from, _ := types.PoolTransactionSender(signer, tx)
+		if _, exists := managedAccounts[from]; exists {
+			if _, ok := tx.(*types.Transaction); ok {
+				continue // Do not return plain transactions here
+			} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
+				transactions = append(transactions, newRPCPendingStakingTransaction(stakingTx))
+			} else {
+				return nil, types.ErrUnknownPoolTxType
+			}
 		}
 	}
 	return transactions, nil
