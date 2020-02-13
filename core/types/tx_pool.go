@@ -1,9 +1,10 @@
 package types
 
 import (
-	"github.com/pkg/errors"
 	"io"
 	"math/big"
+
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
