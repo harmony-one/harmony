@@ -1,7 +1,6 @@
 package node
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -184,7 +183,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		if slashingToPropose, err = node.Worker.VerifyAndEncodeSlashes(); err != nil {
 			return nil, err
 		}
-		fmt.Println("should be non-nil slashes, right", slashingToPropose)
 	}
 
 	// Prepare shard state

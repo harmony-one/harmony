@@ -267,12 +267,6 @@ func (e *engineImpl) Finalize(
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
-	// Apply the slashes, invariant: assume been verified as legit slash by this point
-	if isBeaconChain && isNewEpoch && inStakingEra {
-		if err := slash.Apply(state, header.Slashes()); err != nil {
-			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
-		}
-	}
 
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
@@ -320,6 +314,20 @@ func (e *engineImpl) Finalize(
 	if isBeaconChain && isNewEpoch && inStakingEra {
 		if err := availability.Apply(chain, state); err != nil {
 			return nil, nil, err
+		}
+	}
+
+	if isBeaconChain && inStakingEra {
+		// Apply the slashes, invariant: assume been verified as legit slash by this point
+		superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
+		if err != nil {
+			return nil, nil, errors.New("could not read shard state")
+		}
+		// Apply the slashes, invariant: assume been verified as legit slash by this point
+		if err := slash.Apply(
+			state, doubleSigners, superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys(),
+		); err != nil {
+			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
 	}
 

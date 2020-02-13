@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p/host"
@@ -216,11 +217,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 						go func(reporter common.Address) {
 							consensus.SlashChan <- slash.NewRecord(
-								alreadyCastBallot.SignerPubKey,
 								signed,
-								signed,
-								alreadyCastBallot.Signature,
-								&doubleSign,
+								alreadyCastBallot,
+								&votepower.Ballot{},
 								reporter,
 							)
 						}(consensus.SelfAddress)

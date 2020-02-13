@@ -71,7 +71,9 @@ type ParticipantTracker interface {
 // SignatoryTracker ..
 type SignatoryTracker interface {
 	ParticipantTracker
-	SubmitVote(p Phase, PubKey *bls.PublicKey, sig *bls.Sign)
+	SubmitVote(
+		p Phase, PubKey *bls.PublicKey, sig *bls.Sign,
+	)
 	// Caller assumes concurrency protection
 	SignersCount(Phase) int64
 	reset([]Phase)

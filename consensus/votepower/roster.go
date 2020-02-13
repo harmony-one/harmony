@@ -27,7 +27,8 @@ var (
 // Ballot is a vote cast by a validator
 type Ballot struct {
 	SignerPubKey shard.BlsPublicKey `json:"bls-public-key"`
-	Signature    *bls.Sign          `json:"signature"`
+	BlockHash    common.Hash
+	Signature    *bls.Sign `json:"signature"`
 }
 
 // BallotResults are a completed round of votes

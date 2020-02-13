@@ -312,11 +312,20 @@ func CompareNodeIDList(l1, l2 SlotList) int {
 }
 
 // DeepCopy returns a deep copy of the receiver.
-func (c Committee) DeepCopy() Committee {
+func (c *Committee) DeepCopy() Committee {
 	r := Committee{}
 	r.ShardID = c.ShardID
 	r.Slots = c.Slots.DeepCopy()
 	return r
+}
+
+// BLSPublicKeys ..
+func (c *Committee) BLSPublicKeys() []BlsPublicKey {
+	slice := make([]BlsPublicKey, len(c.Slots))
+	for j := range c.Slots {
+		slice[j] = c.Slots[j].BlsPublicKey
+	}
+	return slice
 }
 
 // CompareCommittee compares two committees and their leader/node list.
