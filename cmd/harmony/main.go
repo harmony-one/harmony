@@ -645,7 +645,7 @@ func main() {
 		for {
 			select {
 			case sig := <-osSignal:
-				if sig == os.Kill || sig == syscall.SIGTERM || sig == os.Interrupt{
+				if sig == os.Kill || sig == syscall.SIGTERM || sig == os.Interrupt {
 					fmt.Printf("Got %s signal. Gracefully shutting down...\n", sig)
 					currentNode.ShutDown()
 				}
