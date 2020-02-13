@@ -2,6 +2,7 @@ package slash
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
@@ -13,15 +14,18 @@ import (
 
 // Evidence ..
 type Evidence struct {
-	//
+	Header  *block.Header `json:"header"`
+	Epoch   *big.Int
+	ShardID uint32
 }
 
 // Record is an proof of a slashing made by a witness of a double-signing event
 type Record struct {
-	Header             *block.Header    `json:"header"`
 	AlreadyCastBallot  votepower.Ballot `json:"already-cast-vote"`
 	DoubleSignedBallot votepower.Ballot `json:"double-signed-vote"`
-	Beneficiary        common.Address   `json:"beneficiary"` // the reporter who will get rewarded
+	// the reporter who will get rewarded
+	Beneficiary common.Address `json:"beneficiary"`
+	Epoch       *big.Int
 }
 
 // NewRecord ..
@@ -30,9 +34,8 @@ func NewRecord(
 	alreadySigned, doubleSigned *votepower.Ballot,
 	beneficiary common.Address,
 ) Record {
-	return Record{
-		header, *alreadySigned, *doubleSigned, beneficiary,
-	}
+	// header, *alreadySigned, *doubleSigned, beneficiary,
+	return Record{}
 }
 
 // Verify checks that the signature is valid
@@ -45,6 +48,11 @@ func Verify(candidate *Record) error {
 // Apply ..
 func Apply(state *state.DB, slashes []Record, committee []shard.BlsPublicKey) error {
 	rate := Rate(uint32(len(slashes)), uint32(len(committee)))
+
+	// for _, slash := range slashes {
+
+	// }
+
 	fmt.Println("applying slash with a rate of", rate, slashes, committee)
 	return nil
 }

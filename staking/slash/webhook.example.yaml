@@ -5,8 +5,8 @@ web-hooks:
 
 
 malicious:
-    # outside will trigger the harmony code
-  validator-public-key: 2d61379e44a772e5757e27ee2b3874254f56073e6bd226eb8b160371cc3c18b8c4977bd3dcb71fd57dc62bf0e143fd08
-  trigger-double-sign: http://localhost:7777/trigger-next-double-sign
+  trigger:
+    double-sign: http://localhost:7777/trigger-next-double-sign
+    list:
+    - 2d61379e44a772e5757e27ee2b3874254f56073e6bd226eb8b160371cc3c18b8c4977bd3dcb71fd57dc62bf0e143fd08
 
-  # // TODO need to write more scenarios out

@@ -317,7 +317,7 @@ func (e *engineImpl) Finalize(
 		}
 	}
 
-	if isBeaconChain && inStakingEra {
+	if isBeaconChain && inStakingEra && len(doubleSigners) > 0 {
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
 		if err != nil {
@@ -325,7 +325,9 @@ func (e *engineImpl) Finalize(
 		}
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		if err := slash.Apply(
-			state, doubleSigners, superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys(),
+			state,
+			doubleSigners,
+			superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys(),
 		); err != nil {
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
