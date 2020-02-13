@@ -15,7 +15,6 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 var (
@@ -80,7 +79,6 @@ func TestCommitTransactions(t *testing.T) {
 	txs[testBankAddress] = types.Transactions{tx}
 	err := worker.CommitTransactions(
 		txs, nil, testBankAddress,
-		func([]staking.RPCTransactionError) {},
 	)
 	if err != nil {
 		t.Error(err)
