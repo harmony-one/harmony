@@ -296,7 +296,7 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 
 	result := &RPCStakingTransaction{
 		Gas:       hexutil.Uint64(tx.Gas()),
-		GasPrice:  (*hexutil.Big)(tx.Price()),
+		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
 		Timestamp: hexutil.Uint64(timestamp),

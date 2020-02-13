@@ -350,13 +350,15 @@ func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 // GetMinSelfDelegation returns the minimum amount the validator must stake
 func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
 
-func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BLSSignature) error {
+// VerifyBLSKeys checks if the public BLS key at index i of pubKeys matches the
+// BLS key signature at index i of pubKeysSigs.
+func VerifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BLSSignature) error {
 	if len(pubKeys) != len(pubKeySigs) {
 		return errBLSKeysNotMatchSigs
 	}
 
 	for i := 0; i < len(pubKeys); i++ {
-		if err := verifyBLSKey(&pubKeys[i], &pubKeySigs[i]); err != nil {
+		if err := VerifyBLSKey(&pubKeys[i], &pubKeySigs[i]); err != nil {
 			return err
 		}
 	}
@@ -364,7 +366,8 @@ func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BLSSignature
 	return nil
 }
 
-func verifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BLSSignature) error {
+// VerifyBLSKey checks if the public BLS key matches the BLS signature
+func VerifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BLSSignature) error {
 	if len(pubKeySig) == 0 {
 		return errBLSKeysNotMatchSigs
 	}
@@ -397,7 +400,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	commission := Commission{val.CommissionRates, blockNum}
 	pubKeys := append(val.SlotPubKeys[0:0], val.SlotPubKeys...)
 
-	if err = verifyBLSKeys(pubKeys, val.SlotKeySigs); err != nil {
+	if err = VerifyBLSKeys(pubKeys, val.SlotKeySigs); err != nil {
 		return nil, err
 	}
 
@@ -458,7 +461,7 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 			}
 		}
 		if !found {
-			if err := verifyBLSKey(edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
+			if err := VerifyBLSKey(edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
 				return err
 			}
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)
