@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+
 BLSKEY=
 BLSPASS=
 
@@ -11,13 +13,16 @@ db_dir=db
 DOCKER_REPO=harmonyone/node
 DOCKER_IMAGE=$DOCKER_REPO:$tag
 
+use_local=false
+
 function usage()
 {
   cat << EOU
 
-usage: $(basename $0) options blskey blspass
+usage: $(basename $0) [options] blskey blspass
 
 options:
+  -l                          : use local docker image (default: $use_local)
   -t tag                      : tag of the image, default: $tag
   -p base,sync,rpc,wss        : all port setting, default: $ports
   -n network                  : network type
@@ -47,8 +52,9 @@ fi
 
 kill_only=
 
-while getopts "t:p:d:kh" opt; do
+while getopts "t:p:d:khl" opt; do
   case "$opt" in
+    l) use_local=true;;
     t) tag="$OPTARG"
        DOCKER_IMAGE=$DOCKER_REPO:$tag;;
     p) ports="$OPTARG"
@@ -101,9 +107,13 @@ if [ "$kill_only" = "true" ]; then
   exit
 fi
 
+if ! $use_local; then
 # Pull latest image
-echo "Pull latest node image"
-docker pull $DOCKER_IMAGE >/dev/null
+   echo "Pull latest node image"
+   docker pull $DOCKER_IMAGE >/dev/null
+else
+   echo "Use local docker image"
+fi
 
 mkdir -p ${db_dir}/harmony_db_0
 mkdir -p ${db_dir}/harmony_db_1
