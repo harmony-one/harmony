@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"sort"
 
@@ -326,6 +327,21 @@ func (c *Committee) BLSPublicKeys() []BlsPublicKey {
 		slice[j] = c.Slots[j].BlsPublicKey
 	}
 	return slice
+}
+
+var (
+	// ErrValidNotInCommittee ..
+	ErrValidNotInCommittee = errors.New("slot signer not this slot's subcommittee")
+)
+
+// AddressForBLSKey ..
+func (c *Committee) AddressForBLSKey(key BlsPublicKey) (*common.Address, error) {
+	for _, slot := range c.Slots {
+		if CompareBlsPublicKey(slot.BlsPublicKey, key) == 0 {
+			return &slot.EcdsaAddress, nil
+		}
+	}
+	return nil, ErrValidNotInCommittee
 }
 
 // CompareCommittee compares two committees and their leader/node list.

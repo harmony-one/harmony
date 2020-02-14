@@ -28,10 +28,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var (
-	errValidNotInCommittee = errors.New("slot signer not this slot's subcommittee")
-)
-
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
 func (consensus *Consensus) WaitForNewRandomness() {
 	go func() {
@@ -262,7 +258,7 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey
 	}
 
 	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, errValidNotInCommittee
+		return nil, shard.ErrValidNotInCommittee
 	}
 	return senderKey, nil
 }
@@ -275,7 +271,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 	}
 
 	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, errValidNotInCommittee
+		return nil, shard.ErrValidNotInCommittee
 	}
 	return senderKey, nil
 }

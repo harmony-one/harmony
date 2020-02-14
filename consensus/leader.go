@@ -193,6 +193,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	if key := (bls.PublicKey{}); consensus.couldThisBeADoubleSigner(recvMsg) {
 		if alreadyCastBallot := consensus.Decider.ReadBallot(
 			quorum.Commit, recvMsg.SenderPubkey,
@@ -218,6 +221,21 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 						}
 
 						curHeader := consensus.ChainReader.CurrentHeader()
+						committee, err := consensus.ChainReader.ReadShardState(curHeader.Epoch())
+						if err != nil {
+							// TODO should not happen, error log
+							return
+						}
+						offender := *shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
+						addr, err := committee.FindCommitteeByID(
+							consensus.ShardID,
+						).AddressForBLSKey(offender)
+
+						if err != nil {
+							// TODO should not happen, error log
+							return
+						}
+
 						now := time.Now().UnixNano()
 
 						go func(reporter common.Address) {
@@ -234,12 +252,13 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 							proof := slash.Record{
 								ConflictingBallots: slash.ConflictingBallots{*alreadyCastBallot,
 									votepower.Ballot{
-										*shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey),
+										offender,
 										recvMsg.BlockHash,
 										&doubleSign,
 									}},
-								Evidence:    evid,
-								Beneficiary: reporter,
+								Evidence: evid,
+								Reporter: reporter,
+								Offender: *addr,
 							}
 							consensus.SlashChan <- proof
 						}(consensus.SelfAddress)
@@ -250,9 +269,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		}
 		return
 	}
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	validatorPubKey, commitSig, commitBitmap :=
 		recvMsg.SenderPubkey, recvMsg.Payload, consensus.commitBitmap

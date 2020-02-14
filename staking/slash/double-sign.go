@@ -39,8 +39,9 @@ type ConflictingBallots struct {
 type Record struct {
 	ConflictingBallots
 	// the reporter who will get rewarded
-	Evidence    Evidence       `json:"evidence"`
-	Beneficiary common.Address `json:"beneficiary"`
+	Evidence Evidence       `json:"evidence"`
+	Reporter common.Address `json:"reporter"`
+	Offender common.Address `json:"offender"`
 }
 
 // MarshalJSON ..
@@ -53,11 +54,15 @@ func (e Evidence) MarshalJSON() ([]byte, error) {
 
 // MarshalJSON ..
 func (r Record) MarshalJSON() ([]byte, error) {
+	reporter, offender :=
+		common2.MustAddressToBech32(r.Reporter),
+		common2.MustAddressToBech32(r.Offender)
 	return json.Marshal(struct {
 		ConflictingBallots
-		Evidence    Evidence `json:"evidence"`
-		Beneficiary string   `json:"beneficiary"`
-	}{r.ConflictingBallots, r.Evidence, common2.MustAddressToBech32(r.Beneficiary)})
+		Evidence         Evidence `json:"evidence"`
+		Beneficiary      string   `json:"beneficiary"`
+		AddressForBLSKey string   `json:"offender"`
+	}{r.ConflictingBallots, r.Evidence, reporter, offender})
 }
 
 func (e Evidence) String() string {

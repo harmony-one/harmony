@@ -4,12 +4,13 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/chain"
+	"github.com/harmony-one/harmony/shard"
 )
 
 func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		if err == errValidNotInCommittee {
+		if err == shard.ErrValidNotInCommittee {
 			consensus.getLogger().Info().
 				Msg("sender key not in this slot's subcommittee")
 		} else {
@@ -37,7 +38,7 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
-		if err == errValidNotInCommittee {
+		if err == shard.ErrValidNotInCommittee {
 			consensus.getLogger().Info().Msg(
 				"[OnAnnounce] sender key not in this slot's subcommittee",
 			)

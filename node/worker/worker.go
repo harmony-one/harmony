@@ -310,7 +310,7 @@ func (w *Worker) VerifyAndEncodeSlashes() ([]slash.Record, error) {
 		sort.SliceStable(d,
 			func(i, j int) bool {
 				return bytes.Compare(
-					d[i].Beneficiary.Bytes(), d[j].Beneficiary.Bytes(),
+					d[i].Reporter.Bytes(), d[j].Reporter.Bytes(),
 				) == -1
 			},
 		)
@@ -325,9 +325,11 @@ func (w *Worker) VerifyAndEncodeSlashes() ([]slash.Record, error) {
 		if err != nil {
 			return nil, err
 		}
+		count := len(slashingToPropose)
 		w.current.header.SetSlashes(rlpBytes)
-		fmt.Printf("set into propose headers %d slashing record\n", len(slashingToPropose))
-		utils.Logger().Info().Msgf("set into propose headers %d slashing record", len(slashingToPropose))
+		fmt.Printf("set into propose headers %d slashing record\n", count)
+		utils.Logger().Info().
+			Msgf("set into propose headers %d slashing record", count)
 		return slashingToPropose, nil
 	}
 
