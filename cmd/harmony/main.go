@@ -645,14 +645,9 @@ func main() {
 		for {
 			select {
 			case sig := <-osSignal:
-				if sig == os.Kill || sig == syscall.SIGTERM {
+				if sig == os.Kill || sig == syscall.SIGTERM || sig == os.Interrupt {
 					fmt.Printf("Got %s signal. Gracefully shutting down...\n", sig)
 					currentNode.ShutDown()
-				}
-				if sig == os.Interrupt {
-					fmt.Printf("Got %s signal. Dumping state to DB...\n", sig)
-					currentNode.Blockchain().Stop()
-					currentNode.Beaconchain().Stop()
 				}
 			}
 		}
