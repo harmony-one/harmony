@@ -318,7 +318,6 @@ func (e *engineImpl) Finalize(
 	}
 
 	if isBeaconChain && inStakingEra && len(doubleSigners) > 0 {
-		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
 		if err != nil {
 			return nil, nil, errors.New("could not read shard state")

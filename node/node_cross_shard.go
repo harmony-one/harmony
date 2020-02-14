@@ -46,7 +46,11 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte)
 // BroadcastCXReceiptsWithShardID broadcasts cross shard receipts to given ToShardID
 func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig []byte, commitBitmap []byte, toShardID uint32) {
 	myShardID := node.Consensus.ShardID
-	utils.Logger().Info().Uint32("toShardID", toShardID).Uint32("myShardID", myShardID).Uint64("blockNum", block.NumberU64()).Msg("[BroadcastCXReceiptsWithShardID]")
+	utils.Logger().Info().
+		Uint32("toShardID", toShardID).
+		Uint32("myShardID", myShardID).
+		Uint64("blockNum", block.NumberU64()).
+		Msg("[BroadcastCXReceiptsWithShardID]")
 
 	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash())
 	if err != nil || len(cxReceipts) == 0 {
