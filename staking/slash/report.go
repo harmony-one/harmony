@@ -30,7 +30,6 @@ func (h *DoubleSignWebHooks) Contains(key *bls.PublicKey) bool {
 	hex := key.SerializeToHexStr()
 	for _, key := range h.Malicious.Trigger.PublicKeys {
 		if hex == key {
-			fmt.Println("Found a hit", hex, key)
 			return true
 		}
 	}

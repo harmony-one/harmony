@@ -50,7 +50,9 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 
 	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash())
 	if err != nil || len(cxReceipts) == 0 {
-		utils.Logger().Info().Err(err).Uint32("ToShardID", toShardID).Int("numCXReceipts", len(cxReceipts)).Msg("[CXMerkleProof] No receipts found for the destination shard")
+		utils.Logger().Info().Uint32("ToShardID", toShardID).
+			Int("numCXReceipts", len(cxReceipts)).
+			Msg("[CXMerkleProof] No receipts found for the destination shard")
 		return
 	}
 

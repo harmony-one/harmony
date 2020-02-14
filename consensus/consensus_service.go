@@ -60,24 +60,28 @@ func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error
 	return vdfBytes, seed, nil
 }
 
+var (
+	empty = []byte{}
+)
+
 // Signs the consensus message and returns the marshaled message.
-func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message) ([]byte, error) {
-	err := consensus.signConsensusMessage(message)
-	if err != nil {
-		return []byte{}, err
+func (consensus *Consensus) signAndMarshalConsensusMessage(
+	message *msg_pb.Message,
+) ([]byte, error) {
+	if err := consensus.signConsensusMessage(message); err != nil {
+		return empty, err
 	}
 
 	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
-		return []byte{}, err
+		return empty, err
 	}
 	return marshaledMessage, nil
 }
 
 // GetNodeIDs returns Node IDs of all nodes in the same shard
 func (consensus *Consensus) GetNodeIDs() []libp2p_peer.ID {
-	nodes := make([]libp2p_peer.ID, 0)
-	nodes = append(nodes, consensus.host.GetID())
+	nodes := []libp2p_peer.ID{consensus.host.GetID()}
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if peer, ok := v.(p2p.Peer); ok {
 			nodes = append(nodes, peer.PeerID)
@@ -93,19 +97,17 @@ func (consensus *Consensus) GetViewID() uint64 {
 	return consensus.viewID
 }
 
-// DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
-func (consensus *Consensus) DebugPrintPublicKeys() {
-	keys := consensus.Decider.DumpParticipants()
-	utils.Logger().Debug().Strs("PublicKeys", keys).Int("count", len(keys)).Msgf("Debug Public Keys")
-}
-
-// UpdatePublicKeys updates the PublicKeys for quorum on current subcommittee, protected by a mutex
+// UpdatePublicKeys updates the PublicKeys for
+// quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
-		utils.Logger().Info().Int("index", i).Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).Msg("Member")
+		utils.Logger().Info().
+			Int("index", i).
+			Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).
+			Msg("Member")
 	}
 	consensus.LeaderPubKey = pubKeys[0]
 	utils.Logger().Info().
@@ -145,7 +147,7 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message) error 
 
 // GetValidatorPeers returns list of validator peers.
 func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
-	validatorPeers := make([]p2p.Peer, 0)
+	validatorPeers := []p2p.Peer{}
 
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if peer, ok := v.(p2p.Peer); ok {

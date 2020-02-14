@@ -1,9 +1,7 @@
 package votepower
 
 import (
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -26,20 +24,22 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	SignerPubKey shard.BlsPublicKey `json:"bls-public-key"`
-	BlockHash    common.Hash
-	Signature    *bls.Sign `json:"signature"`
+	SignerPubKey    shard.BlsPublicKey `json:"bls-public-key"`
+	BlockHeaderHash common.Hash        `json:"block-header-hash"`
+	Signature       *bls.Sign          `json:"signature"`
 }
 
-// BallotResults are a completed round of votes
-type BallotResults struct {
-	Signature shard.BLSSignature // (aggregated) signature
-	Bitmap    []byte             // corresponding bitmap mask for agg signature
-}
-
-// EncodePair returns hex encoded tuple (signature, bitmap)
-func (b BallotResults) EncodePair() (string, string) {
-	return hex.EncodeToString(b.Signature[:]), hex.EncodeToString(b.Bitmap[:])
+// MarshalJSON ..
+func (b Ballot) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		A string `json:"bls-public-key"`
+		B string `json:"block-header-hash"`
+		C string `json:"signature"`
+	}{
+		b.SignerPubKey.Hex(),
+		b.BlockHeaderHash.Hex(),
+		b.Signature.SerializeToHexStr(),
+	})
 }
 
 // Round is a round of voting in any FBFT phase
@@ -48,12 +48,9 @@ type Round struct {
 	BallotBox      map[string]*Ballot
 }
 
-func (b *Ballot) String() string {
-	return fmt.Sprintf(
-		"[PubKey:%s Signature:%s]",
-		b.SignerPubKey.Hex(),
-		b.Signature.SerializeToHexStr(),
-	)
+func (b Ballot) String() string {
+	data, _ := json.Marshal(b)
+	return string(data)
 }
 
 // NewRound ..

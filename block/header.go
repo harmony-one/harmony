@@ -1,6 +1,7 @@
 package block
 
 import (
+	"fmt"
 	"io"
 	"reflect"
 
@@ -48,6 +49,14 @@ func (h *Header) DecodeRLP(s *rlp.Stream) error {
 // choose and return the right tagged RLP form of the header.
 func (h *Header) Hash() ethcommon.Hash {
 	return hash.FromRLP(h)
+}
+
+// String ..
+func (h *Header) String() string {
+	return fmt.Sprintf(
+		"[ShardID:%v Hash:%s Num:%v View:%v Epoch:%v]",
+		h.ShardID(), h.Hash().Hex(), h.Number(), h.ViewID(), h.Epoch(),
+	)
 }
 
 // Logger returns a sub-logger with block contexts added.

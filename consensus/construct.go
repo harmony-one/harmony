@@ -35,8 +35,6 @@ func (consensus *Consensus) populateMessageFields(
 }
 
 // construct is the single creation point of messages intended for the wire.
-// The trailing callback provides a hook for custom mutation so call can control
-// extra nuance on the network message, it is called after the BFT specific logic
 func (consensus *Consensus) construct(
 	p msg_pb.MessageType, payloadForSignOverride, blockHash []byte,
 ) (*NetworkMessage, error) {
@@ -95,7 +93,7 @@ func (consensus *Consensus) construct(
 	case msg_pb.MessageType_ANNOUNCE:
 		consensusMsg.Payload = consensus.blockHash[:]
 	}
-	// TODO check that message is 96 bytes?
+
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
 	if err != nil {
 		utils.Logger().Error().Err(err).

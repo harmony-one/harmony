@@ -3,6 +3,7 @@ package quorum
 import (
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -72,8 +73,8 @@ type ParticipantTracker interface {
 type SignatoryTracker interface {
 	ParticipantTracker
 	SubmitVote(
-		p Phase, PubKey *bls.PublicKey, sig *bls.Sign,
-	)
+		p Phase, PubKey *bls.PublicKey, sig *bls.Sign, headerHash common.Hash,
+	) *votepower.Ballot
 	// Caller assumes concurrency protection
 	SignersCount(Phase) int64
 	reset([]Phase)
@@ -218,10 +219,13 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 	}
 }
 
-func (s *cIdentities) SubmitVote(p Phase, PubKey *bls.PublicKey, sig *bls.Sign) {
+func (s *cIdentities) SubmitVote(
+	p Phase, PubKey *bls.PublicKey, sig *bls.Sign, headerHash common.Hash,
+) *votepower.Ballot {
 	ballot := &votepower.Ballot{
-		SignerPubKey: *shard.FromLibBLSPublicKeyUnsafe(PubKey),
-		Signature:    sig,
+		SignerPubKey:    *shard.FromLibBLSPublicKeyUnsafe(PubKey),
+		BlockHeaderHash: headerHash,
+		Signature:       sig,
 	}
 	switch hex := PubKey.SerializeToHexStr(); p {
 	case Prepare:
@@ -230,7 +234,11 @@ func (s *cIdentities) SubmitVote(p Phase, PubKey *bls.PublicKey, sig *bls.Sign) 
 		s.commit.BallotBox[hex] = ballot
 	case ViewChange:
 		s.viewChange.BallotBox[hex] = ballot
+	default:
+		panic("invariant violated, unknown phase" + p.String())
+		// Not possible, means bad code
 	}
+	return ballot
 }
 
 func (s *cIdentities) reset(ps []Phase) {

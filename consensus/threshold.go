@@ -3,6 +3,7 @@ package consensus
 import (
 	"encoding/binary"
 
+	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -29,14 +30,14 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// Leader add commit phase signature
-	blockNumHash := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
-	commitPayload := append(blockNumHash, consensus.blockHash[:]...)
-
+	blockNumHash := [8]byte{}
+	binary.LittleEndian.PutUint64(blockNumHash[:], consensus.blockNum)
+	commitPayload := append(blockNumHash[:], consensus.blockHash[:]...)
 	consensus.Decider.SubmitVote(
 		quorum.Commit,
 		consensus.PubKey,
 		consensus.priKey.SignHash(commitPayload),
+		common.BytesToHash(consensus.blockHash[:]),
 	)
 
 	if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {

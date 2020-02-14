@@ -1,6 +1,7 @@
 package slash
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -8,34 +9,65 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
 
+// Moment ..
+type Moment struct {
+	Epoch        *big.Int `json:"epoch"`
+	Height       *big.Int `json:"block-height"`
+	ViewID       uint64   `json:"view-id"`
+	ShardID      uint32   `json:"shard-id"`
+	TimeUnixNano int64    `json:"time-unix-nano"`
+}
+
 // Evidence ..
 type Evidence struct {
-	Header  *block.Header `json:"header"`
-	Epoch   *big.Int
-	ShardID uint32
+	Moment
+	ProposalHeader *block.Header `json:"header"`
+}
+
+// ConflictingBallots ..
+type ConflictingBallots struct {
+	AlreadyCastBallot  votepower.Ballot `json:"already-cast-vote"`
+	DoubleSignedBallot votepower.Ballot `json:"double-signed-vote"`
 }
 
 // Record is an proof of a slashing made by a witness of a double-signing event
 type Record struct {
-	AlreadyCastBallot  votepower.Ballot `json:"already-cast-vote"`
-	DoubleSignedBallot votepower.Ballot `json:"double-signed-vote"`
+	ConflictingBallots
 	// the reporter who will get rewarded
+	Evidence    Evidence       `json:"evidence"`
 	Beneficiary common.Address `json:"beneficiary"`
-	Epoch       *big.Int
 }
 
-// NewRecord ..
-func NewRecord(
-	header *block.Header,
-	alreadySigned, doubleSigned *votepower.Ballot,
-	beneficiary common.Address,
-) Record {
-	// header, *alreadySigned, *doubleSigned, beneficiary,
-	return Record{}
+// MarshalJSON ..
+func (e Evidence) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Moment
+		ProposalHeader string `json:"header"`
+	}{e.Moment, e.ProposalHeader.String()})
+}
+
+// MarshalJSON ..
+func (r Record) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		ConflictingBallots
+		Evidence    Evidence `json:"evidence"`
+		Beneficiary string   `json:"beneficiary"`
+	}{r.ConflictingBallots, r.Evidence, common2.MustAddressToBech32(r.Beneficiary)})
+}
+
+func (e Evidence) String() string {
+	s, _ := json.Marshal(e)
+	return string(s)
+}
+
+func (r Record) String() string {
+	s, _ := json.Marshal(r)
+	return string(s)
 }
 
 // Verify checks that the signature is valid

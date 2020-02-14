@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 )
 
@@ -59,6 +60,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 		quorum.Prepare,
 		consensus.PubKey,
 		consensus.priKey.SignHash(consensus.blockHash[:]),
+		common.BytesToHash(consensus.blockHash[:]),
 	)
 	if err := consensus.prepareBitmap.SetKey(
 		consensus.PubKey, true,
@@ -161,7 +163,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
 	consensus.Decider.SubmitVote(
-		quorum.Prepare, validatorPubKey, &sign,
+		quorum.Prepare, validatorPubKey, &sign, recvMsg.BlockHash,
 	)
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
@@ -215,13 +217,31 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 							return
 						}
 
+						curHeader := consensus.ChainReader.CurrentHeader()
+						now := time.Now().UnixNano()
+
 						go func(reporter common.Address) {
-							consensus.SlashChan <- slash.NewRecord(
-								signed,
-								alreadyCastBallot,
-								&votepower.Ballot{},
-								reporter,
-							)
+							evid := slash.Evidence{
+								Moment: slash.Moment{
+									Epoch:        curHeader.Epoch(),
+									Height:       curHeader.Number(),
+									ViewID:       consensus.viewID,
+									ShardID:      consensus.ShardID,
+									TimeUnixNano: now,
+								},
+								ProposalHeader: signed,
+							}
+							proof := slash.Record{
+								ConflictingBallots: slash.ConflictingBallots{*alreadyCastBallot,
+									votepower.Ballot{
+										*shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey),
+										recvMsg.BlockHash,
+										&doubleSign,
+									}},
+								Evidence:    evid,
+								Beneficiary: reporter,
+							}
+							consensus.SlashChan <- proof
 						}(consensus.SelfAddress)
 						return
 					}
@@ -267,7 +287,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	logger.Info().Msg("[OnCommit] Received new commit message")
 
 	consensus.Decider.SubmitVote(
-		quorum.Commit, validatorPubKey, &sign,
+		quorum.Commit, validatorPubKey, &sign, recvMsg.BlockHash,
 	)
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
