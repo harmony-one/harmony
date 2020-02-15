@@ -1,6 +1,7 @@
 package node
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -145,13 +146,16 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
-	// Prepare cross links
-	var (
-		slashingToPropose   []slash.Record
-		crossLinksToPropose types.CrossLinks
-	)
+	// Prepare cross links and slashings messages
+	var crossLinksToPropose types.CrossLinks
+
+	slashingToPropose := slash.Records{}
+
 	isBeaconchainInCrossLinkEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch())
+
+	isBeaconchainInStakingEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch())
 
 	if isBeaconchainInCrossLinkEra {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
@@ -179,8 +183,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
-	if isBeaconchainInCrossLinkEra {
-		if slashingToPropose, err = node.Worker.VerifyAndEncodeSlashes(); err != nil {
+	if isBeaconchainInStakingEra {
+		if err := node.Worker.CollectAndVerifySlashes(); err != nil {
 			return nil, err
 		}
 	}
@@ -199,6 +203,15 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 		return nil, err
 	}
+
+	if node.Consensus.ShardID == 1 &&
+		node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) {
+		fmt.Println("shard id 1, new block",
+			slashingToPropose.String(),
+			node.Worker.GetCurrentHeader().String(),
+		)
+	}
+
 	return node.Worker.FinalizeNewBlock(
 		sig, mask, node.Consensus.GetViewID(),
 		coinbase, crossLinksToPropose, shardState,

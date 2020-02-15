@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -65,6 +66,9 @@ func (node *Node) receiveGroupMessage(
 func (node *Node) processSkippedMsgTypeByteValue(cat proto_node.BlockMessageType, content []byte) {
 	switch cat {
 	case proto_node.SlashCandidate:
+
+		fmt.Println("received slashing candiate", content)
+
 		node.processSlashCandidateMessage(content)
 	case proto_node.Receipt:
 		utils.Logger().Debug().Msg("NET: received message: Node/Receipt")
@@ -154,7 +158,8 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						Msg("block sync")
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
-					if node.Blockchain().ShardID() != 0 && node.NodeConfig.Role() != nodeconfig.ExplorerNode {
+					if node.Blockchain().ShardID() != shard.BeaconChainShardID &&
+						node.NodeConfig.Role() != nodeconfig.ExplorerNode {
 						for _, block := range blocks {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
@@ -241,28 +246,20 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // BroadcastSlash ..
 func (node *Node) BroadcastSlash(witness *slash.Record) {
-	// no point to broadcast the crosslink if we aren't even in the right epoch yet
-	if !node.Blockchain().Config().IsCrossLink(
-		node.Blockchain().CurrentHeader().Epoch(),
-	) {
-		return
-	}
 
-	if hooks := node.NodeConfig.WebHooks.DoubleSigning; hooks != nil {
-		url := hooks.WebHooks.OnNoticeDoubleSign
-		go func() { slash.DoPost(url, witness) }()
-	}
+	records := slash.Records{*witness}
+	fmt.Println("have these slashes to send out", records.String())
 
 	// Send it to beaconchain if I'm shardchain, otherwise just add it to pending
-	if node.NodeConfig.ShardID != shard.BeaconChainShardID {
-		node.host.SendMessageToGroups(
-			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-			host.ConstructP2pMessage(
-				byte(0),
-				proto_node.ConstructSlashMessage(witness)),
-		)
+	if err := node.host.SendMessageToGroups(
+		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
+		host.ConstructP2pMessage(
+			byte(0),
+			proto_node.ConstructSlashMessage(records)),
+	); err != nil {
+		fmt.Println("some issue in constructing the slash message", err.Error())
 	} else {
-		node.Blockchain().AddPendingSlashingCandidate(witness)
+		fmt.Println("sent out successfully", records.String())
 	}
 }
 
@@ -438,6 +435,10 @@ func (node *Node) PostConsensusProcessing(
 		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
 			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
 			node.BroadcastCrossLink(newBlock)
+			// TODO hook here as well?
+
+			// node.BroadcastSlash(newBlock.Header().Slashes())
+
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {

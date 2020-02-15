@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -129,7 +130,7 @@ func eposStakedCommittee(
 		if err != nil {
 			return nil, err
 		}
-
+		fmt.Println("here is a candidate", validator.String())
 		if err := validator.SanityCheck(); err != nil {
 			utils.Logger().Error().
 				Str("failure", validator.String()).

@@ -2213,34 +2213,45 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 // ReadPendingSlashingCandidates retrieves pending slashing candidates
 func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
-		return []slash.Record{}, nil
+		return nil, ErrPreStakingCRUDSlash
 	}
-
+	var err error
 	bytes := []byte{}
 	if cached, ok := bc.pendingSlashingCandidates.Get(pendingSCCacheKey); ok {
 		bytes = cached.([]byte)
 	} else {
-		bytes, err := rawdb.ReadPendingSlashingCandidates(bc.db)
+		bytes, err = rawdb.ReadPendingSlashingCandidates(bc.db)
 		if err != nil || len(bytes) == 0 {
 			utils.Logger().Info().Err(err).
 				Int("dataLen", len(bytes)).
 				Msg("ReadPendingSlashingCandidates")
+			fmt.Println("SOmething bad here?", err.Error())
 			return nil, err
 		}
 	}
+
 	cls := []slash.Record{}
 	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
+		fmt.Println("some problem decoding bytes", err.Error())
 		utils.Logger().Error().Err(err).Msg("Invalid pending slashing candidates RLP decoding")
 		return nil, err
 	}
 	return cls, nil
 }
 
+var (
+	// ErrPreStakingCRUDSlash ..
+	ErrPreStakingCRUDSlash = errors.New(
+		"no pending slashing operations before staking epoch",
+	)
+)
+
 // WritePendingSlashingCandidates saves the pending slashing candidates
 func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) error {
+	fmt.Println("writing", candidates, bc.CurrentHeader().Epoch())
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
 		utils.Logger().Debug().Msg("Writing slashing candidates in prior to staking epoch")
-		return nil
+		return ErrPreStakingCRUDSlash
 	}
 
 	bytes, err := rlp.EncodeToBytes(candidates)
@@ -2314,18 +2325,32 @@ func (bc *BlockChain) WritePendingCrossLinks(crossLinks []types.CrossLink) error
 
 }
 
-// AddPendingSlashingCandidate  appends pending slashing candidates
-func (bc *BlockChain) AddPendingSlashingCandidate(candidate *slash.Record) (int, error) {
+// AddPendingSlashingCandidates appends pending slashing candidates
+func (bc *BlockChain) AddPendingSlashingCandidates(
+	candidates []slash.Record,
+) (int, error) {
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
 
 	cls, err := bc.ReadPendingSlashingCandidates()
+
+	fmt.Println("reading pending", cls, err)
+
 	if err != nil || len(cls) == 0 {
-		err := bc.WritePendingSlashingCandidates([]slash.Record{*candidate})
+		err := bc.WritePendingSlashingCandidates(candidates)
+
+		if err != nil {
+			fmt.Println("some error on writing pending?", err.Error())
+		}
+
 		return 1, err
 	}
-	cls = append(cls, *candidate)
+
+	cls = append(cls, candidates...)
 	err = bc.WritePendingSlashingCandidates(cls)
+	if err != nil {
+		fmt.Println("write pending slash had a problem?", err.Error())
+	}
 	return len(cls), err
 
 }

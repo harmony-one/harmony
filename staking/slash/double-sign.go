@@ -23,7 +23,7 @@ type Moment struct {
 	Height       *big.Int `json:"block-height"`
 	ViewID       uint64   `json:"view-id"`
 	ShardID      uint32   `json:"shard-id"`
-	TimeUnixNano int64    `json:"time-unix-nano"`
+	TimeUnixNano *big.Int `json:"time-unix-nano"`
 }
 
 // Evidence ..
@@ -53,6 +53,21 @@ func (e Evidence) MarshalJSON() ([]byte, error) {
 		Moment
 		ProposalHeader string `json:"header"`
 	}{e.Moment, e.ProposalHeader.String()})
+}
+
+// Records ..
+type Records []Record
+
+// func (r Records) MarshalJSON() ([]byte, error) {
+
+// 	return json.Marshal(struct {
+// 		Slashes []Record `json:""`
+// 	}{r})
+// }
+
+func (r Records) String() string {
+	s, _ := json.Marshal(r)
+	return string(s)
 }
 
 // MarshalJSON ..
@@ -140,23 +155,29 @@ func Apply(
 	state *state.DB, slashes []Record, committee []shard.BlsPublicKey,
 ) error {
 	log := utils.Logger()
-	rate := oneHundredPercent.Sub(
-		Rate(uint32(len(slashes)), uint32(len(committee))),
-	)
+	rate := Rate(uint32(len(slashes)), uint32(len(committee)))
+	postSlashAmount := oneHundredPercent.Sub(rate)
+
 	for _, slash := range slashes {
+
 		if wrapper := state.GetStakingInfo(
 			slash.Offender,
 		); wrapper != nil {
 			if err := state.UpdateStakingInfo(
 				slash.Offender,
 				validatorSlashApply(
-					delegatorSlashApply(wrapper, rate, state, slash.Reporter),
-					rate, state, slash.Reporter,
+					delegatorSlashApply(wrapper, postSlashAmount, state, slash.Reporter),
+					postSlashAmount, state, slash.Reporter,
 				),
 			); err != nil {
+				fmt.Println("cannot update wrapper", err.Error())
 				return err
 			}
 		} else {
+			fmt.Printf(
+				"could not find validator %s\n",
+				common2.MustAddressToBech32(slash.Offender),
+			)
 			return errors.Errorf(
 				"could not find validator %s",
 				common2.MustAddressToBech32(slash.Offender),
@@ -164,7 +185,7 @@ func Apply(
 		}
 	}
 	log.Info().Str("rate", rate.String()).Int("count", len(slashes))
-	fmt.Println("applying slash with a rate of", rate, slashes, committee)
+	fmt.Println("applying slash with a rate of", rate, slashes)
 	return nil
 }
 

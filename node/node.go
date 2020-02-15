@@ -568,7 +568,25 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 			for {
 				select {
 				case doubleSign := <-node.Consensus.SlashChan:
-					go node.BroadcastSlash(&doubleSign)
+					// no point to broadcast the slash if we aren't even in the right epoch yet
+					if !node.Blockchain().Config().IsStaking(
+						node.Blockchain().CurrentHeader().Epoch(),
+					) {
+						fmt.Println("slash occured before staking era", doubleSign.String())
+						return
+					}
+					if hooks := node.NodeConfig.WebHooks.DoubleSigning; hooks != nil {
+						url := hooks.WebHooks.OnNoticeDoubleSign
+						go func() { slash.DoPost(url, &doubleSign) }()
+					}
+					if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+						fmt.Println("need to broadcast the slash", doubleSign.String())
+						go node.BroadcastSlash(&doubleSign)
+					} else {
+						records := slash.Records{doubleSign}
+						fmt.Println("need to add as pending", doubleSign.String())
+						node.Blockchain().AddPendingSlashingCandidates(records)
+					}
 				}
 			}
 		}()
@@ -577,8 +595,13 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 	if h := node.NodeConfig.WebHooks.DoubleSigning; h != nil &&
 		h.Malicious != nil &&
 		h.Contains(node.Consensus.PubKey) {
-		go slash.NewMaliciousHandler(func() {
+		go slash.NewMaliciousHandler(func() *slash.ReportResult {
 			epoch := node.Blockchain().CurrentHeader().Epoch()
+			fmt.Println("trigger hit, some info->", "\n",
+				node.Consensus.String(), "\n",
+				node.Blockchain().CurrentHeader().String(), "\n",
+			)
+
 			if node.Blockchain().Config().IsStaking(epoch) {
 				fmt.Println(
 					"enabling double signing behavior at",
@@ -586,9 +609,18 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 					node.Consensus,
 				)
 				node.Consensus.DoDoubleSign = true
-				return
+
+				// go func() {
+				// 	for range time.After(time.Second * 5) {
+				// 		fmt.Println("set double sign to false at " + time.Now().Format(time.RFC3339))
+				// 		node.Consensus.DoDoubleSign = false
+				// 	}
+				// }()
+				return slash.NewSuccess("set double sign to true at " + time.Now().Format(time.RFC3339) + node.Consensus.String())
 			}
-			fmt.Println("Current epoch isn't staking yet-->", epoch)
+			return slash.NewFailure(
+				fmt.Sprintf("Current epoch isn't staking yet %s", node.Consensus.String()),
+			)
 		})
 	}
 	return &node

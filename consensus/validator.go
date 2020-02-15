@@ -219,12 +219,16 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	if consensus.DoDoubleSign {
+		fmt.Println("have a true double sign setting", consensus.String())
 		cpy := append(consensus.blockHash[0:0], consensus.blockHash[:]...)
 		cpy[0] = byte(29)
 		network, _ := consensus.construct(
 			msg_pb.MessageType_COMMIT, append(blockNumBytes, cpy...), cpy,
 		)
 		msgToSend := network.Bytes
+
+		fmt.Println("sending out double sign attempt", network.FBFTMsg.String(), consensus.String())
+
 		if err := consensus.msgSender.SendWithoutRetry(
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
@@ -237,6 +241,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 				time.Now().Format(time.RFC3339),
 				network.FBFTMsg,
 			)
+
 			consensus.DoDoubleSign = false
 		}
 	}

@@ -217,9 +217,21 @@ func setupLegacyNodeAccount() error {
 		_, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
 	}
 
-	if initialAccount == nil {
+	const crtValdidatorBLS = "be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a"
+
+	if initialAccount == nil &&
+		pubKey.SerializeToHexStr() != crtValdidatorBLS {
 		return errors.Errorf("cannot find key %s in table", pubKey.SerializeToHexStr())
 	}
+
+	if pubKey.SerializeToHexStr() == crtValdidatorBLS {
+		fmt.Println("using my special account")
+		initialAccount = &genesis.DeployAccount{}
+		initialAccount.Address = "one1zyxauxquys60dk824p532jjdq753pnsenrgmef"
+		initialAccount.BlsPublicKey = crtValdidatorBLS
+		initialAccount.ShardID = 0
+	}
+
 	fmt.Printf("My Genesis Account: %v\n", *initialAccount)
 	return nil
 }
@@ -354,7 +366,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, true)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:

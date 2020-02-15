@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,6 +20,11 @@ import (
 )
 
 func (consensus *Consensus) announce(block *types.Block) {
+
+	// if consensus.ShardID == 1 {
+	// 	fmt.Println("annouce happeneing", consensus.String())
+	// }
+
 	blockHash := block.Hash()
 	copy(consensus.blockHash[:], blockHash[:])
 	// prepare message and broadcast to validators
@@ -236,7 +242,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 							return
 						}
 
-						now := time.Now().UnixNano()
+						now := big.NewInt(time.Now().UnixNano())
 
 						go func(reporter common.Address) {
 							evid := slash.Evidence{

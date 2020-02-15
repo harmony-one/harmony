@@ -197,7 +197,8 @@ func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 		return nil, nil, nil
 	}
 	lastCommits, err := consensus.ChainReader.ReadLastCommits()
-	if err != nil || len(lastCommits) < 96 {
+	if err != nil ||
+		len(lastCommits) < shard.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
 		if len(msgs) != 1 {
 			consensus.getLogger().Error().
@@ -208,11 +209,11 @@ func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 		lastCommits = msgs[0].Payload
 	}
 	//#### Read payload data from committed msg
-	aggSig := make([]byte, 96)
-	bitmap := make([]byte, len(lastCommits)-96)
+	aggSig := make([]byte, shard.BLSSignatureSizeInBytes)
+	bitmap := make([]byte, len(lastCommits)-shard.BLSSignatureSizeInBytes)
 	offset := 0
-	copy(aggSig[:], lastCommits[offset:offset+96])
-	offset += 96
+	copy(aggSig[:], lastCommits[offset:offset+shard.BLSSignatureSizeInBytes])
+	offset += shard.BLSSignatureSizeInBytes
 	copy(bitmap[:], lastCommits[offset:])
 	//#### END Read payload data from committed msg
 	return aggSig, bitmap, nil

@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -322,14 +323,17 @@ func (e *engineImpl) Finalize(
 		if err != nil {
 			return nil, nil, errors.New("could not read shard state")
 		}
+		fmt.Println("About to try to apply slashes", superCommittee.String())
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		if err := slash.Apply(
 			state,
 			doubleSigners,
 			superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys(),
 		); err != nil {
+			fmt.Println("something fucked up", err.Error())
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
+
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))

@@ -10,6 +10,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/spf13/cobra"
 )
 
@@ -41,8 +42,15 @@ func baseRequest(node string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	result := slash.ReportResult{}
 
-	fmt.Printf("URL: %s, Response Body: %s\n\n", node, string(body))
+	if err := json.Unmarshal(body, &result); err != nil {
+		fmt.Printf("error case but still raw dump URL: %s, Response Body:%s\n\n", node, string(body))
+		return nil, err
+	}
+
+	fmt.Println(result)
+
 	return body, err
 }
 

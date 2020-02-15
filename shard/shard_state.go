@@ -161,7 +161,7 @@ func (ss *State) ExternalValidators() []common.Address {
 	return slice
 }
 
-// String ..
+// String produces a non-pretty printed JSON string of the SuperCommittee
 func (ss *State) String() string {
 	s, _ := json.Marshal(ss)
 	return string(s)

@@ -209,7 +209,9 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 	if len(receiptsList) == 0 {
 		w.current.header.SetIncomingReceiptHash(types.EmptyRootHash)
 	} else {
-		w.current.header.SetIncomingReceiptHash(types.DeriveSha(types.CXReceiptsProofs(receiptsList)))
+		w.current.header.SetIncomingReceiptHash(
+			types.DeriveSha(types.CXReceiptsProofs(receiptsList)),
+		)
 	}
 
 	for _, cx := range receiptsList {
@@ -274,8 +276,11 @@ func (w *Worker) GetNewEpoch() *big.Int {
 	epoch := new(big.Int).Set(parent.Header().Epoch())
 
 	shardState, err := parent.Header().GetShardState()
-	if err == nil && shardState.Epoch != nil && w.config.IsStaking(shardState.Epoch) {
-		// For shard state of staking epochs, the shard state will have an epoch and it will decide the next epoch for following blocks
+	if err == nil &&
+		shardState.Epoch != nil &&
+		w.config.IsStaking(shardState.Epoch) {
+		// For shard state of staking epochs, the shard state will
+		// have an epoch and it will decide the next epoch for following blocks
 		epoch = new(big.Int).Set(shardState.Epoch)
 	} else {
 		if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
@@ -301,45 +306,54 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 	return w.current.incxs
 }
 
-// VerifyAndEncodeSlashes ..
-func (w *Worker) VerifyAndEncodeSlashes() ([]slash.Record, error) {
+// CollectAndVerifySlashes ..
+func (w *Worker) CollectAndVerifySlashes() error {
 	allSlashing, err := w.chain.ReadPendingSlashingCandidates()
-	if d := allSlashing; err == nil && len(d) > 0 {
-		slashingToPropose := []slash.Record{}
-		// Enforce order, reproducibility
-		sort.SliceStable(d,
-			func(i, j int) bool {
-				return bytes.Compare(
-					d[i].Reporter.Bytes(), d[j].Reporter.Bytes(),
-				) == -1
-			},
-		)
+	slashingToPropose := []slash.Record{}
 
-		for i := range d {
-			if err := slash.Verify(&d[i]); err == nil {
-				slashingToPropose = append(slashingToPropose, d[i])
-			}
+	if err != nil && err != core.ErrPreStakingCRUDSlash {
+		fmt.Println("reading pending slashes, bad to have error", err.Error())
+		return err
+	}
+	if d := allSlashing; len(d) > 0 {
+		if slashingToPropose, err = w.VerifyAll(d); err != nil {
+			fmt.Println("somehow verify failed", err.Error())
+			return err
 		}
-		w.current.slashes = slashingToPropose
-		rlpBytes, err := rlp.EncodeToBytes(d)
-		if err != nil {
+	}
+	w.current.slashes = slashingToPropose
+	return nil
+}
+
+// VerifyAll ..
+func (w *Worker) VerifyAll(allSlashing []slash.Record) ([]slash.Record, error) {
+	d := allSlashing
+	slashingToPropose := []slash.Record{}
+	// Enforce order, reproducibility
+	sort.SliceStable(d,
+		func(i, j int) bool {
+			return bytes.Compare(
+				d[i].Reporter.Bytes(), d[j].Reporter.Bytes(),
+			) == -1
+		},
+	)
+
+	for i := range d {
+		if err := slash.Verify(&d[i]); err != nil {
 			return nil, err
 		}
-		count := len(slashingToPropose)
-		w.current.header.SetSlashes(rlpBytes)
-		fmt.Printf("set into propose headers %d slashing record\n", count)
-		utils.Logger().Info().
-			Msgf("set into propose headers %d slashing record", count)
-		return slashingToPropose, nil
+		slashingToPropose = append(slashingToPropose, d[i])
 	}
-
-	return []slash.Record{}, nil
+	count := len(slashingToPropose)
+	utils.Logger().Info().
+		Msgf("set into propose headers %d slashing record", count)
+	return slashingToPropose, nil
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
 func (w *Worker) FinalizeNewBlock(
 	sig []byte, signers []byte, viewID uint64, coinbase common.Address,
-	crossLinks types.CrossLinks, shardState *shard.State, doubleSigners []slash.Record,
+	crossLinks types.CrossLinks, shardState *shard.State, doubleSigners slash.Records,
 ) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		sig2 := w.current.header.LastCommitSignature()
@@ -368,10 +382,13 @@ func (w *Worker) FinalizeNewBlock(
 		utils.Logger().Debug().Msg("Zero crosslinks to finalize")
 	}
 
-	if len(doubleSigners) > 0 {
+	if w.config.IsStaking(w.current.header.Epoch()) && len(doubleSigners) > 0 {
 		if data, err := rlp.EncodeToBytes(doubleSigners); err == nil {
+			fmt.Println("double-signers to be encoded", doubleSigners.String(), data)
+			// was gonna do slashes in header but need to talk to RJ
 			w.current.header.SetSlashes(data)
 		} else {
+			fmt.Println("encoding problem->", err.Error())
 			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed slashes")
 			return nil, err
 		}
