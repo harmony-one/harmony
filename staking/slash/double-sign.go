@@ -47,6 +47,16 @@ type Record struct {
 	Offender common.Address `json:"offender"`
 }
 
+// Application ..
+type Application struct {
+	TotalSlashed, TotalSnitchReward *big.Int
+}
+
+func (a *Application) String() string {
+	s, _ := json.Marshal(a)
+	return string(s)
+}
+
 // MarshalJSON ..
 func (e Evidence) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
@@ -110,6 +120,7 @@ func validatorSlashApply(
 	rate numeric.Dec,
 	state *state.DB,
 	reporter common.Address,
+	slashTrack *Application,
 ) *staking.ValidatorWrapper {
 	// Kick them off forever
 	wrapper.Banned = true
@@ -124,7 +135,10 @@ func validatorSlashApply(
 	).Mul(fiftyPercent).TruncateInt()
 	state.SubBalance(wrapper.Address, half)
 	state.AddBalance(reporter, half)
+	slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, half)
+	slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, half)
 	wrapper.MinSelfDelegation = discounted
+	fmt.Println("after validator slash application", slashTrack.String())
 	return wrapper
 }
 
@@ -133,6 +147,7 @@ func delegatorSlashApply(
 	rate numeric.Dec,
 	state *state.DB,
 	reporter common.Address,
+	slashTrack *Application,
 ) *staking.ValidatorWrapper {
 	for _, delegator := range wrapper.Delegations {
 		discounted := numeric.NewDecFromBigInt(
@@ -143,8 +158,11 @@ func delegatorSlashApply(
 		).Mul(fiftyPercent).TruncateInt()
 		state.SubBalance(wrapper.Address, half)
 		state.AddBalance(reporter, half)
+		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, half)
+		slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, half)
 		delegator.Amount = discounted
 	}
+	fmt.Println("after delegator slash application", slashTrack.String())
 	return wrapper
 }
 
@@ -157,17 +175,19 @@ func Apply(
 	log := utils.Logger()
 	rate := Rate(uint32(len(slashes)), uint32(len(committee)))
 	postSlashAmount := oneHundredPercent.Sub(rate)
+	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 
 	for _, slash := range slashes {
-
 		if wrapper := state.GetStakingInfo(
 			slash.Offender,
 		); wrapper != nil {
 			if err := state.UpdateStakingInfo(
 				slash.Offender,
 				validatorSlashApply(
-					delegatorSlashApply(wrapper, postSlashAmount, state, slash.Reporter),
-					postSlashAmount, state, slash.Reporter,
+					delegatorSlashApply(
+						wrapper, postSlashAmount, state, slash.Reporter, slashDiff,
+					),
+					postSlashAmount, state, slash.Reporter, slashDiff,
 				),
 			); err != nil {
 				fmt.Println("cannot update wrapper", err.Error())
@@ -185,7 +205,7 @@ func Apply(
 		}
 	}
 	log.Info().Str("rate", rate.String()).Int("count", len(slashes))
-	fmt.Println("applying slash with a rate of", rate, slashes)
+	fmt.Println("applying slash with a rate of", rate, slashes, slashDiff.String())
 	return nil
 }
 

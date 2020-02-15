@@ -256,7 +256,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 								ProposalHeader: signed,
 							}
 							proof := slash.Record{
-								ConflictingBallots: slash.ConflictingBallots{*alreadyCastBallot,
+								ConflictingBallots: slash.ConflictingBallots{
+									*alreadyCastBallot,
 									votepower.Ballot{
 										offender,
 										recvMsg.BlockHash,
