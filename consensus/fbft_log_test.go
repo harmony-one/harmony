@@ -28,7 +28,7 @@ func constructAnnounceMessage(t *testing.T) (*NetworkMessage, error) {
 		t.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	return consensus.construct(msg_pb.MessageType_ANNOUNCE, nil)
+	return consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, nil)
 }
 
 func getConsensusMessage(payload []byte) (*msg_pb.Message, error) {
@@ -41,23 +41,37 @@ func getConsensusMessage(payload []byte) (*msg_pb.Message, error) {
 }
 
 func TestGetMessagesByTypeSeqViewHash(t *testing.T) {
-	pbftMsg := FBFTMessage{MessageType: msg_pb.MessageType_ANNOUNCE, BlockNum: 2, ViewID: 3, BlockHash: [32]byte{01, 02}}
+	pbftMsg := FBFTMessage{
+		MessageType: msg_pb.MessageType_ANNOUNCE,
+		BlockNum:    2,
+		ViewID:      3,
+		BlockHash:   [32]byte{01, 02},
+	}
 	log := NewFBFTLog()
 	log.AddMessage(&pbftMsg)
 
-	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, 2, 3, [32]byte{01, 02})
+	found := log.GetMessagesByTypeSeqViewHash(
+		msg_pb.MessageType_ANNOUNCE, 2, 3, [32]byte{01, 02},
+	)
 	if len(found) != 1 {
 		t.Error("cannot find existing message")
 	}
 
-	notFound := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, 2, 3, [32]byte{01, 03})
+	notFound := log.GetMessagesByTypeSeqViewHash(
+		msg_pb.MessageType_ANNOUNCE, 2, 3, [32]byte{01, 03},
+	)
 	if len(notFound) > 0 {
 		t.Error("find message that not exist")
 	}
 }
 
 func TestHasMatchingAnnounce(t *testing.T) {
-	pbftMsg := FBFTMessage{MessageType: msg_pb.MessageType_ANNOUNCE, BlockNum: 2, ViewID: 3, BlockHash: [32]byte{01, 02}}
+	pbftMsg := FBFTMessage{
+		MessageType: msg_pb.MessageType_ANNOUNCE,
+		BlockNum:    2,
+		ViewID:      3,
+		BlockHash:   [32]byte{01, 02},
+	}
 	log := NewFBFTLog()
 	log.AddMessage(&pbftMsg)
 	found := log.HasMatchingViewAnnounce(2, 3, [32]byte{01, 02})

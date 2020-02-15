@@ -121,7 +121,7 @@ type Engine interface {
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
-		doubleSigners []slash.Record,
+		doubleSigners slash.Records,
 	) (*types.Block, *big.Int, error)
 
 	// Seal generates a new sealing request for the given input block and pushes

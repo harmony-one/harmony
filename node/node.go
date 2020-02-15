@@ -599,7 +599,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 			epoch := node.Blockchain().CurrentHeader().Epoch()
 			fmt.Println("trigger hit, some info->", "\n",
 				node.Consensus.String(), "\n",
-				node.Blockchain().CurrentHeader().String(), "\n",
+				node.Blockchain().CurrentHeader().String(),
 			)
 
 			if node.Blockchain().Config().IsStaking(epoch) {
