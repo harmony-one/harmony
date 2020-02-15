@@ -166,12 +166,33 @@ func delegatorSlashApply(
 	return wrapper
 }
 
-// TODO Need to keep a record in off-chain db of all the slashes
+// DumpBalances ..
+func (r Records) DumpBalances(state *state.DB) {
+	for _, s := range r {
+		oBal, reportBal := state.GetBalance(s.Offender), state.GetBalance(s.Reporter)
+		wrap := state.GetStakingInfo(s.Offender)
+		fmt.Printf(
+			"offender %s balance %v, reporter %s balance %v \n",
+			common2.MustAddressToBech32(s.Offender),
+			oBal,
+			common2.MustAddressToBech32(s.Reporter),
+			reportBal,
+		)
+		for _, deleg := range wrap.Delegations {
+			fmt.Printf("\tdelegator %s bal %v\n",
+				common2.MustAddressToBech32(deleg.DelegatorAddress),
+				state.GetBalance(deleg.DelegatorAddress),
+			)
+		}
+	}
+}
+
+// TODO Need to keep a record in off-chain db of all the slashes?
 
 // Apply ..
 func Apply(
 	state *state.DB, slashes []Record, committee []shard.BlsPublicKey,
-) error {
+) (*Application, error) {
 	log := utils.Logger()
 	rate := Rate(uint32(len(slashes)), uint32(len(committee)))
 	postSlashAmount := oneHundredPercent.Sub(rate)
@@ -191,14 +212,14 @@ func Apply(
 				),
 			); err != nil {
 				fmt.Println("cannot update wrapper", err.Error())
-				return err
+				return nil, err
 			}
 		} else {
 			fmt.Printf(
 				"could not find validator %s\n",
 				common2.MustAddressToBech32(slash.Offender),
 			)
-			return errors.Errorf(
+			return nil, errors.Errorf(
 				"could not find validator %s",
 				common2.MustAddressToBech32(slash.Offender),
 			)
@@ -206,7 +227,7 @@ func Apply(
 	}
 	log.Info().Str("rate", rate.String()).Int("count", len(slashes))
 	fmt.Println("applying slash with a rate of", rate, slashes, slashDiff.String())
-	return nil
+	return slashDiff, nil
 }
 
 var (

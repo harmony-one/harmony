@@ -254,7 +254,7 @@ func (e *engineImpl) Finalize(
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
-	doubleSigners []slash.Record,
+	doubleSigners slash.Records,
 ) (*types.Block, *big.Int, error) {
 
 	// Accumulate any block and uncle rewards and commit the final state root
@@ -323,9 +323,13 @@ func (e *engineImpl) Finalize(
 		if err != nil {
 			return nil, nil, errors.New("could not read shard state")
 		}
-		fmt.Println("About to try to apply slashes", superCommittee.String())
+		fmt.Println(
+			"About to try to apply slashes, here are account states", superCommittee.String(),
+		)
+		doubleSigners.DumpBalances(state)
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
-		if err := slash.Apply(
+		var slashApplied *slash.Application
+		if slashApplied, err = slash.Apply(
 			state,
 			doubleSigners,
 			superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys(),
@@ -333,7 +337,11 @@ func (e *engineImpl) Finalize(
 			fmt.Println("something fucked up", err.Error())
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
-
+		fmt.Println(
+			"after applied applied slashes, here are account states",
+			slashApplied.String(),
+		)
+		doubleSigners.DumpBalances(state)
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
