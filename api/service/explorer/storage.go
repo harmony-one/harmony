@@ -118,7 +118,7 @@ func (storage *Storage) UpdateAddressStorage(batch *leveldb.Batch, addr string, 
 func (storage *Storage) GetAddresses(size int, prefix string) ([]string, error) {
 	db := storage.GetDB()
 	key := GetAddressKey(prefix)
-	iterator := db.NewIterator(&util.Range{Start:[]byte(key)}, nil)
+	iterator := db.NewIterator(&util.Range{Start: []byte(key)}, nil)
 	addresses := make([]string, 0)
 	for iterator.Next() {
 		address := string(iterator.Key())
