@@ -151,11 +151,11 @@ func TestCompatibilityOldShardStateIntoNew(t *testing.T) {
 		t.Errorf("Could not decode new format")
 	}
 
-	if a.JSON() != json1 {
+	if a.String() != json1 {
 		t.Error("old shard state into new shard state as JSON is not equal")
 	}
 
-	if b.JSON() != json2 {
+	if b.String() != json2 {
 		t.Error("new shard state into new shard state as JSON is not equal")
 	}
 

@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -452,4 +453,44 @@ func (b *APIBackend) GetPendingCXReceipts() []*types.CXReceiptsProof {
 // GetCurrentUtilityMetrics ..
 func (b *APIBackend) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
 	return network.NewUtilityMetricSnapshot(b.hmy.BlockChain())
+}
+
+// GetSuperCommittees ..
+func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
+	nowE := b.hmy.BlockChain().CurrentHeader().Epoch()
+	var (
+		nowCommittee, prevCommittee *shard.State
+		err                         error
+	)
+	nowCommittee, err = b.hmy.BlockChain().ReadShardState(nowE)
+	if err != nil {
+		return nil, err
+	}
+	prevCommittee, err = b.hmy.BlockChain().ReadShardState(
+		new(big.Int).Sub(nowE, common.Big1),
+	)
+	if err != nil {
+		return nil, err
+	}
+	then, now := quorum.NewRegistry(), quorum.NewRegistry()
+
+	for _, comm := range prevCommittee.Shards {
+		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		decider.SetShardIDProvider(func() (uint32, error) {
+			return comm.ShardID, nil
+		})
+		decider.SetVoters(comm.Slots)
+		then.Deciders[comm.ShardID] = decider
+	}
+
+	for _, comm := range nowCommittee.Shards {
+		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		decider.SetShardIDProvider(func() (uint32, error) {
+			return comm.ShardID, nil
+		})
+		decider.SetVoters(comm.Slots)
+		now.Deciders[comm.ShardID] = decider
+	}
+
+	return &quorum.Transition{then, now}, nil
 }

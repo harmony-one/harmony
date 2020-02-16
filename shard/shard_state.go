@@ -160,8 +160,14 @@ func (ss *State) ExternalValidators() []common.Address {
 	return slice
 }
 
-// JSON produces a non-pretty printed JSON string of the SuperCommittee
-func (ss *State) JSON() string {
+// String ..
+func (ss *State) String() string {
+	s, _ := json.Marshal(ss)
+	return string(s)
+}
+
+// MarshalJSON ..
+func (ss *State) MarshalJSON() ([]byte, error) {
 	type t struct {
 		Slot
 		EcdsaAddress string `json:"ecdsa-address"`
@@ -184,8 +190,7 @@ func (ss *State) JSON() string {
 			dump[i].NodeList[j].EcdsaAddress = common2.MustAddressToBech32(n.EcdsaAddress)
 		}
 	}
-	buf, _ := json.Marshal(dump)
-	return string(buf)
+	return json.Marshal(dump)
 }
 
 // FindCommitteeByID returns the committee configuration for the given shard,

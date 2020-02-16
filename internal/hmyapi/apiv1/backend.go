@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -83,4 +84,5 @@ type Backend interface {
 	GetMedianRawStakeSnapshot() *big.Int
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
+	GetSuperCommittees() (*quorum.Transition, error)
 }

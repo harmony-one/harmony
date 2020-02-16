@@ -169,10 +169,7 @@ var (
 	)
 )
 
-func (v *stakedVoteWeight) SetVoters(
-	staked shard.SlotList, debug bool,
-) (*TallyResult, error) {
-	s, _ := v.ShardIDProvider()()
+func (v *stakedVoteWeight) SetVoters(staked shard.SlotList) (*TallyResult, error) {
 	v.ResetPrepareAndCommitVotes()
 	v.ResetViewChangeVotes()
 
@@ -180,15 +177,6 @@ func (v *stakedVoteWeight) SetVoters(
 	if err != nil {
 		return nil, err
 	}
-	if debug {
-		utils.Logger().Info().
-			Str("our-percentage", roster.OurVotingPowerTotalPercentage.String()).
-			Str("their-percentage", roster.TheirVotingPowerTotalPercentage.String()).
-			Uint32("on-shard", s).
-			Str("Raw-Staked", roster.RawStakedTotal.String()).
-			Msg("Total staked")
-	}
-
 	// Hold onto this calculation
 	v.roster = *roster
 	return &TallyResult{
@@ -205,7 +193,12 @@ func (v *stakedVoteWeight) ToggleActive(k *bls.PublicKey) bool {
 	return v.roster.Voters[w].IsActive
 }
 
-func (v *stakedVoteWeight) JSON() string {
+func (v *stakedVoteWeight) String() string {
+	s, _ := json.Marshal(v)
+	return string(s)
+}
+
+func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	s, _ := v.ShardIDProvider()()
 	voterCount := len(v.roster.Voters)
 	type u struct {
@@ -242,7 +235,7 @@ func (v *stakedVoteWeight) JSON() string {
 		i++
 	}
 
-	b1, _ := json.Marshal(t{
+	return json.Marshal(t{
 		v.Policy().String(),
 		s,
 		voterCount,
@@ -251,7 +244,6 @@ func (v *stakedVoteWeight) JSON() string {
 		v.roster.TheirVotingPowerTotalPercentage.String(),
 		v.roster.RawStakedTotal.String(),
 	})
-	return string(b1)
 }
 
 func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {

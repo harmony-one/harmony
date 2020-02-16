@@ -103,18 +103,13 @@ type DependencyInjectionReader interface {
 	MyPublicKey() func() (*bls.PublicKey, error)
 }
 
-//WithJSONDump representation dump
-type WithJSONDump interface {
-	JSON() string
-}
-
 // Decider ..
 type Decider interface {
+	fmt.Stringer
 	SignatureReader
 	DependencyInjectionWriter
-	WithJSONDump
 	ToggleActive(*bls.PublicKey) bool
-	SetVoters(shard.SlotList, bool) (*TallyResult, error)
+	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool
@@ -123,6 +118,22 @@ type Decider interface {
 	IsRewardThresholdAchieved() bool
 	ResetPrepareAndCommitVotes()
 	ResetViewChangeVotes()
+}
+
+// Registry ..
+type Registry struct {
+	Deciders map[uint32]Decider
+}
+
+// NewRegistry ..
+func NewRegistry() Registry {
+	return Registry{map[uint32]Decider{}}
+}
+
+// Transition  ..
+type Transition struct {
+	Previous Registry `json:"previous"`
+	Current  Registry `json:"current"`
 }
 
 // These maps represent the signatories (validators), keys are BLS public keys

@@ -474,7 +474,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	curHeader := consensus.ChainReader.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
-	prevSubCommitteeDump := consensus.Decider.JSON()
+	prevSubCommitteeDump := consensus.Decider.String()
 
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
 		len(curHeader.ShardState()) > 0 &&
@@ -552,7 +552,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// Update voters in the committee
 	if _, err := consensus.Decider.SetVoters(
-		committeeToSet.Slots, true,
+		committeeToSet.Slots,
 	); err != nil {
 		utils.Logger().Error().
 			Err(err).
@@ -566,7 +566,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		Uint64("curEpoch", curHeader.Epoch().Uint64()).
 		Uint32("shard-id", consensus.ShardID).
 		RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
-		RawJSON("current-subcommittee", []byte(consensus.Decider.JSON())).
+		RawJSON("current-subcommittee", []byte(consensus.Decider.String())).
 		Msg("[UpdateConsensusInformation] changing committee")
 
 	// take care of possible leader change during the curEpoch

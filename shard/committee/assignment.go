@@ -214,7 +214,7 @@ func eposStakedCommittee(
 	if c := len(candidates); c != 0 {
 		utils.Logger().Info().Int("staked-candidates", c).
 			Str("total-staked-by-validators", totalStake.String()).
-			RawJSON("staked-super-committee", []byte(shardState.JSON())).
+			RawJSON("staked-super-committee", []byte(shardState.String())).
 			Msg("EPoS based super-committe")
 	}
 
