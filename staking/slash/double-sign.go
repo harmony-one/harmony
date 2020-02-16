@@ -151,12 +151,20 @@ func delegatorSlashApply(
 			continue
 		}
 		// otherwise we need to dig deeper in their pocket
-		leftoverDebt := amt.Sub(half.Sub(paidOff))
-		delegator.Amount.Sub(delegator.Amount, leftoverDebt.TruncateInt())
-		fmt.Println(
-			"Did not have enough in undelegations to pay slash debt,",
-			leftoverDebt.String(), "\n Now have ", delegator.Amount, "-had-", amt.String(),
-		)
+		leftoverDebt := amt.Sub(half.Sub(paidOff)).TruncateInt()
+		delegator.Amount.Sub(delegator.Amount, leftoverDebt)
+		paidOff.Add(numeric.NewDecFromBigInt(leftoverDebt))
+		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, leftoverDebt)
+		if !paidOff.Equal(half) {
+			fmt.Println(
+				"Did not have enough to pay off slash debt,",
+				leftoverDebt.String(), "\n Now have ",
+				delegator.Amount, "-had-",
+				amt.String(),
+				paidOff,
+				half,
+			)
+		}
 	}
 	fmt.Println("after delegator slash application", slashTrack.String())
 }
