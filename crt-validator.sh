@@ -10,17 +10,22 @@ blsKey='be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c
 set -eu
 
 # transfer from already imported account (one of the ones that generates tokens)
+printf 'Sent from funded account to external validator\n'
+
 ./hmy-cli transfer --from "${from}" \
 	  --from-shard 0 --to-shard 0 \
 	  --to "${to}" --amount 5 --wait-for-confirm 30
 
+printf 'Sent from funded account to rando delegator\n'
 # transfer for our rando delegator 
 ./hmy-cli transfer --from "${from}" \
 	  --from-shard 0 --to-shard 0 \
 	  --to "${someRando}" --amount 5 --wait-for-confirm 30
 
+printf 'Check balance of our addr for create-validator\n'
 ./hmy-cli balances "${to}"
 
+printf 'Create the actual validator\n'
 ./hmy-cli staking create-validator --validator-addr "${to}" \
 	  --name _Test_key_validator0 --identity test_account \
 	  --website harmony.one --security-contact Daniel-VDM \
@@ -33,9 +38,14 @@ set -eu
 	  --bls-pubkeys "${blsKey}" \
 	  --chain-id testnet --wait-for-confirm 30
 
+printf 'Do a delegation from our rando addr to our created-validator\n'
 # Need to do a delegator test
 ./hmy-cli staking delegate \
 	  --delegator-addr "${someRando}" --validator-addr "${to}" \
-	  --amount 3 --passphrase
+	  --amount 3 --wait-for-confirm 30
 
+printf 'Kick off the double sign on our created-validator\n'
 ./bin/trigger-double-sign
+
+printf 'Start our webhook server, notified when double sign noticed by leader\n'
+node staking/slash/webhook.example.server.js 
