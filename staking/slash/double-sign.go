@@ -173,6 +173,10 @@ func Apply(
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 
 	for _, slash := range slashes {
+		// TODO Probably won't happen but we probably should
+		// be expilict about reading the right epoch validator snapshot,
+		// because it needs to be the epoch of which the double sign
+		// occurred
 		snapshot, err := chain.ReadValidatorSnapshot(
 			slash.Offender,
 		)
