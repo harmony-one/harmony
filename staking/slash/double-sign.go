@@ -115,7 +115,7 @@ func delegatorSlashApply(
 	reporter common.Address,
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
-) {
+) error {
 	for _, delegator := range delegations {
 		amt := numeric.NewDecFromBigInt(
 			delegator.Amount,
@@ -156,7 +156,7 @@ func delegatorSlashApply(
 		paidOff.Add(numeric.NewDecFromBigInt(leftoverDebt))
 		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, leftoverDebt)
 		if !paidOff.Equal(half) {
-			fmt.Println(
+			return errors.Errorf(
 				"Did not have enough to pay off slash debt,",
 				leftoverDebt.String(), "\n Now have ",
 				delegator.Amount, "-had-",
@@ -167,6 +167,7 @@ func delegatorSlashApply(
 		}
 	}
 	fmt.Println("after delegator slash application", slashTrack.String())
+	return nil
 }
 
 // TODO Need to keep a record in off-chain db of all the slashes?
@@ -206,25 +207,31 @@ func Apply(
 		// Handle validator's delegation explicitly for sake of clarity
 		validatorOwnDelegation :=
 			snapshot.Delegations[:mustBeValidatorsDelegationToSelf]
-		delegatorSlashApply(
+		if err := delegatorSlashApply(
 			validatorOwnDelegation, rate, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,
-		)
+		); err != nil {
+			return nil, err
+		}
 
 		// Now can handle external to the validator delegations, third parties
 		// that trusted the validator with some one token, they must also
 		// be slashed so they have skin in the game
 		rest := snapshot.Delegations[mustBeValidatorsDelegationToSelf:]
-		delegatorSlashApply(
+		if err := delegatorSlashApply(
 			rest, rate, state, slash.Reporter, slash.Evidence.Epoch, slashDiff,
-		)
+		); err != nil {
+			return nil, err
+		}
 		// ...and I want those that I have not seen before
 		sinceSnapshotDelegations :=
 			staking.SetDifference(snapshot.Delegations, nowAccountState.Delegations)
-		delegatorSlashApply(
+		if err := delegatorSlashApply(
 			sinceSnapshotDelegations, rate, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,
-		)
+		); err != nil {
+			return nil, err
+		}
 		// finally, kick them off forever
 		snapshot.Banned = true
 
