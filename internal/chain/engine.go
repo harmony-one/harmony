@@ -335,7 +335,7 @@ func (e *engineImpl) Finalize(
 			doubleSigners,
 			superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys(),
 		); err != nil {
-			fmt.Println("something fucked up", err.Error())
+			fmt.Println("ERROR->Could not apply->", err.Error())
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
 		fmt.Println(

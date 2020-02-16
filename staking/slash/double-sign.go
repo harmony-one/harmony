@@ -155,14 +155,23 @@ func delegatorSlashApply(
 		delegator.Amount.Sub(delegator.Amount, leftoverDebt)
 		paidOff.Add(numeric.NewDecFromBigInt(leftoverDebt))
 		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, leftoverDebt)
-		if !paidOff.Equal(half) {
-			return errors.Errorf(
-				"Did not have enough to pay off slash debt,",
-				leftoverDebt.String(), "\n Now have ",
+
+		if paidOff.Equal(half) {
+			fmt.Println("special case when exactly equal", paidOff.String(), half.String())
+		}
+
+		if !paidOff.GTE(half) {
+			fmt.Println(leftoverDebt.String(), "\n Now have ",
 				delegator.Amount, "-had-",
 				amt.String(),
 				paidOff,
 				half,
+			)
+
+			return errors.Errorf(
+				"paidoff %s is not >= slash debt %s",
+				paidOff.String(),
+				half.String(),
 			)
 		}
 	}
