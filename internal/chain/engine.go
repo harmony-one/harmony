@@ -291,7 +291,9 @@ func (e *engineImpl) Finalize(
 					return nil, nil, ctxerror.New("[Finalize] failed update validator info").WithCause(err)
 				}
 			} else {
-				err = errors.New("[Finalize] validator came back empty " + common2.MustAddressToBech32(validator))
+				err := errors.New(
+					"[Finalize] validator came back empty " + common2.MustAddressToBech32(validator),
+				)
 				return nil, nil, ctxerror.New("[Finalize] failed getting validator info").WithCause(err)
 			}
 		}

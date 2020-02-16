@@ -98,6 +98,7 @@ func (r Record) String() string {
 
 // Verify checks that the signature is valid
 func Verify(candidate *Record) error {
+
 	fmt.Println("need to verify the slash", candidate)
 
 	return nil
@@ -167,7 +168,6 @@ func delegatorSlashApply(
 				paidOff,
 				half,
 				delegations.String(),
-				delegator.Undelegations.String(),
 			)
 
 			return errors.Errorf(
@@ -285,7 +285,7 @@ func (r Records) DumpBalances(state *state.DB) {
 		oBal, reportBal := state.GetBalance(s.Offender), state.GetBalance(s.Reporter)
 		wrap := state.GetStakingInfo(s.Offender)
 		fmt.Printf(
-			"offender %s balance %v, reporter %s balance %v \n",
+			"offender %s \n\tbalance %v, \n\treporter %s balance %v \n",
 			common2.MustAddressToBech32(s.Offender),
 			oBal,
 			common2.MustAddressToBech32(s.Reporter),

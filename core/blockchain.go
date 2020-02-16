@@ -2248,7 +2248,7 @@ var (
 
 // WritePendingSlashingCandidates saves the pending slashing candidates
 func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) error {
-	fmt.Println("writing", candidates, bc.CurrentHeader().Epoch())
+	fmt.Println("writing pending slashing candidates", candidates, bc.CurrentHeader().Epoch())
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
 		utils.Logger().Debug().Msg("Writing slashing candidates in prior to staking epoch")
 		return ErrPreStakingCRUDSlash
@@ -2263,11 +2263,8 @@ func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) 
 	if err := rawdb.WritePendingSlashingCandidates(bc.db, bytes); err != nil {
 		return err
 	}
-	if by, err := rlp.EncodeToBytes(candidates); err == nil {
-		bc.pendingSlashingCandidates.Add(pendingSCCacheKey, by)
-	}
+	bc.pendingSlashingCandidates.Add(pendingSCCacheKey, bytes)
 	return nil
-
 }
 
 // ReadPendingCrossLinks retrieves pending crosslinks
