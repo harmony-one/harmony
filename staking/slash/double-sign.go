@@ -138,12 +138,12 @@ func delegatorSlashApply(
 				break
 			}
 			undelegate.Amount.SetInt64(0)
+			slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, undelegate.Amount)
 			paidOff = paidOff.Add(numeric.NewDecFromBigInt(undelegate.Amount))
 		}
 
 		halfB := half.TruncateInt()
 		state.AddBalance(reporter, halfB)
-		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, halfB)
 		slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, halfB)
 
 		// we might have had enough in undelegations to satisfy the slash debt
