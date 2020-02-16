@@ -171,7 +171,6 @@ func Apply(
 ) (*Application, error) {
 	log := utils.Logger()
 	rate := Rate(uint32(len(slashes)), uint32(len(committee)))
-	postSlashAmount := oneHundredPercent.Sub(rate)
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 
 	for _, slash := range slashes {
@@ -186,16 +185,19 @@ func Apply(
 			)
 		}
 
+		nowAccountState := state.GetStakingInfo(slash.Offender)
+
+		if nowAccountState == nil {
+			return nil, errors.New("cannot be nil code field in account state")
+		}
+
 		const mustBeValidatorsDelegationToSelf = 1
 		// Handle validator's delegation explicitly for sake of clarity
-		// and as special case
 		validatorOwnDelegation :=
 			snapshot.Delegations[:mustBeValidatorsDelegationToSelf]
 		delegatorSlashApply(
 			validatorOwnDelegation, rate, state, slash.Reporter, slashDiff,
 		)
-		// Kick them off forever
-		snapshot.Banned = true
 
 		// Now can handle external to the validator delegations, third parties
 		// that trusted the validator with some one token, they must also
@@ -204,20 +206,21 @@ func Apply(
 		delegatorSlashApply(
 			rest, rate, state, slash.Reporter, slashDiff,
 		)
+		// ...and I want those that I have not seen before
+		sinceSnapshotDelegations :=
+			staking.SetDifference(snapshot.Delegations, nowAccountState.Delegations)
+		delegatorSlashApply(
+			sinceSnapshotDelegations, rate, state, slash.Reporter, slashDiff,
+		)
+		// finally, kick them off forever
+		snapshot.Banned = true
 
-		// if err := state.UpdateStakingInfo(
-		// 	slash.Offender,
-		// 	validatorSlashApply(
-		// 		delegatorSlashApply(
-		// 			snapshot, postSlashAmount, state, slash.Reporter, slashDiff,
-		// 		),
-		// 		snapshot, postSlashAmount, state, slash.Reporter, slashDiff,
-		// 	),
-		// ); err != nil {
-		// 	fmt.Println("cannot update wrapper", err.Error())
-		// 	return nil, err
-		// }
-
+		if err := state.UpdateStakingInfo(
+			snapshot.Address, snapshot,
+		); err != nil {
+			fmt.Println("cannot update wrapper", err.Error())
+			return nil, err
+		}
 	}
 
 	log.Info().Str("rate", rate.String()).Int("count", len(slashes))

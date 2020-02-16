@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/crypto/hash"
 )
 
 var (
@@ -26,6 +27,31 @@ type Delegation struct {
 	Amount           *big.Int       `json:"amount"`
 	Reward           *big.Int       `json:"reward"`
 	Undelegations    []Undelegation `json:"undelegations"`
+}
+
+// Hash is a New256 hash of an RLP encoded Delegation
+func (d Delegation) Hash() common.Hash {
+	return hash.FromRLPNew256(d)
+}
+
+// SetDifference ..
+func SetDifference(xs, ys []Delegation) []Delegation {
+	diff := []Delegation{}
+	xsHashed, ysHashed :=
+		make([]common.Hash, len(xs)), make([]common.Hash, len(ys))
+	for i := range xs {
+		xsHashed[i] = xs[i].Hash()
+	}
+	for i := range ys {
+		ysHashed[i] = ys[i].Hash()
+		for j := range xsHashed {
+			if ysHashed[j] != xsHashed[j] {
+				diff = append(diff, ys[j])
+			}
+		}
+	}
+
+	return diff
 }
 
 // Undelegation represents one undelegation entry
