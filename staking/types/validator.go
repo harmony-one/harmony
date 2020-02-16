@@ -44,6 +44,11 @@ var (
 	errDuplicateSlotKeys         = errors.New("slot keys can not have duplicates")
 )
 
+// ValidatorSnapshotReader ..
+type ValidatorSnapshotReader interface {
+	ReadValidatorSnapshot(common.Address) (*ValidatorWrapper, error)
+}
+
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
 	Validator   `json:"validator"`

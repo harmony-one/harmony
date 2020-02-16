@@ -115,83 +115,59 @@ var (
 	fiftyPercent      = numeric.MustNewDecFromStr("0.5")
 )
 
-func validatorSlashApply(
-	wrapper *staking.ValidatorWrapper,
-	rate numeric.Dec,
-	state *state.DB,
-	reporter common.Address,
-	slashTrack *Application,
-) *staking.ValidatorWrapper {
-	// Kick them off forever
-	wrapper.Banned = true
-	// What is the post reduced amount
-	discounted := numeric.NewDecFromBigInt(
-		wrapper.MinSelfDelegation,
-	).Mul(rate).TruncateInt()
-	// The slashed token will be half burned and
-	// half credited to the reporter’s balance.
-	half := numeric.NewDecFromBigInt(
-		new(big.Int).Sub(wrapper.MinSelfDelegation, discounted),
-	).Mul(fiftyPercent).TruncateInt()
-	state.SubBalance(wrapper.Address, half)
-	state.AddBalance(reporter, half)
-	slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, half)
-	slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, half)
-	wrapper.MinSelfDelegation = discounted
-	fmt.Println("after validator slash application", slashTrack.String())
-	return wrapper
-}
-
 func delegatorSlashApply(
-	wrapper *staking.ValidatorWrapper,
+	delegations []staking.Delegation,
 	rate numeric.Dec,
 	state *state.DB,
 	reporter common.Address,
 	slashTrack *Application,
-) *staking.ValidatorWrapper {
-	for _, delegator := range wrapper.Delegations {
-		discounted := numeric.NewDecFromBigInt(
+) {
+	for _, delegator := range delegations {
+		amt := numeric.NewDecFromBigInt(
 			delegator.Amount,
-		).Mul(rate).TruncateInt()
+		)
+		discounted := amt.Mul(rate).TruncateInt()
 		half := numeric.NewDecFromBigInt(
 			new(big.Int).Sub(delegator.Amount, discounted),
-		).Mul(fiftyPercent).TruncateInt()
-		state.SubBalance(wrapper.Address, half)
-		state.AddBalance(reporter, half)
-		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, half)
-		slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, half)
-		delegator.Amount = discounted
+		).Mul(fiftyPercent)
+
+		paidOff := numeric.ZeroDec()
+
+		// NOTE Get the token trying to escape
+		for _, undelegate := range delegator.Undelegations {
+			if paidOff.Equal(half) {
+				break
+			}
+			undelegate.Amount.SetInt64(0)
+			paidOff = paidOff.Add(numeric.NewDecFromBigInt(undelegate.Amount))
+		}
+
+		halfB := half.TruncateInt()
+		state.AddBalance(reporter, halfB)
+		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, halfB)
+		slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, halfB)
+
+		// We should enough in undelegations to raid first
+		if paidOff.Equal(half) {
+			continue
+		}
+		// otherwise we need to dig deeper in their pocket
+		leftoverDebt := amt.Sub(half.Sub(paidOff))
+		delegator.Amount.Sub(delegator.Amount, leftoverDebt.TruncateInt())
+		fmt.Println(
+			"Did not have enough in undelegations to pay slash debt,",
+			leftoverDebt.String(), "\n Now have ", delegator.Amount, "-had-", amt.String(),
+		)
 	}
 	fmt.Println("after delegator slash application", slashTrack.String())
-	return wrapper
-}
-
-// DumpBalances ..
-func (r Records) DumpBalances(state *state.DB) {
-	for _, s := range r {
-		oBal, reportBal := state.GetBalance(s.Offender), state.GetBalance(s.Reporter)
-		wrap := state.GetStakingInfo(s.Offender)
-		fmt.Printf(
-			"offender %s balance %v, reporter %s balance %v \n",
-			common2.MustAddressToBech32(s.Offender),
-			oBal,
-			common2.MustAddressToBech32(s.Reporter),
-			reportBal,
-		)
-		for _, deleg := range wrap.Delegations {
-			fmt.Printf("\tdelegator %s bal %v\n",
-				common2.MustAddressToBech32(deleg.DelegatorAddress),
-				state.GetBalance(deleg.DelegatorAddress),
-			)
-		}
-	}
 }
 
 // TODO Need to keep a record in off-chain db of all the slashes?
 
 // Apply ..
 func Apply(
-	state *state.DB, slashes []Record, committee []shard.BlsPublicKey,
+	chain staking.ValidatorSnapshotReader, state *state.DB,
+	slashes []Record, committee []shard.BlsPublicKey,
 ) (*Application, error) {
 	log := utils.Logger()
 	rate := Rate(uint32(len(slashes)), uint32(len(committee)))
@@ -199,32 +175,51 @@ func Apply(
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 
 	for _, slash := range slashes {
-		if wrapper := state.GetStakingInfo(
+		snapshot, err := chain.ReadValidatorSnapshot(
 			slash.Offender,
-		); wrapper != nil {
-			if err := state.UpdateStakingInfo(
-				slash.Offender,
-				validatorSlashApply(
-					delegatorSlashApply(
-						wrapper, postSlashAmount, state, slash.Reporter, slashDiff,
-					),
-					postSlashAmount, state, slash.Reporter, slashDiff,
-				),
-			); err != nil {
-				fmt.Println("cannot update wrapper", err.Error())
-				return nil, err
-			}
-		} else {
-			fmt.Printf(
-				"could not find validator %s\n",
-				common2.MustAddressToBech32(slash.Offender),
-			)
+		)
+
+		if err != nil {
 			return nil, errors.Errorf(
 				"could not find validator %s",
 				common2.MustAddressToBech32(slash.Offender),
 			)
 		}
+
+		const mustBeValidatorsDelegationToSelf = 1
+		// Handle validator's delegation explicitly for sake of clarity
+		// and as special case
+		validatorOwnDelegation :=
+			snapshot.Delegations[:mustBeValidatorsDelegationToSelf]
+		delegatorSlashApply(
+			validatorOwnDelegation, rate, state, slash.Reporter, slashDiff,
+		)
+		// Kick them off forever
+		snapshot.Banned = true
+
+		// Now can handle external to the validator delegations, third parties
+		// that trusted the validator with some one token, they must also
+		// be slashed so they have skin in the game
+		rest := snapshot.Delegations[mustBeValidatorsDelegationToSelf:]
+		delegatorSlashApply(
+			rest, rate, state, slash.Reporter, slashDiff,
+		)
+
+		// if err := state.UpdateStakingInfo(
+		// 	slash.Offender,
+		// 	validatorSlashApply(
+		// 		delegatorSlashApply(
+		// 			snapshot, postSlashAmount, state, slash.Reporter, slashDiff,
+		// 		),
+		// 		snapshot, postSlashAmount, state, slash.Reporter, slashDiff,
+		// 	),
+		// ); err != nil {
+		// 	fmt.Println("cannot update wrapper", err.Error())
+		// 	return nil, err
+		// }
+
 	}
+
 	log.Info().Str("rate", rate.String()).Int("count", len(slashes))
 	fmt.Println("applying slash with a rate of", rate, slashes, slashDiff.String())
 	return slashDiff, nil
@@ -247,5 +242,26 @@ func Rate(doubleSignerCount, committeeSize uint32) numeric.Dec {
 		return numeric.NewDec(
 			int64(doubleSignerCount),
 		).Quo(numeric.NewDec(int64(committeeSize)))
+	}
+}
+
+// DumpBalances ..
+func (r Records) DumpBalances(state *state.DB) {
+	for _, s := range r {
+		oBal, reportBal := state.GetBalance(s.Offender), state.GetBalance(s.Reporter)
+		wrap := state.GetStakingInfo(s.Offender)
+		fmt.Printf(
+			"offender %s balance %v, reporter %s balance %v \n",
+			common2.MustAddressToBech32(s.Offender),
+			oBal,
+			common2.MustAddressToBech32(s.Reporter),
+			reportBal,
+		)
+		for _, deleg := range wrap.Delegations {
+			fmt.Printf("\tdelegator %s bal %v\n",
+				common2.MustAddressToBech32(deleg.DelegatorAddress),
+				state.GetBalance(deleg.DelegatorAddress),
+			)
+		}
 	}
 }

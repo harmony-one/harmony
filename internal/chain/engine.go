@@ -330,6 +330,7 @@ func (e *engineImpl) Finalize(
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
 		if slashApplied, err = slash.Apply(
+			chain,
 			state,
 			doubleSigners,
 			superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys(),
