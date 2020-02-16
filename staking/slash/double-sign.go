@@ -109,7 +109,7 @@ var (
 )
 
 func delegatorSlashApply(
-	delegations []staking.Delegation,
+	delegations staking.Delegations,
 	rate numeric.Dec,
 	state *state.DB,
 	reporter common.Address,
@@ -166,6 +166,8 @@ func delegatorSlashApply(
 				amt.String(),
 				paidOff,
 				half,
+				delegations.String(),
+				delegator.Undelegations.String(),
 			)
 
 			return errors.Errorf(

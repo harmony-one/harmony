@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
 	"sort"
@@ -23,10 +24,19 @@ const (
 // owned by one delegator, and is associated with the voting power of one
 // validator.
 type Delegation struct {
-	DelegatorAddress common.Address `json:"delegator_address"`
+	DelegatorAddress common.Address `json:"delegator-address"`
 	Amount           *big.Int       `json:"amount"`
 	Reward           *big.Int       `json:"reward"`
-	Undelegations    []Undelegation `json:"undelegations"`
+	Undelegations    Undelegations  `json:"undelegations"`
+}
+
+// Delegations ..
+type Delegations []Delegation
+
+// String ..
+func (d Delegations) String() string {
+	s, _ := json.Marshal(d)
+	return string(s)
 }
 
 // Hash is a New256 hash of an RLP encoded Delegation
@@ -56,8 +66,17 @@ func SetDifference(xs, ys []Delegation) []Delegation {
 
 // Undelegation represents one undelegation entry
 type Undelegation struct {
-	Amount *big.Int
-	Epoch  *big.Int
+	Amount *big.Int `json:"amount"`
+	Epoch  *big.Int `json:"epoch"`
+}
+
+// Undelegations ..
+type Undelegations []Undelegation
+
+// String ..
+func (u Undelegations) String() string {
+	s, _ := json.Marshal(u)
+	return string(s)
 }
 
 // DelegationIndex stored the index of a delegation in the validator's delegation list
@@ -111,8 +130,8 @@ func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 // TotalInUndelegation - return the total amount of token in undelegation (locking period)
 func (d *Delegation) TotalInUndelegation() *big.Int {
 	total := big.NewInt(0)
-	for _, entry := range d.Undelegations {
-		total.Add(total, entry.Amount)
+	for i := range d.Undelegations {
+		total.Add(total, d.Undelegations[i].Amount)
 	}
 	return total
 }
@@ -131,8 +150,11 @@ func (d *Delegation) DeleteEntry(epoch *big.Int) {
 	}
 }
 
-// RemoveUnlockedUndelegations removes all fully unlocked undelegations and returns the total sum
-func (d *Delegation) RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee *big.Int) *big.Int {
+// RemoveUnlockedUndelegations removes all fully unlocked
+// undelegations and returns the total sum
+func (d *Delegation) RemoveUnlockedUndelegations(
+	curEpoch, lastEpochInCommittee *big.Int,
+) *big.Int {
 	totalWithdraw := big.NewInt(0)
 	count := 0
 	for j := range d.Undelegations {
