@@ -68,13 +68,6 @@ func (e Evidence) MarshalJSON() ([]byte, error) {
 // Records ..
 type Records []Record
 
-// func (r Records) MarshalJSON() ([]byte, error) {
-
-// 	return json.Marshal(struct {
-// 		Slashes []Record `json:""`
-// 	}{r})
-// }
-
 func (r Records) String() string {
 	s, _ := json.Marshal(r)
 	return string(s)
@@ -120,6 +113,7 @@ func delegatorSlashApply(
 	rate numeric.Dec,
 	state *state.DB,
 	reporter common.Address,
+	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 ) {
 	for _, delegator := range delegations {
@@ -135,6 +129,11 @@ func delegatorSlashApply(
 
 		// NOTE Get the token trying to escape
 		for _, undelegate := range delegator.Undelegations {
+			// the epoch matters, only those undelegation
+			// such that epoch>= doubleSignEpoch should be slashable
+			if undelegate.Epoch.Cmp(doubleSignEpoch) == -1 {
+				continue
+			}
 			if paidOff.Equal(half) {
 				break
 			}
@@ -147,7 +146,7 @@ func delegatorSlashApply(
 		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, halfB)
 		slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, halfB)
 
-		// We should enough in undelegations to raid first
+		// we might have had enough in undelegations to satisfy the slash debt
 		if paidOff.Equal(half) {
 			continue
 		}
@@ -196,7 +195,8 @@ func Apply(
 		validatorOwnDelegation :=
 			snapshot.Delegations[:mustBeValidatorsDelegationToSelf]
 		delegatorSlashApply(
-			validatorOwnDelegation, rate, state, slash.Reporter, slashDiff,
+			validatorOwnDelegation, rate, state,
+			slash.Reporter, slash.Evidence.Epoch, slashDiff,
 		)
 
 		// Now can handle external to the validator delegations, third parties
@@ -204,13 +204,14 @@ func Apply(
 		// be slashed so they have skin in the game
 		rest := snapshot.Delegations[mustBeValidatorsDelegationToSelf:]
 		delegatorSlashApply(
-			rest, rate, state, slash.Reporter, slashDiff,
+			rest, rate, state, slash.Reporter, slash.Evidence.Epoch, slashDiff,
 		)
 		// ...and I want those that I have not seen before
 		sinceSnapshotDelegations :=
 			staking.SetDifference(snapshot.Delegations, nowAccountState.Delegations)
 		delegatorSlashApply(
-			sinceSnapshotDelegations, rate, state, slash.Reporter, slashDiff,
+			sinceSnapshotDelegations, rate, state,
+			slash.Reporter, slash.Evidence.Epoch, slashDiff,
 		)
 		// finally, kick them off forever
 		snapshot.Banned = true
