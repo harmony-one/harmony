@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -737,6 +738,14 @@ func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (h
 func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetCurrentUtilityMetrics()
+	}
+	return nil, errNotBeaconChainShard
+}
+
+// GetSuperCommittees ..
+func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetSuperCommittees()
 	}
 	return nil, errNotBeaconChainShard
 }

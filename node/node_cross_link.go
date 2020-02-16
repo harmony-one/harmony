@@ -164,7 +164,7 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
 		return nil, nil
 	})
-	if _, err := decider.SetVoters(committee.Slots, false); err != nil {
+	if _, err := decider.SetVoters(committee.Slots); err != nil {
 		return ctxerror.New("[VerifyCrossLink] Cannot SetVoters for committee", "shardID", cl.ShardID())
 	}
 	if !decider.IsQuorumAchievedByMask(mask, false) {

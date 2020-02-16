@@ -66,7 +66,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 	decider := NewDecider(SuperMajorityStake)
 	decider.SetShardIDProvider(func() (uint32, error) { return 0, nil })
 	decider.UpdateParticipants(pubKeys)
-	tally, err := decider.SetVoters(slotList, false)
+	tally, err := decider.SetVoters(slotList)
 	if err != nil {
 		panic("Unable to SetVoters for Base Case")
 	}
@@ -92,7 +92,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	decider := NewDecider(SuperMajorityStake)
 	decider.SetShardIDProvider(func() (uint32, error) { return 0, nil })
 	decider.UpdateParticipants(pubKeys)
-	tally, err := decider.SetVoters(slotList, false)
+	tally, err := decider.SetVoters(slotList)
 	if err != nil {
 		panic("Unable to SetVoters for Edge Case")
 	}

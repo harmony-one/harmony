@@ -216,7 +216,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		d.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
 			return nil, nil
 		})
-		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots, true)
+		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
 		if !d.IsQuorumAchievedByMask(mask, true) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
@@ -382,7 +382,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		d.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
 			return nil, nil
 		})
-		d.SetVoters(slotList.FindCommitteeByID(header.ShardID()).Slots, true)
+		d.SetVoters(slotList.FindCommitteeByID(header.ShardID()).Slots)
 		if !d.IsQuorumAchievedByMask(mask, true) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in commitSignature from Block Header",

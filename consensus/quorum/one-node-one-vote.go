@@ -59,9 +59,7 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 	return v.SignersCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }
 
-func (v *uniformVoteWeight) SetVoters(
-	shard.SlotList, bool,
-) (*TallyResult, error) {
+func (v *uniformVoteWeight) SetVoters(shard.SlotList) (*TallyResult, error) {
 	// NO-OP do not add anything here
 	return nil, nil
 }
@@ -96,19 +94,23 @@ func (v *uniformVoteWeight) Award(
 	return payout
 }
 
-func (v *uniformVoteWeight) JSON() string {
+func (v *uniformVoteWeight) String() string {
+	s, _ := json.Marshal(v)
+	return string(s)
+}
+
+func (v *uniformVoteWeight) MarshalJSON() ([]byte, error) {
 	s, _ := v.ShardIDProvider()()
 
 	type t struct {
-		Policy       string   `json"policy"`
+		Policy       string   `json:"policy"`
 		ShardID      uint32   `json:"shard-id"`
 		Count        int      `json:"count"`
 		Participants []string `json:"committee-members"`
 	}
 
 	members := v.DumpParticipants()
-	b1, _ := json.Marshal(t{v.Policy().String(), s, len(members), members})
-	return string(b1)
+	return json.Marshal(t{v.Policy().String(), s, len(members), members})
 }
 
 func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
