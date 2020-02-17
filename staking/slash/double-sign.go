@@ -214,23 +214,12 @@ func Apply(
 			return nil, errors.New("cannot be nil code field in account state")
 		}
 
-		const mustBeValidatorsDelegationToSelf = 1
-		// Handle validator's delegation explicitly for sake of clarity
-		validatorOwnDelegation :=
-			snapshot.Delegations[:mustBeValidatorsDelegationToSelf]
+		// NOTE invariant: first delegation is the validators own
+		// stake, rest are external delegations.
+		// Bottom line: everyone must have have skin in the game,
 		if err := delegatorSlashApply(
-			validatorOwnDelegation, rate, state,
+			snapshot.Delegations, rate, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,
-		); err != nil {
-			return nil, err
-		}
-
-		// Now can handle external to the validator delegations, third parties
-		// that trusted the validator with some one token, they must also
-		// be slashed so they have skin in the game
-		rest := snapshot.Delegations[mustBeValidatorsDelegationToSelf:]
-		if err := delegatorSlashApply(
-			rest, rate, state, slash.Reporter, slash.Evidence.Epoch, slashDiff,
 		); err != nil {
 			return nil, err
 		}
