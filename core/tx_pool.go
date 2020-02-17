@@ -17,7 +17,6 @@
 package core
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math"
@@ -38,6 +37,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -87,23 +87,9 @@ var (
 	// attempting to be added to the pool.
 	ErrKnownTransaction = errors.New("known transaction")
 
-	// ErrUnknownStakingDirective is returned if staking directive is unknown
-	ErrUnknownStakingDirective = errors.New("unknown staking directive")
-
 	// ErrInvalidMsgForStakingDirective is returned if a staking message does not
 	// match the related directive
 	ErrInvalidMsgForStakingDirective = errors.New("staking message does not match directive message")
-
-	// ErrBLSkeyUnknown is returned if attempting to access and unknown BLS key from validator
-	ErrBLSkeyUnknown = errors.New("unknown BLS key")
-
-	// ErrInsufficientBalanceForUndelegation is returned when attempting to undelegation more
-	// than delegation amount
-	ErrInsufficientBalanceForUndelegation = errors.New("insufficient balances for undelegation")
-
-	// ErrBLSKeyExists is returned if an edit validator txn attempts to add an
-	// existing BLS key to a validator
-	ErrBLSKeyExists = errors.New("known BLS key in validator")
 
 	// ErrBlacklistFrom is returned if a transaction's from/source address is blacklisted
 	ErrBlacklistFrom = errors.New("`from` address of transaction in blacklist")
@@ -731,7 +717,6 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	if tx.Gas() < intrGas {
 		return errors.WithMessagef(ErrIntrinsicGas, "transaction gas is %d", tx.Gas())
 	}
-
 	// Do more checks if it is a staking transaction
 	if isStakingTx {
 		return pool.validateStakingTx(stakingTx)
@@ -758,7 +743,14 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.ValidatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
-		return pool.validateCreateValidatorMsg(stkMsg)
+		currentBlockNumber := pool.chain.CurrentBlock().Number()
+		pendingBlockNumber := new(big.Int).Add(currentBlockNumber, big.NewInt(1))
+		pendingEpoch := pool.chain.CurrentBlock().Epoch()
+		if shard.Schedule.IsLastBlock(currentBlockNumber.Uint64()) {
+			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
+		}
+		_, err = VerifyAndCreateValidatorFromMsg(pool.currentState, pendingEpoch, pendingBlockNumber, stkMsg)
+		return err
 	case staking.DirectiveEditValidator:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveEditValidator)
 		if err != nil {
@@ -771,7 +763,13 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.ValidatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
-		return pool.validateEditValidatorMsg(stkMsg)
+		chainContext, ok := pool.chain.(ChainContext)
+		if !ok {
+			chainContext = nil // might use testing blockchain, set to nil for verifier to handle.
+		}
+		pendingBlockNumber := new(big.Int).Add(pool.chain.CurrentBlock().Number(), big.NewInt(1))
+		_, err = VerifyAndEditValidatorFromMsg(pool.currentState, chainContext, pendingBlockNumber, stkMsg)
+		return err
 	case staking.DirectiveDelegate:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
 		if err != nil {
@@ -784,7 +782,8 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.DelegatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
-		return pool.validateDelegateMsg(stkMsg)
+		_, _, err = VerifyAndDelegateFromMsg(pool.currentState, stkMsg)
+		return err
 	case staking.DirectiveUndelegate:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
 		if err != nil {
@@ -797,9 +796,14 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.DelegatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
-		return pool.validateUndelegateMsg(stkMsg)
+		pendingEpoch := pool.chain.CurrentBlock().Epoch()
+		if shard.Schedule.IsLastBlock(pool.chain.CurrentBlock().Number().Uint64()) {
+			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
+		}
+		_, err = VerifyAndUndelegateFromMsg(pool.currentState, pendingEpoch, stkMsg)
+		return err
 	case staking.DirectiveCollectRewards:
-		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
+		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCollectRewards)
 		if err != nil {
 			return err
 		}
@@ -810,191 +814,19 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.DelegatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
-		return pool.validateCollectRewardsMsg(stkMsg)
-	default:
-		return ErrUnknownStakingDirective
-	}
-}
-
-func (pool *TxPool) validateCreateValidatorMsg(stkMsg *staking.CreateValidator) error {
-	if pool.currentState.IsValidator(stkMsg.ValidatorAddress) {
-		return errValidatorExist
-	}
-
-	// create temp validator to do sanity check
-	validatorWrapper, err := staking.CreateValidatorFromNewMsg(stkMsg, pool.chain.CurrentBlock().Number())
-	if err != nil {
-		return errors.WithMessage(err, "from verification of create validator message")
-	}
-	w := staking.ValidatorWrapper{}
-	w.Validator = *validatorWrapper
-	w.Delegations = []staking.Delegation{ // Create validators implies self delegation.
-		staking.NewDelegation(validatorWrapper.Address, stkMsg.Amount),
-	}
-
-	return w.SanityCheck()
-}
-
-func (pool *TxPool) validateEditValidatorMsg(stkMsg *staking.EditValidator) error {
-	if !pool.currentState.IsValidator(stkMsg.ValidatorAddress) {
-		return errValidatorNotExist
-	}
-
-	validatorWrapper := pool.currentState.GetStakingInfo(stkMsg.ValidatorAddress)
-	if validatorWrapper == nil {
-		return errValidatorNotExist
-	}
-
-	if _, err := stkMsg.Description.EnsureLength(); err != nil {
-		return err
-	}
-
-	if stkMsg.SlotKeyToRemove != nil {
-		index := -1
-		for i, key := range validatorWrapper.SlotPubKeys {
-			if key == *stkMsg.SlotKeyToRemove {
-				index = i
-				break
-			}
+		chain, ok := pool.chain.(ChainContext)
+		if !ok {
+			return nil // for testing, chain could be testing blockchain
 		}
-		if index < 0 {
-			return ErrBLSkeyUnknown
-		}
-	}
-
-	if stkMsg.SlotKeyToAdd != nil {
-		found := false
-		for _, key := range validatorWrapper.SlotPubKeys {
-			if key == *stkMsg.SlotKeyToAdd {
-				found = true
-				break
-			}
-		}
-		if found {
-			return ErrBLSKeyExists
-		}
-		if err := staking.VerifyBLSKey(stkMsg.SlotKeyToAdd, stkMsg.SlotKeyToAddSig); err != nil {
+		delegations, err := chain.ReadDelegationsByDelegator(stkMsg.DelegatorAddress)
+		if err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func (pool *TxPool) validateDelegateMsg(stkMsg *staking.Delegate) error {
-	if stkMsg.Amount.Sign() == -1 {
-		return errNegativeAmount
-	}
-
-	if !pool.currentState.IsValidator(stkMsg.ValidatorAddress) {
-		return errValidatorNotExist
-	}
-
-	validatorWrapper := pool.currentState.GetStakingInfo(stkMsg.ValidatorAddress)
-	if validatorWrapper == nil {
-		return errValidatorNotExist
-	}
-
-	delegatorExist := false
-	for _, delegation := range validatorWrapper.Delegations {
-		if bytes.Equal(delegation.DelegatorAddress.Bytes(), stkMsg.DelegatorAddress.Bytes()) {
-			delegatorExist = true
-			balance := pool.currentState.GetBalance(stkMsg.DelegatorAddress)
-			if big.NewInt(0).Add(delegation.TotalInUndelegation(), balance).Cmp(stkMsg.Amount) < 0 {
-				return errors.Wrapf(
-					errInsufficientBalanceForStake,
-					"total-delegated %s own-current-balance %s amount-to-delegate %s",
-					delegation.TotalInUndelegation().String(),
-					balance.String(),
-					stkMsg.Amount.String(),
-				)
-			}
-		}
-	}
-
-	if !delegatorExist {
-		if CanTransfer(pool.currentState, stkMsg.DelegatorAddress, stkMsg.Amount) {
-			// use new wrapped validator to not edit current state
-			w := staking.ValidatorWrapper{}
-			w.Validator = validatorWrapper.Validator
-			tmpDelegation := []staking.Delegation{
-				staking.NewDelegation(stkMsg.DelegatorAddress, stkMsg.Amount),
-			}
-			w.Delegations = append(tmpDelegation, validatorWrapper.Delegations...)
-			if err := w.SanityCheck(); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (pool *TxPool) validateUndelegateMsg(stkMsg *staking.Undelegate) error {
-	if stkMsg.Amount.Sign() == -1 {
-		return errNegativeAmount
-	}
-
-	if !pool.currentState.IsValidator(stkMsg.ValidatorAddress) {
-		return errValidatorNotExist
-	}
-
-	validatorWrapper := pool.currentState.GetStakingInfo(stkMsg.ValidatorAddress)
-	if validatorWrapper == nil {
-		return errValidatorNotExist
-	}
-
-	delegatorExist := false
-	for _, delegation := range validatorWrapper.Delegations {
-		if bytes.Equal(delegation.DelegatorAddress.Bytes(), stkMsg.DelegatorAddress.Bytes()) {
-			delegatorExist = true
-			if delegation.Amount.Sign() <= 0 {
-				return errNegativeAmount
-			}
-			if delegation.Amount.Cmp(stkMsg.Amount) < 0 {
-				return ErrInsufficientBalanceForUndelegation
-			}
-		}
-	}
-
-	if !delegatorExist {
-		return errNoDelegationToUndelegate
-	}
-	return nil
-}
-
-func (pool *TxPool) validateCollectRewardsMsg(stkMsg *staking.CollectRewards) error {
-	chain, ok := pool.chain.(*BlockChain)
-	if !ok {
-		return nil // for testing, chain could be testing blockchain
-	}
-
-	delegations, err := chain.ReadDelegationsByDelegator(stkMsg.DelegatorAddress)
-	if err != nil {
+		_, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations)
 		return err
+	default:
+		return staking.ErrInvalidStakingKind
 	}
-
-	totalRewards := big.NewInt(0)
-	for _, delegation := range delegations {
-		if !pool.currentState.IsValidator(delegation.ValidatorAddress) {
-			return errValidatorNotExist
-		}
-
-		validatorWrapper := pool.currentState.GetStakingInfo(delegation.ValidatorAddress)
-		if validatorWrapper == nil {
-			return errValidatorNotExist
-		}
-
-		if uint64(len(validatorWrapper.Delegations)) > delegation.Index {
-			delegation := &validatorWrapper.Delegations[delegation.Index]
-			if delegation.Reward.Cmp(big.NewInt(0)) > 0 {
-				totalRewards.Add(totalRewards, delegation.Reward)
-			}
-		}
-	}
-
-	if totalRewards.Int64() <= 0 {
-		return errNoRewardsToCollect
-	}
-	return nil
 }
 
 // add validates a transaction and inserts it into the non-executable queue for
@@ -1599,7 +1431,7 @@ func (pool *TxPool) demoteUnexecutables() {
 	}
 }
 
-// txPoolErrorReporter holds and reports errors transaction in the tx-pool.
+// txPoolErrorReporter holds and reports transaction errors in the tx-pool.
 // Format assumes that error i in errors corresponds to transaction i in transactions.
 type txPoolErrorReporter struct {
 	transactions          types.PoolTransactions
@@ -1630,7 +1462,7 @@ func (txErrs *txPoolErrorReporter) reset() {
 }
 
 // report errors thrown in the tx pool to the appropriate error sink.
-// It resets the errors after the errors are reported to the sink.
+// It resets the held errors after the errors are reported to the sink.
 func (txErrs *txPoolErrorReporter) report() error {
 	plainTxErrors := []types.RPCTransactionError{}
 	stakingTxErrors := []staking.RPCTransactionError{}

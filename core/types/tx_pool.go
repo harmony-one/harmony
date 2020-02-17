@@ -21,7 +21,6 @@ type PoolTransaction interface {
 	Hash() common.Hash
 	Nonce() uint64
 	ChainID() *big.Int
-	ToShardID() uint32
 	To() *common.Address
 	Size() common.StorageSize
 	Data() []byte
@@ -67,11 +66,6 @@ func (s PoolTransactions) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s PoolTransactions) GetRlp(i int) []byte {
 	enc, _ := rlp.EncodeToBytes(s[i])
 	return enc
-}
-
-// ToShardID returns the destination shardID of given PoolTransaction
-func (s PoolTransactions) ToShardID(i int) uint32 {
-	return s[i].ToShardID()
 }
 
 // PoolTxDifference returns a new set which is the difference between a and b.

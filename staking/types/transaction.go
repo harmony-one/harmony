@@ -213,11 +213,6 @@ func (tx *StakingTransaction) Protected() bool {
 	return true
 }
 
-// ToShardID ..
-func (tx *StakingTransaction) ToShardID() uint32 {
-	return 0
-}
-
 // To ..
 func (tx *StakingTransaction) To() *common.Address {
 	return nil
