@@ -106,6 +106,83 @@ type Validator struct {
 	Banned bool
 }
 
+// SanityCheck checks basic requirements of a validator
+func (v *Validator) SanityCheck() error {
+	if _, err := v.EnsureLength(); err != nil {
+		return err
+	}
+
+	if len(v.SlotPubKeys) == 0 {
+		return errNeedAtLeastOneSlotKey
+	}
+
+	if v.MinSelfDelegation == nil {
+		return errNilMinSelfDelegation
+	}
+
+	if v.MaxTotalDelegation == nil {
+		return errNilMaxTotalDelegation
+	}
+
+	// MinSelfDelegation must be >= 1 ONE
+	if v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+		return errors.Wrapf(
+			errMinSelfDelegationTooSmall,
+			"delegation-given %s", v.MinSelfDelegation.String(),
+		)
+	}
+
+	// MaxTotalDelegation must not be less than MinSelfDelegation
+	if v.MaxTotalDelegation.Cmp(v.MinSelfDelegation) < 0 {
+		return errors.Wrapf(
+			errInvalidMaxTotalDelegation,
+			"max-total-delegation %s min-self-delegation %s",
+			v.MaxTotalDelegation.String(),
+			v.MinSelfDelegation.String(),
+		)
+	}
+
+	if v.Rate.LT(zeroPercent) || v.Rate.GT(hundredPercent) {
+		return errors.Wrapf(
+			errInvalidCommissionRate, "rate:%s", v.Rate.String(),
+		)
+	}
+
+	if v.MaxRate.LT(zeroPercent) || v.MaxRate.GT(hundredPercent) {
+		return errors.Wrapf(
+			errInvalidCommissionRate, "rate:%s", v.MaxRate.String(),
+		)
+	}
+
+	if v.MaxChangeRate.LT(zeroPercent) || v.MaxChangeRate.GT(hundredPercent) {
+		return errors.Wrapf(
+			errInvalidCommissionRate, "rate:%s", v.MaxChangeRate.String(),
+		)
+	}
+
+	if v.Rate.GT(v.MaxRate) {
+		return errors.Wrapf(
+			errCommissionRateTooLarge, "rate:%s", v.MaxRate.String(),
+		)
+	}
+
+	if v.MaxChangeRate.GT(v.MaxRate) {
+		return errors.Wrapf(
+			errCommissionRateTooLarge, "rate:%s", v.MaxChangeRate.String(),
+		)
+	}
+
+	allKeys := map[shard.BlsPublicKey]struct{}{}
+	for i := range v.SlotPubKeys {
+		if _, ok := allKeys[v.SlotPubKeys[i]]; !ok {
+			allKeys[v.SlotPubKeys[i]] = struct{}{}
+		} else {
+			return errDuplicateSlotKeys
+		}
+	}
+	return nil
+}
+
 // MarshalJSON ..
 func (v *ValidatorStats) MarshalJSON() ([]byte, error) {
 	type t struct {
@@ -176,26 +253,9 @@ var (
 
 // SanityCheck checks the basic requirements
 func (w *ValidatorWrapper) SanityCheck() error {
-	if len(w.SlotPubKeys) == 0 {
-		return errNeedAtLeastOneSlotKey
+	if err := w.Validator.SanityCheck(); err != nil {
+		return err
 	}
-
-	if w.Validator.MinSelfDelegation == nil {
-		return errNilMinSelfDelegation
-	}
-
-	if w.Validator.MaxTotalDelegation == nil {
-		return errNilMaxTotalDelegation
-	}
-
-	// MinSelfDelegation must be >= 1 ONE
-	if w.Validator.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
-		return errors.Wrapf(
-			errMinSelfDelegationTooSmall,
-			"delegation-given %s", w.Validator.MinSelfDelegation.String(),
-		)
-	}
-
 	// Self delegation must be >= MinSelfDelegation
 	switch len(w.Delegations) {
 	case 0:
@@ -210,17 +270,6 @@ func (w *ValidatorWrapper) SanityCheck() error {
 			)
 		}
 	}
-
-	// MaxTotalDelegation must not be less than MinSelfDelegation
-	if w.Validator.MaxTotalDelegation.Cmp(w.Validator.MinSelfDelegation) < 0 {
-		return errors.Wrapf(
-			errInvalidMaxTotalDelegation,
-			"max-total-delegation %s min-self-delegation %s",
-			w.Validator.MaxTotalDelegation.String(),
-			w.Validator.MinSelfDelegation.String(),
-		)
-	}
-
 	totalDelegation := w.TotalDelegation()
 	// Total delegation must be <= MaxTotalDelegation
 	if totalDelegation.Cmp(w.Validator.MaxTotalDelegation) > 0 {
@@ -230,45 +279,6 @@ func (w *ValidatorWrapper) SanityCheck() error {
 			totalDelegation.String(),
 			w.Validator.MaxTotalDelegation.String(),
 		)
-	}
-
-	if w.Validator.Rate.LT(zeroPercent) || w.Validator.Rate.GT(hundredPercent) {
-		return errors.Wrapf(
-			errInvalidCommissionRate, "rate:%s", w.Validator.Rate.String(),
-		)
-	}
-
-	if w.Validator.MaxRate.LT(zeroPercent) || w.Validator.MaxRate.GT(hundredPercent) {
-		return errors.Wrapf(
-			errInvalidCommissionRate, "rate:%s", w.Validator.MaxRate.String(),
-		)
-	}
-
-	if w.Validator.MaxChangeRate.LT(zeroPercent) || w.Validator.MaxChangeRate.GT(hundredPercent) {
-		return errors.Wrapf(
-			errInvalidCommissionRate, "rate:%s", w.Validator.MaxChangeRate.String(),
-		)
-	}
-
-	if w.Validator.Rate.GT(w.Validator.MaxRate) {
-		return errors.Wrapf(
-			errCommissionRateTooLarge, "rate:%s", w.Validator.MaxRate.String(),
-		)
-	}
-
-	if w.Validator.MaxChangeRate.GT(w.Validator.MaxRate) {
-		return errors.Wrapf(
-			errCommissionRateTooLarge, "rate:%s", w.Validator.MaxChangeRate.String(),
-		)
-	}
-
-	allKeys := map[shard.BlsPublicKey]struct{}{}
-	for i := range w.Validator.SlotPubKeys {
-		if _, ok := allKeys[w.Validator.SlotPubKeys[i]]; !ok {
-			allKeys[w.Validator.SlotPubKeys[i]] = struct{}{}
-		} else {
-			return errDuplicateSlotKeys
-		}
 	}
 	return nil
 }
@@ -350,13 +360,15 @@ func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
 // GetMinSelfDelegation returns the minimum amount the validator must stake
 func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
 
-func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BLSSignature) error {
+// VerifyBLSKeys checks if the public BLS key at index i of pubKeys matches the
+// BLS key signature at index i of pubKeysSigs.
+func VerifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BLSSignature) error {
 	if len(pubKeys) != len(pubKeySigs) {
 		return errBLSKeysNotMatchSigs
 	}
 
 	for i := 0; i < len(pubKeys); i++ {
-		if err := verifyBLSKey(&pubKeys[i], &pubKeySigs[i]); err != nil {
+		if err := VerifyBLSKey(&pubKeys[i], &pubKeySigs[i]); err != nil {
 			return err
 		}
 	}
@@ -364,7 +376,8 @@ func verifyBLSKeys(pubKeys []shard.BlsPublicKey, pubKeySigs []shard.BLSSignature
 	return nil
 }
 
-func verifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BLSSignature) error {
+// VerifyBLSKey checks if the public BLS key matches the BLS signature
+func VerifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BLSSignature) error {
 	if len(pubKeySig) == 0 {
 		return errBLSKeysNotMatchSigs
 	}
@@ -397,7 +410,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	commission := Commission{val.CommissionRates, blockNum}
 	pubKeys := append(val.SlotPubKeys[0:0], val.SlotPubKeys...)
 
-	if err = verifyBLSKeys(pubKeys, val.SlotKeySigs); err != nil {
+	if err = VerifyBLSKeys(pubKeys, val.SlotKeySigs); err != nil {
 		return nil, err
 	}
 
@@ -458,7 +471,7 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 			}
 		}
 		if !found {
-			if err := verifyBLSKey(edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
+			if err := VerifyBLSKey(edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
 				return err
 			}
 			validator.SlotPubKeys = append(validator.SlotPubKeys, *edit.SlotKeyToAdd)

@@ -106,7 +106,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context
 	return nil
 }
 
-// GetTransactionByHash returns the transaction for the given hash
+// GetTransactionByHash returns the plain transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, hash common.Hash) *RPCTransaction {
 	// Try to return an already finalized transaction
 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash)
@@ -117,15 +117,11 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 	if tx != nil {
 		return newRPCTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
 	}
-	// No finalized transaction, try to retrieve it from the pool
-	if tx = s.b.GetPoolTransaction(hash); tx != nil {
-		return newRPCPendingTransaction(tx)
-	}
 	// Transaction unknown, return as such
 	return nil
 }
 
-// GetStakingTransactionByHash returns the transaction for the given hash
+// GetStakingTransactionByHash returns the staking transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Context, hash common.Hash) *RPCStakingTransaction {
 	// Try to return an already finalized transaction
 	stx, blockHash, blockNumber, index := rawdb.ReadStakingTransaction(s.b.ChainDb(), hash)
@@ -136,6 +132,7 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Conte
 	if stx != nil {
 		return newRPCStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
 	}
+	// Transaction unknown, return as such
 	return nil
 }
 
@@ -332,7 +329,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	return fields, nil
 }
 
-// PendingTransactions returns the transactions that are in the transaction pool
+// PendingTransactions returns the plain transactions that are in the transaction pool
 func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
 	pending, err := s.b.GetPoolTransactions()
 	if err != nil {
@@ -340,7 +337,32 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 	}
 	transactions := make([]*RPCTransaction, len(pending))
 	for i := range pending {
-		transactions[i] = newRPCPendingTransaction(pending[i])
+		if plainTx, ok := pending[i].(*types.Transaction); ok {
+			transactions[i] = newRPCPendingTransaction(plainTx)
+		} else if _, ok := pending[i].(*staking.StakingTransaction); ok {
+			continue // Do not return staking transactions here.
+		} else {
+			return nil, types.ErrUnknownPoolTxType
+		}
+	}
+	return transactions, nil
+}
+
+// PendingStakingTransactions returns the staking transactions that are in the transaction pool
+func (s *PublicTransactionPoolAPI) PendingStakingTransactions() ([]*RPCStakingTransaction, error) {
+	pending, err := s.b.GetPoolTransactions()
+	if err != nil {
+		return nil, err
+	}
+	transactions := make([]*RPCStakingTransaction, len(pending))
+	for i := range pending {
+		if _, ok := pending[i].(*types.Transaction); ok {
+			continue // Do not return plain transactions here
+		} else if stakingTx, ok := pending[i].(*staking.StakingTransaction); ok {
+			transactions[i] = newRPCPendingStakingTransaction(stakingTx)
+		} else {
+			return nil, types.ErrUnknownPoolTxType
+		}
 	}
 	return transactions, nil
 }

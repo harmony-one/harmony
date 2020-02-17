@@ -129,7 +129,6 @@ func fundFaucetContract(chain *core.BlockChain) {
 
 	err := contractworker.CommitTransactions(
 		txmap, nil, testUserAddress,
-		func([]staking.RPCTransactionError) {},
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -172,7 +171,6 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 
 	err = contractworker.CommitTransactions(
 		txmap, nil, testUserAddress,
-		func([]staking.RPCTransactionError) {},
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -206,14 +204,19 @@ func main() {
 	genesis := gspec.MustCommit(database)
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine(), vm.Config{}, nil)
 
-	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain, func([]types.RPCTransactionError) {})
+	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain,
+		func([]types.RPCTransactionError) {}, func([]staking.RPCTransactionError) {})
 
 	backend := &testWorkerBackend{
 		db:     database,
 		chain:  chain,
 		txPool: txpool,
 	}
-	backend.txPool.AddLocals(pendingTxs)
+	poolPendingTx := types.PoolTransactions{}
+	for _, tx := range pendingTxs {
+		poolPendingTx = append(poolPendingTx, tx)
+	}
+	backend.txPool.AddLocals(poolPendingTx)
 
 	//// Generate a small n-block chain and an uncle block for it
 	n := 3

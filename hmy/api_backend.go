@@ -48,7 +48,7 @@ func (b *APIBackend) GetBlock(ctx context.Context, hash common.Hash) (*types.Blo
 }
 
 // GetPoolTransaction ...
-func (b *APIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
+func (b *APIBackend) GetPoolTransaction(hash common.Hash) types.PoolTransaction {
 	return b.hmy.txPool.Get(hash)
 }
 
@@ -208,12 +208,12 @@ func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscripti
 
 // GetPoolTransactions returns pool transactions.
 // TODO: this is not implemented or verified yet for harmony.
-func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
+func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	pending, err := b.hmy.txPool.Pending()
 	if err != nil {
 		return nil, err
 	}
-	var txs types.Transactions
+	var txs types.PoolTransactions
 	for _, batch := range pending {
 		txs = append(txs, batch...)
 	}

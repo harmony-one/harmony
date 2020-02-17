@@ -103,34 +103,35 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare transactions including staking transactions
-	pending, err := node.TxPool.Pending()
+	pendingPoolTxs, err := node.TxPool.Pending()
 	if err != nil {
 		utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
 		return nil, err
 	}
-
-	// TODO: integrate staking transaction into tx pool
-	pendingStakingTransactions := staking.StakingTransactions{}
-	// Only process staking transactions after pre-staking epoch happened.
-	if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
-		node.pendingStakingTxMutex.Lock()
-		for _, tx := range node.pendingStakingTransactions {
-			pendingStakingTransactions = append(pendingStakingTransactions, tx)
+	pendingPlainTxs := map[common.Address]types.Transactions{}
+	pendingStakingTxs := staking.StakingTransactions{}
+	for addr, poolTxs := range pendingPoolTxs {
+		plainTxsPerAcc := types.Transactions{}
+		for _, tx := range poolTxs {
+			if plainTx, ok := tx.(*types.Transaction); ok {
+				plainTxsPerAcc = append(plainTxsPerAcc, plainTx)
+			} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
+				// Only process staking transactions after pre-staking epoch happened.
+				if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
+					pendingStakingTxs = append(pendingStakingTxs, stakingTx)
+				}
+			} else {
+				utils.Logger().Err(types.ErrUnknownPoolTxType).Msg("Failed to parse pending transactions")
+				return nil, types.ErrUnknownPoolTxType
+			}
 		}
-		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
-		node.pendingStakingTxMutex.Unlock()
+		if plainTxsPerAcc.Len() > 0 {
+			pendingPlainTxs[addr] = plainTxsPerAcc
+		}
 	}
 
 	if err := node.Worker.CommitTransactions(
-		pending, pendingStakingTransactions, beneficiary,
-		func(payload []staking.RPCTransactionError) {
-			node.errorSink.Lock()
-			for i := range payload {
-				node.errorSink.failedStakingTxns.Value = payload[i]
-				node.errorSink.failedStakingTxns = node.errorSink.failedStakingTxns.Next()
-			}
-			node.errorSink.Unlock()
-		},
+		pendingPlainTxs, pendingStakingTxs, beneficiary,
 	); err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 		return nil, err

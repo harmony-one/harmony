@@ -5,6 +5,7 @@ import (
 	"io"
 	"math/big"
 	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -70,6 +71,24 @@ type StakingTransaction struct {
 	hash atomic.Value
 	size atomic.Value
 	from atomic.Value
+}
+
+// RPCTransactionError ..
+type RPCTransactionError struct {
+	TxHashID             string `json:"tx-hash-id"`
+	StakingDirective     string `json:"directive-kind"`
+	TimestampOfRejection int64  `json:"time-at-rejection"`
+	ErrMessage           string `json:"error-message"`
+}
+
+// NewRPCTransactionError ...
+func NewRPCTransactionError(hash common.Hash, directive Directive, err error) RPCTransactionError {
+	return RPCTransactionError{
+		TxHashID:             hash.Hex(),
+		StakingDirective:     directive.String(),
+		TimestampOfRejection: time.Now().Unix(),
+		ErrMessage:           err.Error(),
+	}
 }
 
 // StakeMsgFulfiller is signature of callback intended to produce the StakeMsg
@@ -146,9 +165,14 @@ func (tx *StakingTransaction) Gas() uint64 {
 	return tx.data.GasLimit
 }
 
-// Price returns price of StakingTransaction.
-func (tx *StakingTransaction) Price() *big.Int {
+// GasPrice returns price of StakingTransaction.
+func (tx *StakingTransaction) GasPrice() *big.Int {
 	return tx.data.Price
+}
+
+// Cost ..
+func (tx *StakingTransaction) Cost() *big.Int {
+	return new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
 }
 
 // ChainID is what chain this staking transaction for
@@ -182,6 +206,48 @@ func (tx *StakingTransaction) Nonce() uint64 {
 // RLPEncodeStakeMsg ..
 func (tx *StakingTransaction) RLPEncodeStakeMsg() (by []byte, err error) {
 	return rlp.EncodeToBytes(tx.data.StakeMsg)
+}
+
+// Protected ..
+func (tx *StakingTransaction) Protected() bool {
+	return true
+}
+
+// To ..
+func (tx *StakingTransaction) To() *common.Address {
+	return nil
+}
+
+// Data ..
+func (tx *StakingTransaction) Data() []byte {
+	data, err := tx.RLPEncodeStakeMsg()
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
+// Value ..
+func (tx *StakingTransaction) Value() *big.Int {
+	return new(big.Int).SetInt64(0)
+}
+
+// Size ..
+func (tx *StakingTransaction) Size() common.StorageSize {
+	if size := tx.size.Load(); size != nil {
+		return size.(common.StorageSize)
+	}
+	c := writeCounter(0)
+	rlp.Encode(&c, &tx.data)
+	tx.size.Store(common.StorageSize(c))
+	return common.StorageSize(c)
+}
+
+type writeCounter common.StorageSize
+
+func (c *writeCounter) Write(b []byte) (int, error) {
+	*c += writeCounter(len(b))
+	return len(b), nil
 }
 
 // RLPDecodeStakeMsg ..

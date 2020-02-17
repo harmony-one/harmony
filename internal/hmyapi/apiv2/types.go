@@ -297,7 +297,7 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 
 	result := &RPCStakingTransaction{
 		Gas:       tx.Gas(),
-		GasPrice:  tx.Price(),
+		GasPrice:  tx.GasPrice(),
 		Hash:      tx.Hash(),
 		Nonce:     tx.Nonce(),
 		Timestamp: timestamp,
@@ -325,6 +325,11 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 // newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
 func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
 	return newRPCTransaction(tx, common.Hash{}, 0, 0, 0)
+}
+
+// newRPCPendingStakingTransaction returns a pending transaction that will serialize to the RPC representation
+func newRPCPendingStakingTransaction(tx *types2.StakingTransaction) *RPCStakingTransaction {
+	return newRPCStakingTransaction(tx, common.Hash{}, 0, 0, 0)
 }
 
 // RPCBlock represents a block that will serialize to the RPC representation of a block
