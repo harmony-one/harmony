@@ -109,73 +109,89 @@ var (
 	fiftyPercent      = numeric.MustNewDecFromStr("0.5")
 )
 
+// applySlashRate returns (amountPostSlash, amountOfReduction, amountOfReduction / 2)
+func applySlashRate(
+	amount *big.Int, rate numeric.Dec,
+) (*big.Int, *big.Int, *big.Int) {
+	amountPostSlash := numeric.NewDecFromBigInt(
+		amount,
+	).Mul(numeric.OneDec().Sub(rate)).TruncateInt()
+	amountOfSlash := new(big.Int).Sub(amount, amountPostSlash)
+	return amountPostSlash, amountOfSlash, new(big.Int).Div(amountOfSlash, common.Big2)
+}
+
+// postSlashBalanceCurrentDelegator applySlashRate
+// returns (amountPostSlash, amountOfReduction, amountOfReduction / 2)
+func postSlashBalanceCurrentDelegator(
+	state *state.DB,
+	validatorAddr common.Address,
+	delegatorAddr common.Address,
+	rate numeric.Dec,
+) (*big.Int, *big.Int, *big.Int) {
+	if wrapper := state.GetStakingInfo(validatorAddr); wrapper != nil {
+		for _, delegation := range wrapper.Delegations {
+			if delegation.DelegatorAddress == delegatorAddr {
+				return applySlashRate(delegation.Amount, rate)
+			}
+		}
+	}
+	fmt.Println("invariant violated, should not come here")
+	return nil, nil, nil
+}
+
 func delegatorSlashApply(
-	delegations staking.Delegations,
+	delegatedToValidator *staking.ValidatorWrapper,
 	rate numeric.Dec,
 	state *state.DB,
 	reporter common.Address,
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 ) error {
-	for _, delegator := range delegations {
-		amt := numeric.NewDecFromBigInt(
-			delegator.Amount,
+	for _, delegationSnapshot := range delegatedToValidator.Delegations {
+		postSlashBal, slashDebt, halfOfSlashDebt := postSlashBalanceCurrentDelegator(
+			state, delegatedToValidator.Address,
+			delegationSnapshot.DelegatorAddress, rate,
 		)
-		discounted := amt.Mul(rate).TruncateInt()
-		half := numeric.NewDecFromBigInt(
-			new(big.Int).Sub(delegator.Amount, discounted),
-		).Mul(fiftyPercent)
-
-		paidOff := numeric.ZeroDec()
-
-		// NOTE Get the token trying to escape
-		for _, undelegate := range delegator.Undelegations {
-			// the epoch matters, only those undelegation
-			// such that epoch>= doubleSignEpoch should be slashable
-			if undelegate.Epoch.Cmp(doubleSignEpoch) == -1 {
-				continue
+		if postSlashBal.Sign() == -1 {
+			stillOwe := new(big.Int).Sub(slashDebt, delegationSnapshot.Amount)
+			if wrapper := state.GetStakingInfo(
+				delegatedToValidator.Address,
+			); wrapper != nil {
+				for _, delegationNow := range wrapper.Delegations {
+					if delegationNow.Hash() == delegationSnapshot.Hash() {
+						for _, undelegate := range delegationNow.Undelegations {
+							// the epoch matters, only those undelegation
+							// such that epoch>= doubleSignEpoch should be slashable
+							if undelegate.Epoch.Cmp(doubleSignEpoch) == -1 {
+								continue
+							}
+							if stillOwe.Cmp(common.Big0) <= 0 {
+								// paid off the slash debt
+								break
+							}
+							amtPostSlash, amtSlash, halfOfSlashAmt := applySlashRate(
+								undelegate.Amount, rate,
+							)
+							undelegate.Amount = amtPostSlash
+							stillOwe.Sub(stillOwe, halfOfSlashAmt)
+							state.AddBalance(reporter, halfOfSlashAmt)
+							slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, amtSlash)
+							slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, halfOfSlashAmt)
+						}
+					}
+				}
+				if stillOwe.Cmp(common.Big0) == 1 {
+					// NOTE is this an error?
+					fmt.Println("Still owe a slash debt", stillOwe)
+				}
 			}
-			if paidOff.Equal(half) {
-				break
-			}
-			undelegate.Amount.SetInt64(0)
-			slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, undelegate.Amount)
-			paidOff = paidOff.Add(numeric.NewDecFromBigInt(undelegate.Amount))
 		}
 
-		halfB := half.TruncateInt()
-		state.AddBalance(reporter, halfB)
-		slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, halfB)
-
-		// we might have had enough in undelegations to satisfy the slash debt
-		if paidOff.Equal(half) {
-			continue
-		}
-		// otherwise we need to dig deeper in their pocket
-		leftoverDebt := amt.Sub(half.Sub(paidOff)).TruncateInt()
-		delegator.Amount.Sub(delegator.Amount, leftoverDebt)
-		paidOff.Add(numeric.NewDecFromBigInt(leftoverDebt))
-		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, leftoverDebt)
-
-		if paidOff.Equal(half) {
-			fmt.Println("special case when exactly equal", paidOff.String(), half.String())
-		}
-
-		if !paidOff.GTE(half) {
-			fmt.Println(leftoverDebt.String(), "\n Now have ",
-				delegator.Amount, "-had-",
-				amt.String(),
-				paidOff,
-				half,
-				delegations.String(),
-			)
-
-			return errors.Errorf(
-				"paidoff %s is not >= slash debt %s",
-				paidOff.String(),
-				half.String(),
-			)
-		}
+		// NOTE Burn other half implicitly but not adding half again to anywhere
+		state.AddBalance(reporter, halfOfSlashDebt)
+		delegationSnapshot.Amount = postSlashBal
+		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
+		slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, halfOfSlashDebt)
 	}
 	fmt.Println("after delegator slash application", slashTrack.String())
 	return nil
@@ -208,33 +224,18 @@ func Apply(
 			)
 		}
 
-		nowAccountState := state.GetStakingInfo(slash.Offender)
-
-		if nowAccountState == nil {
-			return nil, errors.New("cannot be nil code field in account state")
-		}
-
 		// NOTE invariant: first delegation is the validators own
 		// stake, rest are external delegations.
 		// Bottom line: everyone must have have skin in the game,
 		if err := delegatorSlashApply(
-			snapshot.Delegations, rate, state,
+			snapshot, rate, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,
 		); err != nil {
 			return nil, err
 		}
-		// ...and I want those that I have not seen before
-		sinceSnapshotDelegations :=
-			staking.SetDifference(snapshot.Delegations, nowAccountState.Delegations)
-		if err := delegatorSlashApply(
-			sinceSnapshotDelegations, rate, state,
-			slash.Reporter, slash.Evidence.Epoch, slashDiff,
-		); err != nil {
-			return nil, err
-		}
+
 		// finally, kick them off forever
 		snapshot.Banned = true
-
 		if err := state.UpdateStakingInfo(
 			snapshot.Address, snapshot,
 		); err != nil {
