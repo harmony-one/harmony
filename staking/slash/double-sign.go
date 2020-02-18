@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -21,9 +22,9 @@ import (
 type Moment struct {
 	Epoch        *big.Int `json:"epoch"`
 	Height       *big.Int `json:"block-height"`
+	TimeUnixNano *big.Int `json:"time-unix-nano"`
 	ViewID       uint64   `json:"view-id"`
 	ShardID      uint32   `json:"shard-id"`
-	TimeUnixNano *big.Int `json:"time-unix-nano"`
 }
 
 // Evidence ..
@@ -97,7 +98,37 @@ func (r Record) String() string {
 }
 
 // Verify checks that the signature is valid
-func Verify(candidate *Record) error {
+func Verify(chain committee.ChainReader, candidate *Record) error {
+	first, second := candidate.AlreadyCastBallot, candidate.DoubleSignedBallot
+	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
+		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
+		return errors.Wrapf(
+			errBLSKeysNotEqual, "%s %s", k1, k2,
+		)
+	}
+	superCommittee, err := chain.ReadShardState(candidate.Evidence.Epoch)
+	if err != nil {
+		return err
+	}
+	subCommittee := superCommittee.FindCommitteeByID(
+		candidate.Evidence.ShardID,
+	)
+	if subCommittee == nil {
+		return errors.Wrapf(
+			errShardIDNotKnown, "given shardID %d", candidate.Evidence.ShardID,
+		)
+	}
+
+	// for _, key := range subCommittee.BLSPublicKeys() {
+	// 	if shard.CompareBlsPublicKey(
+	// 		shard.FromLibBLSPublicKeyUnsafe(key),
+	// 		second.SignerPubKey) == 0 {
+	// 		//
+	// 	}
+
+	// }
+
+	// candidate.ConflictingBallots
 
 	fmt.Println("need to verify the slash", candidate)
 
@@ -105,8 +136,10 @@ func Verify(candidate *Record) error {
 }
 
 var (
-	oneHundredPercent = numeric.NewDec(1)
-	fiftyPercent      = numeric.MustNewDecFromStr("0.5")
+	errBLSKeysNotEqual = errors.New("bls keys in ballots accompanying slash evidence not equal ")
+	errShardIDNotKnown = errors.New("nil subcommittee for shardID")
+	oneHundredPercent  = numeric.NewDec(1)
+	fiftyPercent       = numeric.MustNewDecFromStr("0.5")
 )
 
 // applySlashRate returns (amountPostSlash, amountOfReduction, amountOfReduction / 2)

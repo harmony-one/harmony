@@ -148,7 +148,6 @@ func (ss *State) ExternalValidators() []common.Address {
 				_, ok := processed[slot.EcdsaAddress]
 				if !ok {
 					processed[slot.EcdsaAddress] = struct{}{}
-
 				}
 			}
 		}

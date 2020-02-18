@@ -339,7 +339,7 @@ func (w *Worker) VerifyAll(allSlashing []slash.Record) ([]slash.Record, error) {
 	)
 
 	for i := range d {
-		if err := slash.Verify(&d[i]); err != nil {
+		if err := slash.Verify(w.chain, &d[i]); err != nil {
 			return nil, err
 		}
 		slashingToPropose = append(slashingToPropose, d[i])
