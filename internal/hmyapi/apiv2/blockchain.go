@@ -150,6 +150,16 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 	return result, nil
 }
 
+// IsLastBlock checks if block is last epoch block.
+func (s *PublicBlockChainAPI) IsLastBlock(blockNum uint64) bool {
+	return shard.Schedule.IsLastBlock(blockNum)
+}
+
+// EpochLastBlock returns epoch last block.
+func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) uint64 {
+	return shard.Schedule.EpochLastBlock(epoch)
+}
+
 // GetBlockSigners returns signers for a particular block.
 func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr uint64) ([]string, error) {
 	if blockNr == 0 || blockNr >= uint64(s.BlockNumber()) {
