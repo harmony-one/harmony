@@ -8,11 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -41,11 +43,55 @@ const (
 		"932a95f48133f886140cefbe4d690eddd0540d246df1fec" +
 		"8b4f719ad9de0bc822f0a1bf70e78b321a5e4462ba3e3efd" +
 		"cd24c21b9cb24ed6b26f02785a2cdbd168696c5f4a49b6c00f00994"
+	// RLP encoded header
+	proposalHeaderRLPBytes = "f9039187486d6e79546764827633f90383a080532768867d8c1a96" +
+		"6ae9df80d4efc9a9a83559b0e2d13b2aa819a6a7627c7294" +
+		"6911b75b2560be9a8f71164a33086be4511fc99aa0eb514ec3bc1" +
+		"8e67ad7d9641768b7a9b9655ff78e54970465aeb037c2d81c5987a05" +
+		"6e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc0016" +
+		"22fb5e363b421a056e81f171bcc55a6ff8345e692c0f86e5b" +
+		"48e01b996cadc001622fb5e363b421a056e81f171bcc55a6" +
+		"ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421a05" +
+		"6e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc0" +
+		"01622fb5e363b421b901000000000000000000000000000" +
+		"00000000000000000000000000000000000000000000000000" +
+		"00000000000000000000000000000000000000000000000000000" +
+		"000000000000000000000000000000000000000000000000000000" +
+		"00000000000000000000000000000000000000000000000000000000" +
+		"000000000000000000000000000000000000000000000000000000000" +
+		"0000000000000000000000000000000000000000000000000000000" +
+		"0000000000000000000000000000000000000000000000000000" +
+		"00000000000000000000000000000000000000000000000000000" +
+		"00000000000000000000000000000000000000000000000000000" +
+		"00002383a9235180845e4c602680a00000000000000000000000" +
+		"000000000000000000000000000000000000000000230680b860c" +
+		"4db93981d5870f0f77bb8487dde189e4579e3866ae3b598fbed0f5" +
+		"d87e53d21a039e427d2a206eeca4ff1f1fab2ed0d2171b9c1f12" +
+		"1e42c1a1456e6e1ba4c5e2fb3ddda5d34873bcdf01f14d1da1bc5" +
+		"0e70dc6f0bdfda3f36f9dafe1e29880e7fb8807b05ee6062476f5a43" +
+		"6b29876d726491fb76bfe2cf8f6d9e3a7361e0ca95bd66c4ef4593c" +
+		"2ac616c4ca171af74a93f5ef9e4d1b74421e789f07e0a36e4b00b7a9" +
+		"13fb6a296e20ee4dcd2d74088ea9711b8b7693af18d3f6ab925d26a0b" +
+		"e30d8899f18e4b7f9e8c6937e78863b828fa172e8edef106cca814294" +
+		"eee7146eec7018080b88bf889f887a0a1cc8366aa9c8acac219a229b2" +
+		"eb88deee3bc9b133baa610bd88af294422ab0020b860e5a234c8bce79" +
+		"24c4f934edf7ce9f8f4b10d61d1e72becdda95c5fb3195598cc9ae334" +
+		"8a00c493fb77a87a094dbf08130c3f93793337be78167b8b241d7ef9e" +
+		"1fab1f8097dda339a6ca2737c291d8a7733c9b5b540ea30544c46" +
+		"a0426a34f60d3f010580"
 	// trailing bech32 info
 	reporterBech32 = "one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"
 	offenderBech32 = "one1zyxauxquys60dk824p532jjdq753pnsenrgmef"
 	// some rando delegator
-	randoDelegatorBech32  = "one1nqevvacj3y5ltuef05my4scwy5wuqteur72jk5"
+	randoDelegatorBech32 = "one1nqevvacj3y5ltuef05my4scwy5wuqteur72jk5"
+	// rest of the committee
+	commK1 = "65f55eb3052f9e9f632b2923be594ba77c55543f5c58ee1454b9cfd658d25e06373b0f7d42a19c84768139ea294f6204"
+	commK2 = "02c8ff0b88f313717bc3a627d2f8bb172ba3ad3bb9ba3ecb8eed4b7c878653d3d4faf769876c528b73f343967f74a917"
+	commK3 = "e751ec995defe4931273aaebcb2cd14bf37e629c554a57d3f334c37881a34a6188a93e76113c55ef3481da23b7d7ab09"
+	commK4 = "2d61379e44a772e5757e27ee2b3874254f56073e6bd226eb8b160371cc3c18b8c4977bd3dcb71fd57dc62bf0e143fd08"
+	commK5 = "86dc2fdc2ceec18f6923b99fd86a68405c132e1005cf1df72dca75db0adfaeb53d201d66af37916d61f079f34f21fb96"
+	commK6 = "95117937cd8c09acd2dfae847d74041a67834ea88662a7cbed1e170350bc329e53db151e5a0ef3e712e35287ae954818"
+
 	doubleSignShardID     = 0
 	doubleSignEpoch       = 3
 	doubleSignBlockNumber = 37
@@ -59,7 +105,8 @@ var (
 	signatureA, signatureB     = &bls.Sign{}, &bls.Sign{}
 	reporterAddr, offenderAddr = common.Address{}, common.Address{}
 	randoDel                   = common.Address{}
-	header                     = &block.Header{}
+	header                     = block.Header{}
+	subCommittee               = []shard.BlsPublicKey{}
 
 	unit = func() interface{} {
 		// Ballot A setup
@@ -78,7 +125,21 @@ var (
 		offenderAddr, _ = common2.Bech32ToAddress(offenderBech32)
 		randoDel, _ = common2.Bech32ToAddress(randoDelegatorBech32)
 		// TODO Do rlp decode on bytes for this header
-
+		headerData, err := hex.DecodeString(proposalHeaderRLPBytes)
+		if err != nil {
+			panic("test case has bad input")
+		}
+		if err := rlp.DecodeBytes(headerData, &header); err != nil {
+			panic("test case has bad input")
+		}
+		for _, hexK := range [...]string{
+			commK1, commK2, commK3, commK4, commK5, commK6,
+		} {
+			k := &bls.PublicKey{}
+			k.DeserializeHexStr(hexK)
+			subCommittee = append(subCommittee, *shard.FromLibBLSPublicKeyUnsafe(k))
+		}
+		fmt.Println("header from rlp!", header.String())
 		return nil
 	}()
 
@@ -107,10 +168,59 @@ var (
 					ViewID:       doubleSignViewID,
 					ShardID:      doubleSignShardID,
 				},
-				ProposalHeader: header,
+				ProposalHeader: &header,
 			},
 			Reporter: reporterAddr,
 			Offender: offenderAddr,
+		},
+	}
+
+	commonCommission = staking.Commission{
+		CommissionRates: staking.CommissionRates{
+			Rate:          numeric.MustNewDecFromStr("0.04"),
+			MaxRate:       numeric.MustNewDecFromStr("0.10"),
+			MaxChangeRate: numeric.MustNewDecFromStr("0.03"),
+		},
+		UpdateHeight: big.NewInt(10),
+	}
+
+	commonDescr = staking.Description{
+		Name:            "someone",
+		Identity:        "someone",
+		Website:         "someone",
+		SecurityContact: "someone",
+		Details:         "someone",
+	}
+
+	delegationsSnapshot = staking.Delegations{
+		// NOTE  delegation is the validator themselves
+		staking.Delegation{
+			DelegatorAddress: offenderAddr,
+			Amount:           big.NewInt(5),
+			Reward:           big.NewInt(0),
+			Undelegations:    staking.Undelegations{},
+		},
+		// some external delegator
+		staking.Delegation{
+			DelegatorAddress: randoDel,
+			Amount:           big.NewInt(5),
+			Reward:           big.NewInt(0),
+			Undelegations:    staking.Undelegations{},
+		},
+	}
+
+	delegationsCurrent = staking.Delegations{
+		// First delegation is the validator themselves
+		staking.Delegation{
+			DelegatorAddress: offenderAddr,
+			Amount:           big.NewInt(1),
+			Reward:           big.NewInt(0),
+			Undelegations: staking.Undelegations{
+				staking.Undelegation{
+					Amount: big.NewInt(4),
+					Epoch:  big.NewInt(doubleSignEpoch + 2),
+				},
+			},
 		},
 	}
 
@@ -118,75 +228,36 @@ var (
 		Validator: staking.Validator{
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
-			LastEpochInCommittee: big.NewInt(2),
-			MinSelfDelegation:    nil,
-			MaxTotalDelegation:   nil,
+			LastEpochInCommittee: big.NewInt(4),
+			MinSelfDelegation:    big.NewInt(1),
+			MaxTotalDelegation:   big.NewInt(10),
 			Active:               true,
-			Commission: staking.Commission{
-				CommissionRates: staking.CommissionRates{
-					// NOTE not relevant for slashing
-				},
-				UpdateHeight: big.NewInt(10),
-			},
-			Description: staking.Description{
-				// NOTE not relevant for slashing
-			},
-			CreationHeight: big.NewInt(33),
-			Banned:         false,
+			Commission:           commonCommission,
+			Description:          commonDescr,
+			CreationHeight:       big.NewInt(33),
+			Banned:               false,
 		},
-		Delegations: staking.Delegations{
-			// NOTE  delegation is the validator themselves
-			staking.Delegation{
-				DelegatorAddress: offenderAddr,
-				Amount:           big.NewInt(5),
-				Reward:           big.NewInt(0),
-				Undelegations:    staking.Undelegations{},
-			},
-			// some external delegator
-			staking.Delegation{
-				DelegatorAddress: randoDel,
-				Amount:           big.NewInt(5),
-				Reward:           big.NewInt(0),
-				Undelegations:    staking.Undelegations{},
-			},
-		},
+		Delegations: delegationsSnapshot,
 	}
 
 	validatorCurrent = staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
-			LastEpochInCommittee: big.NewInt(2),
-			MinSelfDelegation:    nil,
-			MaxTotalDelegation:   nil,
+			LastEpochInCommittee: big.NewInt(5),
+			MinSelfDelegation:    big.NewInt(1),
+			MaxTotalDelegation:   big.NewInt(10),
 			Active:               true,
-			Commission: staking.Commission{
-				CommissionRates: staking.CommissionRates{
-					// NOTE not relevant for slashing
-				},
-				UpdateHeight: big.NewInt(10),
-			},
-			Description: staking.Description{
-				// NOTE not relevant for slashing
-			},
-			CreationHeight: big.NewInt(33),
-			Banned:         false,
+			Commission:           commonCommission,
+			Description:          commonDescr,
+			CreationHeight:       big.NewInt(33),
+			Banned:               false,
 		},
-		Delegations: staking.Delegations{
-			// First delegation is the validator themselves
-			staking.Delegation{
-				DelegatorAddress: offenderAddr,
-				Amount:           big.NewInt(1),
-				Reward:           big.NewInt(0),
-				Undelegations: staking.Undelegations{
-					staking.Undelegation{
-						Amount: big.NewInt(4),
-						Epoch:  big.NewInt(doubleSignEpoch + 2),
-					},
-				},
-			},
-		},
+		Delegations: delegationsCurrent,
 	}
+
+	shouldBeTotalSlashed      = big.NewInt(0)
+	shouldBeTotalSnitchReward = big.NewInt(0)
 )
 
 type mockOutSnapshotReader struct{}
@@ -202,9 +273,28 @@ func TestVerify(t *testing.T) {
 func TestApply(t *testing.T) {
 	st := ethdb.NewMemDatabase()
 	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
-
 	fmt.Println("slash->", exampleSlash.String())
 	stateHandle.UpdateStakingInfo(offenderAddr, &validatorCurrent)
+	slashResult, err := Apply(
+		mockOutSnapshotReader{}, stateHandle, exampleSlash, subCommittee,
+	)
 
-	t.Log("Unimplemented")
+	if err != nil {
+		t.Errorf("slash application failed %s", err.Error())
+	}
+
+	if sn := slashResult.TotalSlashed; sn.Cmp(shouldBeTotalSlashed) != 0 {
+		t.Errorf(
+			"total slash incorrect %v %v", sn, shouldBeTotalSlashed,
+		)
+	}
+
+	if sn := slashResult.TotalSnitchReward; sn.Cmp(shouldBeTotalSnitchReward) != 0 {
+		t.Errorf(
+			"total snitch incorrect %v %v", sn, shouldBeTotalSnitchReward,
+		)
+
+	}
+
+	t.Log("not fully implemented yet")
 }
