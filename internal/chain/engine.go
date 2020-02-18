@@ -325,9 +325,6 @@ func (e *engineImpl) Finalize(
 		if err != nil {
 			return nil, nil, errors.New("could not read shard state")
 		}
-		fmt.Println(
-			"About to try to apply slashes, here are account states", superCommittee.String(),
-		)
 		doubleSigners.DumpBalances(state)
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application

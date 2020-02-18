@@ -2328,28 +2328,21 @@ func (bc *BlockChain) AddPendingSlashingCandidates(
 ) (int, error) {
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
-
 	cls, err := bc.ReadPendingSlashingCandidates()
-
-	fmt.Println("reading pending", cls, err)
 
 	if err != nil || len(cls) == 0 {
 		err := bc.WritePendingSlashingCandidates(candidates)
-
 		if err != nil {
-			fmt.Println("some error on writing pending?", err.Error())
+			return 0, err
 		}
-
 		return 1, err
 	}
 
 	cls = append(cls, candidates...)
-	err = bc.WritePendingSlashingCandidates(cls)
-	if err != nil {
-		fmt.Println("write pending slash had a problem?", err.Error())
+	if err := bc.WritePendingSlashingCandidates(cls); err != nil {
+		return 0, err
 	}
-	return len(cls), err
-
+	return len(cls), nil
 }
 
 // AddPendingCrossLinks appends pending crosslinks

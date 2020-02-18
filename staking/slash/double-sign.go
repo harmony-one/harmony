@@ -130,6 +130,7 @@ func Verify(chain committee.ChainReader, candidate *Record) error {
 
 	// candidate.ConflictingBallots
 
+	// TODO Why this one printng have 00000000 for signature?
 	fmt.Println("need to verify the slash", candidate)
 
 	return nil
