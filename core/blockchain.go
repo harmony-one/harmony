@@ -1213,7 +1213,7 @@ func (bc *BlockChain) WriteBlockWithState(
 		}
 
 		// Update snapshots for all validators
-		if err := bc.UpdateValidatorSnapshots(); err != nil {
+		if err := bc.UpdateValidatorSnapshots(epoch); err != nil {
 			return NonStatTy, err
 		}
 	}
@@ -2432,53 +2432,6 @@ func (bc *BlockChain) CXMerkleProof(toShardID uint32, block *types.Block) (*type
 	return proof, nil
 }
 
-// LatestCXReceiptsCheckpoint returns the latest checkpoint
-func (bc *BlockChain) LatestCXReceiptsCheckpoint(shardID uint32) uint64 {
-	blockNum, _ := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
-	return blockNum
-}
-
-// NextCXReceiptsCheckpoint returns the next checkpoint blockNum
-func (bc *BlockChain) NextCXReceiptsCheckpoint(currentNum uint64, shardID uint32) uint64 {
-	lastCheckpoint, _ := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
-	newCheckpoint := lastCheckpoint
-
-	// the new checkpoint will not exceed currentNum+1
-	for num := lastCheckpoint; num <= currentNum+1; num++ {
-		newCheckpoint = num
-		by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, num)
-		if by == rawdb.NAByte {
-			// TODO chao: check if there is IncompingReceiptsHash in crosslink header
-			// if the rootHash is non-empty, it means incomingReceipts are not delivered
-			// otherwise, it means there is no cross-shard transactions for this block
-			continue
-		}
-		if by == rawdb.SpentByte {
-			continue
-		}
-		// the first unspent blockHash found, break the loop
-		break
-	}
-	return newCheckpoint
-}
-
-// updateCXReceiptsCheckpoints will update the checkpoint and clean spent receipts upto checkpoint
-func (bc *BlockChain) updateCXReceiptsCheckpoints(shardID uint32, currentNum uint64) {
-	lastCheckpoint, err := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
-	if err != nil {
-		utils.Logger().Warn().Msg("[updateCXReceiptsCheckpoints] Cannot get lastCheckpoint")
-	}
-	newCheckpoint := bc.NextCXReceiptsCheckpoint(currentNum, shardID)
-	if lastCheckpoint == newCheckpoint {
-		return
-	}
-	utils.Logger().Debug().Uint64("lastCheckpoint", lastCheckpoint).Uint64("newCheckpont", newCheckpoint).Msg("[updateCXReceiptsCheckpoints]")
-	for num := lastCheckpoint; num < newCheckpoint; num++ {
-		rawdb.DeleteCXReceiptsProofSpent(bc.db, shardID, num)
-	}
-	rawdb.WriteCXReceiptsProofUnspentCheckpoint(bc.db, shardID, newCheckpoint)
-}
-
 // WriteCXReceiptsProofSpent mark the CXReceiptsProof list with given unspent status
 // true: unspent, false: spent
 func (bc *BlockChain) WriteCXReceiptsProofSpent(cxps []*types.CXReceiptsProof) {
@@ -2492,29 +2445,10 @@ func (bc *BlockChain) IsSpent(cxp *types.CXReceiptsProof) bool {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()
 	by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, blockNum)
-	if by == rawdb.SpentByte || cxp.MerkleProof.BlockNum.Uint64() < bc.LatestCXReceiptsCheckpoint(cxp.MerkleProof.ShardID) {
+	if by == rawdb.SpentByte {
 		return true
 	}
 	return false
-}
-
-// UpdateCXReceiptsCheckpointsByBlock cleans checkpoints and update latest checkpoint based on incomingReceipts of the given block
-func (bc *BlockChain) UpdateCXReceiptsCheckpointsByBlock(block *types.Block) {
-	m := make(map[uint32]uint64)
-	for _, cxp := range block.IncomingReceipts() {
-		shardID := cxp.MerkleProof.ShardID
-		blockNum := cxp.MerkleProof.BlockNum.Uint64()
-		if _, ok := m[shardID]; !ok {
-			m[shardID] = blockNum
-		} else if m[shardID] < blockNum {
-			m[shardID] = blockNum
-		}
-	}
-
-	for k, v := range m {
-		utils.Logger().Debug().Uint32("shardID", k).Uint64("blockNum", v).Msg("[CleanCXReceiptsCheckpoints] Cleaning CXReceiptsProof upto")
-		bc.updateCXReceiptsCheckpoints(k, v)
-	}
 }
 
 // ReadTxLookupEntry returns where the given transaction resides in the chain,
@@ -2559,11 +2493,11 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 		return &v, nil
 	}
 
-	return rawdb.ReadValidatorSnapshot(bc.db, addr)
+	return rawdb.ReadValidatorSnapshot(bc.db, addr, bc.CurrentBlock().Epoch())
 }
 
 // writeValidatorSnapshots writes the snapshot of provided list of validators
-func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
+func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address, epoch *big.Int) error {
 	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
 	for i := range addrs {
@@ -2576,7 +2510,7 @@ func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 	// Batch write the current data as snapshot
 	batch := bc.db.NewBatch()
 	for i := range validators {
-		if err := rawdb.WriteValidatorSnapshot(batch, validators[i]); err != nil {
+		if err := rawdb.WriteValidatorSnapshot(batch, validators[i], epoch); err != nil {
 			return err
 		}
 	}
@@ -2645,10 +2579,11 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 }
 
 // deleteValidatorSnapshots deletes the snapshot staking information of given validator address
+// TODO: delete validator snapshots from X epochs ago
 func (bc *BlockChain) deleteValidatorSnapshots(addrs []common.Address) error {
 	batch := bc.db.NewBatch()
 	for i := range addrs {
-		rawdb.DeleteValidatorSnapshot(batch, addrs[i])
+		rawdb.DeleteValidatorSnapshot(batch, addrs[i], bc.CurrentBlock().Epoch())
 	}
 	if err := batch.Write(); err != nil {
 		return err
@@ -2661,7 +2596,7 @@ func (bc *BlockChain) deleteValidatorSnapshots(addrs []common.Address) error {
 
 // UpdateValidatorSnapshots updates the content snapshot of all validators
 // Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateValidatorSnapshots() error {
+func (bc *BlockChain) UpdateValidatorSnapshots(epoch *big.Int) error {
 	allValidators, err := bc.ReadValidatorList()
 	if err != nil {
 		return err
@@ -2673,7 +2608,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots() error {
 	//	return err
 	//}
 
-	return bc.writeValidatorSnapshots(allValidators)
+	return bc.writeValidatorSnapshots(allValidators, epoch)
 }
 
 // ReadValidatorList reads the addresses of current all validators
@@ -2797,7 +2732,7 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 
 		validator.Snapshot.Epoch = epoch
 
-		if err := rawdb.WriteValidatorSnapshot(bc.db, validator); err != nil {
+		if err := rawdb.WriteValidatorSnapshot(bc.db, validator, epoch); err != nil {
 			return err
 		}
 

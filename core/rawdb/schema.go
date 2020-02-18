@@ -39,9 +39,6 @@ var (
 	// headFastBlockKey tracks the latest known incomplete block's hash duirng fast sync.
 	headFastBlockKey = []byte("LastFast")
 
-	// fastTrieProgressKey tracks the number of trie entries imported during fast sync.
-	fastTrieProgressKey = []byte("TrieSync")
-
 	// Data item prefixes (use single byte to avoid mixing data types, avoid `i`, used for indexes).
 	headerPrefix       = []byte("h") // headerPrefix + num (uint64 big endian) + hash -> header
 	headerTDSuffix     = []byte("t") // headerPrefix + num (uint64 big endian) + hash + headerTDSuffix -> td
@@ -228,22 +225,10 @@ func cxReceiptSpentKey(shardID uint32, number uint64) []byte {
 	return append(tmp, encodeBlockNumber(number)...)
 }
 
-// cxReceiptUnspentCheckpointKey = cxReceiptsUnspentCheckpointPrefix + shardID
-func cxReceiptUnspentCheckpointKey(shardID uint32) []byte {
-	prefix := cxReceiptUnspentCheckpointPrefix
-	sKey := make([]byte, 4)
-	binary.BigEndian.PutUint32(sKey, shardID)
-	return append(prefix, sKey...)
-}
-
-func validatorKey(addr common.Address) []byte {
-	prefix := validatorPrefix
-	return append(prefix, addr.Bytes()...)
-}
-
-func validatorSnapshotKey(addr common.Address) []byte {
+func validatorSnapshotKey(addr common.Address, epoch *big.Int) []byte {
 	prefix := validatorSnapshotPrefix
-	return append(prefix, addr.Bytes()...)
+	tmp := append(prefix, addr.Bytes()...)
+	return append(tmp, epoch.Bytes()...)
 }
 
 func validatorStatsKey(addr common.Address) []byte {
