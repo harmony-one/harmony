@@ -153,25 +153,6 @@ func applySlashRate(
 	return amountPostSlash, amountOfSlash, new(big.Int).Div(amountOfSlash, common.Big2)
 }
 
-// postSlashBalanceCurrentDelegator applySlashRate
-// returns (amountPostSlash, amountOfReduction, amountOfReduction / 2)
-func postSlashBalanceCurrentDelegator(
-	state *state.DB,
-	validatorAddr common.Address,
-	delegatorAddr common.Address,
-	rate numeric.Dec,
-) (*big.Int, *big.Int, *big.Int) {
-	if wrapper := state.GetStakingInfo(validatorAddr); wrapper != nil {
-		for _, delegation := range wrapper.Delegations {
-			if delegation.DelegatorAddress == delegatorAddr {
-				return applySlashRate(delegation.Amount, rate)
-			}
-		}
-	}
-	fmt.Println("invariant violated, should not come here")
-	return nil, nil, nil
-}
-
 func delegatorSlashApply(
 	delegatedToValidator *staking.ValidatorWrapper,
 	rate numeric.Dec,
@@ -181,9 +162,8 @@ func delegatorSlashApply(
 	slashTrack *Application,
 ) error {
 	for _, delegationSnapshot := range delegatedToValidator.Delegations {
-		postSlashBal, slashDebt, halfOfSlashDebt := postSlashBalanceCurrentDelegator(
-			state, delegatedToValidator.Address,
-			delegationSnapshot.DelegatorAddress, rate,
+		postSlashBal, slashDebt, halfOfSlashDebt := applySlashRate(
+			delegationSnapshot.Amount, rate,
 		)
 		if postSlashBal.Sign() == -1 {
 			stillOwe := new(big.Int).Sub(slashDebt, delegationSnapshot.Amount)
