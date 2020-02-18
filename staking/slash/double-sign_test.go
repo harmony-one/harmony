@@ -6,13 +6,18 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
+	"github.com/harmony-one/harmony/core/state"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
+	// ballot A hex values
 	signerABLSPublicHex = "be23bc3c93fe14a25f3533" +
 		"feee1cff1c60706845a4907" +
 		"c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a"
@@ -23,7 +28,7 @@ const (
 		"2c4a09b06b2eec3e851f08f3070f3" +
 		"804b35fe4a2033725f073623e3870756141ebc" +
 		"2a6495478930c428f6e6b25f292dab8552d30c"
-
+	// ballot B hex values
 	signerBBLSPublicHex = "be23bc3c93fe14a25f3533feee1cff1c60706845a490" +
 		"7c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a"
 	signerBHeaderHashHex = "0x1dbf572c03e36b4b7a4f268797d187" +
@@ -32,12 +37,16 @@ const (
 		"932a95f48133f886140cefbe4d690eddd0540d246df1fec" +
 		"8b4f719ad9de0bc822f0a1bf70e78b321a5e4462ba3e3efd" +
 		"cd24c21b9cb24ed6b26f02785a2cdbd168696c5f4a49b6c00f00994"
+	// trailing bech32 info
+	reporterBech32 = "one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"
+	offenderBech32 = "one1zyxauxquys60dk824p532jjdq753pnsenrgmef"
 )
 
 var (
-	signerA, signerB       = &bls.PublicKey{}, &bls.PublicKey{}
-	hashA, hashB           = common.Hash{}, common.Hash{}
-	signatureA, signatureB = &bls.Sign{}, &bls.Sign{}
+	signerA, signerB           = &bls.PublicKey{}, &bls.PublicKey{}
+	hashA, hashB               = common.Hash{}, common.Hash{}
+	signatureA, signatureB     = &bls.Sign{}, &bls.Sign{}
+	reporterAddr, offenderAddr = common.Address{}, common.Address{}
 
 	unit = func() interface{} {
 		// Ballot A setup
@@ -51,6 +60,9 @@ var (
 		headerHashB, _ := hex.DecodeString(signerBHeaderHashHex)
 		hashB = common.BytesToHash(headerHashB)
 		signatureB.DeserializeHexStr(signerBBLSSignature)
+
+		reporterAddr, _ = common2.Bech32ToAddress(reporterBech32)
+		offenderAddr, _ = common2.Bech32ToAddress(offenderBech32)
 
 		return nil
 	}()
@@ -82,14 +94,89 @@ var (
 				},
 				ProposalHeader: &block.Header{},
 			},
+			Reporter: reporterAddr,
+			Offender: offenderAddr,
+		},
+	}
+
+	validatorSnapshot = staking.ValidatorWrapper{
+		Validator: staking.Validator{
+			Address:              offenderAddr,
+			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
+			LastEpochInCommittee: big.NewInt(2),
+			MinSelfDelegation:    nil,
+			MaxTotalDelegation:   nil,
+			Active:               true,
+			Commission: staking.Commission{
+				CommissionRates: staking.CommissionRates{
+					// NOTE not relevant for slashing
+				},
+				UpdateHeight: big.NewInt(10),
+			},
+			Description: staking.Description{
+				// NOTE not relevant for slashing
+			},
+			CreationHeight: big.NewInt(33),
+			Banned:         false,
+		},
+		Delegations: staking.Delegations{
+			// First delegation is the validator themselves
+			staking.Delegation{
+				DelegatorAddress: offenderAddr,
+				Amount:           big.NewInt(5),
+				Reward:           big.NewInt(0),
+				Undelegations:    staking.Undelegations{},
+			},
+		},
+	}
+
+	validatorCurrent = staking.ValidatorWrapper{
+		Validator: staking.Validator{
+			Address:              offenderAddr,
+			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
+			LastEpochInCommittee: big.NewInt(2),
+			MinSelfDelegation:    nil,
+			MaxTotalDelegation:   nil,
+			Active:               true,
+			Commission: staking.Commission{
+				CommissionRates: staking.CommissionRates{
+					// NOTE not relevant for slashing
+				},
+				UpdateHeight: big.NewInt(10),
+			},
+			Description: staking.Description{
+				// NOTE not relevant for slashing
+			},
+			CreationHeight: big.NewInt(33),
+			Banned:         false,
+		},
+		Delegations: staking.Delegations{
+			// First delegation is the validator themselves
+			staking.Delegation{
+				DelegatorAddress: offenderAddr,
+				Amount:           big.NewInt(10),
+				Reward:           big.NewInt(10),
+				Undelegations:    staking.Undelegations{},
+			},
 		},
 	}
 )
+
+type mockOutSnapshotReader struct{}
+
+func (mockOutSnapshotReader) ReadValidatorSnapshot(common.Address) (*staking.ValidatorWrapper, error) {
+	return &validatorSnapshot, nil
+}
 
 func TestDidAnyoneDoubleSign(t *testing.T) {
 	t.Log("Unimplemented")
 }
 
 func TestApply(t *testing.T) {
+	st := ethdb.NewMemDatabase()
+	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
+
+	stateHandle.UpdateStakingInfo(offenderAddr, &validatorCurrent)
+
 	t.Log("Unimplemented")
 }
