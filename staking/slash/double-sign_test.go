@@ -46,9 +46,11 @@ const (
 	offenderBech32 = "one1zyxauxquys60dk824p532jjdq753pnsenrgmef"
 	// some rando delegator
 	randoDelegatorBech32  = "one1nqevvacj3y5ltuef05my4scwy5wuqteur72jk5"
+	doubleSignShardID     = 0
 	doubleSignEpoch       = 3
 	doubleSignBlockNumber = 37
 	doubleSignViewID      = 38
+	doubleSignUnixNano    = 1582049233802498300
 )
 
 var (
@@ -101,9 +103,9 @@ var (
 				Moment: Moment{
 					Epoch:        big.NewInt(doubleSignEpoch),
 					Height:       big.NewInt(doubleSignBlockNumber),
-					TimeUnixNano: big.NewInt(1582049233802498300),
+					TimeUnixNano: big.NewInt(doubleSignUnixNano),
 					ViewID:       doubleSignViewID,
-					ShardID:      0,
+					ShardID:      doubleSignShardID,
 				},
 				ProposalHeader: header,
 			},
