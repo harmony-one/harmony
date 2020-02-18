@@ -136,10 +136,15 @@ func Verify(chain committee.ChainReader, candidate *Record) error {
 }
 
 var (
-	errBLSKeysNotEqual = errors.New("bls keys in ballots accompanying slash evidence not equal ")
-	errShardIDNotKnown = errors.New("nil subcommittee for shardID")
-	oneHundredPercent  = numeric.NewDec(1)
-	fiftyPercent       = numeric.MustNewDecFromStr("0.5")
+	errBLSKeysNotEqual = errors.New(
+		"bls keys in ballots accompanying slash evidence not equal ",
+	)
+	errShardIDNotKnown              = errors.New("nil subcommittee for shardID")
+	errValidatorNotFoundDuringSlash = errors.New("validator not found")
+	zero                            = numeric.ZeroDec()
+	oneDoubleSignerRate             = numeric.MustNewDecFromStr("0.02")
+	oneHundredPercent               = numeric.NewDec(1)
+	fiftyPercent                    = numeric.MustNewDecFromStr("0.5")
 )
 
 // applySlashRate returns (amountPostSlash, amountOfReduction, amountOfReduction / 2)
@@ -222,6 +227,9 @@ func Apply(
 	log := utils.Logger()
 	rate := Rate(uint32(len(slashes)), uint32(len(committee)))
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
+	log.Info().Int("count", len(slashes)).
+		Str("rate", rate.String()).
+		Msg("apply slashes")
 
 	for _, slash := range slashes {
 		// TODO Probably won't happen but we probably should
@@ -241,7 +249,10 @@ func Apply(
 
 		current := state.GetStakingInfo(slash.Offender)
 		if current == nil {
-			return nil, errors.Errorf("protocol issue")
+			addr := common2.MustAddressToBech32(slash.Offender)
+			return nil, errors.Wrapf(
+				errValidatorNotFoundDuringSlash, "lookup %s", addr,
+			)
 		}
 		// NOTE invariant: first delegation is the validators own
 		// stake, rest are external delegations.
@@ -267,11 +278,6 @@ func Apply(
 	fmt.Println("applying slash with a rate of", rate, slashes, slashDiff.String())
 	return slashDiff, nil
 }
-
-var (
-	zero                = numeric.ZeroDec()
-	oneDoubleSignerRate = numeric.MustNewDecFromStr("0.02")
-)
 
 // Rate is the slashing % rate
 func Rate(doubleSignerCount, committeeSize uint32) numeric.Dec {
