@@ -2,6 +2,7 @@ package slash
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -23,14 +24,17 @@ const (
 		"c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a"
 	signerAHeaderHashHex = "0x68bf572c03e36b4b7a4f268797d18" +
 		"7027b288bc69725084bab5bfe6214cb8ddf"
-	signerABLSSignature = "ab14e519485b70d8af76ae83205290792d679a8a11eb9a12d21787cc0b73" +
+	signerABLSSignature = "ab14e519485b70d8af76ae83205" +
+		"290792d679a8a11eb9a12d21787cc0b73" +
 		"96e340d88b2a0c39888d0c9cec1" +
 		"2c4a09b06b2eec3e851f08f3070f3" +
 		"804b35fe4a2033725f073623e3870756141ebc" +
 		"2a6495478930c428f6e6b25f292dab8552d30c"
 	// ballot B hex values
-	signerBBLSPublicHex = "be23bc3c93fe14a25f3533feee1cff1c60706845a490" +
-		"7c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a"
+	signerBBLSPublicHex = "be23bc3c93fe14a25f3533" +
+		"feee1cff1c60706845a490" +
+		"7c5df58bc19f5d1760bfff" +
+		"06fe7c9d1f596b18fdf529e0508e0a"
 	signerBHeaderHashHex = "0x1dbf572c03e36b4b7a4f268797d187" +
 		"027b288bc69725084bab5bfe6214cb8ddf"
 	signerBBLSSignature = "0894d55a541a90ada11535866e5a848d9d6a2b5c30" +
@@ -40,6 +44,11 @@ const (
 	// trailing bech32 info
 	reporterBech32 = "one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"
 	offenderBech32 = "one1zyxauxquys60dk824p532jjdq753pnsenrgmef"
+	// some rando delegator
+	randoDelegatorBech32  = "one1nqevvacj3y5ltuef05my4scwy5wuqteur72jk5"
+	doubleSignEpoch       = 3
+	doubleSignBlockNumber = 37
+	doubleSignViewID      = 38
 )
 
 var (
@@ -47,6 +56,8 @@ var (
 	hashA, hashB               = common.Hash{}, common.Hash{}
 	signatureA, signatureB     = &bls.Sign{}, &bls.Sign{}
 	reporterAddr, offenderAddr = common.Address{}, common.Address{}
+	randoDel                   = common.Address{}
+	header                     = &block.Header{}
 
 	unit = func() interface{} {
 		// Ballot A setup
@@ -63,6 +74,8 @@ var (
 
 		reporterAddr, _ = common2.Bech32ToAddress(reporterBech32)
 		offenderAddr, _ = common2.Bech32ToAddress(offenderBech32)
+		randoDel, _ = common2.Bech32ToAddress(randoDelegatorBech32)
+		// TODO Do rlp decode on bytes for this header
 
 		return nil
 	}()
@@ -86,13 +99,13 @@ var (
 			},
 			Evidence: Evidence{
 				Moment: Moment{
-					Epoch:        big.NewInt(6),
-					Height:       big.NewInt(37),
+					Epoch:        big.NewInt(doubleSignEpoch),
+					Height:       big.NewInt(doubleSignBlockNumber),
 					TimeUnixNano: big.NewInt(1582049233802498300),
-					ViewID:       38,
+					ViewID:       doubleSignViewID,
 					ShardID:      0,
 				},
-				ProposalHeader: &block.Header{},
+				ProposalHeader: header,
 			},
 			Reporter: reporterAddr,
 			Offender: offenderAddr,
@@ -120,9 +133,16 @@ var (
 			Banned:         false,
 		},
 		Delegations: staking.Delegations{
-			// First delegation is the validator themselves
+			// NOTE  delegation is the validator themselves
 			staking.Delegation{
 				DelegatorAddress: offenderAddr,
+				Amount:           big.NewInt(5),
+				Reward:           big.NewInt(0),
+				Undelegations:    staking.Undelegations{},
+			},
+			// some external delegator
+			staking.Delegation{
+				DelegatorAddress: randoDel,
 				Amount:           big.NewInt(5),
 				Reward:           big.NewInt(0),
 				Undelegations:    staking.Undelegations{},
@@ -154,9 +174,14 @@ var (
 			// First delegation is the validator themselves
 			staking.Delegation{
 				DelegatorAddress: offenderAddr,
-				Amount:           big.NewInt(10),
-				Reward:           big.NewInt(10),
-				Undelegations:    staking.Undelegations{},
+				Amount:           big.NewInt(1),
+				Reward:           big.NewInt(0),
+				Undelegations: staking.Undelegations{
+					staking.Undelegation{
+						Amount: big.NewInt(4),
+						Epoch:  big.NewInt(doubleSignEpoch + 2),
+					},
+				},
 			},
 		},
 	}
@@ -168,14 +193,15 @@ func (mockOutSnapshotReader) ReadValidatorSnapshot(common.Address) (*staking.Val
 	return &validatorSnapshot, nil
 }
 
-func TestDidAnyoneDoubleSign(t *testing.T) {
-	t.Log("Unimplemented")
+func TestVerify(t *testing.T) {
+	//
 }
 
 func TestApply(t *testing.T) {
 	st := ethdb.NewMemDatabase()
 	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
 
+	fmt.Println("slash->", exampleSlash.String())
 	stateHandle.UpdateStakingInfo(offenderAddr, &validatorCurrent)
 
 	t.Log("Unimplemented")
