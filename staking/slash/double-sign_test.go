@@ -146,35 +146,6 @@ var (
 	blsWrapA, blsWrapB = *shard.FromLibBLSPublicKeyUnsafe(signerA),
 		*shard.FromLibBLSPublicKeyUnsafe(signerB)
 
-	exampleSlash = Records{
-		Record{
-			ConflictingBallots: ConflictingBallots{
-				AlreadyCastBallot: votepower.Ballot{
-					SignerPubKey:    blsWrapA,
-					BlockHeaderHash: hashA,
-					Signature:       signatureA,
-				},
-				DoubleSignedBallot: votepower.Ballot{
-					SignerPubKey:    blsWrapB,
-					BlockHeaderHash: hashB,
-					Signature:       signatureB,
-				},
-			},
-			Evidence: Evidence{
-				Moment: Moment{
-					Epoch:        big.NewInt(doubleSignEpoch),
-					Height:       big.NewInt(doubleSignBlockNumber),
-					TimeUnixNano: big.NewInt(doubleSignUnixNano),
-					ViewID:       doubleSignViewID,
-					ShardID:      doubleSignShardID,
-				},
-				ProposalHeader: &header,
-			},
-			Reporter: reporterAddr,
-			Offender: offenderAddr,
-		},
-	}
-
 	commonCommission = staking.Commission{
 		CommissionRates: staking.CommissionRates{
 			Rate:          numeric.MustNewDecFromStr("0.04"),
@@ -192,38 +163,13 @@ var (
 		Details:         "someone",
 	}
 
-	delegationsSnapshot = staking.Delegations{
-		// NOTE  delegation is the validator themselves
-		staking.Delegation{
-			DelegatorAddress: offenderAddr,
-			Amount:           big.NewInt(5),
-			Reward:           big.NewInt(0),
-			Undelegations:    staking.Undelegations{},
-		},
-		// some external delegator
-		staking.Delegation{
-			DelegatorAddress: randoDel,
-			Amount:           big.NewInt(5),
-			Reward:           big.NewInt(0),
-			Undelegations:    staking.Undelegations{},
-		},
-	}
+	shouldBeTotalSlashed      = big.NewInt(0)
+	shouldBeTotalSnitchReward = big.NewInt(0)
+)
 
-	delegationsCurrent = staking.Delegations{
-		// First delegation is the validator themselves
-		staking.Delegation{
-			DelegatorAddress: offenderAddr,
-			Amount:           big.NewInt(1),
-			Reward:           big.NewInt(0),
-			Undelegations: staking.Undelegations{
-				staking.Undelegation{
-					Amount: big.NewInt(4),
-					Epoch:  big.NewInt(doubleSignEpoch + 2),
-				},
-			},
-		},
-	}
-
+func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) (
+	validatorSnapshot, validatorCurrent staking.ValidatorWrapper,
+) {
 	validatorSnapshot = staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
@@ -255,15 +201,84 @@ var (
 		},
 		Delegations: delegationsCurrent,
 	}
+	return
+}
 
-	shouldBeTotalSlashed      = big.NewInt(0)
-	shouldBeTotalSnitchReward = big.NewInt(0)
-)
+func delegationPair() (
+	delegationsSnapshot, delegationsCurrent staking.Delegations,
+) {
+	delegationsSnapshot = staking.Delegations{
+		// NOTE  delegation is the validator themselves
+		staking.Delegation{
+			DelegatorAddress: offenderAddr,
+			Amount:           big.NewInt(5),
+			Reward:           big.NewInt(0),
+			Undelegations:    staking.Undelegations{},
+		},
+		// some external delegator
+		staking.Delegation{
+			DelegatorAddress: randoDel,
+			Amount:           big.NewInt(5),
+			Reward:           big.NewInt(0),
+			Undelegations:    staking.Undelegations{},
+		},
+	}
 
-type mockOutSnapshotReader struct{}
+	delegationsCurrent = staking.Delegations{
+		// First delegation is the validator themselves
+		staking.Delegation{
+			DelegatorAddress: offenderAddr,
+			Amount:           big.NewInt(1),
+			Reward:           big.NewInt(0),
+			Undelegations: staking.Undelegations{
+				staking.Undelegation{
+					Amount: big.NewInt(4),
+					Epoch:  big.NewInt(doubleSignEpoch + 2),
+				},
+			},
+		},
+	}
+	return
+}
 
-func (mockOutSnapshotReader) ReadValidatorSnapshot(common.Address) (*staking.ValidatorWrapper, error) {
-	return &validatorSnapshot, nil
+func exampleSlashRecords() Records {
+	return Records{
+		Record{
+			ConflictingBallots: ConflictingBallots{
+				AlreadyCastBallot: votepower.Ballot{
+					SignerPubKey:    blsWrapA,
+					BlockHeaderHash: hashA,
+					Signature:       signatureA,
+				},
+				DoubleSignedBallot: votepower.Ballot{
+					SignerPubKey:    blsWrapB,
+					BlockHeaderHash: hashB,
+					Signature:       signatureB,
+				},
+			},
+			Evidence: Evidence{
+				Moment: Moment{
+					Epoch:        big.NewInt(doubleSignEpoch),
+					Height:       big.NewInt(doubleSignBlockNumber),
+					TimeUnixNano: big.NewInt(doubleSignUnixNano),
+					ViewID:       doubleSignViewID,
+					ShardID:      doubleSignShardID,
+				},
+				ProposalHeader: &header,
+			},
+			Reporter: reporterAddr,
+			Offender: offenderAddr,
+		},
+	}
+
+}
+
+type mockOutSnapshotReader struct {
+	snapshot staking.ValidatorWrapper
+}
+
+func (m mockOutSnapshotReader) ReadValidatorSnapshot(common.Address) (*staking.ValidatorWrapper, error) {
+	return &m.snapshot, nil
 }
 
 func TestVerify(t *testing.T) {
@@ -273,14 +288,16 @@ func TestVerify(t *testing.T) {
 func TestApply(t *testing.T) {
 	st := ethdb.NewMemDatabase()
 	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
-	fmt.Println("slash->", exampleSlash.String())
+	slashes := exampleSlashRecords()
+	validatorSnapshot, validatorCurrent := validatorPair(delegationPair())
+	fmt.Println("slash->", slashes.String())
 	stateHandle.UpdateStakingInfo(offenderAddr, &validatorCurrent)
 	slashResult, err := Apply(
-		mockOutSnapshotReader{}, stateHandle, exampleSlash, subCommittee,
+		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, subCommittee,
 	)
 
 	if err != nil {
-		t.Errorf("slash application failed %s", err.Error())
+		t.Fatalf("slash application failed %s", err.Error())
 	}
 
 	if sn := slashResult.TotalSlashed; sn.Cmp(shouldBeTotalSlashed) != 0 {
