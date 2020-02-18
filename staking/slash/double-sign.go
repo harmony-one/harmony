@@ -175,7 +175,7 @@ func delegatorSlashApply(
 						for _, undelegate := range delegationNow.Undelegations {
 							// the epoch matters, only those undelegation
 							// such that epoch>= doubleSignEpoch should be slashable
-							if undelegate.Epoch.Cmp(doubleSignEpoch) == -1 {
+							if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
 								continue
 							}
 							if stillOwe.Cmp(common.Big0) <= 0 {
