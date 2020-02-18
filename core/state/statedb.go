@@ -762,8 +762,9 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 		rewardPool.Sub(rewardPool, rewardInt)
 	}
 
-	// The last remaining bit belongs to the validator (remember the validator's self delegation is always at index 0)
-	if rewardPool.Cmp(big.NewInt(0)) > 0 {
+	// The last remaining bit belongs to the validator (remember the validator's self delegation is
+	// always at index 0)
+	if rewardPool.Cmp(common.Big0) > 0 {
 		curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, rewardPool)
 	}
 

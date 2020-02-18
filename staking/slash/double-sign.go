@@ -145,66 +145,70 @@ var (
 // applySlashRate returns (amountPostSlash, amountOfReduction, amountOfReduction / 2)
 func applySlashRate(
 	amount *big.Int, rate numeric.Dec,
-) (*big.Int, *big.Int, *big.Int) {
+) (*big.Int, *big.Int) {
 	amountPostSlash := numeric.NewDecFromBigInt(
 		amount,
 	).Mul(numeric.OneDec().Sub(rate)).TruncateInt()
 	amountOfSlash := new(big.Int).Sub(amount, amountPostSlash)
-	return amountPostSlash, amountOfSlash, new(big.Int).Div(amountOfSlash, common.Big2)
+	return amountOfSlash, new(big.Int).Div(amountOfSlash, common.Big2)
 }
 
 func delegatorSlashApply(
-	delegatedToValidator *staking.ValidatorWrapper,
+	snapshot, current *staking.ValidatorWrapper,
 	rate numeric.Dec,
 	state *state.DB,
 	reporter common.Address,
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 ) error {
-	for _, delegationSnapshot := range delegatedToValidator.Delegations {
-		postSlashBal, slashDebt, halfOfSlashDebt := applySlashRate(
+	for _, delegationSnapshot := range snapshot.Delegations {
+		slashDebt, halfOfSlashDebt := applySlashRate(
 			delegationSnapshot.Amount, rate,
 		)
-		if postSlashBal.Sign() == -1 {
-			stillOwe := new(big.Int).Sub(slashDebt, delegationSnapshot.Amount)
-			if wrapper := state.GetStakingInfo(
-				delegatedToValidator.Address,
-			); wrapper != nil {
-				for _, delegationNow := range wrapper.Delegations {
-					if delegationNow.Hash() == delegationSnapshot.Hash() {
-						for _, undelegate := range delegationNow.Undelegations {
-							// the epoch matters, only those undelegation
-							// such that epoch>= doubleSignEpoch should be slashable
-							if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
-								continue
-							}
-							if stillOwe.Cmp(common.Big0) <= 0 {
-								// paid off the slash debt
-								break
-							}
-							amtPostSlash, amtSlash, halfOfSlashAmt := applySlashRate(
-								undelegate.Amount, rate,
-							)
-							undelegate.Amount = amtPostSlash
-							stillOwe.Sub(stillOwe, halfOfSlashAmt)
-							state.AddBalance(reporter, halfOfSlashAmt)
-							slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, amtSlash)
-							slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, halfOfSlashAmt)
+		h := delegationSnapshot.Hash()
+		for _, delegationNow := range current.Delegations {
+			if nowAmt := delegationNow.Amount; delegationNow.Hash() == h {
+				state.AddBalance(reporter, halfOfSlashDebt)
+				slashTrack.TotalSnitchReward.Add(
+					slashTrack.TotalSnitchReward, halfOfSlashDebt,
+				)
+				const (
+					haveEnoughToPayOff               = 1
+					paidOffExact                     = 0
+					debtCollectionsRepoUndelegations = -1
+				)
+				switch d := new(big.Int).Sub(nowAmt, halfOfSlashDebt); d.Sign() {
+				case haveEnoughToPayOff, paidOffExact:
+					slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, halfOfSlashDebt)
+					nowAmt.Sub(nowAmt, halfOfSlashDebt)
+					slashDebt.Sub(slashDebt, halfOfSlashDebt)
+
+				case debtCollectionsRepoUndelegations:
+					slashDebt.Sub(slashDebt, nowAmt)
+					nowAmt.SetInt64(0)
+
+					for _, undelegate := range delegationNow.Undelegations {
+						// the epoch matters, only those undelegation
+						// such that epoch>= doubleSignEpoch should be slashable
+						if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
+							continue
 						}
+						if slashDebt.Cmp(common.Big0) <= 0 {
+							// paid off the slash debt
+							break
+						}
+						slashDebt.Sub(slashDebt, undelegate.Amount)
+						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, undelegate.Amount)
+						undelegate.Amount.SetInt64(0)
 					}
-				}
-				if stillOwe.Cmp(common.Big0) == 1 {
-					// NOTE is this an error?
-					fmt.Println("Still owe a slash debt", stillOwe)
 				}
 			}
 		}
+		// NOTE By now we should have paid off all the slashDebt
+		if slashDebt.Cmp(common.Big0) == 1 {
+			fmt.Println("Still owe a slash debt - only possible after 7 epochs", slashDebt)
+		}
 
-		// NOTE Burn other half implicitly but not adding half again to anywhere
-		state.AddBalance(reporter, halfOfSlashDebt)
-		delegationSnapshot.Amount = postSlashBal
-		slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
-		slashTrack.TotalSnitchReward.Add(slashTrack.TotalSnitchReward, halfOfSlashDebt)
 	}
 	fmt.Println("after delegator slash application", slashTrack.String())
 	return nil
@@ -237,22 +241,26 @@ func Apply(
 			)
 		}
 
+		current := state.GetStakingInfo(slash.Offender)
+		if current == nil {
+			return nil, errors.Errorf("protocol issue")
+		}
 		// NOTE invariant: first delegation is the validators own
 		// stake, rest are external delegations.
 		// Bottom line: everyone must have have skin in the game,
 		if err := delegatorSlashApply(
-			snapshot, rate, state,
+			snapshot, current, rate, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,
 		); err != nil {
 			return nil, err
 		}
 
 		// finally, kick them off forever
-		snapshot.Banned = true
+		current.Banned = true
 		if err := state.UpdateStakingInfo(
-			snapshot.Address, snapshot,
+			snapshot.Address, current,
 		); err != nil {
-			fmt.Println("cannot update wrapper", err.Error())
+			fmt.Println("cannot update current", err.Error())
 			return nil, err
 		}
 	}
