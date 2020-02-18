@@ -177,16 +177,14 @@ func delegatorSlashApply(
 					paidOffExact                     = 0
 					debtCollectionsRepoUndelegations = -1
 				)
-				switch d := new(big.Int).Sub(nowAmt, halfOfSlashDebt); d.Sign() {
+				switch d := new(big.Int).Sub(nowAmt, slashDebt); d.Sign() {
 				case haveEnoughToPayOff, paidOffExact:
-					slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, halfOfSlashDebt)
-					nowAmt.Sub(nowAmt, halfOfSlashDebt)
-					slashDebt.Sub(slashDebt, halfOfSlashDebt)
-
+					slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
+					nowAmt.Sub(nowAmt, slashDebt)
+					slashDebt.SetInt64(0)
 				case debtCollectionsRepoUndelegations:
 					slashDebt.Sub(slashDebt, nowAmt)
 					nowAmt.SetInt64(0)
-
 					for _, undelegate := range delegationNow.Undelegations {
 						// the epoch matters, only those undelegation
 						// such that epoch>= doubleSignEpoch should be slashable
