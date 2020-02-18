@@ -233,6 +233,7 @@ func (log *FBFTLog) FindMessageByMaxViewID(msgs []*FBFTMessage) *FBFTMessage {
 
 // ParseFBFTMessage parses FBFT message into FBFTMessage structure
 func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
+	// TODO Have this do sanity checks on the message please
 	pbftMsg := FBFTMessage{}
 	pbftMsg.MessageType = msg.GetType()
 	consensusMsg := msg.GetConsensus()

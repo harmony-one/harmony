@@ -182,13 +182,7 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 // ConstructSlashMessage ..
 func ConstructSlashMessage(witnesses slash.Records) []byte {
 	byteBuffer := bytes.NewBuffer(slashH)
-	slashData, err := rlp.EncodeToBytes(witnesses)
-
-	fmt.Println("in the slash message to be sent", witnesses.String())
-
-	if err != nil {
-		fmt.Println("why an error", witnesses.String(), err.Error())
-	}
+	slashData, _ := rlp.EncodeToBytes(witnesses)
 	byteBuffer.Write(slashData)
 	return byteBuffer.Bytes()
 }

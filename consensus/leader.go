@@ -20,11 +20,6 @@ import (
 )
 
 func (consensus *Consensus) announce(block *types.Block) {
-
-	// if consensus.ShardID == 1 {
-	// 	fmt.Println("annouce happeneing", consensus.String())
-	// }
-
 	blockHash := block.Hash()
 	copy(consensus.blockHash[:], blockHash[:])
 	// prepare message and broadcast to validators
@@ -188,7 +183,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	recvMsg, err := ParseFBFTMessage(msg)
-
+	log := consensus.getLogger()
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Parse pbft message failed")
 		return
@@ -222,14 +217,18 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 					if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
 						var doubleSign bls.Sign
 						if err := doubleSign.Deserialize(recvMsg.Payload); err != nil {
-							// TODO Error log
+							log.Err(err).Str("msg", recvMsg.String()).
+								Msg("could not deserialize potential double signer")
 							return
 						}
 
 						curHeader := consensus.ChainReader.CurrentHeader()
 						committee, err := consensus.ChainReader.ReadShardState(curHeader.Epoch())
 						if err != nil {
-							// TODO should not happen, error log
+							log.Err(err).
+								Uint32("shard", consensus.ShardID).
+								Uint64("epoch", curHeader.Epoch().Uint64()).
+								Msg("could not read shard state")
 							return
 						}
 						offender := *shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
@@ -238,7 +237,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 						).AddressForBLSKey(offender)
 
 						if err != nil {
-							// TODO should not happen, error log
+							log.Err(err).Str("msg", recvMsg.String()).
+								Msg("could not find address for bls key")
 							return
 						}
 
