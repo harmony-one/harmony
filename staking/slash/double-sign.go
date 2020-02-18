@@ -223,7 +223,7 @@ func delegatorSlashApply(
 // Apply ..
 func Apply(
 	chain staking.ValidatorSnapshotReader, state *state.DB,
-	slashes []Record, committee []shard.BlsPublicKey,
+	slashes Records, committee []shard.BlsPublicKey,
 ) (*Application, error) {
 	log := utils.Logger()
 	rate := Rate(uint32(len(slashes)), uint32(len(committee)))
