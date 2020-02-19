@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/harmony-one/harmony/numeric"
 	"math/big"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -31,6 +33,7 @@ const (
 	defaultFromAddress  = "0x0000000000000000000000000000000000000000"
 	defaultBlocksPeriod = 15000
 	validatorsPageSize  = 100
+	initSupply          = int64(12600000000)
 )
 
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
@@ -729,4 +732,21 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 		return s.b.GetSuperCommittees()
 	}
 	return nil, errNotBeaconChainShard
+}
+
+// GetTotalSupply ..
+func (s *PublicBlockChainAPI) GetTotalSupply() (numeric.Dec, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return numeric.NewDec(initSupply), nil
+	}
+	return numeric.NewDec(0), errNotBeaconChainShard
+}
+
+// GetCirculatingSupply ..
+func (s *PublicBlockChainAPI) GetCirculatingSupply() (numeric.Dec, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		timestamp := time.Now()
+		return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix())), nil
+	}
+	return numeric.NewDec(0), errNotBeaconChainShard
 }
