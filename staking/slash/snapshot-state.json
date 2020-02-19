@@ -1,0 +1,66 @@
+{
+  "root": "8794a0607f1f6e9dad4934b74600ef6a82ebc9d4cde4ca8b870ecc1109fa1e67",
+  "accounts": {
+    "one1nqevvacj3y5ltuef05my4scwy5wuqteur72jk5": {
+      "balance": "1999975592000000000",
+      "nonce": 0,
+      "root": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+      "codeHash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+      "code": "",
+      "storage": {}
+    },
+    "one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy": {
+      "balance": "0",
+      "nonce": 0,
+      "root": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+      "codeHash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+      "code": "",
+      "storage": {}
+    },
+    "one1zyxauxquys60dk824p532jjdq753pnsenrgmef": {
+      "balance": "1994680320000000000",
+      "nonce": 0,
+      "root": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+      "codeHash": "31e25c9bca0e6787241ab1b563d4fff645d2b2596fa84cbaf7fffa84be612683",
+      "code": {
+        "validator": {
+          "Address": "0x110dde181c2434f6d8eaa869154a4d07a910ce19",
+          "SlotPubKeys": [
+            "be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a"
+          ],
+          "LastEpochInCommittee": 5,
+          "MinSelfDelegation": 1000000000000000000,
+          "MaxTotalDelegation": 13000000000000000000,
+          "Active": true,
+          "Rate": "0.167983520183826780",
+          "MaxRate": "0.179184469782137200",
+          "MaxChangeRate": "0.152212761523253600",
+          "UpdateHeight": 10,
+          "name": "someone",
+          "identity": "someone",
+          "website": "someone",
+          "security_contact": "someone",
+          "details": "someone",
+          "CreationHeight": 33,
+          "Banned": false
+        },
+        "delegations": [
+          {
+            "delegator-address": "0x110dde181c2434f6d8eaa869154a4d07a910ce19",
+            "amount": 2000000000000000000,
+            "reward": 0,
+            "undelegations": []
+          },
+          {
+            "delegator-address": "0x9832c677128929f5f3297d364ac30e251dc02f3c",
+            "amount": 3000000000000000000,
+            "reward": 0,
+            "undelegations": []
+          }
+        ],
+        "Snapshot": { "Epoch": 0, "NumBlocksToSign": 0, "NumBlocksSigned": 0 }
+      },
+      "storage": {}
+    }
+  }
+}
