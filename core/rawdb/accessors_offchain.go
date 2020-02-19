@@ -190,13 +190,13 @@ func ReadValidatorSnapshot(
 }
 
 // WriteValidatorSnapshot stores validator's snapshot by its address
-func WriteValidatorSnapshot(db DatabaseWriter, v *staking.ValidatorWrapper, epoch *big.Int) error {
+func WriteValidatorSnapshot(batch DatabaseWriter, v *staking.ValidatorWrapper, epoch *big.Int) error {
 	bytes, err := rlp.EncodeToBytes(v)
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorSnapshot] Failed to encode")
 		return err
 	}
-	if err := db.Put(validatorSnapshotKey(v.Address, epoch), bytes); err != nil {
+	if err := batch.Put(validatorSnapshotKey(v.Address, epoch), bytes); err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorSnapshot] Failed to store to database")
 		return err
 	}
@@ -231,14 +231,14 @@ func ReadValidatorStats(
 
 // WriteValidatorStats stores validator's stats by its address
 func WriteValidatorStats(
-	db DatabaseWriter, addr common.Address, stats *staking.ValidatorStats,
+	batch DatabaseWriter, addr common.Address, stats *staking.ValidatorStats,
 ) error {
 	bytes, err := rlp.EncodeToBytes(stats)
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorStats] Failed to encode")
 		return err
 	}
-	if err := db.Put(validatorStatsKey(addr), bytes); err != nil {
+	if err := batch.Put(validatorStatsKey(addr), bytes); err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorStats] Failed to store to database")
 		return err
 	}
@@ -323,6 +323,7 @@ func WriteBlockRewardAccumulator(db DatabaseWriter, newAccum *big.Int, number ui
 }
 
 //// Resharding ////
+
 // ReadEpochBlockNumber retrieves the epoch block number for the given epoch,
 // or nil if the given epoch is not found in the database.
 func ReadEpochBlockNumber(db DatabaseReader, epoch *big.Int) (*big.Int, error) {
