@@ -150,6 +150,22 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 	return result, nil
 }
 
+// IsLastBlock checks if block is last epoch block.
+func (s *PublicBlockChainAPI) IsLastBlock(blockNum uint64) (bool, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return shard.Schedule.IsLastBlock(blockNum), nil
+	}
+	return false, errNotBeaconChainShard
+}
+
+// EpochLastBlock returns epoch last block.
+func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) (uint64, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return shard.Schedule.EpochLastBlock(epoch), nil
+	}
+	return 0, errNotBeaconChainShard
+}
+
 // GetBlockSigners returns signers for a particular block.
 func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr uint64) ([]string, error) {
 	if blockNr == 0 || blockNr >= uint64(s.BlockNumber()) {
