@@ -39,6 +39,11 @@ func (d Delegations) String() string {
 	return string(s)
 }
 
+func (d Delegation) String() string {
+	s, _ := json.Marshal(d)
+	return string(s)
+}
+
 // Hash is a New256 hash of an RLP encoded Delegation
 func (d Delegation) Hash() common.Hash {
 	return hash.FromRLPNew256(d)

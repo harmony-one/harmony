@@ -1,7 +1,6 @@
 package committee
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -202,7 +201,11 @@ func eposStakedCommittee(
 
 	for i := 0; i < stakedSlotsCount; i++ {
 		shardID := int(new(big.Int).Mod(staked[i].BlsPublicKey.Big(), shardBig).Int64())
-		fmt.Println("here is a create validator, what shardID?", staked[i].BlsPublicKey.Hex(), shardID)
+		// fmt.Println(
+		// 	"here is a create validator, what shardID?",
+		// 	staked[i].BlsPublicKey.Hex(),
+		// 	shardID,
+		// )
 		slot := staked[i]
 		totalStake = totalStake.Add(slot.Dec)
 		shardState.Shards[shardID].Slots = append(shardState.Shards[shardID].Slots, shard.Slot{

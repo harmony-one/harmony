@@ -52,7 +52,7 @@ type ValidatorSnapshotReader interface {
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
 	Validator   `json:"validator"`
-	Delegations []Delegation `json:"delegations"`
+	Delegations Delegations `json:"delegations"`
 
 	Snapshot struct {
 		Epoch *big.Int

@@ -325,7 +325,7 @@ func (e *engineImpl) Finalize(
 		if err != nil {
 			return nil, nil, errors.New("could not read shard state")
 		}
-		doubleSigners.DumpBalances(state)
+		fmt.Println("Before slash", state.Dump())
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
 		if slashApplied, err = slash.Apply(
@@ -341,7 +341,7 @@ func (e *engineImpl) Finalize(
 			"after applied applied slashes, here are account states",
 			slashApplied.String(),
 		)
-		doubleSigners.DumpBalances(state)
+		fmt.Println("After slash", state.Dump())
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))

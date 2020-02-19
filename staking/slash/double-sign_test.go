@@ -103,20 +103,30 @@ const (
 	doubleSignUnixNano    = 1582049233802498300
 
 	// validator creation parameters
-	lastEpochInComm    = 5
-	creationHeight     = 33
-	minSelfDelgation   = 1_100_000_000_000_000_000
+	lastEpochInComm = 5
+	creationHeight  = 33
+	// the minimial by protocol, 1 ONE
+	minSelfDelgation   = 1_000_000_000_000_000_000
 	maxTotalDelegation = 13_000_000_000_000_000_000
 
 	// delegation creation parameters
-	delegationSnapshotI1 = 3_000_000_000_000_000_000
-	delegationSnapshotI2 = 3_000_000_000_000_000_000
-	delegationCurrentI1  = 3_000_000_000_000_000_000
-	delegationCurrentI2  = 3_000_000_000_000_000_000
+	delegationSnapshotI1    = 2_000_000_000_000_000_000
+	delegationSnapshotI2    = 1_500_000_000_000_000_000
+	delegationSnapshotTotal = delegationSnapshotI1 + delegationSnapshotI2
+	delegationCurrentI1     = 1_000_000_000_000_000_000
+	delegationCurrentI2     = 5_000_000_000_000_000
+	delegationCurrentTotal  = delegationCurrentI1 + delegationCurrentI2
+	slashRate               = 0.02
+	postSlash               = 1.0 - slashRate
+	undelegateI1            = delegationSnapshotI1 - delegationCurrentI1
+	undelegateI2            = delegationSnapshotI2 - delegationCurrentI2
+
+	expectedSlashI1 = delegationSnapshotI1 - (delegationSnapshotI1 * postSlash)
+	expectedSlashI2 = delegationSnapshotI2 - (delegationSnapshotI2 * postSlash)
 
 	// expected slashing results
-	expectSlash  = 60_000_000_000_000_000
-	expectSnitch = 30_000_000_000_000_000
+	expectSlash  = expectedSlashI1 + expectedSlashI2
+	expectSnitch = expectSlash / 2.0
 )
 
 var (
@@ -129,6 +139,11 @@ var (
 	subCommittee               = []shard.BlsPublicKey{}
 
 	unit = func() interface{} {
+		fmt.Println(
+			postSlash, delegationSnapshotI1, expectedSlashI1,
+			(expectedSlashI1+(delegationSnapshotI1*postSlash)) == delegationSnapshotI1,
+		)
+
 		// Ballot A setup
 		signerA.DeserializeHexStr(signerABLSPublicHex)
 		headerHashA, _ := hex.DecodeString(signerAHeaderHashHex)
@@ -254,7 +269,7 @@ func delegationPair() (
 			Reward:           big.NewInt(0),
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
-					Amount: big.NewInt(4),
+					Amount: big.NewInt(undelegateI1),
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
@@ -264,7 +279,12 @@ func delegationPair() (
 			DelegatorAddress: randoDel,
 			Amount:           big.NewInt(0).SetUint64(delegationCurrentI2),
 			Reward:           big.NewInt(0),
-			Undelegations:    staking.Undelegations{},
+			Undelegations: staking.Undelegations{
+				staking.Undelegation{
+					Amount: big.NewInt(undelegateI2),
+					Epoch:  big.NewInt(doubleSignEpoch + 2),
+				},
+			},
 		},
 	}
 	return
@@ -314,26 +334,73 @@ func TestVerify(t *testing.T) {
 	//
 }
 
+func TestSimple(t *testing.T) {
+	// calculations strictly with wrapper
+	snapshotStartedWithAmt := 2.5
+	slashRate := 0.45
+	slashDebt := snapshotStartedWithAmt * slashRate
+	half := slashDebt / 2.0
+	postSlashBalance := snapshotStartedWithAmt * (1.0 - slashRate)
+
+	// Now say current state is such
+	currentAmt := 0.50
+
+	fmt.Println("slash info",
+		snapshotStartedWithAmt,
+		slashRate,
+		slashDebt,
+		postSlashBalance,
+		half,
+		(snapshotStartedWithAmt-slashDebt) == postSlashBalance,
+	)
+
+	if slashDebt > currentAmt {
+		fmt.Println("have this scenario happening", slashDebt, currentAmt)
+		leftOver := slashDebt - currentAmt
+		currentAmt = 0
+		// Now would be searching in delegations
+		fmt.Println("debt leftover", leftOver)
+	}
+
+	// currentNowAmt :=
+
+}
+
 func TestApply(t *testing.T) {
 	st := ethdb.NewMemDatabase()
 	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
 	slashes := exampleSlashRecords()
 	validatorSnapshot, validatorCurrent := validatorPair(delegationPair())
-	fmt.Println("slash->", slashes.String())
 
 	for _, addr := range []common.Address{reporterAddr, offenderAddr, randoDel} {
 		stateHandle.CreateAccount(addr)
 	}
 
+	stateHandle.SetBalance(offenderAddr, big.NewInt(0).SetUint64(1994680320000000000))
+	stateHandle.SetBalance(randoDel, big.NewInt(0).SetUint64(1999975592000000000))
+
 	if err := stateHandle.UpdateStakingInfo(
-		offenderAddr, &validatorCurrent,
+		offenderAddr, &validatorSnapshot,
 	); err != nil {
 		t.Fatalf("creation of validator failed %s", err.Error())
 	}
 
+	stateHandle.IntermediateRoot(false)
+	stateHandle.Commit(false)
+
+	if err := stateHandle.UpdateStakingInfo(
+		offenderAddr, &validatorCurrent,
+	); err != nil {
+		t.Fatalf("update of validator failed %s", err.Error())
+	}
+
+	// fmt.Println("Before slash apply", stateHandle.Dump())
+
 	slashResult, err := Apply(
 		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, subCommittee,
 	)
+
+	// fmt.Println("After slash apply", stateHandle.Dump())
 
 	if err != nil {
 		t.Fatalf("slash application failed %s", err.Error())

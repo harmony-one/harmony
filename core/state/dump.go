@@ -65,6 +65,9 @@ func (db *DB) RawDump() Dump {
 		} else {
 			marsh, err := json.Marshal(wrapper)
 			if err == nil {
+				fmt.Println("as wrapped", wrapper.String())
+				fmt.Printf("and per field %+v \n", wrapper)
+
 				wrap = string(marsh)
 			}
 		}

@@ -1,11 +1,13 @@
 package slash
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
@@ -99,6 +101,10 @@ func (r Record) String() string {
 
 // Verify checks that the signature is valid
 func Verify(chain committee.ChainReader, candidate *Record) error {
+	dump, _ := rlp.EncodeToBytes(candidate.Evidence.ProposalHeader)
+
+	fmt.Println("here is rlp dump of header for candidate ",
+		candidate.String(), hex.EncodeToString(dump))
 	first, second := candidate.AlreadyCastBallot, candidate.DoubleSignedBallot
 	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
 		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
@@ -167,13 +173,31 @@ func delegatorSlashApply(
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 ) error {
+
+	// fmt.Println("dump->", state.Dump())
+
+	// fmt.Println("count", len(snapshot.Delegations))
+
 	for _, delegationSnapshot := range snapshot.Delegations {
 		slashDebt, halfOfSlashDebt := applySlashRate(
 			delegationSnapshot.Amount, rate,
 		)
-		h := delegationSnapshot.Hash()
+
+		// fmt.Println(
+		// 	"initial-slash-debt",
+		// 	slashDebt,
+		// 	halfOfSlashDebt,
+		// 	common2.MustAddressToBech32(delegationSnapshot.DelegatorAddress),
+		// )
+
+		snapshotAddr := delegationSnapshot.DelegatorAddress
+
 		for _, delegationNow := range current.Delegations {
-			if nowAmt := delegationNow.Amount; delegationNow.Hash() == h {
+
+			fmt.Println("compare", "\n", delegationSnapshot.String(), "\n", delegationNow.String())
+
+			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
+
 				state.AddBalance(reporter, halfOfSlashDebt)
 				slashTrack.TotalSnitchReward.Add(
 					slashTrack.TotalSnitchReward, halfOfSlashDebt,
@@ -185,10 +209,12 @@ func delegatorSlashApply(
 				)
 				switch d := new(big.Int).Sub(nowAmt, slashDebt); d.Sign() {
 				case haveEnoughToPayOff, paidOffExact:
+					fmt.Println("a", d)
 					slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
 					nowAmt.Sub(nowAmt, slashDebt)
 					slashDebt.SetInt64(0)
 				case debtCollectionsRepoUndelegations:
+					fmt.Println("b", d)
 					slashDebt.Sub(slashDebt, nowAmt)
 					nowAmt.SetInt64(0)
 					for _, undelegate := range delegationNow.Undelegations {
@@ -208,13 +234,19 @@ func delegatorSlashApply(
 				}
 			}
 		}
+
+		// fmt.Println("end-initial-slash-debt", slashDebt)
+
 		// NOTE By now we should have paid off all the slashDebt
-		if slashDebt.Cmp(common.Big0) == 1 {
-			fmt.Println("Still owe a slash debt - only possible after 7 epochs", slashDebt)
-		}
+		// if slashDebt.Cmp(common.Big0) == 1 {
+		// 	fmt.Println(
+		// 		"Still owe a slash debt - only possible after 7 epochs",
+		// 		slashDebt,
+		// 	)
+		// }
 
 	}
-	fmt.Println("after delegator slash application", slashTrack.String())
+	// fmt.Println("after delegator slash application", slashTrack.String())
 	return nil
 }
 
@@ -276,7 +308,7 @@ func Apply(
 	}
 
 	log.Info().Str("rate", rate.String()).Int("count", len(slashes))
-	fmt.Println("applying slash with a rate of", rate, slashes, slashDiff.String())
+	// fmt.Println("applying slash with a rate of", rate, slashes, slashDiff.String())
 	return slashDiff, nil
 }
 
@@ -292,26 +324,5 @@ func Rate(doubleSignerCount, committeeSize uint32) numeric.Dec {
 		return numeric.NewDec(
 			int64(doubleSignerCount),
 		).Quo(numeric.NewDec(int64(committeeSize)))
-	}
-}
-
-// DumpBalances ..
-func (r Records) DumpBalances(state *state.DB) {
-	for _, s := range r {
-		oBal, reportBal := state.GetBalance(s.Offender), state.GetBalance(s.Reporter)
-		wrap := state.GetStakingInfo(s.Offender)
-		fmt.Printf(
-			"offender %s \n\tbalance %v, \n\treporter %s balance %v \n",
-			common2.MustAddressToBech32(s.Offender),
-			oBal,
-			common2.MustAddressToBech32(s.Reporter),
-			reportBal,
-		)
-		for _, deleg := range wrap.Delegations {
-			fmt.Printf("\tdelegator %s bal %v\n",
-				common2.MustAddressToBech32(deleg.DelegatorAddress),
-				state.GetBalance(deleg.DelegatorAddress),
-			)
-		}
 	}
 }

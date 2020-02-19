@@ -122,7 +122,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 					pendingStakingTxs = append(pendingStakingTxs, stakingTx)
 				}
 			} else {
-				utils.Logger().Err(types.ErrUnknownPoolTxType).Msg("Failed to parse pending transactions")
+				utils.Logger().Err(types.ErrUnknownPoolTxType).
+					Msg("Failed to parse pending transactions")
 				return nil, types.ErrUnknownPoolTxType
 			}
 		}
