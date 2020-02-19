@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -178,7 +179,7 @@ func delegatorSlashApply(
 
 	// fmt.Println("count", len(snapshot.Delegations))
 
-	for _, delegationSnapshot := range snapshot.Delegations {
+	for i, delegationSnapshot := range snapshot.Delegations {
 		slashDebt, halfOfSlashDebt := applySlashRate(
 			delegationSnapshot.Amount, rate,
 		)
@@ -191,13 +192,22 @@ func delegatorSlashApply(
 		// )
 
 		snapshotAddr := delegationSnapshot.DelegatorAddress
-
-		for _, delegationNow := range current.Delegations {
-
-			fmt.Println("compare", "\n", delegationSnapshot.String(), "\n", delegationNow.String())
-
+		for j, delegationNow := range current.Delegations {
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
-
+				// if i == 0 {
+				// 	fmt.Println(
+				// 		"validator own delegation",
+				// 		"compare",
+				// 		"then\n",
+				// 		delegationSnapshot.String(),
+				// 		"\nnow\n",
+				// 		delegationNow.String(),
+				// 		"slash-debt",
+				// 		slashDebt,
+				// 	)
+				// } else if i == 1 {
+				// 	// fmt.Println("external delegator")
+				// }
 				state.AddBalance(reporter, halfOfSlashDebt)
 				slashTrack.TotalSnitchReward.Add(
 					slashTrack.TotalSnitchReward, halfOfSlashDebt,
@@ -209,12 +219,19 @@ func delegatorSlashApply(
 				)
 				switch d := new(big.Int).Sub(nowAmt, slashDebt); d.Sign() {
 				case haveEnoughToPayOff, paidOffExact:
-					fmt.Println("a", d)
+					const validatorsOwnDelegation = 0
 					slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
 					nowAmt.Sub(nowAmt, slashDebt)
 					slashDebt.SetInt64(0)
+					if i == validatorsOwnDelegation &&
+						j == validatorsOwnDelegation &&
+						nowAmt.Cmp(big.NewInt(denominations.One)) == -1 {
+						// cannot allow it to drop below 1 ONE, otherwise will ruin
+						// a state update b/c of min-self-delegation
+						nowAmt.Set(big.NewInt(denominations.One))
+					}
+
 				case debtCollectionsRepoUndelegations:
-					fmt.Println("b", d)
 					slashDebt.Sub(slashDebt, nowAmt)
 					nowAmt.SetInt64(0)
 					for _, undelegate := range delegationNow.Undelegations {

@@ -125,7 +125,9 @@ const (
 	expectedSlashI2 = delegationSnapshotI2 - (delegationSnapshotI2 * postSlash)
 
 	// expected slashing results
-	expectSlash  = expectedSlashI1 + expectedSlashI2
+	expectSlash = expectedSlashI1
+	// expectSlash  = expectedSlashI1 + expectedSlashI2
+
 	expectSnitch = expectSlash / 2.0
 )
 
@@ -139,11 +141,11 @@ var (
 	subCommittee               = []shard.BlsPublicKey{}
 
 	unit = func() interface{} {
-		fmt.Println(
-			postSlash, delegationSnapshotI1, expectedSlashI1,
-			(expectedSlashI1+(delegationSnapshotI1*postSlash)) == delegationSnapshotI1,
-		)
-
+		// fmt.Println(
+		// 	postSlash, delegationSnapshotI1, expectedSlashI1,
+		// 	(expectedSlashI1+(delegationSnapshotI1*postSlash)) == delegationSnapshotI1,
+		// )
+		fmt.Println("started->", big.NewInt(expectedSlashI1))
 		// Ballot A setup
 		signerA.DeserializeHexStr(signerABLSPublicHex)
 		headerHashA, _ := hex.DecodeString(signerAHeaderHashHex)
@@ -253,12 +255,12 @@ func delegationPair() (
 			Reward:           big.NewInt(0),
 			Undelegations:    staking.Undelegations{},
 		},
-		staking.Delegation{
-			DelegatorAddress: randoDel,
-			Amount:           big.NewInt(0).SetUint64(delegationSnapshotI2),
-			Reward:           big.NewInt(0),
-			Undelegations:    staking.Undelegations{},
-		},
+		// staking.Delegation{
+		// 	DelegatorAddress: randoDel,
+		// 	Amount:           big.NewInt(0).SetUint64(delegationSnapshotI2),
+		// 	Reward:           big.NewInt(0),
+		// 	Undelegations:    staking.Undelegations{},
+		// },
 	}
 
 	delegationsCurrent = staking.Delegations{
@@ -275,17 +277,17 @@ func delegationPair() (
 			},
 		},
 		// some external delegator
-		staking.Delegation{
-			DelegatorAddress: randoDel,
-			Amount:           big.NewInt(0).SetUint64(delegationCurrentI2),
-			Reward:           big.NewInt(0),
-			Undelegations: staking.Undelegations{
-				staking.Undelegation{
-					Amount: big.NewInt(undelegateI2),
-					Epoch:  big.NewInt(doubleSignEpoch + 2),
-				},
-			},
-		},
+		// staking.Delegation{
+		// 	DelegatorAddress: randoDel,
+		// 	Amount:           big.NewInt(0).SetUint64(delegationCurrentI2),
+		// 	Reward:           big.NewInt(0),
+		// 	Undelegations: staking.Undelegations{
+		// 		staking.Undelegation{
+		// 			Amount: big.NewInt(undelegateI2),
+		// 			Epoch:  big.NewInt(doubleSignEpoch + 2),
+		// 		},
+		// 	},
+		// },
 	}
 	return
 }
@@ -334,38 +336,6 @@ func TestVerify(t *testing.T) {
 	//
 }
 
-func TestSimple(t *testing.T) {
-	// calculations strictly with wrapper
-	snapshotStartedWithAmt := 2.5
-	slashRate := 0.45
-	slashDebt := snapshotStartedWithAmt * slashRate
-	half := slashDebt / 2.0
-	postSlashBalance := snapshotStartedWithAmt * (1.0 - slashRate)
-
-	// Now say current state is such
-	currentAmt := 0.50
-
-	fmt.Println("slash info",
-		snapshotStartedWithAmt,
-		slashRate,
-		slashDebt,
-		postSlashBalance,
-		half,
-		(snapshotStartedWithAmt-slashDebt) == postSlashBalance,
-	)
-
-	if slashDebt > currentAmt {
-		fmt.Println("have this scenario happening", slashDebt, currentAmt)
-		leftOver := slashDebt - currentAmt
-		currentAmt = 0
-		// Now would be searching in delegations
-		fmt.Println("debt leftover", leftOver)
-	}
-
-	// currentNowAmt :=
-
-}
-
 func TestApply(t *testing.T) {
 	st := ethdb.NewMemDatabase()
 	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
@@ -408,13 +378,13 @@ func TestApply(t *testing.T) {
 
 	if sn := slashResult.TotalSlashed; sn.Cmp(shouldBeTotalSlashed) != 0 {
 		t.Errorf(
-			"total slash incorrect %v %v", sn, shouldBeTotalSlashed,
+			"total slash incorrect have %v want %v", sn, shouldBeTotalSlashed,
 		)
 	}
 
 	if sn := slashResult.TotalSnitchReward; sn.Cmp(shouldBeTotalSnitchReward) != 0 {
 		t.Errorf(
-			"total snitch incorrect %v %v", sn, shouldBeTotalSnitchReward,
+			"total snitch incorrect have %v want %v", sn, shouldBeTotalSnitchReward,
 		)
 	}
 }
