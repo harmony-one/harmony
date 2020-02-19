@@ -32,6 +32,7 @@ const (
 		"2c4a09b06b2eec3e851f08f3070f3" +
 		"804b35fe4a2033725f073623e3870756141ebc" +
 		"2a6495478930c428f6e6b25f292dab8552d30c"
+
 	// ballot B hex values
 	signerBBLSPublicHex = "be23bc3c93fe14a25f3533" +
 		"feee1cff1c60706845a490" +
@@ -43,6 +44,7 @@ const (
 		"932a95f48133f886140cefbe4d690eddd0540d246df1fec" +
 		"8b4f719ad9de0bc822f0a1bf70e78b321a5e4462ba3e3efd" +
 		"cd24c21b9cb24ed6b26f02785a2cdbd168696c5f4a49b6c00f00994"
+
 	// RLP encoded header
 	proposalHeaderRLPBytes = "f9039187486d6e79546764827633f90383a080532768867d8c1a96" +
 		"6ae9df80d4efc9a9a83559b0e2d13b2aa819a6a7627c7294" +
@@ -79,6 +81,7 @@ const (
 		"8a00c493fb77a87a094dbf08130c3f93793337be78167b8b241d7ef9e" +
 		"1fab1f8097dda339a6ca2737c291d8a7733c9b5b540ea30544c46" +
 		"a0426a34f60d3f010580"
+
 	// trailing bech32 info
 	reporterBech32 = "one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"
 	offenderBech32 = "one1zyxauxquys60dk824p532jjdq753pnsenrgmef"
@@ -92,11 +95,24 @@ const (
 	commK5 = "86dc2fdc2ceec18f6923b99fd86a68405c132e1005cf1df72dca75db0adfaeb53d201d66af37916d61f079f34f21fb96"
 	commK6 = "95117937cd8c09acd2dfae847d74041a67834ea88662a7cbed1e170350bc329e53db151e5a0ef3e712e35287ae954818"
 
+	// double signing info
 	doubleSignShardID     = 0
 	doubleSignEpoch       = 3
 	doubleSignBlockNumber = 37
 	doubleSignViewID      = 38
 	doubleSignUnixNano    = 1582049233802498300
+
+	// validator creation parameters
+	lastEpochInComm    = 5
+	creationHeight     = 33
+	minSelfDelgation   = 1_100_000_000_000_000_000
+	maxTotalDelegation = 13_000_000_000_000_000_000
+
+	// delegation creation parameters
+	delegationSnapshotI1 = 3_000_000_000_000_000_000
+	delegationSnapshotI2 = 3_000_000_000_000_000_000
+	delegationCurrentI1  = 3_000_000_000_000_000_000
+	delegationCurrentI2  = 3_000_000_000_000_000_000
 )
 
 var (
@@ -148,9 +164,9 @@ var (
 
 	commonCommission = staking.Commission{
 		CommissionRates: staking.CommissionRates{
-			Rate:          numeric.MustNewDecFromStr("0.04"),
-			MaxRate:       numeric.MustNewDecFromStr("0.10"),
-			MaxChangeRate: numeric.MustNewDecFromStr("0.03"),
+			Rate:          numeric.MustNewDecFromStr("0.167983520183826780"),
+			MaxRate:       numeric.MustNewDecFromStr("0.179184469782137200"),
+			MaxChangeRate: numeric.MustNewDecFromStr("0.152212761523253600"),
 		},
 		UpdateHeight: big.NewInt(10),
 	}
@@ -170,17 +186,20 @@ var (
 func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) (
 	validatorSnapshot, validatorCurrent staking.ValidatorWrapper,
 ) {
+	minSelf, maxDel :=
+		big.NewInt(minSelfDelgation), big.NewInt(0).SetUint64(maxTotalDelegation)
+
 	validatorSnapshot = staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
-			LastEpochInCommittee: big.NewInt(4),
-			MinSelfDelegation:    big.NewInt(1),
-			MaxTotalDelegation:   big.NewInt(10),
+			LastEpochInCommittee: big.NewInt(lastEpochInComm),
+			MinSelfDelegation:    minSelf,
+			MaxTotalDelegation:   maxDel,
 			Active:               true,
 			Commission:           commonCommission,
 			Description:          commonDescr,
-			CreationHeight:       big.NewInt(33),
+			CreationHeight:       big.NewInt(creationHeight),
 			Banned:               false,
 		},
 		Delegations: delegationsSnapshot,
@@ -190,13 +209,13 @@ func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) 
 		Validator: staking.Validator{
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
-			LastEpochInCommittee: big.NewInt(5),
-			MinSelfDelegation:    big.NewInt(1),
-			MaxTotalDelegation:   big.NewInt(10),
+			LastEpochInCommittee: big.NewInt(lastEpochInComm + 1),
+			MinSelfDelegation:    minSelf,
+			MaxTotalDelegation:   maxDel,
 			Active:               true,
 			Commission:           commonCommission,
 			Description:          commonDescr,
-			CreationHeight:       big.NewInt(33),
+			CreationHeight:       big.NewInt(creationHeight),
 			Banned:               false,
 		},
 		Delegations: delegationsCurrent,
@@ -211,14 +230,13 @@ func delegationPair() (
 		// NOTE  delegation is the validator themselves
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           big.NewInt(5),
+			Amount:           big.NewInt(0).SetUint64(delegationSnapshotI1),
 			Reward:           big.NewInt(0),
 			Undelegations:    staking.Undelegations{},
 		},
-		// some external delegator
 		staking.Delegation{
 			DelegatorAddress: randoDel,
-			Amount:           big.NewInt(5),
+			Amount:           big.NewInt(0).SetUint64(delegationSnapshotI2),
 			Reward:           big.NewInt(0),
 			Undelegations:    staking.Undelegations{},
 		},
@@ -228,7 +246,7 @@ func delegationPair() (
 		// First delegation is the validator themselves
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           big.NewInt(1),
+			Amount:           big.NewInt(0).SetUint64(delegationCurrentI1),
 			Reward:           big.NewInt(0),
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
@@ -236,6 +254,13 @@ func delegationPair() (
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
+		},
+		// some external delegator
+		staking.Delegation{
+			DelegatorAddress: randoDel,
+			Amount:           big.NewInt(0).SetUint64(delegationCurrentI2),
+			Reward:           big.NewInt(0),
+			Undelegations:    staking.Undelegations{},
 		},
 	}
 	return
@@ -291,7 +316,16 @@ func TestApply(t *testing.T) {
 	slashes := exampleSlashRecords()
 	validatorSnapshot, validatorCurrent := validatorPair(delegationPair())
 	fmt.Println("slash->", slashes.String())
-	stateHandle.UpdateStakingInfo(offenderAddr, &validatorCurrent)
+
+	for _, addr := range []common.Address{reporterAddr, offenderAddr, randoDel} {
+		stateHandle.CreateAccount(addr)
+	}
+
+	if err := stateHandle.UpdateStakingInfo(
+		offenderAddr, &validatorCurrent,
+	); err != nil {
+		t.Fatalf("creation of validator failed %s", err.Error())
+	}
 	slashResult, err := Apply(
 		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, subCommittee,
 	)
