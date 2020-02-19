@@ -113,6 +113,10 @@ const (
 	delegationSnapshotI2 = 3_000_000_000_000_000_000
 	delegationCurrentI1  = 3_000_000_000_000_000_000
 	delegationCurrentI2  = 3_000_000_000_000_000_000
+
+	// expected slashing results
+	expectSlash  = 60_000_000_000_000_000
+	expectSnitch = 30_000_000_000_000_000
 )
 
 var (
@@ -179,8 +183,8 @@ var (
 		Details:         "someone",
 	}
 
-	shouldBeTotalSlashed      = big.NewInt(0)
-	shouldBeTotalSnitchReward = big.NewInt(0)
+	shouldBeTotalSlashed      = big.NewInt(expectSlash)
+	shouldBeTotalSnitchReward = big.NewInt(expectSnitch)
 )
 
 func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) (
@@ -326,6 +330,7 @@ func TestApply(t *testing.T) {
 	); err != nil {
 		t.Fatalf("creation of validator failed %s", err.Error())
 	}
+
 	slashResult, err := Apply(
 		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, subCommittee,
 	)
@@ -344,8 +349,5 @@ func TestApply(t *testing.T) {
 		t.Errorf(
 			"total snitch incorrect %v %v", sn, shouldBeTotalSnitchReward,
 		)
-
 	}
-
-	t.Log("not fully implemented yet")
 }
