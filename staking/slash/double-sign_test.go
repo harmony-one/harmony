@@ -362,16 +362,23 @@ func TestApply(t *testing.T) {
 		t.Fatalf("creation of validator failed %s", err.Error())
 	}
 
-	stateHandle.IntermediateRoot(false)
-	stateHandle.Commit(false)
-
 	if err := stateHandle.UpdateStakingInfo(
 		offenderAddr, &validatorCurrent,
 	); err != nil {
 		t.Fatalf("update of validator failed %s", err.Error())
 	}
 
+	stateHandle.IntermediateRoot(false)
+	stateHandle.Commit(false)
+
+	// NOTE See dump.json to see what account
+	// state looks like as of this point
+
 	// fmt.Println("Before slash apply", stateHandle.Dump())
+	dump := stateHandle.Dump()
+	if len(dump) > 0 {
+		//
+	}
 
 	slashResult, err := Apply(
 		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, slashRate,

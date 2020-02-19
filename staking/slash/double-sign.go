@@ -183,10 +183,11 @@ func delegatorSlashApply(
 	// fmt.Println("dump->", state.Dump())
 	// fmt.Println("count", len(snapshot.Delegations))
 
-	dump := state.Dump()
-	if len(dump) > 0 {
-		//
-	}
+	// dump := state.Dump()
+
+	// if len(dump) > 0 {
+	// 	//
+	// }
 
 	for i, delegationSnapshot := range snapshot.Delegations {
 		slashDebt, halfOfSlashDebt := applySlashRate(
