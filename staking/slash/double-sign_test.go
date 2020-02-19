@@ -110,25 +110,14 @@ const (
 	maxTotalDelegation = 13_000_000_000_000_000_000
 
 	// delegation creation parameters
-	delegationSnapshotI1    = 2_000_000_000_000_000_000
-	delegationSnapshotI2    = 1_500_000_000_000_000_000
-	delegationSnapshotTotal = delegationSnapshotI1 + delegationSnapshotI2
-	delegationCurrentI1     = 1_000_000_000_000_000_000
-	delegationCurrentI2     = 5_000_000_000_000_000
-	delegationCurrentTotal  = delegationCurrentI1 + delegationCurrentI2
-	slashRate               = 0.02
-	postSlash               = 1.0 - slashRate
-	undelegateI1            = delegationSnapshotI1 - delegationCurrentI1
-	undelegateI2            = delegationSnapshotI2 - delegationCurrentI2
+	delegationSnapshotI1 = 2_000_000_000_000_000_000
+	delegationSnapshotI2 = 3_000_000_000_000_000_000
 
-	expectedSlashI1 = delegationSnapshotI1 - (delegationSnapshotI1 * postSlash)
-	expectedSlashI2 = delegationSnapshotI2 - (delegationSnapshotI2 * postSlash)
-
-	// expected slashing results
-	expectSlash = expectedSlashI1
-	// expectSlash  = expectedSlashI1 + expectedSlashI2
-
-	expectSnitch = expectSlash / 2.0
+	delegationCurrentI1    = 1_000_000_000_000_000_000
+	delegationCurrentI2    = 500_000_000_000_000_000
+	delegationCurrentTotal = delegationCurrentI1 + delegationCurrentI2
+	undelegateI1           = delegationSnapshotI1 - delegationCurrentI1
+	undelegateI2           = delegationSnapshotI2 - delegationCurrentI2
 )
 
 var (
@@ -140,12 +129,30 @@ var (
 	header                     = block.Header{}
 	subCommittee               = []shard.BlsPublicKey{}
 
+	slashRate       = numeric.MustNewDecFromStr("0.80")
+	expectedSlashI1 = delegationSnapshotI1 * 0.80
+	expectedSlashI2 = delegationSnapshotI2 * 0.80
+
+	// expected slashing results
+	expectSlash  = expectedSlashI1 + expectedSlashI2
+	expectSnitch = expectSlash / 2.0
+
 	unit = func() interface{} {
-		// fmt.Println(
-		// 	postSlash, delegationSnapshotI1, expectedSlashI1,
-		// 	(expectedSlashI1+(delegationSnapshotI1*postSlash)) == delegationSnapshotI1,
-		// )
-		fmt.Println("started->", big.NewInt(expectedSlashI1))
+
+		if expectedSlashI1 > delegationCurrentI1 {
+			fmt.Printf(
+				"self delegation debt => slash %v, current amt %v find debt %v\n",
+				expectedSlashI1, delegationCurrentI1, delegationCurrentI1-expectedSlashI1,
+			)
+		}
+
+		if expectedSlashI2 > delegationCurrentI2 {
+			fmt.Printf(
+				"external delegation => slash %v, current amt %v find debt %v\n",
+				expectedSlashI2, delegationCurrentI2, delegationCurrentI2-expectedSlashI2,
+			)
+		}
+
 		// Ballot A setup
 		signerA.DeserializeHexStr(signerABLSPublicHex)
 		headerHashA, _ := hex.DecodeString(signerAHeaderHashHex)
@@ -200,8 +207,8 @@ var (
 		Details:         "someone",
 	}
 
-	shouldBeTotalSlashed      = big.NewInt(expectSlash)
-	shouldBeTotalSnitchReward = big.NewInt(expectSnitch)
+	shouldBeTotalSlashed      = big.NewInt(int64(expectSlash))
+	shouldBeTotalSnitchReward = big.NewInt(int64(expectSnitch))
 )
 
 func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) (
@@ -244,10 +251,8 @@ func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) 
 	return
 }
 
-func delegationPair() (
-	delegationsSnapshot, delegationsCurrent staking.Delegations,
-) {
-	delegationsSnapshot = staking.Delegations{
+func delegationPair() (staking.Delegations, staking.Delegations) {
+	delegationsSnapshot := staking.Delegations{
 		// NOTE  delegation is the validator themselves
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
@@ -255,16 +260,15 @@ func delegationPair() (
 			Reward:           big.NewInt(0),
 			Undelegations:    staking.Undelegations{},
 		},
-		// staking.Delegation{
-		// 	DelegatorAddress: randoDel,
-		// 	Amount:           big.NewInt(0).SetUint64(delegationSnapshotI2),
-		// 	Reward:           big.NewInt(0),
-		// 	Undelegations:    staking.Undelegations{},
-		// },
+		staking.Delegation{
+			DelegatorAddress: randoDel,
+			Amount:           big.NewInt(0).SetUint64(delegationSnapshotI2),
+			Reward:           big.NewInt(0),
+			Undelegations:    staking.Undelegations{},
+		},
 	}
 
-	delegationsCurrent = staking.Delegations{
-		// First delegation is the validator themselves
+	delegationsCurrent := staking.Delegations{
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
 			Amount:           big.NewInt(0).SetUint64(delegationCurrentI1),
@@ -277,19 +281,22 @@ func delegationPair() (
 			},
 		},
 		// some external delegator
-		// staking.Delegation{
-		// 	DelegatorAddress: randoDel,
-		// 	Amount:           big.NewInt(0).SetUint64(delegationCurrentI2),
-		// 	Reward:           big.NewInt(0),
-		// 	Undelegations: staking.Undelegations{
-		// 		staking.Undelegation{
-		// 			Amount: big.NewInt(undelegateI2),
-		// 			Epoch:  big.NewInt(doubleSignEpoch + 2),
-		// 		},
-		// 	},
-		// },
+		staking.Delegation{
+			DelegatorAddress: randoDel,
+			Amount:           big.NewInt(delegationCurrentI2),
+			Reward:           big.NewInt(0),
+			Undelegations: staking.Undelegations{
+				staking.Undelegation{
+					Amount: big.NewInt(undelegateI2),
+					Epoch:  big.NewInt(doubleSignEpoch + 2),
+				},
+			},
+		},
 	}
-	return
+
+	fmt.Println("the delegations", delegationsSnapshot.String(), "\n", delegationsCurrent.String())
+
+	return delegationsSnapshot, delegationsCurrent
 }
 
 func exampleSlashRecords() Records {
@@ -367,10 +374,10 @@ func TestApply(t *testing.T) {
 	// fmt.Println("Before slash apply", stateHandle.Dump())
 
 	slashResult, err := Apply(
-		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, subCommittee,
+		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, slashRate,
 	)
 
-	// fmt.Println("After slash apply", stateHandle.Dump())
+	fmt.Println("After slash apply", stateHandle.Dump())
 
 	if err != nil {
 		t.Fatalf("slash application failed %s", err.Error())

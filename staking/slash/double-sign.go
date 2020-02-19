@@ -159,9 +159,14 @@ var (
 func applySlashRate(
 	amount *big.Int, rate numeric.Dec,
 ) (*big.Int, *big.Int) {
+	leftOverPercent := numeric.OneDec().Sub(rate)
+
 	amountPostSlash := numeric.NewDecFromBigInt(
 		amount,
-	).Mul(numeric.OneDec().Sub(rate)).TruncateInt()
+	).Mul(leftOverPercent).TruncateInt()
+
+	// fmt.Println("leftover-percent", leftOverPercent, amount, amountPostSlash)
+
 	amountOfSlash := new(big.Int).Sub(amount, amountPostSlash)
 	return amountOfSlash, new(big.Int).Div(amountOfSlash, common.Big2)
 }
@@ -174,40 +179,24 @@ func delegatorSlashApply(
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 ) error {
-
+	totalSlashDebt := big.NewInt(0)
 	// fmt.Println("dump->", state.Dump())
-
 	// fmt.Println("count", len(snapshot.Delegations))
+
+	dump := state.Dump()
+	if len(dump) > 0 {
+		//
+	}
 
 	for i, delegationSnapshot := range snapshot.Delegations {
 		slashDebt, halfOfSlashDebt := applySlashRate(
 			delegationSnapshot.Amount, rate,
 		)
-
-		// fmt.Println(
-		// 	"initial-slash-debt",
-		// 	slashDebt,
-		// 	halfOfSlashDebt,
-		// 	common2.MustAddressToBech32(delegationSnapshot.DelegatorAddress),
-		// )
+		totalSlashDebt.Add(totalSlashDebt, slashDebt)
 
 		snapshotAddr := delegationSnapshot.DelegatorAddress
 		for j, delegationNow := range current.Delegations {
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
-				// if i == 0 {
-				// 	fmt.Println(
-				// 		"validator own delegation",
-				// 		"compare",
-				// 		"then\n",
-				// 		delegationSnapshot.String(),
-				// 		"\nnow\n",
-				// 		delegationNow.String(),
-				// 		"slash-debt",
-				// 		slashDebt,
-				// 	)
-				// } else if i == 1 {
-				// 	// fmt.Println("external delegator")
-				// }
 				state.AddBalance(reporter, halfOfSlashDebt)
 				slashTrack.TotalSnitchReward.Add(
 					slashTrack.TotalSnitchReward, halfOfSlashDebt,
@@ -217,12 +206,16 @@ func delegatorSlashApply(
 					paidOffExact                     = 0
 					debtCollectionsRepoUndelegations = -1
 				)
+
 				switch d := new(big.Int).Sub(nowAmt, slashDebt); d.Sign() {
 				case haveEnoughToPayOff, paidOffExact:
 					const validatorsOwnDelegation = 0
+					fmt.Println("did have enough to pay off")
+
 					slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
 					nowAmt.Sub(nowAmt, slashDebt)
 					slashDebt.SetInt64(0)
+
 					if i == validatorsOwnDelegation &&
 						j == validatorsOwnDelegation &&
 						nowAmt.Cmp(big.NewInt(denominations.One)) == -1 {
@@ -230,23 +223,38 @@ func delegatorSlashApply(
 						// a state update b/c of min-self-delegation
 						nowAmt.Set(big.NewInt(denominations.One))
 					}
-
 				case debtCollectionsRepoUndelegations:
+					fmt.Println("do not have enough to pay off")
+					debtLeft := new(big.Int).Abs(d)
+					// fmt.Println("called here", nowAmt, slashDebt, debtLeft,
+					// 	delegationSnapshot.String(),
+					// 	delegationNow.String(),
+					// )
 					slashDebt.Sub(slashDebt, nowAmt)
+					slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, nowAmt)
 					nowAmt.SetInt64(0)
 					for _, undelegate := range delegationNow.Undelegations {
 						// the epoch matters, only those undelegation
 						// such that epoch>= doubleSignEpoch should be slashable
 						if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
-							continue
+							// fmt.Println("correct case", undelegate)
+
+							// fmt.Println("undelegate-epochs", undelegate.Epoch, doubleSignEpoch)
+							if debtLeft.Cmp(common.Big0) <= 0 {
+								fmt.Println("should be paid off now", slashDebt)
+								// paid off the slash debt
+								break
+							}
+							useUp := new(big.Int).Sub(undelegate.Amount, slashDebt)
+							debtLeft.Sub(debtLeft, useUp)
+
+							// slashDebt.Sub(slashDebt, undelegate.Amount)
+							slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, useUp)
+							undelegate.Amount.SetInt64(0)
+
+							// fmt.Println("how much debt left", slashDebt, undelegate.Amount, useUp)
+
 						}
-						if slashDebt.Cmp(common.Big0) <= 0 {
-							// paid off the slash debt
-							break
-						}
-						slashDebt.Sub(slashDebt, undelegate.Amount)
-						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, undelegate.Amount)
-						undelegate.Amount.SetInt64(0)
 					}
 				}
 			}
@@ -263,7 +271,9 @@ func delegatorSlashApply(
 		// }
 
 	}
-	// fmt.Println("after delegator slash application", slashTrack.String())
+
+	// fmt.Println("end of call", totalSlashDebt)
+
 	return nil
 }
 
@@ -272,10 +282,12 @@ func delegatorSlashApply(
 // Apply ..
 func Apply(
 	chain staking.ValidatorSnapshotReader, state *state.DB,
-	slashes Records, committee []shard.BlsPublicKey,
+	slashes Records, rate numeric.Dec,
+	//	committee []shard.BlsPublicKey,
 ) (*Application, error) {
 	log := utils.Logger()
-	rate := Rate(uint32(len(slashes)), uint32(len(committee)))
+	// rate := Rate(uint32(len(slashes)), uint32(len(committee)))
+	fmt.Println("assuming rate of ", rate.String())
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 	log.Info().Int("count", len(slashes)).
 		Str("rate", rate.String()).
