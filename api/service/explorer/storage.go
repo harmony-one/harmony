@@ -49,9 +49,11 @@ func (storage *Storage) Init(ip, port string, remove bool) {
 	if remove {
 		var err = os.RemoveAll(dbFileName)
 		if err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to re	move existing database files")
+			utils.Logger().Error().Err(err).Msg("Failed to remove existing database files")
 		}
 	}
+	// https://github.com/ethereum/go-ethereum/blob/master/ethdb/leveldb/leveldb.go#L98 options.
+	// We had 0 for handles and cache params before, so set 0s for all of them. Filter opt is the same.
 	options := &opt.Options{
 		OpenFilesCacheCapacity: 0,
 		BlockCacheCapacity:     0,
