@@ -87,6 +87,7 @@ type Backend interface {
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
 	GetSuperCommittees() (*quorum.Transition, error)
+	GetTotalStakingSnapshot() *big.Int
 }
 
 // GetAPIs returns all the APIs.

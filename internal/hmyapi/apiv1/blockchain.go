@@ -523,6 +523,15 @@ var (
 	errNotBeaconChainShard = errors.New("cannot call this rpc on non beaconchain node")
 )
 
+// GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
+// explorer node
+func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetTotalStakingSnapshot(), nil
+	}
+	return nil, errNotBeaconChainShard
+}
+
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
@@ -804,12 +813,32 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 }
 
 // GetTotalSupply ..
-func (s *PublicBlockChainAPI) GetTotalSupply() numeric.Dec {
-	return numeric.NewDec(initSupply)
+func (s *PublicBlockChainAPI) GetTotalSupply() (numeric.Dec, error) {
+	return numeric.NewDec(initSupply), nil
 }
 
 // GetCirculatingSupply ..
-func (s *PublicBlockChainAPI) GetCirculatingSupply() numeric.Dec {
+func (s *PublicBlockChainAPI) GetCirculatingSupply() (numeric.Dec, error) {
 	timestamp := time.Now()
-	return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix()))
+	return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix())), nil
+}
+
+// GetStakingNetworkInfo ..
+func (s *PublicBlockChainAPI) GetStakingNetworkInfo(ctx context.Context) (*StakingNetworkInfo, error) {
+	if s.b.GetShardID() != shard.BeaconChainShardID {
+		return nil, errNotBeaconChainShard
+	}
+	totalStaking, _ := s.GetTotalStaking()
+	medianRawStake, _ := s.GetMedianRawStakeSnapshot()
+	epoch := s.LatestHeader(ctx).Epoch
+	epochLastBlock, _ := s.EpochLastBlock(epoch)
+	totalSupply, _ := s.GetTotalSupply()
+	circulatingSupply, _ := s.GetCirculatingSupply()
+	return &StakingNetworkInfo{
+		TotalSupply:       totalSupply,
+		CirculatingSupply: circulatingSupply,
+		EpochLastBlock:    epochLastBlock,
+		TotalStaking:      totalStaking,
+		MedianRawStake:    medianRawStake,
+	}, nil
 }
