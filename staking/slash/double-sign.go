@@ -154,6 +154,9 @@ var (
 	errBLSKeysNotEqual = errors.New(
 		"bls keys in ballots accompanying slash evidence not equal ",
 	)
+	errSlashDebtNotFullyAccountedFor = errors.New(
+		"slash debt was not fully accounted for, still non-zero",
+	)
 	errShardIDNotKnown              = errors.New("nil subcommittee for shardID")
 	errValidatorNotFoundDuringSlash = errors.New("validator not found")
 	zero                            = numeric.ZeroDec()
@@ -190,6 +193,7 @@ func delegatorSlashApply(
 		for j, delegationNow := range current.Delegations {
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
 				state.AddBalance(reporter, halfOfSlashDebt)
+				// NOTE only need to pay snitch here
 				slashTrack.TotalSnitchReward.Add(
 					slashTrack.TotalSnitchReward, halfOfSlashDebt,
 				)
@@ -198,6 +202,7 @@ func delegatorSlashApply(
 					// say my slash debt is 1.6, and my current amount is 1.2
 					// then while I can't drop below 1, I could still pay 0.2
 					// to bring my debt down to 1.4
+
 					if partialPayment := new(big.Int).Sub(
 						// 1.2 - 1
 						nowAmt, big.NewInt(denominations.One),
@@ -222,50 +227,52 @@ func delegatorSlashApply(
 								break
 							}
 							fmt.Println("before compare",
-								slashDebt,
 								undelegate.Amount,
+								slashDebt,
 							)
-							if diff := new(big.Int).Sub(
+							switch newBal := new(big.Int).Sub(
 								// My slash debt is 1.6 and my undelegate amount is 1.0
 								// so if (1.6 - 1.0) > 0
-								slashDebt,
 								undelegate.Amount,
-							); diff.Cmp(common.Big0) >= 0 {
-								fmt.Println("can use full funds",
-									slashDebt,
-									undelegate.Amount,
-								)
-								fullForfeit := undelegate.Amount
-								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, fullForfeit)
-								slashDebt.Sub(slashDebt, fullForfeit)
-								undelegate.Amount.Sub(undelegate.Amount, fullForfeit)
-								fmt.Println("now show ", slashTrack.String())
-							} else {
+								slashDebt); newBal.Cmp(common.Big0) {
+							case paidOffExact:
+								undelegate.Amount.SetInt64(0)
+							case haveEnoughToPayOff:
+								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
+								undelegate.Amount.Sub(undelegate.Amount, slashDebt)
+								slashDebt.SetInt64(0)
+								undelegate.Amount.Set(newBal)
+								fmt.Println("now show ", slashTrack.String(), slashDebt)
+							case -1:
 								fmt.Println("don't have enough to pay enough in this undelegate, keep going")
 							}
 						}
 					}
+
 					// NOTE at high slashing % rates, we could hit this situation
 					// because of the special casing of logic on min-self-delegation
 					if slashDebt.Cmp(common.Big0) != 0 {
-						// But just to balance the books
-						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
-						slashDebt.Sub(slashDebt, slashDebt)
+						// fmt.Println("could it be this -A?", slashTrack.String(), slashDebt)
+						// // But just to balance the books
+						// slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
+						// slashDebt.Sub(slashDebt, slashDebt)
+						// fmt.Println("could it be this -b?", slashTrack.String(), slashDebt)
 					}
+
 				} else {
 					// NOTE everyone else, that is every plain delegation
 					fmt.Println("slash debt now ", slashDebt.String(), nowAmt)
 
-					if diff := new(big.Int).Sub(
+					if newBal := new(big.Int).Sub(
 						// debt is 1.2, I have 0.5, so I can pay 1
 						// 1.2 - 0.5 > 0,
-						slashDebt, nowAmt,
+						nowAmt, slashDebt,
 						// 0.2 > 0 == true ?
-					); diff.Cmp(common.Big0) >= 0 {
+					); newBal.Cmp(common.Big0) >= 0 {
 						// Mutate wrt partial payment application
-						slashDebt.Sub(slashDebt, nowAmt)
-						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, nowAmt)
-						nowAmt.Sub(nowAmt, nowAmt)
+						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
+						slashDebt.Sub(slashDebt, slashDebt)
+						nowAmt.Set(newBal)
 					}
 					fmt.Println("slash debt now ", slashDebt.String())
 					// NOTE Assume did as much as could above, now check the undelegations
@@ -313,9 +320,11 @@ func delegatorSlashApply(
 				}
 			}
 		}
+		fmt.Println("final slashdebt amount", slashDebt)
 
-		fmt.Println("end of processing, what is slashdebt?", slashDebt)
-
+		if slashDebt.Cmp(common.Big0) == 1 {
+			return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
+		}
 	}
 	return nil
 }

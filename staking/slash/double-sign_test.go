@@ -112,15 +112,14 @@ const (
 	// delegation creation parameters
 	delegationSnapshotI1 = 2_000_000_000_000_000_000
 	delegationSnapshotI2 = 3_000_000_000_000_000_000
-	// now assume current in state
-	delegationCurrentI1 = 1_000_000_000_000_000_000
-	delegationCurrentI2 = 500_000_000_000_000_000
-	undelegateI1        = delegationSnapshotI1 - delegationCurrentI1
-	undelegateI2        = delegationSnapshotI2 - delegationCurrentI2
+	delegationCurrentI1  = 1_000_000_000_000_000_000
+	delegationCurrentI2  = 500_000_000_000_000_000
+	undelegateI1         = delegationSnapshotI1 - delegationCurrentI1
+	undelegateI2         = delegationSnapshotI2 - delegationCurrentI2
 
 	// Remember to change these in tandum
-	slashRate  = 0.80
-	slashRateS = "0.80"
+	slashRate  = 0.02
+	slashRateS = "0.02"
 
 	// Should be 4e+17
 	slashMagnitudeI1 = delegationSnapshotI1 * slashRate
@@ -159,6 +158,7 @@ var (
 
 		fmt.Println("expected values1",
 			delegationSnapshotI1,
+			delegationCurrentI1,
 			expectedBalancePostSlashI1,
 			slashMagnitudeI1,
 			slashAppliedToCurrentBalanceI1,
@@ -166,6 +166,7 @@ var (
 
 		fmt.Println("expected values2",
 			delegationSnapshotI2,
+			delegationCurrentI2,
 			expectedBalancePostSlashI2,
 			slashMagnitudeI2,
 			slashAppliedToCurrentBalanceI2,
@@ -431,11 +432,11 @@ func TestApply(t *testing.T) {
 
 	fmt.Println(slashResult.String())
 
-	// if sn := slashResult.TotalSlashed; sn.Cmp(shouldBeTotalSlashed) != 0 {
-	// 	t.Errorf(
-	// 		"total slash incorrect have %v want %v", sn, shouldBeTotalSlashed,
-	// 	)
-	// }
+	if sn := slashResult.TotalSlashed; sn.Cmp(shouldBeTotalSlashed) != 0 {
+		t.Errorf(
+			"total slash incorrect have %v want %v", sn, shouldBeTotalSlashed,
+		)
+	}
 
 	// if sn := slashResult.TotalSnitchReward; sn.Cmp(shouldBeTotalSnitchReward) != 0 {
 	// 	t.Errorf(
