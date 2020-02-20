@@ -226,10 +226,7 @@ func delegatorSlashApply(
 								// paid off the slash debt
 								break
 							}
-							fmt.Println("before compare",
-								undelegate.Amount,
-								slashDebt,
-							)
+
 							switch newBal := new(big.Int).Sub(
 								// My slash debt is 1.6 and my undelegate amount is 1.0
 								// so if (1.6 - 1.0) > 0
@@ -259,20 +256,12 @@ func delegatorSlashApply(
 					}
 				} else {
 					// NOTE everyone else, that is every plain delegation
-					fmt.Println("slash debt now ", slashDebt.String(), nowAmt)
-
-					if newBal := new(big.Int).Sub(
-						// debt is 1.2, I have 0.5, so I can pay 1
-						// 1.2 - 0.5 > 0,
-						nowAmt, slashDebt,
-						// 0.2 > 0 == true ?
-					); newBal.Cmp(common.Big0) >= 0 {
-						// Mutate wrt partial payment application
-						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
-						slashDebt.Sub(slashDebt, slashDebt)
-						nowAmt.Set(newBal)
+					if nowAmt.Cmp(common.Big0) == 1 {
+						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, nowAmt)
+						slashDebt.Sub(slashDebt, nowAmt)
+						nowAmt.SetUint64(0)
 					}
-					fmt.Println("slash debt now ", slashDebt.String())
+					fmt.Println("slash debt now ", slashDebt.String(), nowAmt)
 					// NOTE Assume did as much as could above, now check the undelegations
 					for _, undelegate := range delegationNow.Undelegations {
 						// the epoch matters, only those undelegation
@@ -285,42 +274,20 @@ func delegatorSlashApply(
 								// paid off the slash debt
 								break
 							}
-							fmt.Println("before compare",
-								"\n", slashDebt,
-								"\n", undelegate.Amount,
-							)
-							if diff := new(big.Int).Sub(
-								// My slash debt is 1.9 and my undelegate amount is 2.5
-								// so I can afford it, that is, (2.5 - 1.9) > 0 == True
-								undelegate.Amount,
-								slashDebt,
-							); diff.Cmp(common.Big0) >= 0 {
-								fmt.Println("can use full funds",
-									undelegate.Amount,
-									slashDebt,
-								)
-								fullForfeit := undelegate.Amount
-								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, fullForfeit)
+
+							if amt := undelegate.Amount; amt.Cmp(slashDebt) == 1 {
+								newBal := new(big.Int).Sub(amt, slashDebt)
+								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
+								amt.Set(newBal)
 								slashDebt.Sub(slashDebt, slashDebt)
-								undelegate.Amount.Sub(undelegate.Amount, fullForfeit)
-								fmt.Println("now show ", slashTrack.String())
-							} else {
-								// TODO try to pay as much as possible
-								fmt.Println(
-									"don't have enough to pay ",
-									slashDebt,
-									delegationNow.String(),
-									diff,
-								)
 							}
 						}
 					}
 				}
 			}
 		}
-		fmt.Println("final slashdebt amount", slashDebt)
 
-		if slashDebt.Cmp(common.Big0) == 1 {
+		if slashDebt.Cmp(common.Big0) != 0 {
 			return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
 		}
 	}

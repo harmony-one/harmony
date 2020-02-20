@@ -156,6 +156,7 @@ var (
 		fmt.Println("expected values1",
 			delegationSnapshotI1,
 			delegationCurrentI1,
+			undelegateI1,
 			expectedBalancePostSlashI1,
 			slashMagnitudeI1,
 			slashAppliedToCurrentBalanceI1,
@@ -164,6 +165,7 @@ var (
 		fmt.Println("expected values2",
 			delegationSnapshotI2,
 			delegationCurrentI2,
+			undelegateI2,
 			expectedBalancePostSlashI2,
 			slashMagnitudeI2,
 			slashAppliedToCurrentBalanceI2,
@@ -308,8 +310,6 @@ func delegationPair() (staking.Delegations, staking.Delegations) {
 		},
 	}
 
-	// fmt.Println("the delegations", delegationsSnapshot.String(), "\n", delegationsCurrent.String())
-
 	return delegationsSnapshot, delegationsCurrent
 }
 
@@ -349,7 +349,9 @@ type mockOutSnapshotReader struct {
 	snapshot staking.ValidatorWrapper
 }
 
-func (m mockOutSnapshotReader) ReadValidatorSnapshot(common.Address) (*staking.ValidatorWrapper, error) {
+func (m mockOutSnapshotReader) ReadValidatorSnapshot(
+	common.Address,
+) (*staking.ValidatorWrapper, error) {
 	return &m.snapshot, nil
 }
 
