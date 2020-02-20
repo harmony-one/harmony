@@ -479,3 +479,9 @@ type CallArgs struct {
 	Value    *hexutil.Big    `json:"value"`
 	Data     *hexutil.Bytes  `json:"data"`
 }
+
+type StakingNetworkInfo struct {
+	EpochLastBlock uint64   `json:"epoch-last-block"`
+	TotalStaking   *big.Int `json:"total-staking"`
+	MedianRawStake *big.Int `json:"median-raw-stake"`
+}

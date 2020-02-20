@@ -739,3 +739,19 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 	}
 	return nil, errNotBeaconChainShard
 }
+
+// GetStakingNetworkInfo ..
+func (s *PublicBlockChainAPI) GetStakingNetworkInfo(ctx context.Context) (*StakingNetworkInfo, error) {
+	if s.b.GetShardID() != shard.BeaconChainShardID {
+		return nil, errNotBeaconChainShard
+	}
+	totalStaking, _ := s.GetTotalStaking()
+	medianRawStake, _ := s.GetMedianRawStakeSnapshot()
+	epoch := s.GetEpoch(ctx)
+	epochLastBlock, _ := s.EpochLastBlock(epoch)
+	return &StakingNetworkInfo{
+		EpochLastBlock: epochLastBlock,
+		TotalStaking: totalStaking,
+		MedianRawStake: medianRawStake,
+	}, nil
+}
