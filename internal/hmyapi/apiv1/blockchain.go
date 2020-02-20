@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -21,6 +22,7 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -31,6 +33,7 @@ const (
 	defaultFromAddress  = "0x0000000000000000000000000000000000000000"
 	defaultBlocksPeriod = 15000
 	validatorsPageSize  = 100
+	initSupply          = int64(12600000000)
 )
 
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
@@ -798,4 +801,15 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 		return s.b.GetSuperCommittees()
 	}
 	return nil, errNotBeaconChainShard
+}
+
+// GetTotalSupply ..
+func (s *PublicBlockChainAPI) GetTotalSupply() numeric.Dec {
+	return numeric.NewDec(initSupply)
+}
+
+// GetCirculatingSupply ..
+func (s *PublicBlockChainAPI) GetCirculatingSupply() numeric.Dec {
+	timestamp := time.Now()
+	return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix()))
 }
