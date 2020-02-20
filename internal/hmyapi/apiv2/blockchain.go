@@ -537,13 +537,14 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 }
 
 // GetAllValidatorInformation returns information about all validators.
-func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, page int) []*staking.Validator {
+// If page is -1, return all else return the pagination.
+func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, page int) ([]*staking.Validator, error) {
 	if page < -1 {
-		return make([]*staking.Validator, 0)
+		return make([]*staking.Validator, 0), nil
 	}
 	addresses := s.b.GetAllValidatorAddresses()
 	if page != -1 && len(addresses) <= page*validatorsPageSize {
-		return make([]*staking.Validator, 0)
+		return make([]*staking.Validator, 0), nil
 	}
 	validatorsNum := len(addresses)
 	start := 0
@@ -552,15 +553,48 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, pa
 		start = page * validatorsPageSize
 		if len(addresses)-start < validatorsPageSize {
 			validatorsNum = len(addresses) - start
-		} else {
-			validatorsNum = validatorsPageSize
 		}
 	}
 	validators := make([]*staking.Validator, validatorsNum)
 	for i := start; i < start+validatorsNum; i++ {
 		validators[i] = s.b.GetValidatorInformation(addresses[i])
+		if validators[i] == nil {
+			addr, _ := internal_common.AddressToBech32(addresses[i])
+			return nil, fmt.Errorf("error when getting validator info of %s", addr)
+		}
 	}
-	return validators
+	return validators, nil
+}
+
+// GetAllDelegationInformation returns delegation information about `validatorsPageSize` validators,
+// starting at `page*validatorsPageSize`.
+// If page is -1, return all instead of `validatorsPageSize` elements.
+func (s *PublicBlockChainAPI) GetAllDelegationInformation(ctx context.Context, page int) ([][]*RPCDelegation, error) {
+	if page < -1 {
+		return make([][]*RPCDelegation, 0), nil
+	}
+	addresses := s.b.GetAllValidatorAddresses()
+	if page != -1 && len(addresses) <= page*validatorsPageSize {
+		return make([][]*RPCDelegation, 0), nil
+	}
+	validatorsNum := len(addresses)
+	start := 0
+	if page != -1 {
+		validatorsNum = validatorsPageSize
+		start = page * validatorsPageSize
+		if len(addresses)-start < validatorsPageSize {
+			validatorsNum = len(addresses) - start
+		}
+	}
+	validators := make([][]*RPCDelegation, validatorsNum)
+	var err error
+	for i := start; i < start+validatorsNum; i++ {
+		validators[i], err = s.GetDelegationsByValidator(ctx, addresses[i].String())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return validators, nil
 }
 
 // GetDelegationsByDelegator returns list of delegations for a delegator address.
