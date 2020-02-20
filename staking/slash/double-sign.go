@@ -1,13 +1,11 @@
 package slash
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/votepower"
@@ -109,10 +107,6 @@ func (r Record) String() string {
 
 // Verify checks that the signature is valid
 func Verify(chain committee.ChainReader, candidate *Record) error {
-	dump, _ := rlp.EncodeToBytes(candidate.Evidence.ProposalHeader)
-
-	fmt.Println("here is rlp dump of header for candidate ",
-		candidate.String(), hex.EncodeToString(dump))
 	first, second := candidate.AlreadyCastBallot, candidate.DoubleSignedBallot
 	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
 		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
@@ -180,12 +174,6 @@ func delegatorSlashApply(
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 ) error {
-	// fmt.Println("dump->", state.Dump())
-	// fmt.Println("count", len(snapshot.Delegations))
-	dump := state.Dump()
-	if len(dump) > 0 {
-		//
-	}
 	for i, delegationSnapshot := range snapshot.Delegations {
 		slashDebt := applySlashRate(delegationSnapshot.Amount, rate)
 		halfOfSlashDebt := new(big.Int).Div(slashDebt, common.Big2)
@@ -219,10 +207,7 @@ func delegatorSlashApply(
 						// the epoch matters, only those undelegation
 						// such that epoch>= doubleSignEpoch should be slashable
 						if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
-							// fmt.Println("correct case", undelegate)
-							// fmt.Println("undelegate-epochs", undelegate.Epoch, doubleSignEpoch)
 							if slashDebt.Cmp(common.Big0) <= 0 {
-								fmt.Println("should be paid off now", slashDebt)
 								// paid off the slash debt
 								break
 							}
@@ -261,16 +246,12 @@ func delegatorSlashApply(
 						slashDebt.Sub(slashDebt, nowAmt)
 						nowAmt.SetUint64(0)
 					}
-					fmt.Println("slash debt now ", slashDebt.String(), nowAmt)
 					// NOTE Assume did as much as could above, now check the undelegations
 					for _, undelegate := range delegationNow.Undelegations {
 						// the epoch matters, only those undelegation
 						// such that epoch>= doubleSignEpoch should be slashable
 						if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
-							// fmt.Println("correct case", undelegate)
-							// fmt.Println("undelegate-epochs", undelegate.Epoch, doubleSignEpoch)
 							if slashDebt.Cmp(common.Big0) <= 0 {
-								fmt.Println("should be paid off now", slashDebt)
 								// paid off the slash debt
 								break
 							}
@@ -300,11 +281,8 @@ func delegatorSlashApply(
 func Apply(
 	chain staking.ValidatorSnapshotReader, state *state.DB,
 	slashes Records, rate numeric.Dec,
-	//	committee []shard.BlsPublicKey,
 ) (*Application, error) {
 	log := utils.Logger()
-	// rate := Rate(uint32(len(slashes)), uint32(len(committee)))
-	// fmt.Println("assuming rate of ", rate.String())
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 	log.Info().Int("count", len(slashes)).
 		Str("rate", rate.String()).
@@ -348,13 +326,11 @@ func Apply(
 		if err := state.UpdateStakingInfo(
 			snapshot.Address, current,
 		); err != nil {
-			fmt.Println("cannot update current", err.Error())
 			return nil, err
 		}
 	}
 
 	log.Info().Str("rate", rate.String()).Int("count", len(slashes))
-	// fmt.Println("applying slash with a rate of", rate, slashes, slashDiff.String())
 	return slashDiff, nil
 }
 

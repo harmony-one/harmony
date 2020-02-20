@@ -2,7 +2,6 @@ package slash
 
 import (
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -153,24 +152,6 @@ var (
 			panic("bad constant time values for computation on slash - delegation 2")
 		}
 
-		fmt.Println("expected values1",
-			delegationSnapshotI1,
-			delegationCurrentI1,
-			undelegateI1,
-			expectedBalancePostSlashI1,
-			slashMagnitudeI1,
-			slashAppliedToCurrentBalanceI1,
-		)
-
-		fmt.Println("expected values2",
-			delegationSnapshotI2,
-			delegationCurrentI2,
-			undelegateI2,
-			expectedBalancePostSlashI2,
-			slashMagnitudeI2,
-			slashAppliedToCurrentBalanceI2,
-		)
-
 		// Ballot A setup
 		signerA.DeserializeHexStr(signerABLSPublicHex)
 		headerHashA, _ := hex.DecodeString(signerAHeaderHashHex)
@@ -201,7 +182,6 @@ var (
 			k.DeserializeHexStr(hexK)
 			subCommittee = append(subCommittee, *shard.FromLibBLSPublicKeyUnsafe(k))
 		}
-		// fmt.Println("header from rlp!", header.String())
 		return nil
 	}()
 
@@ -381,8 +361,6 @@ func TestApply(t *testing.T) {
 	stateHandle.IntermediateRoot(false)
 	stateHandle.Commit(false)
 
-	dump := stateHandle.Dump()
-
 	if err := stateHandle.UpdateStakingInfo(
 		offenderAddr, &validatorCurrent,
 	); err != nil {
@@ -394,26 +372,15 @@ func TestApply(t *testing.T) {
 
 	// NOTE See dump.json to see what account
 	// state looks like as of this point
-
-	// fmt.Println("Before slash apply", stateHandle.Dump())
-	dump = stateHandle.Dump()
-	if len(dump) > 0 {
-		//
-	}
-
 	slashRateH := numeric.MustNewDecFromStr(slashRateS)
 
 	slashResult, err := Apply(
 		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, slashRateH,
 	)
 
-	// fmt.Println("After slash apply", stateHandle.Dump())
-
 	if err != nil {
 		t.Fatalf("slash application failed %s", err.Error())
 	}
-
-	fmt.Println(slashResult.String())
 
 	if sn := slashResult.TotalSlashed; sn.Cmp(expectSlash) != 0 {
 		t.Errorf(
