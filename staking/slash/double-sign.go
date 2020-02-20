@@ -254,9 +254,68 @@ func delegatorSlashApply(
 					}
 				} else {
 					// NOTE everyone else, that is every plain delegation
+					fmt.Println("slash debt now ", slashDebt.String(), nowAmt)
+
+					if diff := new(big.Int).Sub(
+						// debt is 1.2, I have 0.5, so I can pay 1
+						// 1.2 - 0.5 > 0,
+						slashDebt, nowAmt,
+						// 0.2 > 0 == true ?
+					); diff.Cmp(common.Big0) >= 0 {
+						// Mutate wrt partial payment application
+						slashDebt.Sub(slashDebt, nowAmt)
+						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, nowAmt)
+						nowAmt.Sub(nowAmt, nowAmt)
+					}
+					fmt.Println("slash debt now ", slashDebt.String())
+					// NOTE Assume did as much as could above, now check the undelegations
+					for _, undelegate := range delegationNow.Undelegations {
+						// the epoch matters, only those undelegation
+						// such that epoch>= doubleSignEpoch should be slashable
+						if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
+							// fmt.Println("correct case", undelegate)
+							// fmt.Println("undelegate-epochs", undelegate.Epoch, doubleSignEpoch)
+							if slashDebt.Cmp(common.Big0) <= 0 {
+								fmt.Println("should be paid off now", slashDebt)
+								// paid off the slash debt
+								break
+							}
+							fmt.Println("before compare",
+								"\n", slashDebt,
+								"\n", undelegate.Amount,
+							)
+							if diff := new(big.Int).Sub(
+								// My slash debt is 1.9 and my undelegate amount is 2.5
+								// so I can afford it, that is, (2.5 - 1.9) > 0 == True
+								undelegate.Amount,
+								slashDebt,
+							); diff.Cmp(common.Big0) >= 0 {
+								fmt.Println("can use full funds",
+									undelegate.Amount,
+									slashDebt,
+								)
+								fullForfeit := undelegate.Amount
+								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, fullForfeit)
+								slashDebt.Sub(slashDebt, slashDebt)
+								undelegate.Amount.Sub(undelegate.Amount, fullForfeit)
+								fmt.Println("now show ", slashTrack.String())
+							} else {
+								// TODO try to pay as much as possible
+								fmt.Println(
+									"don't have enough to pay ",
+									slashDebt,
+									delegationNow.String(),
+									diff,
+								)
+							}
+						}
+					}
 				}
 			}
 		}
+
+		fmt.Println("end of processing, what is slashdebt?", slashDebt)
+
 	}
 	return nil
 }
