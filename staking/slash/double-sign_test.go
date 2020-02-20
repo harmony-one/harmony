@@ -2,6 +2,7 @@ package slash
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -17,6 +18,25 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
+)
+
+var (
+	commonCommission = staking.Commission{
+		CommissionRates: staking.CommissionRates{
+			Rate:          numeric.MustNewDecFromStr("0.167983520183826780"),
+			MaxRate:       numeric.MustNewDecFromStr("0.179184469782137200"),
+			MaxChangeRate: numeric.MustNewDecFromStr("0.152212761523253600"),
+		},
+		UpdateHeight: big.NewInt(10),
+	}
+
+	commonDescr = staking.Description{
+		Name:            "someoneA",
+		Identity:        "someoneB",
+		Website:         "someoneC",
+		SecurityContact: "someoneD",
+		Details:         "someoneE",
+	}
 )
 
 const (
@@ -100,29 +120,76 @@ const (
 	// validator creation parameters
 	lastEpochInComm = 5
 	creationHeight  = 33
-	// the minimial by protocol, 1 ONE
-	minSelfDelgation   = 1_000_000_000_000_000_000
-	maxTotalDelegation = 13_000_000_000_000_000_000
-	// delegation creation parameters
-	delegationSnapshotI1 = 2_000_000_000_000_000_000
-	delegationSnapshotI2 = 3_000_000_000_000_000_000
-	delegationCurrentI1  = 1_000_000_000_000_000_000
-	delegationCurrentI2  = 500_000_000_000_000_000
-	undelegateI1         = delegationSnapshotI1 - delegationCurrentI1
-	undelegateI2         = delegationSnapshotI2 - delegationCurrentI2
-	// Remember to change these in tandum
-	slashRate                  = 0.02
-	slashRateS                 = "0.02"
-	slashMagnitudeI1           = delegationSnapshotI1 * slashRate
-	slashMagnitudeI2           = delegationSnapshotI2 * slashRate
-	expectedBalancePostSlashI1 = delegationSnapshotI1 - slashMagnitudeI1
-	expectedBalancePostSlashI2 = delegationSnapshotI2 - slashMagnitudeI2
-	// expected slashing results 0.1 ONE
-	expectTotalSlashMagnitudeTwoPercent    = 100_000_000_000_000_000
-	expectTotalSlashMagnitudeEightyPercent = 4 * denominations.One
-	slashAppliedToCurrentBalanceI1         = delegationCurrentI1 - slashMagnitudeI1
-	slashAppliedToCurrentBalanceI2         = delegationCurrentI2 - slashMagnitudeI2
 )
+
+type details struct {
+	MagnitudeI1 *big.Int
+	MagnitudeI2 *big.Int
+	Rate        float64
+}
+
+type scenario struct {
+	minSelfDelgation,
+	maxTotalDelegation,
+	// delegation creation parameters
+	delegationSnapshotI1,
+	delegationSnapshotI2,
+	delegationCurrentI1,
+	delegationCurrentI2,
+	undelegateI1,
+	undelegateI2 uint64
+	slash  *details
+	result *Application
+}
+
+func defaultFundingScenario() *scenario {
+	return &scenario{
+		minSelfDelgation:     1_000_000_000_000_000_000,
+		maxTotalDelegation:   13_000_000_000_000_000_000,
+		delegationSnapshotI1: 2_000_000_000_000_000_000,
+		delegationSnapshotI2: 3_000_000_000_000_000_000,
+		delegationCurrentI1:  1_000_000_000_000_000_000,
+		delegationCurrentI2:  500_000_000_000_000_000,
+		slash:                nil,
+		result:               nil,
+	}
+}
+
+var (
+	scenarioTwoPercent    = defaultFundingScenario()
+	scenarioEightyPercent = defaultFundingScenario()
+)
+
+func init() {
+	{
+		s := scenarioTwoPercent
+		s.undelegateI1 = s.delegationSnapshotI1 - s.delegationCurrentI1
+		s.undelegateI2 = s.delegationSnapshotI2 - s.delegationCurrentI2
+		s.slash = &details{
+			Rate:        0.02,
+			MagnitudeI1: new(big.Int).SetUint64(0.04 * denominations.One),
+			MagnitudeI2: new(big.Int).SetUint64(0.06 * denominations.One),
+		}
+		s.result = &Application{
+			TotalSlashed:      big.NewInt(0.1 * denominations.One),
+			TotalSnitchReward: big.NewInt(0.05 * denominations.One),
+		}
+	}
+	{
+		s := scenarioEightyPercent
+		s.undelegateI1 = s.delegationSnapshotI1 - s.delegationCurrentI1
+		s.undelegateI2 = s.delegationSnapshotI2 - s.delegationCurrentI2
+		s.slash = &details{
+			Rate:        0.80,
+			MagnitudeI1: new(big.Int).SetUint64(1.6 * denominations.One),
+			MagnitudeI2: new(big.Int).SetUint64(2.4 * denominations.One),
+		}
+		s.result = &Application{
+			TotalSlashed:      big.NewInt(4 * denominations.One),
+			TotalSnitchReward: big.NewInt(2 * denominations.One),
+		}
+	}
+}
 
 var (
 	signerA, signerB           = &bls.PublicKey{}, &bls.PublicKey{}
@@ -132,42 +199,21 @@ var (
 	randoDel                   = common.Address{}
 	header                     = block.Header{}
 	subCommittee               = []shard.BlsPublicKey{}
-	expectSlash                = big.NewInt(0)
 
 	unit = func() interface{} {
-
-		if slashRateS == "0.80" {
-			expectSlash.SetUint64(expectTotalSlashMagnitudeEightyPercent)
-		}
-
-		if slashRateS == "0.02" {
-			expectSlash.SetUint64(expectTotalSlashMagnitudeTwoPercent)
-		}
-
-		if expectedBalancePostSlashI1+slashMagnitudeI1 != delegationSnapshotI1 {
-			panic("bad constant time values for computation on slash - delegation 1")
-		}
-
-		if expectedBalancePostSlashI2+slashMagnitudeI2 != delegationSnapshotI2 {
-			panic("bad constant time values for computation on slash - delegation 2")
-		}
-
 		// Ballot A setup
 		signerA.DeserializeHexStr(signerABLSPublicHex)
 		headerHashA, _ := hex.DecodeString(signerAHeaderHashHex)
 		hashA = common.BytesToHash(headerHashA)
 		signatureA.DeserializeHexStr(signerABLSSignature)
-
 		// Ballot B setup
 		signerB.DeserializeHexStr(signerBBLSPublicHex)
 		headerHashB, _ := hex.DecodeString(signerBHeaderHashHex)
 		hashB = common.BytesToHash(headerHashB)
 		signatureB.DeserializeHexStr(signerBBLSSignature)
-
 		reporterAddr, _ = common2.Bech32ToAddress(reporterBech32)
 		offenderAddr, _ = common2.Bech32ToAddress(offenderBech32)
 		randoDel, _ = common2.Bech32ToAddress(randoDelegatorBech32)
-		// TODO Do rlp decode on bytes for this header
 		headerData, err := hex.DecodeString(proposalHeaderRLPBytes)
 		if err != nil {
 			panic("test case has bad input")
@@ -187,33 +233,18 @@ var (
 
 	blsWrapA, blsWrapB = *shard.FromLibBLSPublicKeyUnsafe(signerA),
 		*shard.FromLibBLSPublicKeyUnsafe(signerB)
-
-	commonCommission = staking.Commission{
-		CommissionRates: staking.CommissionRates{
-			Rate:          numeric.MustNewDecFromStr("0.167983520183826780"),
-			MaxRate:       numeric.MustNewDecFromStr("0.179184469782137200"),
-			MaxChangeRate: numeric.MustNewDecFromStr("0.152212761523253600"),
-		},
-		UpdateHeight: big.NewInt(10),
-	}
-
-	commonDescr = staking.Description{
-		Name:            "someone",
-		Identity:        "someone",
-		Website:         "someone",
-		SecurityContact: "someone",
-		Details:         "someone",
-	}
-	expectSnitch = new(big.Int).Div(expectSlash, big.NewInt(2))
 )
 
-func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) (
-	validatorSnapshot, validatorCurrent staking.ValidatorWrapper,
+func (s *scenario) validatorPair(
+	delegationsSnapshot, delegationsCurrent staking.Delegations,
+) (
+	*staking.ValidatorWrapper, *staking.ValidatorWrapper,
 ) {
 	minSelf, maxDel :=
-		big.NewInt(minSelfDelgation), big.NewInt(0).SetUint64(maxTotalDelegation)
+		new(big.Int).SetUint64(s.minSelfDelgation),
+		new(big.Int).SetUint64(s.maxTotalDelegation)
 
-	validatorSnapshot = staking.ValidatorWrapper{
+	validatorSnapshot := &staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
@@ -229,7 +260,7 @@ func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) 
 		Delegations: delegationsSnapshot,
 	}
 
-	validatorCurrent = staking.ValidatorWrapper{
+	validatorCurrent := &staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
@@ -244,21 +275,21 @@ func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) 
 		},
 		Delegations: delegationsCurrent,
 	}
-	return
+	return validatorSnapshot, validatorCurrent
 }
 
-func delegationPair() (staking.Delegations, staking.Delegations) {
+func (s *scenario) delegationPair() (staking.Delegations, staking.Delegations) {
 	delegationsSnapshot := staking.Delegations{
 		// NOTE  delegation is the validator themselves
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           big.NewInt(0).SetUint64(delegationSnapshotI1),
+			Amount:           big.NewInt(0).SetUint64(s.delegationSnapshotI1),
 			Reward:           big.NewInt(0),
 			Undelegations:    staking.Undelegations{},
 		},
 		staking.Delegation{
 			DelegatorAddress: randoDel,
-			Amount:           big.NewInt(0).SetUint64(delegationSnapshotI2),
+			Amount:           big.NewInt(0).SetUint64(s.delegationSnapshotI2),
 			Reward:           big.NewInt(0),
 			Undelegations:    staking.Undelegations{},
 		},
@@ -267,11 +298,11 @@ func delegationPair() (staking.Delegations, staking.Delegations) {
 	delegationsCurrent := staking.Delegations{
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           big.NewInt(0).SetUint64(delegationCurrentI1),
+			Amount:           big.NewInt(0).SetUint64(s.delegationCurrentI1),
 			Reward:           big.NewInt(0),
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
-					Amount: big.NewInt(undelegateI1),
+					Amount: new(big.Int).SetUint64(s.undelegateI1),
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
@@ -279,11 +310,11 @@ func delegationPair() (staking.Delegations, staking.Delegations) {
 		// some external delegator
 		staking.Delegation{
 			DelegatorAddress: randoDel,
-			Amount:           big.NewInt(delegationCurrentI2),
+			Amount:           new(big.Int).SetUint64(s.delegationCurrentI2),
 			Reward:           big.NewInt(0),
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
-					Amount: big.NewInt(undelegateI2),
+					Amount: new(big.Int).SetUint64(s.undelegateI2),
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
@@ -339,21 +370,20 @@ func TestVerify(t *testing.T) {
 	//
 }
 
-func TestApply(t *testing.T) {
-	st := ethdb.NewMemDatabase()
-	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
-	slashes := exampleSlashRecords()
-	validatorSnapshot, validatorCurrent := validatorPair(delegationPair())
+// TODO a more granular approach
+func testDelegatorSlashApply() {
 
-	for _, addr := range []common.Address{reporterAddr, offenderAddr, randoDel} {
-		stateHandle.CreateAccount(addr)
-	}
+}
 
-	stateHandle.SetBalance(offenderAddr, big.NewInt(0).SetUint64(1994680320000000000))
-	stateHandle.SetBalance(randoDel, big.NewInt(0).SetUint64(1999975592000000000))
+func testScenario(
+	t *testing.T, stateHandle *state.DB, slashes Records, s *scenario,
+) {
+	validatorSnapshot, validatorCurrent := scenarioTwoPercent.validatorPair(
+		scenarioTwoPercent.delegationPair(),
+	)
 
 	if err := stateHandle.UpdateStakingInfo(
-		offenderAddr, &validatorSnapshot,
+		offenderAddr, validatorSnapshot,
 	); err != nil {
 		t.Fatalf("creation of validator failed %s", err.Error())
 	}
@@ -362,7 +392,7 @@ func TestApply(t *testing.T) {
 	stateHandle.Commit(false)
 
 	if err := stateHandle.UpdateStakingInfo(
-		offenderAddr, &validatorCurrent,
+		offenderAddr, validatorCurrent,
 	); err != nil {
 		t.Fatalf("update of validator failed %s", err.Error())
 	}
@@ -373,25 +403,61 @@ func TestApply(t *testing.T) {
 	// state looks like as of this point
 
 	slashResult, err := Apply(
-		mockOutSnapshotReader{validatorSnapshot},
+		mockOutSnapshotReader{*validatorSnapshot},
 		stateHandle,
 		slashes,
-		numeric.MustNewDecFromStr(slashRateS),
+		numeric.MustNewDecFromStr(
+			fmt.Sprintf("%f", s.slash.Rate),
+		),
 	)
 
 	if err != nil {
-		t.Fatalf("slash application failed %s", err.Error())
+		t.Fatalf("rate: %v, slash application failed %s", s.slash.Rate, err.Error())
 	}
 
-	if sn := slashResult.TotalSlashed; sn.Cmp(expectSlash) != 0 {
+	if sn := slashResult.TotalSlashed; sn.Cmp(
+		s.result.TotalSlashed,
+	) != 0 {
 		t.Errorf(
-			"total slash incorrect have %v want %v", sn, expectSlash,
+			"total slash incorrect have %v want %v",
+			sn,
+			s.result.TotalSlashed,
 		)
 	}
 
-	if sn := slashResult.TotalSnitchReward; sn.Cmp(expectSnitch) != 0 {
+	if sn := slashResult.TotalSnitchReward; sn.Cmp(
+		s.result.TotalSnitchReward,
+	) != 0 {
 		t.Errorf(
-			"total snitch incorrect have %v want %v", sn, expectSnitch,
+			"total snitch incorrect have %v want %v",
+			sn,
+			s.result.TotalSnitchReward,
 		)
 	}
+}
+
+func defaultStateWithAccountsApplied() *state.DB {
+	st := ethdb.NewMemDatabase()
+	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
+	for _, addr := range []common.Address{reporterAddr, offenderAddr, randoDel} {
+		stateHandle.CreateAccount(addr)
+	}
+	stateHandle.SetBalance(offenderAddr, big.NewInt(0).SetUint64(1994680320000000000))
+	stateHandle.SetBalance(randoDel, big.NewInt(0).SetUint64(1999975592000000000))
+	return stateHandle
+}
+
+func TestApply(t *testing.T) {
+	slashes := exampleSlashRecords()
+
+	{
+		stateHandle := defaultStateWithAccountsApplied()
+		testScenario(t, stateHandle, slashes, scenarioTwoPercent)
+	}
+
+	{
+		stateHandle := defaultStateWithAccountsApplied()
+		testScenario(t, stateHandle, slashes, scenarioEightyPercent)
+	}
+
 }
