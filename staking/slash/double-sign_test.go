@@ -111,8 +111,8 @@ const (
 	undelegateI1         = delegationSnapshotI1 - delegationCurrentI1
 	undelegateI2         = delegationSnapshotI2 - delegationCurrentI2
 	// Remember to change these in tandum
-	slashRate                  = 0.80
-	slashRateS                 = "0.80"
+	slashRate                  = 0.02
+	slashRateS                 = "0.02"
 	slashMagnitudeI1           = delegationSnapshotI1 * slashRate
 	slashMagnitudeI2           = delegationSnapshotI2 * slashRate
 	expectedBalancePostSlashI1 = delegationSnapshotI1 - slashMagnitudeI1
@@ -369,13 +369,14 @@ func TestApply(t *testing.T) {
 
 	stateHandle.IntermediateRoot(false)
 	stateHandle.Commit(false)
-
 	// NOTE See dump.json to see what account
 	// state looks like as of this point
-	slashRateH := numeric.MustNewDecFromStr(slashRateS)
 
 	slashResult, err := Apply(
-		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, slashRateH,
+		mockOutSnapshotReader{validatorSnapshot},
+		stateHandle,
+		slashes,
+		numeric.MustNewDecFromStr(slashRateS),
 	)
 
 	if err != nil {

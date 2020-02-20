@@ -328,11 +328,15 @@ func (e *engineImpl) Finalize(
 		fmt.Println("Before slash", state.Dump())
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
+		rate := slash.Rate(
+			len(doubleSigners),
+			len(superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys()),
+		)
 		if slashApplied, err = slash.Apply(
 			chain,
 			state,
 			doubleSigners,
-			superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys(),
+			rate,
 		); err != nil {
 			fmt.Println("ERROR->Could not apply->", err.Error())
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)

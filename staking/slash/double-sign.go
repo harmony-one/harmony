@@ -190,7 +190,6 @@ func delegatorSlashApply(
 					// say my slash debt is 1.6, and my current amount is 1.2
 					// then while I can't drop below 1, I could still pay 0.2
 					// to bring my debt down to 1.4
-
 					if partialPayment := new(big.Int).Sub(
 						// 1.2 - 1
 						nowAmt, big.NewInt(denominations.One),
@@ -201,7 +200,6 @@ func delegatorSlashApply(
 						nowAmt.Sub(nowAmt, partialPayment)
 						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, partialPayment)
 					}
-
 					// NOTE Assume did as much as could above, now check the undelegations
 					for _, undelegate := range delegationNow.Undelegations {
 						// the epoch matters, only those undelegation
@@ -235,16 +233,19 @@ func delegatorSlashApply(
 					}
 					// NOTE at high slashing % rates, we could hit this situation
 					// because of the special casing of logic on min-self-delegation
-					if slashDebt.Cmp(common.Big0) != 0 {
+					if slashDebt.Cmp(common.Big0) == 1 {
 						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
 						slashDebt.Sub(slashDebt, slashDebt)
 					}
 				} else {
 					// NOTE everyone else, that is every plain delegation
-					if nowAmt.Cmp(common.Big0) == 1 {
-						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, nowAmt)
-						slashDebt.Sub(slashDebt, nowAmt)
-						nowAmt.SetUint64(0)
+					// Current delegation has some money and slashdebt is still not paid off
+					// so contribute as much as can with current delegation amount
+					if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
+						newBal := new(big.Int).Sub(nowAmt, slashDebt)
+						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
+						slashDebt.Sub(slashDebt, slashDebt)
+						nowAmt.Set(newBal)
 					}
 					// NOTE Assume did as much as could above, now check the undelegations
 					for _, undelegate := range delegationNow.Undelegations {
@@ -256,7 +257,8 @@ func delegatorSlashApply(
 								break
 							}
 
-							if amt := undelegate.Amount; amt.Cmp(slashDebt) == 1 {
+							if amt := undelegate.Amount; amt.Cmp(common.Big0) == 1 &&
+								slashDebt.Cmp(common.Big0) == 1 {
 								newBal := new(big.Int).Sub(amt, slashDebt)
 								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
 								amt.Set(newBal)
@@ -335,7 +337,7 @@ func Apply(
 }
 
 // Rate is the slashing % rate
-func Rate(doubleSignerCount, committeeSize uint32) numeric.Dec {
+func Rate(doubleSignerCount, committeeSize int) numeric.Dec {
 	if doubleSignerCount == 0 || committeeSize == 0 {
 		return zero
 	}
