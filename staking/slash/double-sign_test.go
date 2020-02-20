@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -118,10 +119,10 @@ const (
 	expectedBalancePostSlashI1 = delegationSnapshotI1 - slashMagnitudeI1
 	expectedBalancePostSlashI2 = delegationSnapshotI2 - slashMagnitudeI2
 	// expected slashing results 0.1 ONE
-	expectTotalSlashMagnitude      = 100_000_000_000_000_000
-	expectSnitch                   = expectTotalSlashMagnitude / 2.0
-	slashAppliedToCurrentBalanceI1 = delegationCurrentI1 - slashMagnitudeI1
-	slashAppliedToCurrentBalanceI2 = delegationCurrentI2 - slashMagnitudeI2
+	expectTotalSlashMagnitudeTwoPercent    = 100_000_000_000_000_000
+	expectTotalSlashMagnitudeEightyPercent = 4 * denominations.One
+	slashAppliedToCurrentBalanceI1         = delegationCurrentI1 - slashMagnitudeI1
+	slashAppliedToCurrentBalanceI2         = delegationCurrentI2 - slashMagnitudeI2
 )
 
 var (
@@ -132,8 +133,17 @@ var (
 	randoDel                   = common.Address{}
 	header                     = block.Header{}
 	subCommittee               = []shard.BlsPublicKey{}
+	expectSlash                = big.NewInt(0)
 
 	unit = func() interface{} {
+
+		if slashRateS == "0.80" {
+			expectSlash.SetUint64(expectTotalSlashMagnitudeEightyPercent)
+		}
+
+		if slashRateS == "0.02" {
+			expectSlash.SetUint64(expectTotalSlashMagnitudeTwoPercent)
+		}
 
 		if expectedBalancePostSlashI1+slashMagnitudeI1 != delegationSnapshotI1 {
 			panic("bad constant time values for computation on slash - delegation 1")
@@ -158,8 +168,6 @@ var (
 			slashMagnitudeI2,
 			slashAppliedToCurrentBalanceI2,
 		)
-
-		fmt.Println("total slash", expectTotalSlashMagnitude)
 
 		// Ballot A setup
 		signerA.DeserializeHexStr(signerABLSPublicHex)
@@ -214,9 +222,7 @@ var (
 		SecurityContact: "someone",
 		Details:         "someone",
 	}
-
-	shouldBeTotalSlashed      = big.NewInt(int64(expectTotalSlashMagnitude))
-	shouldBeTotalSnitchReward = big.NewInt(int64(expectSnitch))
+	expectSnitch = new(big.Int).Div(expectSlash, big.NewInt(2))
 )
 
 func validatorPair(delegationsSnapshot, delegationsCurrent staking.Delegations) (
@@ -407,15 +413,15 @@ func TestApply(t *testing.T) {
 
 	fmt.Println(slashResult.String())
 
-	if sn := slashResult.TotalSlashed; sn.Cmp(shouldBeTotalSlashed) != 0 {
+	if sn := slashResult.TotalSlashed; sn.Cmp(expectSlash) != 0 {
 		t.Errorf(
-			"total slash incorrect have %v want %v", sn, shouldBeTotalSlashed,
+			"total slash incorrect have %v want %v", sn, expectSlash,
 		)
 	}
 
-	if sn := slashResult.TotalSnitchReward; sn.Cmp(shouldBeTotalSnitchReward) != 0 {
+	if sn := slashResult.TotalSnitchReward; sn.Cmp(expectSnitch) != 0 {
 		t.Errorf(
-			"total snitch incorrect have %v want %v", sn, shouldBeTotalSnitchReward,
+			"total snitch incorrect have %v want %v", sn, expectSnitch,
 		)
 	}
 }
