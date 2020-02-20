@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/numeric"
 )
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
@@ -480,8 +481,11 @@ type CallArgs struct {
 	Data     *hexutil.Bytes  `json:"data"`
 }
 
+// StakingNetworkInfo returns global staking info.
 type StakingNetworkInfo struct {
-	EpochLastBlock uint64   `json:"epoch-last-block"`
-	TotalStaking   *big.Int `json:"total-staking"`
-	MedianRawStake *big.Int `json:"median-raw-stake"`
+	TotalSupply       numeric.Dec `json:"total-supply"`
+	CirculatingSupply numeric.Dec `json:"circulating-supply"`
+	EpochLastBlock    uint64      `json:"epoch-last-block"`
+	TotalStaking      *big.Int    `json:"total-staking"`
+	MedianRawStake    *big.Int    `json:"median-raw-stake"`
 }
