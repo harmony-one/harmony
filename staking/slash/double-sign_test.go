@@ -112,8 +112,8 @@ const (
 	undelegateI1         = delegationSnapshotI1 - delegationCurrentI1
 	undelegateI2         = delegationSnapshotI2 - delegationCurrentI2
 	// Remember to change these in tandum
-	slashRate                  = 0.02
-	slashRateS                 = "0.02"
+	slashRate                  = 0.80
+	slashRateS                 = "0.80"
 	slashMagnitudeI1           = delegationSnapshotI1 * slashRate
 	slashMagnitudeI2           = delegationSnapshotI2 * slashRate
 	expectedBalancePostSlashI1 = delegationSnapshotI1 - slashMagnitudeI1

@@ -242,18 +242,15 @@ func delegatorSlashApply(
 								undelegate.Amount.Sub(undelegate.Amount, slashDebt)
 								slashDebt.SetInt64(0)
 								undelegate.Amount.Set(newBal)
-								fmt.Println("now show 3", slashTrack.String(), slashDebt)
 							case -1:
 								// But do have enough to pay off something at least
-								partialPayment := new(big.Int).Abs(newBal)
+								partialPayment := new(big.Int).Sub(slashDebt, new(big.Int).Abs(newBal))
 								slashDebt.Sub(slashDebt, partialPayment)
 								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, partialPayment)
 								undelegate.Amount.SetInt64(0)
-								fmt.Println("now show 2", slashTrack.String(), slashDebt)
 							}
 						}
 					}
-
 					// NOTE at high slashing % rates, we could hit this situation
 					// because of the special casing of logic on min-self-delegation
 					if slashDebt.Cmp(common.Big0) != 0 {
