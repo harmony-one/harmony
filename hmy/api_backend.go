@@ -35,6 +35,11 @@ type APIBackend struct {
 		BlockHeight    int64
 		MedianRawStake *big.Int
 	}
+	TotalStakingCache struct {
+		sync.Mutex
+		BlockHeight  int64
+		TotalStaking *big.Int
+	}
 }
 
 // ChainDb ...
@@ -375,6 +380,30 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 		b.MedianStakeCache.MedianRawStake = stakes[l/2]
 	}
 	return b.MedianStakeCache.MedianRawStake
+}
+
+// GetTotalStakingSnapshot ..
+func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
+	b.TotalStakingCache.Lock()
+	defer b.TotalStakingCache.Unlock()
+	if b.TotalStakingCache.BlockHeight != -1 && b.TotalStakingCache.BlockHeight > int64(rpc.LatestBlockNumber)-20 {
+		return b.TotalStakingCache.TotalStaking
+	}
+	b.TotalStakingCache.BlockHeight = int64(rpc.LatestBlockNumber)
+	candidates := b.hmy.BlockChain().ValidatorCandidates()
+	if len(candidates) == 0 {
+		b.TotalStakingCache.TotalStaking = big.NewInt(0)
+		return b.TotalStakingCache.TotalStaking
+	}
+	stakes := big.NewInt(0)
+	for i := range candidates {
+		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
+		for i := range validator.Delegations {
+			stakes.Add(stakes, validator.Delegations[i].Amount)
+		}
+	}
+	b.TotalStakingCache.TotalStaking = stakes
+	return b.TotalStakingCache.TotalStaking
 }
 
 // GetValidatorStats returns the stats of validator

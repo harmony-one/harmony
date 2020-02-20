@@ -520,6 +520,15 @@ var (
 	errNotBeaconChainShard = errors.New("cannot call this rpc on non beaconchain node")
 )
 
+// GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
+// explorer node
+func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetTotalStakingSnapshot(), nil
+	}
+	return nil, errNotBeaconChainShard
+}
+
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
