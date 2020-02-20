@@ -770,18 +770,12 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 }
 
 // GetTotalSupply ..
-func (s *PublicBlockChainAPI) GetTotalSupply() (numeric.Dec, error) {
-	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return numeric.NewDec(initSupply), nil
-	}
-	return numeric.NewDec(0), errNotBeaconChainShard
+func (s *PublicBlockChainAPI) GetTotalSupply() numeric.Dec {
+	return numeric.NewDec(initSupply)
 }
 
 // GetCirculatingSupply ..
-func (s *PublicBlockChainAPI) GetCirculatingSupply() (numeric.Dec, error) {
-	if s.b.GetShardID() == shard.BeaconChainShardID {
-		timestamp := time.Now()
-		return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix())), nil
-	}
-	return numeric.NewDec(0), errNotBeaconChainShard
+func (s *PublicBlockChainAPI) GetCirculatingSupply() numeric.Dec {
+	timestamp := time.Now()
+	return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix()))
 }
