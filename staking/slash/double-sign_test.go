@@ -32,7 +32,6 @@ const (
 		"2c4a09b06b2eec3e851f08f3070f3" +
 		"804b35fe4a2033725f073623e3870756141ebc" +
 		"2a6495478930c428f6e6b25f292dab8552d30c"
-
 	// ballot B hex values
 	signerBBLSPublicHex = "be23bc3c93fe14a25f3533" +
 		"feee1cff1c60706845a490" +
@@ -44,7 +43,6 @@ const (
 		"932a95f48133f886140cefbe4d690eddd0540d246df1fec" +
 		"8b4f719ad9de0bc822f0a1bf70e78b321a5e4462ba3e3efd" +
 		"cd24c21b9cb24ed6b26f02785a2cdbd168696c5f4a49b6c00f00994"
-
 	// RLP encoded header
 	proposalHeaderRLPBytes = "f9039187486d6e79546764827633f90383a080532768867d8c1a96" +
 		"6ae9df80d4efc9a9a83559b0e2d13b2aa819a6a7627c7294" +
@@ -81,7 +79,6 @@ const (
 		"8a00c493fb77a87a094dbf08130c3f93793337be78167b8b241d7ef9e" +
 		"1fab1f8097dda339a6ca2737c291d8a7733c9b5b540ea30544c46" +
 		"a0426a34f60d3f010580"
-
 	// trailing bech32 info
 	reporterBech32 = "one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"
 	offenderBech32 = "one1zyxauxquys60dk824p532jjdq753pnsenrgmef"
@@ -94,21 +91,18 @@ const (
 	commK4 = "2d61379e44a772e5757e27ee2b3874254f56073e6bd226eb8b160371cc3c18b8c4977bd3dcb71fd57dc62bf0e143fd08"
 	commK5 = "86dc2fdc2ceec18f6923b99fd86a68405c132e1005cf1df72dca75db0adfaeb53d201d66af37916d61f079f34f21fb96"
 	commK6 = "95117937cd8c09acd2dfae847d74041a67834ea88662a7cbed1e170350bc329e53db151e5a0ef3e712e35287ae954818"
-
 	// double signing info
 	doubleSignShardID     = 0
 	doubleSignEpoch       = 3
 	doubleSignBlockNumber = 37
 	doubleSignViewID      = 38
 	doubleSignUnixNano    = 1582049233802498300
-
 	// validator creation parameters
 	lastEpochInComm = 5
 	creationHeight  = 33
 	// the minimial by protocol, 1 ONE
 	minSelfDelgation   = 1_000_000_000_000_000_000
 	maxTotalDelegation = 13_000_000_000_000_000_000
-
 	// delegation creation parameters
 	delegationSnapshotI1 = 2_000_000_000_000_000_000
 	delegationSnapshotI2 = 3_000_000_000_000_000_000
@@ -116,23 +110,16 @@ const (
 	delegationCurrentI2  = 500_000_000_000_000_000
 	undelegateI1         = delegationSnapshotI1 - delegationCurrentI1
 	undelegateI2         = delegationSnapshotI2 - delegationCurrentI2
-
 	// Remember to change these in tandum
-	slashRate  = 0.02
-	slashRateS = "0.02"
-
-	// Should be 4e+17
-	slashMagnitudeI1 = delegationSnapshotI1 * slashRate
-	slashMagnitudeI2 = delegationSnapshotI2 * slashRate
-
-	// Should be 1.6e+18
+	slashRate                  = 0.02
+	slashRateS                 = "0.02"
+	slashMagnitudeI1           = delegationSnapshotI1 * slashRate
+	slashMagnitudeI2           = delegationSnapshotI2 * slashRate
 	expectedBalancePostSlashI1 = delegationSnapshotI1 - slashMagnitudeI1
 	expectedBalancePostSlashI2 = delegationSnapshotI2 - slashMagnitudeI2
-
-	// expected slashing results
-	expectTotalSlashMagnitude = slashMagnitudeI1 + slashMagnitudeI2
-	expectSnitch              = expectTotalSlashMagnitude / 2.0
-
+	// expected slashing results 0.1 ONE
+	expectTotalSlashMagnitude      = 100_000_000_000_000_000
+	expectSnitch                   = expectTotalSlashMagnitude / 2.0
 	slashAppliedToCurrentBalanceI1 = delegationCurrentI1 - slashMagnitudeI1
 	slashAppliedToCurrentBalanceI2 = delegationCurrentI2 - slashMagnitudeI2
 )
@@ -172,19 +159,7 @@ var (
 			slashAppliedToCurrentBalanceI2,
 		)
 
-		// if expectedSlashI1 > delegationCurrentI1 {
-		// 	fmt.Printf(
-		// 		"self delegation debt => slash %v, current amt %v find debt %v\n",
-		// 		expectedSlashI1, delegationCurrentI1, delegationCurrentI1-expectedSlashI1,
-		// 	)
-		// }
-
-		// if expectedSlashI2 > delegationCurrentI2 {
-		// 	fmt.Printf(
-		// 		"external delegation => slash %v, current amt %v find debt %v\n",
-		// 		expectedSlashI2, delegationCurrentI2, delegationCurrentI2-expectedSlashI2,
-		// 	)
-		// }
+		fmt.Println("total slash", expectTotalSlashMagnitude)
 
 		// Ballot A setup
 		signerA.DeserializeHexStr(signerABLSPublicHex)
@@ -438,9 +413,9 @@ func TestApply(t *testing.T) {
 		)
 	}
 
-	// if sn := slashResult.TotalSnitchReward; sn.Cmp(shouldBeTotalSnitchReward) != 0 {
-	// 	t.Errorf(
-	// 		"total snitch incorrect have %v want %v", sn, shouldBeTotalSnitchReward,
-	// 	)
-	// }
+	if sn := slashResult.TotalSnitchReward; sn.Cmp(shouldBeTotalSnitchReward) != 0 {
+		t.Errorf(
+			"total snitch incorrect have %v want %v", sn, shouldBeTotalSnitchReward,
+		)
+	}
 }
