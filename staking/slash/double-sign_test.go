@@ -118,6 +118,25 @@ const (
 	delegationCurrentTotal = delegationCurrentI1 + delegationCurrentI2
 	undelegateI1           = delegationSnapshotI1 - delegationCurrentI1
 	undelegateI2           = delegationSnapshotI2 - delegationCurrentI2
+
+	// Remember to change these in tandum
+	slashRate  = 0.80
+	slashRateS = "0.80"
+
+	// Should be 4e+17
+	slashMagnitudeI1 = delegationSnapshotI1 * slashRate
+	slashMagnitudeI2 = delegationSnapshotI2 * slashRate
+
+	// Should be 1.6e+18
+	expectedBalancePostSlashI1 = delegationSnapshotI1 - slashMagnitudeI1
+	expectedBalancePostSlashI2 = delegationSnapshotI2 - slashMagnitudeI2
+
+	// expected slashing results
+	expectTotalSlashMagnitude = slashMagnitudeI1 + slashMagnitudeI2
+	expectSnitch              = expectTotalSlashMagnitude / 2.0
+
+	slashAppliedToCurrentBalanceI1 = delegationCurrentI1 - slashMagnitudeI1
+	slashAppliedToCurrentBalanceI2 = delegationCurrentI2 - slashMagnitudeI2
 )
 
 var (
@@ -129,29 +148,43 @@ var (
 	header                     = block.Header{}
 	subCommittee               = []shard.BlsPublicKey{}
 
-	slashRate       = numeric.MustNewDecFromStr("0.80")
-	expectedSlashI1 = delegationSnapshotI1 * 0.80
-	expectedSlashI2 = delegationSnapshotI2 * 0.80
-
-	// expected slashing results
-	expectSlash  = expectedSlashI1 + expectedSlashI2
-	expectSnitch = expectSlash / 2.0
-
 	unit = func() interface{} {
 
-		if expectedSlashI1 > delegationCurrentI1 {
-			fmt.Printf(
-				"self delegation debt => slash %v, current amt %v find debt %v\n",
-				expectedSlashI1, delegationCurrentI1, delegationCurrentI1-expectedSlashI1,
-			)
+		if expectedBalancePostSlashI1+slashMagnitudeI1 != delegationSnapshotI1 {
+			panic("bad constant time values for computation on slash - delegation 1")
 		}
 
-		if expectedSlashI2 > delegationCurrentI2 {
-			fmt.Printf(
-				"external delegation => slash %v, current amt %v find debt %v\n",
-				expectedSlashI2, delegationCurrentI2, delegationCurrentI2-expectedSlashI2,
-			)
+		if expectedBalancePostSlashI2+slashMagnitudeI2 != delegationSnapshotI2 {
+			panic("bad constant time values for computation on slash - delegation 2")
 		}
+
+		fmt.Println("expected values1",
+			delegationSnapshotI1,
+			expectedBalancePostSlashI1,
+			slashMagnitudeI1,
+			slashAppliedToCurrentBalanceI1,
+		)
+
+		fmt.Println("expected values2",
+			delegationSnapshotI2,
+			expectedBalancePostSlashI2,
+			slashMagnitudeI2,
+			slashAppliedToCurrentBalanceI2,
+		)
+
+		// if expectedSlashI1 > delegationCurrentI1 {
+		// 	fmt.Printf(
+		// 		"self delegation debt => slash %v, current amt %v find debt %v\n",
+		// 		expectedSlashI1, delegationCurrentI1, delegationCurrentI1-expectedSlashI1,
+		// 	)
+		// }
+
+		// if expectedSlashI2 > delegationCurrentI2 {
+		// 	fmt.Printf(
+		// 		"external delegation => slash %v, current amt %v find debt %v\n",
+		// 		expectedSlashI2, delegationCurrentI2, delegationCurrentI2-expectedSlashI2,
+		// 	)
+		// }
 
 		// Ballot A setup
 		signerA.DeserializeHexStr(signerABLSPublicHex)
@@ -183,7 +216,7 @@ var (
 			k.DeserializeHexStr(hexK)
 			subCommittee = append(subCommittee, *shard.FromLibBLSPublicKeyUnsafe(k))
 		}
-		fmt.Println("header from rlp!", header.String())
+		// fmt.Println("header from rlp!", header.String())
 		return nil
 	}()
 
@@ -207,7 +240,7 @@ var (
 		Details:         "someone",
 	}
 
-	shouldBeTotalSlashed      = big.NewInt(int64(expectSlash))
+	shouldBeTotalSlashed      = big.NewInt(int64(expectTotalSlashMagnitude))
 	shouldBeTotalSnitchReward = big.NewInt(int64(expectSnitch))
 )
 
@@ -294,7 +327,7 @@ func delegationPair() (staking.Delegations, staking.Delegations) {
 		},
 	}
 
-	fmt.Println("the delegations", delegationsSnapshot.String(), "\n", delegationsCurrent.String())
+	// fmt.Println("the delegations", delegationsSnapshot.String(), "\n", delegationsCurrent.String())
 
 	return delegationsSnapshot, delegationsCurrent
 }
@@ -362,6 +395,11 @@ func TestApply(t *testing.T) {
 		t.Fatalf("creation of validator failed %s", err.Error())
 	}
 
+	stateHandle.IntermediateRoot(false)
+	stateHandle.Commit(false)
+
+	dump := stateHandle.Dump()
+
 	if err := stateHandle.UpdateStakingInfo(
 		offenderAddr, &validatorCurrent,
 	); err != nil {
@@ -375,16 +413,18 @@ func TestApply(t *testing.T) {
 	// state looks like as of this point
 
 	// fmt.Println("Before slash apply", stateHandle.Dump())
-	dump := stateHandle.Dump()
+	dump = stateHandle.Dump()
 	if len(dump) > 0 {
 		//
 	}
 
+	slashRateH := numeric.MustNewDecFromStr(slashRateS)
+
 	slashResult, err := Apply(
-		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, slashRate,
+		mockOutSnapshotReader{validatorSnapshot}, stateHandle, slashes, slashRateH,
 	)
 
-	fmt.Println("After slash apply", stateHandle.Dump())
+	// fmt.Println("After slash apply", stateHandle.Dump())
 
 	if err != nil {
 		t.Fatalf("slash application failed %s", err.Error())

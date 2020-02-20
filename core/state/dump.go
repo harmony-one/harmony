@@ -63,10 +63,11 @@ func (db *DB) RawDump() Dump {
 		if err := rlp.DecodeBytes(obj.Code(db.db), &wrapper); err != nil {
 			//
 		} else {
+
 			marsh, err := json.Marshal(wrapper)
 			if err == nil {
-				fmt.Println("as wrapped", wrapper.String())
-				fmt.Printf("and per field %+v \n", wrapper)
+				// fmt.Println("as wrapped", wrapper.String())
+				// fmt.Printf("and per field %+v \n", wrapper)
 
 				wrap = string(marsh)
 			}

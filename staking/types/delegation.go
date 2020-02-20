@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/hash"
+	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
 var (
@@ -24,10 +25,10 @@ const (
 // owned by one delegator, and is associated with the voting power of one
 // validator.
 type Delegation struct {
-	DelegatorAddress common.Address `json:"delegator-address"`
-	Amount           *big.Int       `json:"amount"`
-	Reward           *big.Int       `json:"reward"`
-	Undelegations    Undelegations  `json:"undelegations"`
+	DelegatorAddress common.Address
+	Amount           *big.Int
+	Reward           *big.Int
+	Undelegations    Undelegations
 }
 
 // Delegations ..
@@ -37,6 +38,18 @@ type Delegations []Delegation
 func (d Delegations) String() string {
 	s, _ := json.Marshal(d)
 	return string(s)
+}
+
+// MarshalJSON ..
+func (d Delegation) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		DelegatorAddress string        `json:"delegator-address"`
+		Amount           *big.Int      `json:"amount"`
+		Reward           *big.Int      `json:"reward"`
+		Undelegations    Undelegations `json:"undelegations"`
+	}{common2.MustAddressToBech32(d.DelegatorAddress), d.Amount,
+		d.Reward, d.Undelegations,
+	})
 }
 
 func (d Delegation) String() string {

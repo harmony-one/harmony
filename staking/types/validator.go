@@ -63,6 +63,11 @@ type ValidatorWrapper struct {
 	}
 }
 
+// MarshalJSON ..
+// func (v *ValidatorWrapper) MarshalJSON() ([]byte, error) {
+
+// }
+
 // VotePerShard ..
 type VotePerShard struct {
 	ShardID     uint32      `json:"shard-id"`
