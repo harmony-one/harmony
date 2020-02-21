@@ -242,10 +242,19 @@ func delegatorSlashApply(
 					// Current delegation has some money and slashdebt is still not paid off
 					// so contribute as much as can with current delegation amount
 					if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
-						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, nowAmt)
-						slashDebt.Sub(slashDebt, nowAmt)
-						nowAmt.Set(common.Big0)
+						// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
+						if nowAmt.Cmp(slashDebt) >= 0 {
+							slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
+							nowAmt.Sub(nowAmt, slashDebt)
+							slashDebt.Sub(slashDebt, slashDebt)
+						} else {
+							// 0.50_amount < 2.4_debt =>, slash == 1.9, nowAmt == 0.0
+							slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, nowAmt)
+							slashDebt.Sub(slashDebt, nowAmt)
+							nowAmt.Sub(nowAmt, nowAmt)
+						}
 					}
+
 					// NOTE Assume did as much as could above, now check the undelegations
 					for _, undelegate := range delegationNow.Undelegations {
 						// the epoch matters, only those undelegation
