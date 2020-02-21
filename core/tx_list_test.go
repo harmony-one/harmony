@@ -30,7 +30,7 @@ func TestStrictTxListAdd(t *testing.T) {
 	// Generate a list of transactions to insert
 	key, _ := crypto.GenerateKey()
 
-	txs := make(types.Transactions, 1024)
+	txs := make(types.PoolTransactions, 1024)
 	for i := 0; i < len(txs); i++ {
 		txs[i] = transaction(uint64(i), 0, key)
 	}

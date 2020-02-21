@@ -55,7 +55,6 @@ type Worker struct {
 func (w *Worker) CommitTransactions(
 	pendingNormal map[common.Address]types.Transactions,
 	pendingStaking staking.StakingTransactions, coinbase common.Address,
-	stkingTxErrorSink func([]staking.RPCTransactionError),
 ) error {
 
 	if w.current.gasPool == nil {
@@ -64,7 +63,6 @@ func (w *Worker) CommitTransactions(
 
 	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
 	coalescedLogs := []*types.Log{}
-	erroredStakingTxns := []staking.RPCTransactionError{}
 	// NORMAL
 	for {
 		// If we don't have enough gas for any further transactions then we're done
@@ -134,12 +132,6 @@ func (w *Worker) CommitTransactions(
 			logs, err := w.commitStakingTransaction(tx, coinbase)
 			if err != nil {
 				txID := tx.Hash().Hex()
-				erroredStakingTxns = append(erroredStakingTxns, staking.RPCTransactionError{
-					TxHashID:             txID,
-					StakingDirective:     tx.StakingType().String(),
-					TimestampOfRejection: time.Now().Unix(),
-					ErrMessage:           err.Error(),
-				})
 				utils.Logger().Error().Err(err).
 					Str("stakingTxId", txID).
 					Msg("Commit staking transaction error")
@@ -151,8 +143,6 @@ func (w *Worker) CommitTransactions(
 			}
 		}
 	}
-	// Here call the error functions
-	stkingTxErrorSink(erroredStakingTxns)
 
 	utils.Logger().Info().
 		Int("newTxns", len(w.current.txs)).

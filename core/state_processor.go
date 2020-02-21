@@ -282,7 +282,7 @@ func StakingToMessage(tx *staking.StakingTransaction, blockNum *big.Int) (types.
 		return types.Message{}, err
 	}
 
-	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.Price(), payload, blockNum)
+	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.GasPrice(), payload, blockNum)
 	stkType := tx.StakingType()
 	if _, ok := types.StakingTypeMap[stkType]; !ok {
 		return types.Message{}, staking.ErrInvalidStakingKind

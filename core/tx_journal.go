@@ -17,15 +17,22 @@
 package core
 
 import (
-	"errors"
 	"io"
 	"os"
+
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking/types"
+)
+
+const (
+	plainTxID   = uint64(1)
+	stakingTxID = uint64(2)
 )
 
 // errNoActiveJournal is returned if a transaction is attempted to be inserted
@@ -55,9 +62,26 @@ func newTxJournal(path string) *txJournal {
 	}
 }
 
+// writeJournalTx writes a transaction journal tx to file with a leading uint64
+// to identify the written transaction.
+func writeJournalTx(writer io.WriteCloser, tx types.PoolTransaction) error {
+	if _, ok := tx.(*types.Transaction); ok {
+		if _, err := writer.Write([]byte{byte(plainTxID)}); err != nil {
+			return err
+		}
+	} else if _, ok := tx.(*staking.StakingTransaction); ok {
+		if _, err := writer.Write([]byte{byte(stakingTxID)}); err != nil {
+			return err
+		}
+	} else {
+		return types.ErrUnknownPoolTxType
+	}
+	return tx.EncodeRLP(writer)
+}
+
 // load parses a transaction journal dump from disk, loading its contents into
 // the specified pool.
-func (journal *txJournal) load(add func([]*types.Transaction) []error) error {
+func (journal *txJournal) load(add func(types.PoolTransactions) []error) error {
 	// Skip the parsing if the journal file doesn't exist at all
 	if _, err := os.Stat(journal.path); os.IsNotExist(err) {
 		return nil
@@ -76,11 +100,12 @@ func (journal *txJournal) load(add func([]*types.Transaction) []error) error {
 	// Inject all transactions from the journal into the pool
 	stream := rlp.NewStream(input, 0)
 	total, dropped := 0, 0
+	batch := types.PoolTransactions{}
 
 	// Create a method to load a limited batch of transactions and bump the
 	// appropriate progress counters. Then use this method to load all the
 	// journaled transactions in small-ish batches.
-	loadBatch := func(txs types.Transactions) {
+	loadBatch := func(txs types.PoolTransactions) {
 		for _, err := range add(txs) {
 			if err != nil {
 				utils.Logger().Error().Err(err).Msg("Failed to add journaled transaction")
@@ -88,21 +113,41 @@ func (journal *txJournal) load(add func([]*types.Transaction) []error) error {
 			}
 		}
 	}
-	var (
-		failure error
-		batch   types.Transactions
-	)
 	for {
-		// Parse the next transaction and terminate on error
-		tx := new(types.Transaction)
-		if err = stream.Decode(tx); err != nil {
-			if err != io.EOF {
-				failure = err
+		// Parse the next transaction and terminate on errors
+		var tx types.PoolTransaction
+		switch txType, err := stream.Uint(); txType {
+		case plainTxID:
+			tx = new(types.Transaction)
+		case stakingTxID:
+			tx = new(staking.StakingTransaction)
+		default:
+			if err != nil {
+				if err == io.EOF { // reached end of journal file, exit with no error after loading batch
+					err = nil
+				} else {
+					utils.Logger().Info().
+						Int("transactions", total).
+						Int("dropped", dropped).
+						Msg("Loaded local transaction journal")
+				}
+				if batch.Len() > 0 {
+					loadBatch(batch)
+				}
+				return err
 			}
+		}
+
+		if err = stream.Decode(tx); err != nil {
+			// should never hit EOF here with the leading ID journal tx encoding scheme.
+			utils.Logger().Info().
+				Int("transactions", total).
+				Int("dropped", dropped).
+				Msg("Loaded local transaction journal")
 			if batch.Len() > 0 {
 				loadBatch(batch)
 			}
-			break
+			return err
 		}
 		// New transaction parsed, queue up for later, import if threshold is reached
 		total++
@@ -112,25 +157,19 @@ func (journal *txJournal) load(add func([]*types.Transaction) []error) error {
 			batch = batch[:0]
 		}
 	}
-	utils.Logger().Info().
-		Int("transactions", total).
-		Int("dropped", dropped).
-		Msg("Loaded local transaction journal")
-
-	return failure
 }
 
 // insert adds the specified transaction to the local disk journal.
-func (journal *txJournal) insert(tx *types.Transaction) error {
+func (journal *txJournal) insert(tx types.PoolTransaction) error {
 	if journal.writer == nil {
 		return errNoActiveJournal
 	}
-	return rlp.Encode(journal.writer, tx)
+	return writeJournalTx(journal.writer, tx)
 }
 
 // rotate regenerates the transaction journal based on the current contents of
 // the transaction pool.
-func (journal *txJournal) rotate(all map[common.Address]types.Transactions) error {
+func (journal *txJournal) rotate(all map[common.Address]types.PoolTransactions) error {
 	// Close the current journal (if any is open)
 	if journal.writer != nil {
 		if err := journal.writer.Close(); err != nil {
@@ -146,7 +185,7 @@ func (journal *txJournal) rotate(all map[common.Address]types.Transactions) erro
 	journaled := 0
 	for _, txs := range all {
 		for _, tx := range txs {
-			if err = rlp.Encode(replacement, tx); err != nil {
+			if err = writeJournalTx(replacement, tx); err != nil {
 				replacement.Close()
 				return err
 			}

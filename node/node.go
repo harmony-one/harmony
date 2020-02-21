@@ -134,9 +134,6 @@ type Node struct {
 
 	CxPool *core.CxPool // pool for missing cross shard receipts resend
 
-	pendingStakingTransactions map[common.Hash]*staking.StakingTransaction // All the staking transactions received but not yet processed for Consensus
-	pendingStakingTxMutex      sync.Mutex
-
 	Worker       *worker.Worker
 	BeaconWorker *worker.Worker // worker for beacon chain
 
@@ -282,50 +279,45 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) {
-	node.TxPool.AddRemotes(newTxs)
+	poolTxs := types.PoolTransactions{}
+	for _, tx := range newTxs {
+		poolTxs = append(poolTxs, tx)
+	}
+	node.TxPool.AddRemotes(poolTxs)
 
 	pendingCount, queueCount := node.TxPool.Stats()
-	utils.Logger().Info().Int("length of newTxs", len(newTxs)).Int("totalPending", pendingCount).Int("totalQueued", queueCount).Msg("Got more transactions")
+	utils.Logger().Info().
+		Int("length of newTxs", len(newTxs)).
+		Int("totalPending", pendingCount).
+		Int("totalQueued", queueCount).
+		Msg("Got more transactions")
 }
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
-	// TODO: incorporate staking txn into TxPool
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
-		node.pendingStakingTxMutex.Lock()
+		poolTxs := types.PoolTransactions{}
 		for _, tx := range newStakingTxs {
-			const txPoolLimit = 1000
-			if s := len(node.pendingStakingTransactions); s >= txPoolLimit {
-				utils.Logger().Info().
-					Int("tx-pool-size", s).
-					Int("tx-pool-limit", txPoolLimit).
-					Msg("Current staking txn pool reached limit")
-				break
-			}
-			if _, ok := node.pendingStakingTransactions[tx.Hash()]; !ok {
-				node.pendingStakingTransactions[tx.Hash()] = tx
-			}
+			poolTxs = append(poolTxs, tx)
 		}
+		node.TxPool.AddRemotes(poolTxs)
+		pendingCount, queueCount := node.TxPool.Stats()
 		utils.Logger().Info().
-			Int("length of newStakingTxs", len(newStakingTxs)).
-			Int("totalPending", len(node.pendingStakingTransactions)).
+			Int("length of newStakingTxs", len(poolTxs)).
+			Int("totalPending", pendingCount).
+			Int("totalQueued", queueCount).
 			Msg("Got more staking transactions")
-		node.pendingStakingTxMutex.Unlock()
 	}
 }
 
 // AddPendingStakingTransaction staking transactions
-func (node *Node) AddPendingStakingTransaction(
-	newStakingTx *staking.StakingTransaction) {
-	// TODO: everyone should record staking txns, not just leader
-	if node.Consensus.IsLeader() &&
-		node.NodeConfig.ShardID == shard.BeaconChainShardID {
+func (node *Node) AddPendingStakingTransaction(newStakingTx *staking.StakingTransaction) {
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
-	} else {
-		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
-		node.tryBroadcastStaking(newStakingTx)
 	}
+	utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
+	node.tryBroadcastStaking(newStakingTx)
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
@@ -333,9 +325,6 @@ func (node *Node) AddPendingStakingTransaction(
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	if newTx.ShardID() == node.NodeConfig.ShardID {
 		node.addPendingTransactions(types.Transactions{newTx})
-		if node.NodeConfig.Role() != nodeconfig.ExplorerNode {
-			return
-		}
 	}
 	utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
 	node.tryBroadcast(newTx)
@@ -515,7 +504,16 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 					}
 					node.errorSink.Unlock()
 				}
-			})
+			},
+			func(payload []staking.RPCTransactionError) {
+				node.errorSink.Lock()
+				for i := range payload {
+					node.errorSink.failedStakingTxns.Value = payload[i]
+					node.errorSink.failedStakingTxns = node.errorSink.failedStakingTxns.Next()
+				}
+				node.errorSink.Unlock()
+			},
+		)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
@@ -526,7 +524,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		}
 
 		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
-		node.pendingStakingTransactions = make(map[common.Hash]*staking.StakingTransaction)
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 		chain.Engine.SetBeaconchain(beaconChain)

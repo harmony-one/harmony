@@ -13,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -20,6 +22,7 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -30,6 +33,7 @@ const (
 	defaultFromAddress  = "0x0000000000000000000000000000000000000000"
 	defaultBlocksPeriod = 15000
 	validatorsPageSize  = 100
+	initSupply          = int64(12600000000)
 )
 
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
@@ -177,6 +181,22 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 		"validators": validators,
 	}
 	return result, nil
+}
+
+// IsLastBlock checks if block is last epoch block.
+func (s *PublicBlockChainAPI) IsLastBlock(blockNum uint64) (bool, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return shard.Schedule.IsLastBlock(blockNum), nil
+	}
+	return false, errNotBeaconChainShard
+}
+
+// EpochLastBlock returns epoch last block.
+func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) (uint64, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return shard.Schedule.EpochLastBlock(epoch), nil
+	}
+	return 0, errNotBeaconChainShard
 }
 
 // GetBlockSigners returns signers for a particular block.
@@ -503,6 +523,15 @@ var (
 	errNotBeaconChainShard = errors.New("cannot call this rpc on non beaconchain node")
 )
 
+// GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
+// explorer node
+func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetTotalStakingSnapshot(), nil
+	}
+	return nil, errNotBeaconChainShard
+}
+
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
@@ -555,13 +584,14 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, addre
 }
 
 // GetAllValidatorInformation returns information about all validators.
-func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, page int) []*staking.Validator {
+// If page is -1, return all instead of `validatorsPageSize` elements.
+func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, page int) ([]*staking.Validator, error) {
 	if page < -1 {
-		return make([]*staking.Validator, 0)
+		return make([]*staking.Validator, 0), nil
 	}
 	addresses := s.b.GetAllValidatorAddresses()
 	if page != -1 && len(addresses) <= page*validatorsPageSize {
-		return make([]*staking.Validator, 0)
+		return make([]*staking.Validator, 0), nil
 	}
 	validatorsNum := len(addresses)
 	start := 0
@@ -570,15 +600,48 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, pa
 		start = page * validatorsPageSize
 		if len(addresses)-start < validatorsPageSize {
 			validatorsNum = len(addresses) - start
-		} else {
-			validatorsNum = validatorsPageSize
 		}
 	}
 	validators := make([]*staking.Validator, validatorsNum)
 	for i := start; i < start+validatorsNum; i++ {
 		validators[i] = s.b.GetValidatorInformation(addresses[i])
+		if validators[i] == nil {
+			addr, _ := internal_common.AddressToBech32(addresses[i])
+			return nil, fmt.Errorf("error when getting validator info of %s", addr)
+		}
 	}
-	return validators
+	return validators, nil
+}
+
+// GetAllDelegationInformation returns delegation information about `validatorsPageSize` validators,
+// starting at `page*validatorsPageSize`.
+// If page is -1, return all instead of `validatorsPageSize` elements.
+func (s *PublicBlockChainAPI) GetAllDelegationInformation(ctx context.Context, page int) ([][]*RPCDelegation, error) {
+	if page < -1 {
+		return make([][]*RPCDelegation, 0), nil
+	}
+	addresses := s.b.GetAllValidatorAddresses()
+	if page != -1 && len(addresses) <= page*validatorsPageSize {
+		return make([][]*RPCDelegation, 0), nil
+	}
+	validatorsNum := len(addresses)
+	start := 0
+	if page != -1 {
+		validatorsNum = validatorsPageSize
+		start = page * validatorsPageSize
+		if len(addresses)-start < validatorsPageSize {
+			validatorsNum = len(addresses) - start
+		}
+	}
+	validators := make([][]*RPCDelegation, validatorsNum)
+	var err error
+	for i := start; i < start+validatorsNum; i++ {
+		validators[i], err = s.GetDelegationsByValidator(ctx, addresses[i].String())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return validators, nil
 }
 
 // GetDelegationsByDelegator returns list of delegations for a delegator address.
@@ -739,4 +802,43 @@ func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric
 		return s.b.GetCurrentUtilityMetrics()
 	}
 	return nil, errNotBeaconChainShard
+}
+
+// GetSuperCommittees ..
+func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetSuperCommittees()
+	}
+	return nil, errNotBeaconChainShard
+}
+
+// GetTotalSupply ..
+func (s *PublicBlockChainAPI) GetTotalSupply() (numeric.Dec, error) {
+	return numeric.NewDec(initSupply), nil
+}
+
+// GetCirculatingSupply ..
+func (s *PublicBlockChainAPI) GetCirculatingSupply() (numeric.Dec, error) {
+	timestamp := time.Now()
+	return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix())), nil
+}
+
+// GetStakingNetworkInfo ..
+func (s *PublicBlockChainAPI) GetStakingNetworkInfo(ctx context.Context) (*StakingNetworkInfo, error) {
+	if s.b.GetShardID() != shard.BeaconChainShardID {
+		return nil, errNotBeaconChainShard
+	}
+	totalStaking, _ := s.GetTotalStaking()
+	medianRawStake, _ := s.GetMedianRawStakeSnapshot()
+	epoch := s.LatestHeader(ctx).Epoch
+	epochLastBlock, _ := s.EpochLastBlock(epoch)
+	totalSupply, _ := s.GetTotalSupply()
+	circulatingSupply, _ := s.GetCirculatingSupply()
+	return &StakingNetworkInfo{
+		TotalSupply:       totalSupply,
+		CirculatingSupply: circulatingSupply,
+		EpochLastBlock:    epochLastBlock,
+		TotalStaking:      totalStaking,
+		MedianRawStake:    medianRawStake,
+	}, nil
 }

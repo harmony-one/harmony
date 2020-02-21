@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20191221.0"
+version="v1 20200212.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -121,6 +121,7 @@ options:
    -V             print out the version of the Harmony binary
    -z             run in staking mode
    -y             run in legacy, foundational-node mode (default)
+   -Y             verify the signature of the downloaded binaries (default: off)
    -M             support multi-key mode (default: off)
    -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
@@ -160,7 +161,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blacklist
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blacklist verify
 start_clean=false
 loop=true
 run_as_root=true
@@ -176,12 +177,12 @@ staking_mode=false
 multi_key=false
 archival=false
 blacklist=./.hmy/blacklist.txt
-archival=false
+verify=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAB: opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAB:Y opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -211,6 +212,7 @@ do
       exit 0 ;;
    V) LD_LIBRARY_PATH=. ./harmony -version
       exit 0 ;;
+   Y) verify=true;;
    z) staking_mode=true;;
    y) staking_mode=false;;
    A) archival=true;;
@@ -354,16 +356,17 @@ download_binaries() {
          ;;
       esac
 
-      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin}.sig -o "${outdir}/${bin}.sig" || status=$?
-      case "${status}" in
-      0) ;;
-      *)
-         msg "cannot download ${bin}.sig (status ${status})"
-         return ${status}
-         ;;
-      esac
-
-      verify_signature "${outdir}" "${bin}" || return $?
+      if $verify; then
+         curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin}.sig -o "${outdir}/${bin}.sig" || status=$?
+         case "${status}" in
+         0) ;;
+         *)
+            msg "cannot download ${bin}.sig (status ${status})"
+            return ${status}
+            ;;
+         esac
+         verify_signature "${outdir}" "${bin}" || return $?
+      fi
       verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
       msg "downloaded ${bin}"
    done

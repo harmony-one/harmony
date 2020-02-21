@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -34,6 +35,11 @@ type APIBackend struct {
 		BlockHeight    int64
 		MedianRawStake *big.Int
 	}
+	TotalStakingCache struct {
+		sync.Mutex
+		BlockHeight  int64
+		TotalStaking *big.Int
+	}
 }
 
 // ChainDb ...
@@ -47,7 +53,7 @@ func (b *APIBackend) GetBlock(ctx context.Context, hash common.Hash) (*types.Blo
 }
 
 // GetPoolTransaction ...
-func (b *APIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
+func (b *APIBackend) GetPoolTransaction(hash common.Hash) types.PoolTransaction {
 	return b.hmy.txPool.Get(hash)
 }
 
@@ -207,12 +213,12 @@ func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscripti
 
 // GetPoolTransactions returns pool transactions.
 // TODO: this is not implemented or verified yet for harmony.
-func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
+func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	pending, err := b.hmy.txPool.Pending()
 	if err != nil {
 		return nil, err
 	}
-	var txs types.Transactions
+	var txs types.PoolTransactions
 	for _, batch := range pending {
 		txs = append(txs, batch...)
 	}
@@ -324,7 +330,10 @@ func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
 // GetValidatorInformation returns the information of validator
 func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Validator {
 	val, _ := b.hmy.BlockChain().ReadValidatorInformation(addr)
-	return &val.Validator
+	if val != nil {
+		return &val.Validator
+	}
+	return nil
 }
 
 var (
@@ -371,6 +380,30 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 		b.MedianStakeCache.MedianRawStake = stakes[l/2]
 	}
 	return b.MedianStakeCache.MedianRawStake
+}
+
+// GetTotalStakingSnapshot ..
+func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
+	b.TotalStakingCache.Lock()
+	defer b.TotalStakingCache.Unlock()
+	if b.TotalStakingCache.BlockHeight != -1 && b.TotalStakingCache.BlockHeight > int64(rpc.LatestBlockNumber)-20 {
+		return b.TotalStakingCache.TotalStaking
+	}
+	b.TotalStakingCache.BlockHeight = int64(rpc.LatestBlockNumber)
+	candidates := b.hmy.BlockChain().ValidatorCandidates()
+	if len(candidates) == 0 {
+		b.TotalStakingCache.TotalStaking = big.NewInt(0)
+		return b.TotalStakingCache.TotalStaking
+	}
+	stakes := big.NewInt(0)
+	for i := range candidates {
+		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
+		for i := range validator.Delegations {
+			stakes.Add(stakes, validator.Delegations[i].Amount)
+		}
+	}
+	b.TotalStakingCache.TotalStaking = stakes
+	return b.TotalStakingCache.TotalStaking
 }
 
 // GetValidatorStats returns the stats of validator
@@ -452,4 +485,44 @@ func (b *APIBackend) GetPendingCXReceipts() []*types.CXReceiptsProof {
 // GetCurrentUtilityMetrics ..
 func (b *APIBackend) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
 	return network.NewUtilityMetricSnapshot(b.hmy.BlockChain())
+}
+
+// GetSuperCommittees ..
+func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
+	nowE := b.hmy.BlockChain().CurrentHeader().Epoch()
+	var (
+		nowCommittee, prevCommittee *shard.State
+		err                         error
+	)
+	nowCommittee, err = b.hmy.BlockChain().ReadShardState(nowE)
+	if err != nil {
+		return nil, err
+	}
+	prevCommittee, err = b.hmy.BlockChain().ReadShardState(
+		new(big.Int).Sub(nowE, common.Big1),
+	)
+	if err != nil {
+		return nil, err
+	}
+	then, now := quorum.NewRegistry(), quorum.NewRegistry()
+
+	for _, comm := range prevCommittee.Shards {
+		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		decider.SetShardIDProvider(func() (uint32, error) {
+			return comm.ShardID, nil
+		})
+		decider.SetVoters(comm.Slots)
+		then.Deciders[comm.ShardID] = decider
+	}
+
+	for _, comm := range nowCommittee.Shards {
+		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		decider.SetShardIDProvider(func() (uint32, error) {
+			return comm.ShardID, nil
+		})
+		decider.SetVoters(comm.Slots)
+		now.Deciders[comm.ShardID] = decider
+	}
+
+	return &quorum.Transition{then, now}, nil
 }

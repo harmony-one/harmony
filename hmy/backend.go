@@ -85,6 +85,16 @@ func New(
 			MedianRawStake: big.NewInt(0),
 		},
 	}
+	hmy.APIBackend = &APIBackend{hmy: hmy,
+		TotalStakingCache: struct {
+			sync.Mutex
+			BlockHeight  int64
+			TotalStaking *big.Int
+		}{
+			BlockHeight:  -1,
+			TotalStaking: big.NewInt(0),
+		},
+	}
 	return hmy, nil
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -53,8 +54,8 @@ type Backend interface {
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
 	// GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
-	GetPoolTransactions() (types.Transactions, error)
-	GetPoolTransaction(txHash common.Hash) *types.Transaction
+	GetPoolTransactions() (types.PoolTransactions, error)
+	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	// Stats() (pending int, queued int)
 	// TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
@@ -85,6 +86,8 @@ type Backend interface {
 	GetMedianRawStakeSnapshot() *big.Int
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
+	GetSuperCommittees() (*quorum.Transition, error)
+	GetTotalStakingSnapshot() *big.Int
 }
 
 // GetAPIs returns all the APIs.

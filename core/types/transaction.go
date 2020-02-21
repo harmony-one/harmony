@@ -79,8 +79,8 @@ type RPCTransactionError struct {
 }
 
 // NewRPCTransactionError ...
-func NewRPCTransactionError(hash common.Hash, err error) *RPCTransactionError {
-	return &RPCTransactionError{
+func NewRPCTransactionError(hash common.Hash, err error) RPCTransactionError {
+	return RPCTransactionError{
 		TxHashID:             hash.Hex(),
 		TimestampOfRejection: time.Now().Unix(),
 		ErrMessage:           err.Error(),

@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/numeric"
 )
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
@@ -296,7 +297,7 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 
 	result := &RPCStakingTransaction{
 		Gas:       hexutil.Uint64(tx.Gas()),
-		GasPrice:  (*hexutil.Big)(tx.Price()),
+		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
 		Timestamp: hexutil.Uint64(timestamp),
@@ -324,6 +325,11 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 // newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
 func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
 	return newRPCTransaction(tx, common.Hash{}, 0, 0, 0)
+}
+
+// newRPCPendingStakingTransaction returns a pending transaction that will serialize to the RPC representation
+func newRPCPendingStakingTransaction(tx *types2.StakingTransaction) *RPCStakingTransaction {
+	return newRPCStakingTransaction(tx, common.Hash{}, 0, 0, 0)
 }
 
 // RPCBlock represents a block that will serialize to the RPC representation of a block
@@ -472,4 +478,13 @@ type CallArgs struct {
 	GasPrice *hexutil.Big    `json:"gasPrice"`
 	Value    *hexutil.Big    `json:"value"`
 	Data     *hexutil.Bytes  `json:"data"`
+}
+
+// StakingNetworkInfo returns global staking info.
+type StakingNetworkInfo struct {
+	TotalSupply       numeric.Dec `json:"total-supply"`
+	CirculatingSupply numeric.Dec `json:"circulating-supply"`
+	EpochLastBlock    uint64      `json:"epoch-last-block"`
+	TotalStaking      *big.Int    `json:"total-staking"`
+	MedianRawStake    *big.Int    `json:"median-raw-stake"`
 }
