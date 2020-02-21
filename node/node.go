@@ -713,8 +713,8 @@ func (node *Node) SetBeaconSyncFreq(syncFreq int) {
 func (node *Node) ShutDown() {
 	node.Blockchain().Stop()
 	node.Beaconchain().Stop()
-	node.StopServices()
-	node.stopHTTP()
-	fmt.Printf("Exiting node program...")
+	msg := "Successfully shut down!\n"
+	utils.Logger().Print(msg)
+	fmt.Print(msg)
 	os.Exit(0)
 }
