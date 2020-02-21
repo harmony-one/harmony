@@ -37,7 +37,7 @@ type environment struct {
 	receipts   []*types.Receipt
 	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
 	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
-	slashes    []slash.Record
+	slashes    slash.Records
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -309,19 +309,21 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 // CollectAndVerifySlashes ..
 func (w *Worker) CollectAndVerifySlashes() error {
 	allSlashing, err := w.chain.ReadPendingSlashingCandidates()
-	slashingToPropose := []slash.Record{}
-
 	if err != nil && err != core.ErrPreStakingCRUDSlash {
-		fmt.Println("reading pending slashes, bad to have error", err.Error())
 		return err
 	}
 	if d := allSlashing; len(d) > 0 {
-		if slashingToPropose, err = w.VerifyAll(d); err != nil {
-			fmt.Println("somehow verify failed", err.Error())
+		// TODO add specific error which is
+		// "could not verify slash", which should not return as err
+		// and therefore stop the block proposal
+		if allSlashing, err = w.VerifyAll(d); err != nil {
+			utils.Logger().Err(err).
+				RawJSON("slashes", []byte(d.String())).
+				Msg("could not verify slashes proposed")
 			return err
 		}
 	}
-	w.current.slashes = slashingToPropose
+	w.current.slashes = allSlashing
 	return nil
 }
 
@@ -353,7 +355,7 @@ func (w *Worker) VerifyAll(allSlashing []slash.Record) ([]slash.Record, error) {
 // FinalizeNewBlock generate a new block for the next consensus round.
 func (w *Worker) FinalizeNewBlock(
 	sig []byte, signers []byte, viewID uint64, coinbase common.Address,
-	crossLinks types.CrossLinks, shardState *shard.State, doubleSigners slash.Records,
+	crossLinks types.CrossLinks, shardState *shard.State,
 ) (*types.Block, error) {
 	if len(sig) > 0 && len(signers) > 0 {
 		sig2 := w.current.header.LastCommitSignature()
@@ -382,15 +384,18 @@ func (w *Worker) FinalizeNewBlock(
 		utils.Logger().Debug().Msg("Zero crosslinks to finalize")
 	}
 
-	if w.config.IsStaking(w.current.header.Epoch()) && len(doubleSigners) > 0 {
-		if data, err := rlp.EncodeToBytes(doubleSigners); err == nil {
-			fmt.Println("double-signers to be encoded", doubleSigners.String(), data)
-			// was gonna do slashes in header but need to talk to RJ
-			w.current.header.SetSlashes(data)
-		} else {
-			fmt.Println("encoding problem->", err.Error())
-			utils.Logger().Debug().Err(err).Msg("Failed to encode proposed slashes")
-			return nil, err
+	if w.config.IsStaking(w.current.header.Epoch()) {
+		doubleSigners := w.current.slashes
+		if len(doubleSigners) > 0 {
+			if data, err := rlp.EncodeToBytes(doubleSigners); err == nil {
+				w.current.header.SetSlashes(data)
+				utils.Logger().Info().
+					RawJSON("slashes", []byte(doubleSigners.String())).
+					Msg("encoded slashes into headers of proposed new block")
+			} else {
+				utils.Logger().Debug().Err(err).Msg("Failed to encode proposed slashes")
+				return nil, err
+			}
 		}
 	}
 

@@ -2211,7 +2211,7 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 }
 
 // ReadPendingSlashingCandidates retrieves pending slashing candidates
-func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
+func (bc *BlockChain) ReadPendingSlashingCandidates() (slash.Records, error) {
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
 		return nil, ErrPreStakingCRUDSlash
 	}
@@ -2229,7 +2229,7 @@ func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
 		}
 	}
 
-	cls := []slash.Record{}
+	cls := slash.Records{}
 	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
 		utils.Logger().Error().Err(err).Msg("Invalid pending slashing candidates RLP decoding")
 		return nil, err

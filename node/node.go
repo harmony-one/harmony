@@ -565,14 +565,17 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 	// Broadcast double-signers reported by consensus
 	if node.Consensus != nil {
 		go func() {
+
 			for {
 				select {
 				case doubleSign := <-node.Consensus.SlashChan:
+					l := utils.Logger().Info().RawJSON("double-sign", []byte(doubleSign.String()))
+
 					// no point to broadcast the slash if we aren't even in the right epoch yet
 					if !node.Blockchain().Config().IsStaking(
 						node.Blockchain().CurrentHeader().Epoch(),
 					) {
-						fmt.Println("slash occured before staking era", doubleSign.String())
+						l.Msg("double sign occured before staking era, no-op")
 						return
 					}
 					if hooks := node.NodeConfig.WebHooks.DoubleSigning; hooks != nil {
@@ -580,12 +583,12 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 						go func() { slash.DoPost(url, &doubleSign) }()
 					}
 					if node.NodeConfig.ShardID != shard.BeaconChainShardID {
-						fmt.Println("need to broadcast the slash", doubleSign.String())
 						go node.BroadcastSlash(&doubleSign)
+						l.Msg("broadcast the double sign record")
 					} else {
 						records := slash.Records{doubleSign}
-						fmt.Println("need to add as pending", doubleSign.String())
 						node.Blockchain().AddPendingSlashingCandidates(records)
+						l.Msg("added double sign record to off-chain pending")
 					}
 				}
 			}
@@ -597,22 +600,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		h.Contains(node.Consensus.PubKey) {
 		go slash.NewMaliciousHandler(func() *slash.ReportResult {
 			epoch := node.Blockchain().CurrentHeader().Epoch()
-			fmt.Println("trigger hit, some info->", "\n",
-				node.Consensus.String(), "\n",
-				node.Blockchain().CurrentHeader().String(),
-			)
-
 			if node.Blockchain().Config().IsStaking(epoch) {
-				fmt.Println(
-					"enabling double signing behavior at",
-					time.Now().Format(time.RFC3339),
-					node.Consensus,
-				)
+				utils.Logger().Info().Msg("received trigger to enable double-signing")
 				node.Consensus.DoDoubleSign = true
-				msg := "set double sign to true at " +
-					time.Now().Format(time.RFC3339) +
-					node.Consensus.String()
-				return slash.NewSuccess(msg)
+				return slash.NewSuccess("enabled double signing on " + node.Consensus.String())
 			}
 			return slash.NewFailure(
 				fmt.Sprintf("Current epoch isn't staking yet %s", node.Consensus.String()),

@@ -121,7 +121,6 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			fmt.Println("something messed up", err.Error())
 			return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
 		}
 	}

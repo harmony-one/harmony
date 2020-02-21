@@ -7,8 +7,10 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/pkg/errors"
 )
 
 // Phase is a phase that needs quorum to proceed
@@ -235,8 +237,9 @@ func (s *cIdentities) SubmitVote(
 	case ViewChange:
 		s.viewChange.BallotBox[hex] = ballot
 	default:
-		panic("invariant violated, unknown phase" + p.String())
-		// Not possible, means bad code
+		utils.Logger().Err(errors.New("invariant of known phase violated")).
+			Str("phase", p.String()).
+			Msg("bad vote input")
 	}
 	return ballot
 }

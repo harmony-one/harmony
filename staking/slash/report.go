@@ -3,11 +3,11 @@ package slash
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/internal/utils"
 	"gopkg.in/yaml.v2"
 )
 
@@ -96,6 +96,7 @@ func NewMaliciousHandler(result func() *ReportResult) {
 			json.NewEncoder(w).Encode(result())
 		})
 	if err := http.ListenAndServe(":7777", nil); err != nil {
-		fmt.Println("why this died", err.Error())
+		utils.Logger().Err(err).
+			Msg("could not start the http double-sign-trigger listener")
 	}
 }

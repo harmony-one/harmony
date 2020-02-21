@@ -405,7 +405,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
 			host.ConstructP2pMessage(byte(17), msgToSend),
 		); err != nil {
-			// TODO log issue
+			consensus.getLogger().Err(err).
+				Msg("could not send out the NEWVIEW message")
 		}
 
 		consensus.viewID = recvMsg.ViewID

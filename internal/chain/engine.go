@@ -324,12 +324,15 @@ func (e *engineImpl) Finalize(
 		if err != nil {
 			return nil, nil, errors.New("could not read shard state")
 		}
+		committeeKeys, err := superCommittee.FindCommitteeByID(
+			header.ShardID(),
+		).BLSPublicKeys()
+		if err != nil {
+			return nil, nil, err
+		}
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
-		rate := slash.Rate(
-			len(doubleSigners),
-			len(superCommittee.FindCommitteeByID(header.ShardID()).BLSPublicKeys()),
-		)
+		rate := slash.Rate(len(doubleSigners), len(committeeKeys))
 		if slashApplied, err = slash.Apply(
 			chain,
 			state,

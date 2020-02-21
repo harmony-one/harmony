@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -198,7 +197,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		append(blockNumBytes, consensus.blockHash[:]...),
 		consensus.blockHash[:],
 	)
-
 	// TODO: genesis account node delay for 1 second,
 	// this is a temp fix for allows FN nodes to earning reward
 	if consensus.delayCommit > 0 {
@@ -219,29 +217,23 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	if consensus.DoDoubleSign {
-		fmt.Println("have a true double sign setting", consensus.String())
 		cpy := append(consensus.blockHash[0:0], consensus.blockHash[:]...)
 		cpy[0] = byte(29)
-		network, _ := consensus.construct(
+		networkMsg, _ := consensus.construct(
 			msg_pb.MessageType_COMMIT, append(blockNumBytes, cpy...), cpy,
 		)
-		msgToSend := network.Bytes
-
-		fmt.Println("sending out double sign attempt", network.FBFTMsg.String(), consensus.String())
+		l := consensus.getLogger().Info().
+			Str("consensus", consensus.String()).
+			Str("double-signed-msg", networkMsg.FBFTMsg.String())
 
 		if err := consensus.msgSender.SendWithoutRetry(
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
-			host.ConstructP2pMessage(byte(17), msgToSend),
+			host.ConstructP2pMessage(byte(17), networkMsg.Bytes),
 		); err != nil {
-			fmt.Println("ERROR Sending out the double sign")
+			l.Err(err).Msg("trouble sending out the double-sign message")
 		} else {
-			fmt.Println(
-				"sent out the double sign, disabling double signing behavior at",
-				time.Now().Format(time.RFC3339),
-				network.FBFTMsg,
-			)
-
+			l.Msg("successfully sent a double sign, setting .DoubleSign=false")
 			consensus.DoDoubleSign = false
 		}
 	}

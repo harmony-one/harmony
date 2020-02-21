@@ -3,7 +3,6 @@ package slash
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -157,8 +156,9 @@ func Verify(chain CommitteeReader, candidate *Record) error {
 	}
 	// candidate.ConflictingBallots
 
-	// TODO Why this one printng have 00000000 for signature?
-	fmt.Println("need to verify the slash", candidate)
+	// TODO Why this one printng have 00000000 for signature? something wrong earlier
+	// TODO need to finish this implementation
+
 	return nil
 }
 

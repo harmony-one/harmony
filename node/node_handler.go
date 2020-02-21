@@ -246,20 +246,15 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // BroadcastSlash ..
 func (node *Node) BroadcastSlash(witness *slash.Record) {
-
-	records := slash.Records{*witness}
-	fmt.Println("have these slashes to send out", records.String())
-
-	// Send it to beaconchain if I'm shardchain, otherwise just add it to pending
 	if err := node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
 		host.ConstructP2pMessage(
 			byte(0),
-			proto_node.ConstructSlashMessage(records)),
+			proto_node.ConstructSlashMessage(slash.Records{*witness})),
 	); err != nil {
-		fmt.Println("some issue in constructing the slash message", err.Error())
-	} else {
-		fmt.Println("sent out successfully", records.String())
+		utils.Logger().Err(err).
+			RawJSON("record", []byte(witness.String())).
+			Msg("could not send slash record to beaconchain")
 	}
 }
 
@@ -435,10 +430,8 @@ func (node *Node) PostConsensusProcessing(
 		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
 			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
 			node.BroadcastCrossLink(newBlock)
-			// TODO hook here as well?
-
+			// TODO hook slashes here as well
 			// node.BroadcastSlash(newBlock.Header().Slashes())
-
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {

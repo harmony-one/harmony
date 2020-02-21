@@ -1,7 +1,6 @@
 package node
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -150,8 +148,6 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Prepare cross links and slashings messages
 	var crossLinksToPropose types.CrossLinks
 
-	slashingToPropose := slash.Records{}
-
 	isBeaconchainInCrossLinkEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch())
 
@@ -185,6 +181,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	if isBeaconchainInStakingEra {
+		// this one will set a meaningful w.current.slashes
 		if err := node.Worker.CollectAndVerifySlashes(); err != nil {
 			return nil, err
 		}
@@ -205,18 +202,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 
-	if node.Consensus.ShardID == 1 &&
-		node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch()) {
-		fmt.Println("shard id 1, new block",
-			slashingToPropose.String(),
-			node.Worker.GetCurrentHeader().String(),
-		)
-	}
-
 	return node.Worker.FinalizeNewBlock(
 		sig, mask, node.Consensus.GetViewID(),
 		coinbase, crossLinksToPropose, shardState,
-		slashingToPropose,
 	)
 }
 
