@@ -3,7 +3,6 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -325,7 +324,6 @@ func (e *engineImpl) Finalize(
 		if err != nil {
 			return nil, nil, errors.New("could not read shard state")
 		}
-		fmt.Println("Before slash", state.Dump())
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
 		rate := slash.Rate(
@@ -338,14 +336,9 @@ func (e *engineImpl) Finalize(
 			doubleSigners,
 			rate,
 		); err != nil {
-			fmt.Println("ERROR->Could not apply->", err.Error())
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
-		fmt.Println(
-			"after applied applied slashes, here are account states",
-			slashApplied.String(),
-		)
-		fmt.Println("After slash", state.Dump())
+		utils.Logger().Info().RawJSON("slash-applied", []byte(slashApplied.String()))
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))

@@ -2246,7 +2246,6 @@ var (
 
 // WritePendingSlashingCandidates saves the pending slashing candidates
 func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) error {
-	fmt.Println("writing pending slashing candidates", candidates, bc.CurrentHeader().Epoch())
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
 		utils.Logger().Debug().Msg("Writing slashing candidates in prior to staking epoch")
 		return ErrPreStakingCRUDSlash

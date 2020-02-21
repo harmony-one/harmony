@@ -28,20 +28,34 @@ const (
 )
 
 var (
-	errAddressNotMatch           = errors.New("Validator key not match")
-	errInvalidSelfDelegation     = errors.New("self delegation can not be less than min_self_delegation")
-	errInvalidTotalDelegation    = errors.New("total delegation can not be bigger than max_total_delegation")
-	errMinSelfDelegationTooSmall = errors.New("min_self_delegation has to be greater than 1 ONE")
-	errInvalidMaxTotalDelegation = errors.New("max_total_delegation can not be less than min_self_delegation")
-	errCommissionRateTooLarge    = errors.New("commission rate and change rate can not be larger than max commission rate")
-	errInvalidCommissionRate     = errors.New("commission rate, change rate and max rate should be within 0-100 percent")
-	errNeedAtLeastOneSlotKey     = errors.New("need at least one slot key")
-	errBLSKeysNotMatchSigs       = errors.New("bls keys and corresponding signatures could not be verified")
-	errNilMinSelfDelegation      = errors.New("MinSelfDelegation can not be nil")
-	errNilMaxTotalDelegation     = errors.New("MaxTotalDelegation can not be nil")
-	errSlotKeyToRemoveNotFound   = errors.New("slot key to remove not found")
-	errSlotKeyToAddExists        = errors.New("slot key to add already exists")
-	errDuplicateSlotKeys         = errors.New("slot keys can not have duplicates")
+	errAddressNotMatch       = errors.New("Validator key not match")
+	errInvalidSelfDelegation = errors.New(
+		"self delegation can not be less than min_self_delegation",
+	)
+	errInvalidTotalDelegation = errors.New(
+		"total delegation can not be bigger than max_total_delegation",
+	)
+	errMinSelfDelegationTooSmall = errors.New(
+		"min_self_delegation has to be greater than 1 ONE",
+	)
+	errInvalidMaxTotalDelegation = errors.New(
+		"max_total_delegation can not be less than min_self_delegation",
+	)
+	errCommissionRateTooLarge = errors.New(
+		"commission rate and change rate can not be larger than max commission rate",
+	)
+	errInvalidCommissionRate = errors.New(
+		"commission rate, change rate and max rate should be within 0-100 percent",
+	)
+	errNeedAtLeastOneSlotKey = errors.New("need at least one slot key")
+	errBLSKeysNotMatchSigs   = errors.New(
+		"bls keys and corresponding signatures could not be verified",
+	)
+	errNilMinSelfDelegation    = errors.New("MinSelfDelegation can not be nil")
+	errNilMaxTotalDelegation   = errors.New("MaxTotalDelegation can not be nil")
+	errSlotKeyToRemoveNotFound = errors.New("slot key to remove not found")
+	errSlotKeyToAddExists      = errors.New("slot key to add already exists")
+	errDuplicateSlotKeys       = errors.New("slot keys can not have duplicates")
 )
 
 // ValidatorSnapshotReader ..
@@ -53,8 +67,7 @@ type ValidatorSnapshotReader interface {
 type ValidatorWrapper struct {
 	Validator   `json:"validator"`
 	Delegations Delegations `json:"delegations"`
-
-	Snapshot struct {
+	Snapshot    struct {
 		Epoch *big.Int
 		// The number of blocks the validator should've signed when in active mode (selected in committee)
 		NumBlocksToSign *big.Int `rlp:"nil"`
@@ -67,11 +80,6 @@ func (w ValidatorWrapper) String() string {
 	s, _ := json.Marshal(w)
 	return string(s)
 }
-
-// MarshalJSON ..
-// func (v *ValidatorWrapper) MarshalJSON() ([]byte, error) {
-// 	return jso
-// }
 
 // VotePerShard ..
 type VotePerShard struct {
@@ -103,13 +111,15 @@ type Validator struct {
 	Address common.Address
 	// The BLS public key of the validator for consensus
 	SlotPubKeys []shard.BlsPublicKey
-	// The number of the last epoch this validator is selected in committee (0 means never selected)
+	// The number of the last epoch this validator is
+	// selected in committee (0 means never selected)
 	LastEpochInCommittee *big.Int
 	// validator's self declared minimum self delegation
 	MinSelfDelegation *big.Int
 	// maximum total delegation allowed
 	MaxTotalDelegation *big.Int
-	// Is the validator active in participating committee selection process or not
+	// Is the validator active in participating
+	// committee selection process or not
 	Active bool
 	// commission parameters
 	Commission

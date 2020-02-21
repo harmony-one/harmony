@@ -304,19 +304,12 @@ func delegatorSlashApply(
 		}
 
 		if slashDebt.Cmp(common.Big0) != 0 {
-			x1, err1 := rlp.EncodeToBytes(snapshot)
-			if err1 != nil {
-				fmt.Println("encode1 failed, why", err1.Error())
-				return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
-
-			}
-			x2, err2 := rlp.EncodeToBytes(current)
-			if err2 != nil {
-				fmt.Println("encode2 failed, why", err1.Error())
-				return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
-
-			}
-			fmt.Println("EDGAR->", rate.String(), hex.EncodeToString(x1), hex.EncodeToString(x2))
+			x1, _ := rlp.EncodeToBytes(snapshot)
+			x2, _ := rlp.EncodeToBytes(current)
+			log := utils.Logger()
+			log.Err(errSlashDebtNotFullyAccountedFor).
+				Str("snapshot-rlp", hex.EncodeToString(x1)).
+				Str("current-rlp", hex.EncodeToString(x2))
 			return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
 		}
 	}
