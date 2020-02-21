@@ -138,11 +138,27 @@ type scenario struct {
 	delegationCurrentI2,
 	undelegateI1,
 	undelegateI2 uint64
-	slash  *details
-	result *Application
+	slash             *details
+	result            *Application
+	snapshot, current *staking.ValidatorWrapper
 }
 
 func defaultFundingScenario() *scenario {
+	return &scenario{
+		minSelfDelgation:     1_000_000_000_000_000_000,
+		maxTotalDelegation:   13_000_000_000_000_000_000,
+		delegationSnapshotI1: 2_000_000_000_000_000_000,
+		delegationSnapshotI2: 3_000_000_000_000_000_000,
+		delegationCurrentI1:  1_000_000_000_000_000_000,
+		delegationCurrentI2:  500_000_000_000_000_000,
+		snapshot:             nil,
+		current:              nil,
+		slash:                nil,
+		result:               nil,
+	}
+}
+
+func scenariorealWorldSample1() *scenario {
 	return &scenario{
 		minSelfDelgation:     1_000_000_000_000_000_000,
 		maxTotalDelegation:   13_000_000_000_000_000_000,
@@ -174,6 +190,7 @@ func init() {
 			TotalSlashed:      big.NewInt(0.1 * denominations.One),
 			TotalSnitchReward: big.NewInt(0.05 * denominations.One),
 		}
+		s.snapshot, s.current = s.validatorPair(s.delegationPair())
 	}
 	{
 		s := scenarioEightyPercent
@@ -188,6 +205,7 @@ func init() {
 			TotalSlashed:      big.NewInt(4 * denominations.One),
 			TotalSnitchReward: big.NewInt(2 * denominations.One),
 		}
+		s.snapshot, s.current = s.validatorPair(s.delegationPair())
 	}
 }
 
@@ -397,12 +415,9 @@ func TestVerify(t *testing.T) {
 func testScenario(
 	t *testing.T, stateHandle *state.DB, slashes Records, s *scenario,
 ) {
-	validatorSnapshot, validatorCurrent := scenarioTwoPercent.validatorPair(
-		scenarioTwoPercent.delegationPair(),
-	)
 
 	if err := stateHandle.UpdateStakingInfo(
-		offenderAddr, validatorSnapshot,
+		offenderAddr, s.snapshot,
 	); err != nil {
 		t.Fatalf("creation of validator failed %s", err.Error())
 	}
@@ -411,7 +426,7 @@ func testScenario(
 	stateHandle.Commit(false)
 
 	if err := stateHandle.UpdateStakingInfo(
-		offenderAddr, validatorCurrent,
+		offenderAddr, s.current,
 	); err != nil {
 		t.Fatalf("update of validator failed %s", err.Error())
 	}
@@ -422,7 +437,7 @@ func testScenario(
 	// state looks like as of this point
 
 	slashResult, err := Apply(
-		mockOutSnapshotReader{*validatorSnapshot},
+		mockOutSnapshotReader{*s.snapshot},
 		stateHandle,
 		slashes,
 		numeric.MustNewDecFromStr(
