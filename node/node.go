@@ -609,14 +609,10 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 					node.Consensus,
 				)
 				node.Consensus.DoDoubleSign = true
-
-				// go func() {
-				// 	for range time.After(time.Second * 5) {
-				// 		fmt.Println("set double sign to false at " + time.Now().Format(time.RFC3339))
-				// 		node.Consensus.DoDoubleSign = false
-				// 	}
-				// }()
-				return slash.NewSuccess("set double sign to true at " + time.Now().Format(time.RFC3339) + node.Consensus.String())
+				msg := "set double sign to true at " +
+					time.Now().Format(time.RFC3339) +
+					node.Consensus.String()
+				return slash.NewSuccess(msg)
 			}
 			return slash.NewFailure(
 				fmt.Sprintf("Current epoch isn't staking yet %s", node.Consensus.String()),

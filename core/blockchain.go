@@ -2225,14 +2225,12 @@ func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
 			utils.Logger().Info().Err(err).
 				Int("dataLen", len(bytes)).
 				Msg("ReadPendingSlashingCandidates")
-			fmt.Println("SOmething bad here?", err.Error())
 			return nil, err
 		}
 	}
 
 	cls := []slash.Record{}
 	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
-		fmt.Println("some problem decoding bytes", err.Error())
 		utils.Logger().Error().Err(err).Msg("Invalid pending slashing candidates RLP decoding")
 		return nil, err
 	}

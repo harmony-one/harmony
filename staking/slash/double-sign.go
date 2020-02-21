@@ -134,22 +134,13 @@ func Verify(chain CommitteeReader, candidate *Record) error {
 		)
 	}
 
-	wasInCommittee := false
-	for _, key := range subCommittee.BLSPublicKeys() {
-		if shard.CompareBlsPublicKey(key, second.SignerPubKey) == 0 {
-			wasInCommittee = true
-			break
-		}
-	}
-
-	if !wasInCommittee {
-		return errWasNotInSubCommittee
+	if _, err := subCommittee.AddressForBLSKey(second.SignerPubKey); err != nil {
+		return err
 	}
 	// candidate.ConflictingBallots
 
 	// TODO Why this one printng have 00000000 for signature?
 	fmt.Println("need to verify the slash", candidate)
-
 	return nil
 }
 
@@ -160,7 +151,6 @@ var (
 	errSlashDebtNotFullyAccountedFor = errors.New(
 		"slash debt was not fully accounted for, still non-zero",
 	)
-	errWasNotInSubCommittee         = errors.New("not in subcommittee")
 	errShardIDNotKnown              = errors.New("nil subcommittee for shardID")
 	errValidatorNotFoundDuringSlash = errors.New("validator not found")
 	zero                            = numeric.ZeroDec()
