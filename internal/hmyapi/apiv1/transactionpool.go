@@ -2,7 +2,6 @@ package apiv1
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -214,7 +213,6 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
 	}
-	fmt.Printf("incoming staking txn %+v\n", tx)
 	c := s.b.ChainConfig().ChainID
 	if tx.ChainID().Cmp(c) != 0 {
 		e := errors.Wrapf(errInvalidChainID, "current chain id:%s", c.String())

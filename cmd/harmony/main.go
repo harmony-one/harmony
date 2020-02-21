@@ -266,10 +266,6 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
 	return pubKey
 }
 
-const (
-	defaultWebHookPath = "./staking/slash/webhook.example.yaml"
-)
-
 func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	var err error
 
@@ -306,7 +302,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	}
 
 	nodeConfig.DBDir = *dbDir
-	*webHookYamlPath = defaultWebHookPath
+	*webHookYamlPath = slash.DefaultWebHookPath
 
 	if p := *webHookYamlPath; p != "" {
 		config, err := slash.NewDoubleSignWebHooksFromPath(p)

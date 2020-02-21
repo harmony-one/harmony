@@ -50,17 +50,24 @@ func baseRequest(node string) ([]byte, error) {
 	}
 
 	fmt.Println(result)
-
 	return body, err
 }
 
 var (
+	p       = slash.DefaultWebHookPath
 	rootCmd = &cobra.Command{
 		Use:          "trigger-double-sign",
 		SilenceUsage: true,
 		Long:         "trigger a double sign",
 		Run: func(cmd *cobra.Command, args []string) {
-			baseRequest("http://localhost:7777/trigger-next-double-sign")
+			config, err := slash.NewDoubleSignWebHooksFromPath(p)
+			if err != nil {
+				fmt.Fprintf(
+					os.Stderr, "ERROR provided yaml path %s but yaml found is illegal", p,
+				)
+				os.Exit(1)
+			}
+			baseRequest(config.Malicious.Trigger.DoubleSignNodeURL)
 		},
 	}
 )
@@ -74,5 +81,4 @@ func init() {
 			os.Exit(0)
 		},
 	})
-
 }

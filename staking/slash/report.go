@@ -11,6 +11,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	// DefaultWebHookPath ..
+	DefaultWebHookPath = "staking/slash/webhook.example.yaml"
+)
+
 // DoubleSignWebHooks ..
 type DoubleSignWebHooks struct {
 	WebHooks *struct {
