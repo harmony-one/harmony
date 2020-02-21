@@ -122,66 +122,26 @@ const (
 	creationHeight  = 33
 )
 
-type details struct {
-	Rate float64
-}
-
 type scenario struct {
-	minSelfDelgation,
-	maxTotalDelegation,
-	// delegation creation parameters
-	delegationSnapshotI1,
-	delegationSnapshotI2,
-	delegationCurrentI1,
-	delegationCurrentI2,
-	undelegateI1,
-	undelegateI2 uint64
-	slash             *details
-	result            *Application
 	snapshot, current *staking.ValidatorWrapper
+	slashRate         float64
+	result            *Application
 }
 
 func defaultFundingScenario() *scenario {
 	return &scenario{
-		minSelfDelgation:     1_000_000_000_000_000_000,
-		maxTotalDelegation:   13_000_000_000_000_000_000,
-		delegationSnapshotI1: 2_000_000_000_000_000_000,
-		delegationSnapshotI2: 3_000_000_000_000_000_000,
-		delegationCurrentI1:  1_000_000_000_000_000_000,
-		delegationCurrentI2:  500_000_000_000_000_000,
-		snapshot:             nil,
-		current:              nil,
-		slash:                nil,
-		result:               nil,
+		snapshot:  nil,
+		current:   nil,
+		slashRate: 0.02,
+		result:    nil,
 	}
 }
 
 func scenariorealWorldSample1() *scenario {
 	const (
-		snapshotBytes = "f90108f8be94110dde181c2434f6d8eaa869154a4d07a910ce" +
-			"19f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4907" +
-			"c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e" +
-			"0a0a880de0b6b3a764000088b469471f8014000001e0dec9880" +
-			"254cc1f20ad395cc988027c97536ea18970c988021cc4b33c" +
-			"dff16035f83e945f546573745f6b65795f76616c696461746f7" +
-			"2308c746573745f6163636f756e748b6861726d6f6e792e6f" +
-			"6e658a44616e69656c2d56444d846e6f6e653580f842e094110" +
-			"dde181c2434f6d8eaa869154a4d07a910ce19880f43fc2c04" +
-			"ee000080c0e0949832c677128929f5f3297d364ac30e2" +
-			"51dc02f3c8814d1120d7b16000080c0c3098080"
+		snapshotBytes = "f90108f8be94110dde181c2434f6d8eaa869154a4d07a910ce19f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a06880de0b6b3a764000088b469471f8014000001e0dec9880254cc1f20ad395cc988027c97536ea18970c988021cc4b33cdff1601df83e945f546573745f6b65795f76616c696461746f72308c746573745f6163636f756e748b6861726d6f6e792e6f6e658a44616e69656c2d56444d846e6f6e651d80f842e094110dde181c2434f6d8eaa869154a4d07a910ce19880f43fc2c04ee000080c0e0949832c677128929f5f3297d364ac30e251dc02f3c8814d1120d7b16000080c0c3060180"
 
-		currentBytes = "f90118f8be94110dde181c2434f6d8eaa869154a4d07a910ce19" +
-			"f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4" +
-			"907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf5" +
-			"29e0508e0a0a880de0b6b3a764000088b469471f8014000001e0dec9" +
-			"880254cc1f20ad395cc988027c97536ea18970c98802" +
-			"1cc4b33cdff16035f83e945f546573745f6b65795f76616c69646174" +
-			"6f72308c746573745f6163636f756e748b6861726d6f" +
-			"6e792e6f6e658a44616e69656c2d56444d846e6f6e653580f852e894" +
-			"110dde181c2434f6d8eaa869154a4d07a910ce19880d" +
-			"e0b6b3a764000088e6ec131ed55ec404c0e8949832c677128929f5f3" +
-			"297d364ac30e251dc02f3c8814d1120d7b16000088d5" +
-			"2ac35139f06a2cc0c30a0180"
+		currentBytes = "f90118f8be94110dde181c2434f6d8eaa869154a4d07a910ce19f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a06880de0b6b3a764000088b469471f8014000001e0dec9880254cc1f20ad395cc988027c97536ea18970c988021cc4b33cdff1601df83e945f546573745f6b65795f76616c696461746f72308c746573745f6163636f756e748b6861726d6f6e792e6f6e658a44616e69656c2d56444d846e6f6e651d80f852e894110dde181c2434f6d8eaa869154a4d07a910ce19880f43fc2c04ee000088e6ec131ed55ec404c0e8949832c677128929f5f3297d364ac30e251dc02f3c8814d1120d7b16000088d52ac35139f06a2cc0c3070280"
 	)
 
 	snapshotData, _ := hex.DecodeString(snapshotBytes)
@@ -198,15 +158,7 @@ func scenariorealWorldSample1() *scenario {
 	}
 
 	return &scenario{
-		minSelfDelgation:     snapshot.MinSelfDelegation.Uint64(),
-		maxTotalDelegation:   snapshot.MaxTotalDelegation.Uint64(),
-		delegationSnapshotI1: snapshot.Delegations[0].Amount.Uint64(),
-		delegationSnapshotI2: snapshot.Delegations[1].Amount.Uint64(),
-		delegationCurrentI1:  current.Delegations[0].Amount.Uint64(),
-		delegationCurrentI2:  current.Delegations[1].Amount.Uint64(),
-		slash: &details{
-			Rate: 0.02,
-		},
+		slashRate: 0.02,
 		result: &Application{
 			TotalSlashed:      big.NewInt(0.052 * denominations.One),
 			TotalSnitchReward: big.NewInt(0.026 * denominations.One),
@@ -224,25 +176,20 @@ var (
 func init() {
 	{
 		s := scenarioTwoPercent
-		s.undelegateI1 = s.delegationSnapshotI1 - s.delegationCurrentI1
-		s.undelegateI2 = s.delegationSnapshotI2 - s.delegationCurrentI2
-		s.slash = &details{Rate: 0.02}
 		s.result = &Application{
 			TotalSlashed:      big.NewInt(0.1 * denominations.One),
 			TotalSnitchReward: big.NewInt(0.05 * denominations.One),
 		}
-		s.snapshot, s.current = s.validatorPair(s.delegationPair())
+		s.snapshot, s.current = s.defaultValidatorPair(s.defaultDelegationPair())
 	}
 	{
 		s := scenarioEightyPercent
-		s.undelegateI1 = s.delegationSnapshotI1 - s.delegationCurrentI1
-		s.undelegateI2 = s.delegationSnapshotI2 - s.delegationCurrentI2
-		s.slash = &details{Rate: 0.80}
+		s.slashRate = 0.80
 		s.result = &Application{
 			TotalSlashed:      big.NewInt(4 * denominations.One),
 			TotalSnitchReward: big.NewInt(2 * denominations.One),
 		}
-		s.snapshot, s.current = s.validatorPair(s.delegationPair())
+		s.snapshot, s.current = s.defaultValidatorPair(s.defaultDelegationPair())
 	}
 }
 
@@ -290,22 +237,19 @@ var (
 		*shard.FromLibBLSPublicKeyUnsafe(signerB)
 )
 
-func (s *scenario) validatorPair(
+func (s *scenario) defaultValidatorPair(
 	delegationsSnapshot, delegationsCurrent staking.Delegations,
 ) (
 	*staking.ValidatorWrapper, *staking.ValidatorWrapper,
 ) {
-	minSelf, maxDel :=
-		new(big.Int).SetUint64(s.minSelfDelgation),
-		new(big.Int).SetUint64(s.maxTotalDelegation)
 
 	validatorSnapshot := &staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
 			LastEpochInCommittee: big.NewInt(lastEpochInComm),
-			MinSelfDelegation:    minSelf,
-			MaxTotalDelegation:   maxDel,
+			MinSelfDelegation:    new(big.Int).SetUint64(1 * denominations.One),
+			MaxTotalDelegation:   new(big.Int).SetUint64(10 * denominations.One),
 			Active:               true,
 			Commission:           commonCommission,
 			Description:          commonDescr,
@@ -320,8 +264,8 @@ func (s *scenario) validatorPair(
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
 			LastEpochInCommittee: big.NewInt(lastEpochInComm + 1),
-			MinSelfDelegation:    minSelf,
-			MaxTotalDelegation:   maxDel,
+			MinSelfDelegation:    new(big.Int).SetUint64(1 * denominations.One),
+			MaxTotalDelegation:   new(big.Int).SetUint64(10 * denominations.One),
 			Active:               true,
 			Commission:           commonCommission,
 			Description:          commonDescr,
@@ -333,19 +277,21 @@ func (s *scenario) validatorPair(
 	return validatorSnapshot, validatorCurrent
 }
 
-func (s *scenario) delegationPair() (staking.Delegations, staking.Delegations) {
+func (s *scenario) defaultDelegationPair() (
+	staking.Delegations, staking.Delegations,
+) {
 	delegationsSnapshot := staking.Delegations{
 		// NOTE  delegation is the validator themselves
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           big.NewInt(0).SetUint64(s.delegationSnapshotI1),
-			Reward:           big.NewInt(0),
+			Amount:           new(big.Int).SetUint64(2 * denominations.One),
+			Reward:           common.Big0,
 			Undelegations:    staking.Undelegations{},
 		},
 		staking.Delegation{
 			DelegatorAddress: randoDel,
-			Amount:           big.NewInt(0).SetUint64(s.delegationSnapshotI2),
-			Reward:           big.NewInt(0),
+			Amount:           new(big.Int).SetUint64(3 * denominations.One),
+			Reward:           common.Big0,
 			Undelegations:    staking.Undelegations{},
 		},
 	}
@@ -353,11 +299,11 @@ func (s *scenario) delegationPair() (staking.Delegations, staking.Delegations) {
 	delegationsCurrent := staking.Delegations{
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           big.NewInt(0).SetUint64(s.delegationCurrentI1),
-			Reward:           big.NewInt(0),
+			Amount:           new(big.Int).SetUint64(1.96 * denominations.One),
+			Reward:           common.Big0,
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
-					Amount: new(big.Int).SetUint64(s.undelegateI1),
+					Amount: new(big.Int).SetUint64(1 * denominations.One),
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
@@ -365,11 +311,11 @@ func (s *scenario) delegationPair() (staking.Delegations, staking.Delegations) {
 		// some external delegator
 		staking.Delegation{
 			DelegatorAddress: randoDel,
-			Amount:           new(big.Int).SetUint64(s.delegationCurrentI2),
-			Reward:           big.NewInt(0),
+			Amount:           new(big.Int).SetUint64(0.5 * denominations.One),
+			Reward:           common.Big0,
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
-					Amount: new(big.Int).SetUint64(s.undelegateI2),
+					Amount: new(big.Int).SetUint64(2.5 * denominations.One),
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
@@ -452,7 +398,6 @@ func TestVerify(t *testing.T) {
 func testScenario(
 	t *testing.T, stateHandle *state.DB, slashes Records, s *scenario,
 ) {
-
 	if err := stateHandle.UpdateStakingInfo(
 		offenderAddr, s.snapshot,
 	); err != nil {
@@ -478,12 +423,12 @@ func testScenario(
 		stateHandle,
 		slashes,
 		numeric.MustNewDecFromStr(
-			fmt.Sprintf("%f", s.slash.Rate),
+			fmt.Sprintf("%f", s.slashRate),
 		),
 	)
 
 	if err != nil {
-		t.Fatalf("rate: %v, slash application failed %s", s.slash.Rate, err.Error())
+		t.Fatalf("rate: %v, slash application failed %s", s.slashRate, err.Error())
 	}
 
 	if sn := slashResult.TotalSlashed; sn.Cmp(
@@ -518,16 +463,20 @@ func defaultStateWithAccountsApplied() *state.DB {
 	return stateHandle
 }
 
+func TestTwoPercentSlashed(t *testing.T) {
+	slashes := exampleSlashRecords()
+	stateHandle := defaultStateWithAccountsApplied()
+	testScenario(t, stateHandle, slashes, scenarioTwoPercent)
+}
+
+func TestEightyPercentSlashed(t *testing.T) {
+	slashes := exampleSlashRecords()
+	stateHandle := defaultStateWithAccountsApplied()
+	testScenario(t, stateHandle, slashes, scenarioEightyPercent)
+}
+
 func TestApply(t *testing.T) {
 	slashes := exampleSlashRecords()
-	{
-		stateHandle := defaultStateWithAccountsApplied()
-		testScenario(t, stateHandle, slashes, scenarioTwoPercent)
-	}
-	{
-		stateHandle := defaultStateWithAccountsApplied()
-		testScenario(t, stateHandle, slashes, scenarioEightyPercent)
-	}
 	{
 		stateHandle := defaultStateWithAccountsApplied()
 		testScenario(t, stateHandle, slashes, scenariorealWorldSample1())
