@@ -63,9 +63,14 @@ type ValidatorWrapper struct {
 	}
 }
 
+func (v ValidatorWrapper) String() string {
+	s, _ := json.Marshal(v)
+	return string(s)
+}
+
 // MarshalJSON ..
 // func (v *ValidatorWrapper) MarshalJSON() ([]byte, error) {
-
+// 	return jso
 // }
 
 // VotePerShard ..
@@ -498,17 +503,7 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 }
 
 // String returns a human readable string representation of a validator.
-func (v *Validator) String() string {
-	return fmt.Sprintf(`Validator
-  Address:                    %s
-  SlotPubKeys:                %s
-  LastEpochInCommittee:           %v
-  Minimum Self Delegation:     %v
-  Maximum Total Delegation:     %v
-  Description:                %v
-  Commission:                 %v`,
-		common2.MustAddressToBech32(v.Address), printSlotPubKeys(v.SlotPubKeys),
-		v.LastEpochInCommittee,
-		v.MinSelfDelegation, v.MaxTotalDelegation, v.Description, v.Commission,
-	)
+func (v Validator) String() string {
+	s, _ := json.Marshal(v)
+	return string(s)
 }

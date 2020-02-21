@@ -1,11 +1,13 @@
 package slash
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/votepower"
@@ -24,6 +26,20 @@ const (
 	debtCollectionsRepoUndelegations = -1
 	validatorsOwnDel                 = 0
 )
+
+func mustStayAboveZeroAfterDebtReduce(
+	snapshot, current *staking.ValidatorWrapper,
+	slashDebt, payment *big.Int,
+	slashTrack *Application,
+) {
+	slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, payment)
+	slashDebt.Sub(slashDebt, payment)
+
+	if slashDebt.Cmp(common.Big0) == -1 {
+		fmt.Println("was->", slashDebt)
+		panic("something made it below 0, why")
+	}
+}
 
 // Moment ..
 type Moment struct {
@@ -180,6 +196,13 @@ func delegatorSlashApply(
 		snapshotAddr := delegationSnapshot.DelegatorAddress
 		for j, delegationNow := range current.Delegations {
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
+
+				// fmt.Println("edgar-Pure-debt-owed", i, j,
+				// 	slashDebt, rate.String(),
+				// 	snapshot.String(),
+				// 	current.String(),
+				// )
+
 				state.AddBalance(reporter, halfOfSlashDebt)
 				// NOTE only need to pay snitch here
 				slashTrack.TotalSnitchReward.Add(
@@ -195,8 +218,10 @@ func delegatorSlashApply(
 						nowAmt, big.NewInt(denominations.One),
 						// 0.2 > 0 == true ?
 					); partialPayment.Cmp(common.Big0) == 1 {
-						// Mutate wrt partial payment application
-						slashDebt.Sub(slashDebt, partialPayment)
+						// fmt.Println("special-case-validator", nowAmt, partialPayment, slashDebt)
+						mustStayAboveZeroAfterDebtReduce(
+							snapshot, current, slashDebt, partialPayment, slashTrack,
+						)
 						nowAmt.Sub(nowAmt, partialPayment)
 						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, partialPayment)
 					}
@@ -218,15 +243,17 @@ func delegatorSlashApply(
 							case paidOffExact:
 								undelegate.Amount.SetInt64(0)
 							case haveEnoughToPayOff:
-								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
 								undelegate.Amount.Sub(undelegate.Amount, slashDebt)
-								slashDebt.SetInt64(0)
+								mustStayAboveZeroAfterDebtReduce(
+									snapshot, current, slashDebt, slashDebt, slashTrack,
+								)
 								undelegate.Amount.Set(newBal)
 							case -1:
 								// But do have enough to pay off something at least
 								partialPayment := new(big.Int).Sub(slashDebt, new(big.Int).Abs(newBal))
-								slashDebt.Sub(slashDebt, partialPayment)
-								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, partialPayment)
+								mustStayAboveZeroAfterDebtReduce(
+									snapshot, current, slashDebt, partialPayment, slashTrack,
+								)
 								undelegate.Amount.SetInt64(0)
 							}
 						}
@@ -234,8 +261,9 @@ func delegatorSlashApply(
 					// NOTE at high slashing % rates, we could hit this situation
 					// because of the special casing of logic on min-self-delegation
 					if slashDebt.Cmp(common.Big0) == 1 {
-						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
-						slashDebt.Sub(slashDebt, slashDebt)
+						mustStayAboveZeroAfterDebtReduce(
+							snapshot, current, slashDebt, slashDebt, slashTrack,
+						)
 					}
 				} else {
 					// NOTE everyone else, that is every plain delegation
@@ -244,13 +272,15 @@ func delegatorSlashApply(
 					if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
 						// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
 						if nowAmt.Cmp(slashDebt) >= 0 {
-							slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
 							nowAmt.Sub(nowAmt, slashDebt)
-							slashDebt.Sub(slashDebt, slashDebt)
+							mustStayAboveZeroAfterDebtReduce(
+								snapshot, current, slashDebt, slashDebt, slashTrack,
+							)
 						} else {
 							// 0.50_amount < 2.4_debt =>, slash == 1.9, nowAmt == 0.0
-							slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, nowAmt)
-							slashDebt.Sub(slashDebt, nowAmt)
+							mustStayAboveZeroAfterDebtReduce(
+								snapshot, current, slashDebt, nowAmt, slashTrack,
+							)
 							nowAmt.Sub(nowAmt, nowAmt)
 						}
 					}
@@ -265,12 +295,13 @@ func delegatorSlashApply(
 								break
 							}
 
-							if amt := undelegate.Amount; amt.Cmp(common.Big0) == 1 &&
+							if undelegate.Amount.Cmp(common.Big0) == 1 &&
 								slashDebt.Cmp(common.Big0) == 1 {
-								newBal := new(big.Int).Sub(amt, slashDebt)
-								slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, slashDebt)
-								amt.Set(newBal)
-								slashDebt.Sub(slashDebt, slashDebt)
+								newBal := new(big.Int).Sub(undelegate.Amount, slashDebt)
+								undelegate.Amount.Set(newBal)
+								mustStayAboveZeroAfterDebtReduce(
+									snapshot, current, slashDebt, slashDebt, slashTrack,
+								)
 							}
 						}
 					}
@@ -279,6 +310,19 @@ func delegatorSlashApply(
 		}
 
 		if slashDebt.Cmp(common.Big0) != 0 {
+			x1, err1 := rlp.EncodeToBytes(snapshot)
+			if err1 != nil {
+				fmt.Println("encode1 failed, why", err1.Error())
+				return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
+
+			}
+			x2, err2 := rlp.EncodeToBytes(current)
+			if err2 != nil {
+				fmt.Println("encode2 failed, why", err1.Error())
+				return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
+
+			}
+			fmt.Println("EDGAR->", rate.String(), hex.EncodeToString(x1), hex.EncodeToString(x2))
 			return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
 		}
 	}
