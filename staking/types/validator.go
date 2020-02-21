@@ -63,8 +63,8 @@ type ValidatorWrapper struct {
 	}
 }
 
-func (v ValidatorWrapper) String() string {
-	s, _ := json.Marshal(v)
+func (w ValidatorWrapper) String() string {
+	s, _ := json.Marshal(w)
 	return string(s)
 }
 
