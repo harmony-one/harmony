@@ -149,10 +149,6 @@ function upload
       AWSCLI+=" --profile $PROFILE"
    fi
 
-   for bin in "${!SRC[@]}"; do
-      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}$FOLDER/$bin --acl public-read
-   done
-
    if [ "$STATIC" != "true" ]; then
       for lib in "${!LIB[@]}"; do
          if [ -e ${LIB[$lib]} ]; then
@@ -161,7 +157,14 @@ function upload
             echo "!! MISSING ${LIB[$lib]} !!"
          fi
       done
+   else
+      FOLDER+='/static'
    fi
+
+   for bin in "${!SRC[@]}"; do
+      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}$FOLDER/$bin --acl public-read
+   done
+
 
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
 }
