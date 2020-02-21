@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -366,13 +367,33 @@ func (m mockOutSnapshotReader) ReadValidatorSnapshot(
 	return &m.snapshot, nil
 }
 
-func TestVerify(t *testing.T) {
-	//
+type mockOutChainReader struct{}
+
+func (mockOutChainReader) ReadShardState(epoch *big.Int) (*shard.State, error) {
+	return nil, nil
 }
 
-// TODO a more granular approach
-func testDelegatorSlashApply() {
+// GetHeader retrieves a block header from the database by hash and number.
+func (mockOutChainReader) GetHeaderByHash(common.Hash) *block.Header {
+	return nil
+}
 
+// Config retrieves the blockchain's chain configuration.
+func (mockOutChainReader) Config() *params.ChainConfig {
+	return nil
+}
+
+// CurrentHeader retrieves the current header from the local chain.
+func (mockOutChainReader) CurrentHeader() *block.Header {
+	return nil
+}
+
+func TestVerify(t *testing.T) {
+	if err := Verify(
+		mockOutChainReader{}, &exampleSlashRecords()[0],
+	); err != nil {
+		t.Errorf("could not verify slash %s", err.Error())
+	}
 }
 
 func testScenario(
