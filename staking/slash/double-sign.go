@@ -323,12 +323,7 @@ func Apply(
 	chain staking.ValidatorSnapshotReader, state *state.DB,
 	slashes Records, rate numeric.Dec,
 ) (*Application, error) {
-	log := utils.Logger()
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
-	log.Info().Int("count", len(slashes)).
-		Str("rate", rate.String()).
-		Msg("apply slashes")
-
 	for _, slash := range slashes {
 		// TODO Probably won't happen but we probably should
 		// be expilict about reading the right epoch validator snapshot,
@@ -370,8 +365,6 @@ func Apply(
 			return nil, err
 		}
 	}
-
-	log.Info().Str("rate", rate.String()).Int("count", len(slashes))
 	return slashDiff, nil
 }
 

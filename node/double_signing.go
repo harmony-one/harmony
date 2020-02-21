@@ -1,8 +1,6 @@
 package node
 
 import (
-	"fmt"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -16,7 +14,6 @@ func (node *Node) processSlashCandidateMessage(msgPayload []byte) {
 	}
 	candidates := []slash.Record{}
 	if err := rlp.DecodeBytes(msgPayload, candidates); err != nil {
-		fmt.Println("couldn't decode the payload correctly.", err.Error())
 		utils.Logger().Error().
 			Err(err).
 			Msg("unable to decode slash candidate message")

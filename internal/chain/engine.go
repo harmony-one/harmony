@@ -338,7 +338,11 @@ func (e *engineImpl) Finalize(
 		); err != nil {
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
-		utils.Logger().Info().RawJSON("slash-applied", []byte(slashApplied.String()))
+		utils.Logger().Info().
+			Str("rate", rate.String()).
+			RawJSON("records", []byte(doubleSigners.String())).
+			RawJSON("slash-applied", []byte(slashApplied.String())).
+			Msg("applied slash successfully")
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
