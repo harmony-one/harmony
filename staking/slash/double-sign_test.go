@@ -123,9 +123,7 @@ const (
 )
 
 type details struct {
-	MagnitudeI1 *big.Int
-	MagnitudeI2 *big.Int
-	Rate        float64
+	Rate float64
 }
 
 type scenario struct {
@@ -159,15 +157,62 @@ func defaultFundingScenario() *scenario {
 }
 
 func scenariorealWorldSample1() *scenario {
+	const (
+		snapshotBytes = "f90108f8be94110dde181c2434f6d8eaa869154a4d07a910ce" +
+			"19f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4907" +
+			"c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e" +
+			"0a0a880de0b6b3a764000088b469471f8014000001e0dec9880" +
+			"254cc1f20ad395cc988027c97536ea18970c988021cc4b33c" +
+			"dff16035f83e945f546573745f6b65795f76616c696461746f7" +
+			"2308c746573745f6163636f756e748b6861726d6f6e792e6f" +
+			"6e658a44616e69656c2d56444d846e6f6e653580f842e094110" +
+			"dde181c2434f6d8eaa869154a4d07a910ce19880f43fc2c04" +
+			"ee000080c0e0949832c677128929f5f3297d364ac30e2" +
+			"51dc02f3c8814d1120d7b16000080c0c3098080"
+
+		currentBytes = "f90118f8be94110dde181c2434f6d8eaa869154a4d07a910ce19" +
+			"f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4" +
+			"907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf5" +
+			"29e0508e0a0a880de0b6b3a764000088b469471f8014000001e0dec9" +
+			"880254cc1f20ad395cc988027c97536ea18970c98802" +
+			"1cc4b33cdff16035f83e945f546573745f6b65795f76616c69646174" +
+			"6f72308c746573745f6163636f756e748b6861726d6f" +
+			"6e792e6f6e658a44616e69656c2d56444d846e6f6e653580f852e894" +
+			"110dde181c2434f6d8eaa869154a4d07a910ce19880d" +
+			"e0b6b3a764000088e6ec131ed55ec404c0e8949832c677128929f5f3" +
+			"297d364ac30e251dc02f3c8814d1120d7b16000088d5" +
+			"2ac35139f06a2cc0c30a0180"
+	)
+
+	snapshotData, _ := hex.DecodeString(snapshotBytes)
+	currentData, _ := hex.DecodeString(currentBytes)
+
+	var snapshot, current staking.ValidatorWrapper
+
+	if err := rlp.DecodeBytes(snapshotData, &snapshot); err != nil {
+		panic("test case has bad input")
+	}
+
+	if err := rlp.DecodeBytes(currentData, &current); err != nil {
+		panic("test case has bad input")
+	}
+
 	return &scenario{
-		minSelfDelgation:     1_000_000_000_000_000_000,
-		maxTotalDelegation:   13_000_000_000_000_000_000,
-		delegationSnapshotI1: 2_000_000_000_000_000_000,
-		delegationSnapshotI2: 3_000_000_000_000_000_000,
-		delegationCurrentI1:  1_000_000_000_000_000_000,
-		delegationCurrentI2:  500_000_000_000_000_000,
-		slash:                nil,
-		result:               nil,
+		minSelfDelgation:     snapshot.MinSelfDelegation.Uint64(),
+		maxTotalDelegation:   snapshot.MaxTotalDelegation.Uint64(),
+		delegationSnapshotI1: snapshot.Delegations[0].Amount.Uint64(),
+		delegationSnapshotI2: snapshot.Delegations[1].Amount.Uint64(),
+		delegationCurrentI1:  current.Delegations[0].Amount.Uint64(),
+		delegationCurrentI2:  current.Delegations[1].Amount.Uint64(),
+		slash: &details{
+			Rate: 0.02,
+		},
+		result: &Application{
+			TotalSlashed:      big.NewInt(0.052 * denominations.One),
+			TotalSnitchReward: big.NewInt(0.026 * denominations.One),
+		},
+		snapshot: &snapshot,
+		current:  &current,
 	}
 }
 
@@ -181,11 +226,7 @@ func init() {
 		s := scenarioTwoPercent
 		s.undelegateI1 = s.delegationSnapshotI1 - s.delegationCurrentI1
 		s.undelegateI2 = s.delegationSnapshotI2 - s.delegationCurrentI2
-		s.slash = &details{
-			Rate:        0.02,
-			MagnitudeI1: new(big.Int).SetUint64(0.04 * denominations.One),
-			MagnitudeI2: new(big.Int).SetUint64(0.06 * denominations.One),
-		}
+		s.slash = &details{Rate: 0.02}
 		s.result = &Application{
 			TotalSlashed:      big.NewInt(0.1 * denominations.One),
 			TotalSnitchReward: big.NewInt(0.05 * denominations.One),
@@ -196,11 +237,7 @@ func init() {
 		s := scenarioEightyPercent
 		s.undelegateI1 = s.delegationSnapshotI1 - s.delegationCurrentI1
 		s.undelegateI2 = s.delegationSnapshotI2 - s.delegationCurrentI2
-		s.slash = &details{
-			Rate:        0.80,
-			MagnitudeI1: new(big.Int).SetUint64(1.6 * denominations.One),
-			MagnitudeI2: new(big.Int).SetUint64(2.4 * denominations.One),
-		}
+		s.slash = &details{Rate: 0.80}
 		s.result = &Application{
 			TotalSlashed:      big.NewInt(4 * denominations.One),
 			TotalSnitchReward: big.NewInt(2 * denominations.One),
@@ -483,15 +520,16 @@ func defaultStateWithAccountsApplied() *state.DB {
 
 func TestApply(t *testing.T) {
 	slashes := exampleSlashRecords()
-
 	{
 		stateHandle := defaultStateWithAccountsApplied()
 		testScenario(t, stateHandle, slashes, scenarioTwoPercent)
 	}
-
 	{
 		stateHandle := defaultStateWithAccountsApplied()
 		testScenario(t, stateHandle, slashes, scenarioEightyPercent)
 	}
-
+	{
+		stateHandle := defaultStateWithAccountsApplied()
+		testScenario(t, stateHandle, slashes, scenariorealWorldSample1())
+	}
 }
