@@ -14,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -105,8 +104,13 @@ func (r Record) String() string {
 	return string(s)
 }
 
+// CommitteeReader ..
+type CommitteeReader interface {
+	ReadShardState(epoch *big.Int) (*shard.State, error)
+}
+
 // Verify checks that the signature is valid
-func Verify(chain committee.ChainReader, candidate *Record) error {
+func Verify(chain CommitteeReader, candidate *Record) error {
 	first, second := candidate.AlreadyCastBallot, candidate.DoubleSignedBallot
 	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
 		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
@@ -115,27 +119,32 @@ func Verify(chain committee.ChainReader, candidate *Record) error {
 		)
 	}
 	superCommittee, err := chain.ReadShardState(candidate.Evidence.Epoch)
+
 	if err != nil {
 		return err
 	}
+
 	subCommittee := superCommittee.FindCommitteeByID(
 		candidate.Evidence.ShardID,
 	)
+
 	if subCommittee == nil {
 		return errors.Wrapf(
 			errShardIDNotKnown, "given shardID %d", candidate.Evidence.ShardID,
 		)
 	}
 
-	// for _, key := range subCommittee.BLSPublicKeys() {
-	// 	if shard.CompareBlsPublicKey(
-	// 		shard.FromLibBLSPublicKeyUnsafe(key),
-	// 		second.SignerPubKey) == 0 {
-	// 		//
-	// 	}
+	wasInCommittee := false
+	for _, key := range subCommittee.BLSPublicKeys() {
+		if shard.CompareBlsPublicKey(key, second.SignerPubKey) == 0 {
+			wasInCommittee = true
+			break
+		}
+	}
 
-	// }
-
+	if !wasInCommittee {
+		return errWasNotInSubCommittee
+	}
 	// candidate.ConflictingBallots
 
 	// TODO Why this one printng have 00000000 for signature?
@@ -151,6 +160,7 @@ var (
 	errSlashDebtNotFullyAccountedFor = errors.New(
 		"slash debt was not fully accounted for, still non-zero",
 	)
+	errWasNotInSubCommittee         = errors.New("not in subcommittee")
 	errShardIDNotKnown              = errors.New("nil subcommittee for shardID")
 	errValidatorNotFoundDuringSlash = errors.New("validator not found")
 	zero                            = numeric.ZeroDec()
