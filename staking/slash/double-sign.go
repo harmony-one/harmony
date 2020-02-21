@@ -27,6 +27,7 @@ const (
 	validatorsOwnDel                 = 0
 )
 
+// invariant assumes snapshot, current can be rlp.EncodeToBytes
 func mustStayAboveZeroAfterDebtReduce(
 	snapshot, current *staking.ValidatorWrapper,
 	slashDebt, payment *big.Int,
@@ -34,10 +35,11 @@ func mustStayAboveZeroAfterDebtReduce(
 ) {
 	slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, payment)
 	slashDebt.Sub(slashDebt, payment)
-
 	if slashDebt.Cmp(common.Big0) == -1 {
-		fmt.Println("was->", slashDebt)
-		panic("something made it below 0, why")
+		x1, _ := rlp.EncodeToBytes(snapshot)
+		x2, _ := rlp.EncodeToBytes(current)
+		msg := "slashdebt balance cannot go below zero-" + hex.EncodeToString(x1) + hex.EncodeToString(x2)
+		panic(msg)
 	}
 }
 
@@ -196,13 +198,6 @@ func delegatorSlashApply(
 		snapshotAddr := delegationSnapshot.DelegatorAddress
 		for j, delegationNow := range current.Delegations {
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
-
-				// fmt.Println("edgar-Pure-debt-owed", i, j,
-				// 	slashDebt, rate.String(),
-				// 	snapshot.String(),
-				// 	current.String(),
-				// )
-
 				state.AddBalance(reporter, halfOfSlashDebt)
 				// NOTE only need to pay snitch here
 				slashTrack.TotalSnitchReward.Add(
@@ -213,17 +208,16 @@ func delegatorSlashApply(
 					// say my slash debt is 1.6, and my current amount is 1.2
 					// then while I can't drop below 1, I could still pay 0.2
 					// to bring my debt down to 1.4
-					if partialPayment := new(big.Int).Sub(
-						// 1.2 - 1
-						nowAmt, big.NewInt(denominations.One),
-						// 0.2 > 0 == true ?
-					); partialPayment.Cmp(common.Big0) == 1 {
-						// fmt.Println("special-case-validator", nowAmt, partialPayment, slashDebt)
-						mustStayAboveZeroAfterDebtReduce(
-							snapshot, current, slashDebt, partialPayment, slashTrack,
-						)
-						nowAmt.Sub(nowAmt, partialPayment)
-						slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, partialPayment)
+					if one := new(big.Int).SetUint64(denominations.One); nowAmt.Cmp(one) == 1 &&
+						slashDebt.Cmp(common.Big0) == 1 {
+						// have 1.1, but debt is 0.022
+						asMuchAsCouldPay := new(big.Int).Sub(nowAmt, one)
+						if asMuchAsCouldPay.Cmp(slashDebt) >= 0 {
+							mustStayAboveZeroAfterDebtReduce(
+								snapshot, current, slashDebt, slashDebt, slashTrack,
+							)
+							nowAmt.Sub(nowAmt, slashDebt)
+						}
 					}
 					// NOTE Assume did as much as could above, now check the undelegations
 					for _, undelegate := range delegationNow.Undelegations {
