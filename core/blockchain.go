@@ -603,6 +603,26 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 	return nil
 }
 
+// similar to insert, but add to the db writer.
+func (bc *BlockChain) insertWithWriter(batch rawdb.DatabaseWriter, block *types.Block) {
+	// If the block is on a side chain or an unknown one, force other heads onto it too
+	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
+
+	// Add the block to the canonical chain number scheme and mark as the head
+	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
+	rawdb.WriteHeadBlockHash(batch, block.Hash())
+
+	bc.currentBlock.Store(block)
+
+	// If the block is better than our head or is on a different chain, force update heads
+	if updateHeads {
+		bc.hc.SetCurrentHeader(block.Header())
+		rawdb.WriteHeadFastBlockHash(batch, block.Hash())
+
+		bc.currentFastBlock.Store(block)
+	}
+}
+
 // insert injects a new head block into the current block chain. This method
 // assumes that the block is indeed a true head. It will also reset the head
 // header and the head fast sync block to this very same block if they are older
@@ -610,22 +630,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 //
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
-	// If the block is on a side chain or an unknown one, force other heads onto it too
-	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
-
-	// Add the block to the canonical chain number scheme and mark as the head
-	rawdb.WriteCanonicalHash(bc.db, block.Hash(), block.NumberU64())
-	rawdb.WriteHeadBlockHash(bc.db, block.Hash())
-
-	bc.currentBlock.Store(block)
-
-	// If the block is better than our head or is on a different chain, force update heads
-	if updateHeads {
-		bc.hc.SetCurrentHeader(block.Header())
-		rawdb.WriteHeadFastBlockHash(bc.db, block.Hash())
-
-		bc.currentFastBlock.Store(block)
-	}
+	bc.insertWithWriter(bc.db, block)
 }
 
 // Genesis retrieves the chain's genesis block.
@@ -1052,17 +1057,19 @@ func (bc *BlockChain) WriteBlockWithState(
 	defer bc.mu.Unlock()
 
 	currentBlock := bc.CurrentBlock()
+	if currentBlock == nil || block.ParentHash() != currentBlock.Hash() {
+		return NonStatTy, errors.New("Hash of parent block doesn't match the current block hash")
+	}
 
-	rawdb.WriteBlock(bc.db, block)
-
+	// Commit state object changes to in-memory trie
 	root, err := state.Commit(bc.chainConfig.IsS3(block.Epoch()))
 	if err != nil {
 		return NonStatTy, err
 	}
-	triedb := bc.stateCache.TrieDB()
 
-	// If we're running an archive node, always flush
-	if bc.cacheConfig.Disabled {
+	// Flush trie state into disk if it's archival node or the block is epoch block
+	triedb := bc.stateCache.TrieDB()
+	if bc.cacheConfig.Disabled || len(block.Header().ShardState()) > 0 {
 		if err := triedb.Commit(root, false); err != nil {
 			return NonStatTy, err
 		}
@@ -1112,208 +1119,31 @@ func (bc *BlockChain) WriteBlockWithState(
 		}
 	}
 
-	// Write other block data using a batch.
-	// TODO: put following into a func
-	/////////////////////////// START
 	batch := bc.db.NewBatch()
-	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
+	// Write the raw block
+	rawdb.WriteBlock(batch, block)
 
-	//// Cross-shard txns
-	epoch := block.Header().Epoch()
-	if bc.chainConfig.HasCrossTxFields(block.Epoch()) {
-		shardingConfig := shard.Schedule.InstanceForEpoch(epoch)
-		shardNum := int(shardingConfig.NumShards())
-		for i := 0; i < shardNum; i++ {
-			if i == int(block.ShardID()) {
-				continue
-			}
-
-			shardReceipts := types.CXReceipts(cxReceipts).GetToShardReceipts(uint32(i))
-			err := rawdb.WriteCXReceipts(batch, uint32(i), block.NumberU64(), block.Hash(), shardReceipts)
-			if err != nil {
-				utils.Logger().Error().Err(err).Interface("shardReceipts", shardReceipts).Int("toShardID", i).Msg("WriteCXReceipts cannot write into database")
-				return NonStatTy, err
-			}
-		}
-		// Mark incomingReceipts in the block as spent
-		bc.WriteCXReceiptsProofSpent(block.IncomingReceipts())
+	// Write offchain data
+	if status, err := bc.CommitOffChainData(
+		batch, block, receipts,
+		cxReceipts, payout, state, root); err != nil {
+		return status, err
 	}
 
-	//// VRF + VDF
-	//check non zero VRF field in header and add to local db
-	if len(block.Vrf()) > 0 {
-		vrfBlockNumbers, _ := bc.ReadEpochVrfBlockNums(block.Header().Epoch())
-		if (len(vrfBlockNumbers) > 0) && (vrfBlockNumbers[len(vrfBlockNumbers)-1] == block.NumberU64()) {
-			utils.Logger().Error().
-				Str("number", block.Number().String()).
-				Str("epoch", block.Header().Epoch().String()).
-				Msg("VRF block number is already in local db")
-		} else {
-			vrfBlockNumbers = append(vrfBlockNumbers, block.NumberU64())
-			err = bc.WriteEpochVrfBlockNums(block.Header().Epoch(), vrfBlockNumbers)
-			if err != nil {
-				utils.Logger().Error().
-					Str("number", block.Number().String()).
-					Str("epoch", block.Header().Epoch().String()).
-					Msg("failed to write VRF block number to local db")
-				return NonStatTy, err
-			}
-		}
-	}
+	// Write the positional metadata for transaction/receipt lookups and preimages
+	rawdb.WriteTxLookupEntries(batch, block)
+	rawdb.WriteCxLookupEntries(batch, block)
+	rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages())
 
-	//check non zero Vdf in header and add to local db
-	if len(block.Vdf()) > 0 {
-		err = bc.WriteEpochVdfBlockNum(block.Header().Epoch(), block.Number())
-		if err != nil {
-			utils.Logger().Error().
-				Str("number", block.Number().String()).
-				Str("epoch", block.Header().Epoch().String()).
-				Msg("failed to write VDF block number to local db")
-			return NonStatTy, err
-		}
-	}
+	// Update current block
+	bc.insertWithWriter(batch, block)
 
-	//// Shard State and Validator Update
-	header := block.Header()
-	if len(header.ShardState()) > 0 {
-		// Write shard state for the new epoch
-		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
-		shardState, err := block.Header().GetShardState()
-		if err == nil && shardState.Epoch != nil && bc.chainConfig.IsStaking(shardState.Epoch) {
-			// After staking, the epoch will be decided by the epoch in the shard state.
-			epoch = new(big.Int).Set(shardState.Epoch)
-		}
-
-		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
-		if err != nil {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
-			return NonStatTy, err
-		}
-
-		// Find all the active validator addresses and store them in db
-		allActiveValidators := []common.Address{}
-		processed := make(map[common.Address]struct{})
-		for i := range newShardState.Shards {
-			shard := newShardState.Shards[i]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-						allActiveValidators = append(allActiveValidators, shard.Slots[j].EcdsaAddress)
-					}
-				}
-			}
-		}
-
-		// Update active validators
-		if err := bc.WriteActiveValidatorList(allActiveValidators); err != nil {
-			return NonStatTy, err
-		}
-
-		// Update snapshots for all validators
-		if err := bc.UpdateValidatorSnapshots(); err != nil {
-			return NonStatTy, err
-		}
-	}
-
-	// Do bookkeeping for new staking txns
-	for _, tx := range block.StakingTransactions() {
-		err = bc.UpdateStakingMetaData(tx, root)
-		// keep offchain database consistency with onchain we need revert
-		// but it should not happend unless local database corrupted
-		if err != nil {
-			utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
-			return NonStatTy, err
-		}
-	}
-
-	// Update voting power of validators for all shards
-	if block.ShardID() == shard.BeaconChainShardID &&
-		len(block.Header().ShardState()) > 0 {
-		shardState := new(shard.State)
-
-		if shardState, err = shard.DecodeWrapper(block.Header().ShardState()); err == nil {
-			if err = bc.UpdateValidatorVotingPower(shardState); err != nil {
-				utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to update voting power")
-			}
-		} else {
-			utils.Logger().Err(err).Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
-		}
-	}
-
-	//// Writing beacon chain cross links
-	if header.ShardID() == shard.BeaconChainShardID &&
-		bc.chainConfig.IsCrossLink(block.Epoch()) &&
-		len(header.CrossLinks()) > 0 {
-		crossLinks := &types.CrossLinks{}
-		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
-		if err != nil {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cannot parse cross links")
-			return NonStatTy, err
-		}
-		if !crossLinks.IsSorted() {
-			header.Logger(utils.Logger()).Warn().Err(err).Msg("[insertChain/crosslinks] cross links are not sorted")
-			return NonStatTy, errors.New("proposed cross links are not sorted")
-		}
-		for _, crossLink := range *crossLinks {
-			// Process crosslink
-			if err := bc.WriteCrossLinks(types.CrossLinks{crossLink}); err == nil {
-				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
-			}
-			bc.LastContinuousCrossLink(crossLink)
-		}
-
-		//clean/update local database cache after crosslink inserted into blockchain
-		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
-		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
-	}
-
-	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		if bc.chainConfig.IsStaking(block.Epoch()) {
-			bc.UpdateBlockRewardAccumulator(payout, block.Number().Uint64())
-		} else {
-			// block reward never accumulate before staking
-			bc.WriteBlockRewardAccumulator(big.NewInt(0), block.Number().Uint64())
-		}
-	}
-
-	/////////////////////////// END
-
-	// If the total difficulty is higher than our known, add it to the canonical chain
-	// Second clause in the if statement reduces the vulnerability to selfish mining.
-	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
-	// TODO: Remove reorg code, it's not used in our code
-	reorg := true
-	if reorg {
-		// Reorganise the chain if the parent is not the head block
-		if block.ParentHash() != currentBlock.Hash() {
-			if err := bc.reorg(currentBlock, block); err != nil {
-				return NonStatTy, err
-			}
-		}
-		// Write the positional metadata for transaction/receipt lookups and preimages
-		rawdb.WriteTxLookupEntries(batch, block)
-		rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages())
-
-		// write the positional metadata for CXReceipts lookups
-		rawdb.WriteCxLookupEntries(batch, block)
-
-		status = CanonStatTy
-	} else {
-		status = SideStatTy
-	}
 	if err := batch.Write(); err != nil {
 		return NonStatTy, err
 	}
 
-	// Set new head.
-	if status == CanonStatTy {
-		bc.insert(block)
-	}
 	bc.futureBlocks.Remove(block.Hash())
-	return status, nil
+	return CanonStatTy, nil
 }
 
 // InsertChain attempts to insert the given batch of blocks in to the canonical
@@ -1526,10 +1356,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 
 			// Only count canonical blocks for GC processing time
 			bc.gcproc += proctime
-		case SideStatTy:
-			logger.Debug().Msg("Inserted forked block")
-			blockInsertTimer.UpdateSince(bstart)
-			events = append(events, ChainSideEvent{block})
 		}
 
 		stats.processed++
@@ -1605,132 +1431,6 @@ func countTransactions(chain []*types.Block) (c int) {
 		c += len(b.Transactions())
 	}
 	return c
-}
-
-// reorgs takes two blocks, an old chain and a new chain and will reconstruct the blocks and inserts them
-// to be part of the new canonical chain and accumulates potential missing transactions and post an
-// event about them
-func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
-	var (
-		newChain    types.Blocks
-		oldChain    types.Blocks
-		commonBlock *types.Block
-		deletedTxs  types.Transactions
-		deletedLogs []*types.Log
-		// collectLogs collects the logs that were generated during the
-		// processing of the block that corresponds with the given hash.
-		// These logs are later announced as deleted.
-		collectLogs = func(hash common.Hash) {
-			// Coalesce logs and set 'Removed'.
-			number := bc.hc.GetBlockNumber(hash)
-			if number == nil {
-				return
-			}
-			receipts := rawdb.ReadReceipts(bc.db, hash, *number)
-			for _, receipt := range receipts {
-				for _, log := range receipt.Logs {
-					del := *log
-					del.Removed = true
-					deletedLogs = append(deletedLogs, &del)
-				}
-			}
-		}
-	)
-
-	// first reduce whoever is higher bound
-	if oldBlock.NumberU64() > newBlock.NumberU64() {
-		// reduce old chain
-		for ; oldBlock != nil && oldBlock.NumberU64() != newBlock.NumberU64(); oldBlock = bc.GetBlock(oldBlock.ParentHash(), oldBlock.NumberU64()-1) {
-			oldChain = append(oldChain, oldBlock)
-			deletedTxs = append(deletedTxs, oldBlock.Transactions()...)
-
-			collectLogs(oldBlock.Hash())
-		}
-	} else {
-		// reduce new chain and append new chain blocks for inserting later on
-		for ; newBlock != nil && newBlock.NumberU64() != oldBlock.NumberU64(); newBlock = bc.GetBlock(newBlock.ParentHash(), newBlock.NumberU64()-1) {
-			newChain = append(newChain, newBlock)
-		}
-	}
-	if oldBlock == nil {
-		return fmt.Errorf("Invalid old chain")
-	}
-	if newBlock == nil {
-		return fmt.Errorf("Invalid new chain")
-	}
-
-	for {
-		if oldBlock.Hash() == newBlock.Hash() {
-			commonBlock = oldBlock
-			break
-		}
-
-		oldChain = append(oldChain, oldBlock)
-		newChain = append(newChain, newBlock)
-		deletedTxs = append(deletedTxs, oldBlock.Transactions()...)
-		collectLogs(oldBlock.Hash())
-
-		oldBlock, newBlock = bc.GetBlock(oldBlock.ParentHash(), oldBlock.NumberU64()-1), bc.GetBlock(newBlock.ParentHash(), newBlock.NumberU64()-1)
-		if oldBlock == nil {
-			return fmt.Errorf("Invalid old chain")
-		}
-		if newBlock == nil {
-			return fmt.Errorf("Invalid new chain")
-		}
-	}
-	// Ensure the user sees large reorgs
-	if len(oldChain) > 0 && len(newChain) > 0 {
-		logEvent := utils.Logger().Debug()
-		if len(oldChain) > 63 {
-			logEvent = utils.Logger().Warn()
-		}
-		logEvent.
-			Str("number", commonBlock.Number().String()).
-			Str("hash", commonBlock.Hash().Hex()).
-			Int("drop", len(oldChain)).
-			Str("dropfrom", oldChain[0].Hash().Hex()).
-			Int("add", len(newChain)).
-			Str("addfrom", newChain[0].Hash().Hex()).
-			Msg("Chain split detected")
-	} else {
-		utils.Logger().Error().
-			Str("oldnum", oldBlock.Number().String()).
-			Str("oldhash", oldBlock.Hash().Hex()).
-			Str("newnum", newBlock.Number().String()).
-			Str("newhash", newBlock.Hash().Hex()).
-			Msg("Impossible reorg, please file an issue")
-	}
-	// Insert the new chain, taking care of the proper incremental order
-	var addedTxs types.Transactions
-	for i := len(newChain) - 1; i >= 0; i-- {
-		// insert the block in the canonical way, re-writing history
-		bc.insert(newChain[i])
-		// write lookup entries for hash based transaction/receipt searches
-		rawdb.WriteTxLookupEntries(bc.db, newChain[i])
-		addedTxs = append(addedTxs, newChain[i].Transactions()...)
-	}
-	// calculate the difference between deleted and added transactions
-	diff := types.TxDifference(deletedTxs, addedTxs)
-	// When transactions get deleted from the database that means the
-	// receipts that were created in the fork must also be deleted
-	batch := bc.db.NewBatch()
-	for _, tx := range diff {
-		rawdb.DeleteTxLookupEntry(batch, tx.Hash())
-	}
-	batch.Write()
-
-	if len(deletedLogs) > 0 {
-		go bc.rmLogsFeed.Send(RemovedLogsEvent{deletedLogs})
-	}
-	if len(oldChain) > 0 {
-		go func() {
-			for _, block := range oldChain {
-				bc.chainSideFeed.Send(ChainSideEvent{Block: block})
-			}
-		}()
-	}
-
-	return nil
 }
 
 // PostChainEvents iterates over the events generated by a chain insertion and
@@ -2129,11 +1829,11 @@ func (bc *BlockChain) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) e
 }
 
 // WriteCrossLinks saves the hashes of crosslinks by shardID and blockNum combination key
-func (bc *BlockChain) WriteCrossLinks(cls []types.CrossLink) error {
+func (bc *BlockChain) WriteCrossLinks(batch rawdb.DatabaseWriter, cls []types.CrossLink) error {
 	var err error
 	for i := 0; i < len(cls); i++ {
 		cl := cls[i]
-		err = rawdb.WriteCrossLinkShardBlock(bc.db, cl.ShardID(), cl.BlockNum(), cl.Serialize())
+		err = rawdb.WriteCrossLinkShardBlock(batch, cl.ShardID(), cl.BlockNum(), cl.Serialize())
 	}
 	return err
 }
@@ -2163,14 +1863,14 @@ func (bc *BlockChain) ReadCrossLink(shardID uint32, blockNum uint64) (*types.Cro
 // This function will update the latest crosslink in the sense that
 // any previous block's crosslink is received up to this point
 // there is no missing hole between genesis to this crosslink of given shardID
-func (bc *BlockChain) LastContinuousCrossLink(cl types.CrossLink) error {
+func (bc *BlockChain) LastContinuousCrossLink(batch rawdb.DatabaseWriter, cl types.CrossLink) error {
 	if !bc.Config().IsCrossLink(cl.Epoch()) {
 		return errors.New("Trying to write last continuous cross link with epoch before cross link starting epoch")
 	}
 
 	cl0, err := bc.ReadShardLastCrossLink(cl.ShardID())
 	if cl0 == nil {
-		rawdb.WriteShardLastCrossLink(bc.db, cl.ShardID(), cl.Serialize())
+		rawdb.WriteShardLastCrossLink(batch, cl.ShardID(), cl.Serialize())
 		return nil
 	}
 	if err != nil {
@@ -2194,7 +1894,7 @@ func (bc *BlockChain) LastContinuousCrossLink(cl types.CrossLink) error {
 		if err != nil {
 			return err
 		}
-		return rawdb.WriteShardLastCrossLink(bc.db, cln.ShardID(), cln.Serialize())
+		return rawdb.WriteShardLastCrossLink(batch, cln.ShardID(), cln.Serialize())
 	}
 	return nil
 }
@@ -2432,58 +2132,11 @@ func (bc *BlockChain) CXMerkleProof(toShardID uint32, block *types.Block) (*type
 	return proof, nil
 }
 
-// LatestCXReceiptsCheckpoint returns the latest checkpoint
-func (bc *BlockChain) LatestCXReceiptsCheckpoint(shardID uint32) uint64 {
-	blockNum, _ := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
-	return blockNum
-}
-
-// NextCXReceiptsCheckpoint returns the next checkpoint blockNum
-func (bc *BlockChain) NextCXReceiptsCheckpoint(currentNum uint64, shardID uint32) uint64 {
-	lastCheckpoint, _ := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
-	newCheckpoint := lastCheckpoint
-
-	// the new checkpoint will not exceed currentNum+1
-	for num := lastCheckpoint; num <= currentNum+1; num++ {
-		newCheckpoint = num
-		by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, num)
-		if by == rawdb.NAByte {
-			// TODO chao: check if there is IncompingReceiptsHash in crosslink header
-			// if the rootHash is non-empty, it means incomingReceipts are not delivered
-			// otherwise, it means there is no cross-shard transactions for this block
-			continue
-		}
-		if by == rawdb.SpentByte {
-			continue
-		}
-		// the first unspent blockHash found, break the loop
-		break
-	}
-	return newCheckpoint
-}
-
-// updateCXReceiptsCheckpoints will update the checkpoint and clean spent receipts upto checkpoint
-func (bc *BlockChain) updateCXReceiptsCheckpoints(shardID uint32, currentNum uint64) {
-	lastCheckpoint, err := rawdb.ReadCXReceiptsProofUnspentCheckpoint(bc.db, shardID)
-	if err != nil {
-		utils.Logger().Warn().Msg("[updateCXReceiptsCheckpoints] Cannot get lastCheckpoint")
-	}
-	newCheckpoint := bc.NextCXReceiptsCheckpoint(currentNum, shardID)
-	if lastCheckpoint == newCheckpoint {
-		return
-	}
-	utils.Logger().Debug().Uint64("lastCheckpoint", lastCheckpoint).Uint64("newCheckpont", newCheckpoint).Msg("[updateCXReceiptsCheckpoints]")
-	for num := lastCheckpoint; num < newCheckpoint; num++ {
-		rawdb.DeleteCXReceiptsProofSpent(bc.db, shardID, num)
-	}
-	rawdb.WriteCXReceiptsProofUnspentCheckpoint(bc.db, shardID, newCheckpoint)
-}
-
 // WriteCXReceiptsProofSpent mark the CXReceiptsProof list with given unspent status
 // true: unspent, false: spent
-func (bc *BlockChain) WriteCXReceiptsProofSpent(cxps []*types.CXReceiptsProof) {
+func (bc *BlockChain) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxps []*types.CXReceiptsProof) {
 	for _, cxp := range cxps {
-		rawdb.WriteCXReceiptsProofSpent(bc.db, cxp)
+		rawdb.WriteCXReceiptsProofSpent(db, cxp)
 	}
 }
 
@@ -2492,29 +2145,10 @@ func (bc *BlockChain) IsSpent(cxp *types.CXReceiptsProof) bool {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()
 	by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, blockNum)
-	if by == rawdb.SpentByte || cxp.MerkleProof.BlockNum.Uint64() < bc.LatestCXReceiptsCheckpoint(cxp.MerkleProof.ShardID) {
+	if by == rawdb.SpentByte {
 		return true
 	}
 	return false
-}
-
-// UpdateCXReceiptsCheckpointsByBlock cleans checkpoints and update latest checkpoint based on incomingReceipts of the given block
-func (bc *BlockChain) UpdateCXReceiptsCheckpointsByBlock(block *types.Block) {
-	m := make(map[uint32]uint64)
-	for _, cxp := range block.IncomingReceipts() {
-		shardID := cxp.MerkleProof.ShardID
-		blockNum := cxp.MerkleProof.BlockNum.Uint64()
-		if _, ok := m[shardID]; !ok {
-			m[shardID] = blockNum
-		} else if m[shardID] < blockNum {
-			m[shardID] = blockNum
-		}
-	}
-
-	for k, v := range m {
-		utils.Logger().Debug().Uint32("shardID", k).Uint64("blockNum", v).Msg("[CleanCXReceiptsCheckpoints] Cleaning CXReceiptsProof upto")
-		bc.updateCXReceiptsCheckpoints(k, v)
-	}
 }
 
 // ReadTxLookupEntry returns where the given transaction resides in the chain,
@@ -2559,11 +2193,11 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 		return &v, nil
 	}
 
-	return rawdb.ReadValidatorSnapshot(bc.db, addr)
+	return rawdb.ReadValidatorSnapshot(bc.db, addr, bc.CurrentBlock().Epoch())
 }
 
 // writeValidatorSnapshots writes the snapshot of provided list of validators
-func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
+func (bc *BlockChain) writeValidatorSnapshots(batch rawdb.DatabaseWriter, addrs []common.Address, epoch *big.Int) error {
 	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
 	for i := range addrs {
@@ -2574,14 +2208,10 @@ func (bc *BlockChain) writeValidatorSnapshots(addrs []common.Address) error {
 		validators = append(validators, validator)
 	}
 	// Batch write the current data as snapshot
-	batch := bc.db.NewBatch()
 	for i := range validators {
-		if err := rawdb.WriteValidatorSnapshot(batch, validators[i]); err != nil {
+		if err := rawdb.WriteValidatorSnapshot(batch, validators[i], epoch); err != nil {
 			return err
 		}
-	}
-	if err := batch.Write(); err != nil {
-		return err
 	}
 
 	// Update cache
@@ -2601,7 +2231,7 @@ func (bc *BlockChain) ReadValidatorStats(addr common.Address) (*staking.Validato
 }
 
 // UpdateValidatorVotingPower writes the voting power for the committees
-func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
+func (bc *BlockChain) UpdateValidatorVotingPower(batch rawdb.DatabaseWriter, state *shard.State) error {
 	if state == nil {
 		return errors.New("[UpdateValidatorVotingPower] Nil shard state")
 	}
@@ -2617,8 +2247,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 	}
 
 	networkWide := votepower.AggregateRosters(rosters)
-
-	batch := bc.db.NewBatch()
 
 	for key, value := range networkWide {
 		statsFromDB, err := rawdb.ReadValidatorStats(bc.db, key)
@@ -2637,18 +2265,15 @@ func (bc *BlockChain) UpdateValidatorVotingPower(state *shard.State) error {
 		}
 	}
 
-	if err := batch.Write(); err != nil {
-		return err
-	}
-	// TODO: Update cache
 	return nil
 }
 
 // deleteValidatorSnapshots deletes the snapshot staking information of given validator address
+// TODO: delete validator snapshots from X epochs ago
 func (bc *BlockChain) deleteValidatorSnapshots(addrs []common.Address) error {
 	batch := bc.db.NewBatch()
 	for i := range addrs {
-		rawdb.DeleteValidatorSnapshot(batch, addrs[i])
+		rawdb.DeleteValidatorSnapshot(batch, addrs[i], bc.CurrentBlock().Epoch())
 	}
 	if err := batch.Write(); err != nil {
 		return err
@@ -2660,8 +2285,8 @@ func (bc *BlockChain) deleteValidatorSnapshots(addrs []common.Address) error {
 }
 
 // UpdateValidatorSnapshots updates the content snapshot of all validators
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateValidatorSnapshots() error {
+// Note: this should only be called within the blockchain insert process.
+func (bc *BlockChain) UpdateValidatorSnapshots(batch rawdb.DatabaseWriter, epoch *big.Int) error {
 	allValidators, err := bc.ReadValidatorList()
 	if err != nil {
 		return err
@@ -2673,7 +2298,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots() error {
 	//	return err
 	//}
 
-	return bc.writeValidatorSnapshots(allValidators)
+	return bc.writeValidatorSnapshots(batch, allValidators, epoch)
 }
 
 // ReadValidatorList reads the addresses of current all validators
@@ -2690,9 +2315,9 @@ func (bc *BlockChain) ReadValidatorList() ([]common.Address, error) {
 }
 
 // WriteValidatorList writes the list of validator addresses to database
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) WriteValidatorList(addrs []common.Address) error {
-	err := rawdb.WriteValidatorList(bc.db, addrs, false)
+// Note: this should only be called within the blockchain insert process.
+func (bc *BlockChain) WriteValidatorList(db rawdb.DatabaseWriter, addrs []common.Address) error {
+	err := rawdb.WriteValidatorList(db, addrs, false)
 	if err != nil {
 		return err
 	}
@@ -2717,9 +2342,9 @@ func (bc *BlockChain) ReadActiveValidatorList() ([]common.Address, error) {
 }
 
 // WriteActiveValidatorList writes the list of active validator addresses to database
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) WriteActiveValidatorList(addrs []common.Address) error {
-	err := rawdb.WriteValidatorList(bc.db, addrs, true)
+// Note: this should only be called within the blockchain insert process.
+func (bc *BlockChain) WriteActiveValidatorList(batch rawdb.DatabaseWriter, addrs []common.Address) error {
+	err := rawdb.WriteValidatorList(batch, addrs, true)
 	if err != nil {
 		return err
 	}
@@ -2744,8 +2369,8 @@ func (bc *BlockChain) ReadDelegationsByDelegator(delegator common.Address) ([]st
 }
 
 // writeDelegationsByDelegator writes the list of validator addresses to database
-func (bc *BlockChain) writeDelegationsByDelegator(delegator common.Address, indices []staking.DelegationIndex) error {
-	err := rawdb.WriteDelegationsByDelegator(bc.db, delegator, indices)
+func (bc *BlockChain) writeDelegationsByDelegator(batch rawdb.DatabaseWriter, delegator common.Address, indices []staking.DelegationIndex) error {
+	err := rawdb.WriteDelegationsByDelegator(batch, delegator, indices)
 	if err != nil {
 		return err
 	}
@@ -2757,8 +2382,8 @@ func (bc *BlockChain) writeDelegationsByDelegator(delegator common.Address, indi
 }
 
 // UpdateStakingMetaData updates the validator's and the delegator's meta data according to staking transaction
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root common.Hash) error {
+// Note: this should only be called within the blockchain insert process.
+func (bc *BlockChain) UpdateStakingMetaData(batch rawdb.DatabaseWriter, tx *staking.StakingTransaction, root common.Hash) error {
 	// TODO: simply the logic here in staking/types/transaction.go
 	payload, err := tx.RLPEncodeStakeMsg()
 	if err != nil {
@@ -2772,7 +2397,6 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 	switch tx.StakingType() {
 	case staking.DirectiveCreateValidator:
 		createValidator := decodePayload.(*staking.CreateValidator)
-		// TODO: batch add validator list instead of one by one
 		list, err := bc.ReadValidatorList()
 		if err != nil {
 			return err
@@ -2784,7 +2408,7 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 		list = utils.AppendIfMissing(list, createValidator.ValidatorAddress)
 
 		if len(list) > beforeLen {
-			if err = bc.WriteValidatorList(list); err != nil {
+			if err = bc.WriteValidatorList(batch, list); err != nil {
 				return err
 			}
 		}
@@ -2797,16 +2421,16 @@ func (bc *BlockChain) UpdateStakingMetaData(tx *staking.StakingTransaction, root
 
 		validator.Snapshot.Epoch = epoch
 
-		if err := rawdb.WriteValidatorSnapshot(bc.db, validator); err != nil {
+		if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
 			return err
 		}
 
 		// Add self delegation into the index
-		return bc.addDelegationIndex(createValidator.ValidatorAddress, createValidator.ValidatorAddress, root)
+		return bc.addDelegationIndex(batch, createValidator.ValidatorAddress, createValidator.ValidatorAddress, root)
 	case staking.DirectiveEditValidator:
 	case staking.DirectiveDelegate:
 		delegate := decodePayload.(*staking.Delegate)
-		return bc.addDelegationIndex(delegate.DelegatorAddress, delegate.ValidatorAddress, root)
+		return bc.addDelegationIndex(batch, delegate.DelegatorAddress, delegate.ValidatorAddress, root)
 	case staking.DirectiveUndelegate:
 	case staking.DirectiveCollectRewards:
 	default:
@@ -2827,8 +2451,8 @@ func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
-func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64) error {
-	err := rawdb.WriteBlockRewardAccumulator(bc.db, reward, number)
+func (bc *BlockChain) WriteBlockRewardAccumulator(batch rawdb.DatabaseWriter, reward *big.Int, number uint64) error {
+	err := rawdb.WriteBlockRewardAccumulator(batch, reward, number)
 	if err != nil {
 		return err
 	}
@@ -2837,19 +2461,19 @@ func (bc *BlockChain) WriteBlockRewardAccumulator(reward *big.Int, number uint64
 }
 
 //UpdateBlockRewardAccumulator ..
-// Note: this should only be called within the blockchain insertBlock process.
-func (bc *BlockChain) UpdateBlockRewardAccumulator(diff *big.Int, number uint64) error {
+// Note: this should only be called within the blockchain insert process.
+func (bc *BlockChain) UpdateBlockRewardAccumulator(batch rawdb.DatabaseWriter, diff *big.Int, number uint64) error {
 	current, err := bc.ReadBlockRewardAccumulator(number - 1)
 	if err != nil {
 		// one-off fix for pangaea, return after pangaea enter staking.
 		current = big.NewInt(0)
-		bc.WriteBlockRewardAccumulator(current, number)
+		bc.WriteBlockRewardAccumulator(batch, current, number)
 	}
-	return bc.WriteBlockRewardAccumulator(new(big.Int).Add(current, diff), number)
+	return bc.WriteBlockRewardAccumulator(batch, new(big.Int).Add(current, diff), number)
 }
 
 // Note this should read from the state of current block in concern (root == newBlock.root)
-func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress common.Address, root common.Hash) error {
+func (bc *BlockChain) addDelegationIndex(batch rawdb.DatabaseWriter, delegatorAddress, validatorAddress common.Address, root common.Hash) error {
 	// Get existing delegations
 	delegations, err := bc.ReadDelegationsByDelegator(delegatorAddress)
 	if err != nil {
@@ -2878,7 +2502,7 @@ func (bc *BlockChain) addDelegationIndex(delegatorAddress, validatorAddress comm
 			})
 		}
 	}
-	return bc.writeDelegationsByDelegator(delegatorAddress, delegations)
+	return bc.writeDelegationsByDelegator(batch, delegatorAddress, delegations)
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch
