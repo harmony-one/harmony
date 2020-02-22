@@ -328,10 +328,10 @@ func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
 }
 
 // GetValidatorInformation returns the information of validator
-func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Validator {
+func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.ValidatorWrapper {
 	val, _ := b.hmy.BlockChain().ReadValidatorInformation(addr)
 	if val != nil {
-		return &val.Validator
+		return val
 	}
 	return nil
 }
