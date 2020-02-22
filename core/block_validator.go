@@ -93,9 +93,7 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.DB, re
 	// Validate the received block's bloom with the one derived from the generated receipts.
 	// For valid blocks this should always validate to true.
 	rbloom := types.CreateBloom(receipts)
-	// Beacon chain block 1213181 is a one-off block with empty bloom which is expected to be non-empty.
-	// Skip the validation for it to avoid failure.
-	if rbloom != header.Bloom() && (block.NumberU64() != 1213181 || block.ShardID() != 0) {
+	if rbloom != header.Bloom() {
 		return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.Bloom(), rbloom)
 	}
 	// Tre receipt Trie's root (R = (Tr [[H1, R1], ... [Hn, R1]]))
