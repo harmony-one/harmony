@@ -12,8 +12,8 @@ func (node *Node) processSlashCandidateMessage(msgPayload []byte) {
 	if node.NodeConfig.ShardID != shard.BeaconChainShardID {
 		return
 	}
-	candidates := []slash.Record{}
-	if err := rlp.DecodeBytes(msgPayload, candidates); err != nil {
+	candidates := slash.Records{}
+	if err := rlp.DecodeBytes(msgPayload, &candidates); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msg("unable to decode slash candidate message")
