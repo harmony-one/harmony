@@ -358,7 +358,8 @@ func Apply(
 		}
 
 		// finally, kick them off forever
-		current.Banned = true
+		current.Banned, current.Active = true, false
+
 		if err := state.UpdateStakingInfo(
 			snapshot.Address, current,
 		); err != nil {
