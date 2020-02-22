@@ -98,7 +98,7 @@ var (
 	// isGenesis indicates this node is a genesis node
 	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
-	isArchival = flag.Bool("is_archival", true, "false will enable cached state pruning")
+	isArchival = flag.Bool("is_archival", false, "false will enable cached state pruning")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
 	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
 	// nodeType indicates the type of the node: validator, explorer
