@@ -63,22 +63,39 @@ type ValidatorSnapshotReader interface {
 	ReadValidatorSnapshot(common.Address) (*ValidatorWrapper, error)
 }
 
+type snapshot struct {
+	Epoch *big.Int `json:"epoch"`
+	// The number of blocks the validator should've signed when in active mode (selected in committee)
+	NumBlocksToSign *big.Int `json:"num-blocks-to-sign",rlp:"nil"`
+	// The number of blocks the validator actually signed
+	NumBlocksSigned *big.Int `json:"num-blocks-signed",rlp:"nil"`
+}
+
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
-	Validator   `json:"validator"`
-	Delegations Delegations `json:"delegations"`
-	Snapshot    struct {
-		Epoch *big.Int
-		// The number of blocks the validator should've signed when in active mode (selected in committee)
-		NumBlocksToSign *big.Int `rlp:"nil"`
-		// The number of blocks the validator actually signed
-		NumBlocksSigned *big.Int `rlp:"nil"`
-	}
+	Validator
+	Delegations Delegations
+	Snapshot    snapshot
 }
 
 func (w ValidatorWrapper) String() string {
 	s, _ := json.Marshal(w)
 	return string(s)
+}
+
+// MarshalJSON ..
+func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Validator
+		Address     string      `json:"address"`
+		Delegations Delegations `json:"delegations"`
+		Snapshot    snapshot    `json:"current-snapshot"`
+	}{
+		w.Validator,
+		common2.MustAddressToBech32(w.Address),
+		w.Delegations,
+		w.Snapshot,
+	})
 }
 
 // VotePerShard ..
@@ -108,27 +125,27 @@ type ValidatorStats struct {
 // Validator - data fields for a validator
 type Validator struct {
 	// ECDSA address of the validator
-	Address common.Address
+	Address common.Address `json:"address"`
 	// The BLS public key of the validator for consensus
-	SlotPubKeys []shard.BlsPublicKey
+	SlotPubKeys []shard.BlsPublicKey `json:"bls-public-keys"`
 	// The number of the last epoch this validator is
 	// selected in committee (0 means never selected)
-	LastEpochInCommittee *big.Int
+	LastEpochInCommittee *big.Int `json:"last-epoch-in-committee"`
 	// validator's self declared minimum self delegation
-	MinSelfDelegation *big.Int
+	MinSelfDelegation *big.Int `json:"min-self-delegation"`
 	// maximum total delegation allowed
-	MaxTotalDelegation *big.Int
+	MaxTotalDelegation *big.Int `json:"max-total-delegation"`
 	// Is the validator active in participating
 	// committee selection process or not
-	Active bool
+	Active bool `json:"eligible-for-epos"`
 	// commission parameters
 	Commission
 	// description for the validator
 	Description
 	// CreationHeight is the height of creation
-	CreationHeight *big.Int
+	CreationHeight *big.Int `json:"creation-height"`
 	// Banned records whether this validator is banned from the network because they double-signed
-	Banned bool
+	Banned bool `json:"banned-from-network"`
 }
 
 // SanityCheck checks basic requirements of a validator
@@ -222,35 +239,6 @@ func (v *ValidatorStats) MarshalJSON() ([]byte, error) {
 		VotingPowerPerShard: v.VotingPowerPerShard,
 		BLSKeyPerShard:      v.BLSKeyPerShard,
 	})
-
-}
-
-// MarshalJSON ..
-func (v *Validator) MarshalJSON() ([]byte, error) {
-	type t struct {
-		Address            string      `json:"one-address"`
-		SlotPubKeys        []string    `json:"bls-public-keys"`
-		MinSelfDelegation  string      `json:"min-self-delegation"`
-		MaxTotalDelegation string      `json:"max-total-delegation"`
-		Active             bool        `json:"active"`
-		Commission         Commission  `json:"commission"`
-		Description        Description `json:"description"`
-		CreationHeight     uint64      `json:"creation-height"`
-	}
-	slots := make([]string, len(v.SlotPubKeys))
-	for i := range v.SlotPubKeys {
-		slots[i] = v.SlotPubKeys[i].Hex()
-	}
-	return json.Marshal(t{
-		Address:            common2.MustAddressToBech32(v.Address),
-		SlotPubKeys:        slots,
-		MinSelfDelegation:  v.MinSelfDelegation.String(),
-		MaxTotalDelegation: v.MaxTotalDelegation.String(),
-		Active:             v.Active,
-		Commission:         v.Commission,
-		Description:        v.Description,
-		CreationHeight:     v.CreationHeight.Uint64(),
-	})
 }
 
 func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
@@ -313,7 +301,7 @@ type Description struct {
 	Name            string `json:"name"`             // name
 	Identity        string `json:"identity"`         // optional identity signature (ex. UPort or Keybase)
 	Website         string `json:"website"`          // optional website link
-	SecurityContact string `json:"security_contact"` // optional security contact info
+	SecurityContact string `json:"security-contact"` // optional security contact info
 	Details         string `json:"details"`          // optional details
 }
 
