@@ -99,3 +99,15 @@ RUN echo "echo "$(jq '.["public-key"]' -r keys.json)" is an extern bls key" \
 RUN echo ". /etc/bash_completion" >> /root/.bashrc
 
 RUN echo ". <(hmy completion)" >> /root/.bashrc
+
+COPY scripts/node.sh bin
+
+ENV BOOTNODE_PATH='MEANT_TO_BE_SET_AS_ENV_AT_RUN'
+
+ENV WEBHOOK_YAML='../staking/slash/webhook.example.yaml'
+
+RUN mkdir -p bin/staking/slash 
+
+WORKDIR bin
+
+CMD ./node.sh -N slashing -z -D

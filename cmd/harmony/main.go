@@ -142,6 +142,8 @@ func initSetup() {
 	// maybe request passphrase for bls key.
 	passphraseForBls()
 
+	fmt.Println("received hook path", *webHookYamlPath)
+
 	// Configure log parameters
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
@@ -302,7 +304,6 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	}
 
 	nodeConfig.DBDir = *dbDir
-	*webHookYamlPath = slash.DefaultWebHookPath
 
 	if p := *webHookYamlPath; p != "" {
 		config, err := slash.NewDoubleSignWebHooksFromPath(p)
