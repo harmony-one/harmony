@@ -67,24 +67,34 @@ go get -u golang.org/x/tools/...
 
 WORKDIR ${HMY_PATH}/harmony
 
+RUN git remote add e https://github.com/fxfactorial/harmony.git && \
+	git fetch e && \
+	git checkout -b double-sign e/double-sign
+
 RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/install_build_tools.sh
 
 RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh
 
 RUN cd ${HMY_PATH}/go-sdk && make -j8 && cp hmy /root/bin
 
-ARG k=one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj
+ARG K=one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj
 
-ARG ks=/root/go/src/github.com/harmony-one/\
-	harmony/.hmy/keystore/${k}.key
+ARG KS=/root/go/src/github.com/harmony-one/harmony/.hmy/keystore/${K}.key
 
-RUN hmy keys import-ks ${ks}
+RUN hmy keys import-ks ${KS}
 
-RUN echo "echo ${k} is funded account for local dev" >> /root/.profile
+RUN hmy keys generate-bls-key > keys.json 
 
-RUN echo ". /etc/bash_completion" >> /root/.profile
+RUN jq  '.["encrypted-private-key-path"]' -r keys.json > keypath && cp keys.json /root
 
-RUN echo ". <(hmy completion)" >> /root/.profile
+RUN echo "export BLS_KEY_PATH=$(cat keypath)" >> /root/.bashrc
+
+RUN echo "export BLS_KEY=$(jq '.["public-key"]' -r keys.json)" >> /root/.bashrc
+
+RUN echo "printf '${K} is funded account for local dev\n\n'" >> /root/.bashrc
+
+RUN echo "echo "$(jq '.["public-key"]' -r keys.json)" is an extern bls key" \
+	>> /root/.bashrc
 
 RUN echo ". /etc/bash_completion" >> /root/.bashrc
 

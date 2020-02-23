@@ -5,7 +5,7 @@ from='one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj'
 to='one1zyxauxquys60dk824p532jjdq753pnsenrgmef'
 someRando='one1nqevvacj3y5ltuef05my4scwy5wuqteur72jk5'
 
-blsKey='be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a'
+blsKey="$BLS_KEY"
 
 set -eu
 
