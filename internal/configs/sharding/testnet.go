@@ -68,4 +68,4 @@ func (ts testnetSchedule) GetShardingStructure(numShard, shardID int) []map[stri
 
 var testnetReshardingEpoch = []*big.Int{big.NewInt(0)}
 
-var testnetV0 = MustNewInstance(2, 30, 30, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)
+var testnetV0 = MustNewInstance(3, 10, 10, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch)
