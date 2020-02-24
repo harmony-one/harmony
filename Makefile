@@ -6,9 +6,9 @@ export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
 
-.PHONY: all libs exe test
+.PHONY: all clean libs exe test
 
-all: libs
+all: clean libs
 	./scripts/go_executable_build.sh
 
 libs:
@@ -19,7 +19,15 @@ exe:
 	./scripts/go_executable_build.sh
 
 test:
-	./test/debug.sh
+	chmod +x ./test/pr.sh
+	./test/pr.sh
+
+clean:
+	rm -rf db-*
+	rm -rf .dht-*
+	rm -rf bin/
+	rm -rf tmp_log/
+	rm -rf pr_log/
 
 linux_static:
 	make -C $(TOP)/mcl
