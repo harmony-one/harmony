@@ -77,7 +77,7 @@ function setup_env
 }
 
 # find my public ip address
-myip
+# myip
 
 # setup runtime environment
 # setup_env

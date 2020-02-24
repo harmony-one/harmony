@@ -31,3 +31,8 @@ WORKDIR /harmony
 
 COPY run /bin/run
 COPY harmony /bin/
+COPY bootnode /bin/
+COPY libmcl.so /lib/
+COPY libbls384_256.so /lib/
+
+RUN echo 'nameserver 8.8.8.8' > /etc/resolv.conf

@@ -26,8 +26,14 @@ linux_static:
 	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j4
 	./scripts/go_executable_build.sh -s
 
-docker: linux_static
-	make -C $(TOP)/harmony-tui linux_static
+clean:
+	make -C $(TOP)/mcl clean
+	make -C $(TOP)/bls clean
+	rm -f bin/*
+
+docker: exe
 	cp bin/harmony ./scripts/docker
-	cp $(TOP)/harmony-tui/bin/harmony-tui ./scripts/docker
+	cp bin/bootnode ./scripts/docker
+	cp bin/libbls384_256.so ./scripts/docker
+	cp bin/libmcl.so ./scripts/docker
 	pushd scripts/docker && sudo docker build -t harmonyone/node:latest . && popd
