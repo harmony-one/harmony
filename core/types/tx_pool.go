@@ -21,6 +21,7 @@ type PoolTransaction interface {
 	Hash() common.Hash
 	Nonce() uint64
 	ChainID() *big.Int
+	ShardID() uint32
 	To() *common.Address
 	Size() common.StorageSize
 	Data() []byte

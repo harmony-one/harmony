@@ -447,7 +447,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	return currentNode
 }
 
-func setupBlacklist() (*map[ethCommon.Address]struct{}, error) {
+func setupBlacklist() (map[ethCommon.Address]struct{}, error) {
 	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", *blacklistPath)
 	dat, err := ioutil.ReadFile(*blacklistPath)
 	if err != nil {
@@ -464,7 +464,7 @@ func setupBlacklist() (*map[ethCommon.Address]struct{}, error) {
 			addrMap[addr] = struct{}{}
 		}
 	}
-	return &addrMap, nil
+	return addrMap, nil
 }
 
 func main() {
