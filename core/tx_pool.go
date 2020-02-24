@@ -50,6 +50,9 @@ var (
 	// ErrInvalidSender is returned if the transaction contains an invalid signature.
 	ErrInvalidSender = errors.New("invalid sender")
 
+	// ErrInvalidShard is returned if the transaction is for the wrong shard.
+	ErrInvalidShard = errors.New("invalid shard")
+
 	// ErrNonceTooLow is returned if the nonce of a transaction is lower than the
 	// one present in the local chain.
 	ErrNonceTooLow = errors.New("nonce too low")
@@ -159,7 +162,7 @@ type TxPoolConfig struct {
 
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
 
-	Blacklist *map[common.Address]struct{} // Set of accounts that cannot be a part of any transaction
+	Blacklist map[common.Address]struct{} // Set of accounts that cannot be a part of any transaction
 }
 
 // DefaultTxPoolConfig contains the default configurations for the transaction
@@ -178,7 +181,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 
 	Lifetime: 3 * time.Hour,
 
-	Blacklist: &map[common.Address]struct{}{},
+	Blacklist: map[common.Address]struct{}{},
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -651,6 +654,9 @@ func (pool *TxPool) local() map[common.Address]types.PoolTransactions {
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
+	if tx.ShardID() != pool.chain.CurrentBlock().ShardID() {
+		return errors.WithMessagef(ErrInvalidShard, "transaction shard is %d", tx.ShardID())
+	}
 	// Heuristic limit, reject transactions over 32KB to prevent DOS attacks
 	if tx.Size() > 32*1024 {
 		return errors.WithMessagef(ErrOversizedData, "transaction size is %s", tx.Size().String())
@@ -673,7 +679,7 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 		return ErrInvalidSender
 	}
 	// Make sure transaction does not have blacklisted addresses
-	if _, exists := (*pool.config.Blacklist)[from]; exists {
+	if _, exists := (pool.config.Blacklist)[from]; exists {
 		if b32, err := hmyCommon.AddressToBech32(from); err == nil {
 			return errors.WithMessagef(ErrBlacklistFrom, "transaction sender is %s", b32)
 		}
@@ -681,7 +687,7 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	}
 	// Make sure transaction does not burn funds by sending funds to blacklisted address
 	if tx.To() != nil {
-		if _, exists := (*pool.config.Blacklist)[*tx.To()]; exists {
+		if _, exists := (pool.config.Blacklist)[*tx.To()]; exists {
 			if b32, err := hmyCommon.AddressToBech32(*tx.To()); err == nil {
 				return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s", b32)
 			}
