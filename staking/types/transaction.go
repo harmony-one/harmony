@@ -180,6 +180,11 @@ func (tx *StakingTransaction) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)
 }
 
+// ShardID returns which shard id this transaction was signed for, implicitly shard 0.
+func (tx *StakingTransaction) ShardID() uint32 {
+	return 0
+}
+
 // EncodeRLP implements rlp.Encoder
 func (tx *StakingTransaction) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, &tx.data)
