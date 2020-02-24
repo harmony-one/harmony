@@ -8,12 +8,4 @@ malicious:
   trigger:
     double-sign: http://localhost:7777/trigger-next-double-sign
     list:
-    # one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj shard 0
-    # - 2d61379e44a772e5757e27ee2b3874254f56073e6bd226eb8b160371cc3c18b8c4977bd3dcb71fd57dc62bf0e143fd08
-    # one1d7jfnr6yraxnrycgaemyktkmhmajhp8kl0yahv shard 1 Port 9107, which means RPC is 9507
-    # ../go-sdk/hmy blockchain latest-header --node=http://localhost:9507
-    # one1m6m0ll3q7ljdqgmth2t5j7dfe6stykucpj2nr5 is leader on shard1, 
-    # 40379eed79ed82bebfb4310894fd33b6a3f8413a78dc4d43b98d0adc9ef69f3285df05eaab9f2ce5f7227f8cb920e809 is leader pub key
-    # - f47238daef97d60deedbde5302d05dea5de67608f11f406576e363661f7dcbc4a1385948549b31a6c70f6fde8a391486
-    # the special one i added 
-    - be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a
+    - 8344cc11a4128941cbf604fdd29e1cc172dd1be20376c914debb079e01c632f4d62fb51e09d3e63a2bc4066ed0e4ea0d
