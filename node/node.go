@@ -439,7 +439,7 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 
 // New creates a new node.
 func New(host p2p.Host, consensusObj *consensus.Consensus,
-	chainDBFactory shardchain.DBFactory, blacklist *map[common.Address]struct{}, isArchival bool) *Node {
+	chainDBFactory shardchain.DBFactory, blacklist map[common.Address]struct{}, isArchival bool) *Node {
 	node := Node{}
 	const sinkSize = 4096
 	node.errorSink = struct {
