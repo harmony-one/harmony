@@ -220,7 +220,6 @@ func setupLegacyNodeAccount() error {
 	if initialAccount == nil {
 		return errors.Errorf("cannot find key %s in table", pubKey.SerializeToHexStr())
 	}
-
 	fmt.Printf("My Genesis Account: %v\n", *initialAccount)
 	return nil
 }

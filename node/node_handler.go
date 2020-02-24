@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -66,9 +65,6 @@ func (node *Node) receiveGroupMessage(
 func (node *Node) processSkippedMsgTypeByteValue(cat proto_node.BlockMessageType, content []byte) {
 	switch cat {
 	case proto_node.SlashCandidate:
-
-		fmt.Println("received slashing candiate", content)
-
 		node.processSlashCandidateMessage(content)
 	case proto_node.Receipt:
 		utils.Logger().Debug().Msg("NET: received message: Node/Receipt")
@@ -430,8 +426,6 @@ func (node *Node) PostConsensusProcessing(
 		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
 			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
 			node.BroadcastCrossLink(newBlock)
-			// TODO hook slashes here as well
-			// node.BroadcastSlash(newBlock.Header().Slashes())
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
