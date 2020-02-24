@@ -142,8 +142,6 @@ func initSetup() {
 	// maybe request passphrase for bls key.
 	passphraseForBls()
 
-	fmt.Println("received hook path", *webHookYamlPath)
-
 	// Configure log parameters
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
@@ -219,19 +217,8 @@ func setupLegacyNodeAccount() error {
 		_, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
 	}
 
-	const crtValdidatorBLS = "be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a"
-
-	if initialAccount == nil &&
-		pubKey.SerializeToHexStr() != crtValdidatorBLS {
+	if initialAccount == nil {
 		return errors.Errorf("cannot find key %s in table", pubKey.SerializeToHexStr())
-	}
-
-	if pubKey.SerializeToHexStr() == crtValdidatorBLS {
-		fmt.Println("using my special account")
-		initialAccount = &genesis.DeployAccount{}
-		initialAccount.Address = "one1zyxauxquys60dk824p532jjdq753pnsenrgmef"
-		initialAccount.BlsPublicKey = crtValdidatorBLS
-		initialAccount.ShardID = 0
 	}
 
 	fmt.Printf("My Genesis Account: %v\n", *initialAccount)
@@ -309,7 +296,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 		config, err := slash.NewDoubleSignWebHooksFromPath(p)
 		if err != nil {
 			fmt.Fprintf(
-				os.Stderr, "ERROR provided yaml path %s but yaml found is illegal", p,
+				os.Stderr, "yaml path is bad: %s", p,
 			)
 			os.Exit(1)
 		}
