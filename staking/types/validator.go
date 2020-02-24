@@ -144,8 +144,9 @@ type Validator struct {
 	Description
 	// CreationHeight is the height of creation
 	CreationHeight *big.Int `json:"creation-height"`
-	// Banned records whether this validator is banned from the network because they double-signed
-	Banned bool `json:"banned-from-network"`
+	// Banned records whether this validator is banned
+	// from the network because they double-signed
+	Banned bool `json:"banned"`
 }
 
 // SanityCheck checks basic requirements of a validator

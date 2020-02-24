@@ -246,6 +246,13 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 						go func(reporter common.Address) {
 							evid := slash.Evidence{
+								ConflictingBallots: slash.ConflictingBallots{
+									*alreadyCastBallot,
+									votepower.Ballot{
+										offender,
+										recvMsg.BlockHash,
+										&doubleSign,
+									}},
 								Moment: slash.Moment{
 									Epoch:        curHeader.Epoch(),
 									Height:       curHeader.Number(),
@@ -256,13 +263,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 								ProposalHeader: signed,
 							}
 							proof := slash.Record{
-								ConflictingBallots: slash.ConflictingBallots{
-									*alreadyCastBallot,
-									votepower.Ballot{
-										offender,
-										recvMsg.BlockHash,
-										&doubleSign,
-									}},
 								Evidence: evid,
 								Reporter: reporter,
 								Offender: *addr,

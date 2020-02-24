@@ -27,7 +27,7 @@ const (
 )
 
 // invariant assumes snapshot, current can be rlp.EncodeToBytes
-func mustStayAboveZeroAfterDebtReduce(
+func payDebt(
 	snapshot, current *staking.ValidatorWrapper,
 	slashDebt, payment *big.Int,
 	slashTrack *Application,
@@ -54,6 +54,7 @@ type Moment struct {
 // Evidence ..
 type Evidence struct {
 	Moment
+	ConflictingBallots
 	ProposalHeader *block.Header `json:"header"`
 }
 
@@ -65,7 +66,6 @@ type ConflictingBallots struct {
 
 // Record is an proof of a slashing made by a witness of a double-signing event
 type Record struct {
-	ConflictingBallots
 	// the reporter who will get rewarded
 	Evidence Evidence       `json:"evidence"`
 	Reporter common.Address `json:"reporter"`
@@ -86,8 +86,9 @@ func (a *Application) String() string {
 func (e Evidence) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Moment
+		ConflictingBallots
 		ProposalHeader string `json:"header"`
-	}{e.Moment, e.ProposalHeader.String()})
+	}{e.Moment, e.ConflictingBallots, e.ProposalHeader.String()})
 }
 
 // Records ..
@@ -104,11 +105,10 @@ func (r Record) MarshalJSON() ([]byte, error) {
 		common2.MustAddressToBech32(r.Reporter),
 		common2.MustAddressToBech32(r.Offender)
 	return json.Marshal(struct {
-		ConflictingBallots
 		Evidence         Evidence `json:"evidence"`
 		Beneficiary      string   `json:"beneficiary"`
 		AddressForBLSKey string   `json:"offender"`
-	}{r.ConflictingBallots, r.Evidence, reporter, offender})
+	}{r.Evidence, reporter, offender})
 }
 
 func (e Evidence) String() string {
@@ -128,7 +128,9 @@ type CommitteeReader interface {
 
 // Verify checks that the signature is valid
 func Verify(chain CommitteeReader, candidate *Record) error {
-	first, second := candidate.AlreadyCastBallot, candidate.DoubleSignedBallot
+	first, second :=
+		candidate.Evidence.AlreadyCastBallot,
+		candidate.Evidence.DoubleSignedBallot
 	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
 		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
 		return errors.Wrapf(
@@ -213,7 +215,7 @@ func delegatorSlashApply(
 						// have 1.1, but debt is 0.022
 						asMuchAsCouldPay := new(big.Int).Sub(nowAmt, one)
 						if asMuchAsCouldPay.Cmp(slashDebt) >= 0 {
-							mustStayAboveZeroAfterDebtReduce(
+							payDebt(
 								snapshot, current, slashDebt, slashDebt, slashTrack,
 							)
 							nowAmt.Sub(nowAmt, slashDebt)
@@ -238,14 +240,14 @@ func delegatorSlashApply(
 								undelegate.Amount.SetInt64(0)
 							case haveEnoughToPayOff:
 								undelegate.Amount.Sub(undelegate.Amount, slashDebt)
-								mustStayAboveZeroAfterDebtReduce(
+								payDebt(
 									snapshot, current, slashDebt, slashDebt, slashTrack,
 								)
 								undelegate.Amount.Set(newBal)
 							case -1:
 								// But do have enough to pay off something at least
 								partialPayment := new(big.Int).Sub(slashDebt, new(big.Int).Abs(newBal))
-								mustStayAboveZeroAfterDebtReduce(
+								payDebt(
 									snapshot, current, slashDebt, partialPayment, slashTrack,
 								)
 								undelegate.Amount.SetInt64(0)
@@ -255,7 +257,7 @@ func delegatorSlashApply(
 					// NOTE at high slashing % rates, we could hit this situation
 					// because of the special casing of logic on min-self-delegation
 					if slashDebt.Cmp(common.Big0) == 1 {
-						mustStayAboveZeroAfterDebtReduce(
+						payDebt(
 							snapshot, current, slashDebt, slashDebt, slashTrack,
 						)
 					}
@@ -267,12 +269,12 @@ func delegatorSlashApply(
 						// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
 						if nowAmt.Cmp(slashDebt) >= 0 {
 							nowAmt.Sub(nowAmt, slashDebt)
-							mustStayAboveZeroAfterDebtReduce(
+							payDebt(
 								snapshot, current, slashDebt, slashDebt, slashTrack,
 							)
 						} else {
 							// 0.50_amount < 2.4_debt =>, slash == 1.9, nowAmt == 0.0
-							mustStayAboveZeroAfterDebtReduce(
+							payDebt(
 								snapshot, current, slashDebt, nowAmt, slashTrack,
 							)
 							nowAmt.Sub(nowAmt, nowAmt)
@@ -293,7 +295,7 @@ func delegatorSlashApply(
 								slashDebt.Cmp(common.Big0) == 1 {
 								newBal := new(big.Int).Sub(undelegate.Amount, slashDebt)
 								undelegate.Amount.Set(newBal)
-								mustStayAboveZeroAfterDebtReduce(
+								payDebt(
 									snapshot, current, slashDebt, slashDebt, slashTrack,
 								)
 							}
@@ -349,7 +351,7 @@ func Apply(
 		}
 		// NOTE invariant: first delegation is the validators own
 		// stake, rest are external delegations.
-		// Bottom line: everyone must have have skin in the game,
+		// Bottom line: everyone will be slashed under the same rule.
 		if err := delegatorSlashApply(
 			snapshot, current, rate, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,

@@ -328,19 +328,19 @@ func (s *scenario) defaultDelegationPair() (
 func exampleSlashRecords() Records {
 	return Records{
 		Record{
-			ConflictingBallots: ConflictingBallots{
-				AlreadyCastBallot: votepower.Ballot{
-					SignerPubKey:    blsWrapA,
-					BlockHeaderHash: hashA,
-					Signature:       signatureA,
-				},
-				DoubleSignedBallot: votepower.Ballot{
-					SignerPubKey:    blsWrapB,
-					BlockHeaderHash: hashB,
-					Signature:       signatureB,
-				},
-			},
 			Evidence: Evidence{
+				ConflictingBallots: ConflictingBallots{
+					AlreadyCastBallot: votepower.Ballot{
+						SignerPubKey:    blsWrapA,
+						BlockHeaderHash: hashA,
+						Signature:       signatureA,
+					},
+					DoubleSignedBallot: votepower.Ballot{
+						SignerPubKey:    blsWrapB,
+						BlockHeaderHash: hashB,
+						Signature:       signatureB,
+					},
+				},
 				Moment: Moment{
 					Epoch:        big.NewInt(doubleSignEpoch),
 					Height:       big.NewInt(doubleSignBlockNumber),
@@ -354,7 +354,6 @@ func exampleSlashRecords() Records {
 			Offender: offenderAddr,
 		},
 	}
-
 }
 
 type mockOutSnapshotReader struct {
