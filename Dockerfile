@@ -85,9 +85,9 @@ RUN hmy keys import-ks ${KS}
 
 RUN hmy keys generate-bls-key > keys.json 
 
-RUN jq  '.["encrypted-private-key-path"]' -r keys.json > keypath && cp keys.json /root
+RUN jq  '.["encrypted-private-key-path"]' -r keys.json > /root/keypath && cp keys.json /root
 
-RUN echo "export BLS_KEY_PATH=$(cat keypath)" >> /root/.bashrc
+RUN echo "export BLS_KEY_PATH=$(cat /root/keypath)" >> /root/.bashrc
 
 RUN echo "export BLS_KEY=$(jq '.["public-key"]' -r keys.json)" >> /root/.bashrc
 
@@ -106,8 +106,11 @@ ENV BOOTNODE_PATH='MEANT_TO_BE_SET_AS_ENV_AT_RUN'
 
 ENV WEBHOOK_YAML='../staking/slash/webhook.example.yaml'
 
-RUN mkdir -p bin/staking/slash 
+RUN mkdir -p bin/staking/slash && \
+	cp staking/slash/webhook.example.yaml bin/staking/slash
 
 WORKDIR bin
 
-CMD ./node.sh -N slashing -z -D
+RUN touch blspass
+
+CMD ./node.sh -p blspass -N slashing -z -D

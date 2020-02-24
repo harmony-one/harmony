@@ -275,7 +275,6 @@ slashing)
   REL=testnet
   network_type=testnet
   dns_zone=ds.hmny.io
-  BLSKEYFILE=$BLS_KEY_PATH
   ;;
 *)
   err 64 "${network}: invalid network"
@@ -673,6 +672,8 @@ elif [ ! -f "${blspass}" ]; then
    err 10 "can't find the ${blspass} file"
 fi
 
+WEBHOOK_YAML='../staking/slash/webhook.example.yaml'
+
 while :
 do
    msg "############### Running Harmony Process ###############"
@@ -685,15 +686,11 @@ do
       -dns_zone="${dns_zone}"
       -blacklist="${blacklist}"
       -webhook_yaml="${WEBHOOK_YAML}"
+      -blskey_file="$(cat /root/keypath)"
    )
    args+=(
       -is_archival="${archival}"
    )
-   if ! ${multi_key}; then
-      args+=(
-      -blskey_file "${BLSKEYFILE}"
-      )
-   fi
    if ${public_rpc}; then
       args+=(
       -public_rpc
@@ -735,7 +732,8 @@ do
    *) ld_path_var=LD_LIBRARY_PATH;;
    esac
    run() {
-      env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
+       echo "${args[@]}" "${@}"
+       env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
    }
    case "${blspass:+set}" in
    "") echo -n "${passphrase}" | run -blspass stdin;;
