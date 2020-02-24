@@ -15,6 +15,28 @@ DOCKER_IMAGE=$DOCKER_REPO:$tag
 
 use_local=false
 
+unset -v progname
+progname="${0##*/}"
+
+unset -f msg err
+
+msg() {
+   case $# in
+   [1-9]*)
+      echo "${progname}: $*" >&2
+      ;;
+   esac
+}
+
+err() {
+   local code
+   code="${1}"
+   shift 1
+   msg "$@"
+   exit "${code}"
+}
+
+
 function usage()
 {
   cat << EOU
@@ -25,7 +47,6 @@ options:
   -l                          : use local docker image (default: $use_local)
   -t tag                      : tag of the image, default: $tag
   -p base,sync,rpc,wss        : all port setting, default: $ports
-  -n network                  : network type
   -z dns_zone                 : dns zone
   -d db_dir                   : harmony db directory
 
@@ -39,6 +60,7 @@ note:
   * the harmony_db will be saved in db/ directory
   * blskey and blspass files have to be saved in the keys/ directory
   * the log files will be saved in logs/ directory
+  * on Mac OS, please do 'brew install coreutils'
 
 examples:
 
