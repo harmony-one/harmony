@@ -55,6 +55,7 @@ type NodeMetadata struct {
 	CurrentEpoch   uint64             `json:"current-epoch"`
 	BlocksPerEpoch *uint64            `json:"blocks-per-epoch,omitempty"`
 	Role           string             `json:"role"`
+	EndpointURL    string             `json:"endpoint-url"`
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
@@ -69,6 +70,11 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		blockEpoch = &b
 	}
 
+	//Uses GetShardingStructure to expose endpoint URL
+	numShard := shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards()
+	shardStructure := shard.Schedule.GetShardingStructure(int(numShard), int(s.b.GetShardID()))
+	endpointURL := shardStructure[int(s.b.GetShardID())]["http"].(string)
+
 	return NodeMetadata{
 		cfg.ConsensusPubKey.SerializeToHexStr(),
 		nodeconfig.GetVersion(),
@@ -79,5 +85,6 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		header.Epoch().Uint64(),
 		blockEpoch,
 		cfg.Role().String(),
+		endpointURL,
 	}
 }
