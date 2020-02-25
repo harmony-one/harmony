@@ -179,7 +179,8 @@ func (bc *BlockChain) CommitOffChainData(
 			); err != nil {
 				return NonStatTy, err
 			}
-			if err := bc.DeletePendingSlashingCandidates(); err != nil {
+			if err := bc.DeletePendingSlashingCandidates(); err != nil &&
+				err != ErrPreStakingCRUDSlash {
 				return NonStatTy, err
 			}
 		} else {

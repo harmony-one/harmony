@@ -1910,9 +1910,8 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 
 // DeletePendingSlashingCandidates ..
 func (bc *BlockChain) DeletePendingSlashingCandidates() error {
-	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
-		return ErrPreStakingCRUDSlash
-	}
+	bc.pendingSlashingCandidatesMU.Lock()
+	defer bc.pendingSlashingCandidatesMU.Unlock()
 	bc.pendingSlashingCandidates.Purge()
 	return bc.WritePendingSlashingCandidates(slash.Records{})
 }
