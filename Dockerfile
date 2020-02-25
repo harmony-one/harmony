@@ -116,10 +116,6 @@ ENV BOOTNODE_PATH='MEANT_TO_BE_SET_AS_ENV_AT_RUN'
 
 ENV WEBHOOK_YAML='../staking/slash/webhook.example.yaml'
 
-RUN mkdir -p bin/staking/slash
-
-COPY staking/slash/webhook.example.yaml bin/staking/slash
-
 WORKDIR bin
 
 RUN touch blspass
