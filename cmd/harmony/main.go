@@ -92,7 +92,7 @@ var (
 	// beaconSyncFreq indicates beaconchain sync frequency
 	beaconSyncFreq = flag.Int("beacon_sync_freq", 60, "unit in seconds")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
-	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
+	blockPeriod    = flag.Int("block_period", 4, "how long in second the leader waits to propose a new block.")
 	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
 	// staking indicates whether the node is operating in staking mode.
 	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
