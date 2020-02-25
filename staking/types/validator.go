@@ -168,7 +168,7 @@ func (v *Validator) SanityCheck() error {
 	}
 
 	// MinSelfDelegation must be >= 1 ONE
-	if v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+	if !v.Banned && v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
 		return errors.Wrapf(
 			errMinSelfDelegationTooSmall,
 			"delegation-given %s", v.MinSelfDelegation.String(),
@@ -277,7 +277,8 @@ func (w *ValidatorWrapper) SanityCheck() error {
 			errInvalidSelfDelegation, "no self delegation given at all",
 		)
 	default:
-		if w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
+		if !w.Banned &&
+			w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidSelfDelegation,
 				"have %s want %s", w.Delegations[0].Amount.String(), w.Validator.MinSelfDelegation,

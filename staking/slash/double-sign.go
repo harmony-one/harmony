@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -194,111 +193,52 @@ func delegatorSlashApply(
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 ) error {
-	for i, delegationSnapshot := range snapshot.Delegations {
+	for _, delegationSnapshot := range snapshot.Delegations {
 		slashDebt := applySlashRate(delegationSnapshot.Amount, rate)
 		halfOfSlashDebt := new(big.Int).Div(slashDebt, common.Big2)
 		snapshotAddr := delegationSnapshot.DelegatorAddress
-		for j, delegationNow := range current.Delegations {
+		for _, delegationNow := range current.Delegations {
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
 				state.AddBalance(reporter, halfOfSlashDebt)
 				// NOTE only need to pay snitch here
 				slashTrack.TotalSnitchReward.Add(
 					slashTrack.TotalSnitchReward, halfOfSlashDebt,
 				)
-				// NOTE handle validator self delegation special case
-				if i == validatorsOwnDel && j == validatorsOwnDel {
-					// say my slash debt is 1.6, and my current amount is 1.2
-					// then while I can't drop below 1, I could still pay 0.2
-					// to bring my debt down to 1.4
-					if one := new(big.Int).SetUint64(denominations.One); nowAmt.Cmp(one) == 1 &&
-						slashDebt.Cmp(common.Big0) == 1 {
-						// have 1.1, but debt is 0.022
-						asMuchAsCouldPay := new(big.Int).Sub(nowAmt, one)
-						if asMuchAsCouldPay.Cmp(slashDebt) >= 0 {
-							payDebt(
-								snapshot, current, slashDebt, slashDebt, slashTrack,
-							)
-							nowAmt.Sub(nowAmt, slashDebt)
-						}
-					}
-					// NOTE Assume did as much as could above, now check the undelegations
-					for _, undelegate := range delegationNow.Undelegations {
-						// the epoch matters, only those undelegation
-						// such that epoch>= doubleSignEpoch should be slashable
-						if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
-							if slashDebt.Cmp(common.Big0) <= 0 {
-								// paid off the slash debt
-								break
-							}
-
-							switch newBal := new(big.Int).Sub(
-								// My slash debt is 1.6 and my undelegate amount is 1.0
-								// so if (1.6 - 1.0) > 0
-								undelegate.Amount,
-								slashDebt); newBal.Cmp(common.Big0) {
-							case paidOffExact:
-								undelegate.Amount.SetInt64(0)
-							case haveEnoughToPayOff:
-								undelegate.Amount.Sub(undelegate.Amount, slashDebt)
-								payDebt(
-									snapshot, current, slashDebt, slashDebt, slashTrack,
-								)
-								undelegate.Amount.Set(newBal)
-							case -1:
-								// But do have enough to pay off something at least
-								partialPayment := new(big.Int).Sub(slashDebt, new(big.Int).Abs(newBal))
-								payDebt(
-									snapshot, current, slashDebt, partialPayment, slashTrack,
-								)
-								undelegate.Amount.SetInt64(0)
-							}
-						}
-					}
-					// NOTE at high slashing % rates, we could hit this situation
-					// because of the special casing of logic on min-self-delegation
-					if slashDebt.Cmp(common.Big0) == 1 {
+				// Current delegation has some money and slashdebt is still not paid off
+				// so contribute as much as can with current delegation amount
+				if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
+					// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
+					if nowAmt.Cmp(slashDebt) >= 0 {
+						nowAmt.Sub(nowAmt, slashDebt)
 						payDebt(
 							snapshot, current, slashDebt, slashDebt, slashTrack,
 						)
+					} else {
+						// 0.50_amount < 2.4_debt =>, slash == 1.9, nowAmt == 0.0
+						payDebt(
+							snapshot, current, slashDebt, nowAmt, slashTrack,
+						)
+						nowAmt.Sub(nowAmt, nowAmt)
 					}
-				} else {
-					// NOTE everyone else, that is every plain delegation
-					// Current delegation has some money and slashdebt is still not paid off
-					// so contribute as much as can with current delegation amount
-					if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
-						// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
-						if nowAmt.Cmp(slashDebt) >= 0 {
-							nowAmt.Sub(nowAmt, slashDebt)
+				}
+
+				// NOTE Assume did as much as could above, now check the undelegations
+				for _, undelegate := range delegationNow.Undelegations {
+					// the epoch matters, only those undelegation
+					// such that epoch>= doubleSignEpoch should be slashable
+					if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
+						if slashDebt.Cmp(common.Big0) <= 0 {
+							// paid off the slash debt
+							break
+						}
+
+						if undelegate.Amount.Cmp(common.Big0) == 1 &&
+							slashDebt.Cmp(common.Big0) == 1 {
+							newBal := new(big.Int).Sub(undelegate.Amount, slashDebt)
+							undelegate.Amount.Set(newBal)
 							payDebt(
 								snapshot, current, slashDebt, slashDebt, slashTrack,
 							)
-						} else {
-							// 0.50_amount < 2.4_debt =>, slash == 1.9, nowAmt == 0.0
-							payDebt(
-								snapshot, current, slashDebt, nowAmt, slashTrack,
-							)
-							nowAmt.Sub(nowAmt, nowAmt)
-						}
-					}
-
-					// NOTE Assume did as much as could above, now check the undelegations
-					for _, undelegate := range delegationNow.Undelegations {
-						// the epoch matters, only those undelegation
-						// such that epoch>= doubleSignEpoch should be slashable
-						if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
-							if slashDebt.Cmp(common.Big0) <= 0 {
-								// paid off the slash debt
-								break
-							}
-
-							if undelegate.Amount.Cmp(common.Big0) == 1 &&
-								slashDebt.Cmp(common.Big0) == 1 {
-								newBal := new(big.Int).Sub(undelegate.Amount, slashDebt)
-								undelegate.Amount.Set(newBal)
-								payDebt(
-									snapshot, current, slashDebt, slashDebt, slashTrack,
-								)
-							}
 						}
 					}
 				}
