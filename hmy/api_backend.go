@@ -522,7 +522,7 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 			return shardID, nil
 		})
 		decider.SetVoters(comm.Slots)
-		then.Deciders[comm.ShardID] = decider
+		then.Deciders[shardID] = decider
 	}
 
 	for _, comm := range nowCommittee.Shards {
@@ -532,7 +532,7 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 			return shardID, nil
 		})
 		decider.SetVoters(comm.Slots)
-		now.Deciders[comm.ShardID] = decider
+		now.Deciders[shardID] = decider
 	}
 
 	return &quorum.Transition{then, now}, nil

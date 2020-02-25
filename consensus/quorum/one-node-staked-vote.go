@@ -6,6 +6,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -203,6 +204,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	voterCount := len(v.roster.Voters)
 	type u struct {
 		IsHarmony      bool   `json:"is-harmony-slot"`
+		EarningAccount string `json:"earning-account"`
 		Identity       string `json:"bls-public-key"`
 		VotingPower    string `json:"voting-power-%"`
 		EffectiveStake string `json:"effective-stake,omitempty"`
@@ -224,6 +226,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	for identity, voter := range v.roster.Voters {
 		member := u{
 			voter.IsHarmonyNode,
+			common2.MustAddressToBech32(voter.EarningAccount),
 			identity.Hex(),
 			voter.EffectivePercent.String(),
 			"",
