@@ -569,8 +569,8 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, pa
 	}
 	validators := make([]*staking.Validator, validatorsNum)
 	for i := start; i < start+validatorsNum; i++ {
-		validators[i] = s.b.GetValidatorInformation(addresses[i])
-		if validators[i] == nil {
+		validators[i-start] = s.b.GetValidatorInformation(addresses[i])
+		if validators[i-start] == nil {
 			addr, _ := internal_common.AddressToBech32(addresses[i])
 			return nil, fmt.Errorf("error when getting validator info of %s", addr)
 		}
@@ -601,7 +601,7 @@ func (s *PublicBlockChainAPI) GetAllDelegationInformation(ctx context.Context, p
 	validators := make([][]*RPCDelegation, validatorsNum)
 	var err error
 	for i := start; i < start+validatorsNum; i++ {
-		validators[i], err = s.GetDelegationsByValidator(ctx, addresses[i].String())
+		validators[i-start], err = s.GetDelegationsByValidator(ctx, addresses[i].String())
 		if err != nil {
 			return nil, err
 		}
