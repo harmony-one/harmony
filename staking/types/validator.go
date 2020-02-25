@@ -137,7 +137,7 @@ type Validator struct {
 	MaxTotalDelegation *big.Int `json:"max-total-delegation"`
 	// Is the validator active in participating
 	// committee selection process or not
-	Active bool `json:"eligible-for-epos"`
+	Active bool `json:"active"`
 	// commission parameters
 	Commission
 	// description for the validator

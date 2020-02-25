@@ -127,15 +127,15 @@ func eposStakedCommittee(
 		if err != nil {
 			return nil, err
 		}
+		if !effective.IsEligibleForEPOSAuction(validator) {
+			l.RawJSON("candidate", []byte(validator.String())).
+				Msg("validator not eligible for epos")
+			continue
+		}
 		if err := validator.SanityCheck(); err != nil {
 			l.Err(err).
 				RawJSON("candidate", []byte(validator.String())).
 				Msg("validator sanity check failed")
-			continue
-		}
-		if !effective.IsEligibleForEPOSAuction(validator) {
-			l.RawJSON("candidate", []byte(validator.String())).
-				Msg("validator not eligible for epos")
 			continue
 		}
 		validatorStake := big.NewInt(0)
