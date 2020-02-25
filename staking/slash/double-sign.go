@@ -302,7 +302,7 @@ func Apply(
 		// finally, kick them off forever
 		current.Banned, current.Active = true, false
 
-		if err := state.UpdateStakingInfo(
+		if err := state.UpdateStakingInfoWithoutSanityCheck(
 			snapshot.Address, current,
 		); err != nil {
 			return nil, err

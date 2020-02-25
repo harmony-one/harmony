@@ -699,6 +699,18 @@ func (db *DB) GetStakingInfo(addr common.Address) *stk.ValidatorWrapper {
 	return &val
 }
 
+// UpdateStakingInfoWithoutSanityCheck ..
+func (db *DB) UpdateStakingInfoWithoutSanityCheck(
+	addr common.Address, val *stk.ValidatorWrapper,
+) error {
+	by, err := rlp.EncodeToBytes(val)
+	if err != nil {
+		return err
+	}
+	db.SetCode(addr, by)
+	return nil
+}
+
 // UpdateStakingInfo update staking information of a given validator (including delegation info)
 func (db *DB) UpdateStakingInfo(addr common.Address, val *stk.ValidatorWrapper) error {
 	if err := val.SanityCheck(); err != nil {
@@ -710,7 +722,6 @@ func (db *DB) UpdateStakingInfo(addr common.Address, val *stk.ValidatorWrapper) 
 		return err
 	}
 	db.SetCode(addr, by)
-
 	return nil
 }
 
