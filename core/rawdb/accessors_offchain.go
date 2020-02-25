@@ -115,11 +115,6 @@ func WritePendingSlashingCandidates(db DatabaseWriter, bytes []byte) error {
 	return db.Put(pendingSlashingKey, bytes)
 }
 
-// DeletePendingSlashingCandidates stores last pending slashing candidates into database.
-func DeletePendingSlashingCandidates(db DatabaseDeleter) error {
-	return db.Delete(pendingSlashingKey)
-}
-
 // ReadCXReceipts retrieves all the transactions of receipts given destination shardID, number and blockHash
 func ReadCXReceipts(db DatabaseReader, shardID uint32, number uint64, hash common.Hash) (types.CXReceipts, error) {
 	data, err := db.Get(cxReceiptKey(shardID, number, hash))

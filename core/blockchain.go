@@ -1905,9 +1905,16 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 	if err != nil {
 		return nil, err
 	}
-	crossLink, err := types.DeserializeCrossLink(bytes)
+	return types.DeserializeCrossLink(bytes)
+}
 
-	return crossLink, err
+// DeletePendingSlashingCandidates ..
+func (bc *BlockChain) DeletePendingSlashingCandidates() error {
+	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
+		return ErrPreStakingCRUDSlash
+	}
+	bc.pendingSlashingCandidates.Purge()
+	return bc.WritePendingSlashingCandidates(slash.Records{})
 }
 
 // ReadPendingSlashingCandidates retrieves pending slashing candidates
@@ -1945,7 +1952,7 @@ var (
 )
 
 // WritePendingSlashingCandidates saves the pending slashing candidates
-func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) error {
+func (bc *BlockChain) WritePendingSlashingCandidates(candidates slash.Records) error {
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
 		utils.Logger().Debug().Msg("Writing slashing candidates in prior to staking epoch")
 		return ErrPreStakingCRUDSlash
