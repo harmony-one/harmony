@@ -1,8 +1,8 @@
 #!/bin/bash
 
-from='one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur'
-to='one1d6wp3ddfjx7ea2mga3822xjz2rzurlxz2y68hv'
-someRando='one1xqcyfa4vg9khlg6vv85p84g4wa0e0lcjtsv80h'
+from='one1tq4hy947c9gr8qzv06yxz4aeyhc9vn78al4rmu'
+to='one1y5gmmzumajkm5mx3g2qsxtza2d3haq0zxyg47r'
+someRando='one1qrqcfek6sc29sachs3glhs4zny72mlad76lqcp'
 
 blsKey="$BLS_KEY"
 
@@ -27,19 +27,16 @@ hmy balances "${to}"
 printf 'Create the actual validator\n'
 hmy staking create-validator --validator-addr "${to}" \
     --name _Test_key_validator0 --identity test_account \
-    --website harmony.one --security-contact Daniel-VDM \
+    --website harmony.one --security-contact Edgar-VDM \
     --details none --rate 0.16798352018382678 \
     --max-rate 0.1791844697821372 \
     --max-change-rate 0.1522127615232536 \
     --min-self-delegation 1.0 \
     --max-total-delegation 13 \
-    --amount 1.1 \
+    --amount 0.6 \
     --bls-pubkeys "${blsKey}" \
     --chain-id testnet --timeout 30
 
-# ./hmy-cli staking undelegate --amount 0.6 \
-    # 	  --delegator-addr="${to}" \
-    # 	  --validator-addr="${to}" 
 
 printf 'Wait 10 seconds, then delegation from our rando addr to our created-validator\n'
 # Need to do a delegator test

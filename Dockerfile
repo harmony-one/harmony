@@ -77,19 +77,20 @@ RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh
 
 RUN cd ${HMY_PATH}/go-sdk && make -j8 && cp hmy /root/bin
 
-# for our validator
-ARG K=one1d6wp3ddfjx7ea2mga3822xjz2rzurlxz2y68hv
+# for our double-signing-testing
+ARG K1=one1tq4hy947c9gr8qzv06yxz4aeyhc9vn78al4rmu
+ARG K2=one1y5gmmzumajkm5mx3g2qsxtza2d3haq0zxyg47r
+ARG K3=one1qrqcfek6sc29sachs3glhs4zny72mlad76lqcp
 
-ARG KS=f935d20804416bf5b4eb1ca55937e6dff19a1a157b8090809c3aa2b19f9fc5b7
+ARG KS1=8d222cffa99eb1fb86c581d9dfe7d60dd40ec62aa29056b7ff48028385270541
+ARG KS2=da1800da5dedf02717696675c7a7e58383aff90b1014dfa1ab5b7bd1ce3ef535
+ARG KS3=f4267bb5a2f0e65b8f5792bb6992597fac2b35ebfac9885ce0f4152c451ca31a
 
-RUN hmy keys import-private-key ${KS}
-
-# for our delegator
-ARG K2=one1xqcyfa4vg9khlg6vv85p84g4wa0e0lcjtsv80h
-
-ARG KS2=eee6c699e0b6598764141a32c65f71ff8a06ad37368b206ee0ecc22de7df8618
+RUN hmy keys import-private-key ${KS1}
 
 RUN hmy keys import-private-key ${KS2}
+
+RUN hmy keys import-private-key ${KS3}
 
 RUN hmy keys generate-bls-key > keys.json 
 
@@ -99,9 +100,9 @@ RUN echo "export BLS_KEY_PATH=$(cat /root/keypath)" >> /root/.bashrc
 
 RUN echo "export BLS_KEY=$(jq '.["public-key"]' -r keys.json)" >> /root/.bashrc
 
-RUN echo "printf '${K}, ${K2} is funded account for local dev\n\n'" >> /root/.bashrc
+RUN echo "printf '${K1}, ${K2}, ${K3} is funded account for local dev\n\n'" >> /root/.bashrc
 
-RUN echo "printf 'test with: hmy blockchain validator information ${K}\n\n'" >> /root/.bashrc
+RUN echo "printf 'test with: hmy blockchain validator information ${K1}\n\n'" >> /root/.bashrc
 
 RUN echo "echo "$(jq '.["public-key"]' -r keys.json)" is an extern bls key" \
 	>> /root/.bashrc
