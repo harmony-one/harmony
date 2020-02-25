@@ -77,7 +77,6 @@ RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh
 
 RUN cd ${HMY_PATH}/go-sdk && make -j8 && cp hmy /root/bin
 
-# for our double-signing-testing
 ARG K1=one1tq4hy947c9gr8qzv06yxz4aeyhc9vn78al4rmu
 ARG K2=one1y5gmmzumajkm5mx3g2qsxtza2d3haq0zxyg47r
 ARG K3=one1qrqcfek6sc29sachs3glhs4zny72mlad76lqcp

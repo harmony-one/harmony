@@ -208,6 +208,13 @@ func delegatorSlashApply(
 		snapshotAddr := delegationSnapshot.DelegatorAddress
 		for _, delegationNow := range current.Delegations {
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
+				utils.Logger().Info().
+					RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
+					RawJSON("delegation-current", []byte(delegationNow.String())).
+					Uint64("slash-debt", slashDebt.Uint64()).
+					Str("rate", rate.String()).
+					Msg("attempt to apply slashing based on snapshot amount to current state")
+
 				state.AddBalance(reporter, halfOfSlashDebt)
 				// NOTE only need to pay snitch here
 				slashTrack.TotalSnitchReward.Add(
@@ -259,8 +266,10 @@ func delegatorSlashApply(
 			x2, _ := rlp.EncodeToBytes(current)
 			log := utils.Logger()
 			log.Err(errSlashDebtNotFullyAccountedFor).
+				Str("slash-rate", rate.String()).
 				Str("snapshot-rlp", hex.EncodeToString(x1)).
-				Str("current-rlp", hex.EncodeToString(x2))
+				Str("current-rlp", hex.EncodeToString(x2)).
+				Msg("slash debt not paid off")
 			return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
 		}
 	}
