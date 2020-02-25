@@ -31,12 +31,21 @@ func payDebt(
 	slashDebt, payment *big.Int,
 	slashTrack *Application,
 ) {
+	utils.Logger().Info().
+		RawJSON("snapshot", []byte(snapshot.String())).
+		RawJSON("current", []byte(current.String())).
+		Uint64("slash-debt", slashDebt.Uint64()).
+		Uint64("payment", payment.Uint64()).
+		RawJSON("slash-track", []byte(slashTrack.String())).
+		Msg("slash debt payment before application")
 	slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, payment)
 	slashDebt.Sub(slashDebt, payment)
 	if slashDebt.Cmp(common.Big0) == -1 {
 		x1, _ := rlp.EncodeToBytes(snapshot)
 		x2, _ := rlp.EncodeToBytes(current)
-		msg := "slashdebt balance cannot go below zero-" + hex.EncodeToString(x1) + hex.EncodeToString(x2)
+		msg := "slashdebt balance cannot go below zero-" +
+			hex.EncodeToString(x1) +
+			hex.EncodeToString(x2)
 		panic(msg)
 	}
 }
