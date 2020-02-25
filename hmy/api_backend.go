@@ -360,7 +360,10 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 		for i := range validator.Delegations {
 			stake.Add(stake, validator.Delegations[i].Amount)
 		}
-		stakes = append(stakes, stake)
+		stake = stake.Div(stake, big.NewInt(int64(len(validator.SlotPubKeys))))
+		for i := 0; i < len(validator.SlotPubKeys); i++ {
+			stakes = append(stakes, stake)
+		}
 	}
 	sort.SliceStable(
 		stakes,
