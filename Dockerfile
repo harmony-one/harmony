@@ -18,7 +18,7 @@ ENV PATH="/root/bin:${PATH}"
 
 RUN apt install libgmp-dev libssl-dev curl git \
 psmisc dnsutils jq make gcc g++ bash tig tree sudo vim \
-silversearcher-ag unzip emacs-nox bash-completion -y
+silversearcher-ag unzip emacs-nox nano bash-completion -y
 
 RUN mkdir ~/bin && \
 	curl -sL -o ~/bin/gimme \
