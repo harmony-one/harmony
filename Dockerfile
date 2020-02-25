@@ -77,11 +77,11 @@ RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh
 
 RUN cd ${HMY_PATH}/go-sdk && make -j8 && cp hmy /root/bin
 
-ARG K=one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj
+ARG K=one1d6wp3ddfjx7ea2mga3822xjz2rzurlxz2y68hv
 
-ARG KS=/root/go/src/github.com/harmony-one/harmony/.hmy/keystore/${K}.key
+ARG KS=f935d20804416bf5b4eb1ca55937e6dff19a1a157b8090809c3aa2b19f9fc5b7
 
-RUN hmy keys import-ks ${KS}
+RUN hmy keys import-private-key ${KS}
 
 RUN hmy keys generate-bls-key > keys.json 
 
