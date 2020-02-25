@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 var (
@@ -182,7 +183,7 @@ func (tx *StakingTransaction) ChainID() *big.Int {
 
 // ShardID returns which shard id this transaction was signed for, implicitly shard 0.
 func (tx *StakingTransaction) ShardID() uint32 {
-	return 0
+	return shard.BeaconChainShardID
 }
 
 // EncodeRLP implements rlp.Encoder
