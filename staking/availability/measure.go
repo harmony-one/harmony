@@ -9,6 +9,7 @@ import (
 	engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -119,9 +120,9 @@ func bumpCount(
 		if _, ok := onlyConsider[addr]; !ok {
 			continue
 		}
-		wrapper, err := chain.ReadValidatorInformation(addr)
-		if err != nil {
-			return err
+		wrapper := state.GetStakingInfo(addr)
+		if wrapper == nil {
+			return ctxerror.New("validator info not found", common2.MustAddressToBech32(addr), "at root:", chain.CurrentHeader().Root().Hex())
 		}
 		wrapper.Snapshot.NumBlocksToSign.Add(
 			wrapper.Snapshot.NumBlocksToSign, common.Big1,
@@ -185,10 +186,9 @@ func SetInactiveUnavailableValidators(
 			return err
 		}
 
-		wrapper, err := bc.ReadValidatorInformation(addrs[i])
-
-		if err != nil {
-			return err
+		wrapper := state.GetStakingInfo(addrs[i])
+		if wrapper == nil {
+			return ctxerror.New("validator info not found", common2.MustAddressToBech32(addrs[i]), "at root:", bc.CurrentHeader().Root().Hex())
 		}
 
 		stats := wrapper.Snapshot
