@@ -191,7 +191,7 @@ do
    c) start_clean=true;;
    1) loop=false;;
    h) print_usage; exit 0;;
-   k) BLSKEYFILE="${OPTARG}";;
+   k) BLSKEYFILE="/home/edgar/go/src/github.com/harmony-one/harmony/377c28caf0fd5ef5a914109c618245804b8c3336e131e4f9e4129fbed9a51ec6ba8ed89fffd1776ac530a2f50d888613.key";;
    s) setup_env; exit 0;;
    S) run_as_root=false ;;
    p) blspass="${OPTARG}";;
@@ -270,7 +270,7 @@ devnet)
   ;;
 slashing)
   bootnodes=(
-      $BOOTNODE_PATH
+    /ip4/52.40.84.2/tcp/9876/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
   )
   REL=testnet
   network_type=testnet
@@ -678,15 +678,15 @@ while :
 do
    msg "############### Running Harmony Process ###############"
    args=(
-      -bootnodes "${BN_MA}"
+      -bootnodes "/ip4/52.40.84.2/tcp/9876/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29"
       -ip "${PUB_IP}"
       -port "${NODE_PORT}"
       -is_genesis
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
       -blacklist="${blacklist}"
-      -webhook_yaml="${WEBHOOK_YAML}"
-      -blskey_file="$(cat /root/keypath)"
+      -webhook_yaml="../staking/slash/webhook.example.yaml"
+      -blskey_file="/home/edgar/go/src/github.com/harmony-one/harmony/377c28caf0fd5ef5a914109c618245804b8c3336e131e4f9e4129fbed9a51ec6ba8ed89fffd1776ac530a2f50d888613.key"
    )
    args+=(
       -is_archival="${archival}"

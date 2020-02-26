@@ -8,4 +8,4 @@ malicious:
   trigger:
     double-sign: http://localhost:7777/trigger-next-double-sign
     list:
-    - 6878ce882b53c6a8f1840cff3473540b92543b4a08776539192cd6abeebe70f93477cb730035fa49840e02830b565996
+    - 377c28caf0fd5ef5a914109c618245804b8c3336e131e4f9e4129fbed9a51ec6ba8ed89fffd1776ac530a2f50d888613
