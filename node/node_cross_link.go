@@ -96,7 +96,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 
 			if err = node.VerifyCrossLink(cl); err != nil {
 				utils.Logger().Info().
-					Str("raw-error", err.Error()).
+					Str("cross-link-issue", err.Error()).
 					Msgf("[ProcessingCrossLink] Failed to verify new cross link for blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
 				continue
 			}

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 from='one1zksj3evekayy90xt4psrz8h6j2v3hla4qwz4ur'
-to='one1zyxauxquys60dk824p532jjdq753pnsenrgmef'
+to='one14438psd5vrjes7qm97jrj3t0s5l4qff5j5cn4h'
 someRando='one1nqevvacj3y5ltuef05my4scwy5wuqteur72jk5'
 endpt="http://34.230.39.233:9500"
 amt="50"
