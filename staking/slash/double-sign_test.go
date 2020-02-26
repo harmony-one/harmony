@@ -196,7 +196,6 @@ func init() {
 var (
 	signerA, signerB           = &bls.PublicKey{}, &bls.PublicKey{}
 	hashA, hashB               = common.Hash{}, common.Hash{}
-	signatureA, signatureB     = &bls.Sign{}, &bls.Sign{}
 	reporterAddr, offenderAddr = common.Address{}, common.Address{}
 	randoDel                   = common.Address{}
 	header                     = block.Header{}
@@ -207,12 +206,11 @@ var (
 		signerA.DeserializeHexStr(signerABLSPublicHex)
 		headerHashA, _ := hex.DecodeString(signerAHeaderHashHex)
 		hashA = common.BytesToHash(headerHashA)
-		signatureA.DeserializeHexStr(signerABLSSignature)
 		// Ballot B setup
 		signerB.DeserializeHexStr(signerBBLSPublicHex)
 		headerHashB, _ := hex.DecodeString(signerBHeaderHashHex)
 		hashB = common.BytesToHash(headerHashB)
-		signatureB.DeserializeHexStr(signerBBLSSignature)
+		// address setup
 		reporterAddr, _ = common2.Bech32ToAddress(reporterBech32)
 		offenderAddr, _ = common2.Bech32ToAddress(offenderBech32)
 		randoDel, _ = common2.Bech32ToAddress(randoDelegatorBech32)
@@ -333,12 +331,12 @@ func exampleSlashRecords() Records {
 					AlreadyCastBallot: votepower.Ballot{
 						SignerPubKey:    blsWrapA,
 						BlockHeaderHash: hashA,
-						Signature:       signatureA,
+						Signature:       common.Hex2Bytes(signerABLSSignature),
 					},
 					DoubleSignedBallot: votepower.Ballot{
 						SignerPubKey:    blsWrapB,
 						BlockHeaderHash: hashB,
-						Signature:       signatureB,
+						Signature:       common.Hex2Bytes(signerBBLSSignature),
 					},
 				},
 				Moment: Moment{
@@ -472,6 +470,23 @@ func TestEightyPercentSlashed(t *testing.T) {
 	slashes := exampleSlashRecords()
 	stateHandle := defaultStateWithAccountsApplied()
 	testScenario(t, stateHandle, slashes, scenarioEightyPercent)
+}
+
+func TestRoundTripSlashRecord(t *testing.T) {
+	slashes := exampleSlashRecords()
+	serializedA := slashes.String()
+	data, err := rlp.EncodeToBytes(slashes)
+	if err != nil {
+		t.Errorf("encoding slash records failed %s", err.Error())
+	}
+	roundTrip := Records{}
+	if err := rlp.DecodeBytes(data, &roundTrip); err != nil {
+		t.Errorf("decoding slash records failed %s", err.Error())
+	}
+	serializedB := roundTrip.String()
+	if serializedA != serializedB {
+		t.Error("rlp encode/decode round trip records failed")
+	}
 }
 
 func TestApply(t *testing.T) {

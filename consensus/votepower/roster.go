@@ -1,6 +1,7 @@
 package votepower
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"sort"
 
@@ -26,7 +27,7 @@ var (
 type Ballot struct {
 	SignerPubKey    shard.BlsPublicKey `json:"bls-public-key"`
 	BlockHeaderHash common.Hash        `json:"block-header-hash"`
-	Signature       *bls.Sign          `json:"signature"`
+	Signature       []byte             `json:"bls-signature"`
 }
 
 // MarshalJSON ..
@@ -34,11 +35,11 @@ func (b Ballot) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		A string `json:"bls-public-key"`
 		B string `json:"block-header-hash"`
-		C string `json:"signature"`
+		C string `json:"bls-signature"`
 	}{
 		b.SignerPubKey.Hex(),
 		b.BlockHeaderHash.Hex(),
-		b.Signature.SerializeToHexStr(),
+		hex.EncodeToString(b.Signature),
 	})
 }
 

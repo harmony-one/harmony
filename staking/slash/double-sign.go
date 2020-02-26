@@ -164,11 +164,7 @@ func Verify(chain CommitteeReader, candidate *Record) error {
 	if _, err := subCommittee.AddressForBLSKey(second.SignerPubKey); err != nil {
 		return err
 	}
-	// candidate.ConflictingBallots
-
-	// TODO Why this one printng have 00000000 for signature? something wrong earlier
 	// TODO need to finish this implementation
-
 	return nil
 }
 

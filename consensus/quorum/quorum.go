@@ -158,7 +158,9 @@ func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
 	ballots := s.ReadAllBallots(p)
 	sigs := make([]*bls.Sign, 0, len(ballots))
 	for _, ballot := range ballots {
-		sigs = append(sigs, ballot.Signature)
+		sig := &bls.Sign{}
+		sig.DeserializeHexStr(common.Bytes2Hex(ballot.Signature))
+		sigs = append(sigs, sig)
 	}
 	return bls_cosi.AggregateSig(sigs)
 }
@@ -227,7 +229,7 @@ func (s *cIdentities) SubmitVote(
 	ballot := &votepower.Ballot{
 		SignerPubKey:    *shard.FromLibBLSPublicKeyUnsafe(PubKey),
 		BlockHeaderHash: headerHash,
-		Signature:       sig,
+		Signature:       common.Hex2Bytes(sig.SerializeToHexStr()),
 	}
 	switch hex := PubKey.SerializeToHexStr(); p {
 	case Prepare:

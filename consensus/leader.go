@@ -251,7 +251,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 									votepower.Ballot{
 										offender,
 										recvMsg.BlockHash,
-										&doubleSign,
+										common.Hex2Bytes(doubleSign.SerializeToHexStr()),
 									}},
 								Moment: slash.Moment{
 									Epoch:        curHeader.Epoch(),
