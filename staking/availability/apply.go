@@ -32,14 +32,8 @@ func Apply(bc engine.ChainReader, state *state.DB) error {
 				}
 			}
 
-			if err := IncrementValidatorSigningCounts(
-				bc, header, header.ShardID(), state, processed,
-			); err != nil {
-				return err
-			}
-
-			// // kick out the inactive validators so they won't come up in the auction as possible
-			// // candidates in the following call to SuperCommitteeForNextEpoch
+			// kick out the inactive validators so they won't come up in the auction as possible
+			// candidates in the following call to SuperCommitteeForNextEpoch
 			if shard.Schedule.IsLastBlock(header.Number().Uint64()) {
 				if err := SetInactiveUnavailableValidators(
 					bc, state, processed,

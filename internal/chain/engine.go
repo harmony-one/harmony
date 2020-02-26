@@ -313,10 +313,41 @@ func (e *engineImpl) Finalize(
 		}
 	}
 
-	if isBeaconChain && isNewEpoch && inStakingEra {
-		if err := availability.Apply(chain, state); err != nil {
+	if isBeaconChain && inStakingEra {
+		header := chain.CurrentHeader()
+		superCommittee, err := chain.ReadShardState(header.Epoch())
+		processed := make(map[common.Address]struct{})
+
+		if err != nil {
 			return nil, nil, err
 		}
+
+		for j := range superCommittee.Shards {
+			shard := superCommittee.Shards[j]
+			for j := range shard.Slots {
+				slot := shard.Slots[j]
+				if slot.EffectiveStake != nil { // For external validator
+					_, ok := processed[slot.EcdsaAddress]
+					if !ok {
+						processed[slot.EcdsaAddress] = struct{}{}
+					}
+				}
+			}
+		}
+
+		if err := availability.IncrementValidatorSigningCounts(
+			chain, header, header.ShardID(), state, processed,
+		); err != nil {
+			return nil, nil, err
+		}
+
+		if isNewEpoch {
+			if err := availability.Apply(chain, state); err != nil {
+				return nil, nil, err
+			}
+
+		}
+
 	}
 
 	if isBeaconChain && inStakingEra && len(doubleSigners) > 0 {

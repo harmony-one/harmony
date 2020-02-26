@@ -1954,7 +1954,7 @@ var (
 func (bc *BlockChain) WritePendingSlashingCandidates(candidates slash.Records) error {
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
 		utils.Logger().Debug().Msg("Writing slashing candidates in prior to staking epoch")
-		return ErrPreStakingCRUDSlash
+		return nil
 	}
 
 	bytes, err := rlp.EncodeToBytes(candidates)
