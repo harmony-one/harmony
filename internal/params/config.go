@@ -23,30 +23,33 @@ var EpochTBD = big.NewInt(10000000)
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:        MainnetChainID,
-		CrossTxEpoch:   big.NewInt(28),
-		CrossLinkEpoch: EpochTBD,
-		EIP155Epoch:    big.NewInt(28),
-		S3Epoch:        big.NewInt(28),
+		ChainID:         MainnetChainID,
+		CrossTxEpoch:    big.NewInt(28),
+		CrossLinkEpoch:  EpochTBD,
+		EIP155Epoch:     big.NewInt(28),
+		S3Epoch:         big.NewInt(28),
+		ReceiptLogEpoch: big.NewInt(101),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:        TestnetChainID,
-		CrossTxEpoch:   big.NewInt(1),
-		CrossLinkEpoch: big.NewInt(2),
-		EIP155Epoch:    big.NewInt(0),
-		S3Epoch:        big.NewInt(0),
+		ChainID:         TestnetChainID,
+		CrossTxEpoch:    big.NewInt(1),
+		CrossLinkEpoch:  big.NewInt(2),
+		EIP155Epoch:     big.NewInt(0),
+		S3Epoch:         big.NewInt(0),
+		ReceiptLogEpoch: big.NewInt(0),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
-		ChainID:        PangaeaChainID,
-		CrossTxEpoch:   big.NewInt(0),
-		CrossLinkEpoch: EpochTBD,
-		EIP155Epoch:    big.NewInt(0),
-		S3Epoch:        big.NewInt(0),
+		ChainID:         PangaeaChainID,
+		CrossTxEpoch:    big.NewInt(0),
+		CrossLinkEpoch:  EpochTBD,
+		EIP155Epoch:     big.NewInt(0),
+		S3Epoch:         big.NewInt(0),
+		ReceiptLogEpoch: big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -58,6 +61,7 @@ var (
 		big.NewInt(0),             // CrossLinkEpoch
 		big.NewInt(0),             // EIP155Epoch
 		big.NewInt(0),             // S3Epoch
+		big.NewInt(0),             // ReceiptLogEpoch
 	}
 
 	// TestChainConfig ...
@@ -69,6 +73,7 @@ var (
 		big.NewInt(0), // CrossLinkEpoch
 		big.NewInt(0), // EIP155Epoch
 		big.NewInt(0), // S3Epoch
+		big.NewInt(0), // ReceiptLogEpoch
 	}
 
 	// TestRules ...
@@ -109,15 +114,19 @@ type ChainConfig struct {
 
 	// S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
 	S3Epoch *big.Int `json:"s3-epoch,omitempty"`
+
+	// ReceiptLogEpoch is the first epoch support receiptlog
+	ReceiptLogEpoch *big.Int `json:"receipt-log-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EIP155: %v CrossTx: %v CrossLink: %v}",
+	return fmt.Sprintf("{ChainID: %v EIP155: %v CrossTx: %v CrossLink: %v ReceiptLog: %v}",
 		c.ChainID,
 		c.EIP155Epoch,
 		c.CrossTxEpoch,
 		c.CrossLinkEpoch,
+		c.ReceiptLogEpoch,
 	)
 }
 
@@ -149,6 +158,11 @@ func (c *ChainConfig) IsCrossLink(epoch *big.Int) bool {
 // IsS3 returns whether epoch is either equal to the S3 fork epoch or greater.
 func (c *ChainConfig) IsS3(epoch *big.Int) bool {
 	return isForked(c.S3Epoch, epoch)
+}
+
+// IsReceiptLog returns whether epoch is either equal to the ReceiptLog fork epoch or greater.
+func (c *ChainConfig) IsReceiptLog(epoch *big.Int) bool {
+	return isForked(c.ReceiptLogEpoch, epoch)
 }
 
 // GasTable returns the gas table corresponding to the current phase (homestead or homestead reprice).
@@ -259,8 +273,8 @@ func (err *ConfigCompatError) Error() string {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                     *big.Int
-	IsCrossLink, IsEIP155, IsS3 bool
+	ChainID                                   *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -270,9 +284,10 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		chainID = new(big.Int)
 	}
 	return Rules{
-		ChainID:     new(big.Int).Set(chainID),
-		IsCrossLink: c.IsCrossLink(epoch),
-		IsEIP155:    c.IsEIP155(epoch),
-		IsS3:        c.IsS3(epoch),
+		ChainID:      new(big.Int).Set(chainID),
+		IsCrossLink:  c.IsCrossLink(epoch),
+		IsEIP155:     c.IsEIP155(epoch),
+		IsS3:         c.IsS3(epoch),
+		IsReceiptLog: c.IsReceiptLog(epoch),
 	}
 }

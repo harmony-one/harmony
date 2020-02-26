@@ -583,6 +583,24 @@ func main() {
 
 	nodeConfig := createGlobalConfig()
 	currentNode := setupConsensusAndNode(nodeConfig)
+
+	// Prepare for graceful shutdown from os signals
+	osSignal := make(chan os.Signal)
+	signal.Notify(osSignal, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for {
+			select {
+			case sig := <-osSignal:
+				if sig == syscall.SIGTERM || sig == os.Interrupt {
+					msg := "Got %s signal. Gracefully shutting down...\n"
+					utils.Logger().Printf(msg, sig)
+					fmt.Printf(msg, sig)
+					currentNode.ShutDown()
+				}
+			}
+		}
+	}()
+
 	//setup state syncing and beacon syncing frequency
 	currentNode.SetSyncFreq(*syncFreq)
 	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
@@ -654,25 +672,6 @@ func main() {
 	if currentNode.NodeConfig.GetMetricsFlag() {
 		go currentNode.CollectMetrics()
 	}
-	// Prepare for graceful shutdown from os signals
-	osSignal := make(chan os.Signal)
-	signal.Notify(osSignal, os.Interrupt, os.Kill, syscall.SIGTERM)
-	go func() {
-		for {
-			select {
-			case sig := <-osSignal:
-				if sig == os.Kill || sig == syscall.SIGTERM {
-					fmt.Printf("Got %s signal. Gracefully shutting down...\n", sig)
-					currentNode.ShutDown()
-				}
-				if sig == os.Interrupt {
-					fmt.Printf("Got %s signal. Dumping state to DB...\n", sig)
-					currentNode.Blockchain().Stop()
-					currentNode.Beaconchain().Stop()
-				}
-			}
-		}
-	}()
 
 	currentNode.StartServer()
 }
