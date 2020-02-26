@@ -278,12 +278,12 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 }
 
 // Add new transactions to the pending transaction list.
-func (node *Node) addPendingTransactions(newTxs types.Transactions) {
+func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 	poolTxs := types.PoolTransactions{}
 	for _, tx := range newTxs {
 		poolTxs = append(poolTxs, tx)
 	}
-	node.TxPool.AddRemotes(poolTxs)
+	errs := node.TxPool.AddRemotes(poolTxs)
 
 	pendingCount, queueCount := node.TxPool.Stats()
 	utils.Logger().Info().
@@ -291,43 +291,56 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) {
 		Int("totalPending", pendingCount).
 		Int("totalQueued", queueCount).
 		Msg("Got more transactions")
+	return errs
 }
 
 // Add new staking transactions to the pending staking transaction list.
-func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) {
+func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) []error {
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
 		poolTxs := types.PoolTransactions{}
 		for _, tx := range newStakingTxs {
 			poolTxs = append(poolTxs, tx)
 		}
-		node.TxPool.AddRemotes(poolTxs)
+		errs := node.TxPool.AddRemotes(poolTxs)
 		pendingCount, queueCount := node.TxPool.Stats()
 		utils.Logger().Info().
 			Int("length of newStakingTxs", len(poolTxs)).
 			Int("totalPending", pendingCount).
 			Int("totalQueued", queueCount).
 			Msg("Got more staking transactions")
+		return errs
 	}
+	return make([]error, len(newStakingTxs))
 }
 
 // AddPendingStakingTransaction staking transactions
 func (node *Node) AddPendingStakingTransaction(newStakingTx *staking.StakingTransaction) {
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-		node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+		for i := range errs {
+			if errs[i] != nil {
+				return
+			}
+		}
+		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
+		node.tryBroadcastStaking(newStakingTx)
 	}
-	utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
-	node.tryBroadcastStaking(newStakingTx)
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 // This is only called from SDK.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	if newTx.ShardID() == node.NodeConfig.ShardID {
-		node.addPendingTransactions(types.Transactions{newTx})
+		errs := node.addPendingTransactions(types.Transactions{newTx})
+		for i := range errs {
+			if errs[i] != nil {
+				return
+			}
+		}
+		utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
+		node.tryBroadcast(newTx)
 	}
-	utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
-	node.tryBroadcast(newTx)
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
