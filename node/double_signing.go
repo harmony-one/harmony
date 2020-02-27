@@ -12,11 +12,18 @@ func (node *Node) processSlashCandidateMessage(msgPayload []byte) {
 	if node.NodeConfig.ShardID != shard.BeaconChainShardID {
 		return
 	}
-	candidates := slash.Records{}
+	candidates, e := slash.Records{}, utils.Logger().Error()
+
 	if err := rlp.DecodeBytes(msgPayload, &candidates); err != nil {
-		utils.Logger().Error().
-			Err(err).
+		e.Err(err).
 			Msg("unable to decode slash candidate message")
+		return
+	}
+
+	if err := candidates.SanityCheck(); err != nil {
+		e.Err(err).
+			RawJSON("slash-candidates", []byte(candidates.String())).
+			Msg("sanity check failed on incoming candidates")
 		return
 	}
 

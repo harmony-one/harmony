@@ -109,6 +109,28 @@ func (r Records) String() string {
 	return string(s)
 }
 
+var (
+	errBallotSignerKeysNotSame = errors.New("conflicting ballots must have same signer key")
+	errReporterAndOffenderSame = errors.New("reporter and offender cannot be same")
+)
+
+// SanityCheck fails if any of the slashes fail
+func (r Records) SanityCheck() error {
+	for _, record := range r {
+		k1 := record.Evidence.AlreadyCastBallot.SignerPubKey
+		k2 := record.Evidence.DoubleSignedBallot.SignerPubKey
+		if k1 != k2 {
+			return errBallotSignerKeysNotSame
+		}
+
+		if record.Offender == record.Reporter {
+			return errReporterAndOffenderSame
+		}
+
+	}
+	return nil
+}
+
 // MarshalJSON ..
 func (r Record) MarshalJSON() ([]byte, error) {
 	reporter, offender :=
@@ -224,16 +246,17 @@ func delegatorSlashApply(
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 ) error {
+
 	for _, delegationSnapshot := range snapshot.Delegations {
 		slashDebt := applySlashRate(delegationSnapshot.Amount, rate)
 		slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 		snapshotAddr := delegationSnapshot.DelegatorAddress
 		for _, delegationNow := range current.Delegations {
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
-				utils.Logger().Info().
-					RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
-					RawJSON("delegation-current", []byte(delegationNow.String())).
-					Uint64("slash-debt", slashDebt.Uint64()).
+				l := utils.Logger().Info().RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
+					RawJSON("delegation-current", []byte(delegationNow.String()))
+
+				l.Uint64("initial-slash-debt", slashDebt.Uint64()).
 					Str("rate", rate.String()).
 					Msg("attempt to apply slashing based on snapshot amount to current state")
 				// Current delegation has some money and slashdebt is still not paid off
@@ -250,7 +273,7 @@ func delegatorSlashApply(
 					// such that epoch>= doubleSignEpoch should be slashable
 					if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
 						if slashDebt.Cmp(common.Big0) <= 0 {
-							// paid off the slash debt
+							l.Msg("paid off the slash debt")
 							break
 						}
 						nowAmt := undelegate.Amount
@@ -268,6 +291,9 @@ func delegatorSlashApply(
 				// then we need to take from their pending rewards
 				if slashDebt.Cmp(common.Big0) == 1 {
 					nowAmt := delegationNow.Reward
+					l.Uint64("slash-debt", slashDebt.Uint64()).
+						Uint64("now-amount-reward", nowAmt.Uint64()).
+						Msg("needed to dig into reward to pay off slash debt")
 					if err := payDownAsMuchAsCan(
 						snapshot, current, slashDebt, nowAmt, slashDiff,
 					); err != nil {
@@ -278,9 +304,13 @@ func delegatorSlashApply(
 				// NOTE only need to pay snitch here,
 				// they only get half of what was actually dispersed
 				halfOfSlashDebt := new(big.Int).Div(slashDiff.TotalSlashed, common.Big2)
+				slashDiff.TotalSnitchReward.Add(slashDiff.TotalSnitchReward, halfOfSlashDebt)
+				l.Uint64("reporter-reward", halfOfSlashDebt.Uint64()).
+					RawJSON("application", []byte(slashDiff.String())).
+					Msg("completed an application of slashing")
 				state.AddBalance(reporter, halfOfSlashDebt)
 				slashTrack.TotalSnitchReward.Add(
-					slashTrack.TotalSnitchReward, halfOfSlashDebt,
+					slashTrack.TotalSnitchReward, slashDiff.TotalSnitchReward,
 				)
 				slashTrack.TotalSlashed.Add(
 					slashTrack.TotalSlashed, slashDiff.TotalSlashed,
@@ -291,8 +321,7 @@ func delegatorSlashApply(
 		if slashDebt.Cmp(common.Big0) == -1 {
 			x1, _ := rlp.EncodeToBytes(snapshot)
 			x2, _ := rlp.EncodeToBytes(current)
-			log := utils.Logger()
-			log.Error().Str("slash-rate", rate.String()).
+			utils.Logger().Error().Str("slash-rate", rate.String()).
 				Str("snapshot-rlp", hex.EncodeToString(x1)).
 				Str("current-rlp", hex.EncodeToString(x2)).
 				Msg("slash debt not paid off")
@@ -345,6 +374,10 @@ func Apply(
 
 		// finally, kick them off forever
 		current.Banned, current.Active = true, false
+		utils.Logger().Info().
+			RawJSON("delegation-current", []byte(current.String())).
+			RawJSON("slash", []byte(slash.String())).
+			Msg("about to update staking info for a validator after a slash")
 
 		if err := state.UpdateStakingInfo(
 			snapshot.Address, current,

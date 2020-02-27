@@ -313,6 +313,11 @@ func (e *engineImpl) Finalize(
 		}
 	}
 
+	l := utils.Logger().Info().
+		Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
+		Uint64("finalizing-epoch", header.Epoch().Uint64()).
+		Uint64("block-number", header.Number().Uint64())
+
 	if isBeaconChain && inStakingEra {
 		header := chain.CurrentHeader()
 		superCommittee, err := chain.ReadShardState(header.Epoch())
@@ -335,6 +340,7 @@ func (e *engineImpl) Finalize(
 			}
 		}
 
+		l.Msg("bumping validator signing counts")
 		if err := availability.IncrementValidatorSigningCounts(
 			chain, header, header.ShardID(), state, processed,
 		); err != nil {
@@ -342,28 +348,41 @@ func (e *engineImpl) Finalize(
 		}
 
 		if isNewEpoch {
+			l.Msg("in new epoch, apply availability check for activity")
 			if err := availability.Apply(chain, state); err != nil {
 				return nil, nil, err
 			}
-
 		}
 
 	}
 
 	if isBeaconChain && inStakingEra && len(doubleSigners) > 0 {
 		superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
+		processed := make(map[common.Address]struct{})
+
 		if err != nil {
 			return nil, nil, errors.New("could not read shard state")
 		}
-		committeeKeys, err := superCommittee.FindCommitteeByID(
-			header.ShardID(),
-		).BLSPublicKeys()
-		if err != nil {
-			return nil, nil, err
+		for j := range superCommittee.Shards {
+			shard := superCommittee.Shards[j]
+			for j := range shard.Slots {
+				slot := shard.Slots[j]
+				if slot.EffectiveStake != nil { // For external validator
+					_, ok := processed[slot.EcdsaAddress]
+					if !ok {
+						processed[slot.EcdsaAddress] = struct{}{}
+					}
+				}
+			}
 		}
+
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
-		rate := slash.Rate(len(doubleSigners), len(committeeKeys))
+		rate := slash.Rate(len(doubleSigners), len(processed))
+		l.Str("rate", rate.String()).
+			RawJSON("records", []byte(doubleSigners.String())).
+			RawJSON("slash-applied", []byte(slashApplied.String())).
+			Msg("applied slash successfully")
 		if slashApplied, err = slash.Apply(
 			chain,
 			state,
@@ -372,11 +391,6 @@ func (e *engineImpl) Finalize(
 		); err != nil {
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
-		utils.Logger().Info().
-			Str("rate", rate.String()).
-			RawJSON("records", []byte(doubleSigners.String())).
-			RawJSON("slash-applied", []byte(slashApplied.String())).
-			Msg("applied slash successfully")
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
