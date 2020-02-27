@@ -1873,7 +1873,7 @@ func (bc *BlockChain) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardI
 		return err
 	}
 	newLink := oldLink
-	for i := oldLink.BlockNum() + 1;; i++ {
+	for i := oldLink.BlockNum() + 1; ; i++ {
 		tmp, err := bc.ReadCrossLink(shardID, i)
 		if err == nil && tmp != nil && tmp.BlockNum() == i {
 			newLink = tmp
