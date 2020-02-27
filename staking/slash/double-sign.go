@@ -30,7 +30,7 @@ func payDebt(
 	snapshot, current *staking.ValidatorWrapper,
 	slashDebt, payment *big.Int,
 	slashTrack *Application,
-) {
+) error {
 	utils.Logger().Info().
 		RawJSON("snapshot", []byte(snapshot.String())).
 		RawJSON("current", []byte(current.String())).
@@ -43,11 +43,13 @@ func payDebt(
 	if slashDebt.Cmp(common.Big0) == -1 {
 		x1, _ := rlp.EncodeToBytes(snapshot)
 		x2, _ := rlp.EncodeToBytes(current)
-		msg := "slashdebt balance cannot go below zero-" +
-			hex.EncodeToString(x1) +
-			hex.EncodeToString(x2)
-		panic(msg)
+		utils.Logger().Info().
+			Str("snapshot-rlp", hex.EncodeToString(x1)).
+			Str("current-rlp", hex.EncodeToString(x2)).
+			Msg("slashdebt balance cannot go below zero")
+		return errSlashDebtCannotBeNegative
 	}
+	return nil
 }
 
 // Moment ..
@@ -172,15 +174,11 @@ var (
 	errBLSKeysNotEqual = errors.New(
 		"bls keys in ballots accompanying slash evidence not equal ",
 	)
-	errSlashDebtNotFullyAccountedFor = errors.New(
-		"slash debt was not fully accounted for, still non-zero",
-	)
+	errSlashDebtCannotBeNegative    = errors.New("slash debt cannot be negative")
 	errShardIDNotKnown              = errors.New("nil subcommittee for shardID")
 	errValidatorNotFoundDuringSlash = errors.New("validator not found")
 	zero                            = numeric.ZeroDec()
 	oneDoubleSignerRate             = numeric.MustNewDecFromStr("0.02")
-	oneHundredPercent               = numeric.NewDec(1)
-	fiftyPercent                    = numeric.MustNewDecFromStr("0.5")
 )
 
 // applySlashRate returns (amountPostSlash, amountOfReduction, amountOfReduction / 2)
@@ -200,7 +198,7 @@ func delegatorSlashApply(
 ) error {
 	for _, delegationSnapshot := range snapshot.Delegations {
 		slashDebt := applySlashRate(delegationSnapshot.Amount, rate)
-		halfOfSlashDebt := new(big.Int).Div(slashDebt, common.Big2)
+		slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 		snapshotAddr := delegationSnapshot.DelegatorAddress
 		for _, delegationNow := range current.Delegations {
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
@@ -210,26 +208,24 @@ func delegatorSlashApply(
 					Uint64("slash-debt", slashDebt.Uint64()).
 					Str("rate", rate.String()).
 					Msg("attempt to apply slashing based on snapshot amount to current state")
-
-				state.AddBalance(reporter, halfOfSlashDebt)
-				// NOTE only need to pay snitch here
-				slashTrack.TotalSnitchReward.Add(
-					slashTrack.TotalSnitchReward, halfOfSlashDebt,
-				)
 				// Current delegation has some money and slashdebt is still not paid off
 				// so contribute as much as can with current delegation amount
 				if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
 					// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
 					if nowAmt.Cmp(slashDebt) >= 0 {
 						nowAmt.Sub(nowAmt, slashDebt)
-						payDebt(
-							snapshot, current, slashDebt, slashDebt, slashTrack,
-						)
+						if err := payDebt(
+							snapshot, current, slashDebt, slashDebt, slashDiff,
+						); err != nil {
+							return err
+						}
 					} else {
 						// 0.50_amount < 2.4_debt =>, slash == 1.9, nowAmt == 0.0
-						payDebt(
-							snapshot, current, slashDebt, nowAmt, slashTrack,
-						)
+						if err := payDebt(
+							snapshot, current, slashDebt, nowAmt, slashDiff,
+						); err != nil {
+							return err
+						}
 						nowAmt.Sub(nowAmt, nowAmt)
 					}
 				}
@@ -249,24 +245,34 @@ func delegatorSlashApply(
 							newBal := new(big.Int).Sub(undelegate.Amount, slashDebt)
 							undelegate.Amount.Set(newBal)
 							payDebt(
-								snapshot, current, slashDebt, slashDebt, slashTrack,
+								snapshot, current, slashDebt, slashDebt, slashDiff,
 							)
 						}
 					}
 				}
+
+				// NOTE only need to pay snitch here,
+				// they only get half of what was actually dispersed
+				halfOfSlashDebt := new(big.Int).Div(slashDiff.TotalSlashed, common.Big2)
+				state.AddBalance(reporter, halfOfSlashDebt)
+				slashTrack.TotalSnitchReward.Add(
+					slashTrack.TotalSnitchReward, halfOfSlashDebt,
+				)
+				slashTrack.TotalSlashed.Add(
+					slashTrack.TotalSlashed, slashDiff.TotalSlashed,
+				)
 			}
 		}
-
-		if slashDebt.Cmp(common.Big0) != 0 {
+		// after the loops, paid off as much as could
+		if slashDebt.Cmp(common.Big0) == -1 {
 			x1, _ := rlp.EncodeToBytes(snapshot)
 			x2, _ := rlp.EncodeToBytes(current)
 			log := utils.Logger()
-			log.Err(errSlashDebtNotFullyAccountedFor).
-				Str("slash-rate", rate.String()).
+			log.Error().Str("slash-rate", rate.String()).
 				Str("snapshot-rlp", hex.EncodeToString(x1)).
 				Str("current-rlp", hex.EncodeToString(x2)).
 				Msg("slash debt not paid off")
-			return errors.Wrapf(errSlashDebtNotFullyAccountedFor, "amt %v", slashDebt)
+			return errors.Wrapf(errSlashDebtCannotBeNegative, "amt %v", slashDebt)
 		}
 	}
 	return nil
@@ -316,7 +322,7 @@ func Apply(
 		// finally, kick them off forever
 		current.Banned, current.Active = true, false
 
-		if err := state.UpdateStakingInfoWithoutSanityCheck(
+		if err := state.UpdateStakingInfo(
 			snapshot.Address, current,
 		); err != nil {
 			return nil, err

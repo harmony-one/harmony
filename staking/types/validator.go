@@ -168,7 +168,7 @@ func (v *Validator) SanityCheck() error {
 	}
 
 	// MinSelfDelegation must be >= 1 ONE
-	if v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+	if !v.Banned && v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
 		return errors.Wrapf(
 			errMinSelfDelegationTooSmall,
 			"delegation-given %s", v.MinSelfDelegation.String(),
@@ -263,16 +263,10 @@ func (w *ValidatorWrapper) TotalDelegation() *big.Int {
 var (
 	hundredPercent = numeric.NewDec(1)
 	zeroPercent    = numeric.NewDec(0)
-	// ErrSanityCheckNotMeaningfulBanned ..
-	ErrSanityCheckNotMeaningfulBanned = errors.New("can't do sanity check on a banned validator")
 )
 
 // SanityCheck checks the basic requirements
 func (w *ValidatorWrapper) SanityCheck() error {
-	if w.Banned {
-		return ErrSanityCheckNotMeaningfulBanned
-	}
-
 	if err := w.Validator.SanityCheck(); err != nil {
 		return err
 	}
@@ -283,7 +277,7 @@ func (w *ValidatorWrapper) SanityCheck() error {
 			errInvalidSelfDelegation, "no self delegation given at all",
 		)
 	default:
-		if w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
+		if !w.Banned && w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidSelfDelegation,
 				"have %s want %s", w.Delegations[0].Amount.String(), w.Validator.MinSelfDelegation,
