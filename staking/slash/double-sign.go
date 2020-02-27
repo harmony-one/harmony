@@ -29,16 +29,16 @@ const (
 func payDebt(
 	snapshot, current *staking.ValidatorWrapper,
 	slashDebt, payment *big.Int,
-	slashTrack *Application,
+	slashDiff *Application,
 ) error {
 	utils.Logger().Info().
 		RawJSON("snapshot", []byte(snapshot.String())).
 		RawJSON("current", []byte(current.String())).
 		Uint64("slash-debt", slashDebt.Uint64()).
 		Uint64("payment", payment.Uint64()).
-		RawJSON("slash-track", []byte(slashTrack.String())).
+		RawJSON("slash-track", []byte(slashDiff.String())).
 		Msg("slash debt payment before application")
-	slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, payment)
+	slashDiff.TotalSlashed.Add(slashDiff.TotalSlashed, payment)
 	slashDebt.Sub(slashDebt, payment)
 	if slashDebt.Cmp(common.Big0) == -1 {
 		x1, _ := rlp.EncodeToBytes(snapshot)
@@ -188,6 +188,34 @@ func applySlashRate(amount *big.Int, rate numeric.Dec) *big.Int {
 	).Mul(rate).TruncateInt()
 }
 
+func payDownAsMuchAsCan(
+	snapshot, current *staking.ValidatorWrapper,
+	slashDebt, nowAmt *big.Int,
+	slashDiff *Application,
+) error {
+	if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
+		// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
+		if nowAmt.Cmp(slashDebt) >= 0 {
+			nowAmt.Sub(nowAmt, slashDebt)
+			if err := payDebt(
+				snapshot, current, slashDebt, slashDebt, slashDiff,
+			); err != nil {
+				return err
+			}
+		} else {
+			// 0.50_amount < 2.4_debt =>, slash == 1.9, nowAmt == 0.0
+			if err := payDebt(
+				snapshot, current, slashDebt, nowAmt, slashDiff,
+			); err != nil {
+				return err
+			}
+			nowAmt.Sub(nowAmt, nowAmt)
+		}
+	}
+
+	return nil
+}
+
 func delegatorSlashApply(
 	snapshot, current *staking.ValidatorWrapper,
 	rate numeric.Dec,
@@ -210,24 +238,10 @@ func delegatorSlashApply(
 					Msg("attempt to apply slashing based on snapshot amount to current state")
 				// Current delegation has some money and slashdebt is still not paid off
 				// so contribute as much as can with current delegation amount
-				if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
-					// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
-					if nowAmt.Cmp(slashDebt) >= 0 {
-						nowAmt.Sub(nowAmt, slashDebt)
-						if err := payDebt(
-							snapshot, current, slashDebt, slashDebt, slashDiff,
-						); err != nil {
-							return err
-						}
-					} else {
-						// 0.50_amount < 2.4_debt =>, slash == 1.9, nowAmt == 0.0
-						if err := payDebt(
-							snapshot, current, slashDebt, nowAmt, slashDiff,
-						); err != nil {
-							return err
-						}
-						nowAmt.Sub(nowAmt, nowAmt)
-					}
+				if err := payDownAsMuchAsCan(
+					snapshot, current, slashDebt, nowAmt, slashDiff,
+				); err != nil {
+					return err
 				}
 
 				// NOTE Assume did as much as could above, now check the undelegations
@@ -239,14 +253,10 @@ func delegatorSlashApply(
 							// paid off the slash debt
 							break
 						}
-
-						if undelegate.Amount.Cmp(common.Big0) == 1 &&
-							slashDebt.Cmp(common.Big0) == 1 {
-							newBal := new(big.Int).Sub(undelegate.Amount, slashDebt)
-							undelegate.Amount.Set(newBal)
-							payDebt(
-								snapshot, current, slashDebt, slashDebt, slashDiff,
-							)
+						if err := payDownAsMuchAsCan(
+							snapshot, current, slashDebt, nowAmt, slashDiff,
+						); err != nil {
+							return err
 						}
 					}
 				}
