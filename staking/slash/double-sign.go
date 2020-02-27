@@ -253,6 +253,7 @@ func delegatorSlashApply(
 							// paid off the slash debt
 							break
 						}
+						nowAmt := undelegate.Amount
 						if err := payDownAsMuchAsCan(
 							snapshot, current, slashDebt, nowAmt, slashDiff,
 						); err != nil {
