@@ -263,7 +263,11 @@ func (l *txList) Add(tx types.PoolTransaction, priceBump uint64) (bool, types.Po
 	}
 	// Otherwise overwrite the old transaction with the current one
 	l.txs.Put(tx)
-	if cost := tx.Cost(); l.costcap.Cmp(cost) < 0 {
+	cost, err := tx.Cost()
+	if err != nil {
+		return false, nil
+	}
+	if l.costcap.Cmp(cost) < 0 {
 		l.costcap = cost
 	}
 	if gas := tx.Gas(); l.gascap < gas {
@@ -297,7 +301,13 @@ func (l *txList) Filter(costLimit *big.Int, gasLimit uint64) (types.PoolTransact
 	l.gascap = gasLimit
 
 	// Filter out all the transactions above the account's funds
-	removed := l.txs.Filter(func(tx types.PoolTransaction) bool { return tx.Cost().Cmp(costLimit) > 0 || tx.Gas() > gasLimit })
+	removed := l.txs.Filter(func(tx types.PoolTransaction) bool {
+		cost, err := tx.Cost()
+		if err != nil {
+			return true // failure should lead to removal of the tx
+		}
+		return cost.Cmp(costLimit) > 0 || tx.Gas() > gasLimit
+	})
 
 	// If the list was strict, filter anything above the lowest nonce
 	var invalids types.PoolTransactions
