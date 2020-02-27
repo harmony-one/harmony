@@ -309,7 +309,7 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 // CollectAndVerifySlashes ..
 func (w *Worker) CollectAndVerifySlashes() error {
 	allSlashing, err := w.chain.ReadPendingSlashingCandidates()
-	if err != nil && err != core.ErrPreStakingCRUDSlash {
+	if err != nil {
 		return err
 	}
 	if d := allSlashing; len(d) > 0 {

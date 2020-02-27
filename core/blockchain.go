@@ -1921,8 +1921,9 @@ func (bc *BlockChain) DeletePendingSlashingCandidates() error {
 
 // ReadPendingSlashingCandidates retrieves pending slashing candidates
 func (bc *BlockChain) ReadPendingSlashingCandidates() (slash.Records, error) {
+	cls := slash.Records{}
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
-		return nil, ErrPreStakingCRUDSlash
+		return cls, nil
 	}
 	var err error
 	bytes := []byte{}
@@ -1938,20 +1939,12 @@ func (bc *BlockChain) ReadPendingSlashingCandidates() (slash.Records, error) {
 		}
 	}
 
-	cls := slash.Records{}
 	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
 		utils.Logger().Error().Err(err).Msg("Invalid pending slashing candidates RLP decoding")
 		return nil, err
 	}
 	return cls, nil
 }
-
-var (
-	// ErrPreStakingCRUDSlash ..
-	ErrPreStakingCRUDSlash = errors.New(
-		"no pending slashing operations before staking epoch",
-	)
-)
 
 // WritePendingSlashingCandidates saves the pending slashing candidates
 func (bc *BlockChain) WritePendingSlashingCandidates(candidates slash.Records) error {
