@@ -33,8 +33,7 @@ func constructAnnounceMessage(t *testing.T) (*NetworkMessage, error) {
 
 func getConsensusMessage(payload []byte) (*msg_pb.Message, error) {
 	msg := &msg_pb.Message{}
-	err := protobuf.Unmarshal(payload, msg)
-	if err != nil {
+	if err := protobuf.Unmarshal(payload, msg); err != nil {
 		return nil, err
 	}
 	return msg, nil

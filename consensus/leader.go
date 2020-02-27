@@ -252,8 +252,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 										common.Hex2Bytes(doubleSign.SerializeToHexStr()),
 									}},
 								Moment: slash.Moment{
+									// TODO need to extend fbft tro have epoch to use its epoch
+									// rather than curHeader epoch
 									Epoch:        curHeader.Epoch(),
-									Height:       curHeader.Number(),
+									Height:       new(big.Int).SetUint64(recvMsg.BlockNum),
 									ViewID:       consensus.viewID,
 									ShardID:      consensus.ShardID,
 									TimeUnixNano: now,
