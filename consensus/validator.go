@@ -58,7 +58,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) prepare() {
-	networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, nil)
+	networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_PREPARE.String()).
@@ -195,7 +195,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	networkMessage, _ := consensus.construct(
 		msg_pb.MessageType_COMMIT,
 		append(blockNumBytes, consensus.blockHash[:]...),
-		consensus.blockHash[:],
 	)
 	// TODO: genesis account node delay for 1 second,
 	// this is a temp fix for allows FN nodes to earning reward
@@ -214,28 +213,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Uint64("blockNum", consensus.blockNum).
 			Hex("blockHash", consensus.blockHash[:]).
 			Msg("[OnPrepared] Sent Commit Message!!")
-	}
-
-	if consensus.DoDoubleSign {
-		cpy := append(consensus.blockHash[0:0], consensus.blockHash[:]...)
-		cpy[0] = byte(29)
-		networkMsg, _ := consensus.construct(
-			msg_pb.MessageType_COMMIT, append(blockNumBytes, cpy...), cpy,
-		)
-		l := consensus.getLogger().Info().
-			Str("consensus", consensus.String()).
-			Str("double-signed-msg", networkMsg.FBFTMsg.String())
-
-		if err := consensus.msgSender.SendWithoutRetry(
-			[]nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
-			host.ConstructP2pMessage(byte(17), networkMsg.Bytes),
-		); err != nil {
-			l.Err(err).Msg("trouble sending out the double-sign message")
-		} else {
-			l.Msg("successfully sent a double sign, setting .DoubleSign=false")
-			consensus.DoDoubleSign = false
-		}
 	}
 
 	consensus.getLogger().Debug().

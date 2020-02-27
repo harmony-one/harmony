@@ -203,7 +203,7 @@ func (consensus *Consensus) String() string {
 	}
 
 	return fmt.Sprintf(
-		"[Duty:%s Pub:%s Header:%s Num:%d View:%d Shard:%d Epoch:%d DoubleSign:%v]",
+		"[Duty:%s Pub:%s Header:%s Num:%d View:%d Shard:%d Epoch:%d]",
 		duty,
 		consensus.PubKey.SerializeToHexStr(),
 		hex.EncodeToString(consensus.blockHeader),
@@ -211,7 +211,6 @@ func (consensus *Consensus) String() string {
 		consensus.viewID,
 		consensus.ShardID,
 		consensus.epoch,
-		consensus.DoDoubleSign,
 	)
 }
 

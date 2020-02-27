@@ -15,7 +15,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	logger := utils.Logger()
 	logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 	// Construct and broadcast prepared message
-	networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, nil)
+	networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_PREPARED.String()).

@@ -36,7 +36,7 @@ func (consensus *Consensus) populateMessageFields(
 
 // construct is the single creation point of messages intended for the wire.
 func (consensus *Consensus) construct(
-	p msg_pb.MessageType, payloadForSignOverride, blockHash []byte,
+	p msg_pb.MessageType, payloadForSign []byte,
 ) (*NetworkMessage, error) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
@@ -50,17 +50,9 @@ func (consensus *Consensus) construct(
 		aggSig       *bls.Sign
 	)
 
-	// if caller provided no special payload,
-	// then let the blockhash be the default off of consensus
-	if len(payloadForSignOverride) == 0 {
-		consensusMsg = consensus.populateMessageFields(
-			message.GetConsensus(), consensus.blockHash[:],
-		)
-	} else {
-		consensusMsg = consensus.populateMessageFields(
-			message.GetConsensus(), blockHash[:],
-		)
-	}
+	consensusMsg = consensus.populateMessageFields(
+		message.GetConsensus(), consensus.blockHash[:],
+	)
 
 	// Do the signing, 96 byte of bls signature
 	switch p {
@@ -79,7 +71,7 @@ func (consensus *Consensus) construct(
 			consensusMsg.Payload = s.Serialize()
 		}
 	case msg_pb.MessageType_COMMIT:
-		if s := consensus.priKey.SignHash(payloadForSignOverride); s != nil {
+		if s := consensus.priKey.SignHash(payloadForSign); s != nil {
 			consensusMsg.Payload = s.Serialize()
 		}
 	case msg_pb.MessageType_COMMITTED:

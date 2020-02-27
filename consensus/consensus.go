@@ -129,8 +129,6 @@ type Consensus struct {
 	lastBlockReward *big.Int
 	// Have a dedicated reader thread pull from this chan, like in node
 	SlashChan chan slash.Record
-	// only during testing
-	DoDoubleSign bool
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,

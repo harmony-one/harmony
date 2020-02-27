@@ -544,7 +544,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		network, err := consensus.construct(
 			msg_pb.MessageType_COMMIT,
 			append(blockNumHash, consensus.blockHash[:]...),
-			consensus.blockHash[:],
 		)
 		if err != nil {
 			consensus.getLogger().Err(err).Msg("could not create commit message")

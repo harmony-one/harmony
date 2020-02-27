@@ -595,21 +595,6 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 		}()
 	}
 
-	if h := node.NodeConfig.WebHooks.DoubleSigning; h != nil &&
-		h.Malicious != nil &&
-		h.Contains(node.Consensus.PubKey) {
-		go slash.NewMaliciousHandler(func() *slash.ReportResult {
-			epoch := node.Blockchain().CurrentHeader().Epoch()
-			if node.Blockchain().Config().IsStaking(epoch) {
-				utils.Logger().Info().Msg("received trigger to enable double-signing")
-				node.Consensus.DoDoubleSign = true
-				return slash.NewSuccess("enabled double signing on " + node.Consensus.String())
-			}
-			return slash.NewFailure(
-				fmt.Sprintf("Current epoch isn't staking yet %s", node.Consensus.String()),
-			)
-		})
-	}
 	return &node
 }
 

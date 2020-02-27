@@ -67,10 +67,6 @@ go get -u golang.org/x/tools/...
 
 WORKDIR ${HMY_PATH}/harmony
 
-RUN git remote add e https://github.com/fxfactorial/harmony.git && \
-	git fetch e && \
-	git checkout -b double-sign e/double-sign
-
 RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/install_build_tools.sh
 
 RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh
@@ -99,7 +95,7 @@ RUN echo "export BLS_KEY_PATH=$(cat /root/keypath)" >> /root/.bashrc
 
 RUN echo "export BLS_KEY=$(jq '.["public-key"]' -r keys.json)" >> /root/.bashrc
 
-RUN echo "printf '${K1}, ${K2}, ${K3} is funded account for local dev\n\n'" >> /root/.bashrc
+RUN echo "printf '${K1}, ${K2}, ${K3} are imported accounts in hmy for local dev\n\n'" >> /root/.bashrc
 
 RUN echo "printf 'test with: hmy blockchain validator information ${K1}\n\n'" >> /root/.bashrc
 
@@ -109,15 +105,3 @@ RUN echo "echo "$(jq '.["public-key"]' -r keys.json)" is an extern bls key" \
 RUN echo ". /etc/bash_completion" >> /root/.bashrc
 
 RUN echo ". <(hmy completion)" >> /root/.bashrc
-
-COPY scripts/node.sh bin
-
-ENV BOOTNODE_PATH='MEANT_TO_BE_SET_AS_ENV_AT_RUN'
-
-ENV WEBHOOK_YAML='../staking/slash/webhook.example.yaml'
-
-WORKDIR bin
-
-RUN touch blspass
-
-CMD ./node.sh -p blspass -N slashing -z -D

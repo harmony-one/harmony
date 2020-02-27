@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 	"gopkg.in/yaml.v2"
 )
 
@@ -87,16 +86,4 @@ func DoPost(url string, record *Record) (*ReportResult, error) {
 		return nil, err
 	}
 	return &anon, nil
-}
-
-// NewMaliciousHandler ..
-func NewMaliciousHandler(result func() *ReportResult) {
-	http.HandleFunc("/trigger-next-double-sign",
-		func(w http.ResponseWriter, r *http.Request) {
-			json.NewEncoder(w).Encode(result())
-		})
-	if err := http.ListenAndServe(":7777", nil); err != nil {
-		utils.Logger().Err(err).
-			Msg("could not start the http double-sign-trigger listener")
-	}
 }
