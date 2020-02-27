@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -480,8 +481,12 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		}
 	}
 
-	if edit.Active != nil {
-		validator.Active = *edit.Active
+	if edit.Active != nil && *edit.Active != "" {
+		val, err := strconv.ParseBool(*edit.Active)
+		if err != nil {
+			return err
+		}
+		validator.Active = val
 	}
 
 	return nil
