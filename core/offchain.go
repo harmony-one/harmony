@@ -164,12 +164,20 @@ func (bc *BlockChain) CommitOffChainData(
 			if err := bc.WriteCrossLinks(batch, types.CrossLinks{crossLink}); err == nil {
 				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
 			}
-			bc.LastContinuousCrossLink(batch, crossLink)
+
+			cl0, _ := bc.ReadShardLastCrossLink(crossLink.ShardID())
+			if cl0 == nil {
+				rawdb.WriteShardLastCrossLink(batch, crossLink.ShardID(), crossLink.Serialize())
+			}
 		}
 
 		//clean/update local database cache after crosslink inserted into blockchain
 		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
 		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
+	}
+	// Roll up latest crosslinks
+	for i := uint32(0); i < shard.Schedule.InstanceForEpoch(epoch).NumShards(); i++ {
+		bc.LastContinuousCrossLink(batch, i)
 	}
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
