@@ -161,7 +161,7 @@ func IncrementValidatorSigningCounts(
 func SetInactiveUnavailableValidators(
 	bc engine.ChainReader, state *state.DB, ss *shard.State,
 ) error {
-	addrs, err := bc.ReadActiveValidatorList()
+	addrs, err := bc.ReadElectedValidatorList()
 	if err != nil {
 		return err
 	}
