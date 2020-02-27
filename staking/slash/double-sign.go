@@ -262,6 +262,19 @@ func delegatorSlashApply(
 					}
 				}
 
+				// if we still have a slashdebt
+				// even after taking away from delegation amount
+				// and even after taking away from undelegate,
+				// then we need to take from their pending rewards
+				if slashDebt.Cmp(common.Big0) == 1 {
+					nowAmt := delegationNow.Reward
+					if err := payDownAsMuchAsCan(
+						snapshot, current, slashDebt, nowAmt, slashDiff,
+					); err != nil {
+						return err
+					}
+				}
+
 				// NOTE only need to pay snitch here,
 				// they only get half of what was actually dispersed
 				halfOfSlashDebt := new(big.Int).Div(slashDiff.TotalSlashed, common.Big2)
