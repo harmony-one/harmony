@@ -168,7 +168,7 @@ func SetInactiveUnavailableValidators(
 	bc engine.ChainReader, state *state.DB,
 	onlyConsider map[common.Address]struct{},
 ) error {
-	addrs, err := bc.ReadActiveValidatorList()
+	addrs, err := bc.ReadElectedValidatorList()
 	if err != nil {
 		return err
 	}

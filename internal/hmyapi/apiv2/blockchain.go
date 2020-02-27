@@ -516,10 +516,10 @@ func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
 	return addresses, nil
 }
 
-// GetActiveValidatorAddresses returns active validator addresses.
-func (s *PublicBlockChainAPI) GetActiveValidatorAddresses() ([]string, error) {
+// GetElectedValidatorAddresses returns elected validator addresses.
+func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 	addresses := []string{}
-	for _, addr := range s.b.GetActiveValidatorAddresses() {
+	for _, addr := range s.b.GetElectedValidatorAddresses() {
 		oneAddr, _ := internal_common.AddressToBech32(addr)
 		addresses = append(addresses, oneAddr)
 	}

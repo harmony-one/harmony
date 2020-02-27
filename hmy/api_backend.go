@@ -316,9 +316,9 @@ func (b *APIBackend) SendStakingTx(
 	return nil
 }
 
-// GetActiveValidatorAddresses returns the address of active validators for current epoch
-func (b *APIBackend) GetActiveValidatorAddresses() []common.Address {
-	list, _ := b.hmy.BlockChain().ReadActiveValidatorList()
+// GetElectedValidatorAddresses returns the address of elected validators for current epoch
+func (b *APIBackend) GetElectedValidatorAddresses() []common.Address {
+	list, _ := b.hmy.BlockChain().ReadElectedValidatorList()
 	return list
 }
 
