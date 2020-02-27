@@ -20,9 +20,9 @@ const (
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
 	// TestNetHTTPPattern is the http pattern for testnet.
-	TestNetHTTPPattern = "https://api.s%d.ds.hmny.io"
+	TestNetHTTPPattern = "https://api.s%d.os.hmny.io"
 	// TestNetWSPattern is the websocket pattern for testnet.
-	TestNetWSPattern = "wss://ws.s%d.ds.hmny.io"
+	TestNetWSPattern = "wss://ws.s%d.os.hmny.io"
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
