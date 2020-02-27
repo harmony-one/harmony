@@ -19,7 +19,6 @@ package core
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -43,7 +42,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -53,6 +51,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -259,13 +258,17 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
-	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(block, state, bc.vmConfig)
+	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(
+		block, state, bc.vmConfig,
+	)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
 
-	if err := bc.Validator().ValidateState(block, state, receipts, cxReceipts, usedGas); err != nil {
+	if err := bc.Validator().ValidateState(
+		block, state, receipts, cxReceipts, usedGas,
+	); err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
@@ -2171,25 +2174,26 @@ func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, 
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }
 
-// ReadValidatorInformationAt reads staking information of given validatorWrapper at a specific state root
-func (bc *BlockChain) ReadValidatorInformationAt(addr common.Address, root common.Hash) (*staking.ValidatorWrapper, error) {
+// ReadValidatorInformationAt reads staking
+// information of given validatorWrapper at a specific state root
+func (bc *BlockChain) ReadValidatorInformationAt(
+	addr common.Address, root common.Hash,
+) (*staking.ValidatorWrapper, error) {
 	state, err := bc.StateAt(root)
 	if err != nil || state == nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
-	wrapper := state.GetStakingInfo(addr)
-	if wrapper == nil {
-		return nil, fmt.Errorf(
-			"at root: %s, validator info not found: %s",
-			root.Hex(),
-			common2.MustAddressToBech32(addr),
-		)
+	wrapper, err := state.ValidatorWrapper(addr)
+	if err != nil {
+		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
 	return wrapper, nil
 }
 
 // ReadValidatorInformation reads staking information of given validator address
-func (bc *BlockChain) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
+func (bc *BlockChain) ReadValidatorInformation(
+	addr common.Address,
+) (*staking.ValidatorWrapper, error) {
 	return bc.ReadValidatorInformationAt(addr, bc.CurrentBlock().Root())
 }
 
@@ -2356,7 +2360,9 @@ func (bc *BlockChain) ReadActiveValidatorList() ([]common.Address, error) {
 
 // WriteActiveValidatorList writes the list of active validator addresses to database
 // Note: this should only be called within the blockchain insert process.
-func (bc *BlockChain) WriteActiveValidatorList(batch rawdb.DatabaseWriter, addrs []common.Address) error {
+func (bc *BlockChain) WriteActiveValidatorList(
+	batch rawdb.DatabaseWriter, addrs []common.Address,
+) error {
 	err := rawdb.WriteValidatorList(batch, addrs, true)
 	if err != nil {
 		return err
@@ -2394,9 +2400,12 @@ func (bc *BlockChain) writeDelegationsByDelegator(batch rawdb.DatabaseWriter, de
 	return nil
 }
 
-// UpdateStakingMetaData updates the validator's and the delegator's meta data according to staking transaction
+// UpdateStakingMetaData updates the validator's
+// and the delegator's meta data according to staking transaction
 // Note: this should only be called within the blockchain insert process.
-func (bc *BlockChain) UpdateStakingMetaData(batch rawdb.DatabaseWriter, tx *staking.StakingTransaction, root common.Hash) error {
+func (bc *BlockChain) UpdateStakingMetaData(
+	batch rawdb.DatabaseWriter, tx *staking.StakingTransaction, root common.Hash,
+) error {
 	// TODO: simply the logic here in staking/types/transaction.go
 	payload, err := tx.RLPEncodeStakeMsg()
 	if err != nil {
@@ -2427,23 +2436,27 @@ func (bc *BlockChain) UpdateStakingMetaData(batch rawdb.DatabaseWriter, tx *stak
 		}
 
 		// Update validator snapshot with the new validator
-		validator, err := bc.ReadValidatorInformationAt(createValidator.ValidatorAddress, root)
+		validator, err := bc.ReadValidatorInformationAt(
+			createValidator.ValidatorAddress, root,
+		)
 		if err != nil {
 			return err
 		}
-
-		validator.Snapshot.Epoch = epoch
 
 		if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
 			return err
 		}
 
 		// Add self delegation into the index
-		return bc.addDelegationIndex(batch, createValidator.ValidatorAddress, createValidator.ValidatorAddress, root)
+		return bc.addDelegationIndex(
+			batch, createValidator.ValidatorAddress, createValidator.ValidatorAddress, root,
+		)
 	case staking.DirectiveEditValidator:
 	case staking.DirectiveDelegate:
 		delegate := decodePayload.(*staking.Delegate)
-		return bc.addDelegationIndex(batch, delegate.DelegatorAddress, delegate.ValidatorAddress, root)
+		return bc.addDelegationIndex(
+			batch, delegate.DelegatorAddress, delegate.ValidatorAddress, root,
+		)
 	case staking.DirectiveUndelegate:
 	case staking.DirectiveCollectRewards:
 	default:
@@ -2464,7 +2477,9 @@ func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
-func (bc *BlockChain) WriteBlockRewardAccumulator(batch rawdb.DatabaseWriter, reward *big.Int, number uint64) error {
+func (bc *BlockChain) WriteBlockRewardAccumulator(
+	batch rawdb.DatabaseWriter, reward *big.Int, number uint64,
+) error {
 	err := rawdb.WriteBlockRewardAccumulator(batch, reward, number)
 	if err != nil {
 		return err

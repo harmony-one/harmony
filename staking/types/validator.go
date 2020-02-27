@@ -63,9 +63,9 @@ type ValidatorSnapshotReader interface {
 	ReadValidatorSnapshot(common.Address) (*ValidatorWrapper, error)
 }
 
-type snapshot struct {
-	Epoch *big.Int `json:"epoch"`
-	// The number of blocks the validator should've signed when in active mode (selected in committee)
+type counters struct {
+	// The number of blocks the validator
+	// should've signed when in active mode (selected in committee)
 	NumBlocksToSign *big.Int `json:"num-blocks-to-sign",rlp:"nil"`
 	// The number of blocks the validator actually signed
 	NumBlocksSigned *big.Int `json:"num-blocks-signed",rlp:"nil"`
@@ -75,7 +75,7 @@ type snapshot struct {
 type ValidatorWrapper struct {
 	Validator
 	Delegations Delegations
-	Snapshot    snapshot
+	Counters    counters
 }
 
 func (w ValidatorWrapper) String() string {
@@ -89,12 +89,12 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 		Validator
 		Address     string      `json:"address"`
 		Delegations Delegations `json:"delegations"`
-		Snapshot    snapshot    `json:"current-snapshot"`
+		Counters    counters    `json:"availability"`
 	}{
 		w.Validator,
 		common2.MustAddressToBech32(w.Address),
 		w.Delegations,
-		w.Snapshot,
+		w.Counters,
 	})
 }
 

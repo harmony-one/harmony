@@ -15,7 +15,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -256,7 +255,7 @@ func (e *engineImpl) Finalize(
 	doubleSigners slash.Records,
 ) (*types.Block, *big.Int, error) {
 
-	// Accumulate any block and uncle rewards and commit the final state root
+	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewards(
 		chain, state, header, e.Rewarder(), e.Beaconchain(),
@@ -277,7 +276,13 @@ func (e *engineImpl) Finalize(
 		}
 		// Payout undelegated/unlocked tokens
 		for _, validator := range validators {
-			wrapper := state.GetStakingInfo(validator)
+			wrapper, err := state.ValidatorWrapper(validator)
+			if err != nil {
+				return nil, nil, ctxerror.New(
+					"[Finalize] failed to get validator from state to finalize",
+				).WithCause(err)
+			}
+
 			if wrapper != nil {
 				for i := range wrapper.Delegations {
 					delegation := &wrapper.Delegations[i]
@@ -286,29 +291,37 @@ func (e *engineImpl) Finalize(
 					)
 					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 				}
-				if err := state.UpdateStakingInfo(validator, wrapper); err != nil {
+				if err := state.UpdateValidatorWrapper(
+					validator, wrapper,
+				); err != nil {
 					return nil, nil, ctxerror.New("[Finalize] failed update validator info").WithCause(err)
 				}
-			} else {
-				err := errors.New(
-					"[Finalize] validator came back empty " + common2.MustAddressToBech32(validator),
-				)
-				return nil, nil, ctxerror.New("[Finalize] failed getting validator info").WithCause(err)
 			}
 		}
 
-		// Set the LastEpochInCommittee field for all external validators in the upcoming epoch.
 		newShardState, err := header.GetShardState()
 		if err != nil {
 			return nil, nil, ctxerror.New("[Finalize] failed to read shard state").WithCause(err)
 		}
-		for _, external := range newShardState.ExternalValidators() {
-			wrapper := state.GetStakingInfo(external)
-			wrapper.LastEpochInCommittee = newShardState.Epoch
-			if err := state.UpdateStakingInfo(external, wrapper); err != nil {
-				return nil, nil, ctxerror.New(
-					"[Finalize] failed update validator info",
-				).WithCause(err)
+
+		if count, _, addrs, _ := newShardState.StakedValidators(); count > 0 {
+			for _, addr := range addrs {
+				wrapper, err := state.ValidatorWrapper(addr)
+				if err != nil {
+					return nil, nil, err
+				}
+				// Set the LastEpochInCommittee field for all
+				// external validators in the upcoming epoch.
+				// and set the availability tracking counters to 0
+				wrapper.LastEpochInCommittee = newShardState.Epoch
+				wrapper.Counters.NumBlocksSigned.SetInt64(0)
+				wrapper.Counters.NumBlocksToSign.SetInt64(0)
+
+				if err := state.UpdateValidatorWrapper(addr, wrapper); err != nil {
+					return nil, nil, ctxerror.New(
+						"[Finalize] failed update validator info",
+					).WithCause(err)
+				}
 			}
 		}
 	}
@@ -319,70 +332,56 @@ func (e *engineImpl) Finalize(
 		Uint64("block-number", header.Number().Uint64())
 
 	if isBeaconChain && inStakingEra {
-		header := chain.CurrentHeader()
-		superCommittee, err := chain.ReadShardState(header.Epoch())
-		processed := make(map[common.Address]struct{})
+		superCommittee, err := chain.ReadShardState(
+			chain.CurrentHeader().Epoch(),
+		)
+		count, externalSubset, _, _ := superCommittee.StakedValidators()
 
-		if err != nil {
-			return nil, nil, err
-		}
+		// could happen that only harmony nodes are running,
+		// so just early return
+		if count > 0 {
+			l.RawJSON("external", []byte(externalSubset.String())).
+				Msg("have non-zero external ")
 
-		for j := range superCommittee.Shards {
-			shard := superCommittee.Shards[j]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-					}
+			if err != nil {
+				return nil, nil, err
+			}
+
+			l.Msg("bumping validator signing counts")
+			if err := availability.IncrementValidatorSigningCounts(
+				chain, header, header.ShardID(), state, externalSubset,
+			); err != nil {
+				return nil, nil, err
+			}
+
+			if isNewEpoch {
+				l.Msg("in new epoch (aka last block), apply availability check for activity")
+				if err := availability.SetInactiveUnavailableValidators(
+					chain, state, externalSubset,
+				); err != nil {
+					return nil, nil, err
 				}
 			}
 		}
-
-		l.Msg("bumping validator signing counts")
-		if err := availability.IncrementValidatorSigningCounts(
-			chain, header, header.ShardID(), state, processed,
-		); err != nil {
-			return nil, nil, err
-		}
-
-		if isNewEpoch {
-			l.Msg("in new epoch, apply availability check for activity")
-			if err := availability.Apply(chain, state); err != nil {
-				return nil, nil, err
-			}
-		}
-
 	}
 
-	if isBeaconChain && inStakingEra && len(doubleSigners) > 0 {
+	if caught := len(
+		doubleSigners,
+	); isBeaconChain && inStakingEra && caught > 0 {
 		superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
-		processed := make(map[common.Address]struct{})
 
 		if err != nil {
 			return nil, nil, errors.New("could not read shard state")
 		}
-		for j := range superCommittee.Shards {
-			shard := superCommittee.Shards[j]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-					}
-				}
-			}
-		}
 
+		totalCountStakedValidatrs, _, _, _ := superCommittee.StakedValidators()
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
-		rate := slash.Rate(len(doubleSigners), len(processed))
-		l.Str("rate", rate.String()).
-			RawJSON("records", []byte(doubleSigners.String())).
-			RawJSON("slash-applied", []byte(slashApplied.String())).
-			Msg("applied slash successfully")
+		rate := slash.Rate(caught, totalCountStakedValidatrs)
+		lg := l.Str("rate", rate.String()).
+			RawJSON("records", []byte(doubleSigners.String()))
+
+		lg.Msg("now applying slash to state during block finalization")
 		if slashApplied, err = slash.Apply(
 			chain,
 			state,
@@ -391,6 +390,10 @@ func (e *engineImpl) Finalize(
 		); err != nil {
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
+
+		lg.RawJSON("applied", []byte(slashApplied.String())).
+			Msg("slash applied successfully")
+
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))

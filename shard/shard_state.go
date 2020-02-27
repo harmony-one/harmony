@@ -136,28 +136,43 @@ func EncodeWrapper(shardState State, isStaking bool) ([]byte, error) {
 	return data, err
 }
 
-// ExternalValidators returns only the staking era,
-// external validators aka non-harmony nodes
-func (ss *State) ExternalValidators() []common.Address {
-	processed := make(map[common.Address]struct{})
+// StakedValidators filters for non-harmony operated nodes,
+// returns (
+//   totalStakedValidatorsCount, stateSubset,
+//   addrsOnNetworkSlice, addrsOnNetworkSet,
+// )
+func (ss *State) StakedValidators() (
+	int, *State, []common.Address, map[common.Address]struct{},
+) {
+	onlyExternal := &State{
+		Epoch:  ss.Epoch,
+		Shards: make([]Committee, len(ss.Shards)),
+	}
+
+	count := 0
+	networkWideSlice, networkWideSet :=
+		[]common.Address{},
+		map[common.Address]struct{}{}
+
 	for i := range ss.Shards {
 		shard := ss.Shards[i]
 		for j := range shard.Slots {
+			onlyExternal.Shards[i].ShardID = shard.ShardID
+			onlyExternal.Shards[i].Slots = SlotList{}
 			slot := shard.Slots[j]
-			if slot.EffectiveStake != nil { // For external validator
-				_, ok := processed[slot.EcdsaAddress]
-				if !ok {
-					processed[slot.EcdsaAddress] = struct{}{}
-				}
+			// an external validator,
+			// non-nil EffectiveStake is how we known
+			if slot.EffectiveStake != nil {
+				count++
+				onlyExternal.Shards[i].Slots = append(
+					onlyExternal.Shards[i].Slots, slot,
+				)
+				networkWideSet[slot.EcdsaAddress] = struct{}{}
 			}
 		}
 	}
-	slice, i := make([]common.Address, len(processed)), 0
-	for key := range processed {
-		slice[i] = key
-		i++
-	}
-	return slice
+
+	return count, onlyExternal, networkWideSlice, networkWideSet
 }
 
 // String produces a non-pretty printed JSON string of the SuperCommittee

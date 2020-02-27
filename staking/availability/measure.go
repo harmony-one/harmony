@@ -110,29 +110,26 @@ func BallotResult(
 
 func bumpCount(
 	chain engine.ChainReader,
-	state *state.DB, onlyConsider map[common.Address]struct{},
+	state *state.DB,
 	signers shard.SlotList, didSign bool,
 ) error {
-	epoch := chain.CurrentHeader().Epoch()
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
-		if _, ok := onlyConsider[addr]; !ok {
-			continue
-		}
-		wrapper, err := chain.ReadValidatorInformation(addr)
+		wrapper, err := state.ValidatorWrapper(addr)
 		if err != nil {
 			return err
 		}
-		wrapper.Snapshot.NumBlocksToSign.Add(
-			wrapper.Snapshot.NumBlocksToSign, common.Big1,
+		wrapper.Counters.NumBlocksToSign.Add(
+			wrapper.Counters.NumBlocksToSign, common.Big1,
 		)
 		if didSign {
-			wrapper.Snapshot.NumBlocksSigned.Add(
-				wrapper.Snapshot.NumBlocksSigned, common.Big1,
+			wrapper.Counters.NumBlocksSigned.Add(
+				wrapper.Counters.NumBlocksSigned, common.Big1,
 			)
 		}
-		wrapper.Snapshot.Epoch = epoch
-		if err := state.UpdateStakingInfo(addr, wrapper); err != nil {
+		if err := state.UpdateValidatorWrapper(
+			addr, wrapper,
+		); err != nil {
 			return err
 		}
 	}
@@ -142,20 +139,17 @@ func bumpCount(
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
 	chain engine.ChainReader, header *block.Header,
-	shardID uint32, state *state.DB, onlyConsider map[common.Address]struct{},
+	shardID uint32, state *state.DB, ss *shard.State,
 ) error {
 	_, signers, missing, err := BallotResult(chain, header, shardID)
 
 	if err != nil {
 		return err
 	}
-	if err := bumpCount(chain, state, onlyConsider, signers, true); err != nil {
+	if err := bumpCount(chain, state, signers, true); err != nil {
 		return err
 	}
-	if err := bumpCount(chain, state, onlyConsider, missing, false); err != nil {
-		return err
-	}
-	return nil
+	return bumpCount(chain, state, missing, false)
 }
 
 // SetInactiveUnavailableValidators sets the validator to
@@ -164,8 +158,7 @@ func IncrementValidatorSigningCounts(
 // whenever committee selection happens in future, the
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
-	bc engine.ChainReader, state *state.DB,
-	onlyConsider map[common.Address]struct{},
+	bc engine.ChainReader, state *state.DB, ss *shard.State,
 ) error {
 	addrs, err := bc.ReadActiveValidatorList()
 	if err != nil {
@@ -175,26 +168,23 @@ func SetInactiveUnavailableValidators(
 	now := bc.CurrentHeader().Epoch()
 	for i := range addrs {
 
-		if _, ok := onlyConsider[addrs[i]]; !ok {
-			continue
-		}
-
 		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
 
 		if err != nil {
 			return err
 		}
 
-		wrapper, err := bc.ReadValidatorInformation(addrs[i])
+		wrapper, err := state.ValidatorWrapper(addrs[i])
 
 		if err != nil {
 			return err
 		}
 
-		stats := wrapper.Snapshot
-		snapEpoch := snapshot.Snapshot.Epoch
-		snapSigned := snapshot.Snapshot.NumBlocksSigned
-		snapToSign := snapshot.Snapshot.NumBlocksToSign
+		stats, snapEpoch, snapSigned, snapToSign :=
+			wrapper.Counters,
+			snapshot.LastEpochInCommittee,
+			snapshot.Counters.NumBlocksSigned,
+			snapshot.Counters.NumBlocksToSign
 
 		if d := new(big.Int).Sub(now, snapEpoch); d.Cmp(common.Big1) != 0 {
 			return errors.Wrapf(
@@ -226,7 +216,7 @@ func SetInactiveUnavailableValidators(
 
 		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
 			wrapper.Active = false
-			if err := state.UpdateStakingInfo(addrs[i], wrapper); err != nil {
+			if err := state.UpdateValidatorWrapper(addrs[i], wrapper); err != nil {
 				return err
 			}
 		}

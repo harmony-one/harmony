@@ -355,11 +355,10 @@ func Apply(
 			)
 		}
 
-		current := state.GetStakingInfo(slash.Offender)
-		if current == nil {
-			addr := common2.MustAddressToBech32(slash.Offender)
+		current, err := state.ValidatorWrapper(slash.Offender)
+		if err != nil {
 			return nil, errors.Wrapf(
-				errValidatorNotFoundDuringSlash, "lookup %s", addr,
+				errValidatorNotFoundDuringSlash, " %s ", err.Error(),
 			)
 		}
 		// NOTE invariant: first delegation is the validators own
@@ -379,7 +378,7 @@ func Apply(
 			RawJSON("slash", []byte(slash.String())).
 			Msg("about to update staking info for a validator after a slash")
 
-		if err := state.UpdateStakingInfo(
+		if err := state.UpdateValidatorWrapper(
 			snapshot.Address, current,
 		); err != nil {
 			return nil, err
