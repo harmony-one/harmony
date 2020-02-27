@@ -56,7 +56,6 @@ func VerifyAndCreateValidatorFromMsg(
 		staking.NewDelegation(v.Address, msg.Amount),
 	}
 	zero := big.NewInt(0)
-	wrapper.LastEpochInCommittee = epoch
 	wrapper.Counters.NumBlocksSigned = zero
 	wrapper.Counters.NumBlocksToSign = zero
 	if err := wrapper.SanityCheck(); err != nil {
