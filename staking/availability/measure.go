@@ -10,12 +10,13 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
 var (
-	measure                    = new(big.Int).Div(big.NewInt(2), big.NewInt(3))
+	measure                    = new(big.Int).Div(common.Big2, common.Big3)
 	errValidatorEpochDeviation = errors.New(
 		"validator snapshot epoch not exactly one epoch behind",
 	)
@@ -167,9 +168,7 @@ func SetInactiveUnavailableValidators(
 
 	now := bc.CurrentHeader().Epoch()
 	for i := range addrs {
-
 		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
-
 		if err != nil {
 			return err
 		}
@@ -186,6 +185,12 @@ func SetInactiveUnavailableValidators(
 			snapshot.Counters.NumBlocksSigned,
 			snapshot.Counters.NumBlocksToSign
 
+		l := utils.Logger().Info().
+			RawJSON("snapshot", []byte(snapshot.String())).
+			RawJSON("current", []byte(wrapper.String()))
+
+		l.Msg("begin checks for availability")
+
 		if d := new(big.Int).Sub(now, snapEpoch); d.Cmp(common.Big1) != 0 {
 			return errors.Wrapf(
 				errValidatorEpochDeviation, "bc %s, snapshot %s",
@@ -193,8 +198,9 @@ func SetInactiveUnavailableValidators(
 			)
 		}
 
-		signed := new(big.Int).Sub(stats.NumBlocksSigned, snapSigned)
-		toSign := new(big.Int).Sub(stats.NumBlocksToSign, snapToSign)
+		signed, toSign :=
+			new(big.Int).Sub(stats.NumBlocksSigned, snapSigned),
+			new(big.Int).Sub(stats.NumBlocksToSign, snapToSign)
 
 		if signed.Sign() == -1 {
 			return errors.Wrapf(
@@ -216,10 +222,13 @@ func SetInactiveUnavailableValidators(
 
 		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
 			wrapper.Active = false
+			l.Str("threshold", measure.String()).
+				Msg("validator failed availability threshold, set to inactive")
 			if err := state.UpdateValidatorWrapper(addrs[i], wrapper); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }
