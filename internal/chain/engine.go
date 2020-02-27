@@ -278,7 +278,7 @@ func (e *engineImpl) Finalize(
 	if isBeaconChain && isNewEpoch && inStakingEra {
 		validators, err := chain.ReadValidatorList()
 		if err != nil {
-			return nil, nil, ctxerror.New("[Finalize] failed to read active validators").WithCause(err)
+			return nil, nil, ctxerror.New("[Finalize] failed to read all validators").WithCause(err)
 		}
 		// Payout undelegated/unlocked tokens
 		for _, validator := range validators {

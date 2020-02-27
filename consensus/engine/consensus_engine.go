@@ -44,8 +44,8 @@ type ChainReader interface {
 	// Thus, only should be used to read the shard state of the current chain.
 	ReadShardState(epoch *big.Int) (*shard.State, error)
 
-	// ReadActiveValidatorList retrieves the list of active validators
-	ReadActiveValidatorList() ([]common.Address, error)
+	// ReadElectedValidatorList retrieves the list of elected validators
+	ReadElectedValidatorList() ([]common.Address, error)
 
 	// ReadValidatorList retrieves the list of all validators
 	ReadValidatorList() ([]common.Address, error)

@@ -2328,9 +2328,9 @@ func (bc *BlockChain) WriteValidatorList(db rawdb.DatabaseWriter, addrs []common
 	return nil
 }
 
-// ReadActiveValidatorList reads the addresses of active validators
-func (bc *BlockChain) ReadActiveValidatorList() ([]common.Address, error) {
-	if cached, ok := bc.validatorListCache.Get("activeValidatorList"); ok {
+// ReadElectedValidatorList reads the addresses of elected validators
+func (bc *BlockChain) ReadElectedValidatorList() ([]common.Address, error) {
+	if cached, ok := bc.validatorListCache.Get("electedValidatorList"); ok {
 		by := cached.([]byte)
 		m := []common.Address{}
 		if err := rlp.DecodeBytes(by, &m); err != nil {
@@ -2341,16 +2341,16 @@ func (bc *BlockChain) ReadActiveValidatorList() ([]common.Address, error) {
 	return rawdb.ReadValidatorList(bc.db, true)
 }
 
-// WriteActiveValidatorList writes the list of active validator addresses to database
+// WriteElectedValidatorList writes the list of elected validator addresses to database
 // Note: this should only be called within the blockchain insert process.
-func (bc *BlockChain) WriteActiveValidatorList(batch rawdb.DatabaseWriter, addrs []common.Address) error {
+func (bc *BlockChain) WriteElectedValidatorList(batch rawdb.DatabaseWriter, addrs []common.Address) error {
 	err := rawdb.WriteValidatorList(batch, addrs, true)
 	if err != nil {
 		return err
 	}
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err == nil {
-		bc.validatorListCache.Add("activeValidatorList", bytes)
+		bc.validatorListCache.Add("electedValidatorList", bytes)
 	}
 	return nil
 }
