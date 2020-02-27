@@ -150,7 +150,7 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 func (node *Node) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key))
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		return make([]common.Hash, 0), nil
 	}
