@@ -15,7 +15,7 @@ type testnetSchedule struct{}
 
 const (
 	// 10 minutes per epoch (at 8s/block)
-	testnetBlocksPerEpoch = 75
+	testnetBlocksPerEpoch = 30
 
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
