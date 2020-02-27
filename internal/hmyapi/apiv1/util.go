@@ -16,20 +16,21 @@ const (
 	defaultPageSize = uint32(100)
 )
 
-// ReturnWithPagination returns result with pagination (offset, page in TxHistoryArgs).
-func ReturnWithPagination(hashes []common.Hash, args TxHistoryArgs) []common.Hash {
+// ReturnPagination returns pagination params.
+func ReturnPagination(length int, args TxHistoryArgs) (int, TxHistoryArgs) {
 	pageSize := defaultPageSize
 	pageIndex := args.PageIndex
 	if args.PageSize > 0 {
 		pageSize = args.PageSize
 	}
-	if uint64(pageSize)*uint64(pageIndex) >= uint64(len(hashes)) {
-		return make([]common.Hash, 0)
+	if uint64(pageSize)*uint64(pageIndex) >= uint64(length) {
+		args.PageSize = 0
+		return 0, args
 	}
-	if uint64(pageSize)*uint64(pageIndex)+uint64(pageSize) > uint64(len(hashes)) {
-		return hashes[pageSize*pageIndex:]
+	if uint64(pageSize)*uint64(pageIndex)+uint64(pageSize) > uint64(length) {
+		return length, args
 	}
-	return hashes[pageSize*pageIndex : pageSize*pageIndex+pageSize]
+	return int(pageSize*pageIndex + pageSize), args
 }
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.

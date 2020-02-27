@@ -74,6 +74,7 @@ type Backend interface {
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
 	GetPendingCrossLinks() []*block.Header
 	GetPendingCXReceipts() []*types.CXReceiptsProof
+	GetCrossShardTransactionsHistory(address string) ([]types.CrossShardTx, error)
 }
 
 // GetAPIs returns all the APIs.

@@ -222,8 +222,12 @@ func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blo
 
 // GetTransactionsHistory returns list of transactions hashes of address.
 func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
-	return hashes, err
+	return b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
+}
+
+// GetCrossShardTransactionsHistory returns list of cross shard transactions.
+func (b *APIBackend) GetCrossShardTransactionsHistory(address string) ([]types.CrossShardTx, error) {
+	return b.hmy.nodeAPI.GetCrossShardTransactionsHistory(address)
 }
 
 // NetVersion returns net version
