@@ -169,7 +169,7 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	if _, err := decider.SetVoters(committee.Slots); err != nil {
 		return ctxerror.New("[VerifyCrossLink] Cannot SetVoters for committee", "shardID", cl.ShardID())
 	}
-	if !decider.IsQuorumAchievedByMask(mask, false) {
+	if !decider.IsQuorumAchievedByMask(mask) {
 		return ctxerror.New("[VerifyCrossLink] Not enough voting power for crosslink", "shardID", cl.ShardID())
 	}
 
