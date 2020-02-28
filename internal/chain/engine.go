@@ -282,46 +282,18 @@ func (e *engineImpl) Finalize(
 					"[Finalize] failed to get validator from state to finalize",
 				).WithCause(err)
 			}
-
-			if wrapper != nil {
-				for i := range wrapper.Delegations {
-					delegation := &wrapper.Delegations[i]
-					totalWithdraw := delegation.RemoveUnlockedUndelegations(
-						header.Epoch(), wrapper.LastEpochInCommittee,
-					)
-					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
-				}
-				if err := state.UpdateValidatorWrapper(
-					validator, wrapper,
-				); err != nil {
-					return nil, nil, ctxerror.New("[Finalize] failed update validator info").WithCause(err)
-				}
+			for i := range wrapper.Delegations {
+				delegation := &wrapper.Delegations[i]
+				totalWithdraw := delegation.RemoveUnlockedUndelegations(
+					header.Epoch(), wrapper.LastEpochInCommittee,
+				)
+				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 			}
-		}
-
-		newShardState, err := header.GetShardState()
-		if err != nil {
-			return nil, nil, ctxerror.New("[Finalize] failed to read shard state").WithCause(err)
-		}
-
-		if stkd := newShardState.StakedValidators(); stkd.CountStakedValidator > 0 {
-			for _, addr := range stkd.Addrs {
-				wrapper, err := state.ValidatorWrapper(addr)
-				if err != nil {
-					return nil, nil, err
-				}
-				// Set the LastEpochInCommittee field for all
-				// external validators in the upcoming epoch.
-				// and set the availability tracking counters to 0
-				wrapper.LastEpochInCommittee = newShardState.Epoch
-				wrapper.Counters.NumBlocksSigned.SetInt64(0)
-				wrapper.Counters.NumBlocksToSign.SetInt64(0)
-
-				if err := state.UpdateValidatorWrapper(addr, wrapper); err != nil {
-					return nil, nil, ctxerror.New(
-						"[Finalize] failed update validator info",
-					).WithCause(err)
-				}
+			if err := state.UpdateValidatorWrapper(
+				validator, wrapper,
+			); err != nil {
+				const msg = "[Finalize] failed update validator info"
+				return nil, nil, ctxerror.New(msg).WithCause(err)
 			}
 		}
 	}
@@ -336,12 +308,10 @@ func (e *engineImpl) Finalize(
 			chain.CurrentHeader().Epoch(),
 		)
 		staked := superCommittee.StakedValidators()
-
 		// could happen that only harmony nodes are running,
-		// so just early return
 		if staked.CountStakedValidator > 0 {
 			l.RawJSON("external", []byte(staked.StateSubset.String())).
-				Msg("have non-zero external ")
+				Msg("have non-zero external")
 
 			if err != nil {
 				return nil, nil, err
@@ -360,6 +330,33 @@ func (e *engineImpl) Finalize(
 					chain, state,
 				); err != nil {
 					return nil, nil, err
+				}
+				// Now can reset the counters, do note, only
+				// after the availability logic runs
+				newShardState, err := header.GetShardState()
+				if err != nil {
+					const msg = "[Finalize] failed to read shard state"
+					return nil, nil, ctxerror.New(msg).WithCause(err)
+				}
+
+				if stkd := newShardState.StakedValidators(); stkd.CountStakedValidator > 0 {
+					for _, addr := range stkd.Addrs {
+						wrapper, err := state.ValidatorWrapper(addr)
+						if err != nil {
+							return nil, nil, err
+						}
+						// Set the LastEpochInCommittee field for all
+						// external validators in the upcoming epoch.
+						// and set the availability tracking counters to 0
+						wrapper.LastEpochInCommittee = newShardState.Epoch
+						wrapper.Counters.NumBlocksSigned.SetInt64(0)
+						wrapper.Counters.NumBlocksToSign.SetInt64(0)
+						if err := state.UpdateValidatorWrapper(addr, wrapper); err != nil {
+							return nil, nil, ctxerror.New(
+								"[Finalize] failed update validator info",
+							).WithCause(err)
+						}
+					}
 				}
 			}
 		}
