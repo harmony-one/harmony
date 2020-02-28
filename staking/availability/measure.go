@@ -203,6 +203,11 @@ func SetInactiveUnavailableValidators(
 
 		l.Msg("begin checks for availability")
 
+		if snapEpoch.Cmp(common.Big0) == 0 {
+			l.Msg("pass newly joined validator for inactivity check")
+			continue
+		}
+
 		if d := new(big.Int).Sub(now, snapEpoch); d.Cmp(common.Big1) != 0 {
 			return errors.Wrapf(
 				errValidatorEpochDeviation, "bc %s, snapshot %s",
