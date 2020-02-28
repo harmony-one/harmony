@@ -56,6 +56,15 @@ type Committee struct {
 	Slots   SlotList `json:"subcommittee"`
 }
 
+func (l SlotList) String() string {
+	blsKeys := make([]string, len(l))
+	for i, k := range l {
+		blsKeys[i] = k.BlsPublicKey.Hex()
+	}
+	s, _ := json.Marshal(blsKeys)
+	return string(s)
+}
+
 /* Legacy
 These are the pre-staking used data-structures, needed to maintain
 compatibilty for RLP decode/encode

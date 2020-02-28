@@ -164,9 +164,15 @@ func IncrementValidatorSigningCounts(
 ) error {
 	l := utils.Logger().Info().Str("candidate-header", header.String())
 	_, signers, missing, err := BallotResult(chain, header, shardID)
+
 	if err != nil {
 		return err
 	}
+
+	l.RawJSON("signers", []byte(signers.String())).
+		RawJSON("missing", []byte(missing.String())).
+		Msg("signers that did sign")
+
 	l.Msg("bumping signing counters for non-missing signers")
 	if err := bumpCount(
 		chain, state, signers, true, stakedAddrSet,
@@ -246,7 +252,8 @@ func SetInactiveUnavailableValidators(
 		}
 
 		if toSign.Cmp(common.Big0) == 0 {
-			return ErrDivByZero
+			l.Msg("toSign is 0, perhaps did not receive crosslink proving signing")
+			continue
 		}
 
 		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
