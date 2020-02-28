@@ -116,9 +116,9 @@ func bumpCount(
 	didSign bool,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
+	l := utils.Logger().Info()
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
-
 		// NOTE if the signer address is not part of the staked addrs,
 		// then it must be a harmony operated node running,
 		// hence keep on going
@@ -130,14 +130,23 @@ func bumpCount(
 		if err != nil {
 			return err
 		}
+
+		l.RawJSON("validator", []byte(wrapper.String())).
+			Msg("about to adjust counters")
+
 		wrapper.Counters.NumBlocksToSign.Add(
 			wrapper.Counters.NumBlocksToSign, common.Big1,
 		)
+
 		if didSign {
 			wrapper.Counters.NumBlocksSigned.Add(
 				wrapper.Counters.NumBlocksSigned, common.Big1,
 			)
 		}
+
+		l.RawJSON("validator", []byte(wrapper.String())).
+			Msg("bumped signing counters")
+
 		if err := state.UpdateValidatorWrapper(
 			addr, wrapper,
 		); err != nil {
@@ -153,15 +162,18 @@ func IncrementValidatorSigningCounts(
 	shardID uint32, state *state.DB,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
+	l := utils.Logger().Info().Str("candidate-header", header.String())
 	_, signers, missing, err := BallotResult(chain, header, shardID)
 	if err != nil {
 		return err
 	}
+	l.Msg("bumping signing counters for non-missing signers")
 	if err := bumpCount(
 		chain, state, signers, true, stakedAddrSet,
 	); err != nil {
 		return err
 	}
+	l.Msg("bumping missed signing counter ")
 	return bumpCount(chain, state, missing, false, stakedAddrSet)
 }
 
@@ -191,7 +203,7 @@ func SetInactiveUnavailableValidators(
 			return err
 		}
 
-		stats, snapEpoch, snapSigned, snapToSign :=
+		statsNow, snapEpoch, snapSigned, snapToSign :=
 			wrapper.Counters,
 			snapshot.LastEpochInCommittee,
 			snapshot.Counters.NumBlocksSigned,
@@ -216,20 +228,20 @@ func SetInactiveUnavailableValidators(
 		}
 
 		signed, toSign :=
-			new(big.Int).Sub(stats.NumBlocksSigned, snapSigned),
-			new(big.Int).Sub(stats.NumBlocksToSign, snapToSign)
+			new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
+			new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
 
 		if signed.Sign() == -1 {
 			return errors.Wrapf(
 				errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
-				stats.NumBlocksSigned.String(), snapSigned.String(),
+				statsNow.NumBlocksSigned.String(), snapSigned.String(),
 			)
 		}
 
 		if toSign.Sign() == -1 {
 			return errors.Wrapf(
 				errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
-				stats.NumBlocksToSign.String(), snapToSign.String(),
+				statsNow.NumBlocksToSign.String(), snapToSign.String(),
 			)
 		}
 

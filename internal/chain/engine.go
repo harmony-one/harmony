@@ -336,9 +336,7 @@ func (e *engineImpl) Finalize(
 			chain.CurrentHeader().Epoch(),
 		)
 		staked := superCommittee.StakedValidators()
-
 		// could happen that only harmony nodes are running,
-		// so just early return
 		if staked.CountStakedValidator > 0 {
 			l.RawJSON("external", []byte(staked.StateSubset.String())).
 				Msg("have non-zero external ")
