@@ -282,21 +282,18 @@ func (e *engineImpl) Finalize(
 					"[Finalize] failed to get validator from state to finalize",
 				).WithCause(err)
 			}
-
-			if wrapper != nil {
-				for i := range wrapper.Delegations {
-					delegation := &wrapper.Delegations[i]
-					totalWithdraw := delegation.RemoveUnlockedUndelegations(
-						header.Epoch(), wrapper.LastEpochInCommittee,
-					)
-					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
-				}
-				if err := state.UpdateValidatorWrapper(
-					validator, wrapper,
-				); err != nil {
-					const msg = "[Finalize] failed update validator info"
-					return nil, nil, ctxerror.New(msg).WithCause(err)
-				}
+			for i := range wrapper.Delegations {
+				delegation := &wrapper.Delegations[i]
+				totalWithdraw := delegation.RemoveUnlockedUndelegations(
+					header.Epoch(), wrapper.LastEpochInCommittee,
+				)
+				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
+			}
+			if err := state.UpdateValidatorWrapper(
+				validator, wrapper,
+			); err != nil {
+				const msg = "[Finalize] failed update validator info"
+				return nil, nil, ctxerror.New(msg).WithCause(err)
 			}
 		}
 	}
