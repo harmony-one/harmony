@@ -60,7 +60,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 	if err != nil {
 		return nil, err
 	}
-	result = ReturnWithPagination(hashes, args)
+	result = ReturnWithPagination(hashes, args.PageIndex, args.PageSize)
 	if !args.FullTx {
 		return map[string]interface{}{"transactions": result}, nil
 	}

@@ -176,3 +176,34 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 	}
 	return hashes, nil
 }
+
+// GetStakingTransactionsHistory returns list of staking transactions hashes of address.
+func (node *Node) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+	addressData := &explorer.Address{}
+	key := explorer.GetAddressKey(address)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key))
+	if err != nil {
+		return make([]common.Hash, 0), nil
+	}
+	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
+		return nil, err
+	}
+	if order == "DESC" {
+		sort.Slice(addressData.TXs[:], func(i, j int) bool {
+			return addressData.TXs[i].Timestamp > addressData.TXs[j].Timestamp
+		})
+	} else {
+		sort.Slice(addressData.TXs[:], func(i, j int) bool {
+			return addressData.TXs[i].Timestamp < addressData.TXs[j].Timestamp
+		})
+	}
+	hashes := make([]common.Hash, 0)
+	for _, tx := range addressData.TXs {
+		if txType == "" || txType == "ALL" || txType == tx.Type {
+			hash := common.HexToHash(tx.ID)
+			hashes = append(hashes, hash)
+		}
+	}
+	return hashes, nil
+}
