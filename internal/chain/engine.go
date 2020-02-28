@@ -304,8 +304,8 @@ func (e *engineImpl) Finalize(
 			return nil, nil, ctxerror.New("[Finalize] failed to read shard state").WithCause(err)
 		}
 
-		if count, _, addrs, _ := newShardState.StakedValidators(); count > 0 {
-			for _, addr := range addrs {
+		if stkd := newShardState.StakedValidators(); stkd.CountStakedValidator > 0 {
+			for _, addr := range stkd.Addrs {
 				wrapper, err := state.ValidatorWrapper(addr)
 				if err != nil {
 					return nil, nil, err
@@ -335,12 +335,12 @@ func (e *engineImpl) Finalize(
 		superCommittee, err := chain.ReadShardState(
 			chain.CurrentHeader().Epoch(),
 		)
-		count, externalSubset, _, _ := superCommittee.StakedValidators()
+		staked := superCommittee.StakedValidators()
 
 		// could happen that only harmony nodes are running,
 		// so just early return
-		if count > 0 {
-			l.RawJSON("external", []byte(externalSubset.String())).
+		if staked.CountStakedValidator > 0 {
+			l.RawJSON("external", []byte(staked.StateSubset.String())).
 				Msg("have non-zero external ")
 
 			if err != nil {
@@ -349,7 +349,7 @@ func (e *engineImpl) Finalize(
 
 			l.Msg("bumping validator signing counts")
 			if err := availability.IncrementValidatorSigningCounts(
-				chain, header, header.ShardID(), state, externalSubset,
+				chain, header, header.ShardID(), state, staked.LookupSet,
 			); err != nil {
 				return nil, nil, err
 			}
@@ -357,7 +357,7 @@ func (e *engineImpl) Finalize(
 			if isNewEpoch {
 				l.Msg("in new epoch (aka last block), apply availability check for activity")
 				if err := availability.SetInactiveUnavailableValidators(
-					chain, state, externalSubset,
+					chain, state,
 				); err != nil {
 					return nil, nil, err
 				}
@@ -374,10 +374,10 @@ func (e *engineImpl) Finalize(
 			return nil, nil, errors.New("could not read shard state")
 		}
 
-		totalCountStakedValidatrs, _, _, _ := superCommittee.StakedValidators()
+		staked := superCommittee.StakedValidators()
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
-		rate := slash.Rate(caught, totalCountStakedValidatrs)
+		rate := slash.Rate(caught, staked.CountStakedBLSKey)
 		lg := l.Str("rate", rate.String()).
 			RawJSON("records", []byte(doubleSigners.String()))
 

@@ -112,7 +112,9 @@ func BallotResult(
 func bumpCount(
 	chain engine.ChainReader,
 	state *state.DB,
-	signers shard.SlotList, didSign bool,
+	signers shard.SlotList,
+	didSign bool,
+	stakedAddrSet map[common.Address]struct{},
 ) error {
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
@@ -140,17 +142,19 @@ func bumpCount(
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
 	chain engine.ChainReader, header *block.Header,
-	shardID uint32, state *state.DB, ss *shard.State,
+	shardID uint32, state *state.DB,
+	stakedAddrSet map[common.Address]struct{},
 ) error {
 	_, signers, missing, err := BallotResult(chain, header, shardID)
-
 	if err != nil {
 		return err
 	}
-	if err := bumpCount(chain, state, signers, true); err != nil {
+	if err := bumpCount(
+		chain, state, signers, true, stakedAddrSet,
+	); err != nil {
 		return err
 	}
-	return bumpCount(chain, state, missing, false)
+	return bumpCount(chain, state, missing, false, stakedAddrSet)
 }
 
 // SetInactiveUnavailableValidators sets the validator to
@@ -159,7 +163,7 @@ func IncrementValidatorSigningCounts(
 // whenever committee selection happens in future, the
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
-	bc engine.ChainReader, state *state.DB, ss *shard.State,
+	bc engine.ChainReader, state *state.DB,
 ) error {
 	addrs, err := bc.ReadElectedValidatorList()
 	if err != nil {

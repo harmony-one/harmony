@@ -136,20 +136,28 @@ func EncodeWrapper(shardState State, isStaking bool) ([]byte, error) {
 	return data, err
 }
 
+// StakedSlots gives overview of subset of shard state that is
+// coming via an stake, that is, view epos
+type StakedSlots struct {
+	CountStakedValidator int
+	CountStakedBLSKey    int
+	StateSubset          *State
+	Addrs                []common.Address
+	LookupSet            map[common.Address]struct{}
+}
+
 // StakedValidators filters for non-harmony operated nodes,
 // returns (
-//   totalStakedValidatorsCount, stateSubset,
-//   addrsOnNetworkSlice, addrsOnNetworkSet,
+//   totalStakedValidatorsCount, totalStakedBLSKeys,
+//   stateSubset, addrsOnNetworkSlice, addrsOnNetworkSet,
 // )
-func (ss *State) StakedValidators() (
-	int, *State, []common.Address, map[common.Address]struct{},
-) {
+func (ss *State) StakedValidators() *StakedSlots {
 	onlyExternal := &State{
 		Epoch:  ss.Epoch,
 		Shards: make([]Committee, len(ss.Shards)),
 	}
 
-	count := 0
+	countStakedValidator, countStakedBLSKey := 0, 0
 	networkWideSlice, networkWideSet :=
 		[]common.Address{},
 		map[common.Address]struct{}{}
@@ -162,17 +170,28 @@ func (ss *State) StakedValidators() (
 			slot := shard.Slots[j]
 			// an external validator,
 			// non-nil EffectiveStake is how we known
-			if slot.EffectiveStake != nil {
-				count++
+			if addr := slot.EcdsaAddress; slot.EffectiveStake != nil {
+				countStakedBLSKey++
 				onlyExternal.Shards[i].Slots = append(
 					onlyExternal.Shards[i].Slots, slot,
 				)
-				networkWideSet[slot.EcdsaAddress] = struct{}{}
+
+				if _, seen := networkWideSet[addr]; !seen {
+					countStakedValidator++
+					networkWideSet[addr] = struct{}{}
+					networkWideSlice = append(networkWideSlice, addr)
+				}
 			}
 		}
 	}
 
-	return count, onlyExternal, networkWideSlice, networkWideSet
+	return &StakedSlots{
+		CountStakedValidator: countStakedValidator,
+		CountStakedBLSKey:    countStakedBLSKey,
+		StateSubset:          onlyExternal,
+		Addrs:                networkWideSlice,
+		LookupSet:            networkWideSet,
+	}
 }
 
 // String produces a non-pretty printed JSON string of the SuperCommittee
