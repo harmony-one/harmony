@@ -11,8 +11,8 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -96,15 +96,54 @@ func Test_CV3(t *testing.T) {
 	}
 }
 
-// Test CV4: identity longer than 140 characters
-func Test_CV4(t *testing.T) {
+// Test CV5: identity longer than 140 characters
+func Test_CV5(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	// identity length: 200 characters 
+	// identity length: 200 characters
 	msg.Identity = "adsfwryuiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfhuewhfiuewhfefhshfrhfhifhwbfvberhbvihfwuoefhusioehfeuwiafhaiobcfwfhceirui"
 	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
-	lengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Identity), "maxIdentityLen", staking.MaxIdentityLength)
-	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != lengthError.Error() {
-		t.Error("expected", lengthError, "got", err)
+	identitylengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Identity), "maxIdentityLen", staking.MaxIdentityLength)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != identitylengthError.Error() {
+		t.Error("expected", identitylengthError, "got", err)
+	}
+}
+
+// Test CV6: website longer than 140 characters
+func Test_CV6(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	// Website length: 200 characters
+	msg.Website = "https://www.iwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceirui.com"
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	websiteLengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Website), "maxWebsiteLen", staking.MaxWebsiteLength)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != websiteLengthError.Error() {
+		t.Error("expected", websiteLengthError, "got", err)
+	}
+}
+
+// Test CV7: security contact longer than 140 characters
+func Test_CV7(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	// Website length: 200 characters
+	msg.SecurityContact = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdf"
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	securityContactLengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.SecurityContact), "maxSecurityContactLen", staking.MaxWebsiteLength)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != securityContactLengthError.Error() {
+		t.Error("expected", securityContactLengthError, "got", err)
+	}
+}
+
+// Test CV8: details longer than 280 characters
+func Test_CV8(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	// Website length: 200 characters
+	msg.Details = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdfjiusngognoherugbounviesrbgufhuoshcofwevusguahferhgvuervurehniwjvseivusehvsghjvorsugjvsiovjpsevsvvvvv"
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	detailsLenError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Details), "maxDetailsLen", staking.MaxDetailsLength)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != detailsLenError.Error() {
+		t.Error("expected", detailsLenError, "got", err)
 	}
 }
