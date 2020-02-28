@@ -282,6 +282,11 @@ func delegatorSlashApply(
 						); err != nil {
 							return err
 						}
+
+						if nowAmt.Cmp(common.Big0) == 0 {
+							// TODO need to remove the undelegate
+							l.Msg("delegation amount after paying slash debt is 0")
+						}
 					}
 				}
 
