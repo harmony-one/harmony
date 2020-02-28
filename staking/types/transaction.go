@@ -172,8 +172,31 @@ func (tx *StakingTransaction) GasPrice() *big.Int {
 }
 
 // Cost ..
-func (tx *StakingTransaction) Cost() *big.Int {
-	return new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
+func (tx *StakingTransaction) Cost() (*big.Int, error) {
+	total := new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
+	switch tx.StakingType() {
+	case DirectiveCreateValidator:
+		msg, err := RLPDecodeStakeMsg(tx.Data(), DirectiveCreateValidator)
+		if err != nil {
+			return nil, err
+		}
+		stkMsg, ok := msg.(*CreateValidator)
+		if !ok {
+			return nil, errStakingTransactionTypeCastErr
+		}
+		total.Add(total, stkMsg.Amount)
+	case DirectiveDelegate:
+		msg, err := RLPDecodeStakeMsg(tx.Data(), DirectiveDelegate)
+		if err != nil {
+			return nil, err
+		}
+		stkMsg, ok := msg.(*CreateValidator)
+		if !ok {
+			return nil, errStakingTransactionTypeCastErr
+		}
+		total.Add(total, stkMsg.Amount)
+	}
+	return total, nil
 }
 
 // ChainID is what chain this staking transaction for
