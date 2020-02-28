@@ -110,7 +110,6 @@ func BallotResult(
 }
 
 func bumpCount(
-	chain engine.ChainReader,
 	state *state.DB,
 	signers shard.SlotList,
 	didSign bool,
@@ -158,29 +157,24 @@ func bumpCount(
 
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
-	chain engine.ChainReader, header *block.Header,
-	shardID uint32, state *state.DB,
-	stakedAddrSet map[common.Address]struct{},
+	staked *shard.StakedSlots,
+	state *state.DB,
+	signers, missing shard.SlotList,
 ) error {
-	l := utils.Logger().Info().Str("candidate-header", header.String())
-	_, signers, missing, err := BallotResult(chain, header, shardID)
-
-	if err != nil {
-		return err
-	}
-
+	l := utils.Logger().Info()
 	l.RawJSON("signers", []byte(signers.String())).
 		RawJSON("missing", []byte(missing.String())).
 		Msg("signers that did sign")
 
 	l.Msg("bumping signing counters for non-missing signers")
+
 	if err := bumpCount(
-		chain, state, signers, true, stakedAddrSet,
+		state, signers, true, staked.LookupSet,
 	); err != nil {
 		return err
 	}
 	l.Msg("bumping missed signing counter ")
-	return bumpCount(chain, state, missing, false, stakedAddrSet)
+	return bumpCount(state, missing, false, staked.LookupSet)
 }
 
 // SetInactiveUnavailableValidators sets the validator to

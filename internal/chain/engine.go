@@ -240,7 +240,10 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	lastCommitPayload := append(blockNumHash, parentHash[:]...)
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
-		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature from last block", "lastBlockNum", header.Number().Uint64()-1, "lastBlockHash", parentHash)
+		const msg = "[VerifySeal] Unable to verify aggregated signature from last block"
+		return ctxerror.New(
+			msg, "lastBlockNum", header.Number().Uint64()-1, "lastBlockHash", parentHash,
+		)
 	}
 	return nil
 }
@@ -254,7 +257,6 @@ func (e *engineImpl) Finalize(
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
 	doubleSigners slash.Records,
 ) (*types.Block, *big.Int, error) {
-
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewards(
@@ -272,7 +274,8 @@ func (e *engineImpl) Finalize(
 	if isBeaconChain && isNewEpoch && inStakingEra {
 		validators, err := chain.ReadValidatorList()
 		if err != nil {
-			return nil, nil, ctxerror.New("[Finalize] failed to read all validators").WithCause(err)
+			const msg = "[Finalize] failed to read all validators"
+			return nil, nil, ctxerror.New(msg).WithCause(err)
 		}
 		// Payout undelegated/unlocked tokens
 		for _, validator := range validators {
@@ -310,19 +313,13 @@ func (e *engineImpl) Finalize(
 		staked := superCommittee.StakedValidators()
 		// could happen that only harmony nodes are running,
 		if staked.CountStakedValidator > 0 {
-			l.RawJSON("external", []byte(staked.StateSubset.String())).
-				Msg("have non-zero external")
+			l.Msg("have non-zero external")
 
 			if err != nil {
 				return nil, nil, err
 			}
 
 			l.Msg("bumping validator signing counts")
-			if err := availability.IncrementValidatorSigningCounts(
-				chain, header, header.ShardID(), state, staked.LookupSet,
-			); err != nil {
-				return nil, nil, err
-			}
 
 			if isNewEpoch {
 				l.Msg("in new epoch (aka last block), apply availability check for activity")
