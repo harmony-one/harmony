@@ -71,11 +71,11 @@ var (
 	cxReceiptSpentPrefix             = []byte("cxReceiptSpent")             // prefix for indicator of unspent of cxReceiptsProof
 	cxReceiptUnspentCheckpointPrefix = []byte("cxReceiptUnspentCheckpoint") // prefix for cxReceiptsProof unspent checkpoint
 
-	validatorPrefix         = []byte("validator")             // prefix for staking validator information
-	validatorSnapshotPrefix = []byte("validator-snapshot")    // prefix for staking validator's snapshot information
-	validatorStatsPrefix    = []byte("validator-stats")       // prefix for staking validator's stats information
-	validatorListKey        = []byte("validator-list")        // key for all validators list
-	activeValidatorListKey  = []byte("active-validator-list") // key for active validators list
+	validatorPrefix         = []byte("validator")              // prefix for staking validator information
+	validatorSnapshotPrefix = []byte("validator-snapshot")     // prefix for staking validator's snapshot information
+	validatorStatsPrefix    = []byte("validator-stats")        // prefix for staking validator's stats information
+	validatorListKey        = []byte("validator-list")         // key for all validators list
+	electedValidatorListKey = []byte("elected-validator-list") // key for elected validators list
 
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())

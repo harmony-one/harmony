@@ -75,6 +75,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 
 	genesisAlloc := make(core.GenesisAlloc)
 	chainConfig := *params.TestnetChainConfig
+	gasLimit := params.GenesisGasLimit
 
 	switch node.NodeConfig.GetNetworkType() {
 	case nodeconfig.Mainnet:
@@ -89,7 +90,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	default: // all other types share testnet config
 		// Test accounts
 		node.AddTestingAddresses(genesisAlloc, TestAccountNumber)
-
+		gasLimit = params.TestGenesisGasLimit
 		// Smart contract deployer account used to deploy initial smart contract
 		contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
 		contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
@@ -104,7 +105,7 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		Factory:        blockfactory.NewFactory(&chainConfig),
 		Alloc:          genesisAlloc,
 		ShardID:        shardID,
-		GasLimit:       params.GenesisGasLimit,
+		GasLimit:       gasLimit,
 		ShardStateHash: myShardState.Hash(),
 		ShardState:     *myShardState.DeepCopy(),
 		Timestamp:      1561734000, // GMT: Friday, June 28, 2019 3:00:00 PM. PST: Friday, June 28, 2019 8:00:00 AM

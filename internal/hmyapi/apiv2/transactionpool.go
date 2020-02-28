@@ -172,6 +172,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr
 
 // SendTransaction creates a transaction for the given argument, sign it and submit it to the
 // transaction pool.
+// NOTE: This api is for regular txns only, not staking txns.
 func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: args.From}

@@ -280,7 +280,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				return
 			}
 
-			if !consensus.Decider.IsQuorumAchievedByMask(mask, true) {
+			if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 				consensus.getLogger().Warn().
 					Msgf("[onViewChange] Quorum Not achieved")
 				return
@@ -347,7 +347,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		Msg("[onViewChange]")
 
 	// received enough view change messages, change state to normal consensus
-	if consensus.Decider.IsQuorumAchievedByMask(consensus.viewIDBitmap[recvMsg.ViewID], true) {
+	if consensus.Decider.IsQuorumAchievedByMask(consensus.viewIDBitmap[recvMsg.ViewID]) {
 		consensus.current.SetMode(Normal)
 		consensus.LeaderPubKey = consensus.PubKey
 		consensus.ResetState()
@@ -374,14 +374,14 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 			// Leader sign and add commit message
-			blockNumBytes := make([]byte, 8)
-			binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
-			commitPayload := append(blockNumBytes, consensus.blockHash[:]...)
+			blockNumBytes := [8]byte{}
+			binary.LittleEndian.PutUint64(blockNumBytes[:], consensus.blockNum)
+			commitPayload := append(blockNumBytes[:], consensus.blockHash[:]...)
 			consensus.Decider.SubmitVote(
 				quorum.Commit,
 				consensus.PubKey,
 				consensus.priKey.SignHash(commitPayload),
-				nil,
+				common.BytesToHash(consensus.blockHash[:]),
 			)
 
 			if err = consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
@@ -398,7 +398,16 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Int("payloadSize", len(consensus.m1Payload)).
 			Hex("M1Payload", consensus.m1Payload).
 			Msg("[onViewChange] Sent NewView Message")
-		consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_NEWVIEW, []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+		if err := consensus.msgSender.SendWithRetry(
+			consensus.blockNum,
+			msg_pb.MessageType_NEWVIEW,
+			[]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+			host.ConstructP2pMessage(byte(17), msgToSend),
+		); err != nil {
+			consensus.getLogger().Err(err).
+				Msg("could not send out the NEWVIEW message")
+		}
 
 		consensus.viewID = recvMsg.ViewID
 		consensus.ResetViewChangeState()
@@ -446,7 +455,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 
-	if !consensus.Decider.IsQuorumAchievedByMask(m3Mask, true) {
+	if !consensus.Decider.IsQuorumAchievedByMask(m3Mask) {
 		consensus.getLogger().Warn().
 			Msgf("[onNewView] Quorum Not achieved")
 		return

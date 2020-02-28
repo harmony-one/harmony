@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -121,7 +120,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 					pendingStakingTxs = append(pendingStakingTxs, stakingTx)
 				}
 			} else {
-				utils.Logger().Err(types.ErrUnknownPoolTxType).Msg("Failed to parse pending transactions")
+				utils.Logger().Err(types.ErrUnknownPoolTxType).
+					Msg("Failed to parse pending transactions")
 				return nil, types.ErrUnknownPoolTxType
 			}
 		}
@@ -145,14 +145,16 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
-	// Prepare cross links
-	var (
-		slashingToPropose   []slash.Record
-		crossLinksToPropose types.CrossLinks
-	)
+	// Prepare cross links and slashings messages
+	var crossLinksToPropose types.CrossLinks
 
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
-		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
+	isBeaconchainInCrossLinkEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch())
+
+	isBeaconchainInStakingEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
+		node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch())
+
+	if isBeaconchainInCrossLinkEra {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
 
 		if err == nil {
@@ -166,9 +168,22 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 				}
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
-			utils.Logger().Debug().Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
+			utils.Logger().Debug().
+				Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
+					len(crossLinksToPropose), len(allPending),
+				)
 		} else {
-			utils.Logger().Error().Err(err).Msgf("[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
+			utils.Logger().Error().Err(err).Msgf(
+				"[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
+				len(allPending),
+			)
+		}
+	}
+
+	if isBeaconchainInStakingEra {
+		// this one will set a meaningful w.current.slashes
+		if err := node.Worker.CollectAndVerifySlashes(); err != nil {
+			return nil, err
 		}
 	}
 
@@ -186,10 +201,10 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 		return nil, err
 	}
+
 	return node.Worker.FinalizeNewBlock(
 		sig, mask, node.Consensus.GetViewID(),
 		coinbase, crossLinksToPropose, shardState,
-		slashingToPropose,
 	)
 }
 

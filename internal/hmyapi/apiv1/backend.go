@@ -49,6 +49,7 @@ type Backend interface {
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
+
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
@@ -61,6 +62,7 @@ type Backend interface {
 	// Stats() (pending int, queued int)
 	// TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
+
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
 	// Get balance
@@ -76,10 +78,10 @@ type Backend interface {
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
 
-	// Staking related tx pool apis
-	GetActiveValidatorAddresses() []common.Address
+	// Staking related apis
+	GetElectedValidatorAddresses() []common.Address
 	GetAllValidatorAddresses() []common.Address
-	GetValidatorInformation(addr common.Address) *staking.Validator
+	GetValidatorInformation(addr common.Address) *staking.ValidatorWrapper
 	GetValidatorStats(addr common.Address) *staking.ValidatorStats
 	GetDelegationsByValidator(validator common.Address) []*staking.Delegation
 	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)

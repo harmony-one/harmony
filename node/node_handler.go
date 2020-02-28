@@ -154,7 +154,8 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						Msg("block sync")
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
-					if node.Blockchain().ShardID() != 0 && node.NodeConfig.Role() != nodeconfig.ExplorerNode {
+					if node.Blockchain().ShardID() != shard.BeaconChainShardID &&
+						node.NodeConfig.Role() != nodeconfig.ExplorerNode {
 						for _, block := range blocks {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
@@ -241,23 +242,15 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // BroadcastSlash ..
 func (node *Node) BroadcastSlash(witness *slash.Record) {
-	// no point to broadcast the crosslink if we aren't even in the right epoch yet
-	if !node.Blockchain().Config().IsCrossLink(
-		node.Blockchain().CurrentHeader().Epoch(),
-	) {
-		return
-	}
-
-	// Send it to beaconchain if I'm shardchain, otherwise just add it to pending
-	if node.NodeConfig.ShardID != shard.BeaconChainShardID {
-		node.host.SendMessageToGroups(
-			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-			host.ConstructP2pMessage(
-				byte(0),
-				proto_node.ConstructSlashMessage(witness)),
-		)
-	} else {
-		node.Blockchain().AddPendingSlashingCandidate(witness)
+	if err := node.host.SendMessageToGroups(
+		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
+		host.ConstructP2pMessage(
+			byte(0),
+			proto_node.ConstructSlashMessage(slash.Records{*witness})),
+	); err != nil {
+		utils.Logger().Err(err).
+			RawJSON("record", []byte(witness.String())).
+			Msg("could not send slash record to beaconchain")
 	}
 }
 

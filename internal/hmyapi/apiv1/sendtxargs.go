@@ -26,8 +26,6 @@ type SendTxArgs struct {
 	Input *hexutil.Bytes `json:"input"`
 }
 
-// TODO SendStakingTxArgs for SubmitStakingTransaction
-
 // setDefaults is a helper function that fills in default values for unspecified tx fields.
 func (args *SendTxArgs) setDefaults(ctx context.Context, b Backend) error {
 	if args.Gas == nil {

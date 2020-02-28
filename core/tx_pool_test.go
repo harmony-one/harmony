@@ -47,6 +47,10 @@ var (
 	testTxPoolConfig TxPoolConfig
 	testBLSPubKey    = "30b2c38b1316da91e068ac3bd8751c0901ef6c02a1d58bc712104918302c6ed03d5894671d0c816dad2b4d303320f202"
 	testBLSPrvKey    = "c6d7603520311f7a4e6aac0b26701fc433b75b38df504cd416ef2b900cd66205"
+
+	gasPrice = big.NewInt(1e9)
+	gasLimit = big.NewInt(int64(params.TxGasValidatorCreation))
+	cost     = big.NewInt(1).Mul(gasPrice, gasLimit)
 )
 
 func init() {
@@ -334,6 +338,8 @@ func TestCreateValidatorTransaction(t *testing.T) {
 	}
 	senderAddr, _ := stx.SenderAddress()
 	pool.currentState.AddBalance(senderAddr, big.NewInt(1e18))
+	// Add additional create validator tx cost
+	pool.currentState.AddBalance(senderAddr, cost)
 
 	err = pool.AddRemote(stx)
 	if err != nil {
@@ -358,6 +364,8 @@ func TestMixedTransactions(t *testing.T) {
 	}
 	stxAddr, _ := stx.SenderAddress()
 	pool.currentState.AddBalance(stxAddr, big.NewInt(1e18))
+	// Add additional create validator tx cost
+	pool.currentState.AddBalance(stxAddr, cost)
 
 	goodFromKey, _ := crypto.GenerateKey()
 	tx := transaction(0, 0, 25000, goodFromKey)
