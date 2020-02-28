@@ -216,7 +216,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 			return nil, nil
 		})
 		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
-		if !d.IsQuorumAchievedByMask(mask, true) {
+		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
 			)
@@ -349,8 +349,6 @@ func (e *engineImpl) Finalize(
 						// external validators in the upcoming epoch.
 						// and set the availability tracking counters to 0
 						wrapper.LastEpochInCommittee = newShardState.Epoch
-						wrapper.Counters.NumBlocksSigned.SetInt64(0)
-						wrapper.Counters.NumBlocksToSign.SetInt64(0)
 						if err := state.UpdateValidatorWrapper(addr, wrapper); err != nil {
 							return nil, nil, ctxerror.New(
 								"[Finalize] failed update validator info",
@@ -454,7 +452,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			return nil, nil
 		})
 		d.SetVoters(slotList.FindCommitteeByID(header.ShardID()).Slots)
-		if !d.IsQuorumAchievedByMask(mask, true) {
+		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in commitSignature from Block Header",
 			)

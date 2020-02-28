@@ -72,22 +72,11 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool {
+func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	threshold := v.QuorumThreshold()
 	currentTotalPower := v.computeTotalPowerByMask(mask)
 	if currentTotalPower == nil {
-		if debug { // temp for remove debug info on crosslink verification
-			utils.Logger().Warn().
-				Msgf("[IsQuorumAchievedByMask] currentTotalPower is nil")
-		}
 		return false
-	}
-	if debug {
-		utils.Logger().Info().
-			Str("policy", v.Policy().String()).
-			Str("threshold", threshold.String()).
-			Str("total-power-of-signers", currentTotalPower.String()).
-			Msg("[IsQuorumAchievedByMask] Checking quorum")
 	}
 	return (*currentTotalPower).GT(threshold)
 }
