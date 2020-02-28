@@ -29,8 +29,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/rlp"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/staking/slash"
 
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
@@ -308,6 +310,9 @@ func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
 		panic(err)
 	}
 	rawdb.WriteBlockRewardAccumulator(db, big.NewInt(0), 0)
+	data, _ := rlp.EncodeToBytes([]slash.Record{})
+	rawdb.WritePendingSlashingCandidates(db, data)
+
 	return block
 }
 

@@ -73,7 +73,7 @@ type Backend interface {
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
 	GetElectedValidatorAddresses() []common.Address
 	GetAllValidatorAddresses() []common.Address
-	GetValidatorInformation(addr common.Address) *staking.Validator
+	GetValidatorInformation(addr common.Address) *staking.ValidatorWrapper
 	GetValidatorStats(addr common.Address) *staking.ValidatorStats
 	GetDelegationsByValidator(validator common.Address) []*staking.Delegation
 	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)

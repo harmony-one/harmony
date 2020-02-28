@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -328,10 +329,10 @@ func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
 }
 
 // GetValidatorInformation returns the information of validator
-func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.Validator {
+func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.ValidatorWrapper {
 	val, _ := b.hmy.BlockChain().ReadValidatorInformation(addr)
 	if val != nil {
-		return &val.Validator
+		return val
 	}
 	return nil
 }
@@ -389,7 +390,8 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() *big.Int {
 func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	b.TotalStakingCache.Lock()
 	defer b.TotalStakingCache.Unlock()
-	if b.TotalStakingCache.BlockHeight != -1 && b.TotalStakingCache.BlockHeight > int64(rpc.LatestBlockNumber)-20 {
+	if b.TotalStakingCache.BlockHeight != -1 &&
+		b.TotalStakingCache.BlockHeight > int64(rpc.LatestBlockNumber)-20 {
 		return b.TotalStakingCache.TotalStaking
 	}
 	b.TotalStakingCache.BlockHeight = int64(rpc.LatestBlockNumber)
@@ -401,6 +403,9 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	stakes := big.NewInt(0)
 	for i := range candidates {
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
+		if !effective.IsEligibleForEPOSAuction(validator) {
+			continue
+		}
 		for i := range validator.Delegations {
 			stakes.Add(stakes, validator.Delegations[i].Amount)
 		}
@@ -429,7 +434,9 @@ func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*stak
 }
 
 // GetDelegationsByDelegator returns all delegation information of a delegator
-func (b *APIBackend) GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation) {
+func (b *APIBackend) GetDelegationsByDelegator(
+	delegator common.Address,
+) ([]common.Address, []*staking.Delegation) {
 	addresses := []common.Address{}
 	delegations := []*staking.Delegation{}
 	delegationIndexes, err := b.hmy.BlockChain().ReadDelegationsByDelegator(delegator)
@@ -438,7 +445,9 @@ func (b *APIBackend) GetDelegationsByDelegator(delegator common.Address) ([]comm
 	}
 
 	for i := range delegationIndexes {
-		wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(delegationIndexes[i].ValidatorAddress)
+		wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(
+			delegationIndexes[i].ValidatorAddress,
+		)
 		if err != nil || wrapper == nil {
 			return nil, nil
 		}
@@ -511,20 +520,22 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		shardID := comm.ShardID
 		decider.SetShardIDProvider(func() (uint32, error) {
-			return comm.ShardID, nil
+			return shardID, nil
 		})
 		decider.SetVoters(comm.Slots)
-		then.Deciders[comm.ShardID] = decider
+		then.Deciders[shardID] = decider
 	}
 
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		shardID := comm.ShardID
 		decider.SetShardIDProvider(func() (uint32, error) {
-			return comm.ShardID, nil
+			return shardID, nil
 		})
 		decider.SetVoters(comm.Slots)
-		now.Deciders[comm.ShardID] = decider
+		now.Deciders[shardID] = decider
 	}
 
 	return &quorum.Transition{then, now}, nil

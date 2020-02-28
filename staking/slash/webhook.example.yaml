@@ -1,0 +1,4 @@
+web-hooks:
+  # node will call these webhooks
+  notice-double-sign: http://localhost:5430/on-notice-double-sign
+  this-node-double-signed: http://localhost:5430/on-this-node-double-signed

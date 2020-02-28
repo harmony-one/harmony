@@ -17,10 +17,12 @@ ENV GIMME_GO_VERSION="1.13.6"
 ENV PATH="/root/bin:${PATH}"
 
 RUN apt install libgmp-dev libssl-dev curl git \
-jq make gcc g++ bash tig tree sudo vim \
-silversearcher-ag unzip emacs-nox bash-completion -y
+psmisc dnsutils jq make gcc g++ bash tig tree sudo vim \
+silversearcher-ag unzip emacs-nox nano bash-completion -y
 
-RUN mkdir ~/bin && curl -sL -o ~/bin/gimme https://raw.githubusercontent.com/travis-ci/gimme/master/gimme
+RUN mkdir ~/bin && \
+	curl -sL -o ~/bin/gimme \
+	https://raw.githubusercontent.com/travis-ci/gimme/master/gimme
 
 RUN chmod +x ~/bin/gimme
 
@@ -71,9 +73,34 @@ RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh
 
 RUN cd ${HMY_PATH}/go-sdk && make -j8 && cp hmy /root/bin
 
-RUN echo ". /etc/bash_completion" >> /root/.profile
+ARG K1=one1tq4hy947c9gr8qzv06yxz4aeyhc9vn78al4rmu
+ARG K2=one1y5gmmzumajkm5mx3g2qsxtza2d3haq0zxyg47r
+ARG K3=one1qrqcfek6sc29sachs3glhs4zny72mlad76lqcp
 
-RUN echo ". <(hmy completion)" >> /root/.profile
+ARG KS1=8d222cffa99eb1fb86c581d9dfe7d60dd40ec62aa29056b7ff48028385270541
+ARG KS2=da1800da5dedf02717696675c7a7e58383aff90b1014dfa1ab5b7bd1ce3ef535
+ARG KS3=f4267bb5a2f0e65b8f5792bb6992597fac2b35ebfac9885ce0f4152c451ca31a
+
+RUN hmy keys import-private-key ${KS1}
+
+RUN hmy keys import-private-key ${KS2}
+
+RUN hmy keys import-private-key ${KS3}
+
+RUN hmy keys generate-bls-key > keys.json 
+
+RUN jq  '.["encrypted-private-key-path"]' -r keys.json > /root/keypath && cp keys.json /root
+
+RUN echo "export BLS_KEY_PATH=$(cat /root/keypath)" >> /root/.bashrc
+
+RUN echo "export BLS_KEY=$(jq '.["public-key"]' -r keys.json)" >> /root/.bashrc
+
+RUN echo "printf '${K1}, ${K2}, ${K3} are imported accounts in hmy for local dev\n\n'" >> /root/.bashrc
+
+RUN echo "printf 'test with: hmy blockchain validator information ${K1}\n\n'" >> /root/.bashrc
+
+RUN echo "echo "$(jq '.["public-key"]' -r keys.json)" is an extern bls key" \
+	>> /root/.bashrc
 
 RUN echo ". /etc/bash_completion" >> /root/.bashrc
 

@@ -19,7 +19,6 @@ package core
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -43,7 +42,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -53,6 +51,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -259,13 +258,17 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
-	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(block, state, bc.vmConfig)
+	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(
+		block, state, bc.vmConfig,
+	)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
 
-	if err := bc.Validator().ValidateState(block, state, receipts, cxReceipts, usedGas); err != nil {
+	if err := bc.Validator().ValidateState(
+		block, state, receipts, cxReceipts, usedGas,
+	); err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
@@ -1905,22 +1908,29 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 	if err != nil {
 		return nil, err
 	}
-	crossLink, err := types.DeserializeCrossLink(bytes)
+	return types.DeserializeCrossLink(bytes)
+}
 
-	return crossLink, err
+// DeletePendingSlashingCandidates ..
+func (bc *BlockChain) DeletePendingSlashingCandidates() error {
+	bc.pendingSlashingCandidatesMU.Lock()
+	defer bc.pendingSlashingCandidatesMU.Unlock()
+	bc.pendingSlashingCandidates.Purge()
+	return bc.WritePendingSlashingCandidates(slash.Records{})
 }
 
 // ReadPendingSlashingCandidates retrieves pending slashing candidates
-func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
+func (bc *BlockChain) ReadPendingSlashingCandidates() (slash.Records, error) {
+	cls := slash.Records{}
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
-		return []slash.Record{}, nil
+		return cls, nil
 	}
-
+	var err error
 	bytes := []byte{}
 	if cached, ok := bc.pendingSlashingCandidates.Get(pendingSCCacheKey); ok {
 		bytes = cached.([]byte)
 	} else {
-		bytes, err := rawdb.ReadPendingSlashingCandidates(bc.db)
+		bytes, err = rawdb.ReadPendingSlashingCandidates(bc.db)
 		if err != nil || len(bytes) == 0 {
 			utils.Logger().Info().Err(err).
 				Int("dataLen", len(bytes)).
@@ -1928,7 +1938,7 @@ func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
 			return nil, err
 		}
 	}
-	cls := []slash.Record{}
+
 	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
 		utils.Logger().Error().Err(err).Msg("Invalid pending slashing candidates RLP decoding")
 		return nil, err
@@ -1937,12 +1947,7 @@ func (bc *BlockChain) ReadPendingSlashingCandidates() ([]slash.Record, error) {
 }
 
 // WritePendingSlashingCandidates saves the pending slashing candidates
-func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) error {
-	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
-		utils.Logger().Debug().Msg("Writing slashing candidates in prior to staking epoch")
-		return nil
-	}
-
+func (bc *BlockChain) WritePendingSlashingCandidates(candidates slash.Records) error {
 	bytes, err := rlp.EncodeToBytes(candidates)
 	if err != nil {
 		const msg = "[WritePendingSlashingCandidates] Failed to encode pending slashing candidates"
@@ -1952,11 +1957,8 @@ func (bc *BlockChain) WritePendingSlashingCandidates(candidates []slash.Record) 
 	if err := rawdb.WritePendingSlashingCandidates(bc.db, bytes); err != nil {
 		return err
 	}
-	if by, err := rlp.EncodeToBytes(candidates); err == nil {
-		bc.pendingSlashingCandidates.Add(pendingSCCacheKey, by)
-	}
+	bc.pendingSlashingCandidates.Add(pendingSCCacheKey, bytes)
 	return nil
-
 }
 
 // ReadPendingCrossLinks retrieves pending crosslinks
@@ -2014,20 +2016,27 @@ func (bc *BlockChain) WritePendingCrossLinks(crossLinks []types.CrossLink) error
 
 }
 
-// AddPendingSlashingCandidate  appends pending slashing candidates
-func (bc *BlockChain) AddPendingSlashingCandidate(candidate *slash.Record) (int, error) {
+// AddPendingSlashingCandidates appends pending slashing candidates
+func (bc *BlockChain) AddPendingSlashingCandidates(
+	candidates []slash.Record,
+) (int, error) {
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
-
 	cls, err := bc.ReadPendingSlashingCandidates()
+
 	if err != nil || len(cls) == 0 {
-		err := bc.WritePendingSlashingCandidates([]slash.Record{*candidate})
+		err := bc.WritePendingSlashingCandidates(candidates)
+		if err != nil {
+			return 0, err
+		}
 		return 1, err
 	}
-	cls = append(cls, *candidate)
-	err = bc.WritePendingSlashingCandidates(cls)
-	return len(cls), err
 
+	cls = append(cls, candidates...)
+	if err := bc.WritePendingSlashingCandidates(cls); err != nil {
+		return 0, err
+	}
+	return len(cls), nil
 }
 
 // AddPendingCrossLinks appends pending crosslinks
@@ -2158,25 +2167,26 @@ func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, 
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }
 
-// ReadValidatorInformationAt reads staking information of given validatorWrapper at a specific state root
-func (bc *BlockChain) ReadValidatorInformationAt(addr common.Address, root common.Hash) (*staking.ValidatorWrapper, error) {
+// ReadValidatorInformationAt reads staking
+// information of given validatorWrapper at a specific state root
+func (bc *BlockChain) ReadValidatorInformationAt(
+	addr common.Address, root common.Hash,
+) (*staking.ValidatorWrapper, error) {
 	state, err := bc.StateAt(root)
 	if err != nil || state == nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
-	wrapper := state.GetStakingInfo(addr)
-	if wrapper == nil {
-		return nil, fmt.Errorf(
-			"at root: %s, validator info not found: %s",
-			root.Hex(),
-			common2.MustAddressToBech32(addr),
-		)
+	wrapper, err := state.ValidatorWrapper(addr)
+	if err != nil {
+		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
 	return wrapper, nil
 }
 
 // ReadValidatorInformation reads staking information of given validator address
-func (bc *BlockChain) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
+func (bc *BlockChain) ReadValidatorInformation(
+	addr common.Address,
+) (*staking.ValidatorWrapper, error) {
 	return bc.ReadValidatorInformationAt(addr, bc.CurrentBlock().Root())
 }
 
@@ -2341,11 +2351,13 @@ func (bc *BlockChain) ReadElectedValidatorList() ([]common.Address, error) {
 	return rawdb.ReadValidatorList(bc.db, true)
 }
 
-// WriteElectedValidatorList writes the list of elected validator addresses to database
+// WriteElectedValidatorList writes the list of
+// elected validator addresses to database
 // Note: this should only be called within the blockchain insert process.
-func (bc *BlockChain) WriteElectedValidatorList(batch rawdb.DatabaseWriter, addrs []common.Address) error {
-	err := rawdb.WriteValidatorList(batch, addrs, true)
-	if err != nil {
+func (bc *BlockChain) WriteElectedValidatorList(
+	batch rawdb.DatabaseWriter, addrs []common.Address,
+) error {
+	if err := rawdb.WriteValidatorList(batch, addrs, true); err != nil {
 		return err
 	}
 	bytes, err := rlp.EncodeToBytes(addrs)
@@ -2356,7 +2368,9 @@ func (bc *BlockChain) WriteElectedValidatorList(batch rawdb.DatabaseWriter, addr
 }
 
 // ReadDelegationsByDelegator reads the addresses of validators delegated by a delegator
-func (bc *BlockChain) ReadDelegationsByDelegator(delegator common.Address) ([]staking.DelegationIndex, error) {
+func (bc *BlockChain) ReadDelegationsByDelegator(
+	delegator common.Address,
+) ([]staking.DelegationIndex, error) {
 	if cached, ok := bc.validatorListByDelegatorCache.Get(string(delegator.Bytes())); ok {
 		by := cached.([]byte)
 		m := []staking.DelegationIndex{}
@@ -2381,9 +2395,12 @@ func (bc *BlockChain) writeDelegationsByDelegator(batch rawdb.DatabaseWriter, de
 	return nil
 }
 
-// UpdateStakingMetaData updates the validator's and the delegator's meta data according to staking transaction
+// UpdateStakingMetaData updates the validator's
+// and the delegator's meta data according to staking transaction
 // Note: this should only be called within the blockchain insert process.
-func (bc *BlockChain) UpdateStakingMetaData(batch rawdb.DatabaseWriter, tx *staking.StakingTransaction, root common.Hash) error {
+func (bc *BlockChain) UpdateStakingMetaData(
+	batch rawdb.DatabaseWriter, tx *staking.StakingTransaction, root common.Hash,
+) error {
 	// TODO: simply the logic here in staking/types/transaction.go
 	payload, err := tx.RLPEncodeStakeMsg()
 	if err != nil {
@@ -2414,23 +2431,27 @@ func (bc *BlockChain) UpdateStakingMetaData(batch rawdb.DatabaseWriter, tx *stak
 		}
 
 		// Update validator snapshot with the new validator
-		validator, err := bc.ReadValidatorInformationAt(createValidator.ValidatorAddress, root)
+		validator, err := bc.ReadValidatorInformationAt(
+			createValidator.ValidatorAddress, root,
+		)
 		if err != nil {
 			return err
 		}
-
-		validator.Snapshot.Epoch = epoch
 
 		if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
 			return err
 		}
 
 		// Add self delegation into the index
-		return bc.addDelegationIndex(batch, createValidator.ValidatorAddress, createValidator.ValidatorAddress, root)
+		return bc.addDelegationIndex(
+			batch, createValidator.ValidatorAddress, createValidator.ValidatorAddress, root,
+		)
 	case staking.DirectiveEditValidator:
 	case staking.DirectiveDelegate:
 		delegate := decodePayload.(*staking.Delegate)
-		return bc.addDelegationIndex(batch, delegate.DelegatorAddress, delegate.ValidatorAddress, root)
+		return bc.addDelegationIndex(
+			batch, delegate.DelegatorAddress, delegate.ValidatorAddress, root,
+		)
 	case staking.DirectiveUndelegate:
 	case staking.DirectiveCollectRewards:
 	default:
@@ -2451,7 +2472,9 @@ func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error
 
 // WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
 // Note: this should only be called once during staking launch.
-func (bc *BlockChain) WriteBlockRewardAccumulator(batch rawdb.DatabaseWriter, reward *big.Int, number uint64) error {
+func (bc *BlockChain) WriteBlockRewardAccumulator(
+	batch rawdb.DatabaseWriter, reward *big.Int, number uint64,
+) error {
 	err := rawdb.WriteBlockRewardAccumulator(batch, reward, number)
 	if err != nil {
 		return err

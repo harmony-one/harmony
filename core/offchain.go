@@ -174,11 +174,19 @@ func (bc *BlockChain) CommitOffChainData(
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
-			bc.UpdateBlockRewardAccumulator(batch, payout, block.Number().Uint64())
+			if err := bc.UpdateBlockRewardAccumulator(
+				batch, payout, block.Number().Uint64(),
+			); err != nil {
+				return NonStatTy, err
+			}
+			if err := bc.DeletePendingSlashingCandidates(); err != nil {
+				return NonStatTy, err
+			}
 		} else {
 			// block reward never accumulate before staking
 			bc.WriteBlockRewardAccumulator(batch, big.NewInt(0), block.Number().Uint64())
 		}
 	}
+
 	return CanonStatTy, nil
 }
