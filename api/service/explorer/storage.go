@@ -88,6 +88,7 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	// Store cross shard txs
 	for _, proof := range block.IncomingReceipts() {
 		for _, receipt := range proof.Receipts {
+			var err error
 			if receipt.ShardID == receipt.ToShardID {
 				continue
 			}
@@ -117,43 +118,13 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 			storage.UpdateAddress(batch, explorerTransaction, nil)
 		}
 	}
-	if err := batch.Write(); err != nil {
+	if err := storage.db.Write(batch, nil); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot write batch")
 	}
 }
 
-// DumpCommittee commits validators for shardNum and epoch.
-func (storage *Storage) DumpCommittee(shardID uint32, epoch uint64, committee shard.Committee) error {
-	batch := storage.db.NewBatch()
-	// Store committees.
-	committeeData, err := rlp.EncodeToBytes(committee)
-	if err != nil {
-		return err
-	}
-	if err := batch.Put([]byte(GetCommitteeKey(shardID, epoch)), committeeData); err != nil {
-		return err
-	}
-	if err := batch.Write(); err != nil {
-		return err
-	}
-	return nil
-}
-
-// UpdateTXStorage ...
-func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
-	if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
-		key := GetTXKey(tx.Hash().Hex())
-		if err := batch.Put([]byte(key), data); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot batch TX")
-		}
-	} else {
-		utils.Logger().Error().Msg("EncodeRLP transaction error")
-	}
-}
-
 // UpdateAddress ...
-// TODO: deprecate this logic
-func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
+func (storage *Storage) UpdateAddress(batch *leveldb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	if explorerTransaction.Type != Cross {
 		explorerTransaction.Type = Received
 	}
