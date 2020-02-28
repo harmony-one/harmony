@@ -10,12 +10,13 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
 var (
-	measure                    = new(big.Int).Div(big.NewInt(2), big.NewInt(3))
+	measure                    = new(big.Int).Div(common.Big2, common.Big3)
 	errValidatorEpochDeviation = errors.New(
 		"validator snapshot epoch not exactly one epoch behind",
 	)
@@ -110,29 +111,45 @@ func BallotResult(
 
 func bumpCount(
 	chain engine.ChainReader,
-	state *state.DB, onlyConsider map[common.Address]struct{},
-	signers shard.SlotList, didSign bool,
+	state *state.DB,
+	signers shard.SlotList,
+	didSign bool,
+	stakedAddrSet map[common.Address]struct{},
 ) error {
-	epoch := chain.CurrentHeader().Epoch()
+	l := utils.Logger().Info()
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
-		if _, ok := onlyConsider[addr]; !ok {
+		// NOTE if the signer address is not part of the staked addrs,
+		// then it must be a harmony operated node running,
+		// hence keep on going
+		if _, isAddrForStaked := stakedAddrSet[addr]; !isAddrForStaked {
 			continue
 		}
-		wrapper, err := chain.ReadValidatorInformation(addr)
+
+		wrapper, err := state.ValidatorWrapper(addr)
 		if err != nil {
 			return err
 		}
-		wrapper.Snapshot.NumBlocksToSign.Add(
-			wrapper.Snapshot.NumBlocksToSign, common.Big1,
+
+		l.RawJSON("validator", []byte(wrapper.String())).
+			Msg("about to adjust counters")
+
+		wrapper.Counters.NumBlocksToSign.Add(
+			wrapper.Counters.NumBlocksToSign, common.Big1,
 		)
+
 		if didSign {
-			wrapper.Snapshot.NumBlocksSigned.Add(
-				wrapper.Snapshot.NumBlocksSigned, common.Big1,
+			wrapper.Counters.NumBlocksSigned.Add(
+				wrapper.Counters.NumBlocksSigned, common.Big1,
 			)
 		}
-		wrapper.Snapshot.Epoch = epoch
-		if err := state.UpdateStakingInfo(addr, wrapper); err != nil {
+
+		l.RawJSON("validator", []byte(wrapper.String())).
+			Msg("bumped signing counters")
+
+		if err := state.UpdateValidatorWrapper(
+			addr, wrapper,
+		); err != nil {
 			return err
 		}
 	}
@@ -142,20 +159,22 @@ func bumpCount(
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
 	chain engine.ChainReader, header *block.Header,
-	shardID uint32, state *state.DB, onlyConsider map[common.Address]struct{},
+	shardID uint32, state *state.DB,
+	stakedAddrSet map[common.Address]struct{},
 ) error {
+	l := utils.Logger().Info().Str("candidate-header", header.String())
 	_, signers, missing, err := BallotResult(chain, header, shardID)
-
 	if err != nil {
 		return err
 	}
-	if err := bumpCount(chain, state, onlyConsider, signers, true); err != nil {
+	l.Msg("bumping signing counters for non-missing signers")
+	if err := bumpCount(
+		chain, state, signers, true, stakedAddrSet,
+	); err != nil {
 		return err
 	}
-	if err := bumpCount(chain, state, onlyConsider, missing, false); err != nil {
-		return err
-	}
-	return nil
+	l.Msg("bumping missed signing counter ")
+	return bumpCount(chain, state, missing, false, stakedAddrSet)
 }
 
 // SetInactiveUnavailableValidators sets the validator to
@@ -165,36 +184,41 @@ func IncrementValidatorSigningCounts(
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
 	bc engine.ChainReader, state *state.DB,
-	onlyConsider map[common.Address]struct{},
 ) error {
-	addrs, err := bc.ReadActiveValidatorList()
+	addrs, err := bc.ReadElectedValidatorList()
 	if err != nil {
 		return err
 	}
 
 	now := bc.CurrentHeader().Epoch()
 	for i := range addrs {
+		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
+		if err != nil {
+			return err
+		}
 
-		if _, ok := onlyConsider[addrs[i]]; !ok {
+		wrapper, err := state.ValidatorWrapper(addrs[i])
+
+		if err != nil {
+			return err
+		}
+
+		statsNow, snapEpoch, snapSigned, snapToSign :=
+			wrapper.Counters,
+			snapshot.LastEpochInCommittee,
+			snapshot.Counters.NumBlocksSigned,
+			snapshot.Counters.NumBlocksToSign
+
+		l := utils.Logger().Info().
+			RawJSON("snapshot", []byte(snapshot.String())).
+			RawJSON("current", []byte(wrapper.String()))
+
+		l.Msg("begin checks for availability")
+
+		if snapEpoch.Cmp(common.Big0) == 0 {
+			l.Msg("pass newly joined validator for inactivity check")
 			continue
 		}
-
-		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
-
-		if err != nil {
-			return err
-		}
-
-		wrapper, err := bc.ReadValidatorInformation(addrs[i])
-
-		if err != nil {
-			return err
-		}
-
-		stats := wrapper.Snapshot
-		snapEpoch := snapshot.Snapshot.Epoch
-		snapSigned := snapshot.Snapshot.NumBlocksSigned
-		snapToSign := snapshot.Snapshot.NumBlocksToSign
 
 		if d := new(big.Int).Sub(now, snapEpoch); d.Cmp(common.Big1) != 0 {
 			return errors.Wrapf(
@@ -203,20 +227,21 @@ func SetInactiveUnavailableValidators(
 			)
 		}
 
-		signed := new(big.Int).Sub(stats.NumBlocksSigned, snapSigned)
-		toSign := new(big.Int).Sub(stats.NumBlocksToSign, snapToSign)
+		signed, toSign :=
+			new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
+			new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
 
 		if signed.Sign() == -1 {
 			return errors.Wrapf(
 				errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
-				stats.NumBlocksSigned.String(), snapSigned.String(),
+				statsNow.NumBlocksSigned.String(), snapSigned.String(),
 			)
 		}
 
 		if toSign.Sign() == -1 {
 			return errors.Wrapf(
 				errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
-				stats.NumBlocksToSign.String(), snapToSign.String(),
+				statsNow.NumBlocksToSign.String(), snapToSign.String(),
 			)
 		}
 
@@ -226,10 +251,13 @@ func SetInactiveUnavailableValidators(
 
 		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
 			wrapper.Active = false
-			if err := state.UpdateStakingInfo(addrs[i], wrapper); err != nil {
+			l.Str("threshold", measure.String()).
+				Msg("validator failed availability threshold, set to inactive")
+			if err := state.UpdateValidatorWrapper(addrs[i], wrapper); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }

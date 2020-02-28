@@ -89,21 +89,23 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			}
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
-				// TODO: leader add double sign checking
 				utils.Logger().Err(err).
 					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d", node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
 				continue
 			}
 
 			if err = node.VerifyCrossLink(cl); err != nil {
-				utils.Logger().Err(err).
+				utils.Logger().Info().
+					Str("cross-link-issue", err.Error()).
 					Msgf("[ProcessingCrossLink] Failed to verify new cross link for blockNum %d epochNum %d shard %d skipped: %v", cl.BlockNum(), cl.Epoch().Uint64(), cl.ShardID(), cl)
 				continue
 			}
 
 			candidates = append(candidates, cl)
 			utils.Logger().Debug().
-				Msgf("[ProcessingCrossLink] Committing for shardID %d, blockNum %d", cl.ShardID(), cl.Number().Uint64())
+				Msgf("[ProcessingCrossLink] Committing for shardID %d, blockNum %d",
+					cl.ShardID(), cl.Number().Uint64(),
+				)
 		}
 		Len, _ := node.Blockchain().AddPendingCrossLinks(candidates)
 		utils.Logger().Debug().

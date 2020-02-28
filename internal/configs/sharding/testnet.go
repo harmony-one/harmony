@@ -80,5 +80,5 @@ var testnetReshardingEpoch = []*big.Int{
 	params.TestnetChainConfig.StakingEpoch,
 }
 
-var testnetV0 = MustNewInstance(3, 10, 7, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-var testnetV1 = MustNewInstance(3, 20, 7, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV0 = MustNewInstance(4, 25, 25, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV1 = MustNewInstance(4, 50, 25, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())

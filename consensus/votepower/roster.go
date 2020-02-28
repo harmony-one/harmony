@@ -25,26 +25,33 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	SignerPubKey       shard.BlsPublicKey `json:"bls-public-key"`
-	Signature          *bls.Sign          `json:"signature"`
-	OptSerializedBlock []byte             `json:"opt-rlp-encoded-block"`
+	SignerPubKey    shard.BlsPublicKey `json:"bls-public-key"`
+	BlockHeaderHash common.Hash        `json:"block-header-hash"`
+	Signature       []byte             `json:"bls-signature"`
 }
 
-// BallotResults are a completed round of votes
-type BallotResults struct {
-	Signature shard.BLSSignature // (aggregated) signature
-	Bitmap    []byte             // corresponding bitmap mask for agg signature
-}
-
-// EncodePair returns hex encoded tuple (signature, bitmap)
-func (b BallotResults) EncodePair() (string, string) {
-	return hex.EncodeToString(b.Signature[:]), hex.EncodeToString(b.Bitmap[:])
+// MarshalJSON ..
+func (b Ballot) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		A string `json:"bls-public-key"`
+		B string `json:"block-header-hash"`
+		C string `json:"bls-signature"`
+	}{
+		b.SignerPubKey.Hex(),
+		b.BlockHeaderHash.Hex(),
+		hex.EncodeToString(b.Signature),
+	})
 }
 
 // Round is a round of voting in any FBFT phase
 type Round struct {
 	AggregatedVote *bls.Sign
 	BallotBox      map[string]*Ballot
+}
+
+func (b Ballot) String() string {
+	data, _ := json.Marshal(b)
+	return string(data)
 }
 
 // NewRound ..

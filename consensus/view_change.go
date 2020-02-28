@@ -374,14 +374,14 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 			// Leader sign and add commit message
-			blockNumBytes := make([]byte, 8)
-			binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
-			commitPayload := append(blockNumBytes, consensus.blockHash[:]...)
+			blockNumBytes := [8]byte{}
+			binary.LittleEndian.PutUint64(blockNumBytes[:], consensus.blockNum)
+			commitPayload := append(blockNumBytes[:], consensus.blockHash[:]...)
 			consensus.Decider.SubmitVote(
 				quorum.Commit,
 				consensus.PubKey,
 				consensus.priKey.SignHash(commitPayload),
-				nil,
+				common.BytesToHash(consensus.blockHash[:]),
 			)
 
 			if err = consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
@@ -398,7 +398,16 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Int("payloadSize", len(consensus.m1Payload)).
 			Hex("M1Payload", consensus.m1Payload).
 			Msg("[onViewChange] Sent NewView Message")
-		consensus.msgSender.SendWithRetry(consensus.blockNum, msg_pb.MessageType_NEWVIEW, []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}, host.ConstructP2pMessage(byte(17), msgToSend))
+		if err := consensus.msgSender.SendWithRetry(
+			consensus.blockNum,
+			msg_pb.MessageType_NEWVIEW,
+			[]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+			host.ConstructP2pMessage(byte(17), msgToSend),
+		); err != nil {
+			consensus.getLogger().Err(err).
+				Msg("could not send out the NEWVIEW message")
+		}
 
 		consensus.viewID = recvMsg.ViewID
 		consensus.ResetViewChangeState()

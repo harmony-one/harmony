@@ -180,9 +180,9 @@ func ConstructBlocksSyncMessage(blocks []*types.Block) []byte {
 }
 
 // ConstructSlashMessage ..
-func ConstructSlashMessage(witness *slash.Record) []byte {
+func ConstructSlashMessage(witnesses slash.Records) []byte {
 	byteBuffer := bytes.NewBuffer(slashH)
-	slashData, _ := rlp.EncodeToBytes(witness)
+	slashData, _ := rlp.EncodeToBytes(witnesses)
 	byteBuffer.Write(slashData)
 	return byteBuffer.Bytes()
 }
