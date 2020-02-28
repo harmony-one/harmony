@@ -1866,38 +1866,29 @@ func (bc *BlockChain) ReadCrossLink(shardID uint32, blockNum uint64) (*types.Cro
 // This function will update the latest crosslink in the sense that
 // any previous block's crosslink is received up to this point
 // there is no missing hole between genesis to this crosslink of given shardID
-func (bc *BlockChain) LastContinuousCrossLink(batch rawdb.DatabaseWriter, cl types.CrossLink) error {
-	if !bc.Config().IsCrossLink(cl.Epoch()) {
+func (bc *BlockChain) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardID uint32) error {
+	if !bc.Config().IsCrossLink(bc.CurrentBlock().Epoch()) {
 		return errors.New("Trying to write last continuous cross link with epoch before cross link starting epoch")
 	}
 
-	cl0, err := bc.ReadShardLastCrossLink(cl.ShardID())
-	if cl0 == nil {
-		rawdb.WriteShardLastCrossLink(batch, cl.ShardID(), cl.Serialize())
-		return nil
-	}
-	if err != nil {
+	oldLink, err := bc.ReadShardLastCrossLink(shardID)
+	if oldLink == nil || err != nil {
 		return err
 	}
-	newCheckpoint := uint64(0)
-	for i := cl0.BlockNum() + 1; i < cl.BlockNum(); i++ {
-		tmp, err := bc.ReadCrossLink(cl.ShardID(), i)
-		if err != nil || tmp == nil {
-			newCheckpoint = i - 1
+	newLink := oldLink
+	// Starting from last checkpoint, keeping reading immediate next crosslink until there is a gap
+	for i := oldLink.BlockNum() + 1; ; i++ {
+		tmp, err := bc.ReadCrossLink(shardID, i)
+		if err == nil && tmp != nil && tmp.BlockNum() == i {
+			newLink = tmp
+		} else {
 			break
-		}
-		if i == cl.BlockNum()-1 {
-			newCheckpoint = cl.BlockNum()
 		}
 	}
 
-	if newCheckpoint > 0 {
-		utils.Logger().Debug().Msgf("LastContinuousCrossLink: latest checkpoint blockNum %d", newCheckpoint)
-		cln, err := bc.ReadCrossLink(cl.ShardID(), newCheckpoint)
-		if err != nil {
-			return err
-		}
-		return rawdb.WriteShardLastCrossLink(batch, cln.ShardID(), cln.Serialize())
+	if newLink.BlockNum() > oldLink.BlockNum() {
+		utils.Logger().Debug().Msgf("LastContinuousCrossLink: latest checkpoint blockNum %d", newLink.BlockNum())
+		return rawdb.WriteShardLastCrossLink(batch, shardID, newLink.Serialize())
 	}
 	return nil
 }
