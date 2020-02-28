@@ -31,18 +31,6 @@ type TxHistoryArgs struct {
 	Order     string `json:"order"`
 }
 
-// StakingTxHistoryArgs is struct to make GetStakingTransactionsHistory request
-// TODO Update StakingTxHistoryArgs to staking txn specific, differentiated from regular TxHistoryArgs
-// if needed. Otherwise, remove as unneeded.
-type StakingTxHistoryArgs struct {
-	Address   string `json:"address"`
-	PageIndex uint32 `json:"pageIndex"`
-	PageSize  uint32 `json:"pageSize"`
-	FullTx    bool   `json:"fullTx"`
-	TxType    string `json:"txType"`
-	Order     string `json:"order"`
-}
-
 // PublicTransactionPoolAPI exposes methods for the RPC interface
 type PublicTransactionPoolAPI struct {
 	b         Backend
@@ -91,7 +79,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(
 // GetStakingTransactionsHistory returns the list of staking transactions hashes
 // that involve a particular address.
 func (s *PublicTransactionPoolAPI) GetStakingTransactionsHistory(
-	ctx context.Context, args StakingTxHistoryArgs) (map[string]interface{}, error) {
+	ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
 	address := args.Address
 	result := []common.Hash{}
 	var err error
@@ -104,7 +92,7 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionsHistory(
 			return nil, err
 		}
 	}
-	hashes, err := s.b.GetStakingTransactionsHistory(address, args.TxType, args.Order)
+	hashes, err := s.b.GetTransactionsHistory(address, args.TxType, args.Order)
 	if err != nil {
 		return nil, err
 	}

@@ -240,12 +240,6 @@ func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]co
 	return hashes, err
 }
 
-// GetStakingTransactionsHistory returns list of staking transactions hashes of address.
-func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
-	return hashes, err
-}
-
 // NetVersion returns net version
 func (b *APIBackend) NetVersion() uint64 {
 	return b.hmy.NetVersion()
