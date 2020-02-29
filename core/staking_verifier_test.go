@@ -72,7 +72,7 @@ func createValidator() *staking.CreateValidator {
 }
 
 // Test CV1: create validator
-func Test_CV1(t *testing.T) {
+func TestCV1(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
 	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
@@ -82,7 +82,7 @@ func Test_CV1(t *testing.T) {
 }
 
 // Test CV3: validator already exists
-func Test_CV3(t *testing.T) {
+func TestCV3(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
 	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
@@ -97,7 +97,7 @@ func Test_CV3(t *testing.T) {
 }
 
 // Test CV5: identity longer than 140 characters
-func Test_CV5(t *testing.T) {
+func TestCV5(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
 	// identity length: 200 characters
@@ -110,7 +110,7 @@ func Test_CV5(t *testing.T) {
 }
 
 // Test CV6: website longer than 140 characters
-func Test_CV6(t *testing.T) {
+func TestCV6(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
 	// Website length: 200 characters
@@ -123,7 +123,7 @@ func Test_CV6(t *testing.T) {
 }
 
 // Test CV7: security contact longer than 140 characters
-func Test_CV7(t *testing.T) {
+func TestCV7(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
 	// Website length: 200 characters
@@ -136,14 +136,74 @@ func Test_CV7(t *testing.T) {
 }
 
 // Test CV8: details longer than 280 characters
-func Test_CV8(t *testing.T) {
+func TestCV8(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	// Website length: 200 characters
+	// Website length: 300 characters
 	msg.Details = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdfjiusngognoherugbounviesrbgufhuoshcofwevusguahferhgvuervurehniwjvseivusehvsghjvorsugjvsiovjpsevsvvvvv"
 	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
 	detailsLenError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Details), "maxDetailsLen", staking.MaxDetailsLength)
 	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != detailsLenError.Error() {
 		t.Error("expected", detailsLenError, "got", err)
+	}
+}
+
+// Test CV9: name == 140 characters
+func TestCV9(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	// name length: 140 characters
+	msg.Name = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+}
+
+// Test CV10: identity == 140 characters
+func TestCV10(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	// identity length: 140 characters
+	msg.Identity = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+}
+
+// Test CV11: website == 140 characters
+func TestCV11(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	// website length: 140 characters
+	msg.Website = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+}
+
+// Test CV12: security == 140 characters
+func TestCV12(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	// security contact length: 140 characters
+	msg.SecurityContact = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+}
+
+// Test CV13: details == 280 characters
+func TestCV13(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	// details length: 280 characters
+	msg.Details = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjoweHlloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuedbfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err != nil {
+		t.Error("expected", nil, "got", err)
 	}
 }
