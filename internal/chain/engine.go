@@ -307,9 +307,9 @@ func (e *engineImpl) Finalize(
 		Uint64("block-number", header.Number().Uint64())
 
 	if isBeaconChain && inStakingEra {
-		superCommittee, err := chain.ReadShardState(
-			chain.CurrentHeader().Epoch(),
-		)
+		nowEpoch := chain.CurrentHeader().Epoch()
+
+		superCommittee, err := chain.ReadShardState(nowEpoch)
 		staked := superCommittee.StakedValidators()
 		// could happen that only harmony nodes are running,
 		if staked.CountStakedValidator > 0 {
@@ -324,7 +324,7 @@ func (e *engineImpl) Finalize(
 			if isNewEpoch {
 				l.Msg("in new epoch (aka last block), apply availability check for activity")
 				if err := availability.SetInactiveUnavailableValidators(
-					chain, state,
+					chain, state, nowEpoch,
 				); err != nil {
 					return nil, nil, err
 				}

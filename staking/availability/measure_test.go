@@ -1,17 +1,15 @@
 package availability
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
-
-type electionReader interface {
-	ReadElectedValidatorList() ([]common.Address, error)
-	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
-}
 
 type fakerAuctioneer struct{}
 
@@ -47,6 +45,26 @@ func (fakerAuctioneer) ReadValidatorSnapshot(
 	}
 }
 
+func defaultStateWithAccountsApplied() *state.DB {
+	st := ethdb.NewMemDatabase()
+	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
+	addrs, _ := (fakerAuctioneer{}).ReadElectedValidatorList()
+	for _, addr := range addrs {
+		stateHandle.CreateAccount(addr)
+	}
+	stateHandle.SetBalance(validatorS0Addr, big.NewInt(0).SetUint64(1994680320000000000))
+	stateHandle.SetBalance(validatorS2Addr, big.NewInt(0).SetUint64(1999975592000000000))
+	return stateHandle
+}
+
 func TestSetInactiveUnavailableValidators(t *testing.T) {
+	state := defaultStateWithAccountsApplied()
+	nowEpoch := big.NewInt(5)
+	if err := SetInactiveUnavailableValidators(
+		fakerAuctioneer{}, state, nowEpoch,
+	); err != nil {
+		//
+	}
+
 	t.Log("Unimplemented")
 }

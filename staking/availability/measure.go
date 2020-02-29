@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
@@ -178,20 +179,25 @@ func IncrementValidatorSigningCounts(
 	return bumpCount(state, missing, false, staked.LookupSet)
 }
 
+// Reader ..
+type Reader interface {
+	ReadElectedValidatorList() ([]common.Address, error)
+	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
+}
+
 // SetInactiveUnavailableValidators sets the validator to
 // inactive and thereby keeping it out of
 // consideration in the pool of validators for
 // whenever committee selection happens in future, the
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
-	bc engine.ChainReader, state *state.DB,
+	bc Reader, state *state.DB, nowEpoch *big.Int,
 ) error {
 	addrs, err := bc.ReadElectedValidatorList()
 	if err != nil {
 		return err
 	}
 
-	now := bc.CurrentHeader().Epoch()
 	for i := range addrs {
 		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
 		if err != nil {
@@ -221,10 +227,10 @@ func SetInactiveUnavailableValidators(
 			continue
 		}
 
-		if d := new(big.Int).Sub(now, snapEpoch); d.Cmp(common.Big1) != 0 {
+		if d := new(big.Int).Sub(nowEpoch, snapEpoch); d.Cmp(common.Big1) != 0 {
 			return errors.Wrapf(
 				errValidatorEpochDeviation, "bc %s, snapshot %s",
-				now.String(), snapEpoch.String(),
+				nowEpoch.String(), snapEpoch.String(),
 			)
 		}
 
