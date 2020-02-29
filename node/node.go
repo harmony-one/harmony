@@ -286,15 +286,16 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 }
 
 // Add new transactions to the pending transaction list.
-func (node *Node) addPendingTransactions(newTxs types.Transactions) {
+func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 	node.pendingTxMutex.Lock()
 
-	node.TxPool.AddRemotes(newTxs)
+	errs := node.TxPool.AddRemotes(newTxs)
 
 	node.pendingTxMutex.Unlock()
 
 	pendingCount, queueCount := node.TxPool.Stats()
 	utils.Logger().Info().Int("length of newTxs", len(newTxs)).Int("totalPending", pendingCount).Int("totalQueued", queueCount).Msg("Got more transactions")
+	return errs
 }
 
 // Add new staking transactions to the pending staking transaction list.
@@ -326,14 +327,18 @@ func (node *Node) AddPendingStakingTransaction(
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
 	role := node.NodeConfig.Role()
 	if newTx.ShardID() == node.NodeConfig.ShardID && (node.Consensus.IsLeader() || role == nodeconfig.ExplorerNode) {
-		node.addPendingTransactions(types.Transactions{newTx})
+		errs := node.addPendingTransactions(types.Transactions{newTx})
 		if role != nodeconfig.ExplorerNode {
 			return
+		}
+		for i := range errs {
+			if errs[i] != nil {
+				return
+			}
 		}
 	}
 	utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
 	node.tryBroadcast(newTx)
-
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
