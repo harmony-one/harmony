@@ -19,3 +19,5 @@ scp shard2.txt watchdog:/home/ec2-user/doublesign
 
 ssh watchdog -- \
     sudo systemctl restart harmony-watchdogd@doublesign.service 
+
+rm -f shard0.txt shard1.txt shard2.txt

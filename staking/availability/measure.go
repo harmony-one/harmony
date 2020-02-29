@@ -251,9 +251,18 @@ func SetInactiveUnavailableValidators(
 			continue
 		}
 
-		if numeric.NewDecFromBigInt(signed).Quo(
-			numeric.NewDecFromBigInt(toSign),
-		).LTE(measure) {
+		s1, s2 := numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
+
+		quotient := s1.Quo(s2)
+
+		l.
+			Str("signed", s1.String()).
+			Str("to-sign", s2.String()).
+			Str("percentage-signed", quotient.String()).
+			Bool("meets-threshold", quotient.LTE(measure)).
+			Msg("check if signing percent is meeting required threshold")
+
+		if quotient.LTE(measure) {
 			wrapper.Active = false
 			l.Str("threshold", measure.String()).
 				Msg("validator failed availability threshold, set to inactive")
