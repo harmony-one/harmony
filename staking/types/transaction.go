@@ -190,7 +190,7 @@ func (tx *StakingTransaction) Cost() (*big.Int, error) {
 		if err != nil {
 			return nil, err
 		}
-		stkMsg, ok := msg.(*CreateValidator)
+		stkMsg, ok := msg.(*Delegate)
 		if !ok {
 			return nil, errStakingTransactionTypeCastErr
 		}
