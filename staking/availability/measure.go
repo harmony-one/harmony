@@ -17,9 +17,7 @@ import (
 )
 
 var (
-	measure  = numeric.NewDec(2).Quo(numeric.NewDec(3))
-	measure2 = new(big.Int).Div(big.NewInt(2), big.NewInt(3))
-
+	measure                    = numeric.NewDec(2).Quo(numeric.NewDec(3))
 	errValidatorEpochDeviation = errors.New(
 		"validator snapshot epoch not exactly one epoch behind",
 	)
@@ -253,25 +251,9 @@ func SetInactiveUnavailableValidators(
 			continue
 		}
 
-		r := new(big.Int).Div(signed, toSign)
-
-		l.Str("signed", signed.String()).
-			Str("to-sign", toSign.String()).
-			Str("division", r.String()).
-			Int("compare", r.Cmp(measure2)).
-			Msg("compute uptime percent")
-
-		a := numeric.NewDecFromBigInt(signed)
-		b := numeric.NewDecFromBigInt(toSign)
-		c := a.Quo(b)
-
-		l.Str("signed-dec", a.String()).
-			Str("to-sign-dec", b.String()).
-			Str("division-dec", c.String()).
-			Bool("compare-dec", c.LTE(measure)).
-			Msg("compute uptime percent-dec")
-
-		if r.Cmp(measure2) == -1 {
+		if numeric.NewDecFromBigInt(signed).Quo(
+			numeric.NewDecFromBigInt(toSign),
+		).LTE(measure) {
 			wrapper.Active = false
 			l.Str("threshold", measure.String()).
 				Msg("validator failed availability threshold, set to inactive")
