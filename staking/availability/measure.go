@@ -112,6 +112,7 @@ func BallotResult(
 }
 
 func bumpCount(
+	bc Reader,
 	state *state.DB,
 	signers shard.SlotList,
 	didSign bool,
@@ -124,6 +125,16 @@ func bumpCount(
 		// then it must be a harmony operated node running,
 		// hence keep on going
 		if _, isAddrForStaked := stakedAddrSet[addr]; !isAddrForStaked {
+			continue
+		}
+
+		snapshot, err := bc.ReadValidatorSnapshot(addr)
+		if err != nil {
+			return err
+		}
+
+		if snapshot.LastEpochInCommittee.Cmp(common.Big0) == 0 {
+			l.Msg("pass newly joined validator for inactivity check")
 			continue
 		}
 
@@ -159,6 +170,7 @@ func bumpCount(
 
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
+	bc Reader,
 	staked *shard.StakedSlots,
 	state *state.DB,
 	signers, missing shard.SlotList,
@@ -171,12 +183,12 @@ func IncrementValidatorSigningCounts(
 	l.Msg("bumping signing counters for non-missing signers")
 
 	if err := bumpCount(
-		state, signers, true, staked.LookupSet,
+		bc, state, signers, true, staked.LookupSet,
 	); err != nil {
 		return err
 	}
 	l.Msg("bumping missed signing counter ")
-	return bumpCount(state, missing, false, staked.LookupSet)
+	return bumpCount(bc, state, missing, false, staked.LookupSet)
 }
 
 // Reader ..
