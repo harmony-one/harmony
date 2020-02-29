@@ -11,12 +11,15 @@ import (
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
 var (
-	measure                    = new(big.Int).Div(common.Big2, common.Big3)
+	measure  = numeric.NewDec(2).Quo(numeric.NewDec(3))
+	measure2 = new(big.Int).Div(big.NewInt(2), big.NewInt(3))
+
 	errValidatorEpochDeviation = errors.New(
 		"validator snapshot epoch not exactly one epoch behind",
 	)
@@ -250,7 +253,25 @@ func SetInactiveUnavailableValidators(
 			continue
 		}
 
-		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
+		r := new(big.Int).Div(signed, toSign)
+
+		l.Str("signed", signed.String()).
+			Str("to-sign", toSign.String()).
+			Str("division", r.String()).
+			Int("compare", r.Cmp(measure2)).
+			Msg("compute uptime percent")
+
+		a := numeric.NewDecFromBigInt(signed)
+		b := numeric.NewDecFromBigInt(toSign)
+		c := a.Quo(b)
+
+		l.Str("signed-dec", a.String()).
+			Str("to-sign-dec", b.String()).
+			Str("division-dec", c.String()).
+			Bool("compare-dec", c.LTE(measure)).
+			Msg("compute uptime percent-dec")
+
+		if r.Cmp(measure2) == -1 {
 			wrapper.Active = false
 			l.Str("threshold", measure.String()).
 				Msg("validator failed availability threshold, set to inactive")
