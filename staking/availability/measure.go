@@ -134,7 +134,8 @@ func bumpCount(
 		}
 
 		if snapshot.LastEpochInCommittee.Cmp(common.Big0) == 0 {
-			l.Msg("pass newly joined validator for inactivity check")
+			l.RawJSON("validator", []byte(snapshot.String())).
+				Msg("pass bumping counts of newly joined validator")
 			continue
 		}
 
@@ -176,8 +177,7 @@ func IncrementValidatorSigningCounts(
 	signers, missing shard.SlotList,
 ) error {
 	l := utils.Logger().Info()
-	l.RawJSON("signers", []byte(signers.String())).
-		RawJSON("missing", []byte(missing.String())).
+	l.RawJSON("missing", []byte(missing.String())).
 		Msg("signers that did sign")
 
 	l.Msg("bumping signing counters for non-missing signers")
@@ -187,7 +187,7 @@ func IncrementValidatorSigningCounts(
 	); err != nil {
 		return err
 	}
-	l.Msg("bumping missed signing counter ")
+	l.Msg("bumping missing signers counters")
 	return bumpCount(bc, state, missing, false, staked.LookupSet)
 }
 
@@ -269,12 +269,11 @@ func SetInactiveUnavailableValidators(
 			continue
 		}
 
-		s1, s2 := numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
-
+		s1, s2 :=
+			numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
 		quotient := s1.Quo(s2)
 
-		l.
-			Str("signed", s1.String()).
+		l.Str("signed", s1.String()).
 			Str("to-sign", s2.String()).
 			Str("percentage-signed", quotient.String()).
 			Bool("meets-threshold", quotient.LTE(measure)).
