@@ -20,16 +20,14 @@ const (
 
 var (
 	validatorS0Addr, validatorS2Addr = common.Address{}, common.Address{}
+	addrs                            = []common.Address{}
 	validatorS0, validatorS2         = &staking.ValidatorWrapper{}, &staking.ValidatorWrapper{}
 )
 
 func init() {
 	validatorS0Addr, _ = common2.Bech32ToAddress(to0)
 	validatorS2Addr, _ = common2.Bech32ToAddress(to2)
-}
-
-func (fakerAuctioneer) ReadElectedValidatorList() ([]common.Address, error) {
-	return []common.Address{validatorS0Addr, validatorS2Addr}, nil
+	addrs = []common.Address{validatorS0Addr, validatorS2Addr}
 }
 
 func (fakerAuctioneer) ReadValidatorSnapshot(
@@ -48,7 +46,6 @@ func (fakerAuctioneer) ReadValidatorSnapshot(
 func defaultStateWithAccountsApplied() *state.DB {
 	st := ethdb.NewMemDatabase()
 	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
-	addrs, _ := (fakerAuctioneer{}).ReadElectedValidatorList()
 	for _, addr := range addrs {
 		stateHandle.CreateAccount(addr)
 	}
@@ -59,9 +56,8 @@ func defaultStateWithAccountsApplied() *state.DB {
 
 func TestSetInactiveUnavailableValidators(t *testing.T) {
 	state := defaultStateWithAccountsApplied()
-	nowEpoch := big.NewInt(5)
 	if err := SetInactiveUnavailableValidators(
-		fakerAuctioneer{}, state, nowEpoch,
+		fakerAuctioneer{}, state, addrs,
 	); err != nil {
 		//
 	}

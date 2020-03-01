@@ -182,7 +182,6 @@ func IncrementValidatorSigningCounts(
 
 // Reader ..
 type Reader interface {
-	ReadElectedValidatorList() ([]common.Address, error)
 	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
 }
 
@@ -192,13 +191,8 @@ type Reader interface {
 // whenever committee selection happens in future, the
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
-	bc Reader, state *state.DB, nowEpoch *big.Int,
+	bc Reader, state *state.DB, addrs []common.Address,
 ) error {
-	addrs, err := bc.ReadElectedValidatorList()
-	if err != nil {
-		return err
-	}
-
 	for i := range addrs {
 		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
 		if err != nil {
@@ -211,9 +205,8 @@ func SetInactiveUnavailableValidators(
 			return err
 		}
 
-		statsNow, snapEpoch, snapSigned, snapToSign :=
+		statsNow, snapSigned, snapToSign :=
 			wrapper.Counters,
-			snapshot.LastEpochInCommittee,
 			snapshot.Counters.NumBlocksSigned,
 			snapshot.Counters.NumBlocksToSign
 
@@ -222,18 +215,6 @@ func SetInactiveUnavailableValidators(
 			RawJSON("current", []byte(wrapper.String()))
 
 		l.Msg("begin checks for availability")
-
-		if snapEpoch.Cmp(common.Big0) == 0 {
-			l.Msg("pass newly joined validator for inactivity check")
-			continue
-		}
-
-		if d := new(big.Int).Sub(nowEpoch, snapEpoch); d.Cmp(common.Big1) != 0 {
-			return errors.Wrapf(
-				errValidatorEpochDeviation, "bc %s, snapshot %s",
-				nowEpoch.String(), snapEpoch.String(),
-			)
-		}
 
 		signed, toSign :=
 			new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
