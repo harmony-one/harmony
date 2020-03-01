@@ -128,17 +128,6 @@ func bumpCount(
 			continue
 		}
 
-		snapshot, err := bc.ReadValidatorSnapshot(addr)
-		if err != nil {
-			return err
-		}
-
-		if snapshot.LastEpochInCommittee.Cmp(common.Big0) == 0 {
-			l.RawJSON("validator", []byte(snapshot.String())).
-				Msg("pass bumping counts of newly joined validator")
-			continue
-		}
-
 		wrapper, err := state.ValidatorWrapper(addr)
 		if err != nil {
 			return err

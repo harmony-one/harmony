@@ -308,19 +308,13 @@ func (e *engineImpl) Finalize(
 
 	if isBeaconChain && inStakingEra {
 		nowEpoch := chain.CurrentHeader().Epoch()
-
 		superCommittee, err := chain.ReadShardState(nowEpoch)
+		if err != nil {
+			return nil, nil, err
+		}
 		staked := superCommittee.StakedValidators()
 		// could happen that only harmony nodes are running,
 		if staked.CountStakedValidator > 0 {
-			l.Msg("have non-zero external")
-
-			if err != nil {
-				return nil, nil, err
-			}
-
-			l.Msg("bumping validator signing counts")
-
 			if isNewEpoch {
 				l.Msg("in new epoch (aka last block), apply availability check for activity")
 				if err := availability.SetInactiveUnavailableValidators(
