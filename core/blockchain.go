@@ -2045,8 +2045,8 @@ func (bc *BlockChain) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, e
 	return len(cls), err
 }
 
-// DeleteCommittedFromPendingCrossLinks delete pending crosslinks that already committed (i.e. passed in the params)
-func (bc *BlockChain) DeleteCommittedFromPendingCrossLinks(crossLinks []types.CrossLink) (int, error) {
+// DeleteFromPendingCrossLinks delete pending crosslinks that already committed (i.e. passed in the params)
+func (bc *BlockChain) DeleteFromPendingCrossLinks(crossLinks []types.CrossLink) (int, error) {
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
 

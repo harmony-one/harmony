@@ -157,12 +157,12 @@ func (bc *BlockChain) CommitOffChainData(
 		}
 
 		//clean/update local database cache after crosslink inserted into blockchain
-		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
+		num, err := bc.DeleteFromPendingCrossLinks(*crossLinks)
 		if err != nil {
-			const msg = "DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, problem: %+v"
+			const msg = "DeleteFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, problem: %+v"
 			utils.Logger().Debug().Msgf(msg, len(*crossLinks), num, err)
 		}
-		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d", len(*crossLinks), num)
+		utils.Logger().Debug().Msgf("DeleteFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d", len(*crossLinks), num)
 	}
 	// Roll up latest crosslinks
 	for i := uint32(0); i < shard.Schedule.InstanceForEpoch(epoch).NumShards(); i++ {
