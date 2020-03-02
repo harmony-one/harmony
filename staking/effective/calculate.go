@@ -66,7 +66,8 @@ func (s Slots) JSON() string {
 	return string(b)
 }
 
-func median(stakes []SlotPurchase) numeric.Dec {
+// Median ..
+func Median(stakes []SlotPurchase) numeric.Dec {
 
 	if len(stakes) == 0 {
 		utils.Logger().Error().Int("non-zero", len(stakes)).
@@ -90,11 +91,13 @@ func median(stakes []SlotPurchase) numeric.Dec {
 	}
 }
 
-// Apply ..
-func Apply(shortHand map[common.Address]SlotOrder, pull int) Slots {
+// Compute ..
+func Compute(
+	shortHand map[common.Address]SlotOrder, pull int,
+) (numeric.Dec, Slots) {
 	eposedSlots := Slots{}
 	if len(shortHand) == 0 {
-		return eposedSlots
+		return numeric.ZeroDec(), eposedSlots
 	}
 
 	type t struct {
@@ -144,11 +147,16 @@ func Apply(shortHand map[common.Address]SlotOrder, pull int) Slots {
 	picks := eposedSlots[:pull]
 
 	if len(picks) == 0 {
-		return Slots{}
+		return numeric.ZeroDec(), Slots{}
 	}
 
-	median := median(picks)
+	return Median(picks), picks
 
+}
+
+// Apply ..
+func Apply(shortHand map[common.Address]SlotOrder, pull int) Slots {
+	median, picks := Compute(shortHand, pull)
 	for i := range picks {
 		picks[i].Dec = effectiveStake(median, picks[i].Dec)
 	}

@@ -501,7 +501,7 @@ func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
 // explorer node
 func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return s.b.GetMedianRawStakeSnapshot(), nil
+		return s.b.GetMedianRawStakeSnapshot()
 	}
 	return nil, errNotBeaconChainShard
 }

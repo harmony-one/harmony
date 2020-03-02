@@ -78,7 +78,7 @@ func TestMedian(t *testing.T) {
 	} else {
 		expectedMedian = copyPurchases[numPurchases].Dec
 	}
-	med := median(testingPurchases)
+	med := Median(testingPurchases)
 	if !med.Equal(expectedMedian) {
 		t.Errorf("Expected: %s, Got: %s", expectedMedian.String(), med.String())
 	}

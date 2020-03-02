@@ -83,7 +83,7 @@ type Backend interface {
 	GetShardState() (*shard.State, error)
 	GetCurrentStakingErrorSink() []staking.RPCTransactionError
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
-	GetMedianRawStakeSnapshot() *big.Int
+	GetMedianRawStakeSnapshot() (*big.Int, error)
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
 	GetSuperCommittees() (*quorum.Transition, error)
