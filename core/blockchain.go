@@ -2580,10 +2580,9 @@ func (bc *BlockChain) SuperCommitteeForNextEpoch(
 	isVerify bool,
 ) (*shard.State, error) {
 	var (
-		nextCommittee = new(shard.State)
-		err           error
-		beaconEpoch   = new(big.Int)
-		shardState    = shard.State{}
+		nextCommittee, shardState = &shard.State{}, shard.State{}
+		err                       error
+		beaconEpoch               = new(big.Int)
 	)
 	switch header.ShardID() {
 	case shard.BeaconChainShardID:

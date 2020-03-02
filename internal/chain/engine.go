@@ -19,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -316,11 +315,6 @@ func (e *engineImpl) Finalize(
 		// could happen that only harmony nodes are running,
 		if isNewEpoch && staked.CountStakedValidator > 0 {
 			l.Msg("in new epoch (aka last block), apply availability check for activity")
-			if err := availability.SetInactiveUnavailableValidators(
-				chain, state, staked.Addrs,
-			); err != nil {
-				return nil, nil, err
-			}
 			// Now can reset the counters, do note, only
 			// after the availability logic runs
 			newShardState, err := header.GetShardState()
@@ -337,7 +331,6 @@ func (e *engineImpl) Finalize(
 					}
 					// Set the LastEpochInCommittee field for all
 					// external validators in the upcoming epoch.
-					// and set the availability tracking counters to 0
 					wrapper.LastEpochInCommittee = newShardState.Epoch
 					if err := state.UpdateValidatorWrapper(addr, wrapper); err != nil {
 						return nil, nil, ctxerror.New(

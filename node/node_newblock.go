@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -185,10 +186,27 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		if err := node.Worker.CollectAndVerifySlashes(); err != nil {
 			return nil, err
 		}
+
+		if shard.Schedule.IsLastBlock(node.Worker.GetCurrentHeader().Number().Uint64()) {
+			chain := node.Beaconchain()
+			nowEpoch := chain.CurrentHeader().Epoch()
+			superCommittee, err := chain.ReadShardState(nowEpoch)
+			if err != nil {
+				return nil, err
+			}
+			staked := superCommittee.StakedValidators()
+			if staked.CountStakedValidator > 0 {
+				if err := availability.SetInactiveUnavailableValidators(
+					chain, node.Worker.GetCurrentState(), staked.Addrs,
+				); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 
 	// Prepare shard state
-	shardState := new(shard.State)
+	shardState := &shard.State{}
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
 		node.Beaconchain(), node.Worker.GetCurrentHeader(), false,
 	); err != nil {
