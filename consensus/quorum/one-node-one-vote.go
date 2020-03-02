@@ -35,7 +35,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool {
+func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	threshold := v.TwoThirdsSignersCount()
 	currentTotalPower := utils.CountOneBits(mask.Bitmap)
 	if currentTotalPower < threshold {

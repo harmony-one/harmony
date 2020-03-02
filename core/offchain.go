@@ -92,25 +92,10 @@ func (bc *BlockChain) CommitOffChainData(
 			return NonStatTy, err
 		}
 
-		// Find all the elected validator addresses and store them in db
-		allElectedValidators := []common.Address{}
-		processed := make(map[common.Address]struct{})
-		for i := range newShardState.Shards {
-			shard := newShardState.Shards[i]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-						allElectedValidators = append(allElectedValidators, shard.Slots[j].EcdsaAddress)
-					}
-				}
-			}
-		}
-
 		// Update elected validators
-		if err := bc.WriteElectedValidatorList(batch, allElectedValidators); err != nil {
+		if err := bc.WriteElectedValidatorList(
+			batch, newShardState.StakedValidators().Addrs,
+		); err != nil {
 			return NonStatTy, err
 		}
 
@@ -173,7 +158,11 @@ func (bc *BlockChain) CommitOffChainData(
 
 		//clean/update local database cache after crosslink inserted into blockchain
 		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
-		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
+		if err != nil {
+			const msg = "DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, problem: %+v"
+			utils.Logger().Debug().Msgf(msg, len(*crossLinks), num, err)
+		}
+		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d", len(*crossLinks), num)
 	}
 	// Roll up latest crosslinks
 	for i := uint32(0); i < shard.Schedule.InstanceForEpoch(epoch).NumShards(); i++ {

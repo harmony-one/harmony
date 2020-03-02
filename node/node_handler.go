@@ -315,8 +315,7 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are
 // running consensus on
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
-	err := node.Blockchain().Validator().ValidateHeader(newBlock, true)
-	if err != nil {
+	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
@@ -327,6 +326,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			newBlock.Hash(),
 		).WithCause(err)
 	}
+
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
 		utils.Logger().Error().
 			Uint32("my shard ID", node.Blockchain().ShardID()).
@@ -334,13 +334,13 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Msg("wrong shard ID")
 		return ctxerror.New("wrong shard ID",
 			"my shard ID", node.Blockchain().ShardID(),
-			"new block's shard ID", newBlock.ShardID())
+			"new block's shard ID", newBlock.ShardID(),
+		)
 	}
 
-	err = node.Blockchain().Engine().VerifyShardState(
+	if err := node.Blockchain().Engine().VerifyShardState(
 		node.Blockchain(), node.Beaconchain(), newBlock.Header(),
-	)
-	if err != nil {
+	); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
@@ -351,8 +351,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		).WithCause(err)
 	}
 
-	err = node.Blockchain().ValidateNewBlock(newBlock)
-	if err != nil {
+	if err := node.Blockchain().ValidateNewBlock(newBlock); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Int("numTx", len(newBlock.Transactions())).
@@ -367,7 +366,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 
 	// Verify cross links
 	// TODO: move into ValidateNewBlock
-	if node.NodeConfig.ShardID == 0 {
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		err := node.VerifyBlockCrossLinks(newBlock)
 		if err != nil {
 			utils.Logger().Debug().Err(err).Msg("ops2 VerifyBlockCrossLinks Failed")
@@ -376,8 +375,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	}
 
 	// TODO: move into ValidateNewBlock
-	err = node.verifyIncomingReceipts(newBlock)
-	if err != nil {
+	if err := node.verifyIncomingReceipts(newBlock); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Int("numIncomingReceipts", len(newBlock.IncomingReceipts())).
