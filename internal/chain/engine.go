@@ -144,7 +144,7 @@ func (e *engineImpl) VerifyShardState(bc engine.ChainReader, beacon engine.Chain
 	}
 	headerShardStateBytes := header.ShardState()
 	// TODO: figure out leader withhold shardState
-	if headerShardStateBytes == nil || len(headerShardStateBytes) == 0 {
+	if len(headerShardStateBytes) == 0 {
 		return nil
 	}
 	shardState, err := bc.SuperCommitteeForNextEpoch(beacon, header, true)
@@ -240,7 +240,10 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	lastCommitPayload := append(blockNumHash, parentHash[:]...)
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
-		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature from last block", "lastBlockNum", header.Number().Uint64()-1, "lastBlockHash", parentHash)
+		const msg = "[VerifySeal] Unable to verify aggregated signature from last block"
+		return ctxerror.New(
+			msg, "lastBlockNum", header.Number().Uint64()-1, "lastBlockHash", parentHash,
+		)
 	}
 	return nil
 }
@@ -254,7 +257,6 @@ func (e *engineImpl) Finalize(
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
 	doubleSigners slash.Records,
 ) (*types.Block, *big.Int, error) {
-
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewards(
@@ -272,7 +274,8 @@ func (e *engineImpl) Finalize(
 	if isBeaconChain && isNewEpoch && inStakingEra {
 		validators, err := chain.ReadValidatorList()
 		if err != nil {
-			return nil, nil, ctxerror.New("[Finalize] failed to read all validators").WithCause(err)
+			const msg = "[Finalize] failed to read all validators"
+			return nil, nil, ctxerror.New(msg).WithCause(err)
 		}
 		// Payout undelegated/unlocked tokens
 		for _, validator := range validators {
@@ -304,56 +307,42 @@ func (e *engineImpl) Finalize(
 		Uint64("block-number", header.Number().Uint64())
 
 	if isBeaconChain && inStakingEra {
-		superCommittee, err := chain.ReadShardState(
-			chain.CurrentHeader().Epoch(),
-		)
+		nowEpoch := chain.CurrentHeader().Epoch()
+		superCommittee, err := chain.ReadShardState(nowEpoch)
+		if err != nil {
+			return nil, nil, err
+		}
 		staked := superCommittee.StakedValidators()
 		// could happen that only harmony nodes are running,
-		if staked.CountStakedValidator > 0 {
-			l.RawJSON("external", []byte(staked.StateSubset.String())).
-				Msg("have non-zero external")
-
-			if err != nil {
-				return nil, nil, err
-			}
-
-			l.Msg("bumping validator signing counts")
-			if err := availability.IncrementValidatorSigningCounts(
-				chain, header, header.ShardID(), state, staked.LookupSet,
+		if isNewEpoch && staked.CountStakedValidator > 0 {
+			l.Msg("in new epoch (aka last block), apply availability check for activity")
+			if err := availability.SetInactiveUnavailableValidators(
+				chain, state, staked.Addrs,
 			); err != nil {
 				return nil, nil, err
 			}
+			// Now can reset the counters, do note, only
+			// after the availability logic runs
+			newShardState, err := header.GetShardState()
+			if err != nil {
+				const msg = "[Finalize] failed to read shard state"
+				return nil, nil, ctxerror.New(msg).WithCause(err)
+			}
 
-			if isNewEpoch {
-				l.Msg("in new epoch (aka last block), apply availability check for activity")
-				if err := availability.SetInactiveUnavailableValidators(
-					chain, state,
-				); err != nil {
-					return nil, nil, err
-				}
-				// Now can reset the counters, do note, only
-				// after the availability logic runs
-				newShardState, err := header.GetShardState()
-				if err != nil {
-					const msg = "[Finalize] failed to read shard state"
-					return nil, nil, ctxerror.New(msg).WithCause(err)
-				}
-
-				if stkd := newShardState.StakedValidators(); stkd.CountStakedValidator > 0 {
-					for _, addr := range stkd.Addrs {
-						wrapper, err := state.ValidatorWrapper(addr)
-						if err != nil {
-							return nil, nil, err
-						}
-						// Set the LastEpochInCommittee field for all
-						// external validators in the upcoming epoch.
-						// and set the availability tracking counters to 0
-						wrapper.LastEpochInCommittee = newShardState.Epoch
-						if err := state.UpdateValidatorWrapper(addr, wrapper); err != nil {
-							return nil, nil, ctxerror.New(
-								"[Finalize] failed update validator info",
-							).WithCause(err)
-						}
+			if stkd := newShardState.StakedValidators(); stkd.CountStakedValidator > 0 {
+				for _, addr := range stkd.Addrs {
+					wrapper, err := state.ValidatorWrapper(addr)
+					if err != nil {
+						return nil, nil, err
+					}
+					// Set the LastEpochInCommittee field for all
+					// external validators in the upcoming epoch.
+					// and set the availability tracking counters to 0
+					wrapper.LastEpochInCommittee = newShardState.Epoch
+					if err := state.UpdateValidatorWrapper(addr, wrapper); err != nil {
+						return nil, nil, ctxerror.New(
+							"[Finalize] failed update validator info",
+						).WithCause(err)
 					}
 				}
 			}
@@ -479,7 +468,9 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 }
 
 // GetPublicKeys finds the public keys of the committee that signed the block header
-func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate bool) ([]*bls.PublicKey, error) {
+func GetPublicKeys(
+	chain engine.ChainReader, header *block.Header, reCalculate bool,
+) ([]*bls.PublicKey, error) {
 	shardState := new(shard.State)
 	var err error
 	if reCalculate {
@@ -499,13 +490,10 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 			"shardID", header.ShardID(),
 		)
 	}
-	var committerKeys []*bls.PublicKey
-
-	utils.Logger().Print(committee.Slots)
+	committerKeys := []*bls.PublicKey{}
 	for _, member := range committee.Slots {
 		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
+		if err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
 			return nil, ctxerror.New("cannot convert BLS public key",
 				"blsPublicKey", member.BlsPublicKey).WithCause(err)
 		}

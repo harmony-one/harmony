@@ -92,25 +92,10 @@ func (bc *BlockChain) CommitOffChainData(
 			return NonStatTy, err
 		}
 
-		// Find all the elected validator addresses and store them in db
-		allElectedValidators := []common.Address{}
-		processed := make(map[common.Address]struct{})
-		for i := range newShardState.Shards {
-			shard := newShardState.Shards[i]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-						allElectedValidators = append(allElectedValidators, shard.Slots[j].EcdsaAddress)
-					}
-				}
-			}
-		}
-
 		// Update elected validators
-		if err := bc.WriteElectedValidatorList(batch, allElectedValidators); err != nil {
+		if err := bc.WriteElectedValidatorList(
+			batch, newShardState.StakedValidators().Addrs,
+		); err != nil {
 			return NonStatTy, err
 		}
 
