@@ -321,3 +321,75 @@ func TestCV22(t *testing.T) {
 		t.Error("expected", nil, "got", err)
 	}
 }
+
+// Test CV23: commission rate < 0
+func TestCV23(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// commission rate < 0
+	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("-0.1")
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "rate:-0.100000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
+	}
+}
+
+// Test CV24: max rate < 0
+func TestCV24(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// max rate < 0
+	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("-0.001")
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "rate:-0.001000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
+	}
+}
+
+// Test CV25: max change rate < 0
+func TestCV25(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// max rate < 0
+	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("-0.001")
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "rate:-0.001000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
+	}
+}
+
+// Test CV26: commission rate > 1
+func TestCV26(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// commission rate > 1
+	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("1.01")
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "rate:1.01000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
+	}
+}
+
+// Test CV27: max rate > 1
+func TestCV27(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// max rate > 1
+	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("1.01")
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "rate:1.01000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
+	}
+}
+
+// Test CV28: max change rate > 1
+func TestCV28(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// max change rate > 1
+	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("1.01")
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "rate:1.01000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
+	}
+}
