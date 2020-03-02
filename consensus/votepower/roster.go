@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -202,23 +201,12 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 	if diff := numeric.OneDec().Sub(
 		ourPercentage.Add(theirPercentage),
 	); !diff.IsZero() && lastStakedVoter != nil {
-		utils.Logger().Info().
-			Str("theirs", theirPercentage.String()).
-			Str("ours", ourPercentage.String()).
-			Str("diff", diff.String()).
-			Str("combined", theirPercentage.Add(diff).Add(ourPercentage).String()).
-			Str("bls-public-key-of-receipent", lastStakedVoter.Identity.Hex()).
-			Msg("voting power of hmy & staked slots not sum to 1, giving diff to staked slot")
 		lastStakedVoter.EffectivePercent = lastStakedVoter.EffectivePercent.Add(diff)
 		theirPercentage = theirPercentage.Add(diff)
 	}
 
 	if lastStakedVoter != nil &&
 		!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
-		utils.Logger().Error().
-			Str("theirs", theirPercentage.String()).
-			Str("ours", ourPercentage.String()).
-			Msg("Total voting power not equal 100 percent")
 		return nil, ErrVotingPowerNotEqualOne
 	}
 

@@ -76,7 +76,6 @@ type Backend interface {
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
 
-	// Staking related apis
 	GetElectedValidatorAddresses() []common.Address
 	GetAllValidatorAddresses() []common.Address
 	GetValidatorInformation(addr common.Address) *staking.ValidatorWrapper

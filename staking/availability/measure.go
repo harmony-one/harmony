@@ -11,12 +11,14 @@ import (
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
 var (
-	measure                    = new(big.Int).Div(common.Big2, common.Big3)
+	measure                    = numeric.NewDec(2).Quo(numeric.NewDec(3))
 	errValidatorEpochDeviation = errors.New(
 		"validator snapshot epoch not exactly one epoch behind",
 	)
@@ -110,7 +112,7 @@ func BallotResult(
 }
 
 func bumpCount(
-	chain engine.ChainReader,
+	bc Reader,
 	state *state.DB,
 	signers shard.SlotList,
 	didSign bool,
@@ -158,23 +160,29 @@ func bumpCount(
 
 // IncrementValidatorSigningCounts ..
 func IncrementValidatorSigningCounts(
-	chain engine.ChainReader, header *block.Header,
-	shardID uint32, state *state.DB,
-	stakedAddrSet map[common.Address]struct{},
+	bc Reader,
+	staked *shard.StakedSlots,
+	state *state.DB,
+	signers, missing shard.SlotList,
 ) error {
-	l := utils.Logger().Info().Str("candidate-header", header.String())
-	_, signers, missing, err := BallotResult(chain, header, shardID)
-	if err != nil {
-		return err
-	}
+	l := utils.Logger().Info()
+	l.RawJSON("missing", []byte(missing.String())).
+		Msg("signers that did sign")
+
 	l.Msg("bumping signing counters for non-missing signers")
+
 	if err := bumpCount(
-		chain, state, signers, true, stakedAddrSet,
+		bc, state, signers, true, staked.LookupSet,
 	); err != nil {
 		return err
 	}
-	l.Msg("bumping missed signing counter ")
-	return bumpCount(chain, state, missing, false, stakedAddrSet)
+	l.Msg("bumping missing signers counters")
+	return bumpCount(bc, state, missing, false, staked.LookupSet)
+}
+
+// Reader ..
+type Reader interface {
+	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
 }
 
 // SetInactiveUnavailableValidators sets the validator to
@@ -183,14 +191,8 @@ func IncrementValidatorSigningCounts(
 // whenever committee selection happens in future, the
 // signing threshold is 66%
 func SetInactiveUnavailableValidators(
-	bc engine.ChainReader, state *state.DB,
+	bc Reader, state *state.DB, addrs []common.Address,
 ) error {
-	addrs, err := bc.ReadElectedValidatorList()
-	if err != nil {
-		return err
-	}
-
-	now := bc.CurrentHeader().Epoch()
 	for i := range addrs {
 		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
 		if err != nil {
@@ -203,9 +205,8 @@ func SetInactiveUnavailableValidators(
 			return err
 		}
 
-		statsNow, snapEpoch, snapSigned, snapToSign :=
+		statsNow, snapSigned, snapToSign :=
 			wrapper.Counters,
-			snapshot.LastEpochInCommittee,
 			snapshot.Counters.NumBlocksSigned,
 			snapshot.Counters.NumBlocksToSign
 
@@ -214,18 +215,6 @@ func SetInactiveUnavailableValidators(
 			RawJSON("current", []byte(wrapper.String()))
 
 		l.Msg("begin checks for availability")
-
-		if snapEpoch.Cmp(common.Big0) == 0 {
-			l.Msg("pass newly joined validator for inactivity check")
-			continue
-		}
-
-		if d := new(big.Int).Sub(now, snapEpoch); d.Cmp(common.Big1) != 0 {
-			return errors.Wrapf(
-				errValidatorEpochDeviation, "bc %s, snapshot %s",
-				now.String(), snapEpoch.String(),
-			)
-		}
 
 		signed, toSign :=
 			new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
@@ -246,10 +235,21 @@ func SetInactiveUnavailableValidators(
 		}
 
 		if toSign.Cmp(common.Big0) == 0 {
-			return ErrDivByZero
+			l.Msg("toSign is 0, perhaps did not receive crosslink proving signing")
+			continue
 		}
 
-		if r := new(big.Int).Div(signed, toSign); r.Cmp(measure) == -1 {
+		s1, s2 :=
+			numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
+		quotient := s1.Quo(s2)
+
+		l.Str("signed", s1.String()).
+			Str("to-sign", s2.String()).
+			Str("percentage-signed", quotient.String()).
+			Bool("meets-threshold", quotient.LTE(measure)).
+			Msg("check if signing percent is meeting required threshold")
+
+		if quotient.LTE(measure) {
 			wrapper.Active = false
 			l.Str("threshold", measure.String()).
 				Msg("validator failed availability threshold, set to inactive")
