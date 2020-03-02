@@ -68,12 +68,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	var (
 		receipts types.Receipts
 		outcxs   types.CXReceipts
-
-		incxs   = block.IncomingReceipts()
-		usedGas = new(uint64)
-		header  = block.Header()
-		allLogs []*types.Log
-		gp      = new(GasPool).AddGas(block.GasLimit())
+		incxs    = block.IncomingReceipts()
+		usedGas  = new(uint64)
+		header   = block.Header()
+		allLogs  []*types.Log
+		gp       = new(GasPool).AddGas(block.GasLimit())
 	)
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
 

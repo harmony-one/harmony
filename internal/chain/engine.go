@@ -144,7 +144,7 @@ func (e *engineImpl) VerifyShardState(bc engine.ChainReader, beacon engine.Chain
 	}
 	headerShardStateBytes := header.ShardState()
 	// TODO: figure out leader withhold shardState
-	if headerShardStateBytes == nil || len(headerShardStateBytes) == 0 {
+	if len(headerShardStateBytes) == 0 {
 		return nil
 	}
 	shardState, err := bc.SuperCommitteeForNextEpoch(beacon, header, true)
@@ -468,7 +468,9 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 }
 
 // GetPublicKeys finds the public keys of the committee that signed the block header
-func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate bool) ([]*bls.PublicKey, error) {
+func GetPublicKeys(
+	chain engine.ChainReader, header *block.Header, reCalculate bool,
+) ([]*bls.PublicKey, error) {
 	shardState := new(shard.State)
 	var err error
 	if reCalculate {
@@ -488,13 +490,10 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 			"shardID", header.ShardID(),
 		)
 	}
-	var committerKeys []*bls.PublicKey
-
-	utils.Logger().Print(committee.Slots)
+	committerKeys := []*bls.PublicKey{}
 	for _, member := range committee.Slots {
 		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
+		if err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
 			return nil, ctxerror.New("cannot convert BLS public key",
 				"blsPublicKey", member.BlsPublicKey).WithCause(err)
 		}
