@@ -630,6 +630,13 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	shardState, err := committee.WithStakingEnabled.Compute(
 		epoch, node.Consensus.ChainReader,
 	)
+	if err != nil {
+		utils.Logger().Err(err).
+			Uint64("blockNum", blockNum).
+			Uint32("shardID", shardID).
+			Uint64("epoch", epoch.Uint64()).
+			Msg("[InitConsensusWithValidators] Failed getting shard state")
+	}
 	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
 		shardState.FindCommitteeByID(shardID),
 	)
