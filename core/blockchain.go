@@ -334,6 +334,10 @@ func (bc *BlockChain) loadLastState() error {
 	//		currentHeader = header
 	//	}
 	//}
+	utils.Logger().Warn().
+		Str("number", currentBlock.Number().String()).
+		Str("hash", currentBlock.Hash().Hex()).
+		Msg("Head state missing, repairing chain")
 	currentHeader := currentBlock.Header()
 	bc.hc.SetCurrentHeader(currentHeader)
 
