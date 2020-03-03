@@ -301,11 +301,6 @@ func (e *engineImpl) Finalize(
 		}
 	}
 
-	l := utils.Logger().Info().
-		Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-		Uint64("finalizing-epoch", header.Epoch().Uint64()).
-		Uint64("block-number", header.Number().Uint64())
-
 	if isBeaconChain && inStakingEra {
 		nowEpoch := chain.CurrentHeader().Epoch()
 		superCommittee, err := chain.ReadShardState(nowEpoch)
@@ -315,7 +310,11 @@ func (e *engineImpl) Finalize(
 		staked := superCommittee.StakedValidators()
 		// could happen that only harmony nodes are running,
 		if isNewEpoch && staked.CountStakedValidator > 0 {
-			l.Msg("in new epoch (aka last block), apply availability check for activity")
+			utils.Logger().Info().
+				Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
+				Uint64("finalizing-epoch", header.Epoch().Uint64()).
+				Uint64("block-number", header.Number().Uint64()).
+				Msg("in new epoch (aka last block), apply availability check for activity")
 			if err := availability.SetInactiveUnavailableValidators(
 				chain, state, staked.Addrs,
 			); err != nil {
@@ -362,10 +361,13 @@ func (e *engineImpl) Finalize(
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
 		rate := slash.Rate(caught, staked.CountStakedBLSKey)
-		lg := l.Str("rate", rate.String()).
-			RawJSON("records", []byte(doubleSigners.String()))
-
-		lg.Msg("now applying slash to state during block finalization")
+		utils.Logger().Info().
+			Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
+			Uint64("finalizing-epoch", header.Epoch().Uint64()).
+			Uint64("block-number", header.Number().Uint64()).
+			Str("rate", rate.String()).
+			RawJSON("records", []byte(doubleSigners.String())).
+			Msg("now applying slash to state during block finalization")
 		if slashApplied, err = slash.Apply(
 			chain,
 			state,
@@ -375,9 +377,14 @@ func (e *engineImpl) Finalize(
 			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
 
-		lg.RawJSON("applied", []byte(slashApplied.String())).
+		utils.Logger().Info().
+			Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
+			Uint64("finalizing-epoch", header.Epoch().Uint64()).
+			Uint64("block-number", header.Number().Uint64()).
+			Str("rate", rate.String()).
+			RawJSON("records", []byte(doubleSigners.String())).
+			RawJSON("applied", []byte(slashApplied.String())).
 			Msg("slash applied successfully")
-
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
