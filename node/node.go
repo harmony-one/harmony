@@ -636,6 +636,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			Uint32("shardID", shardID).
 			Uint64("epoch", epoch.Uint64()).
 			Msg("[InitConsensusWithValidators] Failed getting shard state")
+		return err
 	}
 	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
 		shardState.FindCommitteeByID(shardID),
