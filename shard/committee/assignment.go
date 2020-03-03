@@ -237,6 +237,10 @@ func eposStakedCommittee(
 
 // GetCommitteePublicKeys returns the public keys of a shard
 func (def partialStakingEnabled) GetCommitteePublicKeys(committee *shard.Committee) []*bls.PublicKey {
+	if committee == nil {
+		utils.Logger().Error().Msg("[GetCommitteePublicKeys] Committee is nil")
+		return []*bls.PublicKey{}
+	}
 	allIdentities := make([]*bls.PublicKey, len(committee.Slots))
 	for i := range committee.Slots {
 		identity := &bls.PublicKey{}
