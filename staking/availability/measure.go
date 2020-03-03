@@ -118,7 +118,6 @@ func bumpCount(
 	didSign bool,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
-	l := utils.Logger().Info()
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
 		// NOTE if the signer address is not part of the staked addrs,
@@ -133,7 +132,7 @@ func bumpCount(
 			return err
 		}
 
-		l.RawJSON("validator", []byte(wrapper.String())).
+		utils.Logger().Info().RawJSON("validator", []byte(wrapper.String())).
 			Msg("about to adjust counters")
 
 		wrapper.Counters.NumBlocksToSign.Add(
@@ -146,7 +145,7 @@ func bumpCount(
 			)
 		}
 
-		l.RawJSON("validator", []byte(wrapper.String())).
+		utils.Logger().Info().RawJSON("validator", []byte(wrapper.String())).
 			Msg("bumped signing counters")
 
 		if err := state.UpdateValidatorWrapper(
@@ -165,18 +164,20 @@ func IncrementValidatorSigningCounts(
 	state *state.DB,
 	signers, missing shard.SlotList,
 ) error {
-	l := utils.Logger().Info()
-	l.RawJSON("missing", []byte(missing.String())).
+	utils.Logger().Info().
+		RawJSON("missing", []byte(missing.String())).
 		Msg("signers that did sign")
 
-	l.Msg("bumping signing counters for non-missing signers")
+	utils.Logger().Info().
+		Msg("bumping signing counters for non-missing signers")
 
 	if err := bumpCount(
 		bc, state, signers, true, staked.LookupSet,
 	); err != nil {
 		return err
 	}
-	l.Msg("bumping missing signers counters")
+	utils.Logger().Info().
+		Msg("bumping missing signers counters")
 	return bumpCount(bc, state, missing, false, staked.LookupSet)
 }
 
@@ -210,11 +211,10 @@ func SetInactiveUnavailableValidators(
 			snapshot.Counters.NumBlocksSigned,
 			snapshot.Counters.NumBlocksToSign
 
-		l := utils.Logger().Info().
+		utils.Logger().Info().
 			RawJSON("snapshot", []byte(snapshot.String())).
-			RawJSON("current", []byte(wrapper.String()))
-
-		l.Msg("begin checks for availability")
+			RawJSON("current", []byte(wrapper.String())).
+			Msg("begin checks for availability")
 
 		signed, toSign :=
 			new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
@@ -235,7 +235,10 @@ func SetInactiveUnavailableValidators(
 		}
 
 		if toSign.Cmp(common.Big0) == 0 {
-			l.Msg("toSign is 0, perhaps did not receive crosslink proving signing")
+			utils.Logger().Info().
+				RawJSON("snapshot", []byte(snapshot.String())).
+				RawJSON("current", []byte(wrapper.String())).
+				Msg("toSign is 0, perhaps did not receive crosslink proving signing")
 			continue
 		}
 
@@ -243,7 +246,10 @@ func SetInactiveUnavailableValidators(
 			numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
 		quotient := s1.Quo(s2)
 
-		l.Str("signed", s1.String()).
+		utils.Logger().Info().
+			RawJSON("snapshot", []byte(snapshot.String())).
+			RawJSON("current", []byte(wrapper.String())).
+			Str("signed", s1.String()).
 			Str("to-sign", s2.String()).
 			Str("percentage-signed", quotient.String()).
 			Bool("meets-threshold", quotient.LTE(measure)).
@@ -251,7 +257,10 @@ func SetInactiveUnavailableValidators(
 
 		if quotient.LTE(measure) {
 			wrapper.Active = false
-			l.Str("threshold", measure.String()).
+			utils.Logger().Info().
+				RawJSON("snapshot", []byte(snapshot.String())).
+				RawJSON("current", []byte(wrapper.String())).
+				Str("threshold", measure.String()).
 				Msg("validator failed availability threshold, set to inactive")
 			if err := state.UpdateValidatorWrapper(addrs[i], wrapper); err != nil {
 				return err

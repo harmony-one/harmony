@@ -116,10 +116,12 @@ func eposStakedCommittee(
 ) (*shard.State, error) {
 	// TODO Nervous about this because overtime the list will become quite large
 	candidates := stakerReader.ValidatorCandidates()
-	essentials := map[common.Address]effective.SlotOrder{}
-	l := utils.Logger().Info().Int("staked-candidates", len(candidates))
-	l.Msg("preparing epos staked committee")
-	blsKeys := make(map[shard.BlsPublicKey]struct{})
+	essentials, blsKeys :=
+		map[common.Address]effective.SlotOrder{}, map[shard.BlsPublicKey]struct{}{}
+
+	utils.Logger().Info().
+		Int("staked-candidates", len(candidates)).
+		Msg("preparing epos staked committee")
 
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
@@ -128,12 +130,16 @@ func eposStakedCommittee(
 			return nil, err
 		}
 		if !effective.IsEligibleForEPOSAuction(validator) {
-			l.RawJSON("candidate", []byte(validator.String())).
+			utils.Logger().Info().
+				Int("staked-candidates", len(candidates)).
+				RawJSON("candidate", []byte(validator.String())).
 				Msg("validator not eligible for epos")
 			continue
 		}
 		if err := validator.SanityCheck(); err != nil {
-			l.Err(err).
+			utils.Logger().Info().
+				Int("staked-candidates", len(candidates)).
+				Err(err).
 				RawJSON("candidate", []byte(validator.String())).
 				Msg("validator sanity check failed")
 			continue
@@ -155,7 +161,9 @@ func eposStakedCommittee(
 		}
 		if found {
 			const m = "Duplicate bls key found %x, in validator %+v. Ignoring"
-			l.Msgf(m, dupKey, validator)
+			utils.Logger().Info().
+				Int("staked-candidates", len(candidates)).
+				Msgf(m, dupKey, validator)
 			continue
 		}
 
@@ -188,7 +196,9 @@ func eposStakedCommittee(
 	}
 
 	if stakedSlotsCount == 0 {
-		l.Int("slots-for-epos", stakedSlotsCount).
+		utils.Logger().Info().
+			Int("staked-candidates", len(candidates)).
+			Int("slots-for-epos", stakedSlotsCount).
 			Msg("committe composed only of harmony node")
 		return shardState, nil
 	}
@@ -215,7 +225,8 @@ func eposStakedCommittee(
 	}
 
 	if c := len(candidates); c != 0 {
-		l.Int("staked-candidates", c).
+		utils.Logger().Info().
+			Int("staked-candidates", c).
 			Str("total-staked-by-validators", totalStake.String()).
 			RawJSON("staked-super-committee", []byte(shardState.String())).
 			Msg("epos based super-committe")
@@ -227,7 +238,6 @@ func eposStakedCommittee(
 // GetCommitteePublicKeys returns the public keys of a shard
 func (def partialStakingEnabled) GetCommitteePublicKeys(committee *shard.Committee) []*bls.PublicKey {
 	allIdentities := make([]*bls.PublicKey, len(committee.Slots))
-
 	for i := range committee.Slots {
 		identity := &bls.PublicKey{}
 		committee.Slots[i].BlsPublicKey.ToLibBLSPublicKey(identity)
