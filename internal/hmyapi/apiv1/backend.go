@@ -49,15 +49,20 @@ type Backend interface {
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
+
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
+	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
 	// GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
+	// Note that tx pool will contain both regular and staking txns together
 	GetPoolTransactions() (types.PoolTransactions, error)
+	// GetPoolTransaction ... txHash can be either regular or staking txn hash
 	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	// Stats() (pending int, queued int)
 	// TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
+
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
 	// Get balance
@@ -70,7 +75,7 @@ type Backend interface {
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
-	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
+
 	GetElectedValidatorAddresses() []common.Address
 	GetAllValidatorAddresses() []common.Address
 	GetValidatorInformation(addr common.Address) *staking.ValidatorWrapper
