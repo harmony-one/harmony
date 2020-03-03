@@ -393,3 +393,116 @@ func TestCV28(t *testing.T) {
 		t.Error("expected", "rate:1.01000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
 	}
 }
+
+// Test CV29: amount > MinSelfDelegation
+func TestCV29(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// amount > MinSelfDelegation
+	msg.Amount = big.NewInt(4e18)
+	msg.MinSelfDelegation = big.NewInt(1e18)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+}
+
+// Test CV30: amount == MinSelfDelegation
+func TestCV30(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// amount > MinSelfDelegation
+	msg.Amount = big.NewInt(4e18)
+	msg.MinSelfDelegation = big.NewInt(4e18)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+}
+
+// Test CV31: amount < MinSelfDelegation
+func TestCV31(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// amount > MinSelfDelegation
+	msg.Amount = big.NewInt(4e18)
+	msg.MinSelfDelegation = big.NewInt(5e18)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "have 4000000000000000000 want 5000000000000000000: self delegation can not be less than min_self_delegation", "got", nil)
+	}
+}
+
+// Test CV32: MaxTotalDelegation < MinSelfDelegation
+func TestCV32(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// MaxTotalDelegation < MinSelfDelegation
+	msg.MaxTotalDelegation = big.NewInt(2e18)
+	msg.MinSelfDelegation = big.NewInt(3e18)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "max_total_delegation can not be less than min_self_delegation", "got", nil)
+	}
+}
+
+// Test CV33: MinSelfDelegation < 1 ONE
+func TestCV33(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// MinSelfDelegation < 1 ONE
+	msg.MinSelfDelegation = big.NewInt(1e18 - 1)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "delegation-given 999999999999999999: min_self_delegation has to be greater than 1 ONE", "got", nil)
+	}
+}
+
+// Test CV34: MinSelfDelegation not specified
+func TestCV34(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// MinSelfDelegation not specified
+	msg.MinSelfDelegation = nil
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "MinSelfDelegation can not be nil", "got", nil)
+	}
+}
+
+// Test CV35: MinSelfDelegation < 0
+func TestCV35(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// MinSelfDelegation < 0
+	msg.MinSelfDelegation = big.NewInt(-1)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "delegation-given -1: min_self_delegation has to be greater than 1 ONE", "got", nil)
+	}
+}
+
+// Test CV36: amount > MaxTotalDelegation
+func TestCV36(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// amount > MaxTotalDelegation
+	msg.Amount = big.NewInt(4e18)
+	msg.MaxTotalDelegation = big.NewInt(3e18)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "total delegation can not be bigger than max_total_delegation", "got", nil)
+	}
+}
+
+// Test CV39: MaxTotalDelegation < 0
+func TestCV39(t *testing.T) {
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	// MaxTotalDelegation < 0
+	msg.MaxTotalDelegation = big.NewInt(-1)
+	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err == nil {
+		t.Error("expected", "max_total_delegation can not be less than min_self_delegation", "got", nil)
+	}
+}
