@@ -16,7 +16,7 @@ import (
 
 // Constants of proposing a new block
 const (
-	PeriodicBlock         = 200 * time.Millisecond
+	PeriodicBlock         = 20 * time.Millisecond
 	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
 )
 
@@ -49,6 +49,9 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						continue
 					}
 
+					// Start counting for block time before block proposal.
+					tmpDeadline := time.Now().Add(node.BlockPeriod)
+
 					utils.Logger().Debug().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
@@ -62,8 +65,9 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 							Msg("=========Successfully Proposed New Block==========")
 
-						// Set deadline will be BlockPeriod from now at this place. Announce stage happens right after this.
-						deadline = time.Now().Add(node.BlockPeriod)
+						// Set deadline only if block proposal is successful, otherwise, we should
+						// immediately start retrying block proposal
+						deadline = tmpDeadline
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
 						break
@@ -154,22 +158,32 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch()) {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
-
+		invalidToDelete := []types.CrossLink{}
 		if err == nil {
 			for _, pending := range allPending {
-				if err = node.VerifyCrossLink(pending); err != nil {
-					continue
-				}
 				exist, err := node.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
 				if err == nil || exist != nil {
+					invalidToDelete = append(invalidToDelete, pending)
+					utils.Logger().Debug().
+						AnErr("[proposeNewBlock] pending crosslink is already committed onchain", err)
+					continue
+				}
+				if err = node.VerifyCrossLink(pending); err != nil {
+					invalidToDelete = append(invalidToDelete, pending)
+					utils.Logger().Debug().
+						AnErr("[proposeNewBlock] pending crosslink verification failed", err)
 					continue
 				}
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
 			utils.Logger().Debug().Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks", len(crossLinksToPropose), len(allPending))
 		} else {
-			utils.Logger().Error().Err(err).Msgf("[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d", len(allPending))
+			utils.Logger().Error().Err(err).Msgf(
+				"[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
+				len(allPending),
+			)
 		}
+		node.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete)
 	}
 
 	// Prepare shard state
