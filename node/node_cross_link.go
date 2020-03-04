@@ -10,6 +10,7 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -163,7 +164,7 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	decider.SetShardIDProvider(func() (uint32, error) {
 		return cl.ShardID(), nil
 	})
-	decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+	decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 		return nil, nil
 	})
 	if _, err := decider.SetVoters(committee.Slots); err != nil {

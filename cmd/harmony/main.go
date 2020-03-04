@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -32,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
@@ -101,6 +102,7 @@ var (
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
+	blsFolder          = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys; same blspass is used to decrypt all bls keys; all bls keys mapped to same shard")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 	blsPassphrase      string
 	// Sharding configuration parameters for devnet
@@ -114,7 +116,7 @@ var (
 	// Use a separate log file to log libp2p traces
 	logP2P = flag.Bool("log_p2p", false, "log libp2p debug info")
 
-	initialAccount = &genesis.DeployAccount{}
+	initialAccounts = []*genesis.DeployAccount{}
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 	// dbDir is the database directory.
@@ -188,8 +190,12 @@ func passphraseForBls() {
 		return
 	}
 
-	if *blsKeyFile == "" || *blsPass == "" {
-		fmt.Println("Internal nodes need to have pass to decrypt blskey")
+	if *blsKeyFile == "" && *blsFolder == "" {
+		fmt.Println("blskey_file or blsfolder option must be provided")
+		os.Exit(101)
+	}
+	if *blsPass == "" {
+		fmt.Println("Internal nodes need to have blspass to decrypt blskey")
 		os.Exit(101)
 	}
 	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
@@ -200,27 +206,41 @@ func passphraseForBls() {
 	blsPassphrase = passphrase
 }
 
+func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys []*bls.PublicKey) {
+	for _, key := range pubKeys {
+		keyStr := key.SerializeToHexStr()
+		_, account := config.FindAccount(keyStr)
+		if account != nil {
+			initialAccounts = append(initialAccounts, account)
+		}
+	}
+}
+
 func setupLegacyNodeAccount() error {
 	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
-	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
+	multiBlsPubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
 	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
-			_, initialAccount = config.FindAccount(pubKey.SerializeToHexStr())
-			if initialAccount != nil {
+			findAccountsByPubKeys(config, multiBlsPubKey.PublicKey)
+			if len(initialAccounts) != 0 {
 				break
 			}
 		}
 	} else {
-		_, initialAccount = genesisShardingConfig.FindAccount(pubKey.SerializeToHexStr())
+		findAccountsByPubKeys(genesisShardingConfig, multiBlsPubKey.PublicKey)
 	}
 
-	if initialAccount == nil {
-		return errors.Errorf("cannot find key %s in table", pubKey.SerializeToHexStr())
+	if len(initialAccounts) == 0 {
+		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", multiBlsPubKey.SerializeToHexStr())
+		os.Exit(100)
 	}
-	fmt.Printf("My Genesis Account: %v\n", *initialAccount)
+
+	for _, account := range initialAccounts {
+		fmt.Printf("My Genesis Account: %v\n", *account)
+	}
 	return nil
 }
 
@@ -230,39 +250,82 @@ func setupStakingNodeAccount() error {
 	if err != nil {
 		return errors.Wrap(err, "cannot determine shard to join")
 	}
-	initialAccount = &genesis.DeployAccount{}
-	initialAccount.ShardID = shardID
-	initialAccount.BlsPublicKey = pubKey.SerializeToHexStr()
-	initialAccount.Address = ""
+	for _, blsKey := range pubKey.PublicKey {
+		initialAccount := &genesis.DeployAccount{}
+		initialAccount.ShardID = shardID
+		initialAccount.BlsPublicKey = blsKey.SerializeToHexStr()
+		initialAccount.Address = ""
+		initialAccounts = append(initialAccounts, initialAccount)
+	}
 	return nil
 }
 
-func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) *bls.PublicKey {
-	consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
+func readMultiBlsKeys(consensusMultiBlsPriKey *multibls.PrivateKey, consensusMultiBlsPubKey *multibls.PublicKey) error {
+	multiBlsKeyDir := blsFolder
+	blsKeyFiles, err := ioutil.ReadDir(*multiBlsKeyDir)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
-		os.Exit(100)
+		return err
 	}
-	pubKey := consensusPriKey.GetPublicKey()
+
+	for _, blsKeyFile := range blsKeyFiles {
+		if filepath.Ext(blsKeyFile.Name()) != ".key" {
+			fmt.Println("BLS key file should have .key file extension, found", blsKeyFile.Name())
+			continue
+		}
+		blsKeyFilePath := path.Join(*multiBlsKeyDir, blsKeyFile.Name())
+		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(blsKeyFilePath, blsPassphrase) // uses the same bls passphrase for multiple bls keys
+		if err != nil {
+			return err
+		}
+		// TODO: assumes order between public/private key pairs
+		multibls.AppendPriKey(consensusMultiBlsPriKey, consensusPriKey)
+		multibls.AppendPubKey(consensusMultiBlsPubKey, consensusPriKey.GetPublicKey())
+	}
+
+	return nil
+}
+
+func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
+	consensusMultiPriKey := &multibls.PrivateKey{}
+	consensusMultiPubKey := &multibls.PublicKey{}
+
+	if *blsKeyFile != "" {
+		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
+			os.Exit(100)
+		}
+		multibls.AppendPriKey(consensusMultiPriKey, consensusPriKey)
+		multibls.AppendPubKey(consensusMultiPubKey, consensusPriKey.GetPublicKey())
+	} else {
+		err := readMultiBlsKeys(consensusMultiPriKey, consensusMultiPubKey)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "ERROR when loading bls keys, err :%v\n", err)
+			os.Exit(100)
+		}
+	}
 
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
-	nodeConfig.ConsensusPriKey, nodeConfig.ConsensusPubKey = consensusPriKey, consensusPriKey.GetPublicKey()
-	if nodeConfig.ConsensusPriKey == nil || nodeConfig.ConsensusPubKey == nil {
-		fmt.Println("error to get consensus keys.")
-		os.Exit(100)
-	}
-	return pubKey
+	nodeConfig.ConsensusPriKey = consensusMultiPriKey
+	nodeConfig.ConsensusPubKey = consensusMultiPubKey
+
+	return *consensusMultiPubKey
 }
 
 func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	var err error
 
-	nodeConfig := nodeconfig.GetShardConfig(initialAccount.ShardID)
+	if len(initialAccounts) == 0 {
+		initialAccounts = append(initialAccounts, &genesis.DeployAccount{ShardID: uint32(*shardID)})
+	}
+	nodeConfig := nodeconfig.GetShardConfig(initialAccounts[0].ShardID)
 	if *nodeType == "validator" {
 		// Set up consensus keys.
 		setupConsensusKey(nodeConfig)
 	} else {
-		nodeConfig.ConsensusPriKey = &bls.SecretKey{} // set dummy bls key for consensus object
+		// set dummy bls key for consensus object
+		nodeConfig.ConsensusPriKey = multibls.GetPrivateKey(&bls.SecretKey{})
+		nodeConfig.ConsensusPubKey = multibls.GetPublicKey(&bls.PublicKey{})
 	}
 
 	// Set network type
@@ -279,7 +342,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 			*keyFile)
 	}
 
-	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey}
+	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0]}
 
 	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
 	if err != nil {
@@ -317,12 +380,14 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.Decider.SetShardIDProvider(func() (uint32, error) {
 		return currentConsensus.ShardID, nil
 	})
-	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 		return currentConsensus.PubKey, nil
 	})
 
-	if initialAccount.Address != "" { // staking validator doesn't have to specify ECDSA address
-		currentConsensus.SelfAddress = common.ParseAddr(initialAccount.Address)
+	// staking validator doesn't have to specify ECDSA address
+	currentConsensus.SelfAddresses = map[string]ethCommon.Address{}
+	for _, initialAccount := range initialAccounts {
+		currentConsensus.SelfAddresses[initialAccount.BlsPublicKey] = common.ParseAddr(initialAccount.Address)
 	}
 
 	if err != nil {
@@ -540,17 +605,20 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	fmt.Printf("%s mode; node key %s -> shard %d\n",
-		map[bool]string{false: "Legacy", true: "Staking"}[*stakingFlag],
-		nodeconfig.GetDefaultConfig().ConsensusPubKey.SerializeToHexStr(),
-		initialAccount.ShardID)
-
+	if *nodeType == "validator" {
+		fmt.Printf("%s mode; node key %s -> shard %d\n",
+			map[bool]string{false: "Legacy", true: "Staking"}[*stakingFlag],
+			nodeconfig.GetDefaultConfig().ConsensusPubKey.SerializeToHexStr(),
+			initialAccounts[0].ShardID)
+	}
 	if *nodeType != "validator" && *shardID >= 0 {
-		utils.Logger().Info().
-			Uint32("original", initialAccount.ShardID).
-			Int("override", *shardID).
-			Msg("ShardID Override")
-		initialAccount.ShardID = uint32(*shardID)
+		for _, initialAccount := range initialAccounts {
+			utils.Logger().Info().
+				Uint32("original", initialAccount.ShardID).
+				Int("override", *shardID).
+				Msg("ShardID Override")
+			initialAccount.ShardID = uint32(*shardID)
+		}
 	}
 
 	nodeConfig, err := createGlobalConfig()
@@ -614,7 +682,7 @@ func main() {
 	}
 
 	utils.Logger().Info().
-		Str("BlsPubKey", hex.EncodeToString(nodeConfig.ConsensusPubKey.Serialize())).
+		Str("BlsPubKey", nodeConfig.ConsensusPubKey.SerializeToHexStr()).
 		Uint32("ShardID", nodeConfig.ShardID).
 		Str("ShardGroupID", nodeConfig.GetShardGroupID().String()).
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).

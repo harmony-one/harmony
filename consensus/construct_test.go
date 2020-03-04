@@ -9,6 +9,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/shard"
@@ -22,14 +23,15 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil); err != nil {
+	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, blsPriKey.GetPublicKey(), blsPriKey); err != nil {
 		test.Fatalf("could not construct announce: %v", err)
 	}
 }
@@ -47,8 +49,9 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, bls.RandPrivateKey(), decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
@@ -78,7 +81,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Log(ctxerror.New("prepareBitmap.SetKey").WithCause(err))
 	}
 
-	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
+	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, blsPriKey.GetPublicKey(), blsPriKey)
 	if err != nil {
 		test.Errorf("Error when creating prepared message")
 	}

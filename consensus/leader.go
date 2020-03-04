@@ -36,7 +36,13 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	consensus.block = encodedBlock
 	consensus.blockHeader = encodedBlockHeader
-	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil)
+
+	key, err := consensus.GetConsensusLeaderPrivateKey()
+	if err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[Announce] Node not a leader")
+		return
+	}
+	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, key.GetPublicKey(), key)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_ANNOUNCE.String()).
@@ -55,21 +61,20 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.FBFTLog.AddBlock(block)
 
 	// Leader sign the block hash itself
-	consensus.Decider.SubmitVote(
-		quorum.Prepare,
-		consensus.PubKey,
-		consensus.priKey.SignHash(consensus.blockHash[:]),
-		common.BytesToHash(consensus.blockHash[:]),
-	)
-	if err := consensus.prepareBitmap.SetKey(
-		consensus.PubKey, true,
-	); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg(
-			"[Announce] Leader prepareBitmap SetKey failed",
+	for i, key := range consensus.PubKey.PublicKey {
+		consensus.Decider.SubmitVote(
+			quorum.Prepare,
+			key,
+			consensus.priKey.PrivateKey[i].SignHash(consensus.blockHash[:]),
+			common.BytesToHash(consensus.blockHash[:]),
 		)
-		return
+		if err := consensus.prepareBitmap.SetKey(key, true); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg(
+				"[Announce] Leader prepareBitmap SetKey failed",
+			)
+			return
+		}
 	}
-
 	// Construct broadcast p2p message
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.blockNum, msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
@@ -268,7 +273,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 								Offender: *addr,
 							}
 							consensus.SlashChan <- proof
-						}(consensus.SelfAddress)
+						}(consensus.SelfAddresses[consensus.LeaderPubKey.SerializeToHexStr()])
 						return
 					}
 				}

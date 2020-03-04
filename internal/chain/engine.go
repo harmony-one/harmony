@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/availability"
@@ -212,7 +213,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		d.SetShardIDProvider(func() (uint32, error) {
 			return parentHeader.ShardID(), nil
 		})
-		d.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
 		})
 		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
@@ -444,7 +445,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		d.SetShardIDProvider(func() (uint32, error) {
 			return header.ShardID(), nil
 		})
-		d.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
 		})
 		d.SetVoters(slotList.FindCommitteeByID(header.ShardID()).Slots)

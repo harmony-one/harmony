@@ -244,10 +244,15 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 		return false
 	}
 	identity, _ := pubKeyFunc()
-	w := shard.BlsPublicKey{}
-	w.FromLibBLSPublicKey(identity)
-	_, ok := v.roster.Voters[w]
-	return ok
+	for _, key := range identity.PublicKey {
+		w := shard.BlsPublicKey{}
+		w.FromLibBLSPublicKey(key)
+		_, ok := v.roster.Voters[w]
+		if ok {
+			return true
+		}
+	}
+	return false
 }
 
 func newBox() *voteBox {
