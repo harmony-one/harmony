@@ -297,9 +297,24 @@ func (e *engineImpl) Finalize(
 				)
 				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 			}
-			wrapper.LastEpochInCommittee = newShardState.Epoch
 			if err := state.UpdateValidatorWrapper(
 				validator, wrapper,
+			); err != nil {
+				const msg = "[Finalize] failed update validator info"
+				return nil, nil, ctxerror.New(msg).WithCause(err)
+			}
+		}
+
+		for _, addr := range newShardState.StakedValidators().Addrs {
+			wrapper, err := state.ValidatorWrapper(addr)
+			if err != nil {
+				return nil, nil, ctxerror.New(
+					"[Finalize] failed to get validator from state to finalize",
+				).WithCause(err)
+			}
+			wrapper.LastEpochInCommittee = newShardState.Epoch
+			if err := state.UpdateValidatorWrapper(
+				addr, wrapper,
 			); err != nil {
 				const msg = "[Finalize] failed update validator info"
 				return nil, nil, ctxerror.New(msg).WithCause(err)
