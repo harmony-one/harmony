@@ -89,12 +89,6 @@ func AccumulateRewards(
 			return network.NoReward, err
 		}
 
-		if err := availability.ComputeAndRecord(
-			beaconChain, state, staked,
-		); err != nil {
-			return network.NoReward, err
-		}
-
 		votingPower, err := votepower.Compute(members)
 		if err != nil {
 			return network.NoReward, err
@@ -158,12 +152,6 @@ func AccumulateRewards(
 				staked := subComm.StakedValidators()
 				if err := availability.IncrementValidatorSigningCounts(
 					beaconChain, staked, state, payableSigners, missing,
-				); err != nil {
-					return network.NoReward, err
-				}
-
-				if err := availability.ComputeAndRecord(
-					beaconChain, state, staked,
 				); err != nil {
 					return network.NoReward, err
 				}
