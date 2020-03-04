@@ -186,14 +186,15 @@ type Reader interface {
 	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
 }
 
-// SetInactiveUnavailableValidators sets the validator to
+// ComputeAndRecord sets the validator to
 // inactive and thereby keeping it out of
 // consideration in the pool of validators for
 // whenever committee selection happens in future, the
 // signing threshold is 66%
-func SetInactiveUnavailableValidators(
-	bc Reader, state *state.DB, addrs []common.Address,
+func ComputeAndRecord(
+	bc Reader, state *state.DB, staked *shard.StakedSlots,
 ) error {
+	addrs := staked.Addrs
 	for i := range addrs {
 		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
 		if err != nil {
@@ -255,16 +256,21 @@ func SetInactiveUnavailableValidators(
 			Bool("meets-threshold", quotient.LTE(measure)).
 			Msg("check if signing percent is meeting required threshold")
 
-		if quotient.LTE(measure) {
+		const missedTooManyBlocks = true
+
+		switch quotient.LTE(measure) {
+		case missedTooManyBlocks:
 			wrapper.Active = false
 			utils.Logger().Info().
 				RawJSON("snapshot", []byte(snapshot.String())).
 				RawJSON("current", []byte(wrapper.String())).
 				Str("threshold", measure.String()).
 				Msg("validator failed availability threshold, set to inactive")
-			if err := state.UpdateValidatorWrapper(addrs[i], wrapper); err != nil {
-				return err
-			}
+		default:
+			wrapper.Active = true
+		}
+		if err := state.UpdateValidatorWrapper(addrs[i], wrapper); err != nil {
+			return err
 		}
 	}
 

@@ -77,13 +77,20 @@ func AccumulateRewards(
 		if err != nil {
 			return network.NoReward, err
 		}
+		staked := shard.Committee{shard.BeaconChainShardID, members}.StakedValidators()
 
 		if err := availability.IncrementValidatorSigningCounts(
 			beaconChain,
-			shard.Committee{shard.BeaconChainShardID, members}.StakedValidators(),
+			staked,
 			state,
 			payable,
 			missing,
+		); err != nil {
+			return network.NoReward, err
+		}
+
+		if err := availability.ComputeAndRecord(
+			beaconChain, state, staked,
 		); err != nil {
 			return network.NoReward, err
 		}
@@ -151,6 +158,12 @@ func AccumulateRewards(
 				staked := subComm.StakedValidators()
 				if err := availability.IncrementValidatorSigningCounts(
 					beaconChain, staked, state, payableSigners, missing,
+				); err != nil {
+					return network.NoReward, err
+				}
+
+				if err := availability.ComputeAndRecord(
+					beaconChain, state, staked,
 				); err != nil {
 					return network.NoReward, err
 				}

@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/core/state"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -56,8 +57,15 @@ func defaultStateWithAccountsApplied() *state.DB {
 
 func TestSetInactiveUnavailableValidators(t *testing.T) {
 	state := defaultStateWithAccountsApplied()
-	if err := SetInactiveUnavailableValidators(
-		fakerAuctioneer{}, state, addrs,
+	const junkValue = 0
+
+	if err := ComputeAndRecord(
+		fakerAuctioneer{}, state, &shard.StakedSlots{
+			len(addrs), junkValue, addrs, map[common.Address]struct{}{
+				validatorS0Addr: struct{}{},
+				validatorS2Addr: struct{}{},
+			},
+		},
 	); err != nil {
 		//
 	}
