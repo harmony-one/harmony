@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"sort"
 
@@ -53,6 +54,15 @@ type SlotList []Slot
 type Committee struct {
 	ShardID uint32   `json:"shard-id"`
 	Slots   SlotList `json:"subcommittee"`
+}
+
+func (l SlotList) String() string {
+	blsKeys := make([]string, len(l))
+	for i, k := range l {
+		blsKeys[i] = k.BlsPublicKey.Hex()
+	}
+	s, _ := json.Marshal(blsKeys)
+	return string(s)
 }
 
 /* Legacy
@@ -135,32 +145,84 @@ func EncodeWrapper(shardState State, isStaking bool) ([]byte, error) {
 	return data, err
 }
 
-// ExternalValidators returns only the staking era,
-// external validators aka non-harmony nodes
-func (ss *State) ExternalValidators() []common.Address {
-	processed := make(map[common.Address]struct{})
+// StakedSlots gives overview of subset of shard state that is
+// coming via an stake, that is, view epos
+type StakedSlots struct {
+	CountStakedValidator int
+	CountStakedBLSKey    int
+	Addrs                []common.Address
+	LookupSet            map[common.Address]struct{}
+}
+
+// StakedValidators filters for non-harmony operated nodes,
+// returns (
+//   totalStakedValidatorsCount, totalStakedBLSKeys,
+//   addrsOnNetworkSlice, addrsOnNetworkSet,
+// )
+func (c Committee) StakedValidators() *StakedSlots {
+	countStakedValidator, countStakedBLSKey := 0, 0
+	networkWideSlice, networkWideSet :=
+		[]common.Address{}, map[common.Address]struct{}{}
+	for _, slot := range c.Slots {
+
+		// an external validator,
+		// non-nil EffectiveStake is how we known
+		if addr := slot.EcdsaAddress; slot.EffectiveStake != nil {
+			countStakedBLSKey++
+			if _, seen := networkWideSet[addr]; !seen {
+				countStakedValidator++
+				networkWideSet[addr] = struct{}{}
+				networkWideSlice = append(networkWideSlice, addr)
+			}
+		}
+	}
+
+	return &StakedSlots{
+		CountStakedValidator: countStakedValidator,
+		CountStakedBLSKey:    countStakedBLSKey,
+		Addrs:                networkWideSlice,
+		LookupSet:            networkWideSet,
+	}
+}
+
+// StakedValidators filters for non-harmony operated nodes,
+// returns (
+//   totalStakedValidatorsCount, totalStakedBLSKeys,
+//   addrsOnNetworkSlice, addrsOnNetworkSet,
+// )
+func (ss *State) StakedValidators() *StakedSlots {
+	countStakedValidator, countStakedBLSKey := 0, 0
+	networkWideSlice, networkWideSet :=
+		[]common.Address{},
+		map[common.Address]struct{}{}
+
 	for i := range ss.Shards {
 		shard := ss.Shards[i]
 		for j := range shard.Slots {
-			slot := shard.Slots[j]
-			if slot.EffectiveStake != nil { // For external validator
-				_, ok := processed[slot.EcdsaAddress]
-				if !ok {
-					processed[slot.EcdsaAddress] = struct{}{}
 
+			slot := shard.Slots[j]
+			// an external validator,
+			// non-nil EffectiveStake is how we known
+			if addr := slot.EcdsaAddress; slot.EffectiveStake != nil {
+				countStakedBLSKey++
+				if _, seen := networkWideSet[addr]; !seen {
+					countStakedValidator++
+					networkWideSet[addr] = struct{}{}
+					networkWideSlice = append(networkWideSlice, addr)
 				}
 			}
 		}
 	}
-	slice, i := make([]common.Address, len(processed)), 0
-	for key := range processed {
-		slice[i] = key
-		i++
+
+	return &StakedSlots{
+		CountStakedValidator: countStakedValidator,
+		CountStakedBLSKey:    countStakedBLSKey,
+		Addrs:                networkWideSlice,
+		LookupSet:            networkWideSet,
 	}
-	return slice
 }
 
-// String ..
+// String produces a non-pretty printed JSON string of the SuperCommittee
 func (ss *State) String() string {
 	s, _ := json.Marshal(ss)
 	return string(s)
@@ -312,11 +374,44 @@ func CompareNodeIDList(l1, l2 SlotList) int {
 }
 
 // DeepCopy returns a deep copy of the receiver.
-func (c Committee) DeepCopy() Committee {
+func (c *Committee) DeepCopy() Committee {
 	r := Committee{}
 	r.ShardID = c.ShardID
 	r.Slots = c.Slots.DeepCopy()
 	return r
+}
+
+// BLSPublicKeys ..
+func (c *Committee) BLSPublicKeys() ([]BlsPublicKey, error) {
+	if c == nil {
+		return nil, errCommitteeNil
+	}
+
+	slice := make([]BlsPublicKey, len(c.Slots))
+	for j := range c.Slots {
+		slice[j] = c.Slots[j].BlsPublicKey
+	}
+	return slice, nil
+}
+
+var (
+	// ErrValidNotInCommittee ..
+	ErrValidNotInCommittee = errors.New("slot signer not this slot's subcommittee")
+	errCommitteeNil        = errors.New("subcommittee is nil pointer")
+)
+
+// AddressForBLSKey ..
+func (c *Committee) AddressForBLSKey(key BlsPublicKey) (*common.Address, error) {
+	if c == nil {
+		return nil, errCommitteeNil
+	}
+
+	for _, slot := range c.Slots {
+		if CompareBlsPublicKey(slot.BlsPublicKey, key) == 0 {
+			return &slot.EcdsaAddress, nil
+		}
+	}
+	return nil, ErrValidNotInCommittee
 }
 
 // CompareCommittee compares two committees and their leader/node list.

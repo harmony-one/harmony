@@ -6,6 +6,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -71,22 +72,11 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool {
+func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	threshold := v.QuorumThreshold()
 	currentTotalPower := v.computeTotalPowerByMask(mask)
 	if currentTotalPower == nil {
-		if debug { // temp for remove debug info on crosslink verification
-			utils.Logger().Warn().
-				Msgf("[IsQuorumAchievedByMask] currentTotalPower is nil")
-		}
 		return false
-	}
-	if debug {
-		utils.Logger().Info().
-			Str("policy", v.Policy().String()).
-			Str("threshold", threshold.String()).
-			Str("total-power-of-signers", currentTotalPower.String()).
-			Msg("[IsQuorumAchievedByMask] Checking quorum")
 	}
 	return (*currentTotalPower).GT(threshold)
 }
@@ -203,6 +193,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	voterCount := len(v.roster.Voters)
 	type u struct {
 		IsHarmony      bool   `json:"is-harmony-slot"`
+		EarningAccount string `json:"earning-account"`
 		Identity       string `json:"bls-public-key"`
 		VotingPower    string `json:"voting-power-%"`
 		EffectiveStake string `json:"effective-stake,omitempty"`
@@ -224,6 +215,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	for identity, voter := range v.roster.Voters {
 		member := u{
 			voter.IsHarmonyNode,
+			common2.MustAddressToBech32(voter.EarningAccount),
 			identity.Hex(),
 			voter.EffectivePercent.String(),
 			"",
@@ -252,10 +244,15 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 		return false
 	}
 	identity, _ := pubKeyFunc()
-	w := shard.BlsPublicKey{}
-	w.FromLibBLSPublicKey(identity)
-	_, ok := v.roster.Voters[w]
-	return ok
+	for _, key := range identity.PublicKey {
+		w := shard.BlsPublicKey{}
+		w.FromLibBLSPublicKey(key)
+		_, ok := v.roster.Voters[w]
+		if ok {
+			return true
+		}
+	}
+	return false
 }
 
 func newBox() *voteBox {

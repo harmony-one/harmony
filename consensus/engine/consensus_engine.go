@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -44,8 +45,8 @@ type ChainReader interface {
 	// Thus, only should be used to read the shard state of the current chain.
 	ReadShardState(epoch *big.Int) (*shard.State, error)
 
-	// ReadActiveValidatorList retrieves the list of active validators
-	ReadActiveValidatorList() ([]common.Address, error)
+	// ReadElectedValidatorList retrieves the list of elected validators
+	ReadElectedValidatorList() ([]common.Address, error)
 
 	// ReadValidatorList retrieves the list of all validators
 	ReadValidatorList() ([]common.Address, error)
@@ -120,6 +121,7 @@ type Engine interface {
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+		doubleSigners slash.Records,
 	) (*types.Block, *big.Int, error)
 
 	// Seal generates a new sealing request for the given input block and pushes

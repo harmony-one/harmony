@@ -36,6 +36,7 @@ import (
 	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -577,14 +578,36 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 	// Broadcast double-signers reported by consensus
 	if node.Consensus != nil {
 		go func() {
+
 			for {
 				select {
 				case doubleSign := <-node.Consensus.SlashChan:
-					go node.BroadcastSlash(&doubleSign)
+					l := utils.Logger().Info().RawJSON("double-sign", []byte(doubleSign.String()))
+
+					// no point to broadcast the slash if we aren't even in the right epoch yet
+					if !node.Blockchain().Config().IsStaking(
+						node.Blockchain().CurrentHeader().Epoch(),
+					) {
+						l.Msg("double sign occured before staking era, no-op")
+						return
+					}
+					if hooks := node.NodeConfig.WebHooks.DoubleSigning; hooks != nil {
+						url := hooks.WebHooks.OnNoticeDoubleSign
+						go func() { slash.DoPost(url, &doubleSign) }()
+					}
+					if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+						go node.BroadcastSlash(&doubleSign)
+						l.Msg("broadcast the double sign record")
+					} else {
+						records := slash.Records{doubleSign}
+						node.Blockchain().AddPendingSlashingCandidates(records)
+						l.Msg("added double sign record to off-chain pending")
+					}
 				}
 			}
 		}()
 	}
+
 	return &node
 }
 
@@ -607,6 +630,14 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	shardState, err := committee.WithStakingEnabled.Compute(
 		epoch, node.Consensus.ChainReader,
 	)
+	if err != nil {
+		utils.Logger().Err(err).
+			Uint64("blockNum", blockNum).
+			Uint32("shardID", shardID).
+			Uint64("epoch", epoch.Uint64()).
+			Msg("[InitConsensusWithValidators] Failed getting shard state")
+		return err
+	}
 	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
 		shardState.FindCommitteeByID(shardID),
 	)
@@ -621,8 +652,8 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			"blockNum", blockNum)
 	}
 
-	for i := range pubKeys {
-		if pubKeys[i].IsEqual(node.Consensus.PubKey) {
+	for _, key := range pubKeys {
+		if node.Consensus.PubKey.Contains(key) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).

@@ -92,25 +92,10 @@ func (bc *BlockChain) CommitOffChainData(
 			return NonStatTy, err
 		}
 
-		// Find all the active validator addresses and store them in db
-		allActiveValidators := []common.Address{}
-		processed := make(map[common.Address]struct{})
-		for i := range newShardState.Shards {
-			shard := newShardState.Shards[i]
-			for j := range shard.Slots {
-				slot := shard.Slots[j]
-				if slot.EffectiveStake != nil { // For external validator
-					_, ok := processed[slot.EcdsaAddress]
-					if !ok {
-						processed[slot.EcdsaAddress] = struct{}{}
-						allActiveValidators = append(allActiveValidators, shard.Slots[j].EcdsaAddress)
-					}
-				}
-			}
-		}
-
-		// Update active validators
-		if err := bc.WriteActiveValidatorList(batch, allActiveValidators); err != nil {
+		// Update elected validators
+		if err := bc.WriteElectedValidatorList(
+			batch, newShardState.StakedValidators().Addrs,
+		); err != nil {
 			return NonStatTy, err
 		}
 
@@ -164,21 +149,41 @@ func (bc *BlockChain) CommitOffChainData(
 			if err := bc.WriteCrossLinks(batch, types.CrossLinks{crossLink}); err == nil {
 				utils.Logger().Info().Uint64("blockNum", crossLink.BlockNum()).Uint32("shardID", crossLink.ShardID()).Msg("[insertChain/crosslinks] Cross Link Added to Beaconchain")
 			}
-			bc.LastContinuousCrossLink(batch, crossLink)
+
+			cl0, _ := bc.ReadShardLastCrossLink(crossLink.ShardID())
+			if cl0 == nil {
+				rawdb.WriteShardLastCrossLink(batch, crossLink.ShardID(), crossLink.Serialize())
+			}
 		}
 
 		//clean/update local database cache after crosslink inserted into blockchain
-		num, err := bc.DeleteCommittedFromPendingCrossLinks(*crossLinks)
-		utils.Logger().Debug().Msgf("DeleteCommittedFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, error: %+v", len(*crossLinks), num, err)
+		num, err := bc.DeleteFromPendingCrossLinks(*crossLinks)
+		if err != nil {
+			const msg = "DeleteFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, problem: %+v"
+			utils.Logger().Debug().Msgf(msg, len(*crossLinks), num, err)
+		}
+		utils.Logger().Debug().Msgf("DeleteFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d", len(*crossLinks), num)
+	}
+	// Roll up latest crosslinks
+	for i := uint32(0); i < shard.Schedule.InstanceForEpoch(epoch).NumShards(); i++ {
+		bc.LastContinuousCrossLink(batch, i)
 	}
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
-			bc.UpdateBlockRewardAccumulator(batch, payout, block.Number().Uint64())
+			if err := bc.UpdateBlockRewardAccumulator(
+				batch, payout, block.Number().Uint64(),
+			); err != nil {
+				return NonStatTy, err
+			}
+			if err := bc.DeletePendingSlashingCandidates(); err != nil {
+				return NonStatTy, err
+			}
 		} else {
 			// block reward never accumulate before staking
 			bc.WriteBlockRewardAccumulator(batch, big.NewInt(0), block.Number().Uint64())
 		}
 	}
+
 	return CanonStatTy, nil
 }

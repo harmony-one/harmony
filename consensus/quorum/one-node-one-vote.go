@@ -35,7 +35,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool {
+func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	threshold := v.TwoThirdsSignersCount()
 	currentTotalPower := utils.CountOneBits(mask.Bitmap)
 	if currentTotalPower < threshold {
@@ -120,10 +120,12 @@ func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
 	}
 	identity, _ := pubKeyFunc()
 	everyone := v.DumpParticipants()
-	myVoterID := identity.SerializeToHexStr()
-	for i := range everyone {
-		if everyone[i] == myVoterID {
-			return true
+	for _, key := range identity.PublicKey {
+		myVoterID := key.SerializeToHexStr()
+		for i := range everyone {
+			if everyone[i] == myVoterID {
+				return true
+			}
 		}
 	}
 	return false

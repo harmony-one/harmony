@@ -37,7 +37,7 @@ var (
 	TestnetChainConfig = &ChainConfig{
 		ChainID:         TestnetChainID,
 		CrossTxEpoch:    big.NewInt(0),
-		CrossLinkEpoch:  big.NewInt(3),
+		CrossLinkEpoch:  big.NewInt(4),
 		StakingEpoch:    big.NewInt(4),
 		PreStakingEpoch: big.NewInt(2),
 		EIP155Epoch:     big.NewInt(0),
@@ -50,7 +50,7 @@ var (
 	PangaeaChainConfig = &ChainConfig{
 		ChainID:         PangaeaChainID,
 		CrossTxEpoch:    big.NewInt(0),
-		CrossLinkEpoch:  big.NewInt(2),
+		CrossLinkEpoch:  big.NewInt(3),
 		StakingEpoch:    big.NewInt(3),
 		PreStakingEpoch: big.NewInt(0),
 		EIP155Epoch:     big.NewInt(0),
@@ -62,9 +62,9 @@ var (
 	LocalnetChainConfig = &ChainConfig{
 		ChainID:         TestnetChainID,
 		CrossTxEpoch:    big.NewInt(0),
-		CrossLinkEpoch:  big.NewInt(3),
-		StakingEpoch:    big.NewInt(4),
-		PreStakingEpoch: big.NewInt(2),
+		CrossLinkEpoch:  big.NewInt(2),
+		StakingEpoch:    big.NewInt(2),
+		PreStakingEpoch: big.NewInt(0),
 		EIP155Epoch:     big.NewInt(0),
 		S3Epoch:         big.NewInt(0),
 		ReceiptLogEpoch: big.NewInt(0),
