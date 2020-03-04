@@ -326,7 +326,7 @@ download_binaries() {
       verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
       msg "downloaded ${bin}"
    done
-   chmod +x "${outdir}/harmony"
+   sudo chmod +x "${outdir}/harmony"
    (cd "${outdir}" && exec openssl sha256 "${BIN[@]}") > "${outdir}/harmony-checksums.txt"
 }
 
