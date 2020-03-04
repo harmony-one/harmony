@@ -148,6 +148,10 @@ func bumpCount(
 		utils.Logger().Info().RawJSON("validator", []byte(wrapper.String())).
 			Msg("bumped signing counters")
 
+		if err := compute(bc, state, wrapper); err != nil {
+			return err
+		}
+
 		if err := state.UpdateValidatorWrapper(
 			addr, wrapper,
 		); err != nil {
@@ -186,86 +190,82 @@ type Reader interface {
 	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
 }
 
-// SetInactiveUnavailableValidators sets the validator to
+// compute sets the validator to
 // inactive and thereby keeping it out of
 // consideration in the pool of validators for
 // whenever committee selection happens in future, the
 // signing threshold is 66%
-func SetInactiveUnavailableValidators(
-	bc Reader, state *state.DB, addrs []common.Address,
+func compute(
+	bc Reader,
+	state *state.DB,
+	wrapper *staking.ValidatorWrapper,
 ) error {
-	for i := range addrs {
-		snapshot, err := bc.ReadValidatorSnapshot(addrs[i])
-		if err != nil {
-			return err
-		}
+	snapshot, err := bc.ReadValidatorSnapshot(wrapper.Address)
+	if err != nil {
+		return err
+	}
 
-		wrapper, err := state.ValidatorWrapper(addrs[i])
+	statsNow, snapSigned, snapToSign :=
+		wrapper.Counters,
+		snapshot.Counters.NumBlocksSigned,
+		snapshot.Counters.NumBlocksToSign
 
-		if err != nil {
-			return err
-		}
+	utils.Logger().Info().
+		RawJSON("snapshot", []byte(snapshot.String())).
+		RawJSON("current", []byte(wrapper.String())).
+		Msg("begin checks for availability")
 
-		statsNow, snapSigned, snapToSign :=
-			wrapper.Counters,
-			snapshot.Counters.NumBlocksSigned,
-			snapshot.Counters.NumBlocksToSign
+	signed, toSign :=
+		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
+		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
 
+	if signed.Sign() == -1 {
+		return errors.Wrapf(
+			errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
+			statsNow.NumBlocksSigned.String(), snapSigned.String(),
+		)
+	}
+
+	if toSign.Sign() == -1 {
+		return errors.Wrapf(
+			errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
+			statsNow.NumBlocksToSign.String(), snapToSign.String(),
+		)
+	}
+
+	if toSign.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().
 			RawJSON("snapshot", []byte(snapshot.String())).
 			RawJSON("current", []byte(wrapper.String())).
-			Msg("begin checks for availability")
+			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
+		return nil
+	}
 
-		signed, toSign :=
-			new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
-			new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
+	s1, s2 :=
+		numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
+	quotient := s1.Quo(s2)
 
-		if signed.Sign() == -1 {
-			return errors.Wrapf(
-				errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
-				statsNow.NumBlocksSigned.String(), snapSigned.String(),
-			)
-		}
+	utils.Logger().Info().
+		RawJSON("snapshot", []byte(snapshot.String())).
+		RawJSON("current", []byte(wrapper.String())).
+		Str("signed", s1.String()).
+		Str("to-sign", s2.String()).
+		Str("percentage-signed", quotient.String()).
+		Bool("meets-threshold", quotient.LTE(measure)).
+		Msg("check if signing percent is meeting required threshold")
 
-		if toSign.Sign() == -1 {
-			return errors.Wrapf(
-				errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
-				statsNow.NumBlocksToSign.String(), snapToSign.String(),
-			)
-		}
+	const missedTooManyBlocks = true
 
-		if toSign.Cmp(common.Big0) == 0 {
-			utils.Logger().Info().
-				RawJSON("snapshot", []byte(snapshot.String())).
-				RawJSON("current", []byte(wrapper.String())).
-				Msg("toSign is 0, perhaps did not receive crosslink proving signing")
-			continue
-		}
-
-		s1, s2 :=
-			numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
-		quotient := s1.Quo(s2)
-
+	switch quotient.LTE(measure) {
+	case missedTooManyBlocks:
+		wrapper.Active = false
 		utils.Logger().Info().
 			RawJSON("snapshot", []byte(snapshot.String())).
 			RawJSON("current", []byte(wrapper.String())).
-			Str("signed", s1.String()).
-			Str("to-sign", s2.String()).
-			Str("percentage-signed", quotient.String()).
-			Bool("meets-threshold", quotient.LTE(measure)).
-			Msg("check if signing percent is meeting required threshold")
-
-		if quotient.LTE(measure) {
-			wrapper.Active = false
-			utils.Logger().Info().
-				RawJSON("snapshot", []byte(snapshot.String())).
-				RawJSON("current", []byte(wrapper.String())).
-				Str("threshold", measure.String()).
-				Msg("validator failed availability threshold, set to inactive")
-			if err := state.UpdateValidatorWrapper(addrs[i], wrapper); err != nil {
-				return err
-			}
-		}
+			Str("threshold", measure.String()).
+			Msg("validator failed availability threshold, set to inactive")
+	default:
+		wrapper.Active = true
 	}
 
 	return nil

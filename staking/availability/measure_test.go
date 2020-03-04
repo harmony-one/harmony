@@ -54,13 +54,21 @@ func defaultStateWithAccountsApplied() *state.DB {
 	return stateHandle
 }
 
-func TestSetInactiveUnavailableValidators(t *testing.T) {
-	state := defaultStateWithAccountsApplied()
-	if err := SetInactiveUnavailableValidators(
-		fakerAuctioneer{}, state, addrs,
-	); err != nil {
-		//
-	}
+func TestCompute(t *testing.T) {
+	// state := defaultStateWithAccountsApplied()
+	// const junkValue = 0
+
+	// if err := compute(
+	// 	fakerAuctioneer{}, state, validatorS0,
+	// ); err != nil {
+	// 	//
+	// }
+
+	// if err := compute(
+	// 	fakerAuctioneer{}, state, validatorS2,
+	// ); err != nil {
+	// 	//
+	// }
 
 	t.Log("Unimplemented")
 }

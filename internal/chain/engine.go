@@ -20,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -278,6 +277,11 @@ func (e *engineImpl) Finalize(
 			const msg = "[Finalize] failed to read all validators"
 			return nil, nil, ctxerror.New(msg).WithCause(err)
 		}
+		newShardState, err := header.GetShardState()
+		if err != nil {
+			const msg = "[Finalize] failed to read shard state"
+			return nil, nil, ctxerror.New(msg).WithCause(err)
+		}
 		// Payout undelegated/unlocked tokens
 		for _, validator := range validators {
 			wrapper, err := state.ValidatorWrapper(validator)
@@ -300,51 +304,20 @@ func (e *engineImpl) Finalize(
 				return nil, nil, ctxerror.New(msg).WithCause(err)
 			}
 		}
-	}
 
-	if isBeaconChain && inStakingEra {
-		nowEpoch := chain.CurrentHeader().Epoch()
-		superCommittee, err := chain.ReadShardState(nowEpoch)
-		if err != nil {
-			return nil, nil, err
-		}
-		staked := superCommittee.StakedValidators()
-		// could happen that only harmony nodes are running,
-		if isNewEpoch && staked.CountStakedValidator > 0 {
-			utils.Logger().Info().
-				Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-				Uint64("finalizing-epoch", header.Epoch().Uint64()).
-				Uint64("block-number", header.Number().Uint64()).
-				Msg("in new epoch (aka last block), apply availability check for activity")
-			if err := availability.SetInactiveUnavailableValidators(
-				chain, state, staked.Addrs,
-			); err != nil {
-				return nil, nil, err
-			}
-			// Now can reset the counters, do note, only
-			// after the availability logic runs
-			newShardState, err := header.GetShardState()
+		for _, addr := range newShardState.StakedValidators().Addrs {
+			wrapper, err := state.ValidatorWrapper(addr)
 			if err != nil {
-				const msg = "[Finalize] failed to read shard state"
-				return nil, nil, ctxerror.New(msg).WithCause(err)
+				return nil, nil, ctxerror.New(
+					"[Finalize] failed to get validator from state to finalize",
+				).WithCause(err)
 			}
-
-			if stkd := newShardState.StakedValidators(); stkd.CountStakedValidator > 0 {
-				for _, addr := range stkd.Addrs {
-					wrapper, err := state.ValidatorWrapper(addr)
-					if err != nil {
-						return nil, nil, err
-					}
-					// Set the LastEpochInCommittee field for all
-					// external validators in the upcoming epoch.
-					// and set the availability tracking counters to 0
-					wrapper.LastEpochInCommittee = newShardState.Epoch
-					if err := state.UpdateValidatorWrapper(addr, wrapper); err != nil {
-						return nil, nil, ctxerror.New(
-							"[Finalize] failed update validator info",
-						).WithCause(err)
-					}
-				}
+			wrapper.LastEpochInCommittee = newShardState.Epoch
+			if err := state.UpdateValidatorWrapper(
+				addr, wrapper,
+			); err != nil {
+				const msg = "[Finalize] failed update validator info"
+				return nil, nil, ctxerror.New(msg).WithCause(err)
 			}
 		}
 	}
