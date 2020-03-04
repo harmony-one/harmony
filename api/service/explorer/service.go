@@ -4,16 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -25,6 +22,8 @@ import (
 // Constants for explorer service.
 const (
 	explorerPortDifference = 4000
+	defaultPageSize        = "1000"
+	maxAddresses           = 100000
 	totalSupply            = 12600000000
 )
 
@@ -36,36 +35,17 @@ type HTTPError struct {
 
 // Service is the struct for explorer service.
 type Service struct {
-	router            *mux.Router
-	IP                string
-	Port              string
-	GetNodeIDs        func() []libp2p_peer.ID
-	ShardID           uint32
-	Storage           *Storage
-	server            *http.Server
-	messageChan       chan *msg_pb.Message
-	GetAccountBalance func(common.Address) (*big.Int, error)
+	router      *mux.Router
+	IP          string
+	Port        string
+	Storage     *Storage
+	server      *http.Server
+	messageChan chan *msg_pb.Message
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, shardID uint32, GetNodeIDs func() []libp2p_peer.ID, GetAccountBalance func(common.Address) (*big.Int, error)) *Service {
-	return &Service{
-		IP:                selfPeer.IP,
-		Port:              selfPeer.Port,
-		ShardID:           shardID,
-		GetNodeIDs:        GetNodeIDs,
-		GetAccountBalance: GetAccountBalance,
-	}
-}
-
-// ServiceAPI is rpc api.
-type ServiceAPI struct {
-	Service *Service
-}
-
-// NewServiceAPI returns explorer service api.
-func NewServiceAPI(explorerService *Service) *ServiceAPI {
-	return &ServiceAPI{Service: explorerService}
+func New(selfPeer *p2p.Peer) *Service {
+	return &Service{IP: selfPeer.IP, Port: selfPeer.Port}
 }
 
 // StartService starts explorer service.
@@ -106,6 +86,12 @@ func (s *Service) Run() *http.Server {
 
 	s.router = mux.NewRouter()
 
+	// Set up router for addresses.
+	// Fetch addresses request, accepts parameter size: how much addresses to read,
+	// parameter prefix: from which address prefix start
+	s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
+	s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
+
 	// Set up router for node count.
 	s.router.Path("/circulating-supply").Queries().HandlerFunc(s.GetCirculatingSupply).Methods("GET")
 	s.router.Path("/circulating-supply").HandlerFunc(s.GetCirculatingSupply)
@@ -125,44 +111,32 @@ func (s *Service) Run() *http.Server {
 	return server
 }
 
-// GetExplorerNodeCount serves /nodes end-point.
-func (s *Service) GetExplorerNodeCount(w http.ResponseWriter, r *http.Request) {
+// GetAddresses serves end-point /addresses, returns size of addresses from address with prefix.
+func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(len(s.GetNodeIDs())); err != nil {
-		utils.Logger().Warn().Msg("cannot JSON-encode node count")
+	sizeStr := r.FormValue("size")
+	prefix := r.FormValue("prefix")
+	if sizeStr == "" {
+		sizeStr = defaultPageSize
+	}
+	data := &Data{}
+	defer func() {
+		if err := json.NewEncoder(w).Encode(data.Addresses); err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode addresses")
+		}
+	}()
+
+	size, err := strconv.Atoi(sizeStr)
+	if err != nil || size > maxAddresses {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	data.Addresses, err = s.Storage.GetAddresses(size, prefix)
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
+		return
 	}
-}
-
-// GetExplorerNodeCount rpc end-point.
-func (s *ServiceAPI) GetExplorerNodeCount(ctx context.Context) int {
-	return len(s.Service.GetNodeIDs())
-}
-
-// GetExplorerShard serves /shard end-point.
-func (s *Service) GetExplorerShard(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	var nodes []Node
-	for _, nodeID := range s.GetNodeIDs() {
-		nodes = append(nodes, Node{
-			ID: libp2p_peer.IDB58Encode(nodeID),
-		})
-	}
-	if err := json.NewEncoder(w).Encode(Shard{Nodes: nodes}); err != nil {
-		utils.Logger().Warn().Msg("cannot JSON-encode shard info")
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
-// GetExplorerShard rpc end-point.
-func (s *ServiceAPI) GetExplorerShard(ctx context.Context) *Shard {
-	var nodes []Node
-	for _, nodeID := range s.Service.GetNodeIDs() {
-		nodes = append(nodes, Node{
-			ID: libp2p_peer.IDB58Encode(nodeID),
-		})
-	}
-	return &Shard{Nodes: nodes}
 }
 
 // GetCirculatingSupply serves /circulating-supply end-point.
@@ -197,12 +171,5 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 
 // APIs for the services.
 func (s *Service) APIs() []rpc.API {
-	return []rpc.API{
-		{
-			Namespace: "explorer",
-			Version:   "1.0",
-			Service:   NewServiceAPI(s),
-			Public:    true,
-		},
-	}
+	return nil
 }

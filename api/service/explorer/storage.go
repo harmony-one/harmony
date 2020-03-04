@@ -3,43 +3,26 @@ package explorer
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/filter"
+	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 // Constants for storage.
 const (
-	BlockHeightKey  = "bh"
-	BlockInfoPrefix = "bi"
-	BlockPrefix     = "b"
-	TXPrefix        = "tx"
-	AddressPrefix   = "ad"
+	AddressPrefix = "ad"
+	PrefixLen     = 3
 )
-
-// GetBlockInfoKey ...
-func GetBlockInfoKey(id int) string {
-	return fmt.Sprintf("%s_%d", BlockInfoPrefix, id)
-}
 
 // GetAddressKey ...
 func GetAddressKey(address string) string {
 	return fmt.Sprintf("%s_%s", AddressPrefix, address)
-}
-
-// GetBlockKey ...
-func GetBlockKey(id int) string {
-	return fmt.Sprintf("%s_%d", BlockPrefix, id)
-}
-
-// GetTXKey ...
-func GetTXKey(hash string) string {
-	return fmt.Sprintf("%s_%s", TXPrefix, hash)
 }
 
 var storage *Storage
@@ -47,7 +30,7 @@ var once sync.Once
 
 // Storage dump the block info into leveldb.
 type Storage struct {
-	db *ethdb.LDBDatabase
+	db *leveldb.DB
 }
 
 // GetStorageInstance returns attack model by using singleton pattern.
@@ -69,65 +52,43 @@ func (storage *Storage) Init(ip, port string, remove bool) {
 			utils.Logger().Error().Err(err).Msg("Failed to remove existing database files")
 		}
 	}
-	if storage.db, err = ethdb.NewLDBDatabase(dbFileName, 0, 0); err != nil {
+	// https://github.com/ethereum/go-ethereum/blob/master/ethdb/leveldb/leveldb.go#L98 options.
+	// We had 0 for handles and cache params before, so set 0s for all of them. Filter opt is the same.
+	options := &opt.Options{
+		OpenFilesCacheCapacity: 0,
+		BlockCacheCapacity:     0,
+		WriteBuffer:            0,
+		Filter:                 filter.NewBloomFilter(10),
+	}
+	if storage.db, err = leveldb.OpenFile(dbFileName, options); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to create new database")
 	}
 }
 
 // GetDB returns the LDBDatabase of the storage.
-func (storage *Storage) GetDB() *ethdb.LDBDatabase {
+func (storage *Storage) GetDB() *leveldb.DB {
 	return storage.db
 }
 
 // Dump extracts information from block and index them into lvdb for explorer.
 func (storage *Storage) Dump(block *types.Block, height uint64) {
-	//utils.Logger().Debug().Uint64("block height", height).Msg("Dumping block")
 	if block == nil {
 		return
 	}
 
-	batch := storage.db.NewBatch()
-	// Update block height.
-	if err := batch.Put([]byte(BlockHeightKey), []byte(strconv.Itoa(int(height)))); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot batch block height")
-	}
-
-	// Store block.
-	blockData, err := rlp.EncodeToBytes(block)
-	if err == nil {
-		if err := batch.Put([]byte(GetBlockKey(int(height))), blockData); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot batch block data")
-		}
-	} else {
-		utils.Logger().Error().Err(err).Msg("Failed to serialize block")
-	}
-
+	batch := new(leveldb.Batch)
 	// Store txs
 	for _, tx := range block.Transactions() {
 		explorerTransaction := GetTransaction(tx, block)
-		storage.UpdateTXStorage(batch, explorerTransaction, tx)
 		storage.UpdateAddress(batch, explorerTransaction, tx)
 	}
-	if err := batch.Write(); err != nil {
+	if err := storage.db.Write(batch, nil); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot write batch")
 	}
 }
 
-// UpdateTXStorage ...
-func (storage *Storage) UpdateTXStorage(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
-	if data, err := rlp.EncodeToBytes(explorerTransaction); err == nil {
-		key := GetTXKey(tx.Hash().Hex())
-		if err := batch.Put([]byte(key), data); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot batch TX")
-		}
-	} else {
-		utils.Logger().Error().Msg("EncodeRLP transaction error")
-	}
-}
-
 // UpdateAddress ...
-// TODO: deprecate this logic
-func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
+func (storage *Storage) UpdateAddress(batch *leveldb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
 	if explorerTransaction.To != "" {
 		storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
@@ -137,12 +98,10 @@ func (storage *Storage) UpdateAddress(batch ethdb.Batch, explorerTransaction *Tr
 }
 
 // UpdateAddressStorage updates specific addr Address.
-// TODO: deprecate this logic
-func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
-	key := GetAddressKey(addr)
-
+func (storage *Storage) UpdateAddressStorage(batch *leveldb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	var address Address
-	if data, err := storage.db.Get([]byte(key)); err == nil {
+	key := GetAddressKey(addr)
+	if data, err := storage.db.Get([]byte(key), nil); err == nil {
 		if err = rlp.DecodeBytes(data, &address); err != nil {
 			utils.Logger().Error().Err(err).Msg("Failed due to error")
 		}
@@ -151,10 +110,32 @@ func (storage *Storage) UpdateAddressStorage(batch ethdb.Batch, addr string, exp
 	address.TXs = append(address.TXs, explorerTransaction)
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
-		if err := batch.Put([]byte(key), encoded); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot batch address")
-		}
+		batch.Put([]byte(key), encoded)
 	} else {
 		utils.Logger().Error().Err(err).Msg("cannot encode address")
 	}
+}
+
+// GetAddresses returns size of addresses from address with prefix.
+func (storage *Storage) GetAddresses(size int, prefix string) ([]string, error) {
+	db := storage.GetDB()
+	key := GetAddressKey(prefix)
+	iterator := db.NewIterator(&util.Range{Start: []byte(key)}, nil)
+	addresses := make([]string, 0)
+	read := 0
+	for iterator.Next() && read < size {
+		address := string(iterator.Key())
+		read++
+		if len(address) < PrefixLen {
+			utils.Logger().Info().Msgf("address len < 3 %s", address)
+			continue
+		}
+		addresses = append(addresses, address[PrefixLen:])
+	}
+	iterator.Release()
+	if err := iterator.Error(); err != nil {
+		utils.Logger().Error().Err(err).Msg("iterator error")
+		return nil, err
+	}
+	return addresses, nil
 }
