@@ -77,11 +77,10 @@ func AccumulateRewards(
 		if err != nil {
 			return network.NoReward, err
 		}
-		staked := shard.Committee{shard.BeaconChainShardID, members}.StakedValidators()
 
 		if err := availability.IncrementValidatorSigningCounts(
 			beaconChain,
-			staked,
+			shard.Committee{shard.BeaconChainShardID, members}.StakedValidators(),
 			state,
 			payable,
 			missing,

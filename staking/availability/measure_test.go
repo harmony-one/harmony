@@ -55,20 +55,20 @@ func defaultStateWithAccountsApplied() *state.DB {
 }
 
 func TestCompute(t *testing.T) {
-	state := defaultStateWithAccountsApplied()
-	const junkValue = 0
+	// state := defaultStateWithAccountsApplied()
+	// const junkValue = 0
 
-	if err := compute(
-		fakerAuctioneer{}, state, validatorS0,
-	); err != nil {
-		//
-	}
+	// if err := compute(
+	// 	fakerAuctioneer{}, state, validatorS0,
+	// ); err != nil {
+	// 	//
+	// }
 
-	if err := compute(
-		fakerAuctioneer{}, state, validatorS2,
-	); err != nil {
-		//
-	}
+	// if err := compute(
+	// 	fakerAuctioneer{}, state, validatorS2,
+	// ); err != nil {
+	// 	//
+	// }
 
 	t.Log("Unimplemented")
 }
