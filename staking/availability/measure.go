@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -260,14 +261,14 @@ func compute(
 
 	switch IsBelowSigningThreshold(quotient) {
 	case missedTooManyBlocks:
-		wrapper.Active = false
+		wrapper.EPOSStatus = effective.Inactive
 		utils.Logger().Info().
 			RawJSON("snapshot", []byte(snapshot.String())).
 			RawJSON("current", []byte(wrapper.String())).
 			Str("threshold", measure.String()).
 			Msg("validator failed availability threshold, set to inactive")
 	default:
-		wrapper.Active = true
+		wrapper.EPOSStatus = effective.Active
 	}
 
 	return nil

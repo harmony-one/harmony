@@ -165,7 +165,8 @@ func eposStakedCommittee(
 		if err != nil {
 			return nil, err
 		}
-		if !effective.IsEligibleForEPOSAuction(validator) {
+
+		if validator.EPOSStatus != effective.Active {
 			continue
 		}
 		if err := validator.SanityCheck(); err != nil {

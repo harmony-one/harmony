@@ -5,9 +5,9 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/pkg/errors"
 )
 
@@ -54,27 +54,27 @@ func (d Directive) String() string {
 
 // CreateValidator - type for creating a new validator
 type CreateValidator struct {
-	ValidatorAddress   common.Address `json:"validator_address"`
+	ValidatorAddress   common.Address `json:"validator-address"`
 	Description        `json:"description"`
 	CommissionRates    `json:"commission"`
-	MinSelfDelegation  *big.Int             `json:"min_self_delegation"`
-	MaxTotalDelegation *big.Int             `json:"max_total_delegation"`
-	SlotPubKeys        []shard.BlsPublicKey `json:"slot_pub_keys"`
-	SlotKeySigs        []shard.BLSSignature `json:"slot_key_sigs"`
+	MinSelfDelegation  *big.Int             `json:"min-self-delegation"`
+	MaxTotalDelegation *big.Int             `json:"max-total-delegation"`
+	SlotPubKeys        []shard.BlsPublicKey `json:"slot-pub-keys"`
+	SlotKeySigs        []shard.BLSSignature `json:"slot-key-sigs"`
 	Amount             *big.Int             `json:"amount"`
 }
 
 // EditValidator - type for edit existing validator
 type EditValidator struct {
-	ValidatorAddress   common.Address `json:"validator_address"`
+	ValidatorAddress   common.Address `json:"validator-address"`
 	Description        `json:"description"`
-	CommissionRate     *numeric.Dec        `json:"commission_rate" rlp:"nil"`
-	MinSelfDelegation  *big.Int            `json:"min_self_delegation" rlp:"nil"`
-	MaxTotalDelegation *big.Int            `json:"max_total_delegation" rlp:"nil"`
-	SlotKeyToRemove    *shard.BlsPublicKey `json:"slot_key_to_remove" rlp:"nil"`
-	SlotKeyToAdd       *shard.BlsPublicKey `json:"slot_key_to_add" rlp:"nil"`
-	SlotKeyToAddSig    *shard.BLSSignature `json:"slot_key_to_add_sig" rlp:"nil"`
-	Active             *bool               `json:"active" rlp:"nil"`
+	CommissionRate     *numeric.Dec          `json:"commission-rate" rlp:"nil"`
+	MinSelfDelegation  *big.Int              `json:"min-self-delegation" rlp:"nil"`
+	MaxTotalDelegation *big.Int              `json:"max-total-delegation" rlp:"nil"`
+	SlotKeyToRemove    *shard.BlsPublicKey   `json:"slot-key-to_remove" rlp:"nil"`
+	SlotKeyToAdd       *shard.BlsPublicKey   `json:"slot-key-to_add" rlp:"nil"`
+	SlotKeyToAddSig    *shard.BLSSignature   `json:"slot-key-to-add-sig" rlp:"nil"`
+	EPOSStatus         effective.Eligibility `json:"epos-eligibility-status" rlp:"nil"`
 }
 
 // Delegate - type for delegating to a validator

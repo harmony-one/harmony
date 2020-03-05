@@ -10,10 +10,12 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -84,7 +86,8 @@ type Record struct {
 
 // Application ..
 type Application struct {
-	TotalSlashed, TotalSnitchReward *big.Int
+	TotalSlashed      *big.Int `json:'total-slashed`
+	TotalSnitchReward *big.Int `json:"total-snitch-reward"`
 }
 
 func (a *Application) String() string {
@@ -208,6 +211,31 @@ func applySlashRate(amount *big.Int, rate numeric.Dec) *big.Int {
 	return numeric.NewDecFromBigInt(
 		amount,
 	).Mul(rate).TruncateInt()
+}
+
+// Hash is a New256 hash of an RLP encoded Record
+func (r Record) Hash() common.Hash {
+	return hash.FromRLPNew256(r)
+}
+
+// SetDifference ..
+func (r Records) SetDifference(ys Records) Records {
+	diff := Records{}
+	xsHashed, ysHashed :=
+		make([]common.Hash, len(r)), make([]common.Hash, len(ys))
+	for i := range r {
+		xsHashed[i] = r[i].Hash()
+	}
+	for i := range ys {
+		ysHashed[i] = ys[i].Hash()
+		for j := range xsHashed {
+			if ysHashed[i] != xsHashed[j] {
+				diff = append(diff, ys[i])
+			}
+		}
+	}
+
+	return diff
 }
 
 func payDownAsMuchAsCan(
@@ -389,7 +417,7 @@ func Apply(
 		}
 
 		// finally, kick them off forever
-		current.Banned, current.Active = true, false
+		current.EPOSStatus = effective.Banned
 		utils.Logger().Info().
 			RawJSON("delegation-current", []byte(current.String())).
 			RawJSON("slash", []byte(slash.String())).
