@@ -1,6 +1,7 @@
 package node
 
 import (
+	"errors"
 	"sort"
 	"strings"
 	"time"
