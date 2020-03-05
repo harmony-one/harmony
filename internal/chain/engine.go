@@ -15,12 +15,11 @@ import (
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -145,7 +144,7 @@ func (e *engineImpl) VerifyShardState(bc engine.ChainReader, beacon engine.Chain
 	}
 	headerShardStateBytes := header.ShardState()
 	// TODO: figure out leader withhold shardState
-	if headerShardStateBytes == nil || len(headerShardStateBytes) == 0 {
+	if len(headerShardStateBytes) == 0 {
 		return nil
 	}
 	shardState, err := bc.SuperCommitteeForNextEpoch(beacon, header, true)
@@ -213,11 +212,11 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		d.SetShardIDProvider(func() (uint32, error) {
 			return parentHeader.ShardID(), nil
 		})
-		d.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
 		})
 		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
-		if !d.IsQuorumAchievedByMask(mask, true) {
+		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
 			)
@@ -241,7 +240,10 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	lastCommitPayload := append(blockNumHash, parentHash[:]...)
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
-		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature from last block", "lastBlockNum", header.Number().Uint64()-1, "lastBlockHash", parentHash)
+		const msg = "[VerifySeal] Unable to verify aggregated signature from last block"
+		return ctxerror.New(
+			msg, "lastBlockNum", header.Number().Uint64()-1, "lastBlockHash", parentHash,
+		)
 	}
 	return nil
 }
@@ -253,9 +255,9 @@ func (e *engineImpl) Finalize(
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+	doubleSigners slash.Records,
 ) (*types.Block, *big.Int, error) {
-
-	// Accumulate any block and uncle rewards and commit the final state root
+	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewards(
 		chain, state, header, e.Rewarder(), e.Beaconchain(),
@@ -266,60 +268,97 @@ func (e *engineImpl) Finalize(
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
-	// Apply the slashes, invariant: assume been verified as legit slash by this point
-	if isBeaconChain && isNewEpoch && inStakingEra {
-		if err := slash.Apply(state, header.Slashes()); err != nil {
-			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
-		}
-	}
 
 	// Withdraw unlocked tokens to the delegators' accounts
 	// Only do such at the last block of an epoch
 	if isBeaconChain && isNewEpoch && inStakingEra {
 		validators, err := chain.ReadValidatorList()
 		if err != nil {
-			return nil, nil, ctxerror.New("[Finalize] failed to read all validators").WithCause(err)
+			const msg = "[Finalize] failed to read all validators"
+			return nil, nil, ctxerror.New(msg).WithCause(err)
+		}
+		newShardState, err := header.GetShardState()
+		if err != nil {
+			const msg = "[Finalize] failed to read shard state"
+			return nil, nil, ctxerror.New(msg).WithCause(err)
 		}
 		// Payout undelegated/unlocked tokens
 		for _, validator := range validators {
-			wrapper := state.GetStakingInfo(validator)
-			if wrapper != nil {
-				for i := range wrapper.Delegations {
-					delegation := &wrapper.Delegations[i]
-					totalWithdraw := delegation.RemoveUnlockedUndelegations(
-						header.Epoch(), wrapper.LastEpochInCommittee,
-					)
-					state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
-				}
-				if err := state.UpdateStakingInfo(validator, wrapper); err != nil {
-					return nil, nil, ctxerror.New("[Finalize] failed update validator info").WithCause(err)
-				}
-			} else {
-				err = errors.New("[Finalize] validator came back empty " + common2.MustAddressToBech32(validator))
-				return nil, nil, ctxerror.New("[Finalize] failed getting validator info").WithCause(err)
+			wrapper, err := state.ValidatorWrapper(validator)
+			if err != nil {
+				return nil, nil, ctxerror.New(
+					"[Finalize] failed to get validator from state to finalize",
+				).WithCause(err)
+			}
+			for i := range wrapper.Delegations {
+				delegation := &wrapper.Delegations[i]
+				totalWithdraw := delegation.RemoveUnlockedUndelegations(
+					header.Epoch(), wrapper.LastEpochInCommittee,
+				)
+				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
+			}
+			if err := state.UpdateValidatorWrapper(
+				validator, wrapper,
+			); err != nil {
+				const msg = "[Finalize] failed update validator info"
+				return nil, nil, ctxerror.New(msg).WithCause(err)
 			}
 		}
 
-		// Set the LastEpochInCommittee field for all external validators in the upcoming epoch.
-		newShardState, err := header.GetShardState()
-		if err != nil {
-			return nil, nil, ctxerror.New("[Finalize] failed to read shard state").WithCause(err)
-		}
-		for _, external := range newShardState.ExternalValidators() {
-			wrapper := state.GetStakingInfo(external)
-			wrapper.LastEpochInCommittee = newShardState.Epoch
-			if err := state.UpdateStakingInfo(external, wrapper); err != nil {
+		for _, addr := range newShardState.StakedValidators().Addrs {
+			wrapper, err := state.ValidatorWrapper(addr)
+			if err != nil {
 				return nil, nil, ctxerror.New(
-					"[Finalize] failed update validator info",
+					"[Finalize] failed to get validator from state to finalize",
 				).WithCause(err)
+			}
+			wrapper.LastEpochInCommittee = newShardState.Epoch
+			if err := state.UpdateValidatorWrapper(
+				addr, wrapper,
+			); err != nil {
+				const msg = "[Finalize] failed update validator info"
+				return nil, nil, ctxerror.New(msg).WithCause(err)
 			}
 		}
 	}
 
-	if isBeaconChain && isNewEpoch && inStakingEra {
-		if err := availability.Apply(chain, state); err != nil {
-			return nil, nil, err
+	if caught := len(
+		doubleSigners,
+	); isBeaconChain && inStakingEra && caught > 0 {
+		superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
+
+		if err != nil {
+			return nil, nil, errors.New("could not read shard state")
 		}
+
+		staked := superCommittee.StakedValidators()
+		// Apply the slashes, invariant: assume been verified as legit slash by this point
+		var slashApplied *slash.Application
+		rate := slash.Rate(caught, staked.CountStakedBLSKey)
+		utils.Logger().Info().
+			Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
+			Uint64("finalizing-epoch", header.Epoch().Uint64()).
+			Uint64("block-number", header.Number().Uint64()).
+			Str("rate", rate.String()).
+			RawJSON("records", []byte(doubleSigners.String())).
+			Msg("now applying slash to state during block finalization")
+		if slashApplied, err = slash.Apply(
+			chain,
+			state,
+			doubleSigners,
+			rate,
+		); err != nil {
+			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
+		}
+
+		utils.Logger().Info().
+			Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
+			Uint64("finalizing-epoch", header.Epoch().Uint64()).
+			Uint64("block-number", header.Number().Uint64()).
+			Str("rate", rate.String()).
+			RawJSON("records", []byte(doubleSigners.String())).
+			RawJSON("applied", []byte(slashApplied.String())).
+			Msg("slash applied successfully")
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
@@ -379,11 +418,11 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		d.SetShardIDProvider(func() (uint32, error) {
 			return header.ShardID(), nil
 		})
-		d.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
 		})
 		d.SetVoters(slotList.FindCommitteeByID(header.ShardID()).Slots)
-		if !d.IsQuorumAchievedByMask(mask, true) {
+		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in commitSignature from Block Header",
 			)
@@ -410,7 +449,9 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 }
 
 // GetPublicKeys finds the public keys of the committee that signed the block header
-func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate bool) ([]*bls.PublicKey, error) {
+func GetPublicKeys(
+	chain engine.ChainReader, header *block.Header, reCalculate bool,
+) ([]*bls.PublicKey, error) {
 	shardState := new(shard.State)
 	var err error
 	if reCalculate {
@@ -430,13 +471,10 @@ func GetPublicKeys(chain engine.ChainReader, header *block.Header, reCalculate b
 			"shardID", header.ShardID(),
 		)
 	}
-	var committerKeys []*bls.PublicKey
-
-	utils.Logger().Print(committee.Slots)
+	committerKeys := []*bls.PublicKey{}
 	for _, member := range committee.Slots {
 		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
+		if err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
 			return nil, ctxerror.New("cannot convert BLS public key",
 				"blsPublicKey", member.BlsPublicKey).WithCause(err)
 		}

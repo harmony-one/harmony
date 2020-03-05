@@ -76,14 +76,6 @@ func New(
 		shardID:        shardID,
 	}
 	hmy.APIBackend = &APIBackend{hmy: hmy,
-		MedianStakeCache: struct {
-			sync.Mutex
-			BlockHeight    int64
-			MedianRawStake *big.Int
-		}{
-			BlockHeight:    -1,
-			MedianRawStake: big.NewInt(0),
-		},
 		TotalStakingCache: struct {
 			sync.Mutex
 			BlockHeight  int64

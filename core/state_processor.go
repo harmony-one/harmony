@@ -22,6 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
@@ -31,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -66,12 +68,11 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	var (
 		receipts types.Receipts
 		outcxs   types.CXReceipts
-
-		incxs   = block.IncomingReceipts()
-		usedGas = new(uint64)
-		header  = block.Header()
-		allLogs []*types.Log
-		gp      = new(GasPool).AddGas(block.GasLimit())
+		incxs    = block.IncomingReceipts()
+		usedGas  = new(uint64)
+		header   = block.Header()
+		allLogs  []*types.Log
+		gp       = new(GasPool).AddGas(block.GasLimit())
 	)
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
 
@@ -107,7 +108,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 
-	// incomingReceipts should always be processed after transactions (to be consistent with the block proposal)
+	// incomingReceipts should always be processed
+	// after transactions (to be consistent with the block proposal)
 	for _, cx := range block.IncomingReceipts() {
 		err := ApplyIncomingReceipt(p.config, statedb, header, cx)
 		if err != nil {
@@ -115,8 +117,18 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 		}
 	}
 
+	slashes := slash.Records{}
+	if s := header.Slashes(); len(s) > 0 {
+		if err := rlp.DecodeBytes(s, &slashes); err != nil {
+			return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
+		}
+	}
+
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_, payout, err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, outcxs, incxs, block.StakingTransactions())
+	_, payout, err := p.engine.Finalize(
+		p.bc, header, statedb, block.Transactions(),
+		receipts, outcxs, incxs, block.StakingTransactions(), slashes,
+	)
 	if err != nil {
 		return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
@@ -125,13 +137,19 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 }
 
 // return true if it is valid
-func getTransactionType(config *params.ChainConfig, header *block.Header, tx *types.Transaction) types.TransactionType {
-	if header.ShardID() == tx.ShardID() && (!config.AcceptsCrossTx(header.Epoch()) || tx.ShardID() == tx.ToShardID()) {
+func getTransactionType(
+	config *params.ChainConfig, header *block.Header, tx *types.Transaction,
+) types.TransactionType {
+	if header.ShardID() == tx.ShardID() &&
+		(!config.AcceptsCrossTx(header.Epoch()) ||
+			tx.ShardID() == tx.ToShardID()) {
 		return types.SameShardTx
 	}
 	numShards := shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards()
 	// Assuming here all the shards are consecutive from 0 to n-1, n is total number of shards
-	if tx.ShardID() != tx.ToShardID() && header.ShardID() == tx.ShardID() && tx.ToShardID() < numShards {
+	if tx.ShardID() != tx.ToShardID() &&
+		header.ShardID() == tx.ShardID() &&
+		tx.ToShardID() < numShards {
 		return types.SubtractionOnly
 	}
 	return types.InvalidTx

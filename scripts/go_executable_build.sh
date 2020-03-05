@@ -137,6 +137,10 @@ function build_only
       done
 
       $MD5 "${!SRC[@]}" "${!LIB[@]}" > md5sum.txt
+      # hardcode the prebuilt libcrypto to md5sum.txt
+      if [ "$(uname -s)" == "Linux" ]; then
+         echo '771150db04267126823190c873a96e48  libcrypto.so.10' >> md5sum.txt
+      fi
    fi
    popd
 }

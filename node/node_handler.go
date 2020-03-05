@@ -13,6 +13,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -154,7 +155,8 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						Msg("block sync")
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
-					if node.Blockchain().ShardID() != 0 && node.NodeConfig.Role() != nodeconfig.ExplorerNode {
+					if node.Blockchain().ShardID() != shard.BeaconChainShardID &&
+						node.NodeConfig.Role() != nodeconfig.ExplorerNode {
 						for _, block := range blocks {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
@@ -186,6 +188,10 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
+	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
+		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
+		return
+	}
 	if len(msgPayload) < 1 {
 		utils.Logger().Debug().Msgf("Invalid transaction message size")
 		return
@@ -207,6 +213,10 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
+	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
+		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
+		return
+	}
 	if len(msgPayload) < 1 {
 		utils.Logger().Debug().Msgf("Invalid staking transaction message size")
 		return
@@ -241,23 +251,15 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 
 // BroadcastSlash ..
 func (node *Node) BroadcastSlash(witness *slash.Record) {
-	// no point to broadcast the crosslink if we aren't even in the right epoch yet
-	if !node.Blockchain().Config().IsCrossLink(
-		node.Blockchain().CurrentHeader().Epoch(),
-	) {
-		return
-	}
-
-	// Send it to beaconchain if I'm shardchain, otherwise just add it to pending
-	if node.NodeConfig.ShardID != shard.BeaconChainShardID {
-		node.host.SendMessageToGroups(
-			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-			host.ConstructP2pMessage(
-				byte(0),
-				proto_node.ConstructSlashMessage(witness)),
-		)
-	} else {
-		node.Blockchain().AddPendingSlashingCandidate(witness)
+	if err := node.host.SendMessageToGroups(
+		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
+		host.ConstructP2pMessage(
+			byte(0),
+			proto_node.ConstructSlashMessage(slash.Records{*witness})),
+	); err != nil {
+		utils.Logger().Err(err).
+			RawJSON("record", []byte(witness.String())).
+			Msg("could not send slash record to beaconchain")
 	}
 }
 
@@ -322,8 +324,7 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are
 // running consensus on
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
-	err := node.Blockchain().Validator().ValidateHeader(newBlock, true)
-	if err != nil {
+	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
@@ -334,6 +335,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			newBlock.Hash(),
 		).WithCause(err)
 	}
+
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
 		utils.Logger().Error().
 			Uint32("my shard ID", node.Blockchain().ShardID()).
@@ -341,13 +343,13 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Msg("wrong shard ID")
 		return ctxerror.New("wrong shard ID",
 			"my shard ID", node.Blockchain().ShardID(),
-			"new block's shard ID", newBlock.ShardID())
+			"new block's shard ID", newBlock.ShardID(),
+		)
 	}
 
-	err = node.Blockchain().Engine().VerifyShardState(
+	if err := node.Blockchain().Engine().VerifyShardState(
 		node.Blockchain(), node.Beaconchain(), newBlock.Header(),
-	)
-	if err != nil {
+	); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
@@ -358,8 +360,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		).WithCause(err)
 	}
 
-	err = node.Blockchain().ValidateNewBlock(newBlock)
-	if err != nil {
+	if err := node.Blockchain().ValidateNewBlock(newBlock); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Int("numTx", len(newBlock.Transactions())).
@@ -374,7 +375,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 
 	// Verify cross links
 	// TODO: move into ValidateNewBlock
-	if node.NodeConfig.ShardID == 0 {
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		err := node.VerifyBlockCrossLinks(newBlock)
 		if err != nil {
 			utils.Logger().Debug().Err(err).Msg("ops2 VerifyBlockCrossLinks Failed")
@@ -383,8 +384,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	}
 
 	// TODO: move into ValidateNewBlock
-	err = node.verifyIncomingReceipts(newBlock)
-	if err != nil {
+	if err := node.verifyIncomingReceipts(newBlock); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Int("numIncomingReceipts", len(newBlock.IncomingReceipts())).
@@ -426,7 +426,7 @@ func (node *Node) PostConsensusProcessing(
 	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
 	// TODO: refactor the asynchronous calls to separate go routine.
 	node.lastConsensusTime = time.Now().Unix()
-	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
+	if node.Consensus.IsLeader() {
 		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)
 		}

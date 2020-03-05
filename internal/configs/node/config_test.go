@@ -9,6 +9,7 @@ import (
 
 	mock_shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding/mock"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/multibls"
 )
 
 func TestNodeConfigSingleton(t *testing.T) {
@@ -115,7 +116,7 @@ func TestConfigType_ShardIDFromConsensusKey(t *testing.T) {
 			schedule := mock_shardingconfig.NewMockSchedule(mc)
 			schedule.EXPECT().InstanceForEpoch(tt.epoch).Return(instance)
 			conf := &ConfigType{
-				ConsensusPubKey:  tt.fields.ConsensusPubKey,
+				ConsensusPubKey:  multibls.GetPublicKey(tt.fields.ConsensusPubKey),
 				networkType:      tt.fields.networkType,
 				shardingSchedule: schedule,
 			}

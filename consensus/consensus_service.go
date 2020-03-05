@@ -20,16 +20,13 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-)
-
-var (
-	errValidNotInCommittee = errors.New("slot signer not this slot's subcommittee")
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -60,40 +57,26 @@ func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error
 	return vdfBytes, seed, nil
 }
 
-// Populates the common basic fields for all consensus message.
-func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusRequest) {
-	request.ViewId = consensus.viewID
-	request.BlockNum = consensus.blockNum
-	request.ShardId = consensus.ShardID
-
-	// 32 byte block hash
-	request.BlockHash = consensus.blockHash[:]
-
-	// sender address
-	request.SenderPubkey = consensus.PubKey.Serialize()
-	consensus.getLogger().Debug().
-		Str("senderKey", consensus.PubKey.SerializeToHexStr()).
-		Msg("[populateMessageFields]")
-}
+var (
+	empty = []byte{}
+)
 
 // Signs the consensus message and returns the marshaled message.
-func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message) ([]byte, error) {
-	err := consensus.signConsensusMessage(message)
-	if err != nil {
-		return []byte{}, err
+func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message,
+	priKey *bls.SecretKey) ([]byte, error) {
+	if err := consensus.signConsensusMessage(message, priKey); err != nil {
+		return empty, err
 	}
-
 	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
-		return []byte{}, err
+		return empty, err
 	}
 	return marshaledMessage, nil
 }
 
 // GetNodeIDs returns Node IDs of all nodes in the same shard
 func (consensus *Consensus) GetNodeIDs() []libp2p_peer.ID {
-	nodes := make([]libp2p_peer.ID, 0)
-	nodes = append(nodes, consensus.host.GetID())
+	nodes := []libp2p_peer.ID{consensus.host.GetID()}
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if peer, ok := v.(p2p.Peer); ok {
 			nodes = append(nodes, peer.PeerID)
@@ -109,19 +92,17 @@ func (consensus *Consensus) GetViewID() uint64 {
 	return consensus.viewID
 }
 
-// DebugPrintPublicKeys print all the PublicKeys in string format in Consensus
-func (consensus *Consensus) DebugPrintPublicKeys() {
-	keys := consensus.Decider.DumpParticipants()
-	utils.Logger().Debug().Strs("PublicKeys", keys).Int("count", len(keys)).Msgf("Debug Public Keys")
-}
-
-// UpdatePublicKeys updates the PublicKeys for quorum on current subcommittee, protected by a mutex
+// UpdatePublicKeys updates the PublicKeys for
+// quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
-		utils.Logger().Info().Int("index", i).Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).Msg("Member")
+		utils.Logger().Info().
+			Int("index", i).
+			Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).
+			Msg("Member")
 	}
 	consensus.LeaderPubKey = pubKeys[0]
 	utils.Logger().Info().
@@ -139,14 +120,15 @@ func NewFaker() *Consensus {
 }
 
 // Sign on the hash of the message
-func (consensus *Consensus) signMessage(message []byte) []byte {
+func (consensus *Consensus) signMessage(message []byte, priKey *bls.SecretKey) []byte {
 	hash := hash.Keccak256(message)
-	signature := consensus.priKey.SignHash(hash[:])
+	signature := priKey.SignHash(hash[:])
 	return signature.Serialize()
 }
 
 // Sign on the consensus message signature field.
-func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message) error {
+func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
+	priKey *bls.SecretKey) error {
 	message.Signature = nil
 	// TODO: use custom serialization method rather than protobuf
 	marshaledMessage, err := protobuf.Marshal(message)
@@ -154,14 +136,14 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message) error 
 		return err
 	}
 	// 64 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage)
+	signature := consensus.signMessage(marshaledMessage, priKey)
 	message.Signature = signature
 	return nil
 }
 
 // GetValidatorPeers returns list of validator peers.
 func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
-	validatorPeers := make([]p2p.Peer, 0)
+	validatorPeers := []p2p.Peer{}
 
 	consensus.validators.Range(func(k, v interface{}) bool {
 		if peer, ok := v.(p2p.Peer); ok {
@@ -213,14 +195,23 @@ func (consensus *Consensus) ResetState() {
 
 // Returns a string representation of this consensus
 func (consensus *Consensus) String() string {
-	var duty string
+	duty := ""
 	if consensus.IsLeader() {
-		duty = "LDR" // leader
+		duty = "leader"
 	} else {
-		duty = "VLD" // validator
+		duty = "validator"
 	}
-	return fmt.Sprintf("[duty:%s, PubKey:%s, ShardID:%v]",
-		duty, consensus.PubKey.SerializeToHexStr(), consensus.ShardID)
+
+	return fmt.Sprintf(
+		"[Duty:%s Pub:%s Header:%s Num:%d View:%d Shard:%d Epoch:%d]",
+		duty,
+		consensus.PubKey.SerializeToHexStr(),
+		hex.EncodeToString(consensus.blockHeader),
+		consensus.blockNum,
+		consensus.viewID,
+		consensus.ShardID,
+		consensus.epoch,
+	)
 }
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
@@ -266,7 +257,7 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey
 	}
 
 	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, errValidNotInCommittee
+		return nil, shard.ErrValidNotInCommittee
 	}
 	return senderKey, nil
 }
@@ -279,7 +270,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 	}
 
 	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, errValidNotInCommittee
+		return nil, shard.ErrValidNotInCommittee
 	}
 	return senderKey, nil
 }
@@ -356,7 +347,7 @@ func (consensus *Consensus) SetEpochNum(epoch uint64) {
 func (consensus *Consensus) ReadSignatureBitmapPayload(
 	recvPayload []byte, offset int,
 ) (*bls.Sign, *bls_cosi.Mask, error) {
-	if offset+96 > len(recvPayload) {
+	if offset+shard.BLSSignatureSizeInBytes > len(recvPayload) {
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	sigAndBitmapPayload := recvPayload[offset:]
@@ -390,7 +381,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 		txHashes = append(txHashes, hex.EncodeToString(txHash[:]))
 	}
 	metrics := map[string]interface{}{
-		"key":             hex.EncodeToString(consensus.PubKey.Serialize()),
+		"key":             hex.EncodeToString(consensus.LeaderPubKey.Serialize()),
 		"tps":             tps,
 		"txCount":         numOfTxs,
 		"nodeCount":       consensus.Decider.ParticipantsCount() + 1,
@@ -489,7 +480,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		decider.SetShardIDProvider(func() (uint32, error) {
 			return consensus.ShardID, nil
 		})
-		decider.SetMyPublicKeyProvider(func() (*bls.PublicKey, error) {
+		decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return consensus.PubKey, nil
 		})
 		consensus.Decider = decider
@@ -586,15 +577,15 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 	}
 
-	for i := range pubKeys {
+	for _, key := range pubKeys {
 		// in committee
-		if pubKeys[i].IsEqual(consensus.PubKey) {
+		if consensus.PubKey.Contains(key) {
 			if hasError {
 				return Syncing
 			}
 
 			// If the leader changed and I myself become the leader
-			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.LeaderPubKey.IsEqual(consensus.PubKey) {
+			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.IsLeader() {
 				go func() {
 					utils.Logger().Debug().
 						Str("myKey", consensus.PubKey.SerializeToHexStr()).
@@ -614,8 +605,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
-		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
+	for _, key := range consensus.PubKey.PublicKey {
+		if key.IsEqual(consensus.LeaderPubKey) {
+			return true
+		}
 	}
 	return false
 }

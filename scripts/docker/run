@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 
+unset -v progname
+progname="${0##*/}"
+
+unset -f msg err
+
+msg() {
+   case $# in
+   [1-9]*)
+      echo "${progname}: $*" >&2
+      ;;
+   esac
+}
+
+err() {
+   local code
+   code="${1}"
+   shift 1
+   msg "$@"
+   exit "${code}"
+}
+
 # https://www.linuxjournal.com/content/validating-ip-address-bash-script
 function valid_ip()
 {
@@ -18,19 +39,82 @@ function valid_ip()
   return $stat
 }
 
-PUB_IP=$(wget -qO- https://api.ipify.org)
-if valid_ip $PUB_IP; then
-  echo "MYIP = $PUB_IP"
-else
-  echo "NO valid public IP found: $PUB_IP"
-  exit 1
+function myip() {
+# get ipv4 address only, right now only support ipv4 addresses
+   PUB_IP=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
+   if valid_ip $PUB_IP; then
+      msg "public IP address autodetected: $PUB_IP"
+   else
+      err 1 "NO valid public IP found: $PUB_IP"
+   fi
+}
+
+function add_env
+{
+   filename=$1
+   shift
+   grep -qxF "$@" $filename || echo "$@" >> $filename
+}
+
+function setup_env
+{
+   sysctl -w net.core.somaxconn=1024
+   sysctl -w net.core.netdev_max_backlog=65536
+   sysctl -w net.ipv4.tcp_tw_reuse=1
+   sysctl -w net.ipv4.tcp_rmem='4096 65536 16777216'
+   sysctl -w net.ipv4.tcp_wmem='4096 65536 16777216'
+   sysctl -w net.ipv4.tcp_mem='65536 131072 262144'
+
+   add_env /etc/security/limits.conf "* soft     nproc          65535"
+   add_env /etc/security/limits.conf "* hard     nproc          65535"
+   add_env /etc/security/limits.conf "* soft     nofile         65535"
+   add_env /etc/security/limits.conf "* hard     nofile         65535"
+   add_env /etc/security/limits.conf "root soft     nproc          65535"
+   add_env /etc/security/limits.conf "root hard     nproc          65535"
+   add_env /etc/security/limits.conf "root soft     nofile         65535"
+   add_env /etc/security/limits.conf "root hard     nofile         65535"
+   add_env /etc/pam.d/common-session "session required pam_limits.so"
+}
+
+# find my public ip address
+myip
+
+# setup runtime environment
+setup_env
+
+keydir=/harmony/.hmy
+
+args=(
+      -log_folder "/harmony/log"
+      -node_type "validator"
+      -network_type "mainnet"
+      -bootnodes "$NODE_BN_MNET"
+      -ip "$PUB_IP"
+      -port "$NODE_PORT"
+      -dns_zone "$NODE_DNS_ZONE"
+      -blspass "file:${keydir}/$NODE_BLSPASS"
+      -blskey_file "${keydir}/$NODE_BLSKEY"
+     )
+
+if [ "$NODE_BLACKLIST" != "" ]; then
+  args+=(
+    -blacklist "$NODE_BLACKLIST"
+    )
 fi
 
-if [ -z "$NODE_ACCOUNT_ID" ]; then
-  echo "No account id."
-  exit 2
+if [ "$NODE_RPC" == "true" ]; then
+  args+=(
+    -public_rpc
+  )
 fi
 
-harmony -log_folder log -bootnodes $BN_MA -ip $PUB_IP -port $NODE_PORT -is_genesis -account_index $NODE_ACCOUNT_ID
+if [ -n "$NODE_EXTRA_OPTIONS" ]; then
+  extra_args="$NODE_EXTRA_OPTIONS"
+fi
+
+msg "harmony ${args[@]} $extra_args"
+ls -al ${keydir}
+
+harmony "${args[@]} $extra_args"
 
 # vim: ai ts=2 sw=2 et sts=2 ft=sh

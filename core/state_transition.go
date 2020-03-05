@@ -373,7 +373,7 @@ func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 	if err != nil {
 		return err
 	}
-	if err := st.state.UpdateStakingInfo(wrapper.Validator.Address, wrapper); err != nil {
+	if err := st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper); err != nil {
 		return err
 	}
 	st.state.SetValidatorFlag(wrapper.Validator.Address)
@@ -388,7 +388,7 @@ func (st *StateTransition) verifyAndApplyEditValidatorTx(
 	if err != nil {
 		return err
 	}
-	return st.state.UpdateStakingInfo(wrapper.Address, wrapper)
+	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
 }
 
 func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) error {
@@ -396,7 +396,7 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 	if err != nil {
 		return err
 	}
-	if err := st.state.UpdateStakingInfo(wrapper.Validator.Address, wrapper); err != nil {
+	if err := st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper); err != nil {
 		return err
 	}
 	st.state.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
@@ -408,7 +408,7 @@ func (st *StateTransition) verifyAndApplyUndelegateTx(undelegate *staking.Undele
 	if err != nil {
 		return err
 	}
-	return st.state.UpdateStakingInfo(wrapper.Validator.Address, wrapper)
+	return st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper)
 }
 
 func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.CollectRewards) error {
@@ -419,12 +419,14 @@ func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.
 	if err != nil {
 		return err
 	}
-	updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(st.state, delegations)
+	updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
+		st.state, delegations,
+	)
 	if err != nil {
 		return err
 	}
 	for _, wrapper := range updatedValidatorWrappers {
-		if err := st.state.UpdateStakingInfo(wrapper.Validator.Address, wrapper); err != nil {
+		if err := st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper); err != nil {
 			return err
 		}
 	}

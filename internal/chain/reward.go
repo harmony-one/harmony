@@ -48,11 +48,11 @@ func AccumulateRewards(
 	//// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-
 		defaultReward := network.BaseStakedReward
-
 		// TODO Use cached result in off-chain db instead of full computation
-		_, percentageStaked, err := network.WhatPercentStakedNow(beaconChain, header.Time().Int64())
+		_, percentageStaked, err := network.WhatPercentStakedNow(
+			beaconChain, header.Time().Int64(),
+		)
 		if err != nil {
 			return network.NoReward, err
 		}
@@ -73,8 +73,18 @@ func AccumulateRewards(
 		newRewards := big.NewInt(0)
 
 		// Take care of my own beacon chain committee, _ is missing, for slashing
-		members, payable, _, err := ballotResultBeaconchain(beaconChain, header)
+		members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
+			return network.NoReward, err
+		}
+
+		if err := availability.IncrementValidatorSigningCounts(
+			beaconChain,
+			shard.Committee{shard.BeaconChainShardID, members}.StakedValidators(),
+			state,
+			payable,
+			missing,
+		); err != nil {
 			return network.NoReward, err
 		}
 
@@ -130,10 +140,18 @@ func AccumulateRewards(
 				}
 
 				subComm := shardState.FindCommitteeByID(cxLink.ShardID())
-				// _ are the missing signers, later for slashing
-				payableSigners, _, err := availability.BlockSigners(cxLink.Bitmap(), subComm)
+				payableSigners, missing, err := availability.BlockSigners(
+					cxLink.Bitmap(), subComm,
+				)
 
 				if err != nil {
+					return network.NoReward, err
+				}
+
+				staked := subComm.StakedValidators()
+				if err := availability.IncrementValidatorSigningCounts(
+					beaconChain, staked, state, payableSigners, missing,
+				); err != nil {
 					return network.NoReward, err
 				}
 

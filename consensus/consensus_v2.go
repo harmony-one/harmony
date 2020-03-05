@@ -109,8 +109,13 @@ func (consensus *Consensus) finalizeCommits() {
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
 		Msg("[Finalizing] Finalizing Block")
 	beforeCatchupNum := consensus.blockNum
+	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+	if err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[FinalizeCommits] leader not found")
+		return
+	}
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil)
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, leaderPriKey.GetPublicKey(), leaderPriKey)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[FinalizeCommits] Unable to construct Committed message")
@@ -140,7 +145,11 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 
-	consensus.ChainReader.WriteLastCommits(FBFTMsg.Payload)
+	if err := consensus.ChainReader.WriteLastCommits(FBFTMsg.Payload); err != nil {
+		consensus.getLogger().Err(err).
+			Msg("[FinalizeCommits] could not write last commits")
+		return
+	}
 
 	// if leader success finalize the block, send committed message to validators
 	if err := consensus.msgSender.SendWithRetry(
@@ -178,7 +187,7 @@ func (consensus *Consensus) finalizeCommits() {
 		Uint64("epochNum", block.Epoch().Uint64()).
 		Uint64("ViewId", block.Header().ViewID().Uint64()).
 		Str("blockHash", block.Hash().String()).
-		Int("index", consensus.Decider.IndexOf(consensus.PubKey)).
+		Int("index", consensus.Decider.IndexOf(consensus.LeaderPubKey)).
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
@@ -193,7 +202,8 @@ func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 		return nil, nil, nil
 	}
 	lastCommits, err := consensus.ChainReader.ReadLastCommits()
-	if err != nil || len(lastCommits) < 96 {
+	if err != nil ||
+		len(lastCommits) < shard.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
 		if len(msgs) != 1 {
 			consensus.getLogger().Error().
@@ -204,11 +214,11 @@ func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 		lastCommits = msgs[0].Payload
 	}
 	//#### Read payload data from committed msg
-	aggSig := make([]byte, 96)
-	bitmap := make([]byte, len(lastCommits)-96)
+	aggSig := make([]byte, shard.BLSSignatureSizeInBytes)
+	bitmap := make([]byte, len(lastCommits)-shard.BLSSignatureSizeInBytes)
 	offset := 0
-	copy(aggSig[:], lastCommits[offset:offset+96])
-	offset += 96
+	copy(aggSig[:], lastCommits[offset:offset+shard.BLSSignatureSizeInBytes])
+	offset += shard.BLSSignatureSizeInBytes
 	copy(bitmap[:], lastCommits[offset:])
 	//#### END Read payload data from committed msg
 	return aggSig, bitmap, nil
@@ -487,9 +497,18 @@ func (consensus *Consensus) Start(
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
 func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockNumbers []uint64) []uint64 {
-	sk := vrf_bls.NewVRFSigner(consensus.priKey)
+	key, err := consensus.GetConsensusLeaderPrivateKey()
+	if err != nil {
+		consensus.getLogger().Error().
+			Err(err).
+			Msg("[GenerateVrfAndProof] VRF generation error")
+		return vrfBlockNumbers
+	}
+	sk := vrf_bls.NewVRFSigner(key)
 	blockHash := [32]byte{}
-	previousHeader := consensus.ChainReader.GetHeaderByNumber(newBlock.NumberU64() - 1)
+	previousHeader := consensus.ChainReader.GetHeaderByNumber(
+		newBlock.NumberU64() - 1,
+	)
 	previousHash := previousHeader.Hash()
 	copy(blockHash[:], previousHash[:])
 

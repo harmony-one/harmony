@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -120,6 +121,7 @@ type Engine interface {
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+		doubleSigners slash.Records,
 	) (*types.Block, *big.Int, error)
 
 	// Seal generates a new sealing request for the given input block and pushes

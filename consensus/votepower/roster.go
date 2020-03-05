@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -25,26 +24,33 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	SignerPubKey       shard.BlsPublicKey `json:"bls-public-key"`
-	Signature          *bls.Sign          `json:"signature"`
-	OptSerializedBlock []byte             `json:"opt-rlp-encoded-block"`
+	SignerPubKey    shard.BlsPublicKey `json:"bls-public-key"`
+	BlockHeaderHash common.Hash        `json:"block-header-hash"`
+	Signature       []byte             `json:"bls-signature"`
 }
 
-// BallotResults are a completed round of votes
-type BallotResults struct {
-	Signature shard.BLSSignature // (aggregated) signature
-	Bitmap    []byte             // corresponding bitmap mask for agg signature
-}
-
-// EncodePair returns hex encoded tuple (signature, bitmap)
-func (b BallotResults) EncodePair() (string, string) {
-	return hex.EncodeToString(b.Signature[:]), hex.EncodeToString(b.Bitmap[:])
+// MarshalJSON ..
+func (b Ballot) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		A string `json:"bls-public-key"`
+		B string `json:"block-header-hash"`
+		C string `json:"bls-signature"`
+	}{
+		b.SignerPubKey.Hex(),
+		b.BlockHeaderHash.Hex(),
+		hex.EncodeToString(b.Signature),
+	})
 }
 
 // Round is a round of voting in any FBFT phase
 type Round struct {
 	AggregatedVote *bls.Sign
 	BallotBox      map[string]*Ballot
+}
+
+func (b Ballot) String() string {
+	data, _ := json.Marshal(b)
+	return string(data)
 }
 
 // NewRound ..
@@ -57,6 +63,7 @@ type stakedVoter struct {
 	IsHarmonyNode    bool               `json:"is-harmony"`
 	EarningAccount   common.Address     `json:"earning-account"`
 	Identity         shard.BlsPublicKey `json:"bls-public-key"`
+	RawPercent       numeric.Dec        `json:"voting-power-unnormalized"`
 	EffectivePercent numeric.Dec        `json:"voting"`
 	EffectiveStake   numeric.Dec        `json:"effective-stake"`
 }
@@ -170,6 +177,7 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 			IsHarmonyNode:    true,
 			EarningAccount:   staked[i].EcdsaAddress,
 			Identity:         staked[i].BlsPublicKey,
+			RawPercent:       numeric.ZeroDec(),
 			EffectivePercent: numeric.ZeroDec(),
 			EffectiveStake:   numeric.ZeroDec(),
 		}
@@ -178,13 +186,13 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 		if staked[i].EffectiveStake != nil {
 			member.IsHarmonyNode = false
 			member.EffectiveStake = member.EffectiveStake.Add(*staked[i].EffectiveStake)
-			member.EffectivePercent = staked[i].EffectiveStake.
-				Quo(roster.RawStakedTotal).
-				Mul(StakersShare)
+			member.RawPercent = staked[i].EffectiveStake.Quo(roster.RawStakedTotal)
+			member.EffectivePercent = member.RawPercent.Mul(StakersShare)
 			theirPercentage = theirPercentage.Add(member.EffectivePercent)
 			lastStakedVoter = &member
 		} else { // Our node
 			member.EffectivePercent = HarmonysShare.Quo(ourCount)
+			member.RawPercent = member.EffectivePercent
 			ourPercentage = ourPercentage.Add(member.EffectivePercent)
 		}
 
@@ -195,23 +203,12 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 	if diff := numeric.OneDec().Sub(
 		ourPercentage.Add(theirPercentage),
 	); !diff.IsZero() && lastStakedVoter != nil {
-		utils.Logger().Info().
-			Str("theirs", theirPercentage.String()).
-			Str("ours", ourPercentage.String()).
-			Str("diff", diff.String()).
-			Str("combined", theirPercentage.Add(diff).Add(ourPercentage).String()).
-			Str("bls-public-key-of-receipent", lastStakedVoter.Identity.Hex()).
-			Msg("voting power of hmy & staked slots not sum to 1, giving diff to staked slot")
 		lastStakedVoter.EffectivePercent = lastStakedVoter.EffectivePercent.Add(diff)
 		theirPercentage = theirPercentage.Add(diff)
 	}
 
 	if lastStakedVoter != nil &&
 		!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
-		utils.Logger().Error().
-			Str("theirs", theirPercentage.String()).
-			Str("ours", ourPercentage.String()).
-			Msg("Total voting power not equal 100 percent")
 		return nil, ErrVotingPowerNotEqualOne
 	}
 
