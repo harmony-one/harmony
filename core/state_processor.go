@@ -279,7 +279,7 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 		if cx == nil || cx.To == nil { // should not happend
 			return ctxerror.New("ApplyIncomingReceipts: Invalid incomingReceipt!", "receipt", cx)
 		}
-		utils.Logger().Info().Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
+		utils.Logger().Info().Interface("receipt", cx).Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
 
 		if !db.Exist(*cx.To) {
 			db.CreateAccount(*cx.To)

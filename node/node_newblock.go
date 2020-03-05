@@ -15,7 +15,7 @@ import (
 
 // Constants of proposing a new block
 const (
-	PeriodicBlock         = 20 * time.Millisecond
+	SleepPeriod           = 20 * time.Millisecond
 	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
 )
 
@@ -43,7 +43,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 				return
 			case <-readySignal:
 				for node.Consensus != nil && node.Consensus.IsLeader() {
-					time.Sleep(PeriodicBlock)
+					time.Sleep(SleepPeriod)
 					if time.Now().Before(deadline) {
 						continue
 					}
@@ -60,7 +60,10 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 					if err == nil {
 						utils.Logger().Debug().
 							Uint64("blockNum", newBlock.NumberU64()).
+							Uint64("epoch", newBlock.Epoch().Uint64()).
+							Uint64("viewID", newBlock.Header().ViewID().Uint64()).
 							Int("numTxs", newBlock.Transactions().Len()).
+							Int("numStakingTxs", newBlock.StakingTransactions().Len()).
 							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 							Msg("=========Successfully Proposed New Block==========")
 
@@ -71,7 +74,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					} else {
-						utils.Logger().Err(err).Msg("!!!!!!!!!cannot commit new block!!!!!!!!!")
+						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
 					}
 				}
 			}
@@ -89,23 +92,30 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		err         error
 	)
 
-	node.Worker.GetCurrentHeader().SetCoinbase(coinbase)
-
+	header := node.Worker.GetCurrentHeader()
 	// After staking, all coinbase will be the address of bls pub key
-	if header := node.Worker.GetCurrentHeader(); node.Blockchain().Config().IsStaking(header.Epoch()) {
-		addr := common.Address{}
+	if node.Blockchain().Config().IsStaking(header.Epoch()) {
 		blsPubKeyBytes := node.Consensus.LeaderPubKey.GetAddress()
-		addr.SetBytes(blsPubKeyBytes[:])
-		coinbase = addr // coinbase will be the bls address
-		header.SetCoinbase(coinbase)
+		coinbase.SetBytes(blsPubKeyBytes[:])
 	}
 
-	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(node.Worker.GetCurrentHeader())
+	emptyAddr := common.Address{}
+	if node.Worker.GetCurrentHeader().Coinbase() == emptyAddr {
+		return nil, errors.New("[proposeNewBlock] Failed setting coinbase")
+	}
+
+	// Must set coinbase here because the operations below depend on it
+	header.SetCoinbase(coinbase)
+
+	// Get beneficiary based on coinbase
+	// Before staking, coinbase itself is the beneficial
+	// After staking, beneficial is the corresponding ECDSA address of the bls key
+	beneficiary, err = node.Blockchain().GetECDSAFromCoinbase(header)
 	if err != nil {
 		return nil, err
 	}
 
-	// Prepare transactions including staking transactions
+	// Prepare normal and staking transactions retrieved from transaction pool
 	pendingPoolTxs, err := node.TxPool.Pending()
 	if err != nil {
 		utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
@@ -134,6 +144,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 	}
 
+	// Try commit normal and staking transactions based on the current state
+	// The successfully committed transactions will be put in the proposed block
 	if err := node.Worker.CommitTransactions(
 		pendingPlainTxs, pendingStakingTxs, beneficiary,
 	); err != nil {
@@ -145,12 +157,9 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {
 		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
-			utils.Logger().Error().Err(err).Msg("[proposeNewBlock] cannot commit receipts")
+			return nil, err
 		}
 	}
-
-	// Prepare cross links and slashings messages
-	var crossLinksToPropose types.CrossLinks
 
 	isBeaconchainInCrossLinkEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsCrossLink(node.Worker.GetCurrentHeader().Epoch())
@@ -158,6 +167,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	isBeaconchainInStakingEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch())
 
+	// Prepare cross links and slashing messages
+	var crossLinksToPropose types.CrossLinks
 	if isBeaconchainInCrossLinkEra {
 		allPending, err := node.Blockchain().ReadPendingCrossLinks()
 		invalidToDelete := []types.CrossLink{}
