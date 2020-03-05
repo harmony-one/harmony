@@ -24,6 +24,7 @@ const (
 	MaxWebsiteLength         = 140
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
+	MaxNumBLSKeys            = 5
 	BlsVerificationStr       = "harmony-one"
 )
 
@@ -56,6 +57,7 @@ var (
 	errSlotKeyToRemoveNotFound = errors.New("slot key to remove not found")
 	errSlotKeyToAddExists      = errors.New("slot key to add already exists")
 	errDuplicateSlotKeys       = errors.New("slot keys can not have duplicates")
+	errExcessiveBLSKeys        = errors.New("more slot keys provided than allowed")
 )
 
 // ValidatorSnapshotReader ..
@@ -173,6 +175,12 @@ func (v *Validator) SanityCheck() error {
 
 	if len(v.SlotPubKeys) == 0 {
 		return errNeedAtLeastOneSlotKey
+	}
+
+	if c := len(v.SlotPubKeys); c > MaxNumBLSKeys {
+		return errors.Wrapf(
+			errExcessiveBLSKeys, "have: %d allowed: %d", c, MaxNumBLSKeys,
+		)
 	}
 
 	if v.MinSelfDelegation == nil {
