@@ -13,6 +13,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -187,6 +188,10 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
+	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
+		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
+		return
+	}
 	if len(msgPayload) < 1 {
 		utils.Logger().Debug().Msgf("Invalid transaction message size")
 		return
@@ -208,6 +213,10 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
+	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
+		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
+		return
+	}
 	if len(msgPayload) < 1 {
 		utils.Logger().Debug().Msgf("Invalid staking transaction message size")
 		return
