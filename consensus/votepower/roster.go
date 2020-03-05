@@ -59,7 +59,6 @@ func NewRound() *Round {
 }
 
 type stakedVoter struct {
-	IsActive         bool               `json:"is-active"`
 	IsHarmonyNode    bool               `json:"is-harmony"`
 	EarningAccount   common.Address     `json:"earning-account"`
 	Identity         shard.BlsPublicKey `json:"bls-public-key"`
@@ -173,7 +172,6 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 
 	for i := range staked {
 		member := stakedVoter{
-			IsActive:         true,
 			IsHarmonyNode:    true,
 			EarningAccount:   staked[i].EcdsaAddress,
 			Identity:         staked[i].BlsPublicKey,

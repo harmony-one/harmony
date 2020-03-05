@@ -60,7 +60,6 @@ func TestCompute(t *testing.T) {
 	expectedRoster.RawStakedTotal = totalStake
 	for _, slot := range slotList {
 		newMember := stakedVoter{
-			IsActive:         true,
 			IsHarmonyNode:    false,
 			EarningAccount:   slot.EcdsaAddress,
 			EffectivePercent: numeric.ZeroDec(),
@@ -116,8 +115,7 @@ func compareRosters(a, b *Roster, t *testing.T) bool {
 }
 
 func compareStakedVoter(a, b stakedVoter) bool {
-	return a.IsActive == b.IsActive &&
-		a.IsHarmonyNode == b.IsHarmonyNode &&
+	return a.IsHarmonyNode == b.IsHarmonyNode &&
 		a.EarningAccount == b.EarningAccount &&
 		a.EffectivePercent.Equal(b.EffectivePercent) &&
 		a.EffectiveStake.Equal(b.EffectiveStake)
@@ -125,14 +123,12 @@ func compareStakedVoter(a, b stakedVoter) bool {
 
 func (s *stakedVoter) formatString() string {
 	type t struct {
-		IsActive         string `json:"active"`
 		IsHarmony        string `json:"harmony-node"`
 		EarningAccount   string `json:"one-address"`
 		EffectivePercent string `json:"effective-percent"`
 		EffectiveStake   string `json:"eposed-stake"`
 	}
 	data := t{
-		strconv.FormatBool(s.IsActive),
 		strconv.FormatBool(s.IsHarmonyNode),
 		s.EarningAccount.String(),
 		s.EffectivePercent.String(),

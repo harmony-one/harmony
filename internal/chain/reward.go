@@ -98,6 +98,16 @@ func AccumulateRewards(
 			// what to do about share of those that didn't sign
 			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
 			if !voter.IsHarmonyNode {
+				wrapper, err := state.ValidatorWrapper(voter.EarningAccount)
+				if err != nil {
+					return network.NoReward, err
+				}
+				if wrapper.Banned {
+					utils.Logger().Info().
+						RawJSON("validator", []byte(wrapper.String())).
+						Msg("already banned validator not eligible for block rewards even if signed")
+					continue
+				}
 				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
 				if err != nil {
 					return network.NoReward, err
@@ -199,7 +209,18 @@ func AccumulateRewards(
 			// Finally do the pay
 			for bucket := range resultsHandle {
 				for payThem := range resultsHandle[bucket] {
-					snapshot, err := bc.ReadValidatorSnapshot(resultsHandle[bucket][payThem].payee)
+					addr := resultsHandle[bucket][payThem].payee
+					wrapper, err := state.ValidatorWrapper(addr)
+					if err != nil {
+						return network.NoReward, err
+					}
+					if wrapper.Banned {
+						utils.Logger().Info().
+							RawJSON("validator", []byte(wrapper.String())).
+							Msg("already banned validator not eligible for block rewards even if signed")
+						continue
+					}
+					snapshot, err := bc.ReadValidatorSnapshot(addr)
 					if err != nil {
 						return network.NoReward, err
 					}
