@@ -495,7 +495,11 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 	}
 
 	if edit.Active != nil {
-		validator.Active = *edit.Active
+		if *edit.Active {
+			validator.Active = true
+		}
+	} else {
+		validator.Active = false
 	}
 
 	return nil
