@@ -179,7 +179,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	AccountQueue: 64,
 	GlobalQueue:  1024,
 
-	Lifetime: 3 * time.Hour,
+	Lifetime: 30 * time.Minute,
 
 	Blacklist: map[common.Address]struct{}{},
 }
@@ -657,8 +657,8 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	if tx.ShardID() != pool.chain.CurrentBlock().ShardID() {
 		return errors.WithMessagef(ErrInvalidShard, "transaction shard is %d", tx.ShardID())
 	}
-	// Heuristic limit, reject transactions over 32KB to prevent DOS attacks
-	if tx.Size() > 32*1024 {
+	// For DOS prevention, reject excessively large transactions.
+	if tx.Size() >= types.MaxPoolTransactionDataSize {
 		return errors.WithMessagef(ErrOversizedData, "transaction size is %s", tx.Size().String())
 	}
 	// Transactions can't be negative. This may never happen using RLP decoded
