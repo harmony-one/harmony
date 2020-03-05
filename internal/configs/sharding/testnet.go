@@ -20,9 +20,9 @@ const (
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
 	// TestNetHTTPPattern is the http pattern for testnet.
-	TestNetHTTPPattern = "https://api.s%d.os.hmny.io"
+	TestNetHTTPPattern = "https://api.s%d.ps.hmny.io"
 	// TestNetWSPattern is the websocket pattern for testnet.
-	TestNetWSPattern = "wss://ws.s%d.os.hmny.io"
+	TestNetWSPattern = "wss://ws.s%d.ps.hmny.io"
 )
 
 func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -80,5 +80,5 @@ var testnetReshardingEpoch = []*big.Int{
 	params.TestnetChainConfig.StakingEpoch,
 }
 
-var testnetV0 = MustNewInstance(4, 25, 25, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-var testnetV1 = MustNewInstance(4, 50, 25, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV0 = MustNewInstance(2, 10, 10, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV1 = MustNewInstance(2, 20, 10, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
