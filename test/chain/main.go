@@ -134,7 +134,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 		fmt.Println(err)
 	}
 	block, _ := contractworker.
-		FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil, nil)
+		FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {
 		fmt.Println(err)
@@ -179,7 +179,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 		fmt.Println(err)
 	}
 	block, _ := contractworker.FinalizeNewBlock(
-		[]byte{}, []byte{}, 0, common.Address{}, nil, nil, nil,
+		[]byte{}, []byte{}, 0, common.Address{}, nil, nil,
 	)
 	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {

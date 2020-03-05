@@ -4,7 +4,6 @@ package utils
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/natefinch/lumberjack"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/diode"
 )
 
 var (
@@ -73,7 +73,10 @@ func AddLogHandler(handler log.Handler) {
 // GetLogInstance returns logging singleton.
 func GetLogInstance() log.Logger {
 	onceForLog.Do(func() {
-		ostream := log.StreamHandler(io.Writer(os.Stdout), log.TerminalFormat(false))
+		writer := diode.NewWriter(os.Stdout, 1000, 10*time.Millisecond, func(missed int) {
+			fmt.Printf("Logger Dropped %d messages", missed)
+		})
+		ostream := log.StreamHandler(writer, log.TerminalFormat(false))
 		logHandlers = append(logHandlers, ostream)
 		multiHandler := log.MultiHandler(logHandlers...)
 		glogger = log.NewGlogHandler(multiHandler)
@@ -118,7 +121,10 @@ func setZeroLoggerFileOutput(filepath string, maxSize int) error {
 func Logger() *zerolog.Logger {
 	if zeroLogger == nil {
 		zerolog.TimeFieldFormat = time.RFC3339Nano
-		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
+		writer := diode.NewWriter(os.Stderr, 1000, 10*time.Millisecond, func(missed int) {
+			fmt.Printf("Logger Dropped %d messages", missed)
+		})
+		logger := zerolog.New(zerolog.ConsoleWriter{Out: writer}).
 			Level(zeroLoggerLevel).
 			With().
 			Caller().

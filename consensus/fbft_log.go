@@ -39,6 +39,19 @@ type FBFTMessage struct {
 	M3Bitmap      *bls_cosi.Mask
 }
 
+// String ..
+func (m *FBFTMessage) String() string {
+	return fmt.Sprintf(
+		"[Type:%s ViewID:%d Num:%d BlockHash:%s Sender:%s Leader:%s]",
+		m.MessageType.String(),
+		m.ViewID,
+		m.BlockNum,
+		m.BlockHash.Hex(),
+		m.SenderPubkey.SerializeToHexStr(),
+		m.LeaderPubkey.SerializeToHexStr(),
+	)
+}
+
 // NewFBFTLog returns new instance of FBFTLog
 func NewFBFTLog() *FBFTLog {
 	blocks := mapset.NewSet()
@@ -220,6 +233,7 @@ func (log *FBFTLog) FindMessageByMaxViewID(msgs []*FBFTMessage) *FBFTMessage {
 
 // ParseFBFTMessage parses FBFT message into FBFTMessage structure
 func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
+	// TODO Have this do sanity checks on the message please
 	pbftMsg := FBFTMessage{}
 	pbftMsg.MessageType = msg.GetType()
 	consensusMsg := msg.GetConsensus()

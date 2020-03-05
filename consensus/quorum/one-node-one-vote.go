@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -35,7 +34,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, debug bool) bool {
+func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	threshold := v.TwoThirdsSignersCount()
 	currentTotalPower := utils.CountOneBits(mask.Bitmap)
 	if currentTotalPower < threshold {
@@ -62,12 +61,6 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 func (v *uniformVoteWeight) SetVoters(shard.SlotList) (*TallyResult, error) {
 	// NO-OP do not add anything here
 	return nil, nil
-}
-
-// ToggleActive for uniform vote is a no-op, always says that voter is active
-func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
-	// NO-OP do not add anything here
-	return true
 }
 
 // Award ..
@@ -120,10 +113,12 @@ func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
 	}
 	identity, _ := pubKeyFunc()
 	everyone := v.DumpParticipants()
-	myVoterID := identity.SerializeToHexStr()
-	for i := range everyone {
-		if everyone[i] == myVoterID {
-			return true
+	for _, key := range identity.PublicKey {
+		myVoterID := key.SerializeToHexStr()
+		for i := range everyone {
+			if everyone[i] == myVoterID {
+				return true
+			}
 		}
 	}
 	return false

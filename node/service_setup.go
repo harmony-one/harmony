@@ -72,7 +72,7 @@ func (node *Node) setupForExplorerNode() {
 	// Register networkinfo service.
 	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil, node.networkInfoDHTPath()))
 	// Register explorer service.
-	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer, node.NodeConfig.GetShardID(), node.Consensus.GetNodeIDs, node.GetBalanceOfAddress))
+	node.serviceManager.RegisterService(service.SupportExplorer, explorer.New(&node.SelfPeer))
 	// Register explorer service.
 }
 

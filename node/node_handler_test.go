@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/shard"
@@ -27,7 +28,7 @@ func TestAddNewBlock(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, leader, blsKey, decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -41,7 +42,7 @@ func TestAddNewBlock(t *testing.T) {
 		txs, stks, common.Address{},
 	)
 	block, _ := node.Worker.FinalizeNewBlock(
-		[]byte{}, []byte{}, 0, common.Address{}, nil, nil, nil,
+		[]byte{}, []byte{}, 0, common.Address{}, nil, nil,
 	)
 
 	_, err = node.Blockchain().InsertChain([]*types.Block{block}, true)
@@ -65,7 +66,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, leader, blsKey, decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -78,7 +79,7 @@ func TestVerifyNewBlock(t *testing.T) {
 		txs, stks, common.Address{},
 	)
 	block, _ := node.Worker.FinalizeNewBlock(
-		[]byte{}, []byte{}, 0, common.Address{}, nil, nil, nil,
+		[]byte{}, []byte{}, 0, common.Address{}, nil, nil,
 	)
 
 	if err := node.VerifyNewBlock(block); err != nil {

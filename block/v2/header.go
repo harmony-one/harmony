@@ -366,7 +366,7 @@ func (h *Header) SetCrossLinks(newCrossLinks []byte) {
 
 // Slashes ..
 func (h *Header) Slashes() []byte {
-	h.Logger(utils.Logger()).Error().
+	h.Logger(utils.Logger()).Info().
 		Msg("No slashes in V2 header")
 	return nil
 }

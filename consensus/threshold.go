@@ -3,6 +3,7 @@ package consensus
 import (
 	"encoding/binary"
 
+	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -13,8 +14,13 @@ import (
 func (consensus *Consensus) didReachPrepareQuorum() error {
 	logger := utils.Logger()
 	logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
+	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("[OnPrepare] leader not found")
+		return err
+	}
 	// Construct and broadcast prepared message
-	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil)
+	networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, consensus.LeaderPubKey, leaderPriKey)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_PREPARED.String()).
@@ -22,32 +28,32 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		return err
 	}
 	msgToSend, FBFTMsg, aggSig :=
-		network.Bytes,
-		network.FBFTMsg,
-		network.OptionalAggregateSignature
+		networkMessage.Bytes,
+		networkMessage.FBFTMsg,
+		networkMessage.OptionalAggregateSignature
 
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// Leader add commit phase signature
-	blockNumHash := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumHash, consensus.blockNum)
-	commitPayload := append(blockNumHash, consensus.blockHash[:]...)
+	blockNumHash := [8]byte{}
+	binary.LittleEndian.PutUint64(blockNumHash[:], consensus.blockNum)
+	commitPayload := append(blockNumHash[:], consensus.blockHash[:]...)
 
 	// so by this point, everyone has committed to the blockhash of this block
 	// in prepare and so this is the actual block.
+	for i, key := range consensus.PubKey.PublicKey {
+		consensus.Decider.SubmitVote(
+			quorum.Commit,
+			key,
+			consensus.priKey.PrivateKey[i].SignHash(commitPayload),
+			common.BytesToHash(consensus.blockHash[:]),
+		)
 
-	consensus.Decider.SubmitVote(
-		quorum.Commit,
-		consensus.PubKey,
-		consensus.priKey.SignHash(commitPayload),
-		consensus.block[:],
-	)
-
-	if err := consensus.commitBitmap.SetKey(consensus.PubKey, true); err != nil {
-		consensus.getLogger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
-		return err
+		if err := consensus.commitBitmap.SetKey(key, true); err != nil {
+			consensus.getLogger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
+			return err
+		}
 	}
-
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.blockNum,
 		msg_pb.MessageType_PREPARED, []nodeconfig.GroupID{

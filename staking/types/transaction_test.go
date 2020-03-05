@@ -1,7 +1,8 @@
 package types
 
 import (
-	"fmt"
+	"bytes"
+	"errors"
 	"math/big"
 	"testing"
 
@@ -18,6 +19,20 @@ var (
 	testBLSPubKey  = "65f55eb3052f9e9f632b2923be594ba77c55543f5c58ee1454b9cfd658d25e06373b0f7d42a19c84768139ea294f6204"
 	testBLSPubKey2 = "40379eed79ed82bebfb4310894fd33b6a3f8413a78dc4d43b98d0adc9ef69f3285df05eaab9f2ce5f7227f8cb920e809"
 )
+
+func createDelegate() (*StakingTransaction, error) {
+	dAddr, _ := common2.Bech32ToAddress(testAccount)
+	vAddr, _ := common2.Bech32ToAddress(testAccount)
+	stakePayloadMaker := func() (Directive, interface{}) {
+		return DirectiveDelegate, Delegate{
+			DelegatorAddress: dAddr,
+			ValidatorAddress: vAddr,
+			Amount:           big.NewInt(100),
+		}
+	}
+	gasPrice := big.NewInt(1)
+	return NewStakingTransaction(0, 21000, gasPrice, stakePayloadMaker)
+}
 
 func CreateTestNewTransaction() (*StakingTransaction, error) {
 	dAddr, _ := common2.Bech32ToAddress(testAccount)
@@ -96,9 +111,86 @@ func TestTransactionCopy(t *testing.T) {
 	if cv1.CommissionRates.Rate.Equal(cv2.CommissionRates.Rate) {
 		t.Errorf("CommissionRate should not be equal")
 	}
+}
 
-	fmt.Println("cv1", cv1)
-	fmt.Println("cv2", cv2)
-	fmt.Println("cv1", cv1.Description)
-	fmt.Println("cv2", cv2.Description)
+func TestHash(t *testing.T) {
+	stakingTx, err := CreateTestNewTransaction()
+	if err != nil {
+		t.Errorf("cannot create new staking transaction, %v\n", err)
+	}
+	hash := stakingTx.Hash()
+	if hash.String() == "" {
+		t.Errorf("cannot get hash of staking transaction, %v\n", err)
+	}
+	if stakingTx.Hash().String() != hash.String() {
+		t.Errorf("cannot set hash of staking transaction\n")
+	}
+}
+
+func TestGasCost(t *testing.T) {
+	stakingTx, err := CreateTestNewTransaction()
+	if err != nil {
+		t.Errorf("cannot create validator staking transaction, %v\n", err)
+	}
+	if stakingTx.Gas() != 600000 {
+		t.Errorf("gas set incorrectly \n")
+	}
+	if stakingTx.GasPrice().Int64() != big.NewInt(1).Int64() {
+		t.Errorf("gas price set incorrectly \n")
+	}
+	cost, err := stakingTx.Cost()
+	if err != nil || cost.Int64() != 600100 {
+		t.Errorf("staking transaction cost is incorrect %v\n", err)
+	}
+	delegateTx, err := createDelegate()
+	if err != nil {
+		t.Errorf("cannot create delegate staking transaction, %v\n", err)
+	}
+	cost, err = delegateTx.Cost()
+	if err != nil || cost.Int64() != 21100 {
+		t.Errorf("staking transaction cost is incorrect %v\n", err)
+	}
+	dAddr, _ := common2.Bech32ToAddress(testAccount)
+	vAddr, _ := common2.Bech32ToAddress(testAccount)
+	delegateTx1, err := NewStakingTransaction(0, 21000, big.NewInt(1), func() (Directive, interface{}) {
+		return DirectiveCreateValidator, Delegate{
+			DelegatorAddress: dAddr,
+			ValidatorAddress: vAddr,
+			Amount:           big.NewInt(100),
+		}
+	})
+	if _, err = delegateTx1.Cost(); err == nil {
+		t.Error("expected", errStakingTransactionTypeCastErr, "got", nil)
+	}
+}
+
+func TestNonce(t *testing.T) {
+	stakingTx, err := CreateTestNewTransaction()
+	if err != nil {
+		t.Errorf("cannot create validator staking transaction, %v\n", err)
+	}
+	if stakingTx.Nonce() != 0 {
+		t.Error("incorrect nonce \n")
+	}
+}
+
+func TestData(t *testing.T) {
+	stakingTx, err := CreateTestNewTransaction()
+	if err != nil {
+		t.Errorf("cannot create validator staking transaction, %v\n", err)
+	}
+	encoded, err := stakingTx.RLPEncodeStakeMsg()
+	if err != nil {
+		t.Errorf("could not rlp encode staking tx %v\n", err)
+	}
+	if bytes.Compare(stakingTx.Data(), encoded) != 0 {
+		t.Error("RLPEncode and Data does not match \n")
+	}
+	if _, err = RLPDecodeStakeMsg(encoded, DirectiveCreateValidator); err != nil {
+		t.Errorf("could not rlp decode staking tx %v\n", err)
+	}
+	e := errors.New("rlp: expected input string or byte for common.Address, decoding into (types.Delegate).ValidatorAddress")
+	if _, err = RLPDecodeStakeMsg(encoded, DirectiveDelegate); err == nil {
+		t.Error("expected", e, "got", nil)
+	}
 }
