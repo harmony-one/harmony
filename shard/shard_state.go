@@ -384,7 +384,7 @@ func (c *Committee) DeepCopy() Committee {
 // BLSPublicKeys ..
 func (c *Committee) BLSPublicKeys() ([]BlsPublicKey, error) {
 	if c == nil {
-		return nil, errCommitteeNil
+		return nil, ErrCommitteeNil
 	}
 
 	slice := make([]BlsPublicKey, len(c.Slots))
@@ -397,13 +397,14 @@ func (c *Committee) BLSPublicKeys() ([]BlsPublicKey, error) {
 var (
 	// ErrValidNotInCommittee ..
 	ErrValidNotInCommittee = errors.New("slot signer not this slot's subcommittee")
-	errCommitteeNil        = errors.New("subcommittee is nil pointer")
+	// ErrCommitteeNil ..
+	ErrCommitteeNil = errors.New("subcommittee is nil pointer")
 )
 
 // AddressForBLSKey ..
 func (c *Committee) AddressForBLSKey(key BlsPublicKey) (*common.Address, error) {
 	if c == nil {
-		return nil, errCommitteeNil
+		return nil, ErrCommitteeNil
 	}
 
 	for _, slot := range c.Slots {

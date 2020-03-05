@@ -23,7 +23,9 @@ type ValidatorListProvider interface {
 		epoch *big.Int, reader DataProvider,
 	) (*shard.State, error)
 	ReadFromDB(epoch *big.Int, reader DataProvider) (*shard.State, error)
-	GetCommitteePublicKeys(committee *shard.Committee) []*bls.PublicKey
+	GetCommitteePublicKeys(
+		committee *shard.Committee,
+	) ([]*bls.PublicKey, error)
 }
 
 // Reader is committee.Reader and it is the API that committee membership assignment needs
@@ -236,28 +238,35 @@ func eposStakedCommittee(
 }
 
 // GetCommitteePublicKeys returns the public keys of a shard
-func (def partialStakingEnabled) GetCommitteePublicKeys(committee *shard.Committee) []*bls.PublicKey {
+func (def partialStakingEnabled) GetCommitteePublicKeys(
+	committee *shard.Committee,
+) ([]*bls.PublicKey, error) {
 	if committee == nil {
-		utils.Logger().Error().Msg("[GetCommitteePublicKeys] Committee is nil")
-		return []*bls.PublicKey{}
+		return nil, shard.ErrCommitteeNil
 	}
 	allIdentities := make([]*bls.PublicKey, len(committee.Slots))
 	for i := range committee.Slots {
 		identity := &bls.PublicKey{}
-		committee.Slots[i].BlsPublicKey.ToLibBLSPublicKey(identity)
+		if err := committee.Slots[i].BlsPublicKey.ToLibBLSPublicKey(
+			identity,
+		); err != nil {
+			return nil, err
+		}
 		allIdentities[i] = identity
 	}
 
-	return allIdentities
+	return allIdentities, nil
 }
 
+// ReadFromDB is a wrapper on ReadShardState
 func (def partialStakingEnabled) ReadFromDB(
 	epoch *big.Int, reader DataProvider,
 ) (newSuperComm *shard.State, err error) {
 	return reader.ReadShardState(epoch)
 }
 
-// ReadFromComputation is single entry point for reading the State of the network
+// Compute is single entry point for
+// computing a new super committee, aka new shard state
 func (def partialStakingEnabled) Compute(
 	epoch *big.Int, stakerReader DataProvider,
 ) (newSuperComm *shard.State, err error) {
@@ -291,5 +300,12 @@ func (def partialStakingEnabled) Compute(
 	}
 	// Set the epoch of shard state
 	shardState.Epoch = big.NewInt(0).Set(epoch)
+	staked := shardState.StakedValidators()
+	utils.Logger().Info().
+		Int("bls-key-count", staked.CountStakedBLSKey).
+		Int("validator-one-addr-count", staked.CountStakedValidator).
+		Int("max-staked-slots-count", stakedSlots).
+		Uint64("computed-for-epoch", epoch.Uint64()).
+		Msg("computed new super committee")
 	return shardState, nil
 }
