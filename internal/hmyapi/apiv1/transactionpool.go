@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -209,6 +210,10 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	ctx context.Context, encodedTx hexutil.Bytes,
 ) (common.Hash, error) {
+	if len(encodedTx) >= types.MaxEncodedPoolTransactionSize {
+		err := errors.Wrapf(core.ErrOversizedData, "encoded tx size: %d", len(encodedTx))
+		return common.Hash{}, err
+	}
 	tx := new(staking.StakingTransaction)
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err
@@ -224,6 +229,10 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 // SendRawTransaction will add the signed transaction to the transaction pool.
 // The sender is responsible for signing the transaction and using the correct nonce.
 func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error) {
+	if len(encodedTx) >= types.MaxEncodedPoolTransactionSize {
+		err := errors.Wrapf(core.ErrOversizedData, "encoded tx size: %d", len(encodedTx))
+		return common.Hash{}, err
+	}
 	tx := new(types.Transaction)
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err

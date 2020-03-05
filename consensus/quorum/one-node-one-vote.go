@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -62,12 +61,6 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 func (v *uniformVoteWeight) SetVoters(shard.SlotList) (*TallyResult, error) {
 	// NO-OP do not add anything here
 	return nil, nil
-}
-
-// ToggleActive for uniform vote is a no-op, always says that voter is active
-func (v *uniformVoteWeight) ToggleActive(*bls.PublicKey) bool {
-	// NO-OP do not add anything here
-	return true
 }
 
 // Award ..

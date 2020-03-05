@@ -11,6 +11,13 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+const (
+	//MaxPoolTransactionDataSize is a 32KB heuristic data limit for DOS prevention
+	MaxPoolTransactionDataSize = 32 * 1024
+	//MaxEncodedPoolTransactionSize is a heuristic raw/encoded data size limit. It has an additional 10KB for metadata
+	MaxEncodedPoolTransactionSize = MaxPoolTransactionDataSize + (10 * 1024)
+)
+
 var (
 	// ErrUnknownPoolTxType is returned when attempting to assert a PoolTransaction to its concrete type
 	ErrUnknownPoolTxType = errors.New("unknown transaction type in tx-pool")

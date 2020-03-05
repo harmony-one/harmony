@@ -100,12 +100,20 @@ func TestCV3(t *testing.T) {
 func TestCV5(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
 	// identity length: 200 characters
 	msg.Identity = "adsfwryuiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfhuewhfiuewhfefhshfrhfhifhwbfvberhbvihfwuoefhusioehfeuwiafhaiobcfwfhceirui"
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
-	identitylengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Identity), "maxIdentityLen", staking.MaxIdentityLength)
-	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != identitylengthError.Error() {
-		t.Error("expected", identitylengthError, "got", err)
+	identitylengthCtxError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Identity), "maxIdentityLen", staking.MaxIdentityLength)
+	_, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg)
+	if err == nil {
+		t.Errorf("expected non null error")
+	}
+	ctxerr, ok := err.(ctxerror.CtxError)
+	if !ok {
+		t.Errorf("expected context aware error")
+	}
+	if ctxerr.Message() != identitylengthCtxError.Message() {
+		t.Error("expected", identitylengthCtxError, "got", err)
 	}
 }
 
@@ -113,12 +121,20 @@ func TestCV5(t *testing.T) {
 func TestCV6(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
+	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
 	// Website length: 200 characters
 	msg.Website = "https://www.iwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceirui.com"
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
-	websiteLengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Website), "maxWebsiteLen", staking.MaxWebsiteLength)
-	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != websiteLengthError.Error() {
-		t.Error("expected", websiteLengthError, "got", err)
+	websiteLengthCtxError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Website), "maxWebsiteLen", staking.MaxWebsiteLength)
+	_, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg)
+	if err == nil {
+		t.Errorf("expected non null error")
+	}
+	ctxerr, ok := err.(ctxerror.CtxError)
+	if !ok {
+		t.Errorf("expected context aware error")
+	}
+	if ctxerr.Message() != websiteLengthCtxError.Message() {
+		t.Error("expected", websiteLengthCtxError, "got", err)
 	}
 }
 
@@ -126,11 +142,19 @@ func TestCV6(t *testing.T) {
 func TestCV7(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	// Website length: 200 characters
-	msg.SecurityContact = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdf"
 	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
-	securityContactLengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.SecurityContact), "maxSecurityContactLen", staking.MaxWebsiteLength)
-	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != securityContactLengthError.Error() {
+	// Security Contact length: 200 characters
+	msg.SecurityContact = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdf"
+	securityContactLengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.SecurityContact), "maxSecurityContactLen", staking.MaxSecurityContactLength)
+	_, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg)
+	if err == nil {
+		t.Errorf("expected non null error")
+	}
+	ctxerr, ok := err.(ctxerror.CtxError)
+	if !ok {
+		t.Errorf("expected context aware error")
+	}
+	if ctxerr.Message() != securityContactLengthError.Message() {
 		t.Error("expected", securityContactLengthError, "got", err)
 	}
 }
@@ -139,12 +163,20 @@ func TestCV7(t *testing.T) {
 func TestCV8(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	// Website length: 300 characters
-	msg.Details = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdfjiusngognoherugbounviesrbgufhuoshcofwevusguahferhgvuervurehniwjvseivusehvsghjvorsugjvsiovjpsevsvvvvv"
 	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
-	detailsLenError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Details), "maxDetailsLen", staking.MaxDetailsLength)
-	if _, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg); err.Error() != detailsLenError.Error() {
-		t.Error("expected", detailsLenError, "got", err)
+	// Details length: 300 characters
+	msg.Details = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdfjiusngognoherugbounviesrbgufhuoshcofwevusguahferhgvuervurehniwjvseivusehvsghjvorsugjvsiovjpsevsvvvvv"
+	detailsLenCtxError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Details), "maxDetailsLen", staking.MaxDetailsLength)
+	_, err := VerifyAndCreateValidatorFromMsg(statedb, big.NewInt(0), big.NewInt(0), msg)
+	if err == nil {
+		t.Errorf("Expected non null error")
+	}
+	ctxerr, ok := err.(ctxerror.CtxError)
+	if !ok {
+		t.Errorf("expected context aware error")
+	}
+	if ctxerr.Message() != detailsLenCtxError.Message() {
+		t.Error("expected", detailsLenCtxError, "got", err)
 	}
 }
 
