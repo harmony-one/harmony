@@ -125,6 +125,40 @@ func eposStakedCommittee(
 		Int("staked-candidates", len(candidates)).
 		Msg("preparing epos staked committee")
 
+	shardCount := int(s.NumShards())
+	shardState := &shard.State{}
+	shardState.Shards = make([]shard.Committee, shardCount)
+	hAccounts := s.HmyAccounts()
+	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
+
+	for i := 0; i < shardCount; i++ {
+		shardState.Shards[i] = shard.Committee{uint32(i), shard.SlotList{}}
+		for j := 0; j < shardHarmonyNodes; j++ {
+			index := i + j*shardCount
+			pub := &bls.PublicKey{}
+			if err := pub.DeserializeHexStr(hAccounts[index].BlsPublicKey); err != nil {
+				return nil, err
+			}
+			pubKey := shard.BlsPublicKey{}
+			if err := pubKey.FromLibBLSPublicKey(pub); err != nil {
+				return nil, err
+			}
+			shardState.Shards[i].Slots = append(shardState.Shards[i].Slots, shard.Slot{
+				common2.ParseAddr(hAccounts[index].Address),
+				pubKey,
+				nil,
+			})
+		}
+	}
+
+	if stakedSlotsCount == 0 {
+		utils.Logger().Info().
+			Int("staked-candidates", len(candidates)).
+			Int("slots-for-epos", stakedSlotsCount).
+			Msg("committe composed only of harmony node")
+		return shardState, nil
+	}
+
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		validator, err := stakerReader.ReadValidatorInformation(candidates[i])
@@ -132,10 +166,6 @@ func eposStakedCommittee(
 			return nil, err
 		}
 		if !effective.IsEligibleForEPOSAuction(validator) {
-			utils.Logger().Info().
-				Int("staked-candidates", len(candidates)).
-				RawJSON("candidate", []byte(validator.String())).
-				Msg("validator not eligible for epos")
 			continue
 		}
 		if err := validator.SanityCheck(); err != nil {
@@ -173,36 +203,6 @@ func eposStakedCommittee(
 			validatorStake,
 			validator.SlotPubKeys,
 		}
-	}
-
-	shardCount := int(s.NumShards())
-	shardState := &shard.State{}
-	shardState.Shards = make([]shard.Committee, shardCount)
-	hAccounts := s.HmyAccounts()
-	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
-
-	for i := 0; i < shardCount; i++ {
-		shardState.Shards[i] = shard.Committee{uint32(i), shard.SlotList{}}
-		for j := 0; j < shardHarmonyNodes; j++ {
-			index := i + j*shardCount
-			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(hAccounts[index].BlsPublicKey)
-			pubKey := shard.BlsPublicKey{}
-			pubKey.FromLibBLSPublicKey(pub)
-			shardState.Shards[i].Slots = append(shardState.Shards[i].Slots, shard.Slot{
-				common2.ParseAddr(hAccounts[index].Address),
-				pubKey,
-				nil,
-			})
-		}
-	}
-
-	if stakedSlotsCount == 0 {
-		utils.Logger().Info().
-			Int("staked-candidates", len(candidates)).
-			Int("slots-for-epos", stakedSlotsCount).
-			Msg("committe composed only of harmony node")
-		return shardState, nil
 	}
 
 	staked := effective.Apply(essentials, stakedSlotsCount)
