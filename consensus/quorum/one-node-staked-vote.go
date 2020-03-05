@@ -3,7 +3,6 @@ package quorum
 import (
 	"encoding/json"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -159,7 +158,9 @@ var (
 	)
 )
 
-func (v *stakedVoteWeight) SetVoters(staked shard.SlotList) (*TallyResult, error) {
+func (v *stakedVoteWeight) SetVoters(
+	staked shard.SlotList,
+) (*TallyResult, error) {
 	v.ResetPrepareAndCommitVotes()
 	v.ResetViewChangeVotes()
 
@@ -170,17 +171,9 @@ func (v *stakedVoteWeight) SetVoters(staked shard.SlotList) (*TallyResult, error
 	// Hold onto this calculation
 	v.roster = *roster
 	return &TallyResult{
-		roster.OurVotingPowerTotalPercentage, roster.TheirVotingPowerTotalPercentage,
+		roster.OurVotingPowerTotalPercentage,
+		roster.TheirVotingPowerTotalPercentage,
 	}, nil
-}
-
-func (v *stakedVoteWeight) ToggleActive(k *bls.PublicKey) bool {
-	w := shard.BlsPublicKey{}
-	w.FromLibBLSPublicKey(k)
-	g := v.roster.Voters[w]
-	g.IsActive = !g.IsActive
-	v.roster.Voters[w] = g
-	return v.roster.Voters[w].IsActive
 }
 
 func (v *stakedVoteWeight) String() string {
@@ -195,6 +188,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 		IsHarmony      bool   `json:"is-harmony-slot"`
 		EarningAccount string `json:"earning-account"`
 		Identity       string `json:"bls-public-key"`
+		RawPercent     string `json:"voting-power-unnormalized"`
 		VotingPower    string `json:"voting-power-%"`
 		EffectiveStake string `json:"effective-stake,omitempty"`
 	}
@@ -217,6 +211,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 			voter.IsHarmonyNode,
 			common2.MustAddressToBech32(voter.EarningAccount),
 			identity.Hex(),
+			voter.RawPercent.String(),
 			voter.EffectivePercent.String(),
 			"",
 		}
@@ -245,11 +240,11 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 	}
 	identity, _ := pubKeyFunc()
 	for _, key := range identity.PublicKey {
-		w := shard.BlsPublicKey{}
-		w.FromLibBLSPublicKey(key)
-		_, ok := v.roster.Voters[w]
-		if ok {
-			return true
+		if w := (shard.BlsPublicKey{}); w.FromLibBLSPublicKey(key) != nil {
+			_, ok := v.roster.Voters[w]
+			if ok {
+				return true
+			}
 		}
 	}
 	return false

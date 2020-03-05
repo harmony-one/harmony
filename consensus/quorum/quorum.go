@@ -110,7 +110,6 @@ type Decider interface {
 	fmt.Stringer
 	SignatureReader
 	DependencyInjectionWriter
-	ToggleActive(*bls.PublicKey) bool
 	SetVoters(shard.SlotList) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
