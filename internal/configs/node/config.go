@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/multibls"
@@ -290,6 +291,25 @@ func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
 	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
 	shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
 	return uint32(shardID.Uint64()), nil
+}
+
+// ValidateConsensusKeysForSameShard checks if all consensus public keys belong to the same shard
+func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys []*bls.PublicKey, sID uint32) error {
+	var pubKey shard.BlsPublicKey
+	for _, key := range pubkeys {
+		if err := pubKey.FromLibBLSPublicKey(key); err != nil {
+			return errors.Wrapf(err,
+				"cannot convert libbls public key %s to internal form",
+				key.SerializeToHexStr())
+		}
+		epoch := conf.networkType.ChainConfig().StakingEpoch
+		numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
+		shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
+		if uint32(shardID.Uint64()) != sID {
+			return errors.New("bls keys do not belong to the same shard")
+		}
+	}
+	return nil
 }
 
 // ChainConfig returns the chain configuration for the network type.

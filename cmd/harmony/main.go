@@ -250,6 +250,9 @@ func setupStakingNodeAccount() error {
 	if err != nil {
 		return errors.Wrap(err, "cannot determine shard to join")
 	}
+	if err := nodeconfig.GetDefaultConfig().ValidateConsensusKeysForSameShard(pubKey.PublicKey, shardID); err != nil {
+		return err
+	}
 	for _, blsKey := range pubKey.PublicKey {
 		initialAccount := &genesis.DeployAccount{}
 		initialAccount.ShardID = shardID
