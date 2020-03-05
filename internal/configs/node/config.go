@@ -267,7 +267,10 @@ func GetPublicRPC() bool {
 }
 
 // SerializeToHexStr wrapper
-func (multiKey MultiBlsPublicKey) SerializeToHexStr() string {
+func (multiKey *MultiBlsPublicKey) SerializeToHexStr() string {
+	if multiKey == nil {
+		return ""
+	}
 	var builder strings.Builder
 	for _, pubKey := range multiKey.PublicKey {
 		builder.WriteString(pubKey.SerializeToHexStr())
