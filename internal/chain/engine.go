@@ -265,104 +265,125 @@ func (e *engineImpl) Finalize(
 	if err != nil {
 		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
+
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 
-	// Withdraw unlocked tokens to the delegators' accounts
-	// Only do such at the last block of an epoch
+	// Process Undelegations and set LastEpochInCommittee
 	if isBeaconChain && isNewEpoch && inStakingEra {
-		validators, err := chain.ReadValidatorList()
-		if err != nil {
-			const msg = "[Finalize] failed to read all validators"
-			return nil, nil, ctxerror.New(msg).WithCause(err)
-		}
-		newShardState, err := header.GetShardState()
-		if err != nil {
-			const msg = "[Finalize] failed to read shard state"
-			return nil, nil, ctxerror.New(msg).WithCause(err)
-		}
-		// Payout undelegated/unlocked tokens
-		for _, validator := range validators {
-			wrapper, err := state.ValidatorWrapper(validator)
-			if err != nil {
-				return nil, nil, ctxerror.New(
-					"[Finalize] failed to get validator from state to finalize",
-				).WithCause(err)
-			}
-			for i := range wrapper.Delegations {
-				delegation := &wrapper.Delegations[i]
-				totalWithdraw := delegation.RemoveUnlockedUndelegations(
-					header.Epoch(), wrapper.LastEpochInCommittee,
-				)
-				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
-			}
-			if err := state.UpdateValidatorWrapper(
-				validator, wrapper,
-			); err != nil {
-				const msg = "[Finalize] failed update validator info"
-				return nil, nil, ctxerror.New(msg).WithCause(err)
-			}
+		if err := payoutUndelegations(chain, header, state); err != nil {
+			return nil, nil, err
 		}
 
-		for _, addr := range newShardState.StakedValidators().Addrs {
-			wrapper, err := state.ValidatorWrapper(addr)
-			if err != nil {
-				return nil, nil, ctxerror.New(
-					"[Finalize] failed to get validator from state to finalize",
-				).WithCause(err)
-			}
-			wrapper.LastEpochInCommittee = newShardState.Epoch
-			if err := state.UpdateValidatorWrapper(
-				addr, wrapper,
-			); err != nil {
-				const msg = "[Finalize] failed update validator info"
-				return nil, nil, ctxerror.New(msg).WithCause(err)
-			}
+		if err := setLastEpochInCommittee(header, state); err != nil {
+			return nil, nil, err
 		}
 	}
 
-	if caught := len(
-		doubleSigners,
-	); isBeaconChain && inStakingEra && caught > 0 {
-		superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
-
-		if err != nil {
-			return nil, nil, errors.New("could not read shard state")
+	// Apply slashes
+	if isBeaconChain && inStakingEra && len(doubleSigners) > 0 {
+		if err := applySlashes(chain, header, state, doubleSigners); err != nil {
+			return nil, nil, err
 		}
-
-		staked := superCommittee.StakedValidators()
-		// Apply the slashes, invariant: assume been verified as legit slash by this point
-		var slashApplied *slash.Application
-		rate := slash.Rate(caught, staked.CountStakedBLSKey)
-		utils.Logger().Info().
-			Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-			Uint64("finalizing-epoch", header.Epoch().Uint64()).
-			Uint64("block-number", header.Number().Uint64()).
-			Str("rate", rate.String()).
-			RawJSON("records", []byte(doubleSigners.String())).
-			Msg("now applying slash to state during block finalization")
-		if slashApplied, err = slash.Apply(
-			chain,
-			state,
-			doubleSigners,
-			rate,
-		); err != nil {
-			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
-		}
-
-		utils.Logger().Info().
-			Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-			Uint64("finalizing-epoch", header.Epoch().Uint64()).
-			Uint64("block-number", header.Number().Uint64()).
-			Str("rate", rate.String()).
-			RawJSON("records", []byte(doubleSigners.String())).
-			RawJSON("applied", []byte(slashApplied.String())).
-			Msg("slash applied successfully")
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
+}
+
+// Withdraw unlocked tokens to the delegators' accounts
+func payoutUndelegations(chain engine.ChainReader, header *block.Header, state *state.DB) error {
+	validators, err := chain.ReadValidatorList()
+	if err != nil {
+		const msg = "[Finalize] failed to read all validators"
+		return ctxerror.New(msg).WithCause(err)
+	}
+	// Payout undelegated/unlocked tokens
+	for _, validator := range validators {
+		wrapper, err := state.ValidatorWrapper(validator)
+		if err != nil {
+			return ctxerror.New(
+				"[Finalize] failed to get validator from state to finalize",
+			).WithCause(err)
+		}
+		for i := range wrapper.Delegations {
+			delegation := &wrapper.Delegations[i]
+			totalWithdraw := delegation.RemoveUnlockedUndelegations(
+				header.Epoch(), wrapper.LastEpochInCommittee,
+			)
+			state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
+		}
+		if err := state.UpdateValidatorWrapper(
+			validator, wrapper,
+		); err != nil {
+			const msg = "[Finalize] failed update validator info"
+			return ctxerror.New(msg).WithCause(err)
+		}
+	}
+	return nil
+}
+
+func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
+	newShardState, err := header.GetShardState()
+	if err != nil {
+		const msg = "[Finalize] failed to read shard state"
+		return ctxerror.New(msg).WithCause(err)
+	}
+	for _, addr := range newShardState.StakedValidators().Addrs {
+		wrapper, err := state.ValidatorWrapper(addr)
+		if err != nil {
+			return ctxerror.New(
+				"[Finalize] failed to get validator from state to finalize",
+			).WithCause(err)
+		}
+		wrapper.LastEpochInCommittee = newShardState.Epoch
+		if err := state.UpdateValidatorWrapper(
+			addr, wrapper,
+		); err != nil {
+			const msg = "[Finalize] failed update validator info"
+			return ctxerror.New(msg).WithCause(err)
+		}
+	}
+	return nil
+}
+
+func applySlashes(chain engine.ChainReader, header *block.Header, state *state.DB, doubleSigners slash.Records) error {
+	superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
+
+	if err != nil {
+		return errors.New("could not read shard state")
+	}
+
+	staked := superCommittee.StakedValidators()
+	// Apply the slashes, invariant: assume been verified as legit slash by this point
+	var slashApplied *slash.Application
+	rate := slash.Rate(len(doubleSigners), staked.CountStakedBLSKey)
+	utils.Logger().Info().
+		Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
+		Uint64("finalizing-epoch", header.Epoch().Uint64()).
+		Uint64("block-number", header.Number().Uint64()).
+		Str("rate", rate.String()).
+		RawJSON("records", []byte(doubleSigners.String())).
+		Msg("now applying slash to state during block finalization")
+	if slashApplied, err = slash.Apply(
+		chain,
+		state,
+		doubleSigners,
+		rate,
+	); err != nil {
+		return ctxerror.New("[Finalize] could not apply slash").WithCause(err)
+	}
+
+	utils.Logger().Info().
+		Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
+		Uint64("finalizing-epoch", header.Epoch().Uint64()).
+		Uint64("block-number", header.Number().Uint64()).
+		Str("rate", rate.String()).
+		RawJSON("records", []byte(doubleSigners.String())).
+		RawJSON("applied", []byte(slashApplied.String())).
+		Msg("slash applied successfully")
+	return nil
 }
 
 // QuorumForBlock returns the quorum for the given block header.

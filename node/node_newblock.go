@@ -101,7 +101,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	emptyAddr := common.Address{}
-	if node.Worker.GetCurrentHeader().Coinbase() == emptyAddr {
+	if coinbase == emptyAddr {
 		return nil, errors.New("[proposeNewBlock] Failed setting coinbase")
 	}
 

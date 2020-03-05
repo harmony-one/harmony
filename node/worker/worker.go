@@ -338,6 +338,7 @@ func (w *Worker) CollectAndVerifySlashes() error {
 		// "could not verify slash", which should not return as err
 		// and therefore stop the block proposal
 		if allSlashing, err = w.VerifyAll(d); err != nil {
+			// TODO(audit): very slashes individually; do not return err if verify fails
 			utils.Logger().Err(err).
 				RawJSON("slashes", []byte(d.String())).
 				Msg("could not verify slashes proposed")
@@ -378,7 +379,9 @@ func (w *Worker) FinalizeNewBlock(
 	sig []byte, signers []byte, viewID uint64, coinbase common.Address,
 	crossLinks types.CrossLinks, shardState *shard.State,
 ) (*types.Block, error) {
+	// Put sig, signers, viewID, coinbase into header
 	if len(sig) > 0 && len(signers) > 0 {
+		// TODO: directly set signature into lastCommitSignature
 		sig2 := w.current.header.LastCommitSignature()
 		copy(sig2[:], sig[:])
 		w.current.header.SetLastCommitSignature(sig2)
@@ -387,7 +390,7 @@ func (w *Worker) FinalizeNewBlock(
 	w.current.header.SetCoinbase(coinbase)
 	w.current.header.SetViewID(new(big.Int).SetUint64(viewID))
 
-	// Cross Links
+	// Put crosslinks into header
 	if len(crossLinks) > 0 {
 		crossLinks.Sort()
 		crossLinkData, err := rlp.EncodeToBytes(crossLinks)
@@ -405,6 +408,7 @@ func (w *Worker) FinalizeNewBlock(
 		utils.Logger().Debug().Msg("Zero crosslinks to finalize")
 	}
 
+	// Put slashes into header
 	if w.config.IsStaking(w.current.header.Epoch()) {
 		doubleSigners := w.current.slashes
 		if len(doubleSigners) > 0 {
@@ -420,7 +424,7 @@ func (w *Worker) FinalizeNewBlock(
 		}
 	}
 
-	// Shard State
+	// Put shard state into header
 	if shardState != nil && len(shardState.Shards) != 0 {
 		//we store shardstatehash in header only before prestaking epoch (header v0,v1,v2)
 		if !w.config.IsPreStaking(w.current.header.Epoch()) {
