@@ -258,7 +258,7 @@ staking)
     /ip4/52.40.84.2/tcp/9800/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
     /ip4/54.86.126.90/tcp/9800/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
   )
-  REL=testnet
+  REL=devnet
   network_type=testnet
   dns_zone=ps.hmny.io
   ;;
@@ -333,7 +333,7 @@ verify_checksum() {
 }
 
 verify_signature() {
-   local dir file 
+   local dir file
    dir="${1}"
    file="${dir}/${2}"
    sigfile="${dir}/${2}.sig"
@@ -341,7 +341,7 @@ verify_signature() {
    result=$(openssl dgst -sha256 -verify "${outdir}/harmony_pubkey.pem" -signature "${sigfile}" "${file}" 2>&1)
    echo ${result}
    if  [[ ${result} != "Verified OK" ]]; then
-	   return 1
+     return 1
    fi
    return 0
 }
