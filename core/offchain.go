@@ -204,11 +204,13 @@ func (bc *BlockChain) CommitOffChainData(
 				return NonStatTy, err
 			}
 			records := slash.Records{}
-			if err := rlp.DecodeBytes(header.Slashes(), &records); err != nil {
-				return NonStatTy, err
-			}
-			if err := bc.DeleteFromPendingSlashingCandidates(records); err != nil {
-				return NonStatTy, err
+			if s := header.Slashes(); len(s) > 0 {
+				if err := rlp.DecodeBytes(s, &records); err != nil {
+					return NonStatTy, err
+				}
+				if err := bc.DeleteFromPendingSlashingCandidates(records); err != nil {
+					return NonStatTy, err
+				}
 			}
 		} else {
 			// block reward never accumulate before staking
