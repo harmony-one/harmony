@@ -132,9 +132,6 @@ func bumpCount(
 			return err
 		}
 
-		utils.Logger().Info().RawJSON("validator", []byte(wrapper.String())).
-			Msg("about to adjust counters")
-
 		wrapper.Counters.NumBlocksToSign.Add(
 			wrapper.Counters.NumBlocksToSign, common.Big1,
 		)
@@ -144,9 +141,6 @@ func bumpCount(
 				wrapper.Counters.NumBlocksSigned, common.Big1,
 			)
 		}
-
-		utils.Logger().Info().RawJSON("validator", []byte(wrapper.String())).
-			Msg("bumped signing counters")
 
 		if err := compute(bc, state, wrapper); err != nil {
 			return err
@@ -187,16 +181,10 @@ type Reader interface {
 func ComputeCurrentSigning(
 	snapshot, wrapper *staking.ValidatorWrapper,
 ) (*big.Int, *big.Int, numeric.Dec, error) {
-
 	statsNow, snapSigned, snapToSign :=
 		wrapper.Counters,
 		snapshot.Counters.NumBlocksSigned,
 		snapshot.Counters.NumBlocksToSign
-
-	utils.Logger().Info().
-		RawJSON("snapshot", []byte(snapshot.String())).
-		RawJSON("current", []byte(wrapper.String())).
-		Msg("begin checks for availability")
 
 	signed, toSign :=
 		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
@@ -232,6 +220,8 @@ func compute(
 	state *state.DB,
 	wrapper *staking.ValidatorWrapper,
 ) error {
+	utils.Logger().Info().Msg("begin compute for availability")
+
 	snapshot, err := bc.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
 		return err
