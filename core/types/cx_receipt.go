@@ -14,6 +14,12 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 )
 
+// CrossShardTx is used
+type CrossShardTx struct {
+	Hash  string `json:"hash"`
+	Shard uint32 `json:"shard"`
+}
+
 // CXReceipt represents a receipt for cross-shard transaction
 type CXReceipt struct {
 	TxHash    common.Hash // hash of the cross shard transaction in source shard

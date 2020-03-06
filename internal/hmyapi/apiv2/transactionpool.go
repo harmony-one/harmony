@@ -46,7 +46,6 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 // GetTransactionsHistory returns the list of transactions hashes that involve a particular address.
 func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
 	address := args.Address
-	result := []common.Hash{}
 	var err error
 	if strings.HasPrefix(args.Address, "one1") {
 		address = args.Address
@@ -61,7 +60,8 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 	if err != nil {
 		return nil, err
 	}
-	result = ReturnWithPagination(hashes, args)
+	length, args := ReturnPagination(len(hashes), args)
+	result := hashes[args.PageSize*args.PageIndex : length]
 	if !args.FullTx {
 		return map[string]interface{}{"transactions": result}, nil
 	}
@@ -74,6 +74,28 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 		txs = append(txs, tx)
 	}
 	return map[string]interface{}{"transactions": txs}, nil
+}
+
+// GetCrossShardTransactionsHistory returns the list of cross shard transactions that involve a particular address.
+func (s *PublicTransactionPoolAPI) GetCrossShardTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
+	address := args.Address
+	var err error
+	if strings.HasPrefix(args.Address, "one1") {
+		address = args.Address
+	} else {
+		addr := internal_common.ParseAddr(args.Address)
+		address, err = internal_common.AddressToBech32(addr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	crossTxs, err := s.b.GetCrossShardTransactionsHistory(address)
+	if err != nil {
+		return nil, err
+	}
+	length, args := ReturnPagination(len(crossTxs), args)
+	result := crossTxs[args.PageSize*args.PageIndex : length]
+	return map[string]interface{}{"transactions": result}, nil
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.

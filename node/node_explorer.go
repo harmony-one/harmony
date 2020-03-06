@@ -176,3 +176,24 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 	}
 	return hashes, nil
 }
+
+// GetCrossShardTransactionsHistory returns list of transactions hashes of address.
+func (node *Node) GetCrossShardTransactionsHistory(address string) ([]types.CrossShardTx, error) {
+	addressData := &explorer.Address{}
+	key := explorer.GetAddressKey(address)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	if err != nil {
+		return make([]types.CrossShardTx, 0), nil
+	}
+	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
+		return nil, err
+	}
+	txs := make([]types.CrossShardTx, 0)
+	for _, tx := range addressData.TXs {
+		if tx.Type == explorer.Cross {
+			txs = append(txs, types.CrossShardTx{Hash: tx.ID, Shard: tx.FromShard})
+		}
+	}
+	return txs, nil
+}
