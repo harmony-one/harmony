@@ -533,15 +533,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// update public keys in the committee
 	oldLeader := consensus.LeaderPubKey
-	pubKeys, err := committee.WithStakingEnabled.GetCommitteePublicKeys(
+	pubKeys, _ := committee.WithStakingEnabled.GetCommitteePublicKeys(
 		committeeToSet,
 	)
-	if err != nil {
-		utils.Logger().Error().Err(err).
-			Uint32("shard", consensus.ShardID).
-			Msg("could not get committee public keys")
-		return Syncing
-	}
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")

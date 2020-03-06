@@ -242,7 +242,7 @@ func (def partialStakingEnabled) GetCommitteePublicKeys(
 	committee *shard.Committee,
 ) ([]*bls.PublicKey, error) {
 	if committee == nil {
-		return nil, shard.ErrCommitteeNil
+		return []*bls.PublicKey{}, nil
 	}
 	allIdentities := make([]*bls.PublicKey, len(committee.Slots))
 	for i := range committee.Slots {
