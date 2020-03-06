@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/pkg/errors"
 )
 
@@ -97,16 +98,25 @@ func setSlotKeySigs() []shard.BLSSignature {
 
 // create a new validator
 func createNewValidator() Validator {
-	cr := CommissionRates{Rate: numeric.OneDec(), MaxRate: numeric.OneDec(), MaxChangeRate: numeric.ZeroDec()}
+	cr := CommissionRates{
+		Rate:          numeric.OneDec(),
+		MaxRate:       numeric.OneDec(),
+		MaxChangeRate: numeric.ZeroDec(),
+	}
 	c := Commission{cr, big.NewInt(300)}
-	d := Description{Name: "Wayne", Identity: "wen", Website: "harmony.one.wen", Details: "best"}
+	d := Description{
+		Name:     "Wayne",
+		Identity: "wen",
+		Website:  "harmony.one.wen",
+		Details:  "best",
+	}
 	v := Validator{
 		Address:              validatorAddr,
 		SlotPubKeys:          slotPubKeys,
 		LastEpochInCommittee: big.NewInt(20),
 		MinSelfDelegation:    big.NewInt(1e18),
 		MaxTotalDelegation:   big.NewInt(3e18),
-		Active:               false,
+		EPOSStatus:           effective.Inactive,
 		Commission:           c,
 		Description:          d,
 		CreationHeight:       big.NewInt(12306),

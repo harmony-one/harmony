@@ -218,7 +218,7 @@ func (r Record) Hash() common.Hash {
 	return hash.FromRLPNew256(r)
 }
 
-// SetDifference ..
+// SetDifference returns all the records that are in ys but not in r
 func (r Records) SetDifference(ys Records) Records {
 	diff := Records{}
 	xsHashed, ysHashed :=

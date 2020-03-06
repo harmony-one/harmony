@@ -17,6 +17,7 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -283,11 +284,10 @@ func (s *scenario) defaultValidatorPair(
 			LastEpochInCommittee: big.NewInt(lastEpochInComm),
 			MinSelfDelegation:    new(big.Int).SetUint64(1 * denominations.One),
 			MaxTotalDelegation:   new(big.Int).SetUint64(10 * denominations.One),
-			Active:               true,
+			EPOSStatus:           effective.Active,
 			Commission:           commonCommission,
 			Description:          commonDescr,
 			CreationHeight:       big.NewInt(creationHeight),
-			Banned:               false,
 		},
 		Delegations: delegationsSnapshot,
 	}
@@ -299,11 +299,10 @@ func (s *scenario) defaultValidatorPair(
 			LastEpochInCommittee: big.NewInt(lastEpochInComm + 1),
 			MinSelfDelegation:    new(big.Int).SetUint64(1 * denominations.One),
 			MaxTotalDelegation:   new(big.Int).SetUint64(10 * denominations.One),
-			Active:               true,
+			EPOSStatus:           effective.Active,
 			Commission:           commonCommission,
 			Description:          commonDescr,
 			CreationHeight:       big.NewInt(creationHeight),
-			Banned:               false,
 		},
 		Delegations: delegationsCurrent,
 	}
@@ -358,35 +357,37 @@ func (s *scenario) defaultDelegationPair() (
 	return delegationsSnapshot, delegationsCurrent
 }
 
-func exampleSlashRecords() Records {
-	return Records{
-		Record{
-			Evidence: Evidence{
-				ConflictingBallots: ConflictingBallots{
-					AlreadyCastBallot: votepower.Ballot{
-						SignerPubKey:    blsWrapA,
-						BlockHeaderHash: hashA,
-						Signature:       common.Hex2Bytes(signerABLSSignature),
-					},
-					DoubleSignedBallot: votepower.Ballot{
-						SignerPubKey:    blsWrapB,
-						BlockHeaderHash: hashB,
-						Signature:       common.Hex2Bytes(signerBBLSSignature),
-					},
+func defaultSlashRecord() Record {
+	return Record{
+		Evidence: Evidence{
+			ConflictingBallots: ConflictingBallots{
+				AlreadyCastBallot: votepower.Ballot{
+					SignerPubKey:    blsWrapA,
+					BlockHeaderHash: hashA,
+					Signature:       common.Hex2Bytes(signerABLSSignature),
 				},
-				Moment: Moment{
-					Epoch:        big.NewInt(doubleSignEpoch),
-					Height:       big.NewInt(doubleSignBlockNumber),
-					TimeUnixNano: big.NewInt(doubleSignUnixNano),
-					ViewID:       doubleSignViewID,
-					ShardID:      doubleSignShardID,
+				DoubleSignedBallot: votepower.Ballot{
+					SignerPubKey:    blsWrapB,
+					BlockHeaderHash: hashB,
+					Signature:       common.Hex2Bytes(signerBBLSSignature),
 				},
-				ProposalHeader: &header,
 			},
-			Reporter: reporterAddr,
-			Offender: offenderAddr,
+			Moment: Moment{
+				Epoch:        big.NewInt(doubleSignEpoch),
+				Height:       big.NewInt(doubleSignBlockNumber),
+				TimeUnixNano: big.NewInt(doubleSignUnixNano),
+				ViewID:       doubleSignViewID,
+				ShardID:      doubleSignShardID,
+			},
+			ProposalHeader: &header,
 		},
+		Reporter: reporterAddr,
+		Offender: offenderAddr,
 	}
+}
+
+func exampleSlashRecords() Records {
+	return Records{defaultSlashRecord()}
 }
 
 type mockOutSnapshotReader struct {
@@ -530,6 +531,17 @@ func TestRoundTripSlashRecord(t *testing.T) {
 	serializedB := roundTrip.String()
 	if serializedA != serializedB {
 		t.Error("rlp encode/decode round trip records failed")
+	}
+}
+
+func TestSetDifference(t *testing.T) {
+	setA, setB := exampleSlashRecords(), exampleSlashRecords()
+	additionalSlash := defaultSlashRecord()
+	additionalSlash.Evidence.Epoch.Add(additionalSlash.Evidence.Epoch, common.Big1)
+	setB = append(setB, additionalSlash)
+	diff := setA.SetDifference(setB)
+	if diff[0].Hash() != additionalSlash.Hash() {
+		t.Errorf("did not get set difference of slash")
 	}
 }
 

@@ -372,7 +372,7 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !effective.IsEligibleForEPOSAuction(validator) {
+		if validator.EPOSStatus != effective.Active {
 			continue
 		}
 		if err := validator.SanityCheck(); err != nil {
@@ -430,7 +430,7 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	stakes := big.NewInt(0)
 	for i := range candidates {
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
-		if !effective.IsEligibleForEPOSAuction(validator) {
+		if validator.EPOSStatus != effective.Active {
 			continue
 		}
 		for i := range validator.Delegations {

@@ -204,8 +204,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	if isBeaconchainInStakingEra {
-		// this one will set a meaningful w.current.slashes
-		if err := node.Worker.CollectAndVerifySlashes(); err != nil {
+		// this will set a meaningful w.current.slashes
+		if err := node.Worker.CollectVerifiedSlashes(); err != nil {
 			return nil, err
 		}
 	}

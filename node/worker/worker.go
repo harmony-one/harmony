@@ -327,32 +327,28 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 	return w.current.incxs
 }
 
-// CollectAndVerifySlashes ..
-func (w *Worker) CollectAndVerifySlashes() error {
-	allSlashing, err := w.chain.ReadPendingSlashingCandidates()
-	if err != nil {
-		return err
+// CollectVerifiedSlashes ..
+func (w *Worker) CollectVerifiedSlashes() error {
+	pending, failures :=
+		w.chain.ReadPendingSlashingCandidates(), slash.Records{}
+	if d := pending; len(d) > 0 {
+		pending, failures = w.verifySlashes(d)
 	}
-	if d := allSlashing; len(d) > 0 {
-		// TODO add specific error which is
-		// "could not verify slash", which should not return as err
-		// and therefore stop the block proposal
-		if allSlashing, err = w.VerifyAll(d); err != nil {
-			// TODO(audit): very slashes individually; do not return err if verify fails
-			utils.Logger().Err(err).
-				RawJSON("slashes", []byte(d.String())).
-				Msg("could not verify slashes proposed")
+	if f := failures; len(f) > 0 {
+		if err := w.chain.DeleteFromPendingSlashingCandidates(f); err != nil {
 			return err
 		}
 	}
-	w.current.slashes = allSlashing
+	w.current.slashes = pending
 	return nil
 }
 
-// VerifyAll ..
-func (w *Worker) VerifyAll(allSlashing []slash.Record) ([]slash.Record, error) {
-	d := allSlashing
-	slashingToPropose := []slash.Record{}
+// returns (successes, failures, error)
+func (w *Worker) verifySlashes(
+	records slash.Records,
+) (slash.Records, slash.Records) {
+	d := records
+	successes, failures := slash.Records{}, slash.Records{}
 	// Enforce order, reproducibility
 	sort.SliceStable(d,
 		func(i, j int) bool {
@@ -364,14 +360,18 @@ func (w *Worker) VerifyAll(allSlashing []slash.Record) ([]slash.Record, error) {
 
 	for i := range d {
 		if err := slash.Verify(w.chain, &d[i]); err != nil {
-			return nil, err
+			failures = append(failures, d[i])
 		}
-		slashingToPropose = append(slashingToPropose, d[i])
+		successes = append(successes, d[i])
 	}
-	count := len(slashingToPropose)
-	utils.Logger().Info().
-		Msgf("set into propose headers %d slashing record", count)
-	return slashingToPropose, nil
+
+	if len(failures) > 0 {
+		utils.Logger().Debug().
+			RawJSON("slashes", []byte(failures.String())).
+			Msg("invalid slash records passed over in block proposal")
+	}
+
+	return successes, failures
 }
 
 // FinalizeNewBlock generate a new block for the next consensus round.
