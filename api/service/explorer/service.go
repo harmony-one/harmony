@@ -4,16 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
+	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants for explorer service.
@@ -36,12 +43,22 @@ type Service struct {
 	Port        string
 	Storage     *Storage
 	server      *http.Server
+	shardID     uint32
 	messageChan chan *msg_pb.Message
+	GetBalance  func(common.Address) (*big.Int, error)
+	ReadState   func(epoch *big.Int) (shard.State, error)
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer) *Service {
-	return &Service{IP: selfPeer.IP, Port: selfPeer.Port}
+func New(selfPeer *p2p.Peer, shard uint32, GetAddressBalance func(common.Address) (*big.Int, error),
+	ReadShardState func(epoch *big.Int) (shard.State, error)) *Service {
+	return &Service{
+		IP:         selfPeer.IP,
+		Port:       selfPeer.Port,
+		shardID:    shard,
+		GetBalance: GetAddressBalance,
+		ReadState:  ReadShardState,
+	}
 }
 
 // StartService starts explorer service.
@@ -49,6 +66,7 @@ func (s *Service) StartService() {
 	utils.Logger().Info().Msg("Starting explorer service.")
 	s.Init(true)
 	s.server = s.Run()
+	go s.UpdateTopAddresses()
 }
 
 // StopService shutdowns explorer service.
@@ -82,11 +100,15 @@ func (s *Service) Run() *http.Server {
 
 	s.router = mux.NewRouter()
 
-	// Set up router for address.\
+	// Set up router for addresses.
 	// Fetch addresses request, accepts parameter size: how much addresses to read,
 	// parameter prefix: from which address prefix start
 	s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
 	s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
+
+	// Set up router for top addresses.
+	s.router.Path("/top").Queries().HandlerFunc(s.GetTopAddresses).Methods("GET")
+	s.router.Path("/top").HandlerFunc(s.GetTopAddresses)
 
 	// Do serving now.
 	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
@@ -110,6 +132,7 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 	data := &Data{}
 	defer func() {
 		if err := json.NewEncoder(w).Encode(data.Addresses); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode addresses")
 		}
 	}()
@@ -124,6 +147,108 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
 		return
+	}
+}
+
+// UpdateTopAddresses updates 20 top addresses by balance from storage each 10 minutes.
+func (s *Service) UpdateTopAddresses() {
+	if s.GetBalance == nil || s.ReadState == nil {
+		return
+	}
+	ticker := time.NewTicker(time.Minute)
+	prevEpoch := int64(-1)
+	utils.Logger().Info().Msg("start updating top addresses")
+	for range ticker.C {
+		topAddresses := make([]AddrBalance, 0)
+		bytes, err := s.Storage.GetDB().Get([]byte(EpochPrefix), nil)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("error reading epoch")
+			continue
+		}
+		epoch := big.NewInt(0)
+		if err = rlp.DecodeBytes(bytes, &epoch); err != nil {
+			utils.Logger().Error().Err(err).Msg("cannot decode epoch")
+			continue
+		}
+		for curEpoch := prevEpoch + 1; curEpoch < epoch.Int64(); curEpoch++ {
+			state, err := s.ReadState(big.NewInt(curEpoch))
+			if err != nil {
+				utils.Logger().Error().Err(err).Msg("error reading state")
+				continue
+			}
+			for _, committee := range state {
+				if committee.ShardID == s.shardID {
+					for _, validator := range committee.NodeList {
+						addr, err := internal_common.AddressToBech32(validator.EcdsaAddress)
+						if err != nil {
+							utils.Logger().Error().Err(err).Msg("error conversion to bech32")
+							continue
+						}
+						if err = s.Storage.DumpAddress(addr); err != nil {
+							utils.Logger().Error().Err(err).Msg("error dumping address")
+						}
+					}
+				}
+			}
+		}
+		prevEpoch = epoch.Int64()
+		prefix := ""
+		for {
+			addresses, err := s.Storage.GetAddresses(maxAddresses, prefix)
+			if err != nil {
+				utils.Logger().Error().Err(err).Msg("addresses fetch error")
+				break
+			}
+			for _, address := range addresses {
+				addr := internal_common.ParseAddr(address)
+				balance, err := s.GetBalance(addr)
+				if err != nil {
+					utils.Logger().Error().Err(err).Msg("balance fetch error")
+					continue
+				}
+				key := AddrBalance{Address: address, Balance: balance}
+				topAddresses = append(topAddresses, key)
+				sort.Slice(topAddresses, func(i, j int) bool {
+					return topAddresses[i].Balance.Cmp(topAddresses[j].Balance) < 1
+				})
+				if len(topAddresses) > TopAddrLen {
+					topAddresses = topAddresses[:TopAddrLen-1]
+				}
+			}
+			if len(addresses) < maxAddresses {
+				encoded, err := rlp.EncodeToBytes(topAddresses)
+				if err != nil {
+					utils.Logger().Error().Err(err).Msg("top addresses encoding error")
+					break
+				}
+				if err = s.Storage.GetDB().Put([]byte(TopPrefix), encoded, nil); err != nil {
+					utils.Logger().Error().Err(err).Msg("top addresses db dump error")
+				}
+				break
+			}
+			prefix = addresses[len(addresses)-1]
+		}
+	}
+}
+
+// GetTopAddresses serves end-point /top, returns top <= 20 addresses by balance with respective balance.
+func (s *Service) GetTopAddresses(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	bytes, err := s.Storage.GetDB().Get([]byte(TopPrefix), nil)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		utils.Logger().Error().Err(err).Msg("cannot read addresses from db")
+		return
+	}
+	topAddresses := make([]AddrBalance, 0)
+	if err = rlp.DecodeBytes(bytes, &topAddresses); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		utils.Logger().Error().Err(err).Msg("cannot decode top addresses")
+		return
+	}
+	if err = json.NewEncoder(w).Encode(topAddresses); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode top addresses")
 	}
 }
 

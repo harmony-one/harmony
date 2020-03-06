@@ -2,10 +2,12 @@ package explorer
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -18,6 +20,9 @@ import (
 const (
 	AddressPrefix = "ad"
 	PrefixLen     = 3
+	TopAddrLen    = 20
+	TopPrefix     = "top"
+	EpochPrefix   = "epoch"
 )
 
 // GetAddressKey ...
@@ -38,6 +43,13 @@ func GetStorageInstance(ip, port string, remove bool) *Storage {
 	once.Do(func() {
 		storage = &Storage{}
 		storage.Init(ip, port, remove)
+		if encoded, err := rlp.EncodeToBytes(big.NewInt(0)); err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot encode epoch 0")
+		} else {
+			if err = storage.db.Put([]byte(EpochPrefix), encoded, nil); err != nil {
+				utils.Logger().Warn().Err(err).Msg("cannot put epoch 0")
+			}
+		}
 	})
 	return storage
 }
@@ -77,6 +89,12 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	}
 
 	batch := new(leveldb.Batch)
+	// Store epoch
+	if encoded, err := rlp.EncodeToBytes(block.Epoch()); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot encode epoch")
+	} else {
+		batch.Put([]byte(EpochPrefix), encoded)
+	}
 	// Store txs
 	for _, tx := range block.Transactions() {
 		explorerTransaction := GetTransaction(tx, block)
@@ -95,6 +113,27 @@ func (storage *Storage) UpdateAddress(batch *leveldb.Batch, explorerTransaction 
 	}
 	explorerTransaction.Type = Sent
 	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
+}
+
+// DumpAddress dumps address.
+func (storage *Storage) DumpAddress(address string) error {
+	key := GetAddressKey(address)
+	has, err := storage.db.Has([]byte(key), nil)
+	if err != nil || has {
+		return nil
+	}
+	encoded, err := rlp.EncodeToBytes(Address{ID: address})
+	if err == nil {
+		err = storage.db.Put([]byte(key), encoded, nil)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("cannot put address")
+			return err
+		}
+	} else {
+		utils.Logger().Error().Err(err).Msg("cannot encode address")
+		return err
+	}
+	return nil
 }
 
 // UpdateAddressStorage updates specific addr Address.
@@ -122,8 +161,10 @@ func (storage *Storage) GetAddresses(size int, prefix string) ([]string, error) 
 	key := GetAddressKey(prefix)
 	iterator := db.NewIterator(&util.Range{Start: []byte(key)}, nil)
 	addresses := make([]string, 0)
-	for iterator.Next() {
+	read := 0
+	for iterator.Next() && read < size {
 		address := string(iterator.Key())
+		read++
 		if len(address) < PrefixLen {
 			utils.Logger().Info().Msgf("address len < 3 %s", address)
 			continue
