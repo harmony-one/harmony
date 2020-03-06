@@ -1961,12 +1961,10 @@ func (bc *BlockChain) DeleteFromPendingSlashingCandidates(
 
 // ReadPendingSlashingCandidates retrieves pending slashing candidates
 func (bc *BlockChain) ReadPendingSlashingCandidates() slash.Records {
-	cls := slash.Records{}
 	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
-		return cls
+		return slash.Records{}
 	}
-	cls = append(bc.pendingSlashes[0:0], bc.pendingSlashes...)
-	return cls
+	return append(bc.pendingSlashes[0:0], bc.pendingSlashes...)
 }
 
 // ReadPendingCrossLinks retrieves pending crosslinks
