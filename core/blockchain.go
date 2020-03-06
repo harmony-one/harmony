@@ -2024,7 +2024,7 @@ func (bc *BlockChain) WritePendingCrossLinks(crossLinks []types.CrossLink) error
 
 // AddPendingSlashingCandidates appends pending slashing candidates
 func (bc *BlockChain) AddPendingSlashingCandidates(
-	candidates []slash.Record,
+	candidates slash.Records,
 ) error {
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()

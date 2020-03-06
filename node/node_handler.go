@@ -244,8 +244,13 @@ func (node *Node) stakingMessageHandler(msgPayload []byte) {
 // TODO (lc): broadcast the new blocks to new nodes doing state sync
 func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 	groups := []nodeconfig.GroupID{node.NodeConfig.GetClientGroupID()}
-	utils.Logger().Info().Msgf("broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0])
-	msg := host.ConstructP2pMessage(byte(0), proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}))
+	utils.Logger().Info().
+		Msgf(
+			"broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0],
+		)
+	msg := host.ConstructP2pMessage(byte(0),
+		proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}),
+	)
 	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot broadcast new block")
 	}
@@ -263,9 +268,11 @@ func (node *Node) BroadcastSlash(witness *slash.Record) {
 			RawJSON("record", []byte(witness.String())).
 			Msg("could not send slash record to beaconchain")
 	}
+	utils.Logger().Info().Msg("broadcast the double sign record")
 }
 
-// BroadcastCrossLink is called by consensus leader to send the new header as cross link to beacon chain.
+// BroadcastCrossLink is called by consensus leader to
+// send the new header as cross link to beacon chain.
 func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 	// no point to broadcast the crosslink if we aren't even in the right epoch yet
 	if !node.Blockchain().Config().IsCrossLink(
