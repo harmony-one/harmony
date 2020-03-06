@@ -1,4 +1,4 @@
-package slash
+package webhooks
 
 import (
 	"bytes"
@@ -6,33 +6,29 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/harmony-one/harmony/staking/slash"
 	"gopkg.in/yaml.v2"
 )
 
 const (
 	// DefaultWebHookPath ..
-	DefaultWebHookPath = "staking/slash/webhook.example.yaml"
+	DefaultWebHookPath = "staking/webhooks/webhook.example.yaml"
 )
+
+// AvailabilityHooks ..
+type AvailabilityHooks struct {
+	DroppedBelowThreshold string `yaml:"dropped-below-threshold"`
+}
 
 // DoubleSignWebHooks ..
 type DoubleSignWebHooks struct {
-	WebHooks *struct {
-		OnNoticeDoubleSign     string `yaml:"notice-double-sign"`
-		OnThisNodeDoubleSigned string `yaml:"this-node-double-signed"`
-	} `yaml:"web-hooks"`
+	OnNoticeDoubleSign string `yaml:"notice-double-sign"`
 }
 
-// NewDoubleSignWebHooksFromPath ..
-func NewDoubleSignWebHooksFromPath(yamlPath string) (*DoubleSignWebHooks, error) {
-	rawYAML, err := ioutil.ReadFile(yamlPath)
-	if err != nil {
-		return nil, err
-	}
-	t := DoubleSignWebHooks{}
-	if err := yaml.UnmarshalStrict(rawYAML, &t); err != nil {
-		return nil, err
-	}
-	return &t, nil
+// Hooks ..
+type Hooks struct {
+	Slashing     *DoubleSignWebHooks `yaml:"slashing-hooks"`
+	Availability *AvailabilityHooks  `yaml:"availability-hooks"`
 }
 
 // ReportResult ..
@@ -52,7 +48,7 @@ func NewFailure(payload string) *ReportResult {
 }
 
 // DoPost is a fire and forget helper
-func DoPost(url string, record *Record) (*ReportResult, error) {
+func DoPost(url string, record *slash.Record) (*ReportResult, error) {
 	payload, err := json.Marshal(record)
 	if err != nil {
 		return nil, err
@@ -68,4 +64,17 @@ func DoPost(url string, record *Record) (*ReportResult, error) {
 		return nil, err
 	}
 	return &anon, nil
+}
+
+// NewWebHooksFromPath ..
+func NewWebHooksFromPath(yamlPath string) (*Hooks, error) {
+	rawYAML, err := ioutil.ReadFile(yamlPath)
+	if err != nil {
+		return nil, err
+	}
+	t := Hooks{}
+	if err := yaml.UnmarshalStrict(rawYAML, &t); err != nil {
+		return nil, err
+	}
+	return &t, nil
 }
