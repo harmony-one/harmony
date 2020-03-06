@@ -178,7 +178,48 @@ func IncrementValidatorSigningCounts(
 
 // Reader ..
 type Reader interface {
-	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
+	ReadValidatorSnapshot(
+		addr common.Address,
+	) (*staking.ValidatorWrapper, error)
+}
+
+// ComputeCurrentSigning returns (signed, toSign, quotient, error)
+func ComputeCurrentSigning(
+	snapshot, wrapper *staking.ValidatorWrapper,
+) (*big.Int, *big.Int, numeric.Dec, error) {
+
+	statsNow, snapSigned, snapToSign :=
+		wrapper.Counters,
+		snapshot.Counters.NumBlocksSigned,
+		snapshot.Counters.NumBlocksToSign
+
+	utils.Logger().Info().
+		RawJSON("snapshot", []byte(snapshot.String())).
+		RawJSON("current", []byte(wrapper.String())).
+		Msg("begin checks for availability")
+
+	signed, toSign :=
+		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
+		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
+
+	if signed.Sign() == -1 {
+		return nil, nil, numeric.ZeroDec(), errors.Wrapf(
+			errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
+			statsNow.NumBlocksSigned.String(), snapSigned.String(),
+		)
+	}
+
+	if toSign.Sign() == -1 {
+		return nil, nil, numeric.ZeroDec(), errors.Wrapf(
+			errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
+			statsNow.NumBlocksToSign.String(), snapToSign.String(),
+		)
+	}
+
+	s1, s2 :=
+		numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
+	quotient := s1.Quo(s2)
+	return signed, toSign, quotient, nil
 }
 
 // compute sets the validator to
@@ -196,33 +237,7 @@ func compute(
 		return err
 	}
 
-	statsNow, snapSigned, snapToSign :=
-		wrapper.Counters,
-		snapshot.Counters.NumBlocksSigned,
-		snapshot.Counters.NumBlocksToSign
-
-	utils.Logger().Info().
-		RawJSON("snapshot", []byte(snapshot.String())).
-		RawJSON("current", []byte(wrapper.String())).
-		Msg("begin checks for availability")
-
-	signed, toSign :=
-		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
-		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
-
-	if signed.Sign() == -1 {
-		return errors.Wrapf(
-			errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
-			statsNow.NumBlocksSigned.String(), snapSigned.String(),
-		)
-	}
-
-	if toSign.Sign() == -1 {
-		return errors.Wrapf(
-			errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
-			statsNow.NumBlocksToSign.String(), snapToSign.String(),
-		)
-	}
+	signed, toSign, quotient, err := ComputeCurrentSigning(snapshot, wrapper)
 
 	if toSign.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().
@@ -232,15 +247,15 @@ func compute(
 		return nil
 	}
 
-	s1, s2 :=
-		numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
-	quotient := s1.Quo(s2)
+	if err != nil {
+		return err
+	}
 
 	utils.Logger().Info().
 		RawJSON("snapshot", []byte(snapshot.String())).
 		RawJSON("current", []byte(wrapper.String())).
-		Str("signed", s1.String()).
-		Str("to-sign", s2.String()).
+		Str("signed", signed.String()).
+		Str("to-sign", toSign.String()).
 		Str("percentage-signed", quotient.String()).
 		Bool("meets-threshold", quotient.LTE(measure)).
 		Msg("check if signing percent is meeting required threshold")

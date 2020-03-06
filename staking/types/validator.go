@@ -78,6 +78,19 @@ type ValidatorWrapper struct {
 	Counters    counters
 }
 
+// Computed ..
+type Computed struct {
+	Signed     *big.Int    `json:"current-epoch-signed"`
+	ToSign     *big.Int    `json:"current-epoch-to-sign"`
+	Percentage numeric.Dec `json:"percentage"`
+}
+
+// ValidatorRPCEnchanced contains extra information for RPC consumer
+type ValidatorRPCEnchanced struct {
+	ValidatorWrapper
+	CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
+}
+
 func (w ValidatorWrapper) String() string {
 	s, _ := json.Marshal(w)
 	return string(s)
