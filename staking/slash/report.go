@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"gopkg.in/yaml.v2"
 )
 
@@ -21,23 +20,6 @@ type DoubleSignWebHooks struct {
 		OnNoticeDoubleSign     string `yaml:"notice-double-sign"`
 		OnThisNodeDoubleSigned string `yaml:"this-node-double-signed"`
 	} `yaml:"web-hooks"`
-	Malicious *struct {
-		Trigger *struct {
-			PublicKeys        []string `yaml:"list"`
-			DoubleSignNodeURL string   `yaml:"double-sign"`
-		} `yaml:"trigger"`
-	} `yaml:"malicious"`
-}
-
-// Contains ..
-func (h *DoubleSignWebHooks) Contains(key *bls.PublicKey) bool {
-	hex := key.SerializeToHexStr()
-	for _, key := range h.Malicious.Trigger.PublicKeys {
-		if hex == key {
-			return true
-		}
-	}
-	return false
 }
 
 // NewDoubleSignWebHooksFromPath ..

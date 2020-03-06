@@ -168,20 +168,11 @@ func IncrementValidatorSigningCounts(
 	state *state.DB,
 	signers, missing shard.SlotList,
 ) error {
-	utils.Logger().Info().
-		RawJSON("missing", []byte(missing.String())).
-		Msg("signers that did sign")
-
-	utils.Logger().Info().
-		Msg("bumping signing counters for non-missing signers")
-
 	if err := bumpCount(
 		bc, state, signers, true, staked.LookupSet,
 	); err != nil {
 		return err
 	}
-	utils.Logger().Info().
-		Msg("bumping missing signers counters")
 	return bumpCount(bc, state, missing, false, staked.LookupSet)
 }
 
