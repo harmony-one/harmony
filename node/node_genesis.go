@@ -92,10 +92,15 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		node.AddTestingAddresses(genesisAlloc, TestAccountNumber)
 		gasLimit = params.TestGenesisGasLimit
 		// Smart contract deployer account used to deploy initial smart contract
-		contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
+		contractDeployerKey, _ := ecdsa.GenerateKey(
+			crypto.S256(),
+			strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"),
+		)
 		contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
 		contractDeployerFunds := big.NewInt(ContractDeployerInitFund)
-		contractDeployerFunds = contractDeployerFunds.Mul(contractDeployerFunds, big.NewInt(denominations.One))
+		contractDeployerFunds = contractDeployerFunds.Mul(
+			contractDeployerFunds, big.NewInt(denominations.One),
+		)
 		genesisAlloc[contractDeployerAddress] = core.GenesisAccount{Balance: contractDeployerFunds}
 		node.ContractDeployerKey = contractDeployerKey
 	}
