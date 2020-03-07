@@ -132,9 +132,6 @@ func bumpCount(
 			return err
 		}
 
-		utils.Logger().Info().RawJSON("validator", []byte(wrapper.String())).
-			Msg("about to adjust counters")
-
 		wrapper.Counters.NumBlocksToSign.Add(
 			wrapper.Counters.NumBlocksToSign, common.Big1,
 		)
@@ -144,9 +141,6 @@ func bumpCount(
 				wrapper.Counters.NumBlocksSigned, common.Big1,
 			)
 		}
-
-		utils.Logger().Info().RawJSON("validator", []byte(wrapper.String())).
-			Msg("bumped signing counters")
 
 		if err := compute(bc, state, wrapper); err != nil {
 			return err
@@ -168,26 +162,57 @@ func IncrementValidatorSigningCounts(
 	state *state.DB,
 	signers, missing shard.SlotList,
 ) error {
-	utils.Logger().Info().
-		RawJSON("missing", []byte(missing.String())).
-		Msg("signers that did sign")
-
-	utils.Logger().Info().
-		Msg("bumping signing counters for non-missing signers")
-
 	if err := bumpCount(
 		bc, state, signers, true, staked.LookupSet,
 	); err != nil {
 		return err
 	}
-	utils.Logger().Info().
-		Msg("bumping missing signers counters")
 	return bumpCount(bc, state, missing, false, staked.LookupSet)
 }
 
 // Reader ..
 type Reader interface {
-	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
+	ReadValidatorSnapshot(
+		addr common.Address,
+	) (*staking.ValidatorWrapper, error)
+}
+
+// ComputeCurrentSigning returns (signed, toSign, quotient, error)
+func ComputeCurrentSigning(
+	snapshot, wrapper *staking.ValidatorWrapper,
+) (*big.Int, *big.Int, numeric.Dec, error) {
+	statsNow, snapSigned, snapToSign :=
+		wrapper.Counters,
+		snapshot.Counters.NumBlocksSigned,
+		snapshot.Counters.NumBlocksToSign
+
+	signed, toSign :=
+		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
+		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
+
+	if signed.Sign() == -1 {
+		return nil, nil, numeric.ZeroDec(), errors.Wrapf(
+			errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
+			statsNow.NumBlocksSigned.String(), snapSigned.String(),
+		)
+	}
+
+	if toSign.Sign() == -1 {
+		return nil, nil, numeric.ZeroDec(), errors.Wrapf(
+			errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
+			statsNow.NumBlocksToSign.String(), snapToSign.String(),
+		)
+	}
+
+	s1, s2 :=
+		numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
+	quotient := s1.Quo(s2)
+	return signed, toSign, quotient, nil
+}
+
+// IsBelowSigningThreshold ..
+func IsBelowSigningThreshold(quotient numeric.Dec) bool {
+	return quotient.LTE(measure)
 }
 
 // compute sets the validator to
@@ -200,38 +225,14 @@ func compute(
 	state *state.DB,
 	wrapper *staking.ValidatorWrapper,
 ) error {
+	utils.Logger().Info().Msg("begin compute for availability")
+
 	snapshot, err := bc.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
 		return err
 	}
 
-	statsNow, snapSigned, snapToSign :=
-		wrapper.Counters,
-		snapshot.Counters.NumBlocksSigned,
-		snapshot.Counters.NumBlocksToSign
-
-	utils.Logger().Info().
-		RawJSON("snapshot", []byte(snapshot.String())).
-		RawJSON("current", []byte(wrapper.String())).
-		Msg("begin checks for availability")
-
-	signed, toSign :=
-		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
-		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
-
-	if signed.Sign() == -1 {
-		return errors.Wrapf(
-			errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
-			statsNow.NumBlocksSigned.String(), snapSigned.String(),
-		)
-	}
-
-	if toSign.Sign() == -1 {
-		return errors.Wrapf(
-			errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
-			statsNow.NumBlocksToSign.String(), snapToSign.String(),
-		)
-	}
+	signed, toSign, quotient, err := ComputeCurrentSigning(snapshot, wrapper)
 
 	if toSign.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().
@@ -241,22 +242,22 @@ func compute(
 		return nil
 	}
 
-	s1, s2 :=
-		numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
-	quotient := s1.Quo(s2)
+	if err != nil {
+		return err
+	}
 
 	utils.Logger().Info().
 		RawJSON("snapshot", []byte(snapshot.String())).
 		RawJSON("current", []byte(wrapper.String())).
-		Str("signed", s1.String()).
-		Str("to-sign", s2.String()).
+		Str("signed", signed.String()).
+		Str("to-sign", toSign.String()).
 		Str("percentage-signed", quotient.String()).
 		Bool("meets-threshold", quotient.LTE(measure)).
 		Msg("check if signing percent is meeting required threshold")
 
 	const missedTooManyBlocks = true
 
-	switch quotient.LTE(measure) {
+	switch IsBelowSigningThreshold(quotient) {
 	case missedTooManyBlocks:
 		wrapper.Active = false
 		utils.Logger().Info().

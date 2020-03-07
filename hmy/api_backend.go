@@ -2,7 +2,6 @@ package hmy
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"sync"
 
@@ -20,11 +19,14 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
@@ -323,12 +325,25 @@ func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
 }
 
 // GetValidatorInformation returns the information of validator
-func (b *APIBackend) GetValidatorInformation(addr common.Address) *staking.ValidatorWrapper {
-	val, _ := b.hmy.BlockChain().ReadValidatorInformation(addr)
-	if val != nil {
-		return val
+func (b *APIBackend) GetValidatorInformation(
+	addr common.Address,
+) (*staking.ValidatorRPCEnchanced, error) {
+	wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(addr)
+	if err != nil {
+		s, _ := internal_common.AddressToBech32(addr)
+		return nil, errors.Wrapf(err, "not found address in current state %s", s)
 	}
-	return nil
+	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshot(addr)
+	if err != nil {
+		s, _ := internal_common.AddressToBech32(addr)
+		return nil, errors.Wrapf(err, "not found address in snapshot %s", s)
+	}
+	signed, toSign, quotient, err := availability.ComputeCurrentSigning(snapshot, wrapper)
+	return &staking.ValidatorRPCEnchanced{
+			ValidatorWrapper:         *wrapper,
+			CurrentSigningPercentage: staking.Computed{signed, toSign, quotient},
+		},
+		nil
 }
 
 // GetMedianRawStakeSnapshot ..

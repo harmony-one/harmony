@@ -38,6 +38,7 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/staking/webhooks"
 )
 
 // State is a state of a node.
@@ -591,9 +592,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 						l.Msg("double sign occured before staking era, no-op")
 						return
 					}
-					if hooks := node.NodeConfig.WebHooks.DoubleSigning; hooks != nil {
-						url := hooks.WebHooks.OnNoticeDoubleSign
-						go func() { slash.DoPost(url, &doubleSign) }()
+					if hooks := node.NodeConfig.WebHooks.Hooks; hooks != nil {
+						if s := hooks.Slashing; s != nil {
+							url := s.OnNoticeDoubleSign
+							go func() { webhooks.DoPost(url, &doubleSign) }()
+						}
 					}
 					if node.NodeConfig.ShardID != shard.BeaconChainShardID {
 						go node.BroadcastSlash(&doubleSign)
@@ -638,10 +641,10 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			Msg("[InitConsensusWithValidators] Failed getting shard state")
 		return err
 	}
-	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
+	pubKeys, err := committee.WithStakingEnabled.GetCommitteePublicKeys(
 		shardState.FindCommitteeByID(shardID),
 	)
-	if len(pubKeys) == 0 {
+	if err != nil {
 		utils.Logger().Error().
 			Uint32("shardID", shardID).
 			Uint64("blockNum", blockNum).

@@ -38,7 +38,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
+	"github.com/harmony-one/harmony/staking/webhooks"
 	golog "github.com/ipfs/go-log"
 	"github.com/pkg/errors"
 	gologging "github.com/whyrusleeping/go-logging"
@@ -358,14 +358,14 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	nodeConfig.DBDir = *dbDir
 
 	if p := *webHookYamlPath; p != "" {
-		config, err := slash.NewDoubleSignWebHooksFromPath(p)
+		config, err := webhooks.NewWebHooksFromPath(p)
 		if err != nil {
 			fmt.Fprintf(
 				os.Stderr, "yaml path is bad: %s", p,
 			)
 			os.Exit(1)
 		}
-		nodeConfig.WebHooks.DoubleSigning = config
+		nodeConfig.WebHooks.Hooks = config
 	}
 
 	return nodeConfig, nil
@@ -442,7 +442,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
-
+	currentNode.NodeConfig.DNSZone = *dnsZone
 	// Set up prometheus pushgateway for metrics monitoring serivce.
 	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
