@@ -102,7 +102,8 @@ func (b *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uin
 
 // SendTx ...
 func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	return b.hmy.nodeAPI.AddPendingTransaction(signedTx)
+	b.hmy.nodeAPI.AddPendingTransaction(signedTx)
+	return nil
 }
 
 // ChainConfig ...
@@ -307,7 +308,8 @@ func (b *APIBackend) IsLeader() bool {
 func (b *APIBackend) SendStakingTx(
 	ctx context.Context,
 	newStakingTx *staking.StakingTransaction) error {
-	return b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
+	b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
+	return nil
 }
 
 // GetElectedValidatorAddresses returns the address of elected validators for current epoch
