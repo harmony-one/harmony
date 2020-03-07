@@ -256,14 +256,14 @@ func (e *engineImpl) Finalize(
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
 	doubleSigners slash.Records,
-) (*types.Block, *big.Int, error) {
+) (*types.Block, map[common.Address]struct{}, *big.Int, error) {
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	payout, err := AccumulateRewards(
+	missedSigningThreshold, payout, err := AccumulateRewards(
 		chain, state, header, e.Rewarder(), e.Beaconchain(),
 	)
 	if err != nil {
-		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
+		return nil, nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
@@ -275,18 +275,18 @@ func (e *engineImpl) Finalize(
 		validators, err := chain.ReadValidatorList()
 		if err != nil {
 			const msg = "[Finalize] failed to read all validators"
-			return nil, nil, ctxerror.New(msg).WithCause(err)
+			return nil, nil, nil, ctxerror.New(msg).WithCause(err)
 		}
 		newShardState, err := header.GetShardState()
 		if err != nil {
 			const msg = "[Finalize] failed to read shard state"
-			return nil, nil, ctxerror.New(msg).WithCause(err)
+			return nil, nil, nil, ctxerror.New(msg).WithCause(err)
 		}
 		// Payout undelegated/unlocked tokens
 		for _, validator := range validators {
 			wrapper, err := state.ValidatorWrapper(validator)
 			if err != nil {
-				return nil, nil, ctxerror.New(
+				return nil, nil, nil, ctxerror.New(
 					"[Finalize] failed to get validator from state to finalize",
 				).WithCause(err)
 			}
@@ -301,14 +301,14 @@ func (e *engineImpl) Finalize(
 				validator, wrapper,
 			); err != nil {
 				const msg = "[Finalize] failed update validator info"
-				return nil, nil, ctxerror.New(msg).WithCause(err)
+				return nil, nil, nil, ctxerror.New(msg).WithCause(err)
 			}
 		}
 
 		for _, addr := range newShardState.StakedValidators().Addrs {
 			wrapper, err := state.ValidatorWrapper(addr)
 			if err != nil {
-				return nil, nil, ctxerror.New(
+				return nil, nil, nil, ctxerror.New(
 					"[Finalize] failed to get validator from state to finalize",
 				).WithCause(err)
 			}
@@ -317,7 +317,7 @@ func (e *engineImpl) Finalize(
 				addr, wrapper,
 			); err != nil {
 				const msg = "[Finalize] failed update validator info"
-				return nil, nil, ctxerror.New(msg).WithCause(err)
+				return nil, nil, nil, ctxerror.New(msg).WithCause(err)
 			}
 		}
 	}
@@ -328,7 +328,7 @@ func (e *engineImpl) Finalize(
 		superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
 
 		if err != nil {
-			return nil, nil, errors.New("could not read shard state")
+			return nil, nil, nil, errors.New("could not read shard state")
 		}
 
 		staked := superCommittee.StakedValidators()
@@ -336,9 +336,6 @@ func (e *engineImpl) Finalize(
 		var slashApplied *slash.Application
 		rate := slash.Rate(caught, staked.CountStakedBLSKey)
 		utils.Logger().Info().
-			Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-			Uint64("finalizing-epoch", header.Epoch().Uint64()).
-			Uint64("block-number", header.Number().Uint64()).
 			Str("rate", rate.String()).
 			RawJSON("records", []byte(doubleSigners.String())).
 			Msg("now applying slash to state during block finalization")
@@ -348,13 +345,10 @@ func (e *engineImpl) Finalize(
 			doubleSigners,
 			rate,
 		); err != nil {
-			return nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
+			return nil, nil, nil, ctxerror.New("[Finalize] could not apply slash").WithCause(err)
 		}
 
 		utils.Logger().Info().
-			Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-			Uint64("finalizing-epoch", header.Epoch().Uint64()).
-			Uint64("block-number", header.Number().Uint64()).
 			Str("rate", rate.String()).
 			RawJSON("records", []byte(doubleSigners.String())).
 			RawJSON("applied", []byte(slashApplied.String())).
@@ -362,7 +356,10 @@ func (e *engineImpl) Finalize(
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
-	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
+	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks),
+		missedSigningThreshold,
+		payout,
+		nil
 }
 
 // QuorumForBlock returns the quorum for the given block header.

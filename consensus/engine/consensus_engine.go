@@ -122,7 +122,7 @@ type Engine interface {
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
 		doubleSigners slash.Records,
-	) (*types.Block, *big.Int, error)
+	) (*types.Block, map[common.Address]struct{}, *big.Int, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.

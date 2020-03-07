@@ -32,20 +32,21 @@ func ballotResultBeaconchain(
 func AccumulateRewards(
 	bc engine.ChainReader, state *state.DB, header *block.Header,
 	rewarder reward.Distributor, beaconChain engine.ChainReader,
-) (*big.Int, error) {
-	blockNum := header.Number().Uint64()
+) (map[common.Address]struct{}, *big.Int, error) {
+	blockNum, missedSigningThreshold :=
+		header.Number().Uint64(), map[common.Address]struct{}{}
 
 	if blockNum == 0 {
 		// genesis block has no parent to reward.
-		return network.NoReward, nil
+		return missedSigningThreshold, network.NoReward, nil
 	}
 
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() != shard.BeaconChainShardID {
-		return network.NoReward, nil
+		return missedSigningThreshold, network.NoReward, nil
 	}
 
-	//// After staking
+	// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		defaultReward := network.BaseStakedReward
@@ -54,7 +55,7 @@ func AccumulateRewards(
 			beaconChain, header.Time().Int64(),
 		)
 		if err != nil {
-			return network.NoReward, err
+			return missedSigningThreshold, network.NoReward, err
 		}
 		howMuchOff, adjustBy := network.Adjustment(*percentageStaked)
 		defaultReward = defaultReward.Add(adjustBy)
@@ -67,7 +68,7 @@ func AccumulateRewards(
 		// If too much is staked, then possible to have negative reward,
 		// not an error, just a possible economic situation, hence we return
 		if defaultReward.IsNegative() {
-			return network.NoReward, nil
+			return missedSigningThreshold, network.NoReward, nil
 		}
 
 		newRewards := big.NewInt(0)
@@ -75,22 +76,25 @@ func AccumulateRewards(
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
-			return network.NoReward, err
+			return missedSigningThreshold, network.NoReward, err
 		}
 
-		if err := availability.IncrementValidatorSigningCounts(
+		missedThresholdBeacon, err := availability.IncrementValidatorSigningCounts(
 			beaconChain,
 			shard.Committee{shard.BeaconChainShardID, members}.StakedValidators(),
 			state,
 			payable,
 			missing,
-		); err != nil {
-			return network.NoReward, err
+		)
+		if err != nil {
+			return missedSigningThreshold, network.NoReward, err
 		}
-
+		for k := range missedThresholdBeacon {
+			missedSigningThreshold[k] = struct{}{}
+		}
 		votingPower, err := votepower.Compute(members)
 		if err != nil {
-			return network.NoReward, err
+			return missedSigningThreshold, network.NoReward, err
 		}
 
 		for beaconMember := range payable {
@@ -100,22 +104,23 @@ func AccumulateRewards(
 			if !voter.IsHarmonyNode {
 				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
 				if err != nil {
-					return network.NoReward, err
+					return missedSigningThreshold, network.NoReward, err
 				}
 				due := defaultReward.Mul(
 					voter.EffectivePercent.Quo(votepower.StakersShare),
 				).RoundInt()
 				newRewards = new(big.Int).Add(newRewards, due)
-				state.AddReward(snapshot, due)
+				if err := state.AddReward(snapshot, due); err != nil {
+					return missedSigningThreshold, network.NoReward, err
+				}
 			}
 		}
 
 		// Handle rewards for shardchain
-		if cxLinks := header.CrossLinks(); len(cxLinks) != 0 {
+		if cxLinks := header.CrossLinks(); len(cxLinks) > 0 {
 			crossLinks := types.CrossLinks{}
-			err := rlp.DecodeBytes(cxLinks, &crossLinks)
-			if err != nil {
-				return network.NoReward, err
+			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
+				return missedSigningThreshold, network.NoReward, err
 			}
 
 			type slotPayable struct {
@@ -136,7 +141,7 @@ func AccumulateRewards(
 				shardState, err := bc.ReadShardState(cxLink.Epoch())
 
 				if err != nil {
-					return network.NoReward, err
+					return missedSigningThreshold, network.NoReward, err
 				}
 
 				subComm := shardState.FindCommitteeByID(cxLink.ShardID())
@@ -145,19 +150,23 @@ func AccumulateRewards(
 				)
 
 				if err != nil {
-					return network.NoReward, err
+					return nil, network.NoReward, err
 				}
 
 				staked := subComm.StakedValidators()
-				if err := availability.IncrementValidatorSigningCounts(
+				missedThresholdShard, err := availability.IncrementValidatorSigningCounts(
 					beaconChain, staked, state, payableSigners, missing,
-				); err != nil {
-					return network.NoReward, err
+				)
+				if err != nil {
+					return missedSigningThreshold, network.NoReward, err
+				}
+				for k := range missedThresholdShard {
+					missedSigningThreshold[k] = struct{}{}
 				}
 
 				votingPower, err := votepower.Compute(payableSigners)
 				if err != nil {
-					return network.NoReward, err
+					return missedSigningThreshold, network.NoReward, err
 				}
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
@@ -174,7 +183,6 @@ func AccumulateRewards(
 						})
 					}
 				}
-
 			}
 
 			resultsHandle := make([][]slotPayable, len(crossLinks))
@@ -201,20 +209,22 @@ func AccumulateRewards(
 				for payThem := range resultsHandle[bucket] {
 					snapshot, err := bc.ReadValidatorSnapshot(resultsHandle[bucket][payThem].payee)
 					if err != nil {
-						return network.NoReward, err
+						return missedSigningThreshold, network.NoReward, err
 					}
 					due := resultsHandle[bucket][payThem].payout.TruncateInt()
 					newRewards = new(big.Int).Add(newRewards, due)
-					state.AddReward(snapshot, due)
+					if err := state.AddReward(snapshot, due); err != nil {
+						return missedSigningThreshold, network.NoReward, err
+					}
 				}
 			}
 
-			return newRewards, nil
+			return missedSigningThreshold, newRewards, nil
 		}
-		return network.NoReward, nil
+		return missedSigningThreshold, network.NoReward, nil
 	}
 
-	//// Before staking
+	// Before staking
 	payable := []struct {
 		string
 		common.Address
@@ -225,13 +235,13 @@ func AccumulateRewards(
 	if parentHeader.Number().Cmp(common.Big0) == 0 {
 		// Parent is an epoch block,
 		// which is not signed in the usual manner therefore rewards nothing.
-		return network.NoReward, nil
+		return missedSigningThreshold, network.NoReward, nil
 	}
 
 	_, signers, _, err := availability.BallotResult(bc, header, header.ShardID())
 
 	if err != nil {
-		return network.NoReward, err
+		return missedSigningThreshold, network.NoReward, err
 	}
 
 	totalAmount := rewarder.Award(
@@ -250,7 +260,7 @@ func AccumulateRewards(
 			Int64("block-reward", network.BlockReward.Int64()).
 			Int64("total-amount-paid-out", totalAmount.Int64()).
 			Msg("Total paid out was not equal to block-reward")
-		return nil, errors.Wrapf(
+		return missedSigningThreshold, nil, errors.Wrapf(
 			network.ErrPayoutNotEqualBlockReward, "payout "+totalAmount.String(),
 		)
 	}
@@ -264,5 +274,5 @@ func AccumulateRewards(
 		Str("TotalAmount", totalAmount.String()).
 		Msg("[Block Reward] Successfully paid out block reward")
 
-	return totalAmount, nil
+	return missedSigningThreshold, totalAmount, nil
 }

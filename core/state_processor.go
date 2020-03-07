@@ -62,8 +62,12 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // Process returns the receipts and logs accumulated during the process and
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
-func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.Config) (
-	types.Receipts, types.CXReceipts, []*types.Log, uint64, *big.Int, error,
+func (p *StateProcessor) Process(
+	block *types.Block, statedb *state.DB, cfg vm.Config,
+) (
+	types.Receipts, types.CXReceipts,
+	[]*types.Log, uint64, *big.Int,
+	map[common.Address]struct{}, error,
 ) {
 	var (
 		receipts types.Receipts
@@ -77,15 +81,17 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
 
 	if err != nil {
-		return nil, nil, nil, 0, nil, err
+		return nil, nil, nil, 0, nil, nil, err
 	}
 
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, cxReceipt, _, err := ApplyTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
+		receipt, cxReceipt, _, err := ApplyTransaction(
+			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+		)
 		if err != nil {
-			return nil, nil, nil, 0, nil, err
+			return nil, nil, nil, 0, nil, nil, err
 		}
 		receipts = append(receipts, receipt)
 		if cxReceipt != nil {
@@ -102,7 +108,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 			ApplyStakingTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
 
 		if err != nil {
-			return nil, nil, nil, 0, nil, err
+			return nil, nil, nil, 0, nil, nil, err
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
@@ -113,27 +119,30 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	for _, cx := range block.IncomingReceipts() {
 		err := ApplyIncomingReceipt(p.config, statedb, header, cx)
 		if err != nil {
-			return nil, nil, nil, 0, nil, ctxerror.New("cannot apply incoming receipts").WithCause(err)
+			return nil, nil, nil,
+				0, nil, nil, ctxerror.New("cannot apply incoming receipts").WithCause(err)
 		}
 	}
 
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
+			return nil, nil, nil, 0,
+				nil, nil, ctxerror.New("cannot finalize block").WithCause(err)
 		}
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_, payout, err := p.engine.Finalize(
+	_, missedThreshold, payout, err := p.engine.Finalize(
 		p.bc, header, statedb, block.Transactions(),
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes,
 	)
 	if err != nil {
-		return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
+		return nil, nil, nil, 0,
+			nil, nil, ctxerror.New("cannot finalize block").WithCause(err)
 	}
 
-	return receipts, outcxs, allLogs, *usedGas, payout, nil
+	return receipts, outcxs, allLogs, *usedGas, payout, missedThreshold, nil
 }
 
 // return true if it is valid

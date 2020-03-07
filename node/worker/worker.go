@@ -422,7 +422,7 @@ func (w *Worker) FinalizeNewBlock(
 	state := w.current.state.Copy()
 	copyHeader := types.CopyHeader(w.current.header)
 	// TODO: feed coinbase into here so the proposer gets extra rewards.
-	block, _, err := w.engine.Finalize(
+	block, _, _, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
 		w.current.slashes,
@@ -435,7 +435,9 @@ func (w *Worker) FinalizeNewBlock(
 }
 
 // New create a new worker object.
-func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine) *Worker {
+func New(
+	config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine,
+) *Worker {
 	worker := &Worker{
 		config:  config,
 		factory: blockfactory.NewFactory(config),
