@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path"
@@ -70,6 +72,7 @@ var (
 	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
+	pprof            = flag.String("pprof", "", "what address and port the pprof profiling server should listen on")
 	versionFlag      = flag.Bool("version", false, "Output version info")
 	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
 	dnsZone          = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
@@ -140,6 +143,11 @@ var (
 )
 
 func initSetup() {
+
+	// Setup pprof
+	if addr := *pprof; addr != "" {
+		go func() { http.ListenAndServe(addr, nil) }()
+	}
 
 	// maybe request passphrase for bls key.
 	passphraseForBls()
