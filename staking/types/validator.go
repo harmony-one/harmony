@@ -117,6 +117,7 @@ type VotePerShard struct {
 	ShardID             uint32      `json:"shard-id"`
 	VotingPowerRaw      numeric.Dec `json:"voting-power-raw"`
 	VotingPowerAdjusted numeric.Dec `json:"voting-power-adjusted"`
+	EffectiveStake      numeric.Dec `json:"effective-stake"`
 }
 
 // KeysPerShard ..
