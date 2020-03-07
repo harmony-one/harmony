@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -11,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/pkg/errors"
 )
 
 // CommitOffChainData write off chain data of a block onto db writer.
@@ -194,6 +194,10 @@ func (bc *BlockChain) CommitOffChainData(
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
+			if err := bc.removeInactiveSigners(missedThreshold); err != nil {
+				return NonStatTy, err
+			}
+
 			if err := bc.UpdateBlockRewardAccumulator(
 				batch, payout, block.Number().Uint64(),
 			); err != nil {
@@ -209,4 +213,21 @@ func (bc *BlockChain) CommitOffChainData(
 	}
 
 	return CanonStatTy, nil
+}
+
+func (bc *BlockChain) removeInactiveSigners(
+	missedThreshold map[common.Address]struct{},
+) error {
+	addrs, err := bc.ReadValidatorList()
+	if err != nil {
+		return err
+	}
+	eligible := []common.Address{}
+	for _, addr := range addrs {
+		if _, mia := missedThreshold[addr]; !mia {
+			eligible = append(eligible, addr)
+		}
+	}
+
+	return bc.WriteValidatorList(bc.db, eligible)
 }
