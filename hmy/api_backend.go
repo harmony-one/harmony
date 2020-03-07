@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -334,8 +335,13 @@ func (b *APIBackend) GetValidatorInformation(
 	}
 	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshot(addr)
 	if err != nil {
-		s, _ := internal_common.AddressToBech32(addr)
-		return nil, errors.Wrapf(err, "not found address in snapshot %s", s)
+		return &staking.ValidatorRPCEnchanced{
+			Wrapper: *wrapper,
+			CurrentSigningPercentage: staking.Computed{
+				common.Big0, common.Big0, numeric.ZeroDec(),
+			},
+			CurrentVotingPower: []staking.VotePerShard{},
+		}, nil
 	}
 
 	signed, toSign, quotient, err := availability.ComputeCurrentSigning(snapshot, wrapper)
