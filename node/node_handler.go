@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
@@ -468,24 +467,23 @@ func (node *Node) PostConsensusProcessing(
 	}
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
 		if h.Availability != nil {
-			// TODO ask ganesh
-			addr := common.Address{}
-			wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
-			if err != nil {
-				return
-			}
-			snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
-			if err != nil {
-				return
-			}
-			signed, toSign, quotient, err :=
-				availability.ComputeCurrentSigning(snapshot, wrapper)
-			if availability.IsBelowSigningThreshold(quotient) {
-				url := h.Availability.DroppedBelowThreshold
-				go func() {
-					webhooks.DoPost(url, staking.Computed{signed, toSign, quotient})
-				}()
-
+			for _, addr := range node.Consensus.SelfAddresses {
+				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
+				if err != nil {
+					return
+				}
+				snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
+				if err != nil {
+					return
+				}
+				signed, toSign, quotient, err :=
+					availability.ComputeCurrentSigning(snapshot, wrapper)
+				if err != nil && availability.IsBelowSigningThreshold(quotient) {
+					url := h.Availability.DroppedBelowThreshold
+					go func() {
+						webhooks.DoPost(url, staking.Computed{signed, toSign, quotient})
+					}()
+				}
 			}
 		}
 	}
