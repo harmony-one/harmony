@@ -114,8 +114,9 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 
 // VotePerShard ..
 type VotePerShard struct {
-	ShardID     uint32      `json:"shard-id"`
-	VotingPower numeric.Dec `json:"voting-power"`
+	ShardID             uint32      `json:"shard-id"`
+	VotingPowerRaw      numeric.Dec `json:"voting-power-raw"`
+	VotingPowerAdjusted numeric.Dec `json:"voting-power-adjusted"`
 }
 
 // KeysPerShard ..
