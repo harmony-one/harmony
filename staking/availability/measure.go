@@ -117,8 +117,7 @@ func bumpCount(
 	signers shard.SlotList,
 	didSign bool,
 	stakedAddrSet map[common.Address]struct{},
-) (map[common.Address]struct{}, error) {
-	missedThreshold := map[common.Address]struct{}{}
+) error {
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
 		// NOTE if the signer address is not part of the staked addrs,
@@ -130,7 +129,7 @@ func bumpCount(
 
 		wrapper, err := state.ValidatorWrapper(addr)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		wrapper.Counters.NumBlocksToSign.Add(
@@ -143,17 +142,17 @@ func bumpCount(
 			)
 		}
 
-		if err := compute(bc, state, wrapper, missedThreshold); err != nil {
-			return nil, err
+		if err := compute(bc, state, wrapper); err != nil {
+			return err
 		}
 
 		if err := state.UpdateValidatorWrapper(
 			addr, wrapper,
 		); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return missedThreshold, nil
+	return nil
 }
 
 // IncrementValidatorSigningCounts ..
@@ -162,11 +161,11 @@ func IncrementValidatorSigningCounts(
 	staked *shard.StakedSlots,
 	state *state.DB,
 	signers, missing shard.SlotList,
-) (map[common.Address]struct{}, error) {
-	if _, err := bumpCount(
+) error {
+	if err := bumpCount(
 		bc, state, signers, true, staked.LookupSet,
 	); err != nil {
-		return nil, err
+		return err
 	}
 	return bumpCount(bc, state, missing, false, staked.LookupSet)
 }
@@ -234,7 +233,6 @@ func compute(
 	bc Reader,
 	state *state.DB,
 	wrapper *staking.ValidatorWrapper,
-	missedThreshold map[common.Address]struct{},
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")
 
@@ -263,7 +261,6 @@ func compute(
 	switch IsBelowSigningThreshold(quotient) {
 	case missedTooManyBlocks:
 		wrapper.Active = false
-		missedThreshold[wrapper.Address] = struct{}{}
 		utils.Logger().Info().
 			RawJSON("snapshot", []byte(snapshot.String())).
 			RawJSON("current", []byte(wrapper.String())).

@@ -256,14 +256,14 @@ func (e *engineImpl) Finalize(
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
 	doubleSigners slash.Records,
-) (*types.Block, map[common.Address]struct{}, *big.Int, error) {
+) (*types.Block, *big.Int, error) {
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
-	missedSigningThreshold, payout, err := AccumulateRewards(
+	payout, err := AccumulateRewards(
 		chain, state, header, e.Rewarder(), e.Beaconchain(),
 	)
 	if err != nil {
-		return nil, nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
+		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
@@ -273,26 +273,23 @@ func (e *engineImpl) Finalize(
 	// Process Undelegations and set LastEpochInCommittee
 	if isBeaconChain && isNewEpoch && inStakingEra {
 		if err := payoutUndelegations(chain, header, state); err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 
 		if err := setLastEpochInCommittee(header, state); err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 	}
 
 	// Apply slashes
 	if isBeaconChain && inStakingEra && len(doubleSigners) > 0 {
 		if err := applySlashes(chain, header, state, doubleSigners); err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
-	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks),
-		missedSigningThreshold,
-		payout,
-		nil
+	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
 }
 
 // Withdraw unlocked tokens to the delegators' accounts

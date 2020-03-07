@@ -364,7 +364,7 @@ func (b *APIBackend) GetValidatorInformation(
 func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 	candidates := b.hmy.BlockChain().ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
-	blsKeys := make(map[shard.BlsPublicKey]struct{})
+	blsKeys := map[shard.BlsPublicKey]struct{}{}
 	for i := range candidates {
 		validator, err := b.hmy.BlockChain().ReadValidatorInformation(
 			candidates[i],
@@ -404,8 +404,12 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 			validator.SlotPubKeys,
 		}
 	}
-	// TODO thread through the right value from shard.Schedule.Instance
-	median, _ := effective.Compute(essentials, 320)
+
+	instance := shard.Schedule.InstanceForEpoch(b.CurrentBlock().Epoch())
+	stakedSlots :=
+		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
+			int(instance.NumShards())
+	median, _ := effective.Compute(essentials, stakedSlots)
 	return median.TruncateInt(), nil
 }
 

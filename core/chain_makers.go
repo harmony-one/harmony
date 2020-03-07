@@ -198,7 +198,7 @@ func GenerateChain(
 
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, _, _, err := b.engine.Finalize(
+			block, _, err := b.engine.Finalize(
 				chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil, nil,
 			)
 			if err != nil {

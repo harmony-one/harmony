@@ -259,7 +259,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
-	receipts, cxReceipts, _, usedGas, _, _, err := bc.processor.Process(
+	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(
 		block, state, bc.vmConfig,
 	)
 	if err != nil {
@@ -1056,7 +1056,7 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 func (bc *BlockChain) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt, payout *big.Int,
-	missedThreshold map[common.Address]struct{}, state *state.DB,
+	state *state.DB,
 ) (status WriteStatus, err error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
@@ -1135,7 +1135,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	// Write offchain data
 	if status, err := bc.CommitOffChainData(
 		batch, block, receipts,
-		cxReceipts, payout, state, root, missedThreshold,
+		cxReceipts, payout, state, root,
 	); err != nil {
 		return status, err
 	}
@@ -1327,7 +1327,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, payout, missedThreshold, err := bc.processor.Process(
+		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(
 			block, state, bc.vmConfig,
 		)
 		if err != nil {
@@ -1346,7 +1346,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 
 		// Write the block to the chain and get the status.
 		status, err := bc.WriteBlockWithState(
-			block, receipts, cxReceipts, payout, missedThreshold, state,
+			block, receipts, cxReceipts, payout, state,
 		)
 		if err != nil {
 			return i, events, coalescedLogs, err

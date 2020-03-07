@@ -22,7 +22,6 @@ func (bc *BlockChain) CommitOffChainData(
 	payout *big.Int,
 	state *state.DB,
 	root common.Hash,
-	missedThreshold map[common.Address]struct{},
 ) (status WriteStatus, err error) {
 	// Write receipts of the block
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
@@ -194,10 +193,6 @@ func (bc *BlockChain) CommitOffChainData(
 
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
-			if err := bc.removeInactiveSigners(missedThreshold); err != nil {
-				return NonStatTy, err
-			}
-
 			if err := bc.UpdateBlockRewardAccumulator(
 				batch, payout, block.Number().Uint64(),
 			); err != nil {
@@ -213,21 +208,4 @@ func (bc *BlockChain) CommitOffChainData(
 	}
 
 	return CanonStatTy, nil
-}
-
-func (bc *BlockChain) removeInactiveSigners(
-	missedThreshold map[common.Address]struct{},
-) error {
-	addrs, err := bc.ReadValidatorList()
-	if err != nil {
-		return err
-	}
-	eligible := []common.Address{}
-	for _, addr := range addrs {
-		if _, mia := missedThreshold[addr]; !mia {
-			eligible = append(eligible, addr)
-		}
-	}
-
-	return bc.WriteValidatorList(bc.db, eligible)
 }
