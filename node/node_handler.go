@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
@@ -22,8 +23,10 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/staking/webhooks"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -463,9 +466,29 @@ func (node *Node) PostConsensusProcessing(
 	if len(newBlock.Header().ShardState()) > 0 {
 		node.Consensus.UpdateConsensusInformation()
 	}
+	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
+		if h.Availability != nil {
+			// TODO ask ganesh
+			addr := common.Address{}
+			wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
+			if err != nil {
+				return
+			}
+			snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
+			if err != nil {
+				return
+			}
+			signed, toSign, quotient, err :=
+				availability.ComputeCurrentSigning(snapshot, wrapper)
+			if availability.IsBelowSigningThreshold(quotient) {
+				url := h.Availability.DroppedBelowThreshold
+				go func() {
+					webhooks.DoPost(url, staking.Computed{signed, toSign, quotient})
+				}()
 
-	// TODO chao: uncomment this after beacon syncing is stable
-	// node.Blockchain().UpdateCXReceiptsCheckpointsByBlock(newBlock)
+			}
+		}
+	}
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {

@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/harmony-one/harmony/staking/slash"
 	"gopkg.in/yaml.v2"
 )
 
@@ -48,7 +47,7 @@ func NewFailure(payload string) *ReportResult {
 }
 
 // DoPost is a fire and forget helper
-func DoPost(url string, record *slash.Record) (*ReportResult, error) {
+func DoPost(url string, record interface{}) (*ReportResult, error) {
 	payload, err := json.Marshal(record)
 	if err != nil {
 		return nil, err

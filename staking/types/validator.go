@@ -88,7 +88,18 @@ type Computed struct {
 // ValidatorRPCEnchanced contains extra information for RPC consumer
 type ValidatorRPCEnchanced struct {
 	ValidatorWrapper
-	CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
+	CurrentSigningPercentage Computed
+}
+
+// MarshalJSON ..
+func (w ValidatorRPCEnchanced) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		ValidatorWrapper
+		CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
+	}{
+		w.ValidatorWrapper,
+		w.CurrentSigningPercentage,
+	})
 }
 
 func (w ValidatorWrapper) String() string {

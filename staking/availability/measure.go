@@ -210,6 +210,11 @@ func ComputeCurrentSigning(
 	return signed, toSign, quotient, nil
 }
 
+// IsBelowSigningThreshold ..
+func IsBelowSigningThreshold(quotient numeric.Dec) bool {
+	return quotient.LTE(measure)
+}
+
 // compute sets the validator to
 // inactive and thereby keeping it out of
 // consideration in the pool of validators for
@@ -252,7 +257,7 @@ func compute(
 
 	const missedTooManyBlocks = true
 
-	switch quotient.LTE(measure) {
+	switch IsBelowSigningThreshold(quotient) {
 	case missedTooManyBlocks:
 		wrapper.Active = false
 		utils.Logger().Info().
