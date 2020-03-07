@@ -342,9 +342,15 @@ func (b *APIBackend) GetValidatorInformation(
 	if err != nil {
 		return nil, err
 	}
+	stats, err := b.hmy.BlockChain().ReadValidatorStats(addr)
+	if err != nil {
+		return nil, err
+	}
+
 	return &staking.ValidatorRPCEnchanced{
 		Wrapper:                  *wrapper,
 		CurrentSigningPercentage: staking.Computed{signed, toSign, quotient},
+		CurrentVotingPower:       stats.VotingPowerPerShard,
 	}, nil
 }
 

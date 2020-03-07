@@ -89,6 +89,7 @@ type Computed struct {
 type ValidatorRPCEnchanced struct {
 	Wrapper                  ValidatorWrapper `json:"validator"`
 	CurrentSigningPercentage Computed         `json:"current-epoch-signing-percent"`
+	CurrentVotingPower       []VotePerShard   `json:"current-epoch-voting-power"`
 }
 
 func (w ValidatorWrapper) String() string {
