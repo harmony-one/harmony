@@ -776,6 +776,11 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 	return nil, errNotBeaconChainShard
 }
 
+// GetCurrentBadBlocks ..
+func (s *PublicBlockChainAPI) GetCurrentBadBlocks() []core.BadBlock {
+	return s.b.GetCurrentBadBlocks()
+}
+
 // GetTotalSupply ..
 func (s *PublicBlockChainAPI) GetTotalSupply() (numeric.Dec, error) {
 	return numeric.NewDec(initSupply), nil

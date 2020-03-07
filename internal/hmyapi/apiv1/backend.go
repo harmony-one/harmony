@@ -86,4 +86,5 @@ type Backend interface {
 	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
 	GetSuperCommittees() (*quorum.Transition, error)
 	GetTotalStakingSnapshot() *big.Int
+	GetCurrentBadBlocks() []core.BadBlock
 }

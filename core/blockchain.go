@@ -19,6 +19,7 @@ package core
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -1475,27 +1476,45 @@ func (bc *BlockChain) update() {
 	}
 }
 
-// BadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
-func (bc *BlockChain) BadBlocks() []*types.Block {
-	blocks := make([]*types.Block, 0, bc.badBlocks.Len())
+// BadBlock ..
+type BadBlock struct {
+	Block  *types.Block
+	Reason error
+}
+
+// MarshalJSON ..
+func (b BadBlock) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Block  string `json:"header"`
+		Reason string `json:"error-cause"`
+	}{
+		b.Block.Header().String(),
+		b.Reason.Error(),
+	})
+}
+
+// BadBlocks returns a list of the last 'bad blocks' that
+// the client has seen on the network
+func (bc *BlockChain) BadBlocks() []BadBlock {
+	blocks := make([]BadBlock, bc.badBlocks.Len())
 	for _, hash := range bc.badBlocks.Keys() {
 		if blk, exist := bc.badBlocks.Peek(hash); exist {
-			block := blk.(*types.Block)
-			blocks = append(blocks, block)
+			blocks = append(blocks, blk.(BadBlock))
 		}
 	}
 	return blocks
 }
 
 // addBadBlock adds a bad block to the bad-block LRU cache
-func (bc *BlockChain) addBadBlock(block *types.Block) {
-	bc.badBlocks.Add(block.Hash(), block)
+func (bc *BlockChain) addBadBlock(block *types.Block, reason error) {
+	bc.badBlocks.Add(block.Hash(), BadBlock{block, reason})
 }
 
 // reportBlock logs a bad block error.
-func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
-	bc.addBadBlock(block)
-
+func (bc *BlockChain) reportBlock(
+	block *types.Block, receipts types.Receipts, err error,
+) {
+	bc.addBadBlock(block, err)
 	var receiptString string
 	for _, receipt := range receipts {
 		receiptString += fmt.Sprintf("\t%v\n", receipt)
@@ -1513,9 +1532,18 @@ Hash: 0x%x
 
 Error: %v
 ##############################
-`, bc.chainConfig, block.Number(), block.Epoch(), len(block.Transactions()), len(block.StakingTransactions()), block.Hash(), receiptString, err)
+`, bc.chainConfig,
+		block.Number(),
+		block.Epoch(),
+		len(block.Transactions()),
+		len(block.StakingTransactions()),
+		block.Hash(),
+		receiptString,
+		err,
+	)
 	for i, tx := range block.StakingTransactions() {
-		utils.Logger().Error().Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
+		utils.Logger().Error().
+			Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
 	}
 }
 
@@ -2457,7 +2485,7 @@ func (bc *BlockChain) UpdateStakingMetaData(
 // ReadBlockRewardAccumulator must only be called on beaconchain
 func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
 	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
-		return big.NewInt(0), nil
+		return common.Big0, nil
 	}
 	if cached, ok := bc.blockAccumulatorCache.Get(number); ok {
 		return cached.(*big.Int), nil

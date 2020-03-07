@@ -549,3 +549,8 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 
 	return &quorum.Transition{then, now}, nil
 }
+
+// GetCurrentBadBlocks ..
+func (b *APIBackend) GetCurrentBadBlocks() []core.BadBlock {
+	return b.hmy.BlockChain().BadBlocks()
+}
