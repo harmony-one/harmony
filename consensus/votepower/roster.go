@@ -106,7 +106,12 @@ func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
 						value.EffectiveStake,
 					)
 					payload.VotingPower = append(payload.VotingPower,
-						staking.VotePerShard{roster.ShardID, value.EffectivePercent},
+						staking.VotePerShard{
+							ShardID:             roster.ShardID,
+							VotingPowerRaw:      value.RawPercent,
+							VotingPowerAdjusted: value.EffectivePercent,
+							EffectiveStake:      value.EffectiveStake,
+						},
 					)
 					for i := range payload.BLSPublicKeysOwned {
 						if payload.BLSPublicKeysOwned[i].ShardID == roster.ShardID {
@@ -119,7 +124,8 @@ func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
 					result[value.EarningAccount] = Staker{
 						TotalEffectiveStake: value.EffectiveStake,
 						VotingPower: []staking.VotePerShard{
-							{roster.ShardID, value.EffectivePercent},
+							{roster.ShardID, value.RawPercent,
+								value.EffectivePercent, value.EffectiveStake},
 						},
 						BLSPublicKeysOwned: []staking.KeysPerShard{
 							{roster.ShardID, []shard.BlsPublicKey{key}}},

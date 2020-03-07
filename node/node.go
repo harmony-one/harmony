@@ -317,32 +317,36 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 }
 
 // AddPendingStakingTransaction staking transactions
-func (node *Node) AddPendingStakingTransaction(newStakingTx *staking.StakingTransaction) {
+func (node *Node) AddPendingStakingTransaction(
+	newStakingTx *staking.StakingTransaction,
+) error {
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
 		for i := range errs {
 			if errs[i] != nil {
-				return
+				return errs[i]
 			}
 		}
 		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
 		node.tryBroadcastStaking(newStakingTx)
 	}
+	return nil
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 // This is only called from SDK.
-func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
+func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 	if newTx.ShardID() == node.NodeConfig.ShardID {
 		errs := node.addPendingTransactions(types.Transactions{newTx})
 		for i := range errs {
 			if errs[i] != nil {
-				return
+				return errs[i]
 			}
 		}
 		utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
 		node.tryBroadcast(newTx)
 	}
+	return nil
 }
 
 // AddPendingReceipts adds one receipt message to pending list.

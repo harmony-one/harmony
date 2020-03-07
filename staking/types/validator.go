@@ -87,19 +87,9 @@ type Computed struct {
 
 // ValidatorRPCEnchanced contains extra information for RPC consumer
 type ValidatorRPCEnchanced struct {
-	ValidatorWrapper
-	CurrentSigningPercentage Computed
-}
-
-// MarshalJSON ..
-func (w ValidatorRPCEnchanced) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		ValidatorWrapper
-		CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
-	}{
-		w.ValidatorWrapper,
-		w.CurrentSigningPercentage,
-	})
+	Wrapper                  ValidatorWrapper `json:"validator"`
+	CurrentSigningPercentage Computed         `json:"current-epoch-signing-percent"`
+	CurrentVotingPower       []VotePerShard   `json:"current-epoch-voting-power"`
 }
 
 func (w ValidatorWrapper) String() string {
@@ -124,8 +114,10 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 
 // VotePerShard ..
 type VotePerShard struct {
-	ShardID     uint32      `json:"shard-id"`
-	VotingPower numeric.Dec `json:"voting-power"`
+	ShardID             uint32      `json:"shard-id"`
+	VotingPowerRaw      numeric.Dec `json:"voting-power-raw"`
+	VotingPowerAdjusted numeric.Dec `json:"voting-power-adjusted"`
+	EffectiveStake      numeric.Dec `json:"effective-stake"`
 }
 
 // KeysPerShard ..

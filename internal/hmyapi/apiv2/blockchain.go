@@ -541,20 +541,21 @@ func (s *PublicBlockChainAPI) GetValidatorMetrics(ctx context.Context, address s
 func (s *PublicBlockChainAPI) GetValidatorInformation(
 	ctx context.Context, address string,
 ) (*staking.ValidatorRPCEnchanced, error) {
-	return s.GetValidatorInformation(ctx, address)
+	validatorAddress := internal_common.ParseAddr(address)
+	return s.b.GetValidatorInformation(validatorAddress)
 }
 
 // GetAllValidatorInformation returns information about all validators.
 // If page is -1, return all else return the pagination.
 func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 	ctx context.Context, page int,
-) ([]*staking.ValidatorWrapper, error) {
+) ([]*staking.ValidatorRPCEnchanced, error) {
 	if page < -1 {
 		return nil, errors.Errorf("page given %d cannot be less than -1", page)
 	}
 	addresses := s.b.GetAllValidatorAddresses()
 	if page != -1 && len(addresses) <= page*validatorsPageSize {
-		return make([]*staking.ValidatorWrapper, 0), nil
+		return make([]*staking.ValidatorRPCEnchanced, 0), nil
 	}
 	validatorsNum := len(addresses)
 	start := 0
@@ -565,13 +566,13 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 			validatorsNum = len(addresses) - start
 		}
 	}
-	validators := make([]*staking.ValidatorWrapper, validatorsNum)
+	validators := make([]*staking.ValidatorRPCEnchanced, validatorsNum)
 	for i := start; i < start+validatorsNum; i++ {
 		information, err := s.b.GetValidatorInformation(addresses[i])
 		if err != nil {
 			return nil, err
 		}
-		validators[i-start] = &information.ValidatorWrapper
+		validators[i-start] = information
 	}
 	return validators, nil
 }
@@ -773,6 +774,11 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 		return s.b.GetSuperCommittees()
 	}
 	return nil, errNotBeaconChainShard
+}
+
+// GetCurrentBadBlocks ..
+func (s *PublicBlockChainAPI) GetCurrentBadBlocks() []core.BadBlock {
+	return s.b.GetCurrentBadBlocks()
 }
 
 // GetTotalSupply ..

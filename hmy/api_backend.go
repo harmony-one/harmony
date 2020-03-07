@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -102,9 +103,8 @@ func (b *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uin
 
 // SendTx ...
 func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	// return b.hmy.txPool.Add(ctx, signedTx)
 	b.hmy.nodeAPI.AddPendingTransaction(signedTx)
-	return nil // TODO(ricl): AddPendingTransaction should return error
+	return nil
 }
 
 // ChainConfig ...
@@ -335,22 +335,36 @@ func (b *APIBackend) GetValidatorInformation(
 	}
 	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshot(addr)
 	if err != nil {
-		s, _ := internal_common.AddressToBech32(addr)
-		return nil, errors.Wrapf(err, "not found address in snapshot %s", s)
+		return &staking.ValidatorRPCEnchanced{
+			Wrapper: *wrapper,
+			CurrentSigningPercentage: staking.Computed{
+				common.Big0, common.Big0, numeric.ZeroDec(),
+			},
+			CurrentVotingPower: []staking.VotePerShard{},
+		}, nil
 	}
+
 	signed, toSign, quotient, err := availability.ComputeCurrentSigning(snapshot, wrapper)
+	if err != nil {
+		return nil, err
+	}
+	stats, err := b.hmy.BlockChain().ReadValidatorStats(addr)
+	if err != nil {
+		return nil, err
+	}
+
 	return &staking.ValidatorRPCEnchanced{
-			ValidatorWrapper:         *wrapper,
-			CurrentSigningPercentage: staking.Computed{signed, toSign, quotient},
-		},
-		nil
+		Wrapper:                  *wrapper,
+		CurrentSigningPercentage: staking.Computed{signed, toSign, quotient},
+		CurrentVotingPower:       stats.VotingPowerPerShard,
+	}, nil
 }
 
 // GetMedianRawStakeSnapshot ..
 func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 	candidates := b.hmy.BlockChain().ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
-	blsKeys := make(map[shard.BlsPublicKey]struct{})
+	blsKeys := map[shard.BlsPublicKey]struct{}{}
 	for i := range candidates {
 		validator, err := b.hmy.BlockChain().ReadValidatorInformation(
 			candidates[i],
@@ -390,8 +404,12 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 			validator.SlotPubKeys,
 		}
 	}
-	// TODO thread through the right value from shard.Schedule.Instance
-	median, _ := effective.Compute(essentials, 320)
+
+	instance := shard.Schedule.InstanceForEpoch(b.CurrentBlock().Epoch())
+	stakedSlots :=
+		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
+			int(instance.NumShards())
+	median, _ := effective.Compute(essentials, stakedSlots)
 	return median.TruncateInt(), nil
 }
 
@@ -548,4 +566,9 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	}
 
 	return &quorum.Transition{then, now}, nil
+}
+
+// GetCurrentBadBlocks ..
+func (b *APIBackend) GetCurrentBadBlocks() []core.BadBlock {
+	return b.hmy.BlockChain().BadBlocks()
 }

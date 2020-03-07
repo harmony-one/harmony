@@ -190,6 +190,14 @@ func ComputeCurrentSigning(
 		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
 		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
 
+	if toSign.Cmp(common.Big0) == 0 {
+		utils.Logger().Info().
+			RawJSON("snapshot", []byte(snapshot.String())).
+			RawJSON("current", []byte(wrapper.String())).
+			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
+		return signed, toSign, numeric.ZeroDec(), nil
+	}
+
 	if signed.Sign() == -1 {
 		return nil, nil, numeric.ZeroDec(), errors.Wrapf(
 			errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
@@ -206,6 +214,7 @@ func ComputeCurrentSigning(
 
 	s1, s2 :=
 		numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
+
 	quotient := s1.Quo(s2)
 	return signed, toSign, quotient, nil
 }
@@ -233,14 +242,6 @@ func compute(
 	}
 
 	signed, toSign, quotient, err := ComputeCurrentSigning(snapshot, wrapper)
-
-	if toSign.Cmp(common.Big0) == 0 {
-		utils.Logger().Info().
-			RawJSON("snapshot", []byte(snapshot.String())).
-			RawJSON("current", []byte(wrapper.String())).
-			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
-		return nil
-	}
 
 	if err != nil {
 		return err

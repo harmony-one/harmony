@@ -167,7 +167,12 @@ func (b *BlockGen) PrevBlock(index int) *types.Block {
 // Blocks created by GenerateChain do not contain valid proof of work
 // values. Inserting them into BlockChain requires use of FakePow or
 // a similar non-validating proof of work implementation.
-func GenerateChain(config *params.ChainConfig, parent *types.Block, engine consensus_engine.Engine, db ethdb.Database, n int, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts) {
+func GenerateChain(
+	config *params.ChainConfig, parent *types.Block,
+	engine consensus_engine.Engine, db ethdb.Database,
+	n int,
+	gen func(int, *BlockGen),
+) ([]*types.Block, []types.Receipts) {
 	if config == nil {
 		config = params.TestChainConfig
 	}
@@ -175,12 +180,17 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
 	chainreader := &fakeChainReader{config: config}
 	genblock := func(i int, parent *types.Block, statedb *state.DB) (*types.Block, types.Receipts) {
-		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, factory: factory, engine: engine}
+		b := &BlockGen{
+			i:       i,
+			chain:   blocks,
+			parent:  parent,
+			statedb: statedb,
+			config:  config,
+			factory: factory,
+			engine:  engine,
+		}
 		b.header = makeHeader(chainreader, parent, statedb, b.engine, factory)
 
-		//if config.DAOForkSupport && config.DAOForkBlock != nil && config.DAOForkBlock.Cmp(b.header.Number) == 0 {
-		//	misc.ApplyDAOHardFork(statedb)
-		//}
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)
@@ -188,7 +198,9 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, _, err := b.engine.Finalize(chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil, nil)
+			block, _, err := b.engine.Finalize(
+				chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil, nil,
+			)
 			if err != nil {
 				panic(err)
 			}
