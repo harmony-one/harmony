@@ -273,23 +273,26 @@ func (e *engineImpl) Finalize(
 	// Process Undelegations and set LastEpochInCommittee
 	if isBeaconChain && isNewEpoch && inStakingEra {
 		if err := payoutUndelegations(chain, header, state); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		if err := setLastEpochInCommittee(header, state); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 
 	// Apply slashes
 	if isBeaconChain && inStakingEra && len(doubleSigners) > 0 {
 		if err := applySlashes(chain, header, state, doubleSigners); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
-	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
+	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks),
+		missedSigningThreshold,
+		payout,
+		nil
 }
 
 // Withdraw unlocked tokens to the delegators' accounts
@@ -348,7 +351,12 @@ func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
 	return nil
 }
 
-func applySlashes(chain engine.ChainReader, header *block.Header, state *state.DB, doubleSigners slash.Records) error {
+func applySlashes(
+	chain engine.ChainReader,
+	header *block.Header,
+	state *state.DB,
+	doubleSigners slash.Records,
+) error {
 	superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
 
 	if err != nil {
@@ -360,9 +368,6 @@ func applySlashes(chain engine.ChainReader, header *block.Header, state *state.D
 	var slashApplied *slash.Application
 	rate := slash.Rate(len(doubleSigners), staked.CountStakedBLSKey)
 	utils.Logger().Info().
-		Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-		Uint64("finalizing-epoch", header.Epoch().Uint64()).
-		Uint64("block-number", header.Number().Uint64()).
 		Str("rate", rate.String()).
 		RawJSON("records", []byte(doubleSigners.String())).
 		Msg("now applying slash to state during block finalization")
@@ -376,9 +381,6 @@ func applySlashes(chain engine.ChainReader, header *block.Header, state *state.D
 	}
 
 	utils.Logger().Info().
-		Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-		Uint64("finalizing-epoch", header.Epoch().Uint64()).
-		Uint64("block-number", header.Number().Uint64()).
 		Str("rate", rate.String()).
 		RawJSON("records", []byte(doubleSigners.String())).
 		RawJSON("applied", []byte(slashApplied.String())).
