@@ -339,11 +339,13 @@ func (b *APIBackend) GetValidatorInformation(
 		return nil, errors.Wrapf(err, "not found address in snapshot %s", s)
 	}
 	signed, toSign, quotient, err := availability.ComputeCurrentSigning(snapshot, wrapper)
+	if err != nil {
+		return nil, err
+	}
 	return &staking.ValidatorRPCEnchanced{
-			ValidatorWrapper:         *wrapper,
-			CurrentSigningPercentage: staking.Computed{signed, toSign, quotient},
-		},
-		nil
+		ValidatorWrapper:         *wrapper,
+		CurrentSigningPercentage: staking.Computed{signed, toSign, quotient},
+	}, nil
 }
 
 // GetMedianRawStakeSnapshot ..

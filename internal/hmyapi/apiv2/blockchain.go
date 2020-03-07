@@ -541,7 +541,8 @@ func (s *PublicBlockChainAPI) GetValidatorMetrics(ctx context.Context, address s
 func (s *PublicBlockChainAPI) GetValidatorInformation(
 	ctx context.Context, address string,
 ) (*staking.ValidatorRPCEnchanced, error) {
-	return s.GetValidatorInformation(ctx, address)
+	validatorAddress := internal_common.ParseAddr(address)
+	return s.b.GetValidatorInformation(validatorAddress)
 }
 
 // GetAllValidatorInformation returns information about all validators.
