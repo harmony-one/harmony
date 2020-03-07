@@ -2489,20 +2489,6 @@ func (bc *BlockChain) UpdateStakingMetaData(
 			batch, createValidator.ValidatorAddress, createValidator.ValidatorAddress, root,
 		)
 	case staking.DirectiveEditValidator:
-		editVal := decodePayload.(*staking.EditValidator)
-		if active := editVal.Active; active != nil && *active {
-			list, err := bc.ReadValidatorList()
-			if err != nil {
-				return err
-			}
-			if list == nil {
-				list = []common.Address{}
-			}
-			list = utils.AppendIfMissing(list, editVal.ValidatorAddress)
-			if err := bc.WriteValidatorList(batch, list); err != nil {
-				return err
-			}
-		}
 	case staking.DirectiveDelegate:
 		delegate := decodePayload.(*staking.Delegate)
 		return bc.addDelegationIndex(
