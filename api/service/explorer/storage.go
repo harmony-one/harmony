@@ -2,7 +2,6 @@ package explorer
 
 import (
 	"fmt"
-	"math/big"
 	"os"
 	"sync"
 
@@ -20,9 +19,6 @@ import (
 const (
 	AddressPrefix = "ad"
 	PrefixLen     = 3
-	TopAddrLen    = 20
-	TopPrefix     = "top"
-	EpochPrefix   = "epoch"
 )
 
 // GetAddressKey ...
@@ -43,13 +39,6 @@ func GetStorageInstance(ip, port string, remove bool) *Storage {
 	once.Do(func() {
 		storage = &Storage{}
 		storage.Init(ip, port, remove)
-		if encoded, err := rlp.EncodeToBytes(big.NewInt(0)); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot encode epoch 0")
-		} else {
-			if err = storage.db.Put([]byte(EpochPrefix), encoded, nil); err != nil {
-				utils.Logger().Warn().Err(err).Msg("cannot put epoch 0")
-			}
-		}
 	})
 	return storage
 }
@@ -89,12 +78,6 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	}
 
 	batch := new(leveldb.Batch)
-	// Store epoch
-	if encoded, err := rlp.EncodeToBytes(block.Epoch()); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot encode epoch")
-	} else {
-		batch.Put([]byte(EpochPrefix), encoded)
-	}
 	// Store txs
 	for _, tx := range block.Transactions() {
 		explorerTransaction := GetTransaction(tx, block)
