@@ -16,7 +16,8 @@ const (
 
 // AvailabilityHooks ..
 type AvailabilityHooks struct {
-	OnDroppedBelowThreshold string `yaml:"on-dropped-below-threshold"`
+	DroppedBelowThreshold string `yaml:"dropped-below-threshold"`
+	CannotCommitBlock     string `yaml:"cannot-commit-block"`
 }
 
 // DoubleSignWebHooks ..
