@@ -123,12 +123,13 @@ type Decider interface {
 
 // Registry ..
 type Registry struct {
-	Deciders map[uint32]Decider
+	Deciders      map[uint32]Decider `json:"quorum-deciders"`
+	ExternalCount int                `json:"external-slot-count"`
 }
 
 // NewRegistry ..
-func NewRegistry() Registry {
-	return Registry{map[uint32]Decider{}}
+func NewRegistry(extern int) Registry {
+	return Registry{map[uint32]Decider{}, extern}
 }
 
 // Transition  ..
