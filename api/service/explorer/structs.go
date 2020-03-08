@@ -18,6 +18,7 @@ import (
 const (
 	Received = "RECEIVED"
 	Sent     = "SENT"
+	Cross    = "CROSS"
 )
 
 // Data ...

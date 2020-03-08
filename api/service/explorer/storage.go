@@ -8,6 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/harmony/core/types"
+
+	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
@@ -83,6 +85,39 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		explorerTransaction := GetTransaction(tx, block)
 		storage.UpdateAddress(batch, explorerTransaction, tx)
 	}
+	// Store cross shard txs
+	for _, proof := range block.IncomingReceipts() {
+		for _, receipt := range proof.Receipts {
+			var err error
+			if receipt.ShardID == receipt.ToShardID {
+				continue
+			}
+			to := ""
+			if receipt.To != nil {
+				if to, err = common.AddressToBech32(*receipt.To); err != nil {
+					continue
+				}
+			}
+			from := ""
+			if from, err = common.AddressToBech32(receipt.From); err != nil {
+				continue
+			}
+			explorerTransaction := &Transaction{
+				ID:        receipt.TxHash.String(),
+				Timestamp: "",
+				From:      from,
+				To:        to,
+				Value:     receipt.Amount,
+				Bytes:     "",
+				Data:      "",
+				GasFee:    big.NewInt(0),
+				FromShard: receipt.ShardID,
+				ToShard:   receipt.ToShardID,
+				Type:      Cross,
+			}
+			storage.UpdateAddress(batch, explorerTransaction, nil)
+		}
+	}
 	if err := storage.db.Write(batch, nil); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot write batch")
 	}
@@ -90,11 +125,15 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 
 // UpdateAddress ...
 func (storage *Storage) UpdateAddress(batch *leveldb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
-	explorerTransaction.Type = Received
+	if explorerTransaction.Type != Cross {
+		explorerTransaction.Type = Received
+	}
 	if explorerTransaction.To != "" {
 		storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
 	}
-	explorerTransaction.Type = Sent
+	if explorerTransaction.Type != Cross {
+		explorerTransaction.Type = Sent
+	}
 	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
 }
 

@@ -53,6 +53,7 @@ type NodeAPI interface {
 	GetNonceOfAddress(address common.Address) uint64
 	// Get transactions history for an address
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	GetCrossShardTransactionsHistory(address string) ([]types.CrossShardTx, error)
 	ErroredTransactionSink() []types.RPCTransactionError
 	IsCurrentlyLeader() bool
 	PendingCrossLinks() []*block.Header
