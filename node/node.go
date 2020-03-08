@@ -457,8 +457,13 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 }
 
 // New creates a new node.
-func New(host p2p.Host, consensusObj *consensus.Consensus,
-	chainDBFactory shardchain.DBFactory, blacklist map[common.Address]struct{}, isArchival bool) *Node {
+func New(
+	host p2p.Host,
+	consensusObj *consensus.Consensus,
+	chainDBFactory shardchain.DBFactory,
+	blacklist map[common.Address]struct{},
+	isArchival bool,
+) *Node {
 	node := Node{}
 	const sinkSize = 4096
 	node.errorSink = struct {
@@ -542,7 +547,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 			)
 		}
 
-		node.pendingCXReceipts = make(map[string]*types.CXReceiptsProof)
+		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 		chain.Engine.SetBeaconchain(beaconChain)
@@ -577,7 +582,7 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 	node.globalRxQueue = msgq.New(GlobalRxQueueSize)
 
 	// Setup initial state of syncing.
-	node.peerRegistrationRecord = make(map[string]*syncConfig)
+	node.peerRegistrationRecord = map[string]*syncConfig{}
 	node.startConsensus = make(chan struct{})
 	go node.bootstrapConsensus()
 	// Broadcast double-signers reported by consensus
@@ -623,8 +628,11 @@ func New(host p2p.Host, consensusObj *consensus.Consensus,
 // keys for consensus and drand
 func (node *Node) InitConsensusWithValidators() (err error) {
 	if node.Consensus == nil {
-		utils.Logger().Error().Msg("[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID")
-		return ctxerror.New("[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID")
+		utils.Logger().Error().
+			Msg("[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID")
+		return ctxerror.New(
+			"[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID",
+		)
 	}
 	shardID := node.Consensus.ShardID
 	blockNum := node.Blockchain().CurrentBlock().NumberU64()
@@ -673,7 +681,8 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			return nil
 		}
 	}
-	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
+	// TODO: Disable drand. Currently drand isn't
+	// functioning but we want to compeletely turn it off for full protection.
 	// node.DRand.UpdatePublicKeys(pubKeys)
 	return nil
 }
@@ -714,13 +723,14 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		PushgatewayIP:   node.NodeConfig.GetPushgatewayIP(),
 		PushgatewayPort: node.NodeConfig.GetPushgatewayPort(),
 		IsClient:        node.NodeConfig.IsClient(),
-		Beacon:          nodeconfig.NewGroupIDByShardID(0),
+		Beacon:          nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 		ShardGroupID:    node.NodeConfig.GetShardGroupID(),
 		Actions:         make(map[nodeconfig.GroupID]nodeconfig.ActionType),
 	}
 
 	if nodeConfig.IsClient {
-		nodeConfig.Actions[nodeconfig.NewClientGroupIDByShardID(0)] = nodeconfig.ActionStart
+		nodeConfig.Actions[nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID)] =
+			nodeconfig.ActionStart
 	} else {
 		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = nodeconfig.ActionStart
 	}
@@ -731,7 +741,9 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		utils.Logger().Error().Err(err).Msg("Failed to create shard receiver")
 	}
 
-	node.globalGroupReceiver, err = node.host.GroupReceiver(nodeconfig.NewClientGroupIDByShardID(0))
+	node.globalGroupReceiver, err = node.host.GroupReceiver(
+		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
+	)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to create global receiver")
 	}
