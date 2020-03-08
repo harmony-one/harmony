@@ -235,9 +235,17 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 							return
 						}
 						offender := *shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
-						addr, err := committee.FindCommitteeByID(
+						subComm, err := committee.FindCommitteeByID(
 							consensus.ShardID,
-						).AddressForBLSKey(offender)
+						)
+						if err != nil {
+							log.Err(err).
+								Str("msg", recvMsg.String()).
+								Msg("could not find subcommittee for bls key")
+							return
+						}
+
+						addr, err := subComm.AddressForBLSKey(offender)
 
 						if err != nil {
 							log.Err(err).Str("msg", recvMsg.String()).

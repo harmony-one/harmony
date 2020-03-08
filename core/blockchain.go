@@ -2574,8 +2574,8 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 		).WithCause(err)
 	}
 
-	committee := shardState.FindCommitteeByID(header.ShardID())
-	if committee == nil {
+	committee, err := shardState.FindCommitteeByID(header.ShardID())
+	if err != nil {
 		return common.Address{}, ctxerror.New("cannot find shard in the shard state",
 			"blockNum", header.Number(),
 			"shardID", header.ShardID(),

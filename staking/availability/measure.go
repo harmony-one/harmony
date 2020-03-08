@@ -96,9 +96,10 @@ func BallotResult(
 			"cannot read shard state", "epoch", parentHeader.Epoch(),
 		).WithCause(err)
 	}
-	parentCommittee := parentShardState.FindCommitteeByID(shardID)
 
-	if parentCommittee == nil {
+	parentCommittee, err := parentShardState.FindCommitteeByID(shardID)
+
+	if err != nil {
 		return nil, nil, nil, ctxerror.New(
 			"cannot find shard in the shard state",
 			"parentBlockNumber", parentHeader.Number(),

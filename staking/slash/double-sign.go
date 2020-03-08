@@ -178,13 +178,13 @@ func Verify(chain CommitteeReader, candidate *Record) error {
 		return err
 	}
 
-	subCommittee := superCommittee.FindCommitteeByID(
+	subCommittee, err := superCommittee.FindCommitteeByID(
 		candidate.Evidence.ShardID,
 	)
 
-	if subCommittee == nil {
+	if err != nil {
 		return errors.Wrapf(
-			errShardIDNotKnown, "given shardID %d", candidate.Evidence.ShardID,
+			err, "given shardID %d", candidate.Evidence.ShardID,
 		)
 	}
 
@@ -200,7 +200,6 @@ var (
 		"bls keys in ballots accompanying slash evidence not equal ",
 	)
 	errSlashDebtCannotBeNegative    = errors.New("slash debt cannot be negative")
-	errShardIDNotKnown              = errors.New("nil subcommittee for shardID")
 	errValidatorNotFoundDuringSlash = errors.New("validator not found")
 	zero                            = numeric.ZeroDec()
 	oneDoubleSignerRate             = numeric.MustNewDecFromStr("0.02")

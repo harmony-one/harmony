@@ -19,6 +19,8 @@ import (
 
 var (
 	emptyBlsPubKey = BlsPublicKey{}
+	// ErrShardIDNotInSuperCommittee ..
+	ErrShardIDNotInSuperCommittee = errors.New("shardID not in super committee")
 )
 
 // PublicKeySizeInBytes ..
@@ -257,16 +259,16 @@ func (ss *State) MarshalJSON() ([]byte, error) {
 
 // FindCommitteeByID returns the committee configuration for the given shard,
 // or nil if the given shard is not found.
-func (ss *State) FindCommitteeByID(shardID uint32) *Committee {
+func (ss *State) FindCommitteeByID(shardID uint32) (*Committee, error) {
 	if ss == nil {
-		return nil
+		return nil, ErrShardIDNotInSuperCommittee
 	}
 	for committee := range ss.Shards {
 		if ss.Shards[committee].ShardID == shardID {
-			return &ss.Shards[committee]
+			return &ss.Shards[committee], nil
 		}
 	}
-	return nil
+	return nil, ErrShardIDNotInSuperCommittee
 }
 
 // DeepCopy returns a deep copy of the receiver.

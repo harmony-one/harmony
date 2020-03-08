@@ -131,18 +131,21 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	// Verify signature of the new cross link header
 	// TODO: check whether to recalculate shard state
 	shardState, err := node.Blockchain().ReadShardState(cl.Epoch())
-	committee := shardState.FindCommitteeByID(cl.ShardID())
-
-	if err != nil || committee == nil {
-		return ctxerror.New("[VerifyCrossLink] Failed to read shard state for cross link", "beaconEpoch", node.Blockchain().CurrentHeader().Epoch(), "epoch", cl.Epoch(), "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
+	if err != nil {
+		return err
 	}
-	var committerKeys []*bls.PublicKey
 
+	committee, err := shardState.FindCommitteeByID(cl.ShardID())
+
+	if err != nil {
+		return err
+	}
+
+	committerKeys := []*bls.PublicKey{}
 	parseKeysSuccess := true
 	for _, member := range committee.Slots {
 		committerKey := new(bls.PublicKey)
-		err = member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
+		if err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
 			parseKeysSuccess = false
 			break
 		}
