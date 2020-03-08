@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"sync"
 
@@ -135,27 +136,6 @@ func (storage *Storage) UpdateAddress(batch *leveldb.Batch, explorerTransaction 
 		explorerTransaction.Type = Sent
 	}
 	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
-}
-
-// DumpAddress dumps address.
-func (storage *Storage) DumpAddress(address string) error {
-	key := GetAddressKey(address)
-	has, err := storage.db.Has([]byte(key), nil)
-	if err != nil || has {
-		return nil
-	}
-	encoded, err := rlp.EncodeToBytes(Address{ID: address})
-	if err == nil {
-		err = storage.db.Put([]byte(key), encoded, nil)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("cannot put address")
-			return err
-		}
-	} else {
-		utils.Logger().Error().Err(err).Msg("cannot encode address")
-		return err
-	}
-	return nil
 }
 
 // UpdateAddressStorage updates specific addr Address.
