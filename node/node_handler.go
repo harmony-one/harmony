@@ -363,6 +363,17 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	}
 
 	if err := node.Blockchain().ValidateNewBlock(newBlock); err != nil {
+		if hooks := node.NodeConfig.WebHooks.Hooks; hooks != nil {
+			if p := hooks.ProtocolIssues; p != nil {
+				url := p.OnCannotCommit
+				go func() {
+					webhooks.DoPost(url, map[string]interface{}{
+						"bad-header": newBlock.Header().String(),
+						"reason":     err.Error(),
+					})
+				}()
+			}
+		}
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Int("numTx", len(newBlock.Transactions())).
@@ -479,7 +490,7 @@ func (node *Node) PostConsensusProcessing(
 				signed, toSign, quotient, err :=
 					availability.ComputeCurrentSigning(snapshot, wrapper)
 				if err != nil && availability.IsBelowSigningThreshold(quotient) {
-					url := h.Availability.DroppedBelowThreshold
+					url := h.Availability.OnDroppedBelowThreshold
 					go func() {
 						webhooks.DoPost(url, staking.Computed{signed, toSign, quotient})
 					}()

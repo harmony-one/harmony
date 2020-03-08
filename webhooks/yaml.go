@@ -16,19 +16,24 @@ const (
 
 // AvailabilityHooks ..
 type AvailabilityHooks struct {
-	DroppedBelowThreshold string `yaml:"dropped-below-threshold"`
-	CannotCommitBlock     string `yaml:"cannot-commit-block"`
+	OnDroppedBelowThreshold string `yaml:"on-dropped-below-threshold"`
 }
 
 // DoubleSignWebHooks ..
 type DoubleSignWebHooks struct {
-	OnNoticeDoubleSign string `yaml:"notice-double-sign"`
+	OnNoticeDoubleSign string `yaml:"on-notice-double-sign"`
+}
+
+// BadBlockHooks ..
+type BadBlockHooks struct {
+	OnCannotCommit string `yaml:"on-cannot-commit-block"`
 }
 
 // Hooks ..
 type Hooks struct {
-	Slashing     *DoubleSignWebHooks `yaml:"slashing-hooks"`
-	Availability *AvailabilityHooks  `yaml:"availability-hooks"`
+	Slashing       *DoubleSignWebHooks `yaml:"slashing-hooks"`
+	Availability   *AvailabilityHooks  `yaml:"availability-hooks"`
+	ProtocolIssues *BadBlockHooks      `yaml:"protocol-hooks"`
 }
 
 // ReportResult ..
