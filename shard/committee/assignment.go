@@ -173,7 +173,6 @@ func eposStakedCommittee(
 			utils.Logger().Info().
 				Int("staked-candidates", len(candidates)).
 				Err(err).
-				RawJSON("candidate", []byte(validator.String())).
 				Msg("validator sanity check failed")
 			continue
 		}
@@ -231,7 +230,6 @@ func eposStakedCommittee(
 		utils.Logger().Info().
 			Int("staked-candidates", c).
 			Str("total-staked-by-validators", totalStake.String()).
-			RawJSON("staked-super-committee", []byte(shardState.String())).
 			Msg("epos based super-committe")
 	}
 

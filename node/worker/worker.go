@@ -345,9 +345,8 @@ func (w *Worker) CollectVerifiedSlashes() error {
 
 // returns (successes, failures, error)
 func (w *Worker) verifySlashes(
-	records slash.Records,
+	d slash.Records,
 ) (slash.Records, slash.Records) {
-	d := records
 	successes, failures := slash.Records{}, slash.Records{}
 	// Enforce order, reproducibility
 	sort.SliceStable(d,
@@ -365,9 +364,9 @@ func (w *Worker) verifySlashes(
 		successes = append(successes, d[i])
 	}
 
-	if len(failures) > 0 {
+	if f := len(failures); f > 0 {
 		utils.Logger().Debug().
-			RawJSON("slashes", []byte(failures.String())).
+			Int("count", f).
 			Msg("invalid slash records passed over in block proposal")
 	}
 
@@ -415,7 +414,6 @@ func (w *Worker) FinalizeNewBlock(
 			if data, err := rlp.EncodeToBytes(doubleSigners); err == nil {
 				w.current.header.SetSlashes(data)
 				utils.Logger().Info().
-					RawJSON("slashes", []byte(doubleSigners.String())).
 					Msg("encoded slashes into headers of proposed new block")
 			} else {
 				utils.Logger().Debug().Err(err).Msg("Failed to encode proposed slashes")
