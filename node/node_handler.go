@@ -25,7 +25,7 @@ import (
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/harmony-one/harmony/staking/webhooks"
+	"github.com/harmony-one/harmony/webhooks"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 

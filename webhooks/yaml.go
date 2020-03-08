@@ -11,7 +11,7 @@ import (
 
 const (
 	// DefaultWebHookPath ..
-	DefaultWebHookPath = "staking/webhooks/webhook.example.yaml"
+	DefaultWebHookPath = "webhooks/webhook.example.yaml"
 )
 
 // AvailabilityHooks ..

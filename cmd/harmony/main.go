@@ -40,7 +40,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/webhooks"
+	"github.com/harmony-one/harmony/webhooks"
 	golog "github.com/ipfs/go-log"
 	"github.com/pkg/errors"
 	gologging "github.com/whyrusleeping/go-logging"

@@ -13,7 +13,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/webhooks"
+	"github.com/harmony-one/harmony/webhooks"
 	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/pkg/errors"
 )

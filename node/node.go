@@ -38,7 +38,7 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/harmony-one/harmony/staking/webhooks"
+	"github.com/harmony-one/harmony/webhooks"
 )
 
 // State is a state of a node.
