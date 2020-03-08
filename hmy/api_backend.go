@@ -529,6 +529,8 @@ func (b *APIBackend) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) 
 // GetSuperCommittees ..
 func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	nowE := b.hmy.BlockChain().CurrentHeader().Epoch()
+	thenE := new(big.Int).Sub(nowE, common.Big1)
+
 	var (
 		nowCommittee, prevCommittee *shard.State
 		err                         error
@@ -537,13 +539,21 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	if err != nil {
 		return nil, err
 	}
-	prevCommittee, err = b.hmy.BlockChain().ReadShardState(
-		new(big.Int).Sub(nowE, common.Big1),
-	)
+	prevCommittee, err = b.hmy.BlockChain().ReadShardState(thenE)
 	if err != nil {
 		return nil, err
 	}
-	then, now := quorum.NewRegistry(), quorum.NewRegistry()
+
+	instanceNow := shard.Schedule.InstanceForEpoch(nowE)
+	stakedSlotsNow :=
+		(instanceNow.NumNodesPerShard() - instanceNow.NumHarmonyOperatedNodesPerShard()) *
+			int(instanceNow.NumShards())
+	instanceThen := shard.Schedule.InstanceForEpoch(thenE)
+	stakedSlotsThen :=
+		(instanceThen.NumNodesPerShard() - instanceThen.NumHarmonyOperatedNodesPerShard()) *
+			int(instanceThen.NumShards())
+
+	then, now := quorum.NewRegistry(stakedSlotsThen), quorum.NewRegistry(stakedSlotsNow)
 
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
@@ -564,7 +574,6 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 		decider.SetVoters(comm.Slots)
 		now.Deciders[shardID] = decider
 	}
-
 	return &quorum.Transition{then, now}, nil
 }
 
