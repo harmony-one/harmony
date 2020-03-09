@@ -50,9 +50,9 @@ var (
 	PangaeaChainConfig = &ChainConfig{
 		ChainID:         PangaeaChainID,
 		CrossTxEpoch:    big.NewInt(0),
-		CrossLinkEpoch:  big.NewInt(3),
-		StakingEpoch:    big.NewInt(3),
-		PreStakingEpoch: big.NewInt(0),
+		CrossLinkEpoch:  big.NewInt(2),
+		StakingEpoch:    big.NewInt(2),
+		PreStakingEpoch: big.NewInt(1),
 		EIP155Epoch:     big.NewInt(0),
 		S3Epoch:         big.NewInt(0),
 		ReceiptLogEpoch: big.NewInt(0),

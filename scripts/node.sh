@@ -261,8 +261,8 @@ staking)
     /ip4/54.86.126.90/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
     /ip4/52.40.84.2/tcp/9867/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
   )
-  REL=testnet
-  network_type=testnet
+  REL=pangaea
+  network_type=pangaea
   dns_zone=os.hmny.io
   ;;
 devnet)
@@ -271,7 +271,7 @@ devnet)
     /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
   )
   REL=devnet
-  network_type=pangaea
+  network_type=devnet
   dns_zone=pga.hmny.io
   ;;
 *)
