@@ -149,6 +149,14 @@ examples:
 # start the node in a different port 9010
    ${progname} -n 9010
 
+# multi-bls: place all keys/passphrases under .hmy/blskeys
+# e.g. <blskey>.key and <blskey>.pass
+   ${progname} -S -M 
+
+# multi-bls using default passphrase: place all keys under .hmy/blskeys
+# supply passphrase file using -p option (single passphrase will be used for all bls keys)
+   ${progname} -S -M -p blspass.txt
+
 ENDEND
 }
 
@@ -697,12 +705,14 @@ kill_node() {
 } > harmony-update.out 2>&1 &
 check_update_pid=$!
 
-if [ -z "${blspass}" ]; then
-   unset -v passphrase
-   read -rsp "Enter passphrase for the BLS key file ${BLSKEYFILE}: " passphrase
-   echo
-elif [ ! -f "${blspass}" ]; then
-   err 10 "can't find the ${blspass} file"
+if ! ${multi_key}; then
+   if [ -z "${blspass}" ]; then
+      unset -v passphrase
+      read -rsp "Enter passphrase for the BLS key file ${BLSKEYFILE}: " passphrase
+      echo
+   elif [ ! -f "${blspass}" ]; then
+      err 10 "can't find the ${blspass} file"
+   fi
 fi
 
 while :
