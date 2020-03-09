@@ -259,7 +259,7 @@ staking)
     /ip4/54.86.126.90/tcp/9800/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
   )
   REL=devnet
-  network_type=testnet
+  network_type=devnet
   dns_zone=ps.hmny.io
   ;;
 devnet)
