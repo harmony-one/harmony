@@ -53,6 +53,8 @@ type ChainReader interface {
 
 	// Methods needed for EPoS committee assignment calculation
 	committee.StakingCandidatesReader
+	// Methods for reading right epoch snapshot
+	staking.ValidatorSnapshotReader
 
 	//ReadBlockRewardAccumulator is the block-reward given for block number
 	ReadBlockRewardAccumulator(uint64) (*big.Int, error)

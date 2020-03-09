@@ -63,7 +63,10 @@ var (
 
 // ValidatorSnapshotReader ..
 type ValidatorSnapshotReader interface {
-	ReadValidatorSnapshot(common.Address) (*ValidatorWrapper, error)
+	ReadValidatorSnapshotAtEpoch(
+		epoch *big.Int,
+		addr common.Address,
+	) (*ValidatorWrapper, error)
 }
 
 type counters struct {

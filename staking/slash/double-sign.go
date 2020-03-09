@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -117,6 +118,7 @@ var (
 	errReporterAndOffenderSame = errors.New("reporter and offender cannot be same")
 	errAlreadyBannedValidator  = errors.New("cannot slash on already banned validator")
 	errSignerKeyNotRightSize   = errors.New("bls keys from slash candidate not right side")
+	errSlashFromFutureEpoch    = errors.New("cannot have slash from future epoch")
 )
 
 // MarshalJSON ..
@@ -144,6 +146,7 @@ func (r Record) String() string {
 // CommitteeReader ..
 type CommitteeReader interface {
 	ReadShardState(epoch *big.Int) (*shard.State, error)
+	CurrentBlock() *types.Block
 }
 
 // Verify checks that the slash is valid
@@ -182,6 +185,15 @@ func Verify(
 			errBallotSignerKeysNotSame, "%s %s", k1, k2,
 		)
 	}
+	currentEpoch := chain.CurrentBlock().Epoch()
+	// on beaconchain committee, the slash can't come from the future
+	if candidate.Evidence.ShardID == shard.BeaconChainShardID &&
+		candidate.Evidence.Epoch.Cmp(currentEpoch) == 1 {
+		return errors.Wrapf(
+			errSlashFromFutureEpoch, "current-epoch %v", currentEpoch,
+		)
+	}
+
 	superCommittee, err := chain.ReadShardState(candidate.Evidence.Epoch)
 
 	if err != nil {
@@ -396,11 +408,8 @@ func Apply(
 ) (*Application, error) {
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 	for _, slash := range slashes {
-		// TODO Probably won't happen but we probably should
-		// be expilict about reading the right epoch validator snapshot,
-		// because it needs to be the epoch of which the double sign
-		// occurred
-		snapshot, err := chain.ReadValidatorSnapshot(
+		snapshot, err := chain.ReadValidatorSnapshotAtEpoch(
+			slash.Evidence.Epoch,
 			slash.Offender,
 		)
 

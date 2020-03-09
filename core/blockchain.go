@@ -2195,6 +2195,15 @@ func (bc *BlockChain) ReadValidatorInformation(
 	return bc.ReadValidatorInformationAt(addr, bc.CurrentBlock().Root())
 }
 
+// ReadValidatorSnapshotAtEpoch reads the snapshot
+// staking validator information of given validator address
+func (bc *BlockChain) ReadValidatorSnapshotAtEpoch(
+	epoch *big.Int,
+	addr common.Address,
+) (*staking.ValidatorWrapper, error) {
+	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
+}
+
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
 func (bc *BlockChain) ReadValidatorSnapshot(
 	addr common.Address,
