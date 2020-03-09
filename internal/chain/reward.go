@@ -45,7 +45,7 @@ func AccumulateRewards(
 		return network.NoReward, nil
 	}
 
-	//// After staking
+	// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		defaultReward := network.BaseStakedReward
@@ -106,15 +106,16 @@ func AccumulateRewards(
 					voter.EffectivePercent.Quo(votepower.StakersShare),
 				).RoundInt()
 				newRewards = new(big.Int).Add(newRewards, due)
-				state.AddReward(snapshot, due)
+				if err := state.AddReward(snapshot, due); err != nil {
+					return network.NoReward, err
+				}
 			}
 		}
 
 		// Handle rewards for shardchain
-		if cxLinks := header.CrossLinks(); len(cxLinks) != 0 {
+		if cxLinks := header.CrossLinks(); len(cxLinks) > 0 {
 			crossLinks := types.CrossLinks{}
-			err := rlp.DecodeBytes(cxLinks, &crossLinks)
-			if err != nil {
+			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
 				return network.NoReward, err
 			}
 
@@ -174,7 +175,6 @@ func AccumulateRewards(
 						})
 					}
 				}
-
 			}
 
 			resultsHandle := make([][]slotPayable, len(crossLinks))
@@ -205,7 +205,9 @@ func AccumulateRewards(
 					}
 					due := resultsHandle[bucket][payThem].payout.TruncateInt()
 					newRewards = new(big.Int).Add(newRewards, due)
-					state.AddReward(snapshot, due)
+					if err := state.AddReward(snapshot, due); err != nil {
+						return network.NoReward, err
+					}
 				}
 			}
 
@@ -214,7 +216,7 @@ func AccumulateRewards(
 		return network.NoReward, nil
 	}
 
-	//// Before staking
+	// Before staking
 	payable := []struct {
 		string
 		common.Address

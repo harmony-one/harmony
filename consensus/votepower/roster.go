@@ -63,6 +63,7 @@ type stakedVoter struct {
 	IsHarmonyNode    bool               `json:"is-harmony"`
 	EarningAccount   common.Address     `json:"earning-account"`
 	Identity         shard.BlsPublicKey `json:"bls-public-key"`
+	RawPercent       numeric.Dec        `json:"voting-power-unnormalized"`
 	EffectivePercent numeric.Dec        `json:"voting"`
 	EffectiveStake   numeric.Dec        `json:"effective-stake"`
 }
@@ -105,7 +106,12 @@ func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
 						value.EffectiveStake,
 					)
 					payload.VotingPower = append(payload.VotingPower,
-						staking.VotePerShard{roster.ShardID, value.EffectivePercent},
+						staking.VotePerShard{
+							ShardID:             roster.ShardID,
+							VotingPowerRaw:      value.RawPercent,
+							VotingPowerAdjusted: value.EffectivePercent,
+							EffectiveStake:      value.EffectiveStake,
+						},
 					)
 					for i := range payload.BLSPublicKeysOwned {
 						if payload.BLSPublicKeysOwned[i].ShardID == roster.ShardID {
@@ -118,7 +124,8 @@ func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
 					result[value.EarningAccount] = Staker{
 						TotalEffectiveStake: value.EffectiveStake,
 						VotingPower: []staking.VotePerShard{
-							{roster.ShardID, value.EffectivePercent},
+							{roster.ShardID, value.RawPercent,
+								value.EffectivePercent, value.EffectiveStake},
 						},
 						BLSPublicKeysOwned: []staking.KeysPerShard{
 							{roster.ShardID, []shard.BlsPublicKey{key}}},
@@ -176,6 +183,7 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 			IsHarmonyNode:    true,
 			EarningAccount:   staked[i].EcdsaAddress,
 			Identity:         staked[i].BlsPublicKey,
+			RawPercent:       numeric.ZeroDec(),
 			EffectivePercent: numeric.ZeroDec(),
 			EffectiveStake:   numeric.ZeroDec(),
 		}
@@ -184,13 +192,13 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 		if staked[i].EffectiveStake != nil {
 			member.IsHarmonyNode = false
 			member.EffectiveStake = member.EffectiveStake.Add(*staked[i].EffectiveStake)
-			member.EffectivePercent = staked[i].EffectiveStake.
-				Quo(roster.RawStakedTotal).
-				Mul(StakersShare)
+			member.RawPercent = staked[i].EffectiveStake.Quo(roster.RawStakedTotal)
+			member.EffectivePercent = member.RawPercent.Mul(StakersShare)
 			theirPercentage = theirPercentage.Add(member.EffectivePercent)
 			lastStakedVoter = &member
 		} else { // Our node
 			member.EffectivePercent = HarmonysShare.Quo(ourCount)
+			member.RawPercent = member.EffectivePercent
 			ourPercentage = ourPercentage.Add(member.EffectivePercent)
 		}
 

@@ -17,7 +17,10 @@ type PublicKey struct {
 }
 
 // SerializeToHexStr wrapper
-func (multiKey PublicKey) SerializeToHexStr() string {
+func (multiKey *PublicKey) SerializeToHexStr() string {
+	if multiKey == nil {
+		return ""
+	}
 	var builder strings.Builder
 	for _, pubKey := range multiKey.PublicKey {
 		builder.WriteString(pubKey.SerializeToHexStr())

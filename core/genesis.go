@@ -310,9 +310,13 @@ func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
 		panic(err)
 	}
 	rawdb.WriteBlockRewardAccumulator(db, big.NewInt(0), 0)
-	data, _ := rlp.EncodeToBytes([]slash.Record{})
-	rawdb.WritePendingSlashingCandidates(db, data)
-
+	data, err := rlp.EncodeToBytes(slash.Records{})
+	if err != nil {
+		panic(err)
+	}
+	if err := rawdb.WritePendingSlashingCandidates(db, data); err != nil {
+		panic(err)
+	}
 	return block
 }
 

@@ -78,6 +78,20 @@ type ValidatorWrapper struct {
 	Counters    counters
 }
 
+// Computed ..
+type Computed struct {
+	Signed     *big.Int    `json:"current-epoch-signed"`
+	ToSign     *big.Int    `json:"current-epoch-to-sign"`
+	Percentage numeric.Dec `json:"percentage"`
+}
+
+// ValidatorRPCEnchanced contains extra information for RPC consumer
+type ValidatorRPCEnchanced struct {
+	Wrapper                  ValidatorWrapper `json:"validator"`
+	CurrentSigningPercentage Computed         `json:"current-epoch-signing-percent"`
+	CurrentVotingPower       []VotePerShard   `json:"current-epoch-voting-power"`
+}
+
 func (w ValidatorWrapper) String() string {
 	s, _ := json.Marshal(w)
 	return string(s)
@@ -100,8 +114,10 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 
 // VotePerShard ..
 type VotePerShard struct {
-	ShardID     uint32      `json:"shard-id"`
-	VotingPower numeric.Dec `json:"voting-power"`
+	ShardID             uint32      `json:"shard-id"`
+	VotingPowerRaw      numeric.Dec `json:"voting-power-raw"`
+	VotingPowerAdjusted numeric.Dec `json:"voting-power-adjusted"`
+	EffectiveStake      numeric.Dec `json:"effective-stake"`
 }
 
 // KeysPerShard ..

@@ -6,7 +6,10 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/pkg/errors"
 
+	"github.com/harmony-one/harmony/internal/blsgen"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	mock_shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding/mock"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/multibls"
@@ -129,5 +132,46 @@ func TestConfigType_ShardIDFromConsensusKey(t *testing.T) {
 				t.Errorf("ShardIDFromConsensusKey() got = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestValidateConsensusKeysForSameShard(t *testing.T) {
+	// set localnet config
+	networkType := "localnet"
+	schedule := shardingconfig.LocalnetSchedule
+	netType := NetworkType(networkType)
+	SetNetworkType(netType)
+	SetShardingSchedule(schedule)
+
+	// import two keys that belong to same shard and test ValidateConsensusKeysForSameShard
+	keyPath1 := "../../../.hmy/65f55eb3052f9e9f632b2923be594ba77c55543f5c58ee1454b9cfd658d25e06373b0f7d42a19c84768139ea294f6204.key"
+	priKey1, err := blsgen.LoadBlsKeyWithPassPhrase(keyPath1, "")
+	pubKey1 := priKey1.GetPublicKey()
+	if err != nil {
+		t.Error(err)
+	}
+	keyPath2 := "../../../.hmy/ca86e551ee42adaaa6477322d7db869d3e203c00d7b86c82ebee629ad79cb6d57b8f3db28336778ec2180e56a8e07296.key"
+	priKey2, err := blsgen.LoadBlsKeyWithPassPhrase(keyPath2, "")
+	pubKey2 := priKey2.GetPublicKey()
+	if err != nil {
+		t.Error(err)
+	}
+	keys := []*bls.PublicKey{}
+	keys = append(keys, pubKey1)
+	keys = append(keys, pubKey2)
+	if err := GetDefaultConfig().ValidateConsensusKeysForSameShard(keys, 0); err != nil {
+		t.Error("expected", nil, "got", err)
+	}
+	// add third key in different shard and test ValidateConsensusKeysForSameShard
+	keyPath3 := "../../../.hmy/68ae289d73332872ec8d04ac256ca0f5453c88ad392730c5741b6055bc3ec3d086ab03637713a29f459177aaa8340615.key"
+	priKey3, err := blsgen.LoadBlsKeyWithPassPhrase(keyPath3, "")
+	pubKey3 := priKey3.GetPublicKey()
+	if err != nil {
+		t.Error(err)
+	}
+	keys = append(keys, pubKey3)
+	if err := GetDefaultConfig().ValidateConsensusKeysForSameShard(keys, 0); err == nil {
+		e := errors.New("bls keys do not belong to the same shard")
+		t.Error("expected", e, "got", nil)
 	}
 }

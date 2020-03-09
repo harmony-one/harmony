@@ -533,7 +533,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// update public keys in the committee
 	oldLeader := consensus.LeaderPubKey
-	pubKeys := committee.WithStakingEnabled.GetCommitteePublicKeys(
+	pubKeys, _ := committee.WithStakingEnabled.GetCommitteePublicKeys(
 		committeeToSet,
 	)
 	consensus.getLogger().Info().

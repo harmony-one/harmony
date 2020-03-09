@@ -62,8 +62,11 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // Process returns the receipts and logs accumulated during the process and
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
-func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.Config) (
-	types.Receipts, types.CXReceipts, []*types.Log, uint64, *big.Int, error,
+func (p *StateProcessor) Process(
+	block *types.Block, statedb *state.DB, cfg vm.Config,
+) (
+	types.Receipts, types.CXReceipts,
+	[]*types.Log, uint64, *big.Int, error,
 ) {
 	var (
 		receipts types.Receipts
@@ -83,7 +86,9 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, cxReceipt, _, err := ApplyTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
+		receipt, cxReceipt, _, err := ApplyTransaction(
+			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+		)
 		if err != nil {
 			return nil, nil, nil, 0, nil, err
 		}
@@ -113,7 +118,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.DB, cfg vm.C
 	for _, cx := range block.IncomingReceipts() {
 		err := ApplyIncomingReceipt(p.config, statedb, header, cx)
 		if err != nil {
-			return nil, nil, nil, 0, nil, ctxerror.New("cannot apply incoming receipts").WithCause(err)
+			return nil, nil,
+				nil, 0, nil, ctxerror.New("cannot apply incoming receipts").WithCause(err)
 		}
 	}
 

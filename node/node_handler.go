@@ -13,6 +13,7 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -21,8 +22,10 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/webhooks"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -187,6 +190,10 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
+	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
+		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
+		return
+	}
 	if len(msgPayload) < 1 {
 		utils.Logger().Debug().Msgf("Invalid transaction message size")
 		return
@@ -208,6 +215,10 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
+	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
+		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
+		return
+	}
 	if len(msgPayload) < 1 {
 		utils.Logger().Debug().Msgf("Invalid staking transaction message size")
 		return
@@ -352,6 +363,17 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	}
 
 	if err := node.Blockchain().ValidateNewBlock(newBlock); err != nil {
+		if hooks := node.NodeConfig.WebHooks.Hooks; hooks != nil {
+			if p := hooks.ProtocolIssues; p != nil {
+				url := p.OnCannotCommit
+				go func() {
+					webhooks.DoPost(url, map[string]interface{}{
+						"bad-header": newBlock.Header().String(),
+						"reason":     err.Error(),
+					})
+				}()
+			}
+		}
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Int("numTx", len(newBlock.Transactions())).
@@ -454,9 +476,28 @@ func (node *Node) PostConsensusProcessing(
 	if len(newBlock.Header().ShardState()) > 0 {
 		node.Consensus.UpdateConsensusInformation()
 	}
-
-	// TODO chao: uncomment this after beacon syncing is stable
-	// node.Blockchain().UpdateCXReceiptsCheckpointsByBlock(newBlock)
+	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
+		if h.Availability != nil {
+			for _, addr := range node.Consensus.SelfAddresses {
+				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
+				if err != nil {
+					return
+				}
+				snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
+				if err != nil {
+					return
+				}
+				signed, toSign, quotient, err :=
+					availability.ComputeCurrentSigning(snapshot, wrapper)
+				if err != nil && availability.IsBelowSigningThreshold(quotient) {
+					url := h.Availability.OnDroppedBelowThreshold
+					go func() {
+						webhooks.DoPost(url, staking.Computed{signed, toSign, quotient})
+					}()
+				}
+			}
+		}
+	}
 }
 
 func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
