@@ -125,6 +125,7 @@ options:
    -M             support multi-key mode (default: off)
    -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
+   -R address     start a pprof profiling server listening on the specified address
    -I             use statically linked Harmony binary
 
 examples:
@@ -178,13 +179,14 @@ staking_mode=false
 multi_key=false
 archival=false
 blacklist=./.hmy/blacklist.txt
+pprof=""
 static=false
 verify=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAIB:Y opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAIB:R:Y opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -211,6 +213,7 @@ do
    U) upgrade_rel="${OPTARG}";;
    P) public_rpc=true;;
    B) blacklist="${OPTARG}";;
+   R) pprof="${OPTARG}";;
    v) msg "version: $version"
       exit 0 ;;
    V) LD_LIBRARY_PATH=. ./harmony -version
@@ -725,6 +728,11 @@ do
    if ${public_rpc}; then
       args+=(
       -public_rpc
+      )
+   fi
+   if [ ! -z "${pprof}" ]; then
+      args+=(
+      -pprof "${pprof}"
       )
    fi
 # backward compatible with older harmony node software
