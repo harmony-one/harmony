@@ -421,8 +421,10 @@ func (mockOutChainReader) ReadShardState(epoch *big.Int) (*shard.State, error) {
 }
 
 func TestVerify(t *testing.T) {
+	stateHandle := defaultStateWithAccountsApplied()
+
 	if err := Verify(
-		mockOutChainReader{}, &exampleSlashRecords()[0],
+		mockOutChainReader{}, stateHandle, &exampleSlashRecords()[0],
 	); err != nil {
 		t.Errorf("could not verify slash %s", err.Error())
 	}

@@ -116,6 +116,7 @@ var (
 	errBallotSignerKeysNotSame = errors.New("conflicting ballots must have same signer key")
 	errReporterAndOffenderSame = errors.New("reporter and offender cannot be same")
 	errAlreadyBannedValidator  = errors.New("cannot slash on already banned validator")
+	errSignerKeyNotRightSize   = errors.New("bls keys from slash candidate not right side")
 )
 
 // MarshalJSON ..
@@ -167,6 +168,14 @@ func Verify(
 	first, second :=
 		candidate.Evidence.AlreadyCastBallot,
 		candidate.Evidence.DoubleSignedBallot
+	k1, k2 := len(first.SignerPubKey), len(second.SignerPubKey)
+	if k1 != shard.PublicKeySizeInBytes ||
+		k2 != shard.PublicKeySizeInBytes {
+		return errors.Wrapf(
+			errSignerKeyNotRightSize, "cast key %d double-signed key %d", k1, k2,
+		)
+	}
+
 	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
 		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
 		return errors.Wrapf(
@@ -189,7 +198,9 @@ func Verify(
 		)
 	}
 
-	if _, err := subCommittee.AddressForBLSKey(second.SignerPubKey); err != nil {
+	if _, err := subCommittee.AddressForBLSKey(
+		second.SignerPubKey,
+	); err != nil {
 		return err
 	}
 	// TODO need to finish this implementation
