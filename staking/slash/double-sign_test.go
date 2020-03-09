@@ -120,6 +120,9 @@ const (
 	// validator creation parameters
 	lastEpochInComm = 5
 	creationHeight  = 33
+	// slash rates to test double signing
+	// from 0 percent to 100 percent slash rate, 1 percent increment per testSlashRate
+	numSlashRatesToTest = 101
 )
 
 type scenario struct {
@@ -137,7 +140,7 @@ func defaultFundingScenario() *scenario {
 	}
 }
 
-func scenariorealWorldSample1() *scenario {
+func scenarioRealWorldSample1() *scenario {
 	const (
 		snapshotBytes = "f90108f8be94110dde181c2434f6d8eaa869154a4d07a910ce19f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a06880de0b6b3a764000088b469471f8014000001e0dec9880254cc1f20ad395cc988027c97536ea18970c988021cc4b33cdff1601df83e945f546573745f6b65795f76616c696461746f72308c746573745f6163636f756e748b6861726d6f6e792e6f6e658a44616e69656c2d56444d846e6f6e651d80f842e094110dde181c2434f6d8eaa869154a4d07a910ce19880f43fc2c04ee000080c0e0949832c677128929f5f3297d364ac30e251dc02f3c8814d1120d7b16000080c0c3060180"
 
@@ -171,14 +174,26 @@ func scenariorealWorldSample1() *scenario {
 var (
 	scenarioTwoPercent    = defaultFundingScenario()
 	scenarioEightyPercent = defaultFundingScenario()
+	doubleSignScenarios   = make([]*scenario, numSlashRatesToTest)
 )
+
+func totalSlashedExpected(slashRate float64) *big.Int {
+	return big.NewInt(int64(slashRate * 5.0 * denominations.One))
+}
+
+func totalSnitchRewardExpected(slashRate float64) *big.Int {
+	return big.NewInt(int64(slashRate * 2.5 * denominations.One))
+}
 
 func init() {
 	{
 		s := scenarioTwoPercent
+		s.slashRate = 0.02
 		s.result = &Application{
-			TotalSlashed:      big.NewInt(0.1 * denominations.One),
-			TotalSnitchReward: big.NewInt(0.05 * denominations.One),
+			// totalSlashedExpected
+			TotalSlashed: totalSlashedExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 5.0 * denominations.One)),
+			// totalSnitchRewardExpected
+			TotalSnitchReward: totalSnitchRewardExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 2.5 * denominations.One)),
 		}
 		s.snapshot, s.current = s.defaultValidatorPair(s.defaultDelegationPair())
 	}
@@ -186,10 +201,30 @@ func init() {
 		s := scenarioEightyPercent
 		s.slashRate = 0.80
 		s.result = &Application{
-			TotalSlashed:      big.NewInt(4 * denominations.One),
-			TotalSnitchReward: big.NewInt(2 * denominations.One),
+			// totalSlashedExpected
+			TotalSlashed: totalSlashedExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 5.0 * denominations.One)),
+			// totalSnitchRewardExpected
+			TotalSnitchReward: totalSnitchRewardExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 2.5 * denominations.One)),
 		}
 		s.snapshot, s.current = s.defaultValidatorPair(s.defaultDelegationPair())
+	}
+
+	// Testing slash rate from 0% to 100% with increment being 100.0 / numSlashRatesToTest.
+	// numSlashRatesToTest=100, so it's 1 percent step size in between test slash rates.
+	testSlashRateStepSize := numeric.NewDec(1).
+		Quo(numeric.NewDec(numSlashRatesToTest - 1)) // -1 since starting from 0% slash rate edge case
+	slashRate := numeric.NewDec(0)
+	for i := 0; i < numSlashRatesToTest; i++ {
+		s := defaultFundingScenario()
+		s.slashRate = float64(slashRate.Quo(numeric.NewDec(100)).TruncateInt64())
+		s.result = &Application{
+			TotalSlashed:      totalSlashedExpected(s.slashRate),
+			TotalSnitchReward: totalSnitchRewardExpected(s.slashRate),
+		}
+		s.snapshot, s.current = s.defaultValidatorPair(s.defaultDelegationPair())
+		doubleSignScenarios[i] = s
+
+		slashRate = slashRate.Add(testSlashRateStepSize)
 	}
 }
 
@@ -472,6 +507,15 @@ func TestEightyPercentSlashed(t *testing.T) {
 	testScenario(t, stateHandle, slashes, scenarioEightyPercent)
 }
 
+func TestDoubleSignSlashRates(t *testing.T) {
+	for _, scenario := range doubleSignScenarios {
+		slashes := exampleSlashRecords()
+		stateHandle := defaultStateWithAccountsApplied()
+		testScenario(t, stateHandle, slashes, scenario)
+	}
+}
+
+// Simply testing serialization / deserialization of slash records working correctly
 func TestRoundTripSlashRecord(t *testing.T) {
 	slashes := exampleSlashRecords()
 	serializedA := slashes.String()
@@ -494,6 +538,6 @@ func TestRoundTripSlashRecord(t *testing.T) {
 // 	slashes := exampleSlashRecords()
 // {
 // 	stateHandle := defaultStateWithAccountsApplied()
-// 	testScenario(t, stateHandle, slashes, scenariorealWorldSample1())
+// 	testScenario(t, stateHandle, slashes, scenarioRealWorldSample1())
 // }
 // }
