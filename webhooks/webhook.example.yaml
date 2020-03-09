@@ -1,0 +1,8 @@
+slashing-hooks:
+  on-notice-double-sign: http://localhost:5430/on-notice-double-sign
+
+availability-hooks:
+  on-dropped-below-threshold: http://localhost:5430/on-dropped-below-threshold
+
+protocol-hooks:
+  on-cannot-commit-block: http://localhost:5430/on-cannot-commit-block
