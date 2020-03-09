@@ -60,6 +60,8 @@ var (
 	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
 	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis = errors.New("Genesis not found in chain")
+	// errExceedMaxPendingSlashes ..
+	errExceedMaxPendingSlashes = errors.New("exceeed max pending slashes")
 )
 
 const (
@@ -80,6 +82,7 @@ const (
 	validatorListByDelegatorCacheLimit = 1024
 	pendingCrossLinksCacheLimit        = 2
 	blockAccumulatorCacheLimit         = 256
+	maxPendingSlashes                  = 512
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
 	pendingCLCacheKey = "pendingCLs"
@@ -2029,9 +2032,15 @@ func (bc *BlockChain) AddPendingSlashingCandidates(
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
 	current := bc.ReadPendingSlashingCandidates()
-	bc.pendingSlashes = append(
+	pendingSlashes := append(
 		bc.pendingSlashes, current.SetDifference(candidates)...,
 	)
+	if l, c := len(pendingSlashes), len(current); l > maxPendingSlashes {
+		return errors.Wrapf(
+			errExceedMaxPendingSlashes, "current %d with-additional %d", c, l,
+		)
+	}
+	bc.pendingSlashes = pendingSlashes
 	return bc.writeSlashes(bc.pendingSlashes)
 }
 
