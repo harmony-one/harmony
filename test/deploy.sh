@@ -127,7 +127,7 @@ SHARDS=2
 DRYRUN=
 SYNC=true
 NETWORK=localnet
-NUM_TEST=10
+NUM_TEST=1
 ACC1=one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj
 ACC2=one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg
 ACC3=one1r4zyyjqrulf935a479sgqlpa78kz7zlcg2jfen
@@ -228,8 +228,8 @@ if [ "$DOTEST" == "true" ]; then
    i=1
    echo "launching wallet cross shard transfer test"
    while [ $i -le $NUM_TEST ]; do
-      "${ROOT}/bin/wallet" -p local transfer --from $ACC1 --to $ACC3 --shardID 0 --toShardID 1 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
-      "${ROOT}/bin/wallet" -p local transfer --from $ACC2 --to $ACC3 --shardID 1 --toShardID 0 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
+      "${ROOT}/bin/wallet" -p local transfer --from $ACC1 --to $ACC3 --shardID 0 --toShardID 1 --amount 1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
+      "${ROOT}/bin/wallet" -p local transfer --from $ACC2 --to $ACC3 --shardID 1 --toShardID 0 --amount 1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
       sleep 25
       i=$((i+1))
    done
