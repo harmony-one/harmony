@@ -569,18 +569,19 @@ func main() {
 	case nodeconfig.Localnet:
 		shard.Schedule = shardingconfig.LocalnetSchedule
 	case nodeconfig.Devnet:
-		if *devnetHarmonySize < 0 {
-			*devnetHarmonySize = *devnetShardSize
-		}
-		// TODO (leo): use a passing list of accounts here
-		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
-				err)
-			os.Exit(1)
-		}
-		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
+		shard.Schedule = shardingconfig.TestnetSchedule // config specific for partner network (3-9-20)
+		//if *devnetHarmonySize < 0 {
+		//	*devnetHarmonySize = *devnetShardSize
+		//}
+		//// TODO (leo): use a passing list of accounts here
+		//devnetConfig, err := shardingconfig.NewInstance(
+		//	uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
+		//if err != nil {
+		//	_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
+		//		err)
+		//	os.Exit(1)
+		//}
+		//shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
 		os.Exit(2)
