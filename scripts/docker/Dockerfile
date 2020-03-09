@@ -1,10 +1,12 @@
 FROM alpine
 
+# install necessary packages
 RUN apk add --no-cache bash libstdc++ gmp-dev libc6-compat bind-tools jq && ln -s libcrypto.so.1.1 /lib/libcrypto.so.10
 
 # default base port, rpc port and rest port
 EXPOSE 9000/tcp 9500/tcp 9800/tcp 6000/tcp
 
+# database volumes, log volume, and key volume
 VOLUME ["/harmony/harmony_db_0","/harmony/harmony_db_1","/harmony/harmony_db_2","/harmony/harmony_db_3","/harmony/log","/harmony/.hmy"]
 
 # Default BN for S3/mainnet
@@ -29,3 +31,8 @@ WORKDIR /harmony
 
 COPY run /bin/run
 COPY harmony /bin/
+COPY bootnode /bin/
+COPY libmcl.so /lib/
+COPY libbls384_256.so /lib/
+
+RUN echo 'nameserver 8.8.8.8' > /etc/resolv.conf
