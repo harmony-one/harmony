@@ -228,8 +228,6 @@ func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys []*bls.Public
 		_, account := config.FindAccount(keyStr)
 		if account != nil {
 			initialAccounts = append(initialAccounts, account)
-		} else {
-			fmt.Printf("Bls key not found: %s\n", keyStr)
 		}
 	}
 }
