@@ -122,6 +122,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -M             support multi-key mode (default: off)
    -A             enable archival node mode (default: off)
    -R tracefile   enable p2p trace using tracefile (default: off)
+   -r address     start a pprof profiling server listening on the specified address
 
 examples:
 
@@ -168,6 +169,7 @@ shard_id=1
 download_harmony_db=false
 public_rpc=false
 blacklist=./.hmy/blacklist.txt
+pprof=""
 static=false
 multi_key=false
 archival=false
@@ -177,7 +179,7 @@ ${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVIMB:AYR: opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVIMB:AYR:r: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -203,6 +205,7 @@ do
    U) upgrade_rel="${OPTARG}";;
    P) public_rpc=true;;
    B) blacklist="${OPTARG}";;
+   r) pprof="${OPTARG}";;
    v) msg "version: $version"
       exit 0 ;;
    V) LD_LIBRARY_PATH=. ./harmony -version
@@ -682,6 +685,11 @@ do
    if ${public_rpc}; then
       args+=(
       -public_rpc
+      )
+   fi
+   if [ ! -z "${pprof}" ]; then
+      args+=(
+      -pprof "${pprof}"
       )
    fi
 # backward compatible with older harmony node software
