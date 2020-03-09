@@ -384,14 +384,20 @@ func (c *Committee) DeepCopy() Committee {
 }
 
 // BLSPublicKeys ..
-func (c *Committee) BLSPublicKeys() ([]BlsPublicKey, error) {
+func (c *Committee) BLSPublicKeys() ([]*bls.PublicKey, error) {
 	if c == nil {
 		return nil, ErrCommitteeNil
 	}
 
-	slice := make([]BlsPublicKey, len(c.Slots))
+	slice := make([]*bls.PublicKey, len(c.Slots))
 	for j := range c.Slots {
-		slice[j] = c.Slots[j].BlsPublicKey
+		committerKey := &bls.PublicKey{}
+		if err := c.Slots[j].BlsPublicKey.ToLibBLSPublicKey(
+			committerKey,
+		); err != nil {
+			return nil, err
+		}
+		slice[j] = committerKey
 	}
 	return slice, nil
 }

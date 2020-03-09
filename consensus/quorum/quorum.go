@@ -95,13 +95,11 @@ type SignatureReader interface {
 
 // DependencyInjectionWriter ..
 type DependencyInjectionWriter interface {
-	SetShardIDProvider(func() (uint32, error))
 	SetMyPublicKeyProvider(func() (*multibls.PublicKey, error))
 }
 
 // DependencyInjectionReader ..
 type DependencyInjectionReader interface {
-	ShardIDProvider() func() (uint32, error)
 	MyPublicKey() func() (*multibls.PublicKey, error)
 }
 
@@ -314,14 +312,6 @@ type composite struct {
 	DependencyInjectionWriter
 	DependencyInjectionReader
 	SignatureReader
-}
-
-func (d *depInject) SetShardIDProvider(p func() (uint32, error)) {
-	d.shardIDProvider = p
-}
-
-func (d *depInject) ShardIDProvider() func() (uint32, error) {
-	return d.shardIDProvider
 }
 
 func (d *depInject) SetMyPublicKeyProvider(p func() (*multibls.PublicKey, error)) {

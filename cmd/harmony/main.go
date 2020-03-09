@@ -422,9 +422,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
 	)
-	currentConsensus.Decider.SetShardIDProvider(func() (uint32, error) {
-		return currentConsensus.ShardID, nil
-	})
 	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 		return currentConsensus.PubKey, nil
 	})

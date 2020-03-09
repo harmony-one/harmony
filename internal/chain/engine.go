@@ -209,9 +209,6 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 			return errors.Wrapf(err, "cannot decoded shard state")
 		}
 		d := quorum.NewDecider(quorum.SuperMajorityStake)
-		d.SetShardIDProvider(func() (uint32, error) {
-			return parentHeader.ShardID(), nil
-		})
 		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
 		})
@@ -438,9 +435,6 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			return errors.Wrapf(err, "cannot read shard state")
 		}
 		d := quorum.NewDecider(quorum.SuperMajorityStake)
-		d.SetShardIDProvider(func() (uint32, error) {
-			return header.ShardID(), nil
-		})
 		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
 		})

@@ -125,7 +125,11 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	}
 
 	if !node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
-		return ctxerror.New("[VerifyCrossLink] CrossLink Epoch should >= cross link starting epoch", "crossLinkEpoch", cl.Epoch(), "cross_link_starting_eoch", node.Blockchain().Config().CrossLinkEpoch)
+		return ctxerror.New(
+			"[VerifyCrossLink] CrossLink Epoch should >= cross link starting epoch",
+			"crossLinkEpoch", cl.Epoch(), "cross_link_starting_eoch",
+			node.Blockchain().Config().CrossLinkEpoch,
+		)
 	}
 
 	// Verify signature of the new cross link header
@@ -141,20 +145,10 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 		return err
 	}
 
-	committerKeys := []*bls.PublicKey{}
-	parseKeysSuccess := true
-	for _, member := range committee.Slots {
-		committerKey := new(bls.PublicKey)
-		if err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
-			parseKeysSuccess = false
-			break
-		}
-		committerKeys = append(committerKeys, committerKey)
+	committerKeys, err := committee.BLSPublicKeys()
+	if err != nil {
+		return err
 	}
-	if !parseKeysSuccess {
-		return ctxerror.New("[VerifyCrossLink] cannot convert BLS public key", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
-	}
-
 	mask, err := bls_cosi.NewMask(committerKeys, nil)
 	if err != nil {
 		return ctxerror.New("[VerifyCrossLink] cannot create group sig mask", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
@@ -164,9 +158,6 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	}
 
 	decider := quorum.NewDecider(quorum.SuperMajorityStake)
-	decider.SetShardIDProvider(func() (uint32, error) {
-		return cl.ShardID(), nil
-	})
 	decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 		return nil, nil
 	})

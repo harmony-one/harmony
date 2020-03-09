@@ -182,7 +182,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 						AnErr("[proposeNewBlock] pending crosslink is already committed onchain", err)
 					continue
 				}
-				if err = node.VerifyCrossLink(pending); err != nil {
+				if err := node.VerifyCrossLink(pending); err != nil {
 					invalidToDelete = append(invalidToDelete, pending)
 					utils.Logger().Debug().
 						AnErr("[proposeNewBlock] pending crosslink verification failed", err)

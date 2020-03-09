@@ -477,9 +477,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
-		decider.SetShardIDProvider(func() (uint32, error) {
-			return consensus.ShardID, nil
-		})
 		decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return consensus.PubKey, nil
 		})
