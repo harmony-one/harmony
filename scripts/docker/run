@@ -77,10 +77,10 @@ function setup_env
 }
 
 # find my public ip address
-myip
+# myip
 
 # setup runtime environment
-setup_env
+# setup_env
 
 keydir=/harmony/.hmy
 

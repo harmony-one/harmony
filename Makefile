@@ -25,3 +25,15 @@ linux_static:
 	make -C $(TOP)/mcl -j4
 	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j4
 	./scripts/go_executable_build.sh -s
+
+clean:
+	make -C $(TOP)/mcl clean
+	make -C $(TOP)/bls clean
+	rm -f bin/*
+
+docker: exe
+	cp bin/harmony ./scripts/docker
+	cp bin/bootnode ./scripts/docker
+	cp bin/libbls384_256.so ./scripts/docker
+	cp bin/libmcl.so ./scripts/docker
+	pushd scripts/docker && sudo docker build -t harmonyone/node:latest . && popd
