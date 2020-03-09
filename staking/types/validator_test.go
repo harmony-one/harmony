@@ -167,7 +167,7 @@ func TestTotalDelegation(t *testing.T) {
 
 // check the validator wrapper's sanity
 func TestValidatorSanityCheck(t *testing.T) {
-	err := validator.SanityCheck()
+	err := validator.SanityCheck(DoNotEnforceMaxBLS)
 	if err != nil {
 		t.Error("expected", nil, "got", err)
 	}
@@ -175,16 +175,16 @@ func TestValidatorSanityCheck(t *testing.T) {
 	v := Validator{
 		Address: validatorAddr,
 	}
-	if err := v.SanityCheck(); err != errNeedAtLeastOneSlotKey {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errNeedAtLeastOneSlotKey {
 		t.Error("expected", errNeedAtLeastOneSlotKey, "got", err)
 	}
 
 	v.SlotPubKeys = setSlotPubKeys()
-	if err := v.SanityCheck(); err != errNilMinSelfDelegation {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errNilMinSelfDelegation {
 		t.Error("expected", errNilMinSelfDelegation, "got", err)
 	}
 	v.MinSelfDelegation = big.NewInt(1e18)
-	if err := v.SanityCheck(); err != errNilMaxTotalDelegation {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errNilMaxTotalDelegation {
 		t.Error("expected", errNilMaxTotalDelegation, "got", err)
 	}
 	v.MinSelfDelegation = big.NewInt(1e17)
@@ -193,7 +193,7 @@ func TestValidatorSanityCheck(t *testing.T) {
 		errMinSelfDelegationTooSmall,
 		"delegation-given %s", v.MinSelfDelegation.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 
@@ -205,7 +205,7 @@ func TestValidatorSanityCheck(t *testing.T) {
 		v.MaxTotalDelegation.String(),
 		v.MinSelfDelegation.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 	v.MinSelfDelegation = big.NewInt(1e18)
@@ -218,14 +218,14 @@ func TestValidatorSanityCheck(t *testing.T) {
 	e = errors.Wrapf(
 		errInvalidCommissionRate, "rate:%s", v.Rate.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 	v.Commission.Rate = plusTwoDec
 	e = errors.Wrapf(
 		errInvalidCommissionRate, "rate:%s", v.Rate.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 	v.Commission.Rate = numeric.MustNewDecFromStr("0.5")
@@ -233,14 +233,14 @@ func TestValidatorSanityCheck(t *testing.T) {
 	e = errors.Wrapf(
 		errInvalidCommissionRate, "rate:%s", v.MaxRate.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 	v.Commission.MaxRate = plusTwoDec
 	e = errors.Wrapf(
 		errInvalidCommissionRate, "rate:%s", v.MaxRate.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 	v.Commission.MaxRate = numeric.MustNewDecFromStr("0.9")
@@ -248,14 +248,14 @@ func TestValidatorSanityCheck(t *testing.T) {
 	e = errors.Wrapf(
 		errInvalidCommissionRate, "rate:%s", v.MaxChangeRate.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 	v.Commission.MaxChangeRate = plusTwoDec
 	e = errors.Wrapf(
 		errInvalidCommissionRate, "rate:%s", v.MaxChangeRate.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 	v.Commission.MaxChangeRate = numeric.MustNewDecFromStr("0.05")
@@ -263,7 +263,7 @@ func TestValidatorSanityCheck(t *testing.T) {
 	e = errors.Wrapf(
 		errCommissionRateTooLarge, "rate:%s", v.MaxRate.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 	v.Commission.MaxRate = numeric.MustNewDecFromStr("0.51")
@@ -271,12 +271,12 @@ func TestValidatorSanityCheck(t *testing.T) {
 	e = errors.Wrapf(
 		errCommissionRateTooLarge, "rate:%s", v.MaxChangeRate.String(),
 	)
-	if err := v.SanityCheck(); err.Error() != e.Error() {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
 	v.Commission.MaxChangeRate = numeric.MustNewDecFromStr("0.05")
 	v.SlotPubKeys = append(v.SlotPubKeys, v.SlotPubKeys[0])
-	if err := v.SanityCheck(); err != errDuplicateSlotKeys {
+	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errDuplicateSlotKeys {
 		t.Error("expected", errDuplicateSlotKeys, "got", err)
 	}
 }
@@ -284,21 +284,21 @@ func TestValidatorSanityCheck(t *testing.T) {
 func TestValidatorWrapperSanityCheck(t *testing.T) {
 	// no delegation must fail
 	wrapper := createNewValidatorWrapper(createNewValidator())
-	if err := wrapper.SanityCheck(); err == nil {
+	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
 		t.Error("expected", errInvalidSelfDelegation, "got", err)
 	}
 
 	// valid self delegation must not fail
 	valDel := NewDelegation(validatorAddr, big.NewInt(1e18))
 	wrapper.Delegations = []Delegation{valDel}
-	if err := wrapper.SanityCheck(); err != nil {
+	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err != nil {
 		t.Errorf("validator wrapper SanityCheck failed: %s", err)
 	}
 
 	// invalid self delegation must fail
 	valDel = NewDelegation(validatorAddr, big.NewInt(1e17))
 	wrapper.Delegations = []Delegation{valDel}
-	if err := wrapper.SanityCheck(); err == nil {
+	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
 		t.Error("expected", errInvalidSelfDelegation, "got", err)
 	}
 }

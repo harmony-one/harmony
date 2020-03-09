@@ -375,7 +375,9 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 		if validator.EPOSStatus != effective.Active {
 			continue
 		}
-		if err := validator.SanityCheck(); err != nil {
+		if err := validator.SanityCheck(
+			staking.DoNotEnforceMaxBLS,
+		); err != nil {
 			continue
 		}
 

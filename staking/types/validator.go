@@ -25,7 +25,6 @@ const (
 	MaxWebsiteLength         = 140
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
-	MaxNumBLSKeys            = 5
 	BlsVerificationStr       = "harmony-one"
 )
 
@@ -168,8 +167,11 @@ type Validator struct {
 	CreationHeight *big.Int `json:"creation-height"`
 }
 
+// DoNotEnforceMaxBLS ..
+const DoNotEnforceMaxBLS = -1
+
 // SanityCheck checks basic requirements of a validator
-func (v *Validator) SanityCheck() error {
+func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 	if _, err := v.EnsureLength(); err != nil {
 		return err
 	}
@@ -178,9 +180,11 @@ func (v *Validator) SanityCheck() error {
 		return errNeedAtLeastOneSlotKey
 	}
 
-	if c := len(v.SlotPubKeys); c > MaxNumBLSKeys {
+	if c := len(v.SlotPubKeys); oneThirdExtrn != DoNotEnforceMaxBLS &&
+		c > oneThirdExtrn {
 		return errors.Wrapf(
-			errExcessiveBLSKeys, "have: %d allowed: %d", c, MaxNumBLSKeys,
+			errExcessiveBLSKeys, "have: %d allowed: %d",
+			c, oneThirdExtrn,
 		)
 	}
 
@@ -292,8 +296,12 @@ var (
 )
 
 // SanityCheck checks the basic requirements
-func (w *ValidatorWrapper) SanityCheck() error {
-	if err := w.Validator.SanityCheck(); err != nil {
+func (w *ValidatorWrapper) SanityCheck(
+	oneThirdExternalValidator int,
+) error {
+	if err := w.Validator.SanityCheck(
+		oneThirdExternalValidator,
+	); err != nil {
 		return err
 	}
 	// Self delegation must be >= MinSelfDelegation
