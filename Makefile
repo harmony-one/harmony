@@ -18,6 +18,9 @@ libs:
 exe:
 	./scripts/go_executable_build.sh
 
+race:
+	./scripts/go_executable_build.sh -r
+
 test:
 	./test/debug.sh
 
