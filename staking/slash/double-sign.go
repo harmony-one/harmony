@@ -115,24 +115,8 @@ func (r Records) String() string {
 var (
 	errBallotSignerKeysNotSame = errors.New("conflicting ballots must have same signer key")
 	errReporterAndOffenderSame = errors.New("reporter and offender cannot be same")
+	errAlreadyBannedValidator  = errors.New("cannot slash on already banned validator")
 )
-
-// SanityCheck fails if any of the slashes fail
-func (r Records) SanityCheck() error {
-	for _, record := range r {
-		k1 := record.Evidence.AlreadyCastBallot.SignerPubKey
-		k2 := record.Evidence.DoubleSignedBallot.SignerPubKey
-		if k1 != k2 {
-			return errBallotSignerKeysNotSame
-		}
-
-		if record.Offender == record.Reporter {
-			return errReporterAndOffenderSame
-		}
-
-	}
-	return nil
-}
 
 // MarshalJSON ..
 func (r Record) MarshalJSON() ([]byte, error) {
@@ -161,15 +145,32 @@ type CommitteeReader interface {
 	ReadShardState(epoch *big.Int) (*shard.State, error)
 }
 
-// Verify checks that the signature is valid
-func Verify(chain CommitteeReader, candidate *Record) error {
+// Verify checks that the slash is valid
+func Verify(
+	chain CommitteeReader,
+	state *state.DB,
+	candidate *Record,
+) error {
+	wrapper, err := state.ValidatorWrapper(candidate.Offender)
+	if err != nil {
+		return err
+	}
+
+	if wrapper.EPOSStatus == effective.Banned {
+		return errAlreadyBannedValidator
+	}
+
+	if candidate.Offender == candidate.Reporter {
+		return errReporterAndOffenderSame
+	}
+
 	first, second :=
 		candidate.Evidence.AlreadyCastBallot,
 		candidate.Evidence.DoubleSignedBallot
 	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
 		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
 		return errors.Wrapf(
-			errBLSKeysNotEqual, "%s %s", k1, k2,
+			errBallotSignerKeysNotSame, "%s %s", k1, k2,
 		)
 	}
 	superCommittee, err := chain.ReadShardState(candidate.Evidence.Epoch)

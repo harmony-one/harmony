@@ -357,8 +357,12 @@ func (w *Worker) verifySlashes(
 		},
 	)
 
+	workingState := w.GetCurrentState()
+
 	for i := range d {
-		if err := slash.Verify(w.chain, &d[i]); err != nil {
+		if err := slash.Verify(
+			w.chain, workingState, &d[i],
+		); err != nil {
 			failures = append(failures, d[i])
 		}
 		successes = append(successes, d[i])
