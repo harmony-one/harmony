@@ -17,6 +17,6 @@ const (
 	Inactive
 	// Banned records whether this validator is banned
 	// from the network because they double-signed
-	// it can never be undo
+	// it can never be undone
 	Banned
 )
