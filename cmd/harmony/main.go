@@ -105,7 +105,7 @@ var (
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
-	blsFolder          = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys; same blspass is used to decrypt all bls keys; all bls keys mapped to same shard")
+	blsFolder          = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 	blsPassphrase      string
 	// Sharding configuration parameters for devnet
@@ -272,19 +272,53 @@ func setupStakingNodeAccount() error {
 }
 
 func readMultiBlsKeys(consensusMultiBlsPriKey *multibls.PrivateKey, consensusMultiBlsPubKey *multibls.PublicKey) error {
-	multiBlsKeyDir := blsFolder
-	blsKeyFiles, err := ioutil.ReadDir(*multiBlsKeyDir)
-	if err != nil {
-		return err
-	}
-
-	for _, blsKeyFile := range blsKeyFiles {
-		if filepath.Ext(blsKeyFile.Name()) != ".key" {
-			fmt.Println("BLS key file should have .key file extension, found", blsKeyFile.Name())
-			continue
+	keyPasses := map[string]string{}
+	blsKeyFiles := []os.FileInfo{}
+	if err := filepath.Walk(*blsFolder, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
 		}
-		blsKeyFilePath := path.Join(*multiBlsKeyDir, blsKeyFile.Name())
-		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(blsKeyFilePath, blsPassphrase) // uses the same bls passphrase for multiple bls keys
+		fullName := info.Name()
+		ext := filepath.Ext(fullName)
+		if ext == ".key" {
+			blsKeyFiles = append(blsKeyFiles, info)
+		} else if ext == ".pass" {
+			passFileName := "file:" + path
+			passphrase, err := utils.GetPassphraseFromSource(passFileName)
+			if err != nil {
+				return err
+			}
+			name := fullName[:len(fullName)-len(ext)]
+			keyPasses[name] = passphrase
+		} else {
+			return errors.Errorf(
+				"[Multi-BLS] found file: %s that does not have .key or .pass file extension",
+				path,
+			)
+		}
+		return nil
+	}); err != nil {
+		fmt.Fprintf(os.Stderr,
+			"[Multi-BLS] ERROR when reading blskey file under %s: %v\n",
+			*blsFolder,
+			err,
+		)
+		os.Exit(100)
+	}
+	for _, blsKeyFile := range blsKeyFiles {
+		fullName := blsKeyFile.Name()
+		ext := filepath.Ext(fullName)
+		name := fullName[:len(fullName)-len(ext)]
+		if val, ok := keyPasses[name]; ok {
+			blsPassphrase = val
+		} else {
+			fmt.Printf("[Multi-BLS] could not find passphrase for bls key file: %s, using passphrase from %s\n",
+				fullName,
+				*blsPass,
+			)
+		}
+		blsKeyFilePath := path.Join(*blsFolder, blsKeyFile.Name())
+		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
 		if err != nil {
 			return err
 		}
@@ -303,7 +337,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 	if *blsKeyFile != "" {
 		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
+			fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
 			os.Exit(100)
 		}
 		multibls.AppendPriKey(consensusMultiPriKey, consensusPriKey)
@@ -311,7 +345,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 	} else {
 		err := readMultiBlsKeys(consensusMultiPriKey, consensusMultiPubKey)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "ERROR when loading bls keys, err :%v\n", err)
+			fmt.Fprintf(os.Stderr, "[Multi-BLS] ERROR when loading bls keys, err :%v\n", err)
 			os.Exit(100)
 		}
 	}
