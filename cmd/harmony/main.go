@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path"
@@ -38,7 +40,7 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
+	"github.com/harmony-one/harmony/webhooks"
 	golog "github.com/ipfs/go-log"
 	"github.com/pkg/errors"
 	gologging "github.com/whyrusleeping/go-logging"
@@ -70,6 +72,7 @@ var (
 	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
 	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
+	pprof            = flag.String("pprof", "", "what address and port the pprof profiling server should listen on")
 	versionFlag      = flag.Bool("version", false, "Output version info")
 	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
 	dnsZone          = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
@@ -140,6 +143,11 @@ var (
 )
 
 func initSetup() {
+
+	// Setup pprof
+	if addr := *pprof; addr != "" {
+		go func() { http.ListenAndServe(addr, nil) }()
+	}
 
 	// maybe request passphrase for bls key.
 	passphraseForBls()
@@ -250,6 +258,9 @@ func setupStakingNodeAccount() error {
 	if err != nil {
 		return errors.Wrap(err, "cannot determine shard to join")
 	}
+	if err := nodeconfig.GetDefaultConfig().ValidateConsensusKeysForSameShard(pubKey.PublicKey, shardID); err != nil {
+		return err
+	}
 	for _, blsKey := range pubKey.PublicKey {
 		initialAccount := &genesis.DeployAccount{}
 		initialAccount.ShardID = shardID
@@ -355,14 +366,14 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	nodeConfig.DBDir = *dbDir
 
 	if p := *webHookYamlPath; p != "" {
-		config, err := slash.NewDoubleSignWebHooksFromPath(p)
+		config, err := webhooks.NewWebHooksFromPath(p)
 		if err != nil {
 			fmt.Fprintf(
 				os.Stderr, "yaml path is bad: %s", p,
 			)
 			os.Exit(1)
 		}
-		nodeConfig.WebHooks.DoubleSigning = config
+		nodeConfig.WebHooks.Hooks = config
 	}
 
 	return nodeConfig, nil
@@ -439,7 +450,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
-
+	currentNode.NodeConfig.DNSZone = *dnsZone
 	// Set up prometheus pushgateway for metrics monitoring serivce.
 	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
 	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)

@@ -460,7 +460,9 @@ func (w *Worker) FinalizeNewBlock(
 }
 
 // New create a new worker object.
-func New(config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine) *Worker {
+func New(
+	config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine,
+) *Worker {
 	worker := &Worker{
 		config:  config,
 		factory: blockfactory.NewFactory(config),

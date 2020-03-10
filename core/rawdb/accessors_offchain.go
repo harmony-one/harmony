@@ -260,8 +260,11 @@ func ReadValidatorList(db DatabaseReader, electedOnly bool) ([]common.Address, e
 }
 
 // WriteValidatorList stores staking validator's information by its address
-// Writes only for elected validators if electedOnly==true, otherwise, writes for all validators
-func WriteValidatorList(db DatabaseWriter, addrs []common.Address, electedOnly bool) error {
+// Writes only for elected validators
+// if electedOnly==true, otherwise, writes for all validators
+func WriteValidatorList(
+	db DatabaseWriter, addrs []common.Address, electedOnly bool,
+) error {
 	key := validatorListKey
 	if electedOnly {
 		key = electedValidatorListKey
@@ -271,10 +274,7 @@ func WriteValidatorList(db DatabaseWriter, addrs []common.Address, electedOnly b
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorList] Failed to encode")
 	}
-	if err := db.Put(key, bytes); err != nil {
-		utils.Logger().Error().Msg("[WriteValidatorList] Failed to store to database")
-	}
-	return err
+	return db.Put(key, bytes)
 }
 
 // ReadDelegationsByDelegator retrieves the list of validators delegated by a delegator

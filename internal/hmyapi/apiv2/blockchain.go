@@ -2,7 +2,6 @@ package apiv2
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -26,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -537,26 +537,25 @@ func (s *PublicBlockChainAPI) GetValidatorMetrics(ctx context.Context, address s
 	return stats, nil
 }
 
-// GetValidatorInformation returns information about a validator.
-func (s *PublicBlockChainAPI) GetValidatorInformation(ctx context.Context, address string) (*staking.ValidatorWrapper, error) {
+// GetValidatorInformation ..
+func (s *PublicBlockChainAPI) GetValidatorInformation(
+	ctx context.Context, address string,
+) (*staking.ValidatorRPCEnchanced, error) {
 	validatorAddress := internal_common.ParseAddr(address)
-	validator := s.b.GetValidatorInformation(validatorAddress)
-	if validator == nil {
-		addr, _ := internal_common.AddressToBech32(validatorAddress)
-		return nil, fmt.Errorf("validator not found: %s", addr)
-	}
-	return validator, nil
+	return s.b.GetValidatorInformation(validatorAddress)
 }
 
 // GetAllValidatorInformation returns information about all validators.
 // If page is -1, return all else return the pagination.
-func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, page int) ([]*staking.ValidatorWrapper, error) {
+func (s *PublicBlockChainAPI) GetAllValidatorInformation(
+	ctx context.Context, page int,
+) ([]*staking.ValidatorRPCEnchanced, error) {
 	if page < -1 {
-		return make([]*staking.ValidatorWrapper, 0), nil
+		return nil, errors.Errorf("page given %d cannot be less than -1", page)
 	}
 	addresses := s.b.GetAllValidatorAddresses()
 	if page != -1 && len(addresses) <= page*validatorsPageSize {
-		return make([]*staking.ValidatorWrapper, 0), nil
+		return make([]*staking.ValidatorRPCEnchanced, 0), nil
 	}
 	validatorsNum := len(addresses)
 	start := 0
@@ -567,13 +566,13 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(ctx context.Context, pa
 			validatorsNum = len(addresses) - start
 		}
 	}
-	validators := make([]*staking.ValidatorWrapper, validatorsNum)
+	validators := make([]*staking.ValidatorRPCEnchanced, validatorsNum)
 	for i := start; i < start+validatorsNum; i++ {
-		validators[i-start] = s.b.GetValidatorInformation(addresses[i])
-		if validators[i-start] == nil {
-			addr, _ := internal_common.AddressToBech32(addresses[i])
-			return nil, fmt.Errorf("error when getting validator info of %s", addr)
+		information, err := s.b.GetValidatorInformation(addresses[i])
+		if err != nil {
+			return nil, err
 		}
+		validators[i-start] = information
 	}
 	return validators, nil
 }
@@ -775,6 +774,11 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 		return s.b.GetSuperCommittees()
 	}
 	return nil, errNotBeaconChainShard
+}
+
+// GetCurrentBadBlocks ..
+func (s *PublicBlockChainAPI) GetCurrentBadBlocks() []core.BadBlock {
+	return s.b.GetCurrentBadBlocks()
 }
 
 // GetTotalSupply ..

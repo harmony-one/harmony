@@ -18,6 +18,7 @@ GOARCH=amd64
 FOLDER=/${WHOAMI:-$USER}
 RACE=
 VERBOSE=
+GO_GCFLAGS="all=-c 2"
 DEBUG=false
 NETWORK=main
 STATIC=false
@@ -102,6 +103,7 @@ function build_only
    BUILTBY=${USER}@
    local build=$1
 
+   set_gcflags
    set -e
 
    for bin in "${!SRC[@]}"; do
@@ -109,12 +111,12 @@ function build_only
          rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
          if [ "$DEBUG" == "true" ]; then
-            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-N -l -c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
          else
             if [ "$STATIC" == "true" ]; then
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE ${SRC[$bin]}
             else
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="all=-c 2" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
             fi
          fi
          if [ "$(uname -s)" == "Linux" ]; then
@@ -143,6 +145,21 @@ function build_only
       fi
    fi
    popd
+}
+
+function set_gcflags
+{
+   if [[ ! -z "$RACE" ]]; then
+      if [ "$DEBUG" == "true" ]; then
+         GO_GCFLAGS="all=-N -l"
+      else
+         GO_GCFLAGS=""
+      fi
+   else
+      if [ "$DEBUG" == "true" ]; then
+         GO_GCFLAGS="all=-N -l -c 2"
+      fi
+   fi
 }
 
 function upload
@@ -249,7 +266,7 @@ function upload_wallet
 }
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:rvsN:" option; do
+while getopts "hp:a:o:b:f:rvsdN:" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;

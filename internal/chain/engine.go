@@ -348,7 +348,12 @@ func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
 	return nil
 }
 
-func applySlashes(chain engine.ChainReader, header *block.Header, state *state.DB, doubleSigners slash.Records) error {
+func applySlashes(
+	chain engine.ChainReader,
+	header *block.Header,
+	state *state.DB,
+	doubleSigners slash.Records,
+) error {
 	superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
 
 	if err != nil {
@@ -360,9 +365,6 @@ func applySlashes(chain engine.ChainReader, header *block.Header, state *state.D
 	var slashApplied *slash.Application
 	rate := slash.Rate(len(doubleSigners), staked.CountStakedBLSKey)
 	utils.Logger().Info().
-		Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-		Uint64("finalizing-epoch", header.Epoch().Uint64()).
-		Uint64("block-number", header.Number().Uint64()).
 		Str("rate", rate.String()).
 		RawJSON("records", []byte(doubleSigners.String())).
 		Msg("now applying slash to state during block finalization")
@@ -376,9 +378,6 @@ func applySlashes(chain engine.ChainReader, header *block.Header, state *state.D
 	}
 
 	utils.Logger().Info().
-		Uint64("current-epoch", chain.CurrentHeader().Epoch().Uint64()).
-		Uint64("finalizing-epoch", header.Epoch().Uint64()).
-		Uint64("block-number", header.Number().Uint64()).
 		Str("rate", rate.String()).
 		RawJSON("records", []byte(doubleSigners.String())).
 		RawJSON("applied", []byte(slashApplied.String())).
