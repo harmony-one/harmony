@@ -194,8 +194,6 @@ func ComputeCurrentSigning(
 
 	if toSign.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().
-			RawJSON("snapshot", []byte(snapshot.String())).
-			RawJSON("current", []byte(wrapper.String())).
 			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
 		return signed, toSign, numeric.ZeroDec(), nil
 	}
@@ -250,8 +248,6 @@ func compute(
 	}
 
 	utils.Logger().Info().
-		RawJSON("snapshot", []byte(snapshot.String())).
-		RawJSON("current", []byte(wrapper.String())).
 		Str("signed", signed.String()).
 		Str("to-sign", toSign.String()).
 		Str("percentage-signed", quotient.String()).
@@ -264,8 +260,6 @@ func compute(
 	case missedTooManyBlocks:
 		wrapper.EPOSStatus = effective.Inactive
 		utils.Logger().Info().
-			RawJSON("snapshot", []byte(snapshot.String())).
-			RawJSON("current", []byte(wrapper.String())).
 			Str("threshold", measure.String()).
 			Msg("validator failed availability threshold, set to inactive")
 	default:

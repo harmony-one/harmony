@@ -333,7 +333,10 @@ func (b *APIBackend) GetValidatorInformation(
 		s, _ := internal_common.AddressToBech32(addr)
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
 	}
-	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshot(addr)
+	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
+		b.hmy.BlockChain().CurrentHeader().Epoch(),
+		addr,
+	)
 	if err != nil {
 		return &staking.ValidatorRPCEnchanced{
 			Wrapper: *wrapper,

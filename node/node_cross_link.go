@@ -67,9 +67,8 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			return
 		}
 
-		var crosslinks []types.CrossLink
-		err = rlp.DecodeBytes(msgPayload, &crosslinks)
-		if err != nil {
+		crosslinks := []types.CrossLink{}
+		if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
 			utils.Logger().Error().
 				Err(err).
 				Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
