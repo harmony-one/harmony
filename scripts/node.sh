@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200304.0"
+version="v1 20200309.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -275,6 +275,7 @@ if [ "$OS" == "Linux" ]; then
    FOLDER=release/linux-x86_64/$REL
    if [ "$static" == "true" ]; then
       BIN=( harmony md5sum.txt )
+      FOLDER=${FOLDER}/static
    else
       BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
    fi
@@ -485,9 +486,6 @@ any_new_binaries() {
    ${do_not_download} && return 0
    outdir="${1:-.}"
    mkdir -p "${outdir}"
-   if [ "$static" == "true" ]; then
-      FOLDER=${FOLDER}/static
-   fi
    curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
    if diff $outdir/md5sum.txt.new md5sum.txt
    then
