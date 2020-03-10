@@ -206,15 +206,15 @@ func (bc *BlockChain) CommitOffChainData(
 			records := slash.Records{}
 			if s := header.Slashes(); len(s) > 0 {
 				if err := rlp.DecodeBytes(s, &records); err != nil {
-					return NonStatTy, err
+					utils.Logger().Debug().Err(err).Msg("could not decode slashes in header")
 				}
 				if err := bc.DeleteFromPendingSlashingCandidates(records); err != nil {
-					return NonStatTy, err
+					utils.Logger().Debug().Err(err).Msg("could not deleting pending slashes")
 				}
 			}
 		} else {
 			// block reward never accumulate before staking
-			bc.WriteBlockRewardAccumulator(batch, big.NewInt(0), block.Number().Uint64())
+			bc.WriteBlockRewardAccumulator(batch, common.Big0, block.Number().Uint64())
 		}
 	}
 
