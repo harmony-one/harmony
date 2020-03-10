@@ -17,10 +17,11 @@
 package core
 
 import (
-	staking2 "github.com/harmony-one/harmony/staking"
-	"github.com/harmony-one/harmony/staking/network"
 	"math"
 	"math/big"
+
+	staking2 "github.com/harmony-one/harmony/staking"
+	"github.com/harmony-one/harmony/staking/network"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"

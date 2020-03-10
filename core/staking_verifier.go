@@ -2,8 +2,9 @@ package core
 
 import (
 	"bytes"
-	"github.com/harmony-one/harmony/internal/utils"
 	"math/big"
+
+	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/pkg/errors"
 
