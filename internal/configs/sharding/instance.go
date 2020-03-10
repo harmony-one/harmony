@@ -16,6 +16,7 @@ const (
 	TestNet
 	LocalNet
 	Pangaea
+	Partner
 	DevNet
 )
 

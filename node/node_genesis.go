@@ -74,10 +74,12 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	// Initialize genesis block and blockchain
 
 	genesisAlloc := make(core.GenesisAlloc)
-	chainConfig := *params.TestnetChainConfig
+	chainConfig := params.ChainConfig{}
 	gasLimit := params.GenesisGasLimit
 
-	switch node.NodeConfig.GetNetworkType() {
+	netType := node.NodeConfig.GetNetworkType()
+
+	switch netType {
 	case nodeconfig.Mainnet:
 		chainConfig = *params.MainnetChainConfig
 		if shardID == 0 {
@@ -86,9 +88,14 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		}
 	case nodeconfig.Pangaea:
 		chainConfig = *params.PangaeaChainConfig
-		fallthrough // the rest is the same as testnet
+	case nodeconfig.Partner:
+		chainConfig = *params.PartnerChainConfig
 	default: // all other types share testnet config
-		// Test accounts
+		chainConfig = *params.TestChainConfig
+	}
+
+	// All non-mainnet chains get test accounts
+	if netType != nodeconfig.Mainnet {
 		node.AddTestingAddresses(genesisAlloc, TestAccountNumber)
 		gasLimit = params.TestGenesisGasLimit
 		// Smart contract deployer account used to deploy initial smart contract

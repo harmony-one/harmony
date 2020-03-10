@@ -54,6 +54,7 @@ const (
 	Mainnet  = "mainnet"
 	Testnet  = "testnet"
 	Pangaea  = "pangaea"
+	Partner  = "partner"
 	Devnet   = "devnet"
 	Localnet = "localnet"
 )
@@ -320,6 +321,8 @@ func (t NetworkType) ChainConfig() params.ChainConfig {
 		return *params.MainnetChainConfig
 	case Pangaea:
 		return *params.PangaeaChainConfig
+	case Partner:
+		return *params.PartnerChainConfig
 	case Localnet:
 		return *params.LocalnetChainConfig
 	default:
