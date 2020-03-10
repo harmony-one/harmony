@@ -294,8 +294,11 @@ func (e *engineImpl) Finalize(
 }
 
 // Withdraw unlocked tokens to the delegators' accounts
-func payoutUndelegations(chain engine.ChainReader, header *block.Header, state *state.DB) error {
+func payoutUndelegations(
+	chain engine.ChainReader, header *block.Header, state *state.DB,
+) error {
 	validators, err := chain.ReadValidatorList()
+	countTrack := map[common.Address]int{}
 	if err != nil {
 		const msg = "[Finalize] failed to read all validators"
 		return ctxerror.New(msg).WithCause(err)
@@ -315,6 +318,7 @@ func payoutUndelegations(chain engine.ChainReader, header *block.Header, state *
 			)
 			state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 		}
+		countTrack[validator] = len(wrapper.Delegations)
 		if err := state.UpdateValidatorWrapper(
 			validator, wrapper,
 		); err != nil {
@@ -322,6 +326,13 @@ func payoutUndelegations(chain engine.ChainReader, header *block.Header, state *
 			return ctxerror.New(msg).WithCause(err)
 		}
 	}
+
+	utils.Logger().Info().
+		Uint64("epoch", header.Epoch().Uint64()).
+		Uint64("block-number", header.Number().Uint64()).
+		Interface("count-track", countTrack).
+		Msg("paid out delegations")
+
 	return nil
 }
 
