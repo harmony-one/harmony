@@ -20,3 +20,16 @@ const (
 	// it can never be undone
 	Banned
 )
+
+func (e Eligibility) String() string {
+	switch e {
+	case Active:
+		return "active"
+	case Inactive:
+		return "inactive"
+	case Banned:
+		return "banned"
+	default:
+		return "nil"
+	}
+}
