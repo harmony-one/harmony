@@ -286,15 +286,27 @@ func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (*shard.State, error) 
 func (cr *fakeChainReader) ReadElectedValidatorList() ([]common.Address, error)     { return nil, nil }
 func (cr *fakeChainReader) ReadValidatorList() ([]common.Address, error)            { return nil, nil }
 func (cr *fakeChainReader) ValidatorCandidates() []common.Address                   { return nil }
-func (cr *fakeChainReader) SuperCommitteeForNextEpoch(beacon consensus_engine.ChainReader, header *block.Header, isVerify bool) (*shard.State, error) {
+func (cr *fakeChainReader) SuperCommitteeForNextEpoch(
+	beacon consensus_engine.ChainReader, header *block.Header, isVerify bool,
+) (*shard.State, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
+func (cr *fakeChainReader) ReadValidatorInformation(
+	addr common.Address,
+) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
+func (cr *fakeChainReader) ReadValidatorSnapshot(
+	addr common.Address,
+) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
+func (cr *fakeChainReader) ReadValidatorSnapshotAtEpoch(
+	epoch *big.Int, addr common.Address,
+) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+
 func (cr *fakeChainReader) ReadBlockRewardAccumulator(uint64) (*big.Int, error)         { return nil, nil }
 func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) *big.Int { return nil }
 func (cr *fakeChainReader) ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error) {

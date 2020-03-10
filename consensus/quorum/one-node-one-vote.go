@@ -93,17 +93,14 @@ func (v *uniformVoteWeight) String() string {
 }
 
 func (v *uniformVoteWeight) MarshalJSON() ([]byte, error) {
-	s, _ := v.ShardIDProvider()()
-
 	type t struct {
 		Policy       string   `json:"policy"`
-		ShardID      uint32   `json:"shard-id"`
 		Count        int      `json:"count"`
 		Participants []string `json:"committee-members"`
 	}
 
 	members := v.DumpParticipants()
-	return json.Marshal(t{v.Policy().String(), s, len(members), members})
+	return json.Marshal(t{v.Policy().String(), len(members), members})
 }
 
 func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {

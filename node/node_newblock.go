@@ -182,7 +182,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 						AnErr("[proposeNewBlock] pending crosslink is already committed onchain", err)
 					continue
 				}
-				if err = node.VerifyCrossLink(pending); err != nil {
+				if err := node.VerifyCrossLink(pending); err != nil {
 					invalidToDelete = append(invalidToDelete, pending)
 					utils.Logger().Debug().
 						AnErr("[proposeNewBlock] pending crosslink verification failed", err)
@@ -204,8 +204,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	if isBeaconchainInStakingEra {
-		// this one will set a meaningful w.current.slashes
-		if err := node.Worker.CollectAndVerifySlashes(); err != nil {
+		// this will set a meaningful w.current.slashes
+		if err := node.Worker.CollectVerifiedSlashes(); err != nil {
 			return nil, err
 		}
 	}

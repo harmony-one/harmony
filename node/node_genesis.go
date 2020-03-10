@@ -51,14 +51,13 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 	if shardState == nil {
 		return errors.New("failed to create genesis shard state")
 	}
-
 	if shardID != shard.BeaconChainShardID {
 		// store only the local shard for shard chains
-		c := shardState.FindCommitteeByID(shardID)
-		if c == nil {
+		subComm, err := shardState.FindCommitteeByID(shardID)
+		if err != nil {
 			return errors.New("cannot find local shard in genesis")
 		}
-		shardState = &shard.State{nil, []shard.Committee{*c}}
+		shardState = &shard.State{nil, []shard.Committee{*subComm}}
 	}
 	gi.node.SetupGenesisBlock(db, shardID, shardState)
 	return nil

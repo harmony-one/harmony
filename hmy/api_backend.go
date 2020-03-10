@@ -333,31 +333,33 @@ func (b *APIBackend) GetValidatorInformation(
 		s, _ := internal_common.AddressToBech32(addr)
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
 	}
-	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshot(addr)
+	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
+		b.hmy.BlockChain().CurrentHeader().Epoch(),
+		addr,
+	)
+	defaultReply := &staking.ValidatorRPCEnchanced{
+		Wrapper: *wrapper,
+		CurrentSigningPercentage: staking.Computed{
+			common.Big0, common.Big0, numeric.ZeroDec(),
+		},
+		CurrentVotingPower: []staking.VotePerShard{},
+	}
 	if err != nil {
-		return &staking.ValidatorRPCEnchanced{
-			Wrapper: *wrapper,
-			CurrentSigningPercentage: staking.Computed{
-				common.Big0, common.Big0, numeric.ZeroDec(),
-			},
-			CurrentVotingPower: []staking.VotePerShard{},
-		}, nil
+		return defaultReply, nil
 	}
 
 	signed, toSign, quotient, err := availability.ComputeCurrentSigning(snapshot, wrapper)
 	if err != nil {
-		return nil, err
+		return defaultReply, nil
 	}
 	stats, err := b.hmy.BlockChain().ReadValidatorStats(addr)
 	if err != nil {
-		return nil, err
+		return defaultReply, nil
 	}
 
-	return &staking.ValidatorRPCEnchanced{
-		Wrapper:                  *wrapper,
-		CurrentSigningPercentage: staking.Computed{signed, toSign, quotient},
-		CurrentVotingPower:       stats.VotingPowerPerShard,
-	}, nil
+	defaultReply.CurrentSigningPercentage = staking.Computed{signed, toSign, quotient}
+	defaultReply.CurrentVotingPower = stats.VotingPowerPerShard
+	return defaultReply, nil
 }
 
 // GetMedianRawStakeSnapshot ..
@@ -372,10 +374,12 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !effective.IsEligibleForEPOSAuction(validator) {
+		if validator.EPOSStatus != effective.Active {
 			continue
 		}
-		if err := validator.SanityCheck(); err != nil {
+		if err := validator.SanityCheck(
+			staking.DoNotEnforceMaxBLS,
+		); err != nil {
 			continue
 		}
 
@@ -430,7 +434,7 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	stakes := big.NewInt(0)
 	for i := range candidates {
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
-		if !effective.IsEligibleForEPOSAuction(validator) {
+		if validator.EPOSStatus != effective.Active {
 			continue
 		}
 		for i := range validator.Delegations {
@@ -558,9 +562,6 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
 		shardID := comm.ShardID
-		decider.SetShardIDProvider(func() (uint32, error) {
-			return shardID, nil
-		})
 		decider.SetVoters(comm.Slots)
 		then.Deciders[shardID] = decider
 	}
@@ -568,9 +569,6 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
 		shardID := comm.ShardID
-		decider.SetShardIDProvider(func() (uint32, error) {
-			return shardID, nil
-		})
 		decider.SetVoters(comm.Slots)
 		now.Deciders[shardID] = decider
 	}

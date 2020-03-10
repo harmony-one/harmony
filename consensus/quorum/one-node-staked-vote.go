@@ -182,7 +182,6 @@ func (v *stakedVoteWeight) String() string {
 }
 
 func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
-	s, _ := v.ShardIDProvider()()
 	voterCount := len(v.roster.Voters)
 	type u struct {
 		IsHarmony      bool   `json:"is-harmony-slot"`
@@ -195,7 +194,6 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 
 	type t struct {
 		Policy            string `json"policy"`
-		ShardID           uint32 `json:"shard-id"`
 		Count             int    `json:"count"`
 		Participants      []u    `json:"committee-members"`
 		HmyVotingPower    string `json:"hmy-voting-power"`
@@ -224,7 +222,6 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(t{
 		v.Policy().String(),
-		s,
 		voterCount,
 		parts,
 		v.roster.OurVotingPowerTotalPercentage.String(),

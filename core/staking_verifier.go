@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/vm"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -43,7 +44,9 @@ func VerifyAndCreateValidatorFromMsg(
 		return nil, errNegativeAmount
 	}
 	if stateDB.IsValidator(msg.ValidatorAddress) {
-		return nil, errors.Wrapf(errValidatorExist, common2.MustAddressToBech32(msg.ValidatorAddress))
+		return nil, errors.Wrapf(
+			errValidatorExist, common2.MustAddressToBech32(msg.ValidatorAddress),
+		)
 	}
 	if !CanTransfer(stateDB, msg.ValidatorAddress, msg.Amount) {
 		return nil, errInsufficientBalanceForStake
@@ -60,7 +63,7 @@ func VerifyAndCreateValidatorFromMsg(
 	zero := big.NewInt(0)
 	wrapper.Counters.NumBlocksSigned = zero
 	wrapper.Counters.NumBlocksToSign = zero
-	if err := wrapper.SanityCheck(); err != nil {
+	if err := wrapper.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {
 		return nil, err
 	}
 	return wrapper, nil
@@ -71,7 +74,8 @@ func VerifyAndCreateValidatorFromMsg(
 //
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndEditValidatorFromMsg(
-	stateDB vm.StateDB, chainContext ChainContext, blockNum *big.Int, msg *staking.EditValidator,
+	stateDB vm.StateDB, chainContext ChainContext,
+	blockNum *big.Int, msg *staking.EditValidator,
 ) (*staking.ValidatorWrapper, error) {
 	if stateDB == nil {
 		return nil, errStateDBIsMissing
@@ -107,11 +111,13 @@ func VerifyAndEditValidatorFromMsg(
 		wrapper.Validator.UpdateHeight = blockNum
 	}
 
-	if newRate.Sub(rateAtBeginningOfEpoch).Abs().GT(wrapper.Validator.MaxChangeRate) {
+	if newRate.Sub(rateAtBeginningOfEpoch).Abs().GT(
+		wrapper.Validator.MaxChangeRate,
+	) {
 		return nil, errCommissionRateChangeTooFast
 	}
 
-	if err := wrapper.SanityCheck(); err != nil {
+	if err := wrapper.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {
 		return nil, err
 	}
 	return wrapper, nil
@@ -154,14 +160,18 @@ func VerifyAndDelegateFromMsg(
 					if delegation.Undelegations[i].Amount.Cmp(delegateBalance) <= 0 {
 						delegateBalance.Sub(delegateBalance, delegation.Undelegations[i].Amount)
 					} else {
-						delegation.Undelegations[i].Amount.Sub(delegation.Undelegations[i].Amount, delegateBalance)
+						delegation.Undelegations[i].Amount.Sub(
+							delegation.Undelegations[i].Amount, delegateBalance,
+						)
 						delegateBalance = big.NewInt(0)
 						break
 					}
 				}
 				delegation.Undelegations = delegation.Undelegations[:i+1]
 				delegation.Amount.Add(delegation.Amount, msg.Amount)
-				if err := wrapper.SanityCheck(); err != nil {
+				if err := wrapper.SanityCheck(
+					staking.DoNotEnforceMaxBLS,
+				); err != nil {
 					return nil, nil, err
 				}
 				if delegateBalance.Cmp(big.NewInt(0)) < 0 {
@@ -183,12 +193,16 @@ func VerifyAndDelegateFromMsg(
 		}
 	}
 	// If no redelegation, create new delegation
-	wrapper.Delegations = append(wrapper.Delegations, staking.NewDelegation(msg.DelegatorAddress, msg.Amount))
-	if err := wrapper.SanityCheck(); err != nil {
-		return nil, nil, err
-	}
 	if !CanTransfer(stateDB, msg.DelegatorAddress, msg.Amount) {
 		return nil, nil, errInsufficientBalanceForStake
+	}
+	wrapper.Delegations = append(
+		wrapper.Delegations, staking.NewDelegation(
+			msg.DelegatorAddress, msg.Amount,
+		),
+	)
+	if err := wrapper.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {
+		return nil, nil, err
 	}
 	return wrapper, msg.Amount, nil
 }
@@ -227,7 +241,9 @@ func VerifyAndUndelegateFromMsg(
 			if err := delegation.Undelegate(epoch, msg.Amount); err != nil {
 				return nil, err
 			}
-			if err := wrapper.SanityCheck(); err != nil {
+			if err := wrapper.SanityCheck(
+				staking.DoNotEnforceMaxBLS,
+			); err != nil {
 				return nil, err
 			}
 			return wrapper, nil
@@ -257,7 +273,7 @@ func VerifyAndCollectRewardsFromDelegation(
 		}
 		if uint64(len(wrapper.Delegations)) > delegation.Index {
 			delegation := &wrapper.Delegations[delegation.Index]
-			if delegation.Reward.Cmp(big.NewInt(0)) > 0 {
+			if delegation.Reward.Cmp(common.Big0) > 0 {
 				totalRewards.Add(totalRewards, delegation.Reward)
 				delegation.Reward.SetUint64(0)
 			}
@@ -269,7 +285,9 @@ func VerifyAndCollectRewardsFromDelegation(
 				Msg("Delegation index out of bound")
 			return nil, nil, errors.New("Delegation index out of bound")
 		}
-		if err := wrapper.SanityCheck(); err != nil {
+		if err := wrapper.SanityCheck(
+			staking.DoNotEnforceMaxBLS,
+		); err != nil {
 			return nil, nil, err
 		}
 		updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)

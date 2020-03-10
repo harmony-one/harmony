@@ -27,6 +27,8 @@ type Ballot struct {
 	SignerPubKey    shard.BlsPublicKey `json:"bls-public-key"`
 	BlockHeaderHash common.Hash        `json:"block-header-hash"`
 	Signature       []byte             `json:"bls-signature"`
+	Height          uint64             `json:"block-height"`
+	ViewID          uint64             `json:"view-id"`
 }
 
 // MarshalJSON ..
@@ -35,10 +37,14 @@ func (b Ballot) MarshalJSON() ([]byte, error) {
 		A string `json:"bls-public-key"`
 		B string `json:"block-header-hash"`
 		C string `json:"bls-signature"`
+		E uint64 `json:"block-height"`
+		F uint64 `json:"view-id"`
 	}{
 		b.SignerPubKey.Hex(),
 		b.BlockHeaderHash.Hex(),
 		hex.EncodeToString(b.Signature),
+		b.Height,
+		b.ViewID,
 	})
 }
 

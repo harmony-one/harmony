@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
 
@@ -147,22 +148,25 @@ func (bc *BlockChain) CommitOffChainData(
 		bc.chainConfig.IsCrossLink(block.Epoch()) &&
 		len(header.CrossLinks()) > 0 {
 		crossLinks := &types.CrossLinks{}
-		err = rlp.DecodeBytes(header.CrossLinks(), crossLinks)
-		if err != nil {
-			header.Logger(
-				utils.Logger()).
+		if err := rlp.DecodeBytes(
+			header.CrossLinks(), crossLinks,
+		); err != nil {
+			header.Logger(utils.Logger()).
 				Warn().Err(err).
 				Msg("[insertChain/crosslinks] cannot parse cross links")
 			return NonStatTy, err
 		}
 		if !crossLinks.IsSorted() {
-			header.Logger(utils.Logger()).Warn().
-				Err(err).Msg("[insertChain/crosslinks] cross links are not sorted")
+			header.Logger(utils.Logger()).
+				Warn().Err(err).
+				Msg("[insertChain/crosslinks] cross links are not sorted")
 			return NonStatTy, errors.New("proposed cross links are not sorted")
 		}
 		for _, crossLink := range *crossLinks {
 			// Process crosslink
-			if err := bc.WriteCrossLinks(batch, types.CrossLinks{crossLink}); err == nil {
+			if err := bc.WriteCrossLinks(
+				batch, types.CrossLinks{crossLink},
+			); err == nil {
 				utils.Logger().Info().
 					Uint64("blockNum", crossLink.BlockNum()).
 					Uint32("shardID", crossLink.ShardID()).
@@ -185,6 +189,7 @@ func (bc *BlockChain) CommitOffChainData(
 		utils.Logger().
 			Debug().
 			Msgf(msg, len(*crossLinks), num)
+		utils.Logger().Debug().Msgf(msg, len(*crossLinks), num)
 	}
 	// Roll up latest crosslinks
 	for i := uint32(0); i < shard.Schedule.InstanceForEpoch(epoch).NumShards(); i++ {
@@ -198,12 +203,18 @@ func (bc *BlockChain) CommitOffChainData(
 			); err != nil {
 				return NonStatTy, err
 			}
-			if err := bc.DeletePendingSlashingCandidates(); err != nil {
-				return NonStatTy, err
+			records := slash.Records{}
+			if s := header.Slashes(); len(s) > 0 {
+				if err := rlp.DecodeBytes(s, &records); err != nil {
+					utils.Logger().Debug().Err(err).Msg("could not decode slashes in header")
+				}
+				if err := bc.DeleteFromPendingSlashingCandidates(records); err != nil {
+					utils.Logger().Debug().Err(err).Msg("could not deleting pending slashes")
+				}
 			}
 		} else {
 			// block reward never accumulate before staking
-			bc.WriteBlockRewardAccumulator(batch, big.NewInt(0), block.Number().Uint64())
+			bc.WriteBlockRewardAccumulator(batch, common.Big0, block.Number().Uint64())
 		}
 	}
 

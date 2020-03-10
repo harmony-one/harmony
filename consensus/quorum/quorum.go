@@ -7,7 +7,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -26,11 +25,14 @@ const (
 	ViewChange
 )
 
-var phaseNames = map[Phase]string{
-	Prepare:    "Prepare",
-	Commit:     "Commit",
-	ViewChange: "viewChange",
-}
+var (
+	phaseNames = map[Phase]string{
+		Prepare:    "Prepare",
+		Commit:     "Commit",
+		ViewChange: "viewChange",
+	}
+	errPhaseUnknown = errors.New("invariant of known phase violated")
+)
 
 func (p Phase) String() string {
 	if name, ok := phaseNames[p]; ok {
@@ -76,8 +78,10 @@ type ParticipantTracker interface {
 type SignatoryTracker interface {
 	ParticipantTracker
 	SubmitVote(
-		p Phase, PubKey *bls.PublicKey, sig *bls.Sign, headerHash common.Hash,
-	) *votepower.Ballot
+		p Phase, PubKey *bls.PublicKey,
+		sig *bls.Sign, headerHash common.Hash,
+		height, viewID uint64,
+	) (*votepower.Ballot, error)
 	// Caller assumes concurrency protection
 	SignersCount(Phase) int64
 	reset([]Phase)
@@ -95,13 +99,11 @@ type SignatureReader interface {
 
 // DependencyInjectionWriter ..
 type DependencyInjectionWriter interface {
-	SetShardIDProvider(func() (uint32, error))
 	SetMyPublicKeyProvider(func() (*multibls.PublicKey, error))
 }
 
 // DependencyInjectionReader ..
 type DependencyInjectionReader interface {
-	ShardIDProvider() func() (uint32, error)
 	MyPublicKey() func() (*multibls.PublicKey, error)
 }
 
@@ -225,12 +227,16 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 }
 
 func (s *cIdentities) SubmitVote(
-	p Phase, PubKey *bls.PublicKey, sig *bls.Sign, headerHash common.Hash,
-) *votepower.Ballot {
+	p Phase, PubKey *bls.PublicKey,
+	sig *bls.Sign, headerHash common.Hash,
+	height, viewID uint64,
+) (*votepower.Ballot, error) {
 	ballot := &votepower.Ballot{
 		SignerPubKey:    *shard.FromLibBLSPublicKeyUnsafe(PubKey),
 		BlockHeaderHash: headerHash,
 		Signature:       common.Hex2Bytes(sig.SerializeToHexStr()),
+		Height:          height,
+		ViewID:          viewID,
 	}
 	switch hex := PubKey.SerializeToHexStr(); p {
 	case Prepare:
@@ -240,11 +246,9 @@ func (s *cIdentities) SubmitVote(
 	case ViewChange:
 		s.viewChange.BallotBox[hex] = ballot
 	default:
-		utils.Logger().Err(errors.New("invariant of known phase violated")).
-			Str("phase", p.String()).
-			Msg("bad vote input")
+		return nil, errors.Wrapf(errPhaseUnknown, "given: %s", p.String())
 	}
-	return ballot
+	return ballot, nil
 }
 
 func (s *cIdentities) reset(ps []Phase) {
@@ -314,14 +318,6 @@ type composite struct {
 	DependencyInjectionWriter
 	DependencyInjectionReader
 	SignatureReader
-}
-
-func (d *depInject) SetShardIDProvider(p func() (uint32, error)) {
-	d.shardIDProvider = p
-}
-
-func (d *depInject) ShardIDProvider() func() (uint32, error) {
-	return d.shardIDProvider
 }
 
 func (d *depInject) SetMyPublicKeyProvider(p func() (*multibls.PublicKey, error)) {
