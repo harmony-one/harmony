@@ -171,6 +171,7 @@ func (v *Validator) SanityCheck() error {
 		return err
 	}
 
+	// TODO(audit): add limit on the number of bls keys one can have.
 	if len(v.SlotPubKeys) == 0 {
 		return errNeedAtLeastOneSlotKey
 	}
@@ -184,7 +185,7 @@ func (v *Validator) SanityCheck() error {
 	}
 
 	// MinSelfDelegation must be >= 1 ONE
-	if !v.Banned && v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+	if v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
 		return errors.Wrapf(
 			errMinSelfDelegationTooSmall,
 			"delegation-given %s", v.MinSelfDelegation.String(),
@@ -510,6 +511,7 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		}
 	}
 
+	// TODO(audit): change bool fields into a string status field
 	if edit.Active != nil {
 		validator.Active = *edit.Active
 	}

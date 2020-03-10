@@ -17,6 +17,8 @@
 package core
 
 import (
+	staking2 "github.com/harmony-one/harmony/staking"
+	"github.com/harmony-one/harmony/staking/network"
 	"math"
 	"math/big"
 
@@ -291,7 +293,6 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
 
 	// Pay intrinsic gas
-	// TODO: propose staking-specific formula for staking transaction
 	gas, err := IntrinsicGas(st.data, false, homestead, msg.Type() == types.StakeCreateVal)
 
 	if err != nil {
@@ -354,7 +355,15 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.DelegatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.verifyAndApplyCollectRewards(stkMsg)
+		collectedRewards, err := st.verifyAndApplyCollectRewards(stkMsg)
+		if err == nil {
+			st.state.AddLog(&types.Log{
+				Address:     stkMsg.DelegatorAddress,
+				Topics:      []common.Hash{staking2.CollectRewardsTopic},
+				Data:        collectedRewards.Bytes(),
+				BlockNumber: st.evm.BlockNumber.Uint64(),
+			})
+		}
 	default:
 		return 0, staking.ErrInvalidStakingKind
 	}
@@ -396,11 +405,10 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 	if err != nil {
 		return err
 	}
-	if err := st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper); err != nil {
-		return err
-	}
+
 	st.state.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
-	return nil
+
+	return st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper)
 }
 
 func (st *StateTransition) verifyAndApplyUndelegateTx(undelegate *staking.Undelegate) error {
@@ -411,25 +419,26 @@ func (st *StateTransition) verifyAndApplyUndelegateTx(undelegate *staking.Undele
 	return st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper)
 }
 
-func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.CollectRewards) error {
+func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.CollectRewards) (*big.Int, error) {
 	if st.bc == nil {
-		return errors.New("[CollectRewards] No chain context provided")
+		return network.NoReward, errors.New("[CollectRewards] No chain context provided")
 	}
+	// TODO(audit): make sure the delegation index is always consistent with onchain data
 	delegations, err := st.bc.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
 	if err != nil {
-		return err
+		return network.NoReward, err
 	}
 	updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
 		st.state, delegations,
 	)
 	if err != nil {
-		return err
+		return network.NoReward, err
 	}
 	for _, wrapper := range updatedValidatorWrappers {
 		if err := st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper); err != nil {
-			return err
+			return network.NoReward, err
 		}
 	}
 	st.state.AddBalance(collectRewards.DelegatorAddress, totalRewards)
-	return nil
+	return totalRewards, nil
 }

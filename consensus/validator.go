@@ -196,7 +196,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 	for i, key := range consensus.PubKey.PublicKey {
 		networkMessage, _ := consensus.construct(
-			// TODO: should only sign on block hash
+			// TODO(audit): sign signature on hash+blockNum+viewID (add a hard fork)
 			msg_pb.MessageType_COMMIT,
 			append(blockNumBytes, consensus.blockHash[:]...),
 			key, consensus.priKey.PrivateKey[i],
@@ -249,6 +249,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
+	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, recvMsg.BlockNum)
 	commitPayload := append(blockNumBytes, recvMsg.BlockHash[:]...)

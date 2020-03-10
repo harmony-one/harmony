@@ -294,12 +294,19 @@ func NewBlock(
 	header *block.Header, txs []*Transaction,
 	receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof,
 	stks []*staking.StakingTransaction) *Block {
+
 	b := &Block{header: CopyHeader(header)}
 
 	if len(receipts) != len(txs)+len(stks) {
+		utils.Logger().Error().
+			Int("receiptsLen", len(receipts)).
+			Int("txnsLen", len(txs)).
+			Int("stakingTxnsLen", len(stks)).
+			Msg("Length of receipts doesn't match length of transactions")
 		return nil
 	}
 
+	// Put transactions into block
 	if len(txs) == 0 && len(stks) == 0 {
 		b.header.SetTxHash(EmptyRootHash)
 	} else {
@@ -315,6 +322,7 @@ func NewBlock(
 		))
 	}
 
+	// Put receipts into block
 	if len(receipts) == 0 {
 		b.header.SetReceiptHash(EmptyRootHash)
 	} else {
@@ -322,8 +330,8 @@ func NewBlock(
 		b.header.SetBloom(CreateBloom(receipts))
 	}
 
+	// Put cross-shard receipts (ingres/egress) into block
 	b.header.SetOutgoingReceiptHash(CXReceipts(outcxs).ComputeMerkleRoot())
-
 	if len(incxs) == 0 {
 		b.header.SetIncomingReceiptHash(EmptyRootHash)
 	} else {
@@ -332,6 +340,7 @@ func NewBlock(
 		copy(b.incomingReceipts, incxs)
 	}
 
+	// Great! Block is finally finalized.
 	return b
 }
 

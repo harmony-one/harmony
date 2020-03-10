@@ -338,7 +338,7 @@ func (w *Worker) CollectAndVerifySlashes() error {
 		// "could not verify slash", which should not return as err
 		// and therefore stop the block proposal
 		if allSlashing, err = w.VerifyAll(d); err != nil {
-			// TODO(audit): very slashes individually; do not return err if verify fails
+			// TODO(audit): verify slashes individually; do not return err if verify fails
 			utils.Logger().Err(err).
 				RawJSON("slashes", []byte(d.String())).
 				Msg("could not verify slashes proposed")

@@ -377,6 +377,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 			// Leader sign and add commit message
+			// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
 			blockNumBytes := [8]byte{}
 			binary.LittleEndian.PutUint64(blockNumBytes[:], consensus.blockNum)
 			commitPayload := append(blockNumBytes[:], consensus.blockHash[:]...)

@@ -182,6 +182,7 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	}
 
 	hash := cl.Hash()
+	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, cl.BlockNum())
 	commitPayload := append(blockNumBytes, hash[:]...)
