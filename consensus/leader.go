@@ -276,8 +276,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 										ViewID:          recvMsg.ViewID,
 									}},
 								Moment: slash.Moment{
-									// TODO need to extend fbft tro have epoch to use its epoch
-									// rather than curHeader epoch
 									Epoch:        curHeader.Epoch(),
 									ShardID:      consensus.ShardID,
 									TimeUnixNano: now,
