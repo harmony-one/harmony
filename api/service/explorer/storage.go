@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/internal/common"
@@ -162,8 +163,10 @@ func (storage *Storage) GetAddresses(size int, prefix string) ([]string, error) 
 	key := GetAddressKey(prefix)
 	iterator := db.NewIterator(&util.Range{Start: []byte(key)}, nil)
 	addresses := make([]string, 0)
-	for iterator.Next() {
+	read := 0
+	for iterator.Next() && read < size {
 		address := string(iterator.Key())
+		read++
 		if len(address) < PrefixLen {
 			utils.Logger().Info().Msgf("address len < 3 %s", address)
 			continue

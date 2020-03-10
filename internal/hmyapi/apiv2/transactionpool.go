@@ -68,6 +68,9 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 	txs := []*RPCTransaction{}
 	for _, hash := range result {
 		tx := s.GetTransactionByHash(ctx, hash)
+		if tx == nil {
+			continue
+		}
 		txs = append(txs, tx)
 	}
 	return map[string]interface{}{"transactions": txs}, nil

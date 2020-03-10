@@ -48,6 +48,12 @@ type Transaction struct {
 	Type      string   `json:"type"`
 }
 
+// AddrBalance ...
+type AddrBalance struct {
+	Address string   `json:"address"`
+	Balance *big.Int `json:"balance"`
+}
+
 // GetTransaction ...
 func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transaction {
 	msg, err := tx.AsMessage(types.NewEIP155Signer(tx.ChainID()))
