@@ -109,11 +109,13 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Validator
 		Address     string      `json:"address"`
+		EPOSStatus  string      `json:"epos-eligibility-status"`
 		Delegations Delegations `json:"delegations"`
 		Counters    counters    `json:"availability"`
 	}{
 		w.Validator,
 		common2.MustAddressToBech32(w.Address),
+		w.EPOSStatus.String(),
 		w.Delegations,
 		w.Counters,
 	})
