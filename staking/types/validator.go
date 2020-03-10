@@ -84,7 +84,8 @@ type ValidatorWrapper struct {
 	Counters    counters
 }
 
-// Computed ..
+// Computed represents current epoch
+// availability measures, mostly for RPC
 type Computed struct {
 	Signed     *big.Int    `json:"current-epoch-signed"`
 	ToSign     *big.Int    `json:"current-epoch-to-sign"`
@@ -197,7 +198,8 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 		return errNilMaxTotalDelegation
 	}
 
-	// MinSelfDelegation must be >= 1 ONE
+	// if I'm not banned, then I must
+	// ensure that MinSelfDelegation >= 1 ONE
 	if v.EPOSStatus != effective.Banned &&
 		v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
 		return errors.Wrapf(

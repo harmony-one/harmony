@@ -85,7 +85,7 @@ type Record struct {
 	Offender common.Address `json:"offender"`
 }
 
-// Application ..
+// Application tracks the slash application to state
 type Application struct {
 	TotalSlashed      *big.Int `json:'total-slashed`
 	TotalSnitchReward *big.Int `json:"total-snitch-reward"`

@@ -327,7 +327,8 @@ func (w *Worker) IncomingReceipts() []*types.CXReceiptsProof {
 	return w.current.incxs
 }
 
-// CollectVerifiedSlashes ..
+// CollectVerifiedSlashes sets w.current.slashes only to those that
+// past verification
 func (w *Worker) CollectVerifiedSlashes() error {
 	pending, failures :=
 		w.chain.ReadPendingSlashingCandidates(), slash.Records{}

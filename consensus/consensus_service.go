@@ -503,7 +503,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.SetEpochNum(curEpoch.Uint64() + 1)
 		consensus.getLogger().Info().
 			Uint64("headerNum", curHeader.Number().Uint64()).
-			Msg("[Epoch updated for nextEpoch curEpoch")
+			Msg("Epoch updated for nextEpoch curEpoch")
 
 		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
 			nextEpoch, consensus.ChainReader,
