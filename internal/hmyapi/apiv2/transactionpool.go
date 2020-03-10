@@ -217,9 +217,10 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 		return common.Hash{}, err
 	}
 	c := s.b.ChainConfig().ChainID
-	if tx.ChainID().Cmp(c) != 0 {
-		e := errors.Wrapf(errInvalidChainID, "current chain id:%s", c.String())
-		return common.Hash{}, e
+	if id := tx.ChainID(); id.Cmp(c) != 0 {
+		return common.Hash{}, errors.Wrapf(
+			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+		)
 	}
 	return SubmitStakingTransaction(ctx, s.b, tx)
 }
@@ -236,9 +237,10 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 		return common.Hash{}, err
 	}
 	c := s.b.ChainConfig().ChainID
-	if tx.ChainID().Cmp(c) != 0 {
-		e := errors.Wrapf(errInvalidChainID, "current chain id:%s", c.String())
-		return common.Hash{}, e
+	if id := tx.ChainID(); id.Cmp(c) != 0 {
+		return common.Hash{}, errors.Wrapf(
+			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+		)
 	}
 	return SubmitTransaction(ctx, s.b, tx)
 }
