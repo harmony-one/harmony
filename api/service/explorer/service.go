@@ -146,6 +146,7 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 // UpdateTopAddresses updates 20 top addresses by balance from storage each 10 minutes.
 func (s *Service) UpdateTopAddresses() {
 	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
 	utils.Logger().Info().Msg("start updating top addresses")
 	for range ticker.C {
 		db, err := s.State()
