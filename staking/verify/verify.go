@@ -9,6 +9,12 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/pkg/errors"
+)
+
+var (
+	errQuorumVerifyAggSign = errors.New("insufficient voting power to verify aggreate sig")
+	errAggregateSigFail    = errors.New("could not verify hash of aggregate signature")
 )
 
 // AggregateSigForCommittee ..
@@ -38,18 +44,15 @@ func AggregateSigForCommittee(
 	if _, err := decider.SetVoters(committee.Slots); err != nil {
 		return err
 	}
-	// TODO make this one give back how much there is so far
 	if !decider.IsQuorumAchievedByMask(mask) {
-		// TODO proper error
-		return nil
+		return errQuorumVerifyAggSign
 	}
 
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, blockNum)
 	commitPayload := append(blockNumBytes, hash[:]...)
 	if !aggSignature.VerifyHash(mask.AggregatePublic, commitPayload) {
-		// TODO proper error
-		return nil
+		return errAggregateSigFail
 	}
 
 	return nil
