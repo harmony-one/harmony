@@ -337,30 +337,29 @@ func (b *APIBackend) GetValidatorInformation(
 		b.hmy.BlockChain().CurrentHeader().Epoch(),
 		addr,
 	)
+	defaultReply := &staking.ValidatorRPCEnchanced{
+		Wrapper: *wrapper,
+		CurrentSigningPercentage: staking.Computed{
+			common.Big0, common.Big0, numeric.ZeroDec(),
+		},
+		CurrentVotingPower: []staking.VotePerShard{},
+	}
 	if err != nil {
-		return &staking.ValidatorRPCEnchanced{
-			Wrapper: *wrapper,
-			CurrentSigningPercentage: staking.Computed{
-				common.Big0, common.Big0, numeric.ZeroDec(),
-			},
-			CurrentVotingPower: []staking.VotePerShard{},
-		}, nil
+		return defaultReply, nil
 	}
 
 	signed, toSign, quotient, err := availability.ComputeCurrentSigning(snapshot, wrapper)
 	if err != nil {
-		return nil, err
+		return defaultReply, nil
 	}
 	stats, err := b.hmy.BlockChain().ReadValidatorStats(addr)
 	if err != nil {
-		return nil, err
+		return defaultReply, nil
 	}
 
-	return &staking.ValidatorRPCEnchanced{
-		Wrapper:                  *wrapper,
-		CurrentSigningPercentage: staking.Computed{signed, toSign, quotient},
-		CurrentVotingPower:       stats.VotingPowerPerShard,
-	}, nil
+	defaultReply.CurrentSigningPercentage = staking.Computed{signed, toSign, quotient}
+	defaultReply.CurrentVotingPower = stats.VotingPowerPerShard
+	return defaultReply, nil
 }
 
 // GetMedianRawStakeSnapshot ..
