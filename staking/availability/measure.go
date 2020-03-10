@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
@@ -32,20 +31,14 @@ var (
 func BlockSigners(
 	bitmap []byte, parentCommittee *shard.Committee,
 ) (shard.SlotList, shard.SlotList, error) {
-	committerKeys := []*bls.PublicKey{}
+	committerKeys, err := parentCommittee.BLSPublicKeys()
 
-	for _, member := range parentCommittee.Slots {
-		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, nil, ctxerror.New(
-				"cannot convert BLS public key",
-				"blsPublicKey",
-				member.BlsPublicKey,
-			).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
+	if err != nil {
+		return nil, nil, ctxerror.New(
+			"cannot convert a BLS public key",
+		).WithCause(err)
 	}
+
 	mask, err := bls2.NewMask(committerKeys, nil)
 	if err != nil {
 		return nil, nil, ctxerror.New(

@@ -503,14 +503,5 @@ func GetPublicKeys(
 			"shardID", header.ShardID(),
 		)
 	}
-	committerKeys := []*bls.PublicKey{}
-	for _, member := range subCommittee.Slots {
-		committerKey := new(bls.PublicKey)
-		if err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
-			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", member.BlsPublicKey).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	return committerKeys, nil
+	return subCommittee.BLSPublicKeys()
 }
