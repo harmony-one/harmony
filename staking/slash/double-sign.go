@@ -1,12 +1,14 @@
 package slash
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
@@ -210,12 +212,37 @@ func Verify(
 		)
 	}
 
-	if _, err := subCommittee.AddressForBLSKey(
+	if addr, err := subCommittee.AddressForBLSKey(
 		second.SignerPubKey,
-	); err != nil {
+	); err != nil || *addr != candidate.Offender {
+		// TODO more description
 		return err
 	}
-	// TODO need to finish this implementation
+
+	for _, ballot := range [...]votepower.Ballot{
+		candidate.Evidence.AlreadyCastBallot,
+		candidate.Evidence.DoubleSignedBallot,
+	} {
+		// now the only real assurance, cryptography
+		signature := &bls.Sign{}
+		publicKey := &bls.PublicKey{}
+
+		if err := signature.Deserialize(ballot.Signature); err != nil {
+			return err
+		}
+		if err := first.SignerPubKey.ToLibBLSPublicKey(publicKey); err != nil {
+			return err
+		}
+
+		blockNumBytes := make([]byte, 8)
+		blockNum := candidate.Evidence.Height.Uint64()
+		binary.LittleEndian.PutUint64(blockNumBytes, blockNum)
+		commitPayload := append(blockNumBytes, ballot.BlockHeaderHash[:]...)
+		if !signature.VerifyHash(publicKey, commitPayload) {
+			return nil
+		}
+	}
+
 	return nil
 }
 
@@ -398,8 +425,6 @@ func delegatorSlashApply(
 	}
 	return nil
 }
-
-// TODO Need to keep a record in off-chain db of all the slashes?
 
 // Apply ..
 func Apply(
