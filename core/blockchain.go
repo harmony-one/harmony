@@ -60,6 +60,8 @@ var (
 	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
 	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis = errors.New("Genesis not found in chain")
+	// errExceedMaxPendingSlashes ..
+	errExceedMaxPendingSlashes = errors.New("exceeed max pending slashes")
 )
 
 const (
@@ -80,15 +82,10 @@ const (
 	validatorListByDelegatorCacheLimit = 1024
 	pendingCrossLinksCacheLimit        = 2
 	blockAccumulatorCacheLimit         = 256
-	pendingSlashingCandidateCacheLimit = 2
-
+	maxPendingSlashes                  = 512
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
-)
-
-const (
 	pendingCLCacheKey = "pendingCLs"
-	pendingSCCacheKey = "pendingSCs"
 )
 
 // CacheConfig contains the configuration values for the trie caching/pruning
@@ -148,35 +145,37 @@ type BlockChain struct {
 	futureBlocks                  *lru.Cache     // future blocks are blocks added for later processing
 	shardStateCache               *lru.Cache
 	lastCommitsCache              *lru.Cache
-	epochCache                    *lru.Cache // Cache epoch number → first block number
-	randomnessCache               *lru.Cache // Cache for vrf/vdf
-	validatorCache                *lru.Cache // Cache for validator info
-	validatorStatsCache           *lru.Cache // Cache for validator stats
-	validatorListCache            *lru.Cache // Cache of validator list
-	validatorListByDelegatorCache *lru.Cache // Cache of validator list by delegator
-	pendingCrossLinksCache        *lru.Cache // Cache of last pending crosslinks
-	blockAccumulatorCache         *lru.Cache // Cache of block accumulators
-	pendingSlashingCandidates     *lru.Cache // Cache of last pending slashing candidates
-
-	quit    chan struct{} // blockchain quit channel
-	running int32         // running must be called atomically
+	epochCache                    *lru.Cache    // Cache epoch number → first block number
+	randomnessCache               *lru.Cache    // Cache for vrf/vdf
+	validatorCache                *lru.Cache    // Cache for validator info
+	validatorStatsCache           *lru.Cache    // Cache for validator stats
+	validatorListCache            *lru.Cache    // Cache of validator list
+	validatorListByDelegatorCache *lru.Cache    // Cache of validator list by delegator
+	pendingCrossLinksCache        *lru.Cache    // Cache of last pending crosslinks
+	blockAccumulatorCache         *lru.Cache    // Cache of block accumulators
+	quit                          chan struct{} // blockchain quit channel
+	running                       int32         // running must be called atomically
 	// procInterrupt must be atomically called
 	procInterrupt int32          // interrupt signaler for block processing
 	wg            sync.WaitGroup // chain processing wait group for shutting down
 
-	engine    consensus_engine.Engine
-	processor Processor // block processor interface
-	validator Validator // block and state validator interface
-	vmConfig  vm.Config
-
+	engine         consensus_engine.Engine
+	processor      Processor // block processor interface
+	validator      Validator // block and state validator interface
+	vmConfig       vm.Config
 	badBlocks      *lru.Cache              // Bad block cache
 	shouldPreserve func(*types.Block) bool // Function used to determine whether should preserve the given block.
+	pendingSlashes slash.Records
 }
 
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus_engine.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool) (*BlockChain, error) {
+func NewBlockChain(
+	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	engine consensus_engine.Engine, vmConfig vm.Config,
+	shouldPreserve func(block *types.Block) bool,
+) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -199,7 +198,6 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
-	pendingSlashingCandidateCache, _ := lru.New(pendingSlashingCandidateCacheLimit)
 
 	bc := &BlockChain{
 		chainConfig:                   chainConfig,
@@ -223,11 +221,11 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		validatorListCache:            validatorListCache,
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
-		pendingSlashingCandidates:     pendingSlashingCandidateCache,
 		blockAccumulatorCache:         blockAccumulatorCache,
 		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
+		pendingSlashes:                slash.Records{},
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -1940,54 +1938,36 @@ func (bc *BlockChain) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, 
 	return types.DeserializeCrossLink(bytes)
 }
 
-// DeletePendingSlashingCandidates ..
-func (bc *BlockChain) DeletePendingSlashingCandidates() error {
-	bc.pendingSlashingCandidatesMU.Lock()
-	defer bc.pendingSlashingCandidatesMU.Unlock()
-	bc.pendingSlashingCandidates.Purge()
-	return bc.WritePendingSlashingCandidates(slash.Records{})
-}
-
-// ReadPendingSlashingCandidates retrieves pending slashing candidates
-func (bc *BlockChain) ReadPendingSlashingCandidates() (slash.Records, error) {
-	cls := slash.Records{}
-	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
-		return cls, nil
-	}
-	var err error
-	bytes := []byte{}
-	if cached, ok := bc.pendingSlashingCandidates.Get(pendingSCCacheKey); ok {
-		bytes = cached.([]byte)
-	} else {
-		bytes, err = rawdb.ReadPendingSlashingCandidates(bc.db)
-		if err != nil || len(bytes) == 0 {
-			utils.Logger().Info().Err(err).
-				Int("dataLen", len(bytes)).
-				Msg("ReadPendingSlashingCandidates")
-			return nil, err
-		}
-	}
-
-	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
-		utils.Logger().Error().Err(err).Msg("Invalid pending slashing candidates RLP decoding")
-		return nil, err
-	}
-	return cls, nil
-}
-
-// WritePendingSlashingCandidates saves the pending slashing candidates
-func (bc *BlockChain) WritePendingSlashingCandidates(candidates slash.Records) error {
-	bytes, err := rlp.EncodeToBytes(candidates)
+func (bc *BlockChain) writeSlashes(processed slash.Records) error {
+	bytes, err := rlp.EncodeToBytes(processed)
 	if err != nil {
-		const msg = "[WritePendingSlashingCandidates] Failed to encode pending slashing candidates"
+		const msg = "failed to encode slashing candidates"
 		utils.Logger().Error().Msg(msg)
 		return err
 	}
 	if err := rawdb.WritePendingSlashingCandidates(bc.db, bytes); err != nil {
 		return err
 	}
-	bc.pendingSlashingCandidates.Add(pendingSCCacheKey, bytes)
 	return nil
+}
+
+// DeleteFromPendingSlashingCandidates ..
+func (bc *BlockChain) DeleteFromPendingSlashingCandidates(
+	processed slash.Records,
+) error {
+	bc.pendingSlashingCandidatesMU.Lock()
+	defer bc.pendingSlashingCandidatesMU.Unlock()
+	current := bc.ReadPendingSlashingCandidates()
+	bc.pendingSlashes = current.SetDifference(processed)
+	return bc.writeSlashes(bc.pendingSlashes)
+}
+
+// ReadPendingSlashingCandidates retrieves pending slashing candidates
+func (bc *BlockChain) ReadPendingSlashingCandidates() slash.Records {
+	if !bc.Config().IsStaking(bc.CurrentHeader().Epoch()) {
+		return slash.Records{}
+	}
+	return append(bc.pendingSlashes[0:0], bc.pendingSlashes...)
 }
 
 // ReadPendingCrossLinks retrieves pending crosslinks
@@ -2047,25 +2027,21 @@ func (bc *BlockChain) WritePendingCrossLinks(crossLinks []types.CrossLink) error
 
 // AddPendingSlashingCandidates appends pending slashing candidates
 func (bc *BlockChain) AddPendingSlashingCandidates(
-	candidates []slash.Record,
-) (int, error) {
+	candidates slash.Records,
+) error {
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
-	cls, err := bc.ReadPendingSlashingCandidates()
-
-	if err != nil || len(cls) == 0 {
-		err := bc.WritePendingSlashingCandidates(candidates)
-		if err != nil {
-			return 0, err
-		}
-		return 1, err
+	current := bc.ReadPendingSlashingCandidates()
+	pendingSlashes := append(
+		bc.pendingSlashes, current.SetDifference(candidates)...,
+	)
+	if l, c := len(pendingSlashes), len(current); l > maxPendingSlashes {
+		return errors.Wrapf(
+			errExceedMaxPendingSlashes, "current %d with-additional %d", c, l,
+		)
 	}
-
-	cls = append(cls, candidates...)
-	if err := bc.WritePendingSlashingCandidates(cls); err != nil {
-		return 0, err
-	}
-	return len(cls), nil
+	bc.pendingSlashes = pendingSlashes
+	return bc.writeSlashes(bc.pendingSlashes)
 }
 
 // AddPendingCrossLinks appends pending crosslinks
@@ -2217,6 +2193,15 @@ func (bc *BlockChain) ReadValidatorInformation(
 	addr common.Address,
 ) (*staking.ValidatorWrapper, error) {
 	return bc.ReadValidatorInformationAt(addr, bc.CurrentBlock().Root())
+}
+
+// ReadValidatorSnapshotAtEpoch reads the snapshot
+// staking validator information of given validator address
+func (bc *BlockChain) ReadValidatorSnapshotAtEpoch(
+	epoch *big.Int,
+	addr common.Address,
+) (*staking.ValidatorWrapper, error) {
+	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
 }
 
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
@@ -2607,8 +2592,8 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 		).WithCause(err)
 	}
 
-	committee := shardState.FindCommitteeByID(header.ShardID())
-	if committee == nil {
+	committee, err := shardState.FindCommitteeByID(header.ShardID())
+	if err != nil {
 		return common.Address{}, ctxerror.New("cannot find shard in the shard state",
 			"blockNum", header.Number(),
 			"shardID", header.ShardID(),

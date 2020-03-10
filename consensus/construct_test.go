@@ -65,13 +65,19 @@ func TestConstructPreparedMessage(test *testing.T) {
 		leaderPubKey,
 		leaderPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
+		consensus.blockNum,
+		consensus.viewID,
 	)
-	consensus.Decider.SubmitVote(
+	if _, err := consensus.Decider.SubmitVote(
 		quorum.Prepare,
 		validatorPubKey,
 		validatorPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
-	)
+		consensus.blockNum,
+		consensus.viewID,
+	); err != nil {
+		test.Log(err)
+	}
 
 	// According to RJ these failures are benign.
 	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {

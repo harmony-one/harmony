@@ -140,11 +140,13 @@ func AccumulateRewards(
 					return network.NoReward, err
 				}
 
-				subComm := shardState.FindCommitteeByID(cxLink.ShardID())
+				subComm, err := shardState.FindCommitteeByID(cxLink.ShardID())
+				if err != nil {
+					return network.NoReward, err
+				}
 				payableSigners, missing, err := availability.BlockSigners(
 					cxLink.Bitmap(), subComm,
 				)
-
 				if err != nil {
 					return network.NoReward, err
 				}

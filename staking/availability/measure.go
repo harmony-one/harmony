@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
@@ -13,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -31,20 +31,14 @@ var (
 func BlockSigners(
 	bitmap []byte, parentCommittee *shard.Committee,
 ) (shard.SlotList, shard.SlotList, error) {
-	committerKeys := []*bls.PublicKey{}
+	committerKeys, err := parentCommittee.BLSPublicKeys()
 
-	for _, member := range parentCommittee.Slots {
-		committerKey := new(bls.PublicKey)
-		err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			return nil, nil, ctxerror.New(
-				"cannot convert BLS public key",
-				"blsPublicKey",
-				member.BlsPublicKey,
-			).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
+	if err != nil {
+		return nil, nil, ctxerror.New(
+			"cannot convert a BLS public key",
+		).WithCause(err)
 	}
+
 	mask, err := bls2.NewMask(committerKeys, nil)
 	if err != nil {
 		return nil, nil, ctxerror.New(
@@ -95,9 +89,10 @@ func BallotResult(
 			"cannot read shard state", "epoch", parentHeader.Epoch(),
 		).WithCause(err)
 	}
-	parentCommittee := parentShardState.FindCommitteeByID(shardID)
 
-	if parentCommittee == nil {
+	parentCommittee, err := parentShardState.FindCommitteeByID(shardID)
+
+	if err != nil {
 		return nil, nil, nil, ctxerror.New(
 			"cannot find shard in the shard state",
 			"parentBlockNumber", parentHeader.Number(),
@@ -192,8 +187,6 @@ func ComputeCurrentSigning(
 
 	if toSign.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().
-			RawJSON("snapshot", []byte(snapshot.String())).
-			RawJSON("current", []byte(wrapper.String())).
 			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
 		return signed, toSign, numeric.ZeroDec(), nil
 	}
@@ -248,8 +241,6 @@ func compute(
 	}
 
 	utils.Logger().Info().
-		RawJSON("snapshot", []byte(snapshot.String())).
-		RawJSON("current", []byte(wrapper.String())).
 		Str("signed", signed.String()).
 		Str("to-sign", toSign.String()).
 		Str("percentage-signed", quotient.String()).
@@ -260,14 +251,12 @@ func compute(
 
 	switch IsBelowSigningThreshold(quotient) {
 	case missedTooManyBlocks:
-		wrapper.Active = false
+		wrapper.EPOSStatus = effective.Inactive
 		utils.Logger().Info().
-			RawJSON("snapshot", []byte(snapshot.String())).
-			RawJSON("current", []byte(wrapper.String())).
 			Str("threshold", measure.String()).
 			Msg("validator failed availability threshold, set to inactive")
 	default:
-		wrapper.Active = true
+		wrapper.EPOSStatus = effective.Active
 	}
 
 	return nil

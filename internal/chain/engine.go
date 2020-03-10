@@ -209,13 +209,14 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 			return errors.Wrapf(err, "cannot decoded shard state")
 		}
 		d := quorum.NewDecider(quorum.SuperMajorityStake)
-		d.SetShardIDProvider(func() (uint32, error) {
-			return parentHeader.ShardID(), nil
-		})
 		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
 		})
-		d.SetVoters(slotList.FindCommitteeByID(parentHeader.ShardID()).Slots)
+		subComm, err := slotList.FindCommitteeByID(parentHeader.ShardID())
+		if err != nil {
+			return err
+		}
+		d.SetVoters(subComm.Slots)
 		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
@@ -293,8 +294,11 @@ func (e *engineImpl) Finalize(
 }
 
 // Withdraw unlocked tokens to the delegators' accounts
-func payoutUndelegations(chain engine.ChainReader, header *block.Header, state *state.DB) error {
+func payoutUndelegations(
+	chain engine.ChainReader, header *block.Header, state *state.DB,
+) error {
 	validators, err := chain.ReadValidatorList()
+	countTrack := map[common.Address]int{}
 	if err != nil {
 		const msg = "[Finalize] failed to read all validators"
 		return ctxerror.New(msg).WithCause(err)
@@ -314,6 +318,7 @@ func payoutUndelegations(chain engine.ChainReader, header *block.Header, state *
 			)
 			state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 		}
+		countTrack[validator] = len(wrapper.Delegations)
 		if err := state.UpdateValidatorWrapper(
 			validator, wrapper,
 		); err != nil {
@@ -321,6 +326,13 @@ func payoutUndelegations(chain engine.ChainReader, header *block.Header, state *
 			return ctxerror.New(msg).WithCause(err)
 		}
 	}
+
+	utils.Logger().Info().
+		Uint64("epoch", header.Epoch().Uint64()).
+		Uint64("block-number", header.Number().Uint64()).
+		Interface("count-track", countTrack).
+		Msg("paid out delegations")
+
 	return nil
 }
 
@@ -400,12 +412,11 @@ func QuorumForBlock(
 		}
 	}
 
-	c := ss.FindCommitteeByID(h.ShardID())
-	if c == nil {
-		return 0, errors.Errorf(
-			"cannot find shard %d in shard state", h.ShardID())
+	subComm, err := ss.FindCommitteeByID(h.ShardID())
+	if err != nil {
+		return 0, errors.Errorf("cannot find shard %d in shard state", h.ShardID())
 	}
-	return (len(c.Slots))*2/3 + 1, nil
+	return (len(subComm.Slots))*2/3 + 1, nil
 }
 
 // Similiar to VerifyHeader, which is only for verifying the block headers of one's own chain, this verification
@@ -435,13 +446,14 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			return errors.Wrapf(err, "cannot read shard state")
 		}
 		d := quorum.NewDecider(quorum.SuperMajorityStake)
-		d.SetShardIDProvider(func() (uint32, error) {
-			return header.ShardID(), nil
-		})
 		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
 		})
-		d.SetVoters(slotList.FindCommitteeByID(header.ShardID()).Slots)
+		subComm, err := slotList.FindCommitteeByID(header.ShardID())
+		if err != nil {
+			return err
+		}
+		d.SetVoters(subComm.Slots)
 		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in commitSignature from Block Header",
@@ -484,21 +496,12 @@ func GetPublicKeys(
 		}
 	}
 
-	committee := shardState.FindCommitteeByID(header.ShardID())
-	if committee == nil {
+	subCommittee, err := shardState.FindCommitteeByID(header.ShardID())
+	if err != nil {
 		return nil, ctxerror.New("cannot find shard in the shard state",
 			"blockNumber", header.Number(),
 			"shardID", header.ShardID(),
 		)
 	}
-	committerKeys := []*bls.PublicKey{}
-	for _, member := range committee.Slots {
-		committerKey := new(bls.PublicKey)
-		if err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
-			return nil, ctxerror.New("cannot convert BLS public key",
-				"blsPublicKey", member.BlsPublicKey).WithCause(err)
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	return committerKeys, nil
+	return subCommittee.BLSPublicKeys()
 }

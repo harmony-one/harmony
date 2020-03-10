@@ -414,8 +414,8 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*
 		).WithCause(err)
 	}
 
-	committee := shardState.FindCommitteeByID(header.ShardID())
-	if committee == nil {
+	committee, err := shardState.FindCommitteeByID(header.ShardID())
+	if err != nil {
 		return nil, ctxerror.New("cannot find shard in the shard state",
 			"blockNum", header.Number(),
 			"shardID", header.ShardID(),
@@ -477,9 +477,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
-		decider.SetShardIDProvider(func() (uint32, error) {
-			return consensus.ShardID, nil
-		})
 		decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return consensus.PubKey, nil
 		})
@@ -504,8 +501,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if len(curHeader.ShardState()) > 0 {
 		// increase curEpoch by one if it's the last block
 		consensus.SetEpochNum(curEpoch.Uint64() + 1)
-		consensus.getLogger().Info().Uint64("headerNum", curHeader.Number().Uint64()).
-			Msg("[UpdateConsensusInformation] Epoch updated for nextEpoch curEpoch")
+		consensus.getLogger().Info().
+			Uint64("headerNum", curHeader.Number().Uint64()).
+			Msg("Epoch updated for nextEpoch curEpoch")
 
 		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
 			nextEpoch, consensus.ChainReader,
@@ -514,15 +512,33 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			utils.Logger().Error().
 				Err(err).
 				Uint32("shard", consensus.ShardID).
-				Msg("[UpdateConsensusInformation] Error retrieving nextEpoch shard state")
+				Msg("Error retrieving nextEpoch shard state")
 			return Syncing
 		}
 
-		committeeToSet = nextShardState.FindCommitteeByID(curHeader.ShardID())
+		subComm, err := nextShardState.FindCommitteeByID(curHeader.ShardID())
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error retrieving nextEpoch shard state")
+			return Syncing
+		}
+
+		committeeToSet = subComm
 
 	} else {
 		consensus.SetEpochNum(curEpoch.Uint64())
-		committeeToSet = curShardState.FindCommitteeByID(curHeader.ShardID())
+		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("Error retrieving current shard state")
+			return Syncing
+		}
+
+		committeeToSet = subComm
 	}
 
 	if len(committeeToSet.Slots) == 0 {

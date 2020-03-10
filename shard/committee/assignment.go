@@ -159,20 +159,22 @@ func eposStakedCommittee(
 		return shardState, nil
 	}
 
+	maxBLSKey := stakedSlotsCount / 3
+
 	// TODO benchmark difference if went with data structure that sorts on insert
 	for i := range candidates {
 		validator, err := stakerReader.ReadValidatorInformation(candidates[i])
 		if err != nil {
 			return nil, err
 		}
-		if !effective.IsEligibleForEPOSAuction(validator) {
+
+		if validator.EPOSStatus != effective.Active {
 			continue
 		}
-		if err := validator.SanityCheck(); err != nil {
+		if err := validator.SanityCheck(maxBLSKey); err != nil {
 			utils.Logger().Info().
 				Int("staked-candidates", len(candidates)).
 				Err(err).
-				RawJSON("candidate", []byte(validator.String())).
 				Msg("validator sanity check failed")
 			continue
 		}
@@ -230,7 +232,6 @@ func eposStakedCommittee(
 		utils.Logger().Info().
 			Int("staked-candidates", c).
 			Str("total-staked-by-validators", totalStake.String()).
-			RawJSON("staked-super-committee", []byte(shardState.String())).
 			Msg("epos based super-committe")
 	}
 

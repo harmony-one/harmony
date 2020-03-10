@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/pkg/errors"
 )
 
@@ -56,11 +57,16 @@ var (
 	errSlotKeyToRemoveNotFound = errors.New("slot key to remove not found")
 	errSlotKeyToAddExists      = errors.New("slot key to add already exists")
 	errDuplicateSlotKeys       = errors.New("slot keys can not have duplicates")
+	errExcessiveBLSKeys        = errors.New("more slot keys provided than allowed")
+	errCannotChangeBannedTaint = errors.New("cannot change validator banned status")
 )
 
 // ValidatorSnapshotReader ..
 type ValidatorSnapshotReader interface {
-	ReadValidatorSnapshot(common.Address) (*ValidatorWrapper, error)
+	ReadValidatorSnapshotAtEpoch(
+		epoch *big.Int,
+		addr common.Address,
+	) (*ValidatorWrapper, error)
 }
 
 type counters struct {
@@ -78,7 +84,8 @@ type ValidatorWrapper struct {
 	Counters    counters
 }
 
-// Computed ..
+// Computed represents current epoch
+// availability measures, mostly for RPC
 type Computed struct {
 	Signed     *big.Int    `json:"current-epoch-signed"`
 	ToSign     *big.Int    `json:"current-epoch-to-sign"`
@@ -153,26 +160,34 @@ type Validator struct {
 	MaxTotalDelegation *big.Int `json:"max-total-delegation"`
 	// Is the validator active in participating
 	// committee selection process or not
-	Active bool `json:"active"`
+	EPOSStatus effective.Eligibility `json:"epos-eligibility-status"`
 	// commission parameters
 	Commission
 	// description for the validator
 	Description
 	// CreationHeight is the height of creation
 	CreationHeight *big.Int `json:"creation-height"`
-	// Banned records whether this validator is banned
-	// from the network because they double-signed
-	Banned bool `json:"banned"`
 }
 
+// DoNotEnforceMaxBLS ..
+const DoNotEnforceMaxBLS = -1
+
 // SanityCheck checks basic requirements of a validator
-func (v *Validator) SanityCheck() error {
+func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 	if _, err := v.EnsureLength(); err != nil {
 		return err
 	}
 
 	if len(v.SlotPubKeys) == 0 {
 		return errNeedAtLeastOneSlotKey
+	}
+
+	if c := len(v.SlotPubKeys); oneThirdExtrn != DoNotEnforceMaxBLS &&
+		c > oneThirdExtrn {
+		return errors.Wrapf(
+			errExcessiveBLSKeys, "have: %d allowed: %d",
+			c, oneThirdExtrn,
+		)
 	}
 
 	if v.MinSelfDelegation == nil {
@@ -183,8 +198,10 @@ func (v *Validator) SanityCheck() error {
 		return errNilMaxTotalDelegation
 	}
 
-	// MinSelfDelegation must be >= 1 ONE
-	if !v.Banned && v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+	// if I'm not banned, then I must
+	// ensure that MinSelfDelegation >= 1 ONE
+	if v.EPOSStatus != effective.Banned &&
+		v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
 		return errors.Wrapf(
 			errMinSelfDelegationTooSmall,
 			"delegation-given %s", v.MinSelfDelegation.String(),
@@ -282,8 +299,12 @@ var (
 )
 
 // SanityCheck checks the basic requirements
-func (w *ValidatorWrapper) SanityCheck() error {
-	if err := w.Validator.SanityCheck(); err != nil {
+func (w *ValidatorWrapper) SanityCheck(
+	oneThirdExternalValidator int,
+) error {
+	if err := w.Validator.SanityCheck(
+		oneThirdExternalValidator,
+	); err != nil {
 		return err
 	}
 	// Self delegation must be >= MinSelfDelegation
@@ -293,7 +314,8 @@ func (w *ValidatorWrapper) SanityCheck() error {
 			errInvalidSelfDelegation, "no self delegation given at all",
 		)
 	default:
-		if !w.Banned && w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
+		if w.EPOSStatus != effective.Banned &&
+			w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidSelfDelegation,
 				"have %s want %s", w.Delegations[0].Amount.String(), w.Validator.MinSelfDelegation,
@@ -445,9 +467,15 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 	}
 
 	v := Validator{
-		val.ValidatorAddress, pubKeys,
-		new(big.Int), val.MinSelfDelegation, val.MaxTotalDelegation, true,
-		commission, desc, blockNum, false,
+		Address:              val.ValidatorAddress,
+		SlotPubKeys:          pubKeys,
+		LastEpochInCommittee: new(big.Int),
+		MinSelfDelegation:    val.MinSelfDelegation,
+		MaxTotalDelegation:   val.MaxTotalDelegation,
+		EPOSStatus:           effective.Active,
+		Commission:           commission,
+		Description:          desc,
+		CreationHeight:       blockNum,
 	}
 	return &v, nil
 }
@@ -486,7 +514,9 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		}
 		// we found key to be removed
 		if index >= 0 {
-			validator.SlotPubKeys = append(validator.SlotPubKeys[:index], validator.SlotPubKeys[index+1:]...)
+			validator.SlotPubKeys = append(
+				validator.SlotPubKeys[:index], validator.SlotPubKeys[index+1:]...,
+			)
 		} else {
 			return errSlotKeyToRemoveNotFound
 		}
@@ -510,8 +540,15 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		}
 	}
 
-	if edit.Active != nil {
-		validator.Active = *edit.Active
+	switch validator.EPOSStatus {
+	case effective.Banned:
+		return errCannotChangeBannedTaint
+	default:
+		switch edit.EPOSStatus {
+		case effective.Active, effective.Inactive:
+			validator.EPOSStatus = edit.EPOSStatus
+		default:
+		}
 	}
 
 	return nil

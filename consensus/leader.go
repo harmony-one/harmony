@@ -62,12 +62,16 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	// Leader sign the block hash itself
 	for i, key := range consensus.PubKey.PublicKey {
-		consensus.Decider.SubmitVote(
+		if _, err := consensus.Decider.SubmitVote(
 			quorum.Prepare,
 			key,
 			consensus.priKey.PrivateKey[i].SignHash(consensus.blockHash[:]),
 			common.BytesToHash(consensus.blockHash[:]),
-		)
+			consensus.blockNum,
+			consensus.viewID,
+		); err != nil {
+			return
+		}
 		if err := consensus.prepareBitmap.SetKey(key, true); err != nil {
 			consensus.getLogger().Warn().Err(err).Msg(
 				"[Announce] Leader prepareBitmap SetKey failed",
@@ -166,9 +170,14 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
 	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
-	consensus.Decider.SubmitVote(
-		quorum.Prepare, validatorPubKey, &sign, recvMsg.BlockHash,
-	)
+	if _, err := consensus.Decider.SubmitVote(
+		quorum.Prepare, validatorPubKey,
+		&sign, recvMsg.BlockHash,
+		recvMsg.BlockNum, recvMsg.ViewID,
+	); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("submit vote prepare failed")
+		return
+	}
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
@@ -235,9 +244,17 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 							return
 						}
 						offender := *shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
-						addr, err := committee.FindCommitteeByID(
+						subComm, err := committee.FindCommitteeByID(
 							consensus.ShardID,
-						).AddressForBLSKey(offender)
+						)
+						if err != nil {
+							log.Err(err).
+								Str("msg", recvMsg.String()).
+								Msg("could not find subcommittee for bls key")
+							return
+						}
+
+						addr, err := subComm.AddressForBLSKey(offender)
 
 						if err != nil {
 							log.Err(err).Str("msg", recvMsg.String()).
@@ -252,16 +269,14 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 								ConflictingBallots: slash.ConflictingBallots{
 									*alreadyCastBallot,
 									votepower.Ballot{
-										offender,
-										recvMsg.BlockHash,
-										common.Hex2Bytes(doubleSign.SerializeToHexStr()),
+										SignerPubKey:    offender,
+										BlockHeaderHash: recvMsg.BlockHash,
+										Signature:       common.Hex2Bytes(doubleSign.SerializeToHexStr()),
+										Height:          recvMsg.BlockNum,
+										ViewID:          recvMsg.ViewID,
 									}},
 								Moment: slash.Moment{
-									// TODO need to extend fbft tro have epoch to use its epoch
-									// rather than curHeader epoch
 									Epoch:        curHeader.Epoch(),
-									Height:       new(big.Int).SetUint64(recvMsg.BlockNum),
-									ViewID:       consensus.viewID,
 									ShardID:      consensus.ShardID,
 									TimeUnixNano: now,
 								},
@@ -314,9 +329,13 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		Logger()
 	logger.Info().Msg("[OnCommit] Received new commit message")
 
-	consensus.Decider.SubmitVote(
-		quorum.Commit, validatorPubKey, &sign, recvMsg.BlockHash,
-	)
+	if _, err := consensus.Decider.SubmitVote(
+		quorum.Commit, validatorPubKey,
+		&sign, recvMsg.BlockHash,
+		recvMsg.BlockNum, recvMsg.ViewID,
+	); err != nil {
+		return
+	}
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).

@@ -1,17 +1,13 @@
 package node
 
 import (
-	"encoding/binary"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/verify"
 )
 
 const (
@@ -71,9 +67,8 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			return
 		}
 
-		var crosslinks []types.CrossLink
-		err = rlp.DecodeBytes(msgPayload, &crosslinks)
-		if err != nil {
+		crosslinks := []types.CrossLink{}
+		if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
 			utils.Logger().Error().
 				Err(err).
 				Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
@@ -125,68 +120,35 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	}
 
 	if !node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
-		return ctxerror.New("[VerifyCrossLink] CrossLink Epoch should >= cross link starting epoch", "crossLinkEpoch", cl.Epoch(), "cross_link_starting_eoch", node.Blockchain().Config().CrossLinkEpoch)
+		return ctxerror.New(
+			"[VerifyCrossLink] CrossLink Epoch should >= cross link starting epoch",
+			"crossLinkEpoch", cl.Epoch(), "cross_link_starting_eoch",
+			node.Blockchain().Config().CrossLinkEpoch,
+		)
 	}
 
 	// Verify signature of the new cross link header
 	// TODO: check whether to recalculate shard state
 	shardState, err := node.Blockchain().ReadShardState(cl.Epoch())
-	committee := shardState.FindCommitteeByID(cl.ShardID())
-
-	if err != nil || committee == nil {
-		return ctxerror.New("[VerifyCrossLink] Failed to read shard state for cross link", "beaconEpoch", node.Blockchain().CurrentHeader().Epoch(), "epoch", cl.Epoch(), "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
-	}
-	var committerKeys []*bls.PublicKey
-
-	parseKeysSuccess := true
-	for _, member := range committee.Slots {
-		committerKey := new(bls.PublicKey)
-		err = member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-		if err != nil {
-			parseKeysSuccess = false
-			break
-		}
-		committerKeys = append(committerKeys, committerKey)
-	}
-	if !parseKeysSuccess {
-		return ctxerror.New("[VerifyCrossLink] cannot convert BLS public key", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
-	}
-
-	mask, err := bls_cosi.NewMask(committerKeys, nil)
 	if err != nil {
-		return ctxerror.New("[VerifyCrossLink] cannot create group sig mask", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
-	}
-	if err := mask.SetMask(cl.Bitmap()); err != nil {
-		return ctxerror.New("[VerifyCrossLink] cannot set group sig mask bits", "shardID", cl.ShardID(), "blockNum", cl.BlockNum()).WithCause(err)
+		return err
 	}
 
-	decider := quorum.NewDecider(quorum.SuperMajorityStake)
-	decider.SetShardIDProvider(func() (uint32, error) {
-		return cl.ShardID(), nil
-	})
-	decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
-		return nil, nil
-	})
-	if _, err := decider.SetVoters(committee.Slots); err != nil {
-		return ctxerror.New("[VerifyCrossLink] Cannot SetVoters for committee", "shardID", cl.ShardID())
-	}
-	if !decider.IsQuorumAchievedByMask(mask) {
-		return ctxerror.New("[VerifyCrossLink] Not enough voting power for crosslink", "shardID", cl.ShardID())
+	committee, err := shardState.FindCommitteeByID(cl.ShardID())
+
+	if err != nil {
+		return err
 	}
 
-	aggSig := bls.Sign{}
+	aggSig := &bls.Sign{}
 	sig := cl.Signature()
-	err = aggSig.Deserialize(sig[:])
-	if err != nil {
-		return ctxerror.New("[VerifyCrossLink] unable to deserialize multi-signature from payload").WithCause(err)
+	if err = aggSig.Deserialize(sig[:]); err != nil {
+		return ctxerror.New(
+			"[VerifyCrossLink] unable to deserialize multi-signature from payload",
+		).WithCause(err)
 	}
 
-	hash := cl.Hash()
-	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, cl.BlockNum())
-	commitPayload := append(blockNumBytes, hash[:]...)
-	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-		return ctxerror.New("[VerifyCrossLink] Failed to verify the signature for cross link", "shardID", cl.ShardID(), "blockNum", cl.BlockNum())
-	}
-	return nil
+	return verify.AggregateSigForCommittee(
+		committee, aggSig, cl.Hash(), cl.BlockNum(), cl.Bitmap(),
+	)
 }

@@ -380,14 +380,19 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			blockNumBytes := [8]byte{}
 			binary.LittleEndian.PutUint64(blockNumBytes[:], consensus.blockNum)
 			commitPayload := append(blockNumBytes[:], consensus.blockHash[:]...)
-			consensus.Decider.SubmitVote(
+			if _, err := consensus.Decider.SubmitVote(
 				quorum.Commit,
 				newLeaderKey,
 				newLeaderPriKey.SignHash(commitPayload),
 				common.BytesToHash(consensus.blockHash[:]),
-			)
+				consensus.blockNum,
+				recvMsg.ViewID,
+			); err != nil {
+				consensus.getLogger().Debug().Msg("submit vote on viewchange commit failed")
+				return
+			}
 
-			if err = consensus.commitBitmap.SetKey(newLeaderKey, true); err != nil {
+			if err := consensus.commitBitmap.SetKey(newLeaderKey, true); err != nil {
 				consensus.getLogger().Debug().
 					Msg("[OnViewChange] New Leader commit bitmap set failed")
 				return
@@ -395,7 +400,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		}
 
 		consensus.current.SetViewID(recvMsg.ViewID)
-		msgToSend := consensus.constructNewViewMessage(recvMsg.ViewID, newLeaderKey, newLeaderPriKey)
+		msgToSend := consensus.constructNewViewMessage(
+			recvMsg.ViewID, newLeaderKey, newLeaderPriKey,
+		)
 
 		consensus.getLogger().Warn().
 			Int("payloadSize", len(consensus.m1Payload)).
