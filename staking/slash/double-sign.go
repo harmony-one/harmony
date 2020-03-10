@@ -60,9 +60,7 @@ func payDebt(
 // Moment ..
 type Moment struct {
 	Epoch        *big.Int `json:"epoch"`
-	Height       *big.Int `json:"block-height"`
 	TimeUnixNano *big.Int `json:"time-unix-nano"`
-	ViewID       uint64   `json:"view-id"`
 	ShardID      uint32   `json:"shard-id"`
 }
 
@@ -215,7 +213,6 @@ func Verify(
 	if addr, err := subCommittee.AddressForBLSKey(
 		second.SignerPubKey,
 	); err != nil || *addr != candidate.Offender {
-		// TODO more description
 		return err
 	}
 
@@ -235,11 +232,10 @@ func Verify(
 		}
 
 		blockNumBytes := make([]byte, 8)
-		blockNum := candidate.Evidence.Height.Uint64()
-		binary.LittleEndian.PutUint64(blockNumBytes, blockNum)
+		binary.LittleEndian.PutUint64(blockNumBytes, ballot.Height)
 		commitPayload := append(blockNumBytes, ballot.BlockHeaderHash[:]...)
 		if !signature.VerifyHash(publicKey, commitPayload) {
-			return nil
+			return errFailVerifySlash
 		}
 	}
 
@@ -252,6 +248,7 @@ var (
 	)
 	errSlashDebtCannotBeNegative    = errors.New("slash debt cannot be negative")
 	errValidatorNotFoundDuringSlash = errors.New("validator not found")
+	errFailVerifySlash              = errors.New("could not verify bls key signature on slash")
 	zero                            = numeric.ZeroDec()
 	oneDoubleSignerRate             = numeric.MustNewDecFromStr("0.02")
 )
