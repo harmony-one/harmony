@@ -59,7 +59,6 @@ var (
 	errDuplicateSlotKeys       = errors.New("slot keys can not have duplicates")
 	errExcessiveBLSKeys        = errors.New("more slot keys provided than allowed")
 	errCannotChangeBannedTaint = errors.New("cannot change validator banned status")
-	errBadInputEPOSStatus      = errors.New("invalid value for epos status change ")
 )
 
 // ValidatorSnapshotReader ..
@@ -549,9 +548,6 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		case effective.Active, effective.Inactive:
 			validator.EPOSStatus = edit.EPOSStatus
 		default:
-			return errors.Wrapf(
-				errBadInputEPOSStatus, "given: %v", edit.EPOSStatus,
-			)
 		}
 	}
 

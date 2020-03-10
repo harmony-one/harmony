@@ -5,8 +5,8 @@ package effective
 type Eligibility byte
 
 const (
-	// Unknown is a default state that represents bad input
-	Unknown Eligibility = iota
+	// Nil is a default state that represents a no-op
+	Nil Eligibility = iota
 	// Active means allowed in epos auction
 	Active
 	// Inactive means validator did not sign enough over 66%
