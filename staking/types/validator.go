@@ -58,6 +58,7 @@ var (
 	errSlotKeyToAddExists      = errors.New("slot key to add already exists")
 	errDuplicateSlotKeys       = errors.New("slot keys can not have duplicates")
 	errExcessiveBLSKeys        = errors.New("more slot keys provided than allowed")
+	errCannotChangeBannedTaint = errors.New("cannot change validator banned status")
 )
 
 // ValidatorSnapshotReader ..
@@ -537,7 +538,12 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		}
 	}
 
-	validator.EPOSStatus = edit.EPOSStatus
+	switch validator.EPOSStatus {
+	case effective.Banned:
+		return errCannotChangeBannedTaint
+	default:
+		validator.EPOSStatus = edit.EPOSStatus
+	}
 
 	return nil
 }
