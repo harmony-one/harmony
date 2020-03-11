@@ -20,9 +20,9 @@ const (
 	stressnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
 	// StressNetHTTPPattern is the http pattern for stressnet.
-	StressNetHTTPPattern = "https://api.s%d.os.hmny.io"
+	StressNetHTTPPattern = "https://api.s%d.stn.hmny.io"
 	// StressNetWSPattern is the websocket pattern for stressnet.
-	StressNetWSPattern = "wss://ws.s%d.os.hmny.io"
+	StressNetWSPattern = "wss://ws.s%d.stn.hmny.io"
 )
 
 func (stressnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -80,5 +80,5 @@ var stressnetReshardingEpoch = []*big.Int{
 	params.StressnetChainConfig.StakingEpoch,
 }
 
-var stressnetV0 = MustNewInstance(4, 27, 27, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
-var stressnetV1 = MustNewInstance(4, 50, 27, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
+var stressnetV0 = MustNewInstance(4, 120, 120, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
+var stressnetV1 = MustNewInstance(4, 150, 120, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
