@@ -45,11 +45,12 @@ func (f *factory) NewHeader(epoch *big.Int) *block.Header {
 
 // Factories corresponding to well-known chain configurations.
 var (
-	ForTest    = NewFactory(params.TestChainConfig)
-	ForTestnet = NewFactory(params.TestnetChainConfig)
-	ForMainnet = NewFactory(params.MainnetChainConfig)
-	ForPangaea = NewFactory(params.PangaeaChainConfig)
-	ForPartner = NewFactory(params.PartnerChainConfig)
+	ForTest      = NewFactory(params.TestChainConfig)
+	ForTestnet   = NewFactory(params.TestnetChainConfig)
+	ForMainnet   = NewFactory(params.MainnetChainConfig)
+	ForPangaea   = NewFactory(params.PangaeaChainConfig)
+	ForPartner   = NewFactory(params.PartnerChainConfig)
+	ForStressnet = NewFactory(params.StressnetChainConfig)
 )
 
 // NewTestHeader creates a new, empty header object for epoch 0 using the test

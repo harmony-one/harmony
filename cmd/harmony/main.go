@@ -615,6 +615,8 @@ func main() {
 		shard.Schedule = shardingconfig.LocalnetSchedule
 	case nodeconfig.Partner:
 		shard.Schedule = shardingconfig.PartnerSchedule
+	case nodeconfig.Stressnet:
+		shard.Schedule = shardingconfig.StressNetSchedule
 	case nodeconfig.Devnet:
 		if *devnetHarmonySize < 0 {
 			*devnetHarmonySize = *devnetShardSize

@@ -60,6 +60,8 @@ func ReadProfile(iniBytes []byte, profile string) (*Profile, error) {
 			config.ChainID = params.PangaeaChainID.String()
 		case "partner":
 			config.ChainID = params.PartnerChainID.String()
+		case "stressnet":
+			config.ChainID = params.StressnetChainID.String()
 		default:
 			config.ChainID = params.TestnetChainID.String()
 		}

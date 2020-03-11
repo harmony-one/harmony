@@ -17,6 +17,7 @@ const (
 	LocalNet
 	Pangaea
 	Partner
+	StressNet
 	DevNet
 )
 

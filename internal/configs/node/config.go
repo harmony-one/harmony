@@ -51,12 +51,13 @@ type NetworkType string
 
 // Constants for NetworkType
 const (
-	Mainnet  = "mainnet"
-	Testnet  = "testnet"
-	Pangaea  = "pangaea"
-	Partner  = "partner"
-	Devnet   = "devnet"
-	Localnet = "localnet"
+	Mainnet   = "mainnet"
+	Testnet   = "testnet"
+	Pangaea   = "pangaea"
+	Partner   = "partner"
+	Stressnet = "stressnet"
+	Devnet    = "devnet"
+	Localnet  = "localnet"
 )
 
 // Global is the index of the global node configuration
@@ -323,6 +324,8 @@ func (t NetworkType) ChainConfig() params.ChainConfig {
 		return *params.PangaeaChainConfig
 	case Partner:
 		return *params.PartnerChainConfig
+	case Stressnet:
+		return *params.StressnetChainConfig
 	case Localnet:
 		return *params.LocalnetChainConfig
 	default:

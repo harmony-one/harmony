@@ -90,6 +90,8 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 		chainConfig = *params.PangaeaChainConfig
 	case nodeconfig.Partner:
 		chainConfig = *params.PartnerChainConfig
+	case nodeconfig.Stressnet:
+		chainConfig = *params.StressnetChainConfig
 	default: // all other types share testnet config
 		chainConfig = *params.TestChainConfig
 	}
