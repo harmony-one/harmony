@@ -59,6 +59,8 @@ var (
 		ReceiptLogEpoch: big.NewInt(0),
 	}
 
+	// PartnerChainConfig contains the chain parameters for the Partner network.
+	// All features except for CrossLink are enabled at launch.
 	PartnerChainConfig = &ChainConfig{
 		ChainID:         PartnerChainID,
 		CrossTxEpoch:    big.NewInt(0),
