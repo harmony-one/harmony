@@ -2487,6 +2487,7 @@ func (bc *BlockChain) UpdateStakingMetaData(
 func (bc *BlockChain) prepareStakingMetaData(
 	txns staking.StakingTransactions, state *state.DB,
 ) (newValidators []common.Address, newDelegations map[common.Address]staking.DelegationIndexes, err error) {
+	newDelegations = map[common.Address]staking.DelegationIndexes{}
 	for _, txn := range txns {
 		payload, err := txn.RLPEncodeStakeMsg()
 		if err != nil {
