@@ -335,6 +335,7 @@ func (w *Worker) CollectVerifiedSlashes() error {
 	if d := pending; len(d) > 0 {
 		pending, failures = w.verifySlashes(d)
 	}
+
 	if f := failures; len(f) > 0 {
 		if err := w.chain.DeleteFromPendingSlashingCandidates(f); err != nil {
 			return err

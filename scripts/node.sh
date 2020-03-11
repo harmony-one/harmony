@@ -108,7 +108,7 @@ options:
    -d             just download the Harmony binaries (default: off)
    -D             do not download Harmony binaries (default: download when start)
    -m             collect and upload node metrics to harmony prometheus + grafana
-   -N network     join the given network (mainnet, testnet, devnet; default: mainnet)
+   -N network     join the given network (mainnet, testnet, staking, partner, stress, devnet; default: mainnet)
    -n port        specify the public base port of the node (default: 9000)
    -t             equivalent to -N testnet (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
@@ -255,7 +255,7 @@ mainnet)
   network_type=mainnet
   dns_zone=t.hmny.io
   ;;
-testnet)
+testnet)  # TODO: update Testnet configs once LRTN is upgraded
   bootnodes=(
     /ip4/54.218.73.167/tcp/9876/p2p/QmWBVCPXQmc2ULigm3b9ayCZa15gj25kywiQQwPhHCZeXj
     /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
@@ -272,6 +272,23 @@ staking)
   REL=pangaea
   network_type=pangaea
   dns_zone=os.hmny.io
+  ;;
+partner)
+  bootnodes=(
+    /ip4/52.40.84.2/tcp/9800/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
+    /ip4/54.86.126.90/tcp/9800/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+  )
+  REL=partner
+  network_type=partner
+  dns_zone=ps.hmny.io
+  ;;
+stress)
+  bootnodes=(
+    /ip4/52.40.84.2/tcp/9842/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
+  )
+  REL=stressnet
+  network_type=stressnet
+  dns_zone=stn.hmny.io
   ;;
 devnet)
   bootnodes=(

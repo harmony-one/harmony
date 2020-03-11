@@ -208,6 +208,8 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		if err != nil {
 			return errors.Wrapf(err, "cannot decoded shard state")
 		}
+
+		// TODO(audit): reuse a singleton decider and not recreate it for every single block
 		d := quorum.NewDecider(quorum.SuperMajorityStake)
 		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
@@ -236,6 +238,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		}
 	}
 
+	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
 	blockNumHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumHash, header.Number().Uint64()-1)
 	lastCommitPayload := append(blockNumHash, parentHash[:]...)
@@ -289,6 +292,7 @@ func (e *engineImpl) Finalize(
 		}
 	}
 
+	// Finalize the state root
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
 }
@@ -445,6 +449,8 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		if err != nil {
 			return errors.Wrapf(err, "cannot read shard state")
 		}
+
+		// TODO(audit): reuse a singleton decider and not recreate it for every single block
 		d := quorum.NewDecider(quorum.SuperMajorityStake)
 		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return nil, nil
@@ -470,6 +476,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 				"need", quorumCount, "got", count)
 		}
 	}
+	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
 	blockNumHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumHash, header.Number().Uint64())
 	commitPayload := append(blockNumHash, hash[:]...)

@@ -37,6 +37,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// Leader add commit phase signature
+	// TODO(audit): sign signature on hash+blockNum+viewID (add a hard fork)
 	blockNumHash := [8]byte{}
 	binary.LittleEndian.PutUint64(blockNumHash[:], consensus.blockNum)
 	commitPayload := append(blockNumHash[:], consensus.blockHash[:]...)

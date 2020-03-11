@@ -16,6 +16,8 @@ const (
 	TestNet
 	LocalNet
 	Pangaea
+	Partner
+	StressNet
 	DevNet
 )
 

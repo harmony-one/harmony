@@ -12,6 +12,8 @@ var (
 	MainnetChainID            = big.NewInt(1)
 	TestnetChainID            = big.NewInt(2)
 	PangaeaChainID            = big.NewInt(3)
+	PartnerChainID            = big.NewInt(4)
+	StressnetChainID          = big.NewInt(5)
 	TestChainID               = big.NewInt(99)  // not a real network
 	AllProtocolChangesChainID = big.NewInt(100) // not a real network
 )
@@ -49,6 +51,32 @@ var (
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
 		ChainID:         PangaeaChainID,
+		CrossTxEpoch:    big.NewInt(0),
+		CrossLinkEpoch:  big.NewInt(2),
+		StakingEpoch:    big.NewInt(2),
+		PreStakingEpoch: big.NewInt(1),
+		EIP155Epoch:     big.NewInt(0),
+		S3Epoch:         big.NewInt(0),
+		ReceiptLogEpoch: big.NewInt(0),
+	}
+
+	// PartnerChainConfig contains the chain parameters for the Partner network.
+	// All features except for CrossLink are enabled at launch.
+	PartnerChainConfig = &ChainConfig{
+		ChainID:         PartnerChainID,
+		CrossTxEpoch:    big.NewInt(0),
+		CrossLinkEpoch:  big.NewInt(2),
+		StakingEpoch:    big.NewInt(2),
+		PreStakingEpoch: big.NewInt(1),
+		EIP155Epoch:     big.NewInt(0),
+		S3Epoch:         big.NewInt(0),
+		ReceiptLogEpoch: big.NewInt(0),
+	}
+
+	// StressnetChainConfig contains the chain parameters for the Stress test network.
+	// All features except for CrossLink are enabled at launch.
+	StressnetChainConfig = &ChainConfig{
+		ChainID:         StressnetChainID,
 		CrossTxEpoch:    big.NewInt(0),
 		CrossLinkEpoch:  big.NewInt(2),
 		StakingEpoch:    big.NewInt(2),
