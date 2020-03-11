@@ -90,7 +90,7 @@ var (
 	// nodeType indicates the type of the node: validator, explorer
 	nodeType = flag.String("node_type", "validator", "node type: validator, explorer")
 	// networkType indicates the type of the network
-	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, devnet, localnet")
+	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, pangaea, partner, stressnet, devnet, localnet")
 	// syncFreq indicates sync frequency
 	syncFreq = flag.Int("sync_freq", 60, "unit in seconds")
 	// beaconSyncFreq indicates beaconchain sync frequency
@@ -610,6 +610,10 @@ func main() {
 		shard.Schedule = shardingconfig.PangaeaSchedule
 	case nodeconfig.Localnet:
 		shard.Schedule = shardingconfig.LocalnetSchedule
+	case nodeconfig.Partner:
+		shard.Schedule = shardingconfig.PartnerSchedule
+	case nodeconfig.Stressnet:
+		shard.Schedule = shardingconfig.StressNetSchedule
 	case nodeconfig.Devnet:
 		if *devnetHarmonySize < 0 {
 			*devnetHarmonySize = *devnetShardSize
