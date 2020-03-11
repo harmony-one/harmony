@@ -87,16 +87,43 @@ type ValidatorWrapper struct {
 // Computed represents current epoch
 // availability measures, mostly for RPC
 type Computed struct {
-	Signed     *big.Int    `json:"current-epoch-signed"`
-	ToSign     *big.Int    `json:"current-epoch-to-sign"`
-	Percentage numeric.Dec `json:"percentage"`
+	Signed           *big.Int    `json:"current-epoch-signed"`
+	ToSign           *big.Int    `json:"current-epoch-to-sign"`
+	Missed           *big.Int    `json:"current-epoch-blocks-missed"`
+	Percentage       numeric.Dec `json:"percentage"`
+	IsBelowThreshold bool        `json:"is-below-epos-threshold"`
+}
+
+// These mostly done for places where a sane default value needed,
+// like at the RPC layer
+var (
+	// NoSigningDone ..
+	NoSigningDone = Computed{
+		common.Big0, common.Big0, common.Big0, numeric.ZeroDec(), true,
+	}
+	// EmptyVotingPower ..
+	EmptyVotingPower = []VotePerShard{}
+	// EmptyPerformance ..
+	EmptyPerformance = CurrentEpochPerformance{NoSigningDone, EmptyVotingPower}
+)
+
+// CurrentEpochPerformance represents validator performance in the context of
+// whatever current epoch is
+type CurrentEpochPerformance struct {
+	CurrentSigningPercentage Computed       `json:"current-epoch-signing-percent"`
+	CurrentVotingPower       []VotePerShard `json:"current-epoch-voting-power"`
+}
+
+// CurrentStakes ..
+type CurrentStakes struct {
+	TotalDelegated *big.Int `json:"total-delegation"`
 }
 
 // ValidatorRPCEnchanced contains extra information for RPC consumer
 type ValidatorRPCEnchanced struct {
-	Wrapper                  ValidatorWrapper `json:"validator"`
-	CurrentSigningPercentage Computed         `json:"current-epoch-signing-percent"`
-	CurrentVotingPower       []VotePerShard   `json:"current-epoch-voting-power"`
+	Wrapper     ValidatorWrapper        `json:"validator"`
+	Performance CurrentEpochPerformance `json:"current-epoch-performance"`
+	Stakes      CurrentStakes           `json:"aggregated"`
 }
 
 func (w ValidatorWrapper) String() string {

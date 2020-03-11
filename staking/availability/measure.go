@@ -137,7 +137,7 @@ func bumpCount(
 			)
 		}
 
-		if err := compute(bc, state, wrapper); err != nil {
+		if err := computeAndMutateEPOSStatus(bc, state, wrapper); err != nil {
 			return err
 		}
 
@@ -175,7 +175,8 @@ type Reader interface {
 // ComputeCurrentSigning returns (signed, toSign, quotient, error)
 func ComputeCurrentSigning(
 	snapshot, wrapper *staking.ValidatorWrapper,
-) (*big.Int, *big.Int, numeric.Dec, error) {
+	blocksPerEpoch *big.Int,
+) (*staking.Computed, error) {
 	statsNow, snapSigned, snapToSign :=
 		wrapper.Counters,
 		snapshot.Counters.NumBlocksSigned,
@@ -184,22 +185,27 @@ func ComputeCurrentSigning(
 	signed, toSign :=
 		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
 		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
+	missedSoFar := new(big.Int).Sub(blocksPerEpoch, signed)
+
+	computed := &staking.Computed{
+		signed, toSign, missedSoFar, numeric.ZeroDec(), true,
+	}
 
 	if toSign.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().
 			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
-		return signed, toSign, numeric.ZeroDec(), nil
+		return computed, nil
 	}
 
 	if signed.Sign() == -1 {
-		return nil, nil, numeric.ZeroDec(), errors.Wrapf(
+		return nil, errors.Wrapf(
 			errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
 			statsNow.NumBlocksSigned.String(), snapSigned.String(),
 		)
 	}
 
 	if toSign.Sign() == -1 {
-		return nil, nil, numeric.ZeroDec(), errors.Wrapf(
+		return nil, errors.Wrapf(
 			errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
 			statsNow.NumBlocksToSign.String(), snapToSign.String(),
 		)
@@ -207,9 +213,9 @@ func ComputeCurrentSigning(
 
 	s1, s2 :=
 		numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
-
-	quotient := s1.Quo(s2)
-	return signed, toSign, quotient, nil
+	computed.Percentage = s1.Quo(s2)
+	computed.IsBelowThreshold = IsBelowSigningThreshold(computed.Percentage)
+	return computed, nil
 }
 
 // IsBelowSigningThreshold ..
@@ -217,12 +223,12 @@ func IsBelowSigningThreshold(quotient numeric.Dec) bool {
 	return quotient.LTE(measure)
 }
 
-// compute sets the validator to
+// computeAndMutateEPOSStatus sets the validator to
 // inactive and thereby keeping it out of
 // consideration in the pool of validators for
 // whenever committee selection happens in future, the
 // signing threshold is 66%
-func compute(
+func computeAndMutateEPOSStatus(
 	bc Reader,
 	state *state.DB,
 	wrapper *staking.ValidatorWrapper,
@@ -234,22 +240,24 @@ func compute(
 		return err
 	}
 
-	signed, toSign, quotient, err := ComputeCurrentSigning(snapshot, wrapper)
+	computed, err := ComputeCurrentSigning(snapshot, wrapper, big.NewInt(75))
 
 	if err != nil {
 		return err
 	}
 
+	quotient := computed.Percentage
+
 	utils.Logger().Info().
-		Str("signed", signed.String()).
-		Str("to-sign", toSign.String()).
+		Str("signed", computed.Signed.String()).
+		Str("to-sign", computed.ToSign.String()).
 		Str("percentage-signed", quotient.String()).
-		Bool("meets-threshold", quotient.LTE(measure)).
+		Bool("meets-threshold", computed.IsBelowThreshold).
 		Msg("check if signing percent is meeting required threshold")
 
 	const missedTooManyBlocks = true
 
-	switch IsBelowSigningThreshold(quotient) {
+	switch computed.IsBelowThreshold {
 	case missedTooManyBlocks:
 		wrapper.EPOSStatus = effective.Inactive
 		utils.Logger().Info().

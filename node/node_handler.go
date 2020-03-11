@@ -494,12 +494,12 @@ func (node *Node) PostConsensusProcessing(
 				if err != nil {
 					return
 				}
-				signed, toSign, quotient, err :=
-					availability.ComputeCurrentSigning(snapshot, wrapper)
-				if err != nil && availability.IsBelowSigningThreshold(quotient) {
+				computed, err :=
+					availability.ComputeCurrentSigning(snapshot, wrapper, big.NewInt(75))
+				if err != nil && computed.IsBelowThreshold {
 					url := h.Availability.OnDroppedBelowThreshold
 					go func() {
-						webhooks.DoPost(url, staking.Computed{signed, toSign, quotient})
+						webhooks.DoPost(url, computed)
 					}()
 				}
 			}

@@ -21,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -333,22 +332,28 @@ func (b *APIBackend) GetValidatorInformation(
 		s, _ := internal_common.AddressToBech32(addr)
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
 	}
+
+	totalDelegation := big.NewInt(0)
+	for i := range wrapper.Delegations {
+		totalDelegation.Add(totalDelegation, wrapper.Delegations[i].Amount)
+	}
+
 	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
 		b.hmy.BlockChain().CurrentHeader().Epoch(),
 		addr,
 	)
 	defaultReply := &staking.ValidatorRPCEnchanced{
-		Wrapper: *wrapper,
-		CurrentSigningPercentage: staking.Computed{
-			common.Big0, common.Big0, numeric.ZeroDec(),
-		},
-		CurrentVotingPower: []staking.VotePerShard{},
+		Wrapper:     *wrapper,
+		Performance: staking.EmptyPerformance,
+		Stakes:      staking.CurrentStakes{totalDelegation},
 	}
 	if err != nil {
 		return defaultReply, nil
 	}
 
-	signed, toSign, quotient, err := availability.ComputeCurrentSigning(snapshot, wrapper)
+	computed, err := availability.ComputeCurrentSigning(
+		snapshot, wrapper, big.NewInt(75),
+	)
 	if err != nil {
 		return defaultReply, nil
 	}
@@ -357,8 +362,11 @@ func (b *APIBackend) GetValidatorInformation(
 		return defaultReply, nil
 	}
 
-	defaultReply.CurrentSigningPercentage = staking.Computed{signed, toSign, quotient}
-	defaultReply.CurrentVotingPower = stats.VotingPowerPerShard
+	defaultReply.Performance = staking.CurrentEpochPerformance{
+		CurrentSigningPercentage: *computed,
+		CurrentVotingPower:       stats.VotingPowerPerShard,
+	}
+
 	return defaultReply, nil
 }
 
