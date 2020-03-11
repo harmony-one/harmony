@@ -179,7 +179,9 @@ func VerifyAndDelegateFromMsg(
 				}
 				// Return remaining balance to be deducted for delegation
 				if !CanTransfer(stateDB, msg.DelegatorAddress, delegateBalance) {
-					return nil, nil, errInsufficientBalanceForStake
+					return nil, nil, errors.Wrapf(
+						errInsufficientBalanceForStake, "had %v, tried to stake %v",
+						stateDB.GetBalance(msg.DelegatorAddress), delegateBalance)
 				}
 				return wrapper, delegateBalance, nil
 			}
@@ -194,7 +196,9 @@ func VerifyAndDelegateFromMsg(
 	}
 	// If no redelegation, create new delegation
 	if !CanTransfer(stateDB, msg.DelegatorAddress, msg.Amount) {
-		return nil, nil, errInsufficientBalanceForStake
+		return nil, nil, errors.Wrapf(
+			errInsufficientBalanceForStake, "had %v, tried to stake %v",
+			stateDB.GetBalance(msg.DelegatorAddress), msg.Amount)
 	}
 	wrapper.Delegations = append(
 		wrapper.Delegations, staking.NewDelegation(

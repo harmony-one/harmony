@@ -383,10 +383,10 @@ func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 	if err != nil {
 		return err
 	}
-	if err := st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper); err != nil {
+	if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
 		return err
 	}
-	st.state.SetValidatorFlag(wrapper.Validator.Address)
+	st.state.SetValidatorFlag(wrapper.Address)
 	st.state.SubBalance(wrapper.Address, createValidator.Amount)
 	return nil
 }
@@ -409,7 +409,7 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 
 	st.state.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
 
-	return st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper)
+	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
 }
 
 func (st *StateTransition) verifyAndApplyUndelegateTx(undelegate *staking.Undelegate) error {
@@ -417,7 +417,7 @@ func (st *StateTransition) verifyAndApplyUndelegateTx(undelegate *staking.Undele
 	if err != nil {
 		return err
 	}
-	return st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper)
+	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
 }
 
 func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.CollectRewards) (*big.Int, error) {
@@ -436,7 +436,7 @@ func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.
 		return network.NoReward, err
 	}
 	for _, wrapper := range updatedValidatorWrappers {
-		if err := st.state.UpdateValidatorWrapper(wrapper.Validator.Address, wrapper); err != nil {
+		if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
 			return network.NoReward, err
 		}
 	}
