@@ -2,7 +2,6 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -105,7 +104,17 @@ var (
 	EmptyVotingPower = []VotePerShard{}
 	// EmptyPerformance ..
 	EmptyPerformance = CurrentEpochPerformance{NoSigningDone, EmptyVotingPower}
+	// EmptyKeysPerShard ..
+	EmptyKeysPerShard = []KeysPerShard{}
 )
+
+// NewEmptyStats ..
+func NewEmptyStats() *ValidatorStats {
+	return &ValidatorStats{
+		big.NewInt(0), numeric.ZeroDec(),
+		EmptyVotingPower, EmptyKeysPerShard,
+	}
+}
 
 // CurrentEpochPerformance represents validator performance in the context of
 // whatever current epoch is
@@ -164,8 +173,7 @@ type KeysPerShard struct {
 
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
-	// The number of times they validator is jailed due to extensive downtime
-	NumJailed *big.Int `rlp:"nil"`
+	BlockReward *big.Int `json:"block-reward-accumulated"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `rlp:"nil"`
 	// VotingPowerPerShard ..
@@ -287,31 +295,6 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 	return nil
 }
 
-// MarshalJSON ..
-func (v *ValidatorStats) MarshalJSON() ([]byte, error) {
-	type t struct {
-		NumJailed           uint64         `json:"blocks-jailed"`
-		TotalEffectiveStake numeric.Dec    `json:"total-effective-stake"`
-		VotingPowerPerShard []VotePerShard `json:"voting-power-per-shard"`
-		BLSKeyPerShard      []KeysPerShard `json:"bls-keys-per-shard"`
-	}
-	return json.Marshal(t{
-		NumJailed:           v.NumJailed.Uint64(),
-		TotalEffectiveStake: v.TotalEffectiveStake,
-		VotingPowerPerShard: v.VotingPowerPerShard,
-		BLSKeyPerShard:      v.BLSKeyPerShard,
-	})
-}
-
-func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
-	str := "["
-	for i := range pubKeys {
-		str += fmt.Sprintf("%d: %s,", i, pubKeys[i].Hex())
-	}
-	str += "]"
-	return str
-}
-
 // TotalDelegation - return the total amount of token in delegation
 func (w *ValidatorWrapper) TotalDelegation() *big.Int {
 	total := big.NewInt(0)
@@ -410,35 +393,38 @@ func UpdateDescription(d1, d2 Description) (Description, error) {
 // EnsureLength ensures the length of a validator's description.
 func (d Description) EnsureLength() (Description, error) {
 	if len(d.Name) > MaxNameLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.Name), "maxNameLen", MaxNameLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have",
+			len(d.Name), "maxNameLen", MaxNameLength,
+		)
 	}
 	if len(d.Identity) > MaxIdentityLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.Identity), "maxIdentityLen", MaxIdentityLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have",
+			len(d.Identity), "maxIdentityLen", MaxIdentityLength,
+		)
 	}
 	if len(d.Website) > MaxWebsiteLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.Website), "maxWebsiteLen", MaxWebsiteLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have", len(d.Website),
+			"maxWebsiteLen", MaxWebsiteLength,
+		)
 	}
 	if len(d.SecurityContact) > MaxSecurityContactLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.SecurityContact), "maxSecurityContactLen", MaxSecurityContactLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have",
+			len(d.SecurityContact), "maxSecurityContactLen", MaxSecurityContactLength,
+		)
 	}
 	if len(d.Details) > MaxDetailsLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.Details), "maxDetailsLen", MaxDetailsLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have", len(d.Details),
+			"maxDetailsLen", MaxDetailsLength,
+		)
 	}
 
 	return d, nil
 }
-
-// GetAddress returns address
-func (v *Validator) GetAddress() common.Address { return v.Address }
-
-// GetName returns the name of validator in the description
-func (v *Validator) GetName() string { return v.Description.Name }
-
-// GetCommissionRate returns the commission rate of the validator
-func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
-
-// GetMinSelfDelegation returns the minimum amount the validator must stake
-func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
 
 // VerifyBLSKeys checks if the public BLS key at index i of pubKeys matches the
 // BLS key signature at index i of pubKeysSigs.

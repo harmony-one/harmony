@@ -2,13 +2,10 @@ package effective
 
 import (
 	"bytes"
-	"encoding/json"
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -40,37 +37,10 @@ type SlotOrder struct {
 	SpreadAmong []shard.BlsPublicKey
 }
 
-// Slots ..
-type Slots []SlotPurchase
-
-// JSON is a plain JSON dump
-func (s Slots) JSON() string {
-	type t struct {
-		Address string `json:"slot-owner"`
-		Key     string `json:"bls-public-key"`
-		Stake   string `json:"actual-stake"`
-	}
-	type v struct {
-		Slots []t `json:"slots"`
-	}
-	data := v{}
-	for i := range s {
-		newData := t{
-			common2.MustAddressToBech32(s[i].Address),
-			s[i].BlsPublicKey.Hex(),
-			s[i].Dec.String(),
-		}
-		data.Slots = append(data.Slots, newData)
-	}
-	b, _ := json.Marshal(data)
-	return string(b)
-}
-
 // Median ..
 func Median(stakes []SlotPurchase) numeric.Dec {
 	if len(stakes) == 0 {
-		utils.Logger().Error().Int("non-zero", len(stakes)).
-			Msg("Input to median has len 0, check caller")
+		return numeric.ZeroDec()
 	}
 
 	sort.SliceStable(
@@ -81,11 +51,9 @@ func Median(stakes []SlotPurchase) numeric.Dec {
 	switch l := len(stakes); l % 2 {
 	case isEven:
 		left := (l / 2) - 1
-		right := (l / 2)
-		utils.Logger().Info().Int("left", left).Int("right", right)
+		right := l / 2
 		return stakes[left].Dec.Add(stakes[right].Dec).Quo(two)
 	default:
-		utils.Logger().Info().Int("median index", l/2)
 		return stakes[l/2].Dec
 	}
 }
@@ -93,8 +61,8 @@ func Median(stakes []SlotPurchase) numeric.Dec {
 // Compute ..
 func Compute(
 	shortHand map[common.Address]SlotOrder, pull int,
-) (numeric.Dec, Slots) {
-	eposedSlots := Slots{}
+) (numeric.Dec, []SlotPurchase) {
+	eposedSlots := []SlotPurchase{}
 	if len(shortHand) == 0 {
 		return numeric.ZeroDec(), eposedSlots
 	}
@@ -143,7 +111,7 @@ func Compute(
 	picks := eposedSlots[:pull]
 
 	if len(picks) == 0 {
-		return numeric.ZeroDec(), Slots{}
+		return numeric.ZeroDec(), []SlotPurchase{}
 	}
 
 	return Median(picks), picks
@@ -151,7 +119,7 @@ func Compute(
 }
 
 // Apply ..
-func Apply(shortHand map[common.Address]SlotOrder, pull int) Slots {
+func Apply(shortHand map[common.Address]SlotOrder, pull int) []SlotPurchase {
 	median, picks := Compute(shortHand, pull)
 	for i := range picks {
 		picks[i].Dec = effectiveStake(median, picks[i].Dec)

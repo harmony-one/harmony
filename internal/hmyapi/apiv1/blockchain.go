@@ -561,23 +561,13 @@ func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 	return addresses, nil
 }
 
-// GetValidatorMetrics ..
-func (s *PublicBlockChainAPI) GetValidatorMetrics(ctx context.Context, address string) (*staking.ValidatorStats, error) {
-	validatorAddress := internal_common.ParseAddr(address)
-	stats := s.b.GetValidatorStats(validatorAddress)
-	if stats == nil {
-		addr, _ := internal_common.AddressToBech32(validatorAddress)
-		return nil, fmt.Errorf("validator stats not found: %s", addr)
-	}
-	return stats, nil
-}
-
 // GetValidatorInformation returns information about a validator.
 func (s *PublicBlockChainAPI) GetValidatorInformation(
 	ctx context.Context, address string,
 ) (*staking.ValidatorRPCEnchanced, error) {
-	validatorAddress := internal_common.ParseAddr(address)
-	return s.b.GetValidatorInformation(validatorAddress)
+	return s.b.GetValidatorInformation(
+		internal_common.ParseAddr(address),
+	)
 }
 
 // GetAllValidatorInformation returns information about all validators.

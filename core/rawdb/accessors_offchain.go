@@ -206,23 +206,21 @@ func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address, epoch *big
 	}
 }
 
-// ReadValidatorStats retrieves validator's stats by its address
+// ReadValidatorStats retrieves validator's stats by its address,
+// any errors during its execution are swallowed and it returns a
+// fresh ValidatorStats made by staking.NewEmptyStats()
 func ReadValidatorStats(
 	db DatabaseReader, addr common.Address,
-) (*staking.ValidatorStats, error) {
+) *staking.ValidatorStats {
 	data, err := db.Get(validatorStatsKey(addr))
-	if err != nil || len(data) == 0 {
-		utils.Logger().Info().Err(err).Msg("ReadValidatorStats")
-		return nil, err
+	if err != nil {
+		return staking.NewEmptyStats()
 	}
 	stats := staking.ValidatorStats{}
 	if err := rlp.DecodeBytes(data, &stats); err != nil {
-		utils.Logger().Error().Err(err).
-			Str("address", addr.Hex()).
-			Msg("Unable to decode validator stats from database")
-		return nil, err
+		return staking.NewEmptyStats()
 	}
-	return &stats, nil
+	return &stats
 }
 
 // WriteValidatorStats stores validator's stats by its address

@@ -74,7 +74,6 @@ type Backend interface {
 	GetElectedValidatorAddresses() []common.Address
 	GetAllValidatorAddresses() []common.Address
 	GetValidatorInformation(addr common.Address) (*staking.ValidatorRPCEnchanced, error)
-	GetValidatorStats(addr common.Address) *staking.ValidatorStats
 	GetDelegationsByValidator(validator common.Address) []*staking.Delegation
 	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)
 	GetValidatorSelfDelegation(addr common.Address) *big.Int

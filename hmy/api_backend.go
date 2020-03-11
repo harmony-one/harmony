@@ -357,7 +357,7 @@ func (b *APIBackend) GetValidatorInformation(
 	if err != nil {
 		return defaultReply, nil
 	}
-	stats, err := b.hmy.BlockChain().ReadValidatorStats(addr)
+	stats := b.hmy.BlockChain().ReadValidatorStats(addr)
 	if err != nil {
 		return defaultReply, nil
 	}
@@ -375,6 +375,11 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 	candidates := b.hmy.BlockChain().ValidatorCandidates()
 	essentials := map[common.Address]effective.SlotOrder{}
 	blsKeys := map[shard.BlsPublicKey]struct{}{}
+	instance := shard.Schedule.InstanceForEpoch(b.CurrentBlock().Epoch())
+	stakedSlots :=
+		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
+			int(instance.NumShards())
+
 	for i := range candidates {
 		validator, err := b.hmy.BlockChain().ReadValidatorInformation(
 			candidates[i],
@@ -385,9 +390,7 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 		if validator.EPOSStatus != effective.Active {
 			continue
 		}
-		if err := validator.SanityCheck(
-			staking.DoNotEnforceMaxBLS,
-		); err != nil {
+		if err := validator.SanityCheck(stakedSlots / 3); err != nil {
 			continue
 		}
 
@@ -417,10 +420,6 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
 		}
 	}
 
-	instance := shard.Schedule.InstanceForEpoch(b.CurrentBlock().Epoch())
-	stakedSlots :=
-		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
-			int(instance.NumShards())
 	median, _ := effective.Compute(essentials, stakedSlots)
 	return median.TruncateInt(), nil
 }
@@ -451,12 +450,6 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	}
 	b.TotalStakingCache.TotalStaking = stakes
 	return b.TotalStakingCache.TotalStaking
-}
-
-// GetValidatorStats returns the stats of validator
-func (b *APIBackend) GetValidatorStats(addr common.Address) *staking.ValidatorStats {
-	val, _ := b.hmy.BlockChain().ReadValidatorStats(addr)
-	return val
 }
 
 // GetDelegationsByValidator returns all delegation information of a validator

@@ -46,7 +46,6 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -2257,8 +2256,17 @@ func (bc *BlockChain) writeValidatorSnapshots(
 // ReadValidatorStats reads the stats of a validator
 func (bc *BlockChain) ReadValidatorStats(
 	addr common.Address,
-) (*staking.ValidatorStats, error) {
+) *staking.ValidatorStats {
 	return rawdb.ReadValidatorStats(bc.db, addr)
+}
+
+// UpdateValidatorStatsBlockReward ..
+func (bc *BlockChain) UpdateValidatorStatsBlockReward(
+	batch rawdb.DatabaseWriter, addr common.Address, newlyEarned *big.Int,
+) error {
+	stats := bc.ReadValidatorStats(addr)
+	stats.BlockReward.Add(stats.BlockReward, newlyEarned)
+	return rawdb.WriteValidatorStats(batch, addr, stats)
 }
 
 // UpdateValidatorVotingPower writes the voting power for the committees
@@ -2282,18 +2290,11 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 	networkWide := votepower.AggregateRosters(rosters)
 
 	for key, value := range networkWide {
-		statsFromDB, _ := rawdb.ReadValidatorStats(bc.db, key)
-		if statsFromDB == nil {
-			statsFromDB = &staking.ValidatorStats{
-				big.NewInt(0), numeric.NewDec(0),
-				[]staking.VotePerShard{}, []staking.KeysPerShard{},
-			}
-		}
-		statsFromDB.TotalEffectiveStake = value.TotalEffectiveStake
-		statsFromDB.VotingPowerPerShard = value.VotingPower
-		statsFromDB.BLSKeyPerShard = value.BLSPublicKeysOwned
-		// TODO(audit): should clear the voting power of those validators who are not elected.
-		if err := rawdb.WriteValidatorStats(batch, key, statsFromDB); err != nil {
+		stats := rawdb.ReadValidatorStats(bc.db, key)
+		stats.TotalEffectiveStake = value.TotalEffectiveStake
+		stats.VotingPowerPerShard = value.VotingPower
+		stats.BLSKeyPerShard = value.BLSPublicKeysOwned
+		if err := rawdb.WriteValidatorStats(batch, key, stats); err != nil {
 			return err
 		}
 	}

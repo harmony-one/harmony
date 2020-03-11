@@ -20,7 +20,7 @@ const eposTestingFile = "epos.json"
 var (
 	testingNumber    = 20
 	testingSlots     slotsData
-	testingPurchases Slots
+	testingPurchases []SlotPurchase
 	expectedMedian   numeric.Dec
 	maxAccountGen    = int64(98765654323123134)
 	accountGen       = rand.New(rand.NewSource(1337))
@@ -53,8 +53,8 @@ func init() {
 	testingPurchases = generateRandomSlots(testingNumber)
 }
 
-func generateRandomSlots(num int) Slots {
-	randomSlots := Slots{}
+func generateRandomSlots(num int) []SlotPurchase {
+	randomSlots := []SlotPurchase{}
 	for i := 0; i < num; i++ {
 		addr := common.Address{}
 		addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
