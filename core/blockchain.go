@@ -1958,7 +1958,6 @@ func (bc *BlockChain) DeleteFromPendingSlashingCandidates(
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
 	current := bc.ReadPendingSlashingCandidates()
-	// TODO(audit): fix SetDifference impl mistake
 	bc.pendingSlashes = current.SetDifference(processed)
 	return bc.writeSlashes(bc.pendingSlashes)
 }
