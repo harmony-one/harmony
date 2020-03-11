@@ -99,7 +99,7 @@ func (p *StateProcessor) Process(
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 
-	// Iterate over staking transactions
+	// Iterate over and process the staking transactions
 	L := len(block.Transactions())
 	for i, tx := range block.StakingTransactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
@@ -119,14 +119,14 @@ func (p *StateProcessor) Process(
 		err := ApplyIncomingReceipt(p.config, statedb, header, cx)
 		if err != nil {
 			return nil, nil,
-				nil, 0, nil, ctxerror.New("cannot apply incoming receipts").WithCause(err)
+				nil, 0, nil, ctxerror.New("[Process] Cannot apply incoming receipts").WithCause(err)
 		}
 	}
 
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
+			return nil, nil, nil, 0, nil, ctxerror.New("[Process] Cannot finalize block").WithCause(err)
 		}
 	}
 
@@ -136,7 +136,7 @@ func (p *StateProcessor) Process(
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes,
 	)
 	if err != nil {
-		return nil, nil, nil, 0, nil, ctxerror.New("cannot finalize block").WithCause(err)
+		return nil, nil, nil, 0, nil, ctxerror.New("[Process] Cannot finalize block").WithCause(err)
 	}
 
 	return receipts, outcxs, allLogs, *usedGas, payout, nil
@@ -253,11 +253,8 @@ func ApplyStakingTransaction(
 
 	// Apply the transaction to the current state (included in the env)
 	gas, err = ApplyStakingMessage(vmenv, msg, gp, bc)
-	utils.Logger().Info().Msgf("ApplyStakingMessage: usedGas: %v, err: %v, stakingTxn:", gas, err)
-
-	// even there is error, we charge it
 	if err != nil {
-		return nil, gas, err
+		return nil, 0, err
 	}
 
 	// Update the state with pending changes
@@ -271,6 +268,11 @@ func ApplyStakingTransaction(
 	receipt = types.NewReceipt(root, false, *usedGas)
 	receipt.TxHash = tx.Hash()
 	receipt.GasUsed = gas
+
+	// TODO(audit): add more log to staking txns; expose them in block explorer.
+	if config.IsReceiptLog(header.Epoch()) {
+		receipt.Logs = statedb.GetLogs(tx.Hash())
+	}
 
 	return receipt, gas, nil
 }

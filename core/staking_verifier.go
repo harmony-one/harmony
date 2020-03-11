@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"math/big"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
+	"github.com/pkg/errors"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/vm"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -98,10 +101,9 @@ func VerifyAndEditValidatorFromMsg(
 		return nil, errCommissionRateChangeTooHigh
 	}
 
-	// TODO: make sure we are reading from the correct snapshot
 	snapshotValidator, err := chainContext.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessage(err, "Validator snapshot not found.")
 	}
 	rateAtBeginningOfEpoch := snapshotValidator.Validator.Rate
 
@@ -172,9 +174,14 @@ func VerifyAndDelegateFromMsg(
 				); err != nil {
 					return nil, nil, err
 				}
-				// Return remaining balance to be deducted for delegation
 				if delegateBalance.Cmp(big.NewInt(0)) < 0 {
-					return nil, nil, errInsufficientBalanceForStake // shouldn't really happen
+					return nil, nil, errNegativeAmount // shouldn't really happen
+				}
+				// Return remaining balance to be deducted for delegation
+				if !CanTransfer(stateDB, msg.DelegatorAddress, delegateBalance) {
+					return nil, nil, errors.Wrapf(
+						errInsufficientBalanceForStake, "had %v, tried to stake %v",
+						stateDB.GetBalance(msg.DelegatorAddress), delegateBalance)
 				}
 				return wrapper, delegateBalance, nil
 			}
@@ -189,7 +196,9 @@ func VerifyAndDelegateFromMsg(
 	}
 	// If no redelegation, create new delegation
 	if !CanTransfer(stateDB, msg.DelegatorAddress, msg.Amount) {
-		return nil, nil, errInsufficientBalanceForStake
+		return nil, nil, errors.Wrapf(
+			errInsufficientBalanceForStake, "had %v, tried to stake %v",
+			stateDB.GetBalance(msg.DelegatorAddress), msg.Amount)
 	}
 	wrapper.Delegations = append(
 		wrapper.Delegations, staking.NewDelegation(
@@ -270,8 +279,15 @@ func VerifyAndCollectRewardsFromDelegation(
 			delegation := &wrapper.Delegations[delegation.Index]
 			if delegation.Reward.Cmp(common.Big0) > 0 {
 				totalRewards.Add(totalRewards, delegation.Reward)
+				delegation.Reward.SetUint64(0)
 			}
-			delegation.Reward.SetUint64(0)
+		} else {
+			utils.Logger().Warn().
+				Str("validator", delegation.ValidatorAddress.String()).
+				Uint64("delegation index", delegation.Index).
+				Int("delegations length", len(wrapper.Delegations)).
+				Msg("Delegation index out of bound")
+			return nil, nil, errors.New("Delegation index out of bound")
 		}
 		if err := wrapper.SanityCheck(
 			staking.DoNotEnforceMaxBLS,

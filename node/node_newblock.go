@@ -1,6 +1,7 @@
 package node
 
 import (
+	"errors"
 	"sort"
 	"strings"
 	"time"
@@ -11,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/pkg/errors"
 )
 
 // Constants of proposing a new block

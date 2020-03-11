@@ -337,9 +337,9 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
-			Msg("cannot ValidateHeader for the new block")
+			Msg("[VerifyNewBlock] Cannot validate header for the new block")
 		return ctxerror.New(
-			"cannot ValidateHeader for the new block",
+			"[VerifyNewBlock] Cannot validate header for the new block",
 			"blockHash",
 			newBlock.Hash(),
 		).WithCause(err)
@@ -349,8 +349,8 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		utils.Logger().Error().
 			Uint32("my shard ID", node.Blockchain().ShardID()).
 			Uint32("new block's shard ID", newBlock.ShardID()).
-			Msg("wrong shard ID")
-		return ctxerror.New("wrong shard ID",
+			Msg("[VerifyNewBlock] Wrong shard ID of the new block")
+		return ctxerror.New("[VerifyNewBlock] Wrong shard ID of the new block",
 			"my shard ID", node.Blockchain().ShardID(),
 			"new block's shard ID", newBlock.ShardID(),
 		)
@@ -362,9 +362,9 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
-			Msg("cannot VerifyShardState for the new block")
+			Msg("[VerifyNewBlock] Cannot verify shard state for the new block")
 		return ctxerror.New(
-			"cannot VerifyShardState for the new block", "blockHash",
+			"[VerifyNewBlock] Cannot verify shard state for the new block", "blockHash",
 			newBlock.Hash(),
 		).WithCause(err)
 	}

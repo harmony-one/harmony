@@ -180,6 +180,7 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 		return err
 	}
 
+	// TODO(audit): add limit on the number of bls keys one can have.
 	if len(v.SlotPubKeys) == 0 {
 		return errNeedAtLeastOneSlotKey
 	}
@@ -200,10 +201,8 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 		return errNilMaxTotalDelegation
 	}
 
-	// if I'm not banned, then I must
-	// ensure that MinSelfDelegation >= 1 ONE
-	if v.EPOSStatus != effective.Banned &&
-		v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+	// MinSelfDelegation must be >= 1 ONE
+	if v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
 		return errors.Wrapf(
 			errMinSelfDelegationTooSmall,
 			"delegation-given %s", v.MinSelfDelegation.String(),

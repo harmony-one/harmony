@@ -265,6 +265,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 		return err
 	}
 
+	// Verify all the hash roots (state, txns, receipts, cross-shard)
 	if err := bc.Validator().ValidateState(
 		block, state, receipts, cxReceipts, usedGas,
 	); err != nil {
