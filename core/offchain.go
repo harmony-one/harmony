@@ -22,7 +22,6 @@ func (bc *BlockChain) CommitOffChainData(
 	cxReceipts []*types.CXReceipt,
 	payout *big.Int,
 	state *state.DB,
-	root common.Hash,
 ) (status WriteStatus, err error) {
 	// Write receipts of the block
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
@@ -86,6 +85,12 @@ func (bc *BlockChain) CommitOffChainData(
 	//	}
 	//}
 
+	// Do bookkeeping for new staking txns
+	if err := bc.UpdateStakingMetaData(batch, block.StakingTransactions(), state, epoch); err != nil {
+		utils.Logger().Warn().Msgf("Oops, UpdateStakingMetaData failed, err: %+v", err)
+		return NonStatTy, err
+	}
+
 	// Shard State and Validator Update
 	header := block.Header()
 	if len(header.ShardState()) > 0 {
@@ -111,17 +116,7 @@ func (bc *BlockChain) CommitOffChainData(
 		}
 
 		// Update snapshots for all validators
-		if err := bc.UpdateValidatorSnapshots(batch, epoch); err != nil {
-			return NonStatTy, err
-		}
-	}
-
-	// Do bookkeeping for new staking txns
-	for _, tx := range block.StakingTransactions() {
-		// keep offchain database consistency with onchain we need revert
-		// but it should not happend unless local database corrupted
-		if err := bc.UpdateStakingMetaData(batch, tx, root); err != nil {
-			utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
+		if err := bc.UpdateValidatorSnapshots(batch, epoch, state); err != nil {
 			return NonStatTy, err
 		}
 	}
@@ -196,6 +191,7 @@ func (bc *BlockChain) CommitOffChainData(
 		bc.LastContinuousCrossLink(batch, i)
 	}
 
+	// Update block reward accumulator and slashes
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
 			if err := bc.UpdateBlockRewardAccumulator(

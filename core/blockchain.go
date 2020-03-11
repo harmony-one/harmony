@@ -1134,7 +1134,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	// Write offchain data
 	if status, err := bc.CommitOffChainData(
 		batch, block, receipts,
-		cxReceipts, payout, state, root,
+		cxReceipts, payout, state,
 	); err != nil {
 		return status, err
 	}
@@ -1959,6 +1959,7 @@ func (bc *BlockChain) DeleteFromPendingSlashingCandidates(
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
 	current := bc.ReadPendingSlashingCandidates()
+	// TODO(audit): fix SetDifference impl mistake
 	bc.pendingSlashes = current.SetDifference(processed)
 	return bc.writeSlashes(bc.pendingSlashes)
 }
@@ -2223,12 +2224,13 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 
 // writeValidatorSnapshots writes the snapshot of provided list of validators
 func (bc *BlockChain) writeValidatorSnapshots(
-	batch rawdb.DatabaseWriter, addrs []common.Address, epoch *big.Int,
+	batch rawdb.DatabaseWriter, addrs []common.Address, epoch *big.Int, state *state.DB,
 ) error {
 	// Read all validator's current data
 	validators := []*staking.ValidatorWrapper{}
 	for i := range addrs {
-		validator, err := bc.ReadValidatorInformation(addrs[i])
+		// The snapshot will be captured in the state after the last epoch block is finalized
+		validator, err := state.ValidatorWrapper(addrs[i])
 		if err != nil {
 			return err
 		}
@@ -2290,6 +2292,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		statsFromDB.TotalEffectiveStake = value.TotalEffectiveStake
 		statsFromDB.VotingPowerPerShard = value.VotingPower
 		statsFromDB.BLSKeyPerShard = value.BLSPublicKeysOwned
+		// TODO(audit): should clear the voting power of those validators who are not elected.
 		if err := rawdb.WriteValidatorStats(batch, key, statsFromDB); err != nil {
 			return err
 		}
@@ -2317,8 +2320,10 @@ func (bc *BlockChain) deleteValidatorSnapshots(addrs []common.Address) error {
 // UpdateValidatorSnapshots updates the content snapshot of all validators
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateValidatorSnapshots(
-	batch rawdb.DatabaseWriter, epoch *big.Int,
+	batch rawdb.DatabaseWriter, epoch *big.Int, state *state.DB,
 ) error {
+	// Note this is reading the validator list from last block.
+	// It's fine since the new validators from this block is already snapshot when created.
 	allValidators, err := bc.ReadValidatorList()
 	if err != nil {
 		return err
@@ -2330,7 +2335,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 	//	return err
 	//}
 
-	return bc.writeValidatorSnapshots(batch, allValidators, epoch)
+	return bc.writeValidatorSnapshots(batch, allValidators, epoch, state)
 }
 
 // ReadValidatorList reads the addresses of current all validators
@@ -2393,7 +2398,7 @@ func (bc *BlockChain) WriteElectedValidatorList(
 // ReadDelegationsByDelegator reads the addresses of validators delegated by a delegator
 func (bc *BlockChain) ReadDelegationsByDelegator(
 	delegator common.Address,
-) ([]staking.DelegationIndex, error) {
+) (staking.DelegationIndexes, error) {
 	if cached, ok := bc.validatorListByDelegatorCache.Get(string(delegator.Bytes())); ok {
 		by := cached.([]byte)
 		m := []staking.DelegationIndex{}
@@ -2423,68 +2428,123 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 	return nil
 }
 
-// UpdateStakingMetaData updates the validator's
-// and the delegator's meta data according to staking transaction
+// UpdateStakingMetaData updates the metadata of validators and delegations,
+// including the full validator list and delegation indexes.
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateStakingMetaData(
-	batch rawdb.DatabaseWriter, tx *staking.StakingTransaction, root common.Hash,
-) error {
-	// TODO: simply the logic here in staking/types/transaction.go
-	payload, err := tx.RLPEncodeStakeMsg()
+	batch rawdb.DatabaseWriter, txns staking.StakingTransactions, state *state.DB, epoch *big.Int) error {
+	newValidators, newDelegations, err := bc.prepareStakingMetaData(txns, state)
 	if err != nil {
+		utils.Logger().Warn().Msgf("oops, prepareStakingMetaData failed, err: %+v", err)
 		return err
 	}
-	decodePayload, err := staking.RLPDecodeStakeMsg(payload, tx.StakingType())
-	if err != nil {
-		return err
-	}
-	epoch := bc.CurrentHeader().Epoch()
-	switch tx.StakingType() {
-	case staking.DirectiveCreateValidator:
-		createValidator := decodePayload.(*staking.CreateValidator)
+
+	if len(newValidators) > 0 {
 		list, err := bc.ReadValidatorList()
 		if err != nil {
 			return err
 		}
-		if list == nil {
-			list = []common.Address{}
-		}
-		beforeLen := len(list)
-		list = utils.AppendIfMissing(list, createValidator.ValidatorAddress)
 
-		if len(list) > beforeLen {
-			if err = bc.WriteValidatorList(batch, list); err != nil {
+		for _, addr := range newValidators {
+			newList, appended := utils.AppendIfMissing(list, addr)
+			if !appended {
+				return errValidatorExist
+			}
+			list = newList
+
+			// Update validator snapshot for the new validator
+			validator, err := state.ValidatorWrapper(addr)
+			if err != nil {
+				return err
+			}
+
+			if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
 				return err
 			}
 		}
 
-		// Update validator snapshot with the new validator
-		validator, err := bc.ReadValidatorInformationAt(
-			createValidator.ValidatorAddress, root,
-		)
-		if err != nil {
+		// Update validator list
+		if err = bc.WriteValidatorList(batch, list); err != nil {
 			return err
 		}
+	}
 
-		if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
+	for addr, delegations := range newDelegations {
+		if err := bc.writeDelegationsByDelegator(batch, addr, delegations); err != nil {
 			return err
 		}
-
-		// Add self delegation into the index
-		return bc.addDelegationIndex(
-			batch, createValidator.ValidatorAddress, createValidator.ValidatorAddress, root,
-		)
-	case staking.DirectiveEditValidator:
-	case staking.DirectiveDelegate:
-		delegate := decodePayload.(*staking.Delegate)
-		return bc.addDelegationIndex(
-			batch, delegate.DelegatorAddress, delegate.ValidatorAddress, root,
-		)
-	case staking.DirectiveUndelegate:
-	case staking.DirectiveCollectRewards:
-	default:
 	}
 	return nil
+}
+
+// prepareStakingMetaData prepare the updates of validator's
+// and the delegator's meta data according to staking transaction.
+// The following return values are cached end state to be written to DB.
+// The reason for the cached state is to solve the issue that batch DB changes
+// won't be reflected immediately so the intermediary state can't be read from DB.
+// newValidators - the addresses of the newly created validators
+// newDelegations - the map of delegator address and their updated delegation indexes
+func (bc *BlockChain) prepareStakingMetaData(
+	txns staking.StakingTransactions, state *state.DB,
+) (newValidators []common.Address, newDelegations map[common.Address]staking.DelegationIndexes, err error) {
+	newDelegations = map[common.Address]staking.DelegationIndexes{}
+	for _, txn := range txns {
+		payload, err := txn.RLPEncodeStakeMsg()
+		if err != nil {
+			return nil, nil, err
+		}
+		decodePayload, err := staking.RLPDecodeStakeMsg(payload, txn.StakingType())
+		if err != nil {
+			return nil, nil, err
+		}
+
+		switch txn.StakingType() {
+		case staking.DirectiveCreateValidator:
+			createValidator := decodePayload.(*staking.CreateValidator)
+
+			newList, appended := utils.AppendIfMissing(newValidators, createValidator.ValidatorAddress)
+			if !appended {
+				return nil, nil, errValidatorExist
+			}
+			newValidators = newList
+
+			// Add self delegation into the index
+			selfIndex := staking.DelegationIndex{
+				createValidator.ValidatorAddress,
+				uint64(0),
+			}
+			delegations, ok := newDelegations[createValidator.ValidatorAddress]
+			if ok {
+				delegations = append(delegations, selfIndex)
+			} else {
+				delegations = staking.DelegationIndexes{selfIndex}
+			}
+			newDelegations[createValidator.ValidatorAddress] = delegations
+		case staking.DirectiveEditValidator:
+		case staking.DirectiveDelegate:
+			delegate := decodePayload.(*staking.Delegate)
+
+			delegations, ok := newDelegations[delegate.DelegatorAddress]
+			if !ok {
+				// If the cache doesn't have it, load it from DB for the first time.
+				delegations, err = bc.ReadDelegationsByDelegator(delegate.DelegatorAddress)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+			if delegations, err = bc.addDelegationIndex(
+				delegations, delegate.DelegatorAddress, delegate.ValidatorAddress, state,
+			); err != nil {
+				return nil, nil, err
+			}
+			newDelegations[delegate.DelegatorAddress] = delegations
+		case staking.DirectiveUndelegate:
+		case staking.DirectiveCollectRewards:
+		default:
+		}
+	}
+
+	return newValidators, newDelegations, nil
 }
 
 // ReadBlockRewardAccumulator must only be called on beaconchain
@@ -2528,38 +2588,33 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(
 
 // Note this should read from the state of current block in concern (root == newBlock.root)
 func (bc *BlockChain) addDelegationIndex(
-	batch rawdb.DatabaseWriter,
-	delegatorAddress, validatorAddress common.Address, root common.Hash,
-) error {
-	// Get existing delegations
-	delegations, err := bc.ReadDelegationsByDelegator(delegatorAddress)
-	if err != nil {
-		return err
-	}
-
+	delegations staking.DelegationIndexes,
+	delegatorAddress, validatorAddress common.Address, state *state.DB,
+) (staking.DelegationIndexes, error) {
 	// If there is an existing delegation, just return
 	validatorAddressBytes := validatorAddress.Bytes()
 	for _, delegation := range delegations {
 		if bytes.Compare(delegation.ValidatorAddress.Bytes(), validatorAddressBytes) == 0 {
-			return nil
+			return delegations, nil
 		}
 	}
 
 	// Found the delegation from state and add the delegation index
 	// Note this should read from the state of current block in concern
-	wrapper, err := bc.ReadValidatorInformationAt(validatorAddress, root)
+	wrapper, err := state.ValidatorWrapper(validatorAddress)
 	if err != nil {
-		return err
+		return delegations, err
 	}
 	for i := range wrapper.Delegations {
 		if bytes.Compare(wrapper.Delegations[i].DelegatorAddress.Bytes(), delegatorAddress.Bytes()) == 0 {
+			// TODO(audit): change the way of indexing if we allow delegation deletion.
 			delegations = append(delegations, staking.DelegationIndex{
 				validatorAddress,
 				uint64(i),
 			})
 		}
 	}
-	return bc.writeDelegationsByDelegator(batch, delegatorAddress, delegations)
+	return delegations, nil
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch

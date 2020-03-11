@@ -37,7 +37,7 @@ type ChainContext interface {
 	GetHeader(common.Hash, uint64) *block.Header
 
 	// ReadDelegationsByDelegator returns the validators list of a delegator
-	ReadDelegationsByDelegator(common.Address) ([]staking.DelegationIndex, error)
+	ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error)
 
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
 	ReadValidatorSnapshot(common.Address) (*staking.ValidatorWrapper, error)
