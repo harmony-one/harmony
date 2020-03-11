@@ -22,7 +22,6 @@ func (bc *BlockChain) CommitOffChainData(
 	cxReceipts []*types.CXReceipt,
 	payout *big.Int,
 	state *state.DB,
-	root common.Hash,
 ) (status WriteStatus, err error) {
 	// Write receipts of the block
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
@@ -86,6 +85,50 @@ func (bc *BlockChain) CommitOffChainData(
 	//	}
 	//}
 
+	// Do bookkeeping for new staking txns
+	newValidators, newDelegations, err := bc.UpdateStakingMetaData(block.StakingTransactions(), state)
+
+	if err != nil {
+		utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
+		return NonStatTy, err
+	}
+
+	if len(newValidators) > 0 {
+		list, err := bc.ReadValidatorList()
+		if err != nil {
+			return NonStatTy, err
+		}
+
+		for _, addr := range newValidators {
+			newList, appended := utils.AppendIfMissing(list, addr)
+			if !appended {
+				return NonStatTy, errValidatorExist
+			}
+			list = newList
+
+			// Update validator snapshot for the new validator
+			validator, err := state.ValidatorWrapper(addr)
+			if err != nil {
+				return NonStatTy, err
+			}
+
+			if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
+				return NonStatTy, err
+			}
+		}
+		// Update validator list
+		// This should happen before validator snapshot happens
+		if err = bc.WriteValidatorList(batch, list); err != nil {
+			return NonStatTy, err
+		}
+	}
+
+	for addr, delegations := range newDelegations {
+		if err := bc.writeDelegationsByDelegator(batch, addr, delegations); err != nil {
+			return NonStatTy, err
+		}
+	}
+
 	// Shard State and Validator Update
 	header := block.Header()
 	if len(header.ShardState()) > 0 {
@@ -111,17 +154,7 @@ func (bc *BlockChain) CommitOffChainData(
 		}
 
 		// Update snapshots for all validators
-		if err := bc.UpdateValidatorSnapshots(batch, epoch); err != nil {
-			return NonStatTy, err
-		}
-	}
-
-	// Do bookkeeping for new staking txns
-	for _, tx := range block.StakingTransactions() {
-		// keep offchain database consistency with onchain we need revert
-		// but it should not happend unless local database corrupted
-		if err := bc.UpdateStakingMetaData(batch, tx, root); err != nil {
-			utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
+		if err := bc.UpdateValidatorSnapshots(batch, epoch, state); err != nil {
 			return NonStatTy, err
 		}
 	}

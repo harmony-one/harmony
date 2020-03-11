@@ -97,6 +97,9 @@ func (u Undelegations) String() string {
 	return string(s)
 }
 
+// DelegationIndexes is a slice of DelegationIndex
+type DelegationIndexes []DelegationIndex
+
 // DelegationIndex stored the index of a delegation in the validator's delegation list
 type DelegationIndex struct {
 	ValidatorAddress common.Address

@@ -263,14 +263,15 @@ func GetPendingCXKey(shardID uint32, blockNum uint64) string {
 	return key
 }
 
-// AppendIfMissing returns a list of unique addresses
-func AppendIfMissing(slice []common.Address, addr common.Address) []common.Address {
+// AppendIfMissing appends an item if it's missing in the slice, returns appended slice and true
+// Otherwise, return the original slice and false
+func AppendIfMissing(slice []common.Address, addr common.Address) ([]common.Address, bool) {
 	for _, ele := range slice {
 		if ele == addr {
-			return slice
+			return slice, false
 		}
 	}
-	return append(slice, addr)
+	return append(slice, addr), true
 }
 
 // PrintError prints the given error in the extended format (%+v) onto stderr.
