@@ -41,7 +41,7 @@ func TestUndelegate(t *testing.T) {
 }
 
 func TestTotalInUndelegation(t *testing.T) {
-	var totalAmount *big.Int = delegation.TotalInUndelegation()
+	var totalAmount = delegation.TotalInUndelegation()
 
 	// check the total amount of undelegation
 	if totalAmount.Cmp(big.NewInt(3000)) != 0 {

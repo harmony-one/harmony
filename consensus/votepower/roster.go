@@ -204,7 +204,7 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 			lastStakedVoter = &member
 		} else { // Our node
 			member.EffectivePercent = HarmonysShare.Quo(ourCount)
-			member.RawPercent = member.EffectivePercent
+			member.RawPercent = member.EffectivePercent.Quo(HarmonysShare)
 			ourPercentage = ourPercentage.Add(member.EffectivePercent)
 		}
 

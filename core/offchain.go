@@ -86,47 +86,9 @@ func (bc *BlockChain) CommitOffChainData(
 	//}
 
 	// Do bookkeeping for new staking txns
-	newValidators, newDelegations, err := bc.UpdateStakingMetaData(block.StakingTransactions(), state)
-
-	if err != nil {
-		utils.Logger().Debug().Msgf("oops, UpdateStakingMetaData failed, err: %+v", err)
+	if err := bc.UpdateStakingMetaData(batch, block.StakingTransactions(), state, epoch); err != nil {
+		utils.Logger().Warn().Msgf("Oops, UpdateStakingMetaData failed, err: %+v", err)
 		return NonStatTy, err
-	}
-
-	if len(newValidators) > 0 {
-		list, err := bc.ReadValidatorList()
-		if err != nil {
-			return NonStatTy, err
-		}
-
-		for _, addr := range newValidators {
-			newList, appended := utils.AppendIfMissing(list, addr)
-			if !appended {
-				return NonStatTy, errValidatorExist
-			}
-			list = newList
-
-			// Update validator snapshot for the new validator
-			validator, err := state.ValidatorWrapper(addr)
-			if err != nil {
-				return NonStatTy, err
-			}
-
-			if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
-				return NonStatTy, err
-			}
-		}
-		// Update validator list
-		// This should happen before validator snapshot happens
-		if err = bc.WriteValidatorList(batch, list); err != nil {
-			return NonStatTy, err
-		}
-	}
-
-	for addr, delegations := range newDelegations {
-		if err := bc.writeDelegationsByDelegator(batch, addr, delegations); err != nil {
-			return NonStatTy, err
-		}
 	}
 
 	// Shard State and Validator Update
@@ -229,6 +191,7 @@ func (bc *BlockChain) CommitOffChainData(
 		bc.LastContinuousCrossLink(batch, i)
 	}
 
+	// Update block reward accumulator and slashes
 	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		if bc.chainConfig.IsStaking(block.Epoch()) {
 			if err := bc.UpdateBlockRewardAccumulator(
