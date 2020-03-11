@@ -106,47 +106,54 @@ func BallotResult(
 	return parentCommittee.Slots, payable, missing, err
 }
 
+type signerKind struct {
+	didSign   bool
+	committee shard.SlotList
+}
+
 func bumpCount(
 	bc Reader,
 	state *state.DB,
-	signers shard.SlotList,
-	didSign bool,
+	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
-	for i := range signers {
-		addr := signers[i].EcdsaAddress
-		// NOTE if the signer address is not part of the staked addrs,
-		// then it must be a harmony operated node running,
-		// hence keep on going
-		if _, isAddrForStaked := stakedAddrSet[addr]; !isAddrForStaked {
-			continue
-		}
+	for _, subset := range signers {
+		for i := range subset.committee {
+			addr := subset.committee[i].EcdsaAddress
+			// NOTE if the signer address is not part of the staked addrs,
+			// then it must be a harmony operated node running,
+			// hence keep on going
+			if _, isAddrForStaked := stakedAddrSet[addr]; !isAddrForStaked {
+				continue
+			}
 
-		wrapper, err := state.ValidatorWrapper(addr)
-		if err != nil {
-			return err
-		}
+			wrapper, err := state.ValidatorWrapper(addr)
+			if err != nil {
+				return err
+			}
 
-		wrapper.Counters.NumBlocksToSign.Add(
-			wrapper.Counters.NumBlocksToSign, common.Big1,
-		)
-
-		if didSign {
-			wrapper.Counters.NumBlocksSigned.Add(
-				wrapper.Counters.NumBlocksSigned, common.Big1,
+			wrapper.Counters.NumBlocksToSign.Add(
+				wrapper.Counters.NumBlocksToSign, common.Big1,
 			)
-		}
 
-		if err := computeAndMutateEPOSStatus(bc, state, wrapper); err != nil {
-			return err
-		}
+			if subset.didSign {
+				wrapper.Counters.NumBlocksSigned.Add(
+					wrapper.Counters.NumBlocksSigned, common.Big1,
+				)
+			}
 
-		if err := state.UpdateValidatorWrapper(
-			addr, wrapper,
-		); err != nil {
-			return err
+			if err := computeAndMutateEPOSStatus(bc, state, wrapper); err != nil {
+				return err
+			}
+
+			if err := state.UpdateValidatorWrapper(
+				addr, wrapper,
+			); err != nil {
+				return err
+			}
 		}
 	}
+
 	return nil
 }
 
@@ -157,12 +164,10 @@ func IncrementValidatorSigningCounts(
 	state *state.DB,
 	signers, missing shard.SlotList,
 ) error {
-	if err := bumpCount(
-		bc, state, signers, true, staked.LookupSet,
-	); err != nil {
-		return err
-	}
-	return bumpCount(bc, state, missing, false, staked.LookupSet)
+	return bumpCount(
+		bc, state, []signerKind{{false, missing}, {true, signers}},
+		staked.LookupSet,
+	)
 }
 
 // Reader ..
