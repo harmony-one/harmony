@@ -359,7 +359,11 @@ func (w *Worker) verifySlashes(
 		},
 	)
 
-	workingState := w.GetCurrentState()
+	// Always base the state on current tip of the chain
+	workingState, err := w.chain.State()
+	if err != nil {
+		return successes, failures
+	}
 
 	for i := range d {
 		if err := slash.Verify(

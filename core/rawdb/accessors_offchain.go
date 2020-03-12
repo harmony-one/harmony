@@ -106,6 +106,7 @@ func DeletePendingCrossLinks(db DatabaseDeleter) error {
 }
 
 // ReadPendingSlashingCandidates retrieves last pending slashing candidates
+// TODO(audit): the pending slashes written in DB is never used.
 func ReadPendingSlashingCandidates(db DatabaseReader) ([]byte, error) {
 	return db.Get(pendingSlashingKey)
 }

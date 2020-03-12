@@ -290,6 +290,8 @@ func (e *engineImpl) Finalize(
 		if err := applySlashes(chain, header, state, doubleSigners); err != nil {
 			return nil, nil, err
 		}
+	} else if len(doubleSigners) > 0 {
+		return nil, nil, errors.New("slashes proposed in non-beacon chain or non-staking epoch")
 	}
 
 	// Finalize the state root
@@ -370,6 +372,7 @@ func applySlashes(
 	state *state.DB,
 	doubleSigners slash.Records,
 ) error {
+	// TODO(audit): should read from the epoch when the slash happened
 	superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
 
 	if err != nil {
@@ -379,6 +382,8 @@ func applySlashes(
 	staked := superCommittee.StakedValidators()
 	// Apply the slashes, invariant: assume been verified as legit slash by this point
 	var slashApplied *slash.Application
+	// TODO(audit): need to group doubleSigners by the target (block) and slash them separately
+	//              the rate of slash should be based on num_keys_signed_on_same_block/total_bls_key
 	rate := slash.Rate(len(doubleSigners), staked.CountStakedBLSKey)
 	utils.Logger().Info().
 		Str("rate", rate.String()).
