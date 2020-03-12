@@ -101,8 +101,8 @@ func (e Evidence) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Moment
 		ConflictingBallots
-		ProposalHeader string `json:"header"`
-	}{e.Moment, e.ConflictingBallots, e.ProposalHeader.String()})
+		ProposalHeader *block.Header `json:"header"`
+	}{e.Moment, e.ConflictingBallots, e.ProposalHeader})
 }
 
 // Records ..

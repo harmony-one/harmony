@@ -1491,10 +1491,10 @@ type BadBlock struct {
 // MarshalJSON ..
 func (b BadBlock) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Block  string `json:"header"`
-		Reason string `json:"error-cause"`
+		Block  *block.Header `json:"header"`
+		Reason string        `json:"error-cause"`
 	}{
-		b.Block.Header().String(),
+		b.Block.Header(),
 		b.Reason.Error(),
 	})
 }

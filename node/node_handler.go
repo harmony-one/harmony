@@ -375,7 +375,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 				url := p.OnCannotCommit
 				go func() {
 					webhooks.DoPost(url, map[string]interface{}{
-						"bad-header": newBlock.Header().String(),
+						"bad-header": newBlock.Header(),
 						"reason":     err.Error(),
 					})
 				}()
