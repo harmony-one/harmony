@@ -22,6 +22,7 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/network"
@@ -371,57 +372,10 @@ func (b *APIBackend) GetValidatorInformation(
 }
 
 // GetMedianRawStakeSnapshot ..
-func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
-	candidates := b.hmy.BlockChain().ValidatorCandidates()
-	essentials := map[common.Address]effective.SlotOrder{}
-	blsKeys := map[shard.BlsPublicKey]struct{}{}
-	instance := shard.Schedule.InstanceForEpoch(b.CurrentBlock().Epoch())
-	stakedSlots :=
-		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
-			int(instance.NumShards())
-
-	for i := range candidates {
-		validator, err := b.hmy.BlockChain().ReadValidatorInformation(
-			candidates[i],
-		)
-		if err != nil {
-			return nil, err
-		}
-		if validator.EPOSStatus != effective.Active {
-			continue
-		}
-		if err := validator.SanityCheck(stakedSlots / 3); err != nil {
-			continue
-		}
-
-		validatorStake := big.NewInt(0)
-		for i := range validator.Delegations {
-			validatorStake.Add(
-				validatorStake, validator.Delegations[i].Amount,
-			)
-		}
-
-		found := false
-		for _, key := range validator.SlotPubKeys {
-			if _, ok := blsKeys[key]; ok {
-				found = true
-			} else {
-				blsKeys[key] = struct{}{}
-			}
-		}
-
-		if found {
-			continue
-		}
-
-		essentials[validator.Address] = effective.SlotOrder{
-			validatorStake,
-			validator.SlotPubKeys,
-		}
-	}
-
-	median, _ := effective.Compute(essentials, stakedSlots)
-	return median.TruncateInt(), nil
+func (b *APIBackend) GetMedianRawStakeSnapshot() (
+	*committee.CompletedEPoSRound, error,
+) {
+	return committee.NewEPoSRound(b.hmy.BlockChain())
 }
 
 // GetTotalStakingSnapshot ..

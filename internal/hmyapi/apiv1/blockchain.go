@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -534,7 +535,9 @@ func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
 
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
 // explorer node
-func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (*big.Int, error) {
+func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (
+	*committee.CompletedEPoSRound, error,
+) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetMedianRawStakeSnapshot()
 	}
@@ -823,7 +826,7 @@ func (s *PublicBlockChainAPI) GetStakingNetworkInfo(ctx context.Context) (*Staki
 		return nil, errNotBeaconChainShard
 	}
 	totalStaking, _ := s.GetTotalStaking()
-	medianRawStake, _ := s.GetMedianRawStakeSnapshot()
+	round, _ := s.GetMedianRawStakeSnapshot()
 	epoch := s.LatestHeader(ctx).Epoch
 	epochLastBlock, _ := s.EpochLastBlock(epoch)
 	totalSupply, _ := s.GetTotalSupply()
@@ -833,7 +836,7 @@ func (s *PublicBlockChainAPI) GetStakingNetworkInfo(ctx context.Context) (*Staki
 		CirculatingSupply: circulatingSupply,
 		EpochLastBlock:    epochLastBlock,
 		TotalStaking:      totalStaking,
-		MedianRawStake:    medianRawStake,
+		MedianRawStake:    round.MedianStake,
 	}, nil
 }
 

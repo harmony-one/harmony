@@ -549,9 +549,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// update public keys in the committee
 	oldLeader := consensus.LeaderPubKey
-	pubKeys, _ := committee.WithStakingEnabled.GetCommitteePublicKeys(
-		committeeToSet,
-	)
+	pubKeys, _ := committeeToSet.BLSPublicKeys()
+
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")

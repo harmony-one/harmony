@@ -655,7 +655,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	if err != nil {
 		return err
 	}
-	pubKeys, err := committee.WithStakingEnabled.GetCommitteePublicKeys(subComm)
+	pubKeys, err := subComm.BLSPublicKeys()
 	if err != nil {
 		utils.Logger().Error().
 			Uint32("shardID", shardID).

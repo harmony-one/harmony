@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -80,7 +81,7 @@ type Backend interface {
 	GetShardState() (*shard.State, error)
 	GetCurrentStakingErrorSink() []staking.RPCTransactionError
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
-	GetMedianRawStakeSnapshot() (*big.Int, error)
+	GetMedianRawStakeSnapshot() (*committee.CompletedEPoSRound, error)
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
 	GetSuperCommittees() (*quorum.Transition, error)

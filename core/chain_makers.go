@@ -313,6 +313,10 @@ func (cr *fakeChainReader) ReadBlockRewardAccumulator(
 	return nil, nil
 }
 
+func (cr *fakeChainReader) CurrentBlock() *types.Block {
+	return nil
+}
+
 func (cr *fakeChainReader) ValidatorStakingWithDelegation(
 	addr common.Address,
 ) *big.Int {

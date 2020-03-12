@@ -2488,7 +2488,10 @@ func (bc *BlockChain) UpdateStakingMetaData(
 // newDelegations - the map of delegator address and their updated delegation indexes
 func (bc *BlockChain) prepareStakingMetaData(
 	txns staking.StakingTransactions, state *state.DB,
-) (newValidators []common.Address, newDelegations map[common.Address]staking.DelegationIndexes, err error) {
+) (newValidators []common.Address,
+	newDelegations map[common.Address]staking.DelegationIndexes,
+	err error,
+) {
 	newDelegations = map[common.Address]staking.DelegationIndexes{}
 	for _, txn := range txns {
 		payload, err := txn.RLPEncodeStakeMsg()
@@ -2503,8 +2506,9 @@ func (bc *BlockChain) prepareStakingMetaData(
 		switch txn.StakingType() {
 		case staking.DirectiveCreateValidator:
 			createValidator := decodePayload.(*staking.CreateValidator)
-
-			newList, appended := utils.AppendIfMissing(newValidators, createValidator.ValidatorAddress)
+			newList, appended := utils.AppendIfMissing(
+				newValidators, createValidator.ValidatorAddress,
+			)
 			if !appended {
 				return nil, nil, errValidatorExist
 			}

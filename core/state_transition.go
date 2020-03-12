@@ -312,7 +312,8 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
-		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		utils.Logger().Info().
+			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
 		if msg.From() != stkMsg.ValidatorAddress {
 			return 0, errInvalidSigner
 		}
@@ -322,7 +323,8 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
 			return 0, err
 		}
-		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		utils.Logger().Info().
+			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
 		if msg.From() != stkMsg.ValidatorAddress {
 			return 0, errInvalidSigner
 		}
@@ -379,7 +381,10 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 	createValidator *staking.CreateValidator, blockNum *big.Int,
 ) error {
-	wrapper, err := VerifyAndCreateValidatorFromMsg(st.state, st.evm.EpochNumber, blockNum, createValidator)
+
+	wrapper, err := VerifyAndCreateValidatorFromMsg(
+		st.state, st.evm.EpochNumber, blockNum, createValidator,
+	)
 	if err != nil {
 		return err
 	}
@@ -394,7 +399,9 @@ func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 func (st *StateTransition) verifyAndApplyEditValidatorTx(
 	editValidator *staking.EditValidator, blockNum *big.Int,
 ) error {
-	wrapper, err := VerifyAndEditValidatorFromMsg(st.state, st.bc, blockNum, editValidator)
+	wrapper, err := VerifyAndEditValidatorFromMsg(
+		st.state, st.bc, st.evm.EpochNumber, blockNum, editValidator,
+	)
 	if err != nil {
 		return err
 	}
@@ -412,7 +419,9 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
 }
 
-func (st *StateTransition) verifyAndApplyUndelegateTx(undelegate *staking.Undelegate) error {
+func (st *StateTransition) verifyAndApplyUndelegateTx(
+	undelegate *staking.Undelegate,
+) error {
 	wrapper, err := VerifyAndUndelegateFromMsg(st.state, st.evm.EpochNumber, undelegate)
 	if err != nil {
 		return err

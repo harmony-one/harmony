@@ -778,7 +778,11 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			chainContext = nil // might use testing blockchain, set to nil for verifier to handle.
 		}
 		pendingBlockNumber := new(big.Int).Add(pool.chain.CurrentBlock().Number(), big.NewInt(1))
-		_, err = VerifyAndEditValidatorFromMsg(pool.currentState, chainContext, pendingBlockNumber, stkMsg)
+		_, err = VerifyAndEditValidatorFromMsg(
+			pool.currentState, chainContext,
+			pool.chain.CurrentBlock().Epoch(),
+			pendingBlockNumber, stkMsg,
+		)
 		return err
 	case staking.DirectiveDelegate:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)

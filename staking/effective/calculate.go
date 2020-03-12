@@ -119,11 +119,13 @@ func Compute(
 }
 
 // Apply ..
-func Apply(shortHand map[common.Address]SlotOrder, pull int) []SlotPurchase {
+func Apply(shortHand map[common.Address]SlotOrder, pull int) (
+	*big.Int, []SlotPurchase,
+) {
 	median, picks := Compute(shortHand, pull)
 	for i := range picks {
 		picks[i].Dec = effectiveStake(median, picks[i].Dec)
 	}
 
-	return picks
+	return median.TruncateInt(), picks
 }
