@@ -56,7 +56,8 @@ var (
 	errSlotKeyToRemoveNotFound = errors.New("slot key to remove not found")
 	errSlotKeyToAddExists      = errors.New("slot key to add already exists")
 	errDuplicateSlotKeys       = errors.New("slot keys can not have duplicates")
-	errExcessiveBLSKeys        = errors.New("more slot keys provided than allowed")
+	// ErrExcessiveBLSKeys ..
+	ErrExcessiveBLSKeys        = errors.New("more slot keys provided than allowed")
 	errCannotChangeBannedTaint = errors.New("cannot change validator banned status")
 )
 
@@ -223,7 +224,7 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 	if c := len(v.SlotPubKeys); oneThirdExtrn != DoNotEnforceMaxBLS &&
 		c > oneThirdExtrn {
 		return errors.Wrapf(
-			errExcessiveBLSKeys, "have: %d allowed: %d",
+			ErrExcessiveBLSKeys, "have: %d allowed: %d",
 			c, oneThirdExtrn,
 		)
 	}
