@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // PayoutRound ..
@@ -22,4 +23,5 @@ type Payout struct {
 type Reader interface {
 	// ReadRoundResult ..
 	ReadRoundResult() *Payout
+	MissingSigners() shard.SlotList
 }

@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -13,17 +14,49 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/network"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/singleflight"
 )
 
 func ballotResultBeaconchain(
 	bc engine.ChainReader, header *block.Header,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
 	return availability.BallotResult(bc, header, shard.BeaconChainShardID)
+}
+
+var (
+	superCommitteeCache  singleflight.Group
+	maxMemoryBehindShard = big.NewInt(5)
+)
+
+func lookupSubCommittee(
+	epochIncoming *big.Int, shardID uint32,
+	epochNow *big.Int, beaconChain engine.ChainReader,
+) (*shard.Committee, error) {
+	key := fmt.Sprintf("%s-%d", epochIncoming.String(), shardID)
+	results, err, _ := superCommitteeCache.Do(
+		key, func() (interface{}, error) {
+			superCommittee, err := beaconChain.ReadShardState(epochIncoming)
+			if err != nil {
+				return nil, err
+			}
+			subComm, err := superCommittee.FindCommitteeByID(shardID)
+			if err != nil {
+				return nil, err
+			}
+			return subComm, nil
+		},
+	)
+	if epochIncoming.Abs(new(big.Int).Sub(
+		epochNow, epochIncoming,
+	)).Cmp(maxMemoryBehindShard) == 1 {
+		superCommitteeCache.Forget(key)
+	}
+
+	return results.(*shard.Committee), err
 }
 
 // AccumulateRewards credits the coinbase of the given block with the mining
@@ -33,6 +66,7 @@ func AccumulateRewards(
 	header *block.Header, beaconChain engine.ChainReader,
 ) (reward.Reader, error) {
 	blockNum := header.Number().Uint64()
+	beaconEpochNow := beaconChain.CurrentHeader().Epoch()
 
 	if blockNum == 0 {
 		// genesis block has no parent to reward.
@@ -119,27 +153,31 @@ func AccumulateRewards(
 			}
 
 			type slotPayable struct {
-				payout numeric.Dec
-				payee  common.Address
+				shard.Slot
+				payout *big.Int
 				bucket int
 				index  int
 			}
 
-			allPayables := []slotPayable{}
+			type slotMissing struct {
+				shard.Slot
+				bucket int
+				index  int
+			}
+
+			allPayables, allMissing := []slotPayable{}, []slotMissing{}
 
 			for i := range crossLinks {
 				cxLink := crossLinks[i]
 				if !bc.Config().IsStaking(cxLink.Epoch()) {
 					continue
 				}
+				epoch, shardID := cxLink.Epoch(), cxLink.ShardID()
 
-				shardState, err := bc.ReadShardState(cxLink.Epoch())
+				subComm, err := lookupSubCommittee(
+					epoch, shardID, beaconEpochNow, beaconChain,
+				)
 
-				if err != nil {
-					return network.EmptyPayout, err
-				}
-
-				subComm, err := shardState.FindCommitteeByID(cxLink.ShardID())
 				if err != nil {
 					return network.EmptyPayout, err
 				}
@@ -167,15 +205,23 @@ func AccumulateRewards(
 						due := defaultReward.Mul(
 							voter.EffectivePercent.Quo(votepower.StakersShare),
 						)
-						to := voter.EarningAccount
 						allPayables = append(allPayables, slotPayable{
-							payout: due,
-							payee:  to,
+							Slot:   payableSigners[j],
+							payout: due.TruncateInt(),
 							bucket: i,
 							index:  j,
 						})
 					}
 				}
+
+				for j := range missing {
+					allMissing = append(allMissing, slotMissing{
+						Slot:   missing[j],
+						bucket: i,
+						index:  j,
+					})
+				}
+
 			}
 
 			resultsHandle := make([][]slotPayable, len(crossLinks))
@@ -200,11 +246,13 @@ func AccumulateRewards(
 			// Finally do the pay
 			for bucket := range resultsHandle {
 				for payThem := range resultsHandle[bucket] {
-					snapshot, err := bc.ReadValidatorSnapshot(resultsHandle[bucket][payThem].payee)
+					snapshot, err := bc.ReadValidatorSnapshot(
+						resultsHandle[bucket][payThem].EcdsaAddress,
+					)
 					if err != nil {
 						return network.EmptyPayout, err
 					}
-					due := resultsHandle[bucket][payThem].payout.TruncateInt()
+					due := resultsHandle[bucket][payThem].payout
 					newRewards.Add(newRewards, due)
 					if err := state.AddReward(snapshot, due); err != nil {
 						return network.EmptyPayout, err
@@ -212,7 +260,7 @@ func AccumulateRewards(
 				}
 			}
 
-			return network.NewStakingEraRewardForRound(newRewards), nil
+			return network.NewStakingEraRewardForRound(newRewards, missing), nil
 		}
 		return network.EmptyPayout, nil
 	}

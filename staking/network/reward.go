@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 )
 
 var (
@@ -35,7 +36,13 @@ var (
 	EmptyPayout = noReward{}
 )
 
-type noReward struct{}
+type ignoreMissing struct{}
+
+func (ignoreMissing) MissingSigners() shard.SlotList {
+	return shard.SlotList{}
+}
+
+type noReward struct{ ignoreMissing }
 
 func (noReward) ReadRoundResult() *reward.Payout {
 	return &reward.Payout{
@@ -45,12 +52,13 @@ func (noReward) ReadRoundResult() *reward.Payout {
 }
 
 type preStakingEra struct {
+	ignoreMissing
 	payout *big.Int
 }
 
 // NewPreStakingEraRewarded ..
 func NewPreStakingEraRewarded(totalAmount *big.Int) reward.Reader {
-	return &preStakingEra{totalAmount}
+	return &preStakingEra{ignoreMissing{}, totalAmount}
 }
 
 func (p *preStakingEra) ReadRoundResult() *reward.Payout {
@@ -62,16 +70,26 @@ func (p *preStakingEra) ReadRoundResult() *reward.Payout {
 
 type stakingEra struct {
 	reward.Payout
+	missingSigners shard.SlotList
 }
 
 // NewStakingEraRewardForRound ..
 func NewStakingEraRewardForRound(
 	totalPayout *big.Int,
+	mia shard.SlotList,
 ) reward.Reader {
-	return &stakingEra{Payout: reward.Payout{
-		Total: totalPayout,
-		Round: []reward.PayoutRound{},
-	}}
+
+	return &stakingEra{
+		Payout: reward.Payout{
+			Total: totalPayout,
+			Round: []reward.PayoutRound{},
+		},
+		missingSigners: mia,
+	}
+}
+
+func (r *stakingEra) MissingSigners() shard.SlotList {
+	return r.missingSigners
 }
 
 // ReadRoundResult ..
