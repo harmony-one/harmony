@@ -19,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
@@ -549,9 +548,7 @@ func New(
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
-		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 		chain.Engine.SetBeaconchain(beaconChain)
-
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)

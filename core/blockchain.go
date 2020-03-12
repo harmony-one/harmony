@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
@@ -1053,7 +1054,8 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 // WriteBlockWithState writes the block and all associated state to the database.
 func (bc *BlockChain) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
-	cxReceipts []*types.CXReceipt, payout *big.Int,
+	cxReceipts []*types.CXReceipt,
+	paid reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
 	bc.wg.Add(1)
@@ -1133,7 +1135,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	// Write offchain data
 	if status, err := bc.CommitOffChainData(
 		batch, block, receipts,
-		cxReceipts, payout, state,
+		cxReceipts, paid, state,
 	); err != nil {
 		return status, err
 	}

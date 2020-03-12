@@ -26,10 +26,58 @@ var (
 	targetStakedPercentage = numeric.MustNewDecFromStr("0.35")
 	dynamicAdjust          = numeric.MustNewDecFromStr("0.4")
 	// ErrPayoutNotEqualBlockReward ..
-	ErrPayoutNotEqualBlockReward = errors.New("total payout not equal to blockreward")
+	ErrPayoutNotEqualBlockReward = errors.New(
+		"total payout not equal to blockreward",
+	)
 	// NoReward ..
 	NoReward = common.Big0
+	// EmptyPayout ..
+	EmptyPayout = noReward{}
 )
+
+type noReward struct{}
+
+func (noReward) ReadRoundResult() *reward.Payout {
+	return &reward.Payout{
+		Total: common.Big0,
+		Round: []reward.PayoutRound{},
+	}
+}
+
+type preStakingEra struct {
+	payout *big.Int
+}
+
+// NewPreStakingEraRewarded ..
+func NewPreStakingEraRewarded(totalAmount *big.Int) reward.Reader {
+	return &preStakingEra{totalAmount}
+}
+
+func (p *preStakingEra) ReadRoundResult() *reward.Payout {
+	return &reward.Payout{
+		Total: p.payout,
+		Round: []reward.PayoutRound{},
+	}
+}
+
+type stakingEra struct {
+	reward.Payout
+}
+
+// NewStakingEraRewardForRound ..
+func NewStakingEraRewardForRound(
+	totalPayout *big.Int,
+) reward.Reader {
+	return &stakingEra{Payout: reward.Payout{
+		Total: totalPayout,
+		Round: []reward.PayoutRound{},
+	}}
+}
+
+// ReadRoundResult ..
+func (r *stakingEra) ReadRoundResult() *reward.Payout {
+	return &r.Payout
+}
 
 func adjust(amount numeric.Dec) numeric.Dec {
 	return amount.MulTruncate(

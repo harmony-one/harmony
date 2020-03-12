@@ -3,7 +3,6 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -27,22 +26,11 @@ import (
 )
 
 type engineImpl struct {
-	d      reward.Distributor
 	beacon engine.ChainReader
 }
 
 // Engine is an algorithm-agnostic consensus engine.
-var Engine = &engineImpl{nil, nil}
-
-// Rewarder handles the distribution of block rewards
-func (e *engineImpl) Rewarder() reward.Distributor {
-	return e.d
-}
-
-// SetRewarder ..
-func (e *engineImpl) SetRewarder(d reward.Distributor) {
-	e.d = d
-}
+var Engine = &engineImpl{nil}
 
 func (e *engineImpl) Beaconchain() engine.ChainReader {
 	return e.beacon
@@ -258,13 +246,13 @@ func (e *engineImpl) Finalize(
 	chain engine.ChainReader, header *block.Header,
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
-	incxs []*types.CXReceiptsProof, stks []*staking.StakingTransaction,
+	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
 	doubleSigners slash.Records,
-) (*types.Block, *big.Int, error) {
+) (*types.Block, reward.Reader, error) {
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewards(
-		chain, state, header, e.Rewarder(), e.Beaconchain(),
+		chain, state, header, e.Beaconchain(),
 	)
 	if err != nil {
 		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)

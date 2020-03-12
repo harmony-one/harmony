@@ -2,9 +2,7 @@ package quorum
 
 import (
 	"encoding/json"
-	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -61,30 +59,6 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 func (v *uniformVoteWeight) SetVoters(shard.SlotList) (*TallyResult, error) {
 	// NO-OP do not add anything here
 	return nil, nil
-}
-
-// Award ..
-func (v *uniformVoteWeight) Award(
-	// Here hook is the callback which gets the amount the earner is due in just reward
-	// up to the hook to do side-effects like write the statedb
-	Pie *big.Int,
-	earners shard.SlotList,
-	hook func(earner common.Address, due *big.Int),
-) *big.Int {
-	payout := big.NewInt(0)
-	last := big.NewInt(0)
-	count := big.NewInt(int64(len(earners)))
-
-	for i, account := range earners {
-		cur := big.NewInt(0)
-		cur.Mul(Pie, big.NewInt(int64(i+1))).Div(cur, count)
-		diff := big.NewInt(0).Sub(cur, last)
-		hook(common.Address(account.EcdsaAddress), diff)
-		payout = big.NewInt(0).Add(payout, diff)
-		last = cur
-	}
-
-	return payout
 }
 
 func (v *uniformVoteWeight) String() string {
