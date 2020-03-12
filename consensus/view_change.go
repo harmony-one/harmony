@@ -16,6 +16,9 @@ import (
 	"github.com/harmony-one/harmony/p2p/host"
 )
 
+// MaxViewIDDiff limits the received view ID to only 100 further from the current view ID
+const MaxViewIDDiff = 100
+
 // State contains current mode and current viewID
 type State struct {
 	mode   Mode
@@ -149,11 +152,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[onViewChange] Unable To Parse Viewchange Message")
 		return
 	}
-	newLeaderKey := recvMsg.LeaderPubkey
-	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey)
-	if err != nil {
-		return
-	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.ViewChange) {
 		consensus.getLogger().Debug().
@@ -164,38 +162,14 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
+	if !consensus.onViewChangeSanityCheck(recvMsg) {
+		return
+	}
+
+	senderKey := recvMsg.SenderPubkey
+	newLeaderKey := recvMsg.LeaderPubkey
+	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey)
 	if err != nil {
-		consensus.getLogger().Debug().Err(err).Msg("[onViewChange] VerifySenderKey Failed")
-		return
-	}
-
-	// TODO: if difference is only one, new leader can still propose the same committed block to avoid another view change
-	// TODO: new leader catchup without ignore view change message
-	if consensus.blockNum > recvMsg.BlockNum {
-		consensus.getLogger().Debug().
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Msg("[onViewChange] Message BlockNum Is Low")
-		return
-	}
-
-	if consensus.blockNum < recvMsg.BlockNum {
-		consensus.getLogger().Warn().
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Msg("[onViewChange] New Leader Has Lower Blocknum")
-		return
-	}
-
-	if consensus.current.Mode() == ViewChanging &&
-		consensus.current.ViewID() > recvMsg.ViewID {
-		consensus.getLogger().Warn().
-			Uint64("MyViewChangingID", consensus.current.ViewID()).
-			Uint64("MsgViewChangingID", recvMsg.ViewID).
-			Msg("[onViewChange] ViewChanging ID Is Low")
-		return
-	}
-	if err = verifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Debug().Err(err).Msg("[onViewChange] Failed To Verify Sender's Signature")
 		return
 	}
 
@@ -438,21 +412,17 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 // TODO: move to consensus_leader.go later
 func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	consensus.getLogger().Debug().Msg("[onNewView] Received NewView Message")
-	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
-	if err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[onNewView] VerifySenderKey Failed")
-		return
-	}
 	recvMsg, err := consensus.ParseNewViewMessage(msg)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[onNewView] Unable to Parse NewView Message")
 		return
 	}
 
-	if err = verifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[onNewView] Failed to Verify New Leader's Signature")
+	if !consensus.onNewViewSanityCheck(recvMsg) {
 		return
 	}
+
+	senderKey := recvMsg.SenderPubkey
 	consensus.vcLock.Lock()
 	defer consensus.vcLock.Unlock()
 
