@@ -68,7 +68,6 @@ func (s Slots) JSON() string {
 
 // Median ..
 func Median(stakes []SlotPurchase) numeric.Dec {
-
 	if len(stakes) == 0 {
 		utils.Logger().Error().Int("non-zero", len(stakes)).
 			Msg("Input to median has len 0, check caller")
@@ -76,7 +75,7 @@ func Median(stakes []SlotPurchase) numeric.Dec {
 
 	sort.SliceStable(
 		stakes,
-		func(i, j int) bool { return stakes[i].Dec.LT(stakes[j].Dec) },
+		func(i, j int) bool { return stakes[i].Dec.GT(stakes[j].Dec) },
 	)
 	const isEven = 0
 	switch l := len(stakes); l % 2 {
@@ -131,9 +130,6 @@ func Compute(
 				spread,
 			})
 		}
-	}
-	if len(eposedSlots) < len(shortHand) {
-		// WARN Should never happen
 	}
 
 	sort.SliceStable(

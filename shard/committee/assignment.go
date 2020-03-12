@@ -171,6 +171,7 @@ func eposStakedCommittee(
 		if validator.EPOSStatus != effective.Active {
 			continue
 		}
+		// TODO(audit): remove the sanity check here; do the sanity check with maxBLSKey before validator change
 		if err := validator.SanityCheck(maxBLSKey); err != nil {
 			utils.Logger().Info().
 				Int("staked-candidates", len(candidates)).
@@ -178,10 +179,7 @@ func eposStakedCommittee(
 				Msg("validator sanity check failed")
 			continue
 		}
-		validatorStake := big.NewInt(0)
-		for _, delegation := range validator.Delegations {
-			validatorStake.Add(validatorStake, delegation.Amount)
-		}
+		totalStake := validator.TotalDelegation()
 
 		found := false
 		dupKey := shard.BlsPublicKey{}
@@ -202,28 +200,23 @@ func eposStakedCommittee(
 		}
 
 		essentials[validator.Address] = effective.SlotOrder{
-			validatorStake,
+			totalStake,
 			validator.SlotPubKeys,
 		}
 	}
 
-	staked := effective.Apply(essentials, stakedSlotsCount)
+	electedSlots := effective.Apply(essentials, stakedSlotsCount)
 	shardBig := big.NewInt(int64(shardCount))
 
-	if l := len(staked); l < stakedSlotsCount {
-		// WARN unlikely to happen in production but will happen as we are developing
-		stakedSlotsCount = l
-	}
+	totalEffectiveStake := numeric.ZeroDec()
 
-	totalStake := numeric.ZeroDec()
-
-	for i := 0; i < stakedSlotsCount; i++ {
-		shardID := int(new(big.Int).Mod(staked[i].BlsPublicKey.Big(), shardBig).Int64())
-		slot := staked[i]
-		totalStake = totalStake.Add(slot.Dec)
+	for i := 0; i < len(electedSlots); i++ {
+		slot := electedSlots[i]
+		shardID := int(new(big.Int).Mod(slot.BlsPublicKey.Big(), shardBig).Int64())
+		totalEffectiveStake = totalEffectiveStake.Add(slot.Dec)
 		shardState.Shards[shardID].Slots = append(shardState.Shards[shardID].Slots, shard.Slot{
 			slot.Address,
-			staked[i].BlsPublicKey,
+			slot.BlsPublicKey,
 			&slot.Dec,
 		})
 	}
@@ -231,7 +224,7 @@ func eposStakedCommittee(
 	if c := len(candidates); c != 0 {
 		utils.Logger().Info().
 			Int("staked-candidates", c).
-			Str("total-staked-by-validators", totalStake.String()).
+			Str("sum-all-effective-stake-by-validators", totalEffectiveStake.String()).
 			Msg("epos based super-committe")
 	}
 

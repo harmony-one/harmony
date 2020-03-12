@@ -209,6 +209,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
+	// TODO(audit): refactor into a new func
 	if key := (bls.PublicKey{}); consensus.couldThisBeADoubleSigner(recvMsg) {
 		if alreadyCastBallot := consensus.Decider.ReadBallot(
 			quorum.Commit, recvMsg.SenderPubkey,

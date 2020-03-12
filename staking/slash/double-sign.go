@@ -186,9 +186,8 @@ func Verify(
 		)
 	}
 	currentEpoch := chain.CurrentBlock().Epoch()
-	// on beaconchain committee, the slash can't come from the future
-	if candidate.Evidence.ShardID == shard.BeaconChainShardID &&
-		candidate.Evidence.Epoch.Cmp(currentEpoch) == 1 {
+	// the slash can't come from the future (shard chain's epoch can't be larger than beacon chain's)
+	if candidate.Evidence.Epoch.Cmp(currentEpoch) == 1 {
 		return errors.Wrapf(
 			errSlashFromFutureEpoch, "current-epoch %v", currentEpoch,
 		)
@@ -232,6 +231,7 @@ func Verify(
 		}
 
 		blockNumBytes := make([]byte, 8)
+		// TODO(audit): add view ID into signature payload
 		binary.LittleEndian.PutUint64(blockNumBytes, ballot.Height)
 		commitPayload := append(blockNumBytes, ballot.BlockHeaderHash[:]...)
 		if !signature.VerifyHash(publicKey, commitPayload) {
@@ -362,7 +362,7 @@ func delegatorSlashApply(
 						}
 
 						if nowAmt.Cmp(common.Big0) == 0 {
-							// TODO need to remove the undelegate
+							// TODO(audit): need to remove the undelegate
 							utils.Logger().Info().
 								RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
 								RawJSON("delegation-current", []byte(delegationNow.String())).

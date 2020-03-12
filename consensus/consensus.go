@@ -79,8 +79,9 @@ type Consensus struct {
 	MinPeers   int
 	pubKeyLock sync.Mutex
 	// private/public keys of current node
-	priKey        *multibls.PrivateKey
-	PubKey        *multibls.PublicKey
+	priKey *multibls.PrivateKey
+	PubKey *multibls.PublicKey
+	// TODO(audit): SelfAddresses doesn't have the ECDSA address for external validators. Don't use it that way.
 	SelfAddresses map[string]common.Address
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
