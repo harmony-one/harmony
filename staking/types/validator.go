@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/pkg/errors"
 )
@@ -78,6 +77,11 @@ type counters struct {
 	NumBlocksSigned *big.Int `json:"num-blocks-signed",rlp:"nil"`
 }
 
+// ComputedAPR ..
+type ComputedAPR struct {
+	Result *big.Int
+}
+
 // ValidatorWrapper contains validator and its delegation information
 type ValidatorWrapper struct {
 	Validator
@@ -109,7 +113,7 @@ var (
 	// EmptyKeysPerShard ..
 	EmptyKeysPerShard = []KeysPerShard{}
 	// EmptyAPR ..
-	EmptyAPR = apr.Computed{}
+	EmptyAPR = ComputedAPR{}
 )
 
 // NewEmptyStats ..
@@ -181,7 +185,7 @@ type ValidatorStats struct {
 	// BlockReward ..
 	BlockReward *big.Int `json:"block-reward-accumulated"`
 	// APR ..
-	APR apr.Computed `json:"current-apr"`
+	APR ComputedAPR `json:"current-apr"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `rlp:"nil"`
 	// VotingPowerPerShard ..
