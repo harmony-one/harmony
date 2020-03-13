@@ -7,21 +7,22 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-// PayoutRound ..
-type PayoutRound struct {
+// Payout ..
+type Payout struct {
+	ShardID     uint32
 	Addr        common.Address
 	NewlyEarned *big.Int
 }
 
-// Payout ..
-type Payout struct {
-	Total *big.Int
-	Round []PayoutRound
+// CompletedRound ..
+type CompletedRound struct {
+	Total            *big.Int
+	BeaconchainAward []Payout
+	ShardChainAward  []Payout
 }
 
 // Reader ..
 type Reader interface {
-	// ReadRoundResult ..
-	ReadRoundResult() *Payout
+	ReadRoundResult() *CompletedRound
 	MissingSigners() shard.SlotList
 }

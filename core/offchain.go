@@ -203,12 +203,19 @@ func (bc *BlockChain) CommitOffChainData(
 	if isBeaconChain {
 		if isStaking {
 			paid := payout.ReadRoundResult()
+			earners := [...][]reward.Payout{
+				paid.BeaconchainAward, paid.ShardChainAward,
+			}
 
-			for i := range paid.Round {
-				if err := bc.UpdateValidatorStatsBlockReward(
-					batch, paid.Round[i].Addr, paid.Round[i].NewlyEarned,
-				); err != nil {
-					//
+			for i := range earners {
+				for j := range earners[i] {
+					payout := &earners[i][j]
+					if err := bc.UpdateValidatorStatsBlockReward(
+						batch, payout.Addr, payout.NewlyEarned,
+					); err != nil {
+						// TODO
+					}
+
 				}
 
 			}
