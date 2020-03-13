@@ -50,13 +50,16 @@ func lookupSubCommittee(
 			return subComm, nil
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 	if epochIncoming.Abs(new(big.Int).Sub(
 		epochNow, epochIncoming,
 	)).Cmp(maxMemoryBehindShard) == 1 {
 		superCommitteeCache.Forget(key)
 	}
 
-	return results.(*shard.Committee), err
+	return results.(*shard.Committee), nil
 }
 
 // AccumulateRewards credits the coinbase of the given block with the mining
