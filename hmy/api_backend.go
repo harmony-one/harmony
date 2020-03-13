@@ -363,12 +363,14 @@ func (b *APIBackend) GetValidatorInformation(
 		return defaultReply, nil
 	}
 
-	defaultReply.Performance = &staking.CurrentEpochPerformance{
-		CurrentSigningPercentage: *computed,
-		CurrentVotingPower:       stats.VotingPowerPerShard,
+	if defaultReply.CurrentlyInCommittee {
+		defaultReply.Performance = &staking.CurrentEpochPerformance{
+			CurrentSigningPercentage: *computed,
+			CurrentVotingPower:       stats.VotingPowerPerShard,
+		}
+		defaultReply.ComputedMetrics = stats
 	}
 
-	defaultReply.ComputedMetrics = stats
 	return defaultReply, nil
 }
 
