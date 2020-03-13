@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200212.0"
+version="v1 20200313.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -97,7 +97,7 @@ print_usage() {
 usage: ${progname} [options]
 
 options:
-   -c             back up database/logs and start clean
+   -c             back up database/logs and start clean (not for mainnet)
                   (use only when directed by Harmony)
    -1             do not loop; run once and exit
    -h             print this help and exit
@@ -602,15 +602,19 @@ do
   BN_MA="${BN_MA+"${BN_MA},"}${bn}"
 done
 
-if ${start_clean}
+if [[ "${start_clean}" == "true" && "${network_type}" != "mainnet" ]]
 then
-   msg "backing up old database/logs (-c)"
-   unset -v backup_dir now
-   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-   mkdir -p backups
-   backup_dir=$(mktemp -d "backups/${now}.XXXXXX")
-   mv harmony_db_* latest "${backup_dir}/" || :
-   rm -rf latest
+   msg "cleaning up old database/logs (-c)"
+   read -rp "Remove old database/logs? (Y/n) " yesno
+   echo
+   if [[ "$yesno" == "y" || "$yesno" == "Y" ]]; then
+      unset -v backup_dir now
+      now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      mkdir -p backups; rm -rf backups/*
+      backup_dir=$(mktemp -d "backups/${now}.XXXXXX")
+      mv -f harmony_db_* latest .dht* "${backup_dir}/" 2>/dev/null || :
+      rm -rf latest
+   fi
 fi
 mkdir -p latest
 
