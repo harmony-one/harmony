@@ -579,3 +579,17 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 func (b *APIBackend) GetCurrentBadBlocks() []core.BadBlock {
 	return b.hmy.BlockChain().BadBlocks()
 }
+
+// GetLastCrossLinks ..
+func (b *APIBackend) GetLastCrossLinks() ([]*types.RPCCrossLink, error) {
+	lastCrossLinks := []*types.RPCCrossLink{}
+	for i := uint32(1); i < shard.Schedule.InstanceForEpoch(b.CurrentBlock().Epoch()).NumShards(); i++ {
+		link, err := b.hmy.BlockChain().ReadShardLastCrossLink(i)
+		if err != nil {
+			return nil, err
+		}
+		lastCrossLinks = append(lastCrossLinks, link.ConvertForRPC())
+	}
+
+	return lastCrossLinks, nil
+}
