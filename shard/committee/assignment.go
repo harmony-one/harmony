@@ -236,12 +236,12 @@ func eposStakedCommittee(
 
 	shardBig := big.NewInt(int64(shardCount))
 	for i := range completedEPoSRound.AuctionWinners {
-		slot := completedEPoSRound.AuctionWinners[i]
-		shardID := int(new(big.Int).Mod(slot.BlsPublicKey.Big(), shardBig).Int64())
+		purchasedSlot := completedEPoSRound.AuctionWinners[i]
+		shardID := int(new(big.Int).Mod(purchasedSlot.Key.Big(), shardBig).Int64())
 		shardState.Shards[shardID].Slots = append(shardState.Shards[shardID].Slots, shard.Slot{
-			slot.Address,
-			slot.BlsPublicKey,
-			&slot.Dec,
+			purchasedSlot.Addr,
+			purchasedSlot.Key,
+			&purchasedSlot.Stake,
 		})
 	}
 

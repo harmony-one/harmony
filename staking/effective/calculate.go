@@ -2,10 +2,12 @@ package effective
 
 import (
 	"bytes"
+	"encoding/json"
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -26,9 +28,22 @@ func effectiveStake(median, actual numeric.Dec) numeric.Dec {
 
 // SlotPurchase ..
 type SlotPurchase struct {
-	common.Address     `json:"slot-owner"`
-	shard.BlsPublicKey `json:"bls-public-key"`
-	numeric.Dec        `json:"eposed-stake"`
+	Addr  common.Address     `json:"slot-owner"`
+	Key   shard.BlsPublicKey `json:"bls-public-key"`
+	Stake numeric.Dec        `json:"eposed-stake"`
+}
+
+// MarshalJSON ..
+func (p SlotPurchase) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Addr  string      `json:"slot-owner"`
+		Key   string      `json:"bls-public-key"`
+		Stake numeric.Dec `json:"eposed-stake"`
+	}{
+		common2.MustAddressToBech32(p.Addr),
+		p.Key.Hex(),
+		p.Stake,
+	})
 }
 
 // SlotOrder ..
@@ -45,16 +60,18 @@ func Median(stakes []SlotPurchase) numeric.Dec {
 
 	sort.SliceStable(
 		stakes,
-		func(i, j int) bool { return stakes[i].Dec.GT(stakes[j].Dec) },
+		func(i, j int) bool {
+			return stakes[i].Stake.GT(stakes[j].Stake)
+		},
 	)
 	const isEven = 0
 	switch l := len(stakes); l % 2 {
 	case isEven:
 		left := (l / 2) - 1
 		right := l / 2
-		return stakes[left].Dec.Add(stakes[right].Dec).Quo(two)
+		return stakes[left].Stake.Add(stakes[right].Stake).Quo(two)
 	default:
-		return stakes[l/2].Dec
+		return stakes[l/2].Stake
 	}
 }
 
@@ -102,7 +119,9 @@ func Compute(
 
 	sort.SliceStable(
 		eposedSlots,
-		func(i, j int) bool { return eposedSlots[i].Dec.GT(eposedSlots[j].Dec) },
+		func(i, j int) bool {
+			return eposedSlots[i].Stake.GT(eposedSlots[j].Stake)
+		},
 	)
 
 	if l := len(eposedSlots); l < pull {
@@ -124,7 +143,7 @@ func Apply(shortHand map[common.Address]SlotOrder, pull int) (
 ) {
 	median, picks := Compute(shortHand, pull)
 	for i := range picks {
-		picks[i].Dec = effectiveStake(median, picks[i].Dec)
+		picks[i].Stake = effectiveStake(median, picks[i].Stake)
 	}
 
 	return median.TruncateInt(), picks
