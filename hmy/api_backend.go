@@ -342,11 +342,9 @@ func (b *APIBackend) GetValidatorInformation(
 	defaultReply := &staking.ValidatorRPCEnchanced{
 		CurrentlyInCommittee: now.Cmp(snapshot.LastEpochInCommittee) == 0,
 		Wrapper:              *wrapper,
-		Performance:          staking.EmptyPerformance,
-		ComputedMetrics: staking.Metrics{
-			ValidatorStats: &staking.ValidatorStats{},
-			TotalDelegated: wrapper.TotalDelegation(),
-		},
+		Performance:          nil,
+		ComputedMetrics:      nil,
+		TotalDelegated:       wrapper.TotalDelegation(),
 	}
 	if err != nil {
 		return defaultReply, nil
@@ -364,12 +362,12 @@ func (b *APIBackend) GetValidatorInformation(
 		return defaultReply, nil
 	}
 
-	defaultReply.Performance = staking.CurrentEpochPerformance{
+	defaultReply.Performance = &staking.CurrentEpochPerformance{
 		CurrentSigningPercentage: *computed,
 		CurrentVotingPower:       stats.VotingPowerPerShard,
 	}
 
-	defaultReply.ComputedMetrics.ValidatorStats = stats
+	defaultReply.ComputedMetrics = stats
 	return defaultReply, nil
 }
 
