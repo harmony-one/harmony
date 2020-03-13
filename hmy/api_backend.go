@@ -377,7 +377,14 @@ func (b *APIBackend) GetValidatorInformation(
 func (b *APIBackend) GetMedianRawStakeSnapshot() (
 	*committee.CompletedEPoSRound, error,
 ) {
-	return committee.NewEPoSRound(b.hmy.BlockChain())
+	round, err := committee.NewEPoSRound(b.hmy.BlockChain())
+	if err != nil {
+		return nil, err
+	}
+	// NOTE We do this because for RPC presentation, we index from 1 instead of 0
+	// like how committee assignment does.
+	round.MaximumExternalSlotAllowed++
+	return round, nil
 }
 
 // GetTotalStakingSnapshot ..
