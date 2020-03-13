@@ -67,7 +67,7 @@ func ComputeForValidator(
 	estimatedBlocksPerYear, err := expectedNumBlocksPerYear(
 		nil, nil, blocksPerEpoch,
 	)
-	estimatedRewardPerYear := new(big.Int).Div(
+	estimatedRewardPerYear := new(big.Int).Mul(
 		avgRewardPerBlock, estimatedBlocksPerYear,
 	)
 
