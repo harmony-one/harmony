@@ -105,7 +105,7 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 				return nil, err
 			}
 			ballot.currentTotal = ballot.currentTotal.Add(
-				v.roster.Voters[w].EffectivePercent,
+				v.roster.Voters[w].OverallPercent,
 			)
 			ballot.voters[w] = struct{}{}
 		}
@@ -115,6 +115,8 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 }
 
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
+// TODO(audit): the bls key serialization is memory intensive. Better cache the result
+//              and pass in.
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	pubKeys := mask.Publics
 	w := shard.BlsPublicKey{}
@@ -127,7 +129,7 @@ func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric
 		}
 		if enabled, err := mask.KeyEnabled(pubKeys[i]); err == nil && enabled {
 			currentTotal = currentTotal.Add(
-				v.roster.Voters[w].EffectivePercent,
+				v.roster.Voters[w].OverallPercent,
 			)
 		}
 	}
@@ -209,8 +211,8 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 			voter.IsHarmonyNode,
 			common2.MustAddressToBech32(voter.EarningAccount),
 			identity.Hex(),
-			voter.RawPercent.String(),
-			voter.EffectivePercent.String(),
+			voter.GroupPercent.String(),
+			voter.OverallPercent.String(),
 			"",
 		}
 		if !voter.IsHarmonyNode {
@@ -226,7 +228,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 		parts,
 		v.roster.OurVotingPowerTotalPercentage.String(),
 		v.roster.TheirVotingPowerTotalPercentage.String(),
-		v.roster.RawStakedTotal.String(),
+		v.roster.TotalEffectiveStake.String(),
 	})
 }
 

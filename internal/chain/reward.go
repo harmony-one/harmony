@@ -33,6 +33,13 @@ func AccumulateRewards(
 	bc engine.ChainReader, state *state.DB, header *block.Header,
 	rewarder reward.Distributor, beaconChain engine.ChainReader,
 ) (*big.Int, error) {
+	isStakingEpoch := bc.Config().IsStaking(header.Epoch())
+	isBeaconChain := bc.CurrentHeader().ShardID() == shard.BeaconChainShardID
+
+	if isStakingEpoch && !isBeaconChain {
+		return network.NoReward, nil
+	}
+
 	blockNum := header.Number().Uint64()
 
 	if blockNum == 0 {
@@ -40,14 +47,8 @@ func AccumulateRewards(
 		return network.NoReward, nil
 	}
 
-	if bc.Config().IsStaking(header.Epoch()) &&
-		bc.CurrentHeader().ShardID() != shard.BeaconChainShardID {
-		return network.NoReward, nil
-	}
-
 	// After staking
-	if bc.Config().IsStaking(header.Epoch()) &&
-		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
+	if isStakingEpoch && isBeaconChain {
 		defaultReward := network.BaseStakedReward
 		// TODO Use cached result in off-chain db instead of full computation
 		_, percentageStaked, err := network.WhatPercentStakedNow(
@@ -103,7 +104,7 @@ func AccumulateRewards(
 					return network.NoReward, err
 				}
 				due := defaultReward.Mul(
-					voter.EffectivePercent.Quo(votepower.StakersShare),
+					voter.OverallPercent.Quo(votepower.StakersShare),
 				).RoundInt()
 				newRewards = new(big.Int).Add(newRewards, due)
 				if err := state.AddReward(snapshot, due); err != nil {
@@ -164,9 +165,9 @@ func AccumulateRewards(
 				}
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
-					if !voter.IsHarmonyNode && !voter.EffectivePercent.IsZero() {
+					if !voter.IsHarmonyNode {
 						due := defaultReward.Mul(
-							voter.EffectivePercent.Quo(votepower.StakersShare),
+							voter.OverallPercent.Quo(votepower.StakersShare),
 						)
 						to := voter.EarningAccount
 						allPayables = append(allPayables, slotPayable{

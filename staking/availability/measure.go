@@ -113,6 +113,7 @@ func bumpCount(
 	didSign bool,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
+	// TODO(audit): batch the bumps and update validator only once
 	for i := range signers {
 		addr := signers[i].EcdsaAddress
 		// NOTE if the signer address is not part of the staked addrs,
@@ -137,7 +138,7 @@ func bumpCount(
 			)
 		}
 
-		if err := compute(bc, state, wrapper); err != nil {
+		if err := checkUptime(bc, state, wrapper); err != nil {
 			return err
 		}
 
@@ -217,18 +218,19 @@ func IsBelowSigningThreshold(quotient numeric.Dec) bool {
 	return quotient.LTE(measure)
 }
 
-// compute sets the validator to
+// checkUptime sets the validator to
 // inactive and thereby keeping it out of
 // consideration in the pool of validators for
-// whenever committee selection happens in future, the
-// signing threshold is 66%
-func compute(
+// whenever committee selection happens in future, if the
+// signing threshold is below 2/3
+func checkUptime(
 	bc Reader,
 	state *state.DB,
 	wrapper *staking.ValidatorWrapper,
 ) error {
-	utils.Logger().Info().Msg("begin compute for availability")
+	utils.Logger().Info().Msg("begin checkUptime for availability")
 
+	// TODO(audit): do the checking at the time of bump, so no need to read validator again.
 	snapshot, err := bc.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
 		return err
@@ -256,7 +258,7 @@ func compute(
 			Str("threshold", measure.String()).
 			Msg("validator failed availability threshold, set to inactive")
 	default:
-		wrapper.EPOSStatus = effective.Active
+		// Default is no-op
 	}
 
 	return nil

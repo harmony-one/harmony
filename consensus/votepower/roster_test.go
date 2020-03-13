@@ -57,25 +57,25 @@ func TestCompute(t *testing.T) {
 	// Parameterized
 	expectedRoster.HmySlotCount = int64(harmonyNodes)
 	// Calculated when generated
-	expectedRoster.RawStakedTotal = totalStake
+	expectedRoster.TotalEffectiveStake = totalStake
 	for _, slot := range slotList {
 		newMember := stakedVoter{
-			IsActive:         true,
-			IsHarmonyNode:    false,
-			EarningAccount:   slot.EcdsaAddress,
-			EffectivePercent: numeric.ZeroDec(),
-			EffectiveStake:   numeric.ZeroDec(),
+			IsActive:       true,
+			IsHarmonyNode:  false,
+			EarningAccount: slot.EcdsaAddress,
+			OverallPercent: numeric.ZeroDec(),
+			EffectiveStake: numeric.ZeroDec(),
 		}
 		// Not Harmony node
 		if slot.EffectiveStake != nil {
 			newMember.EffectiveStake = *slot.EffectiveStake
-			newMember.EffectivePercent = slot.EffectiveStake.Quo(expectedRoster.RawStakedTotal).Mul(StakersShare)
-			expectedRoster.TheirVotingPowerTotalPercentage = expectedRoster.TheirVotingPowerTotalPercentage.Add(newMember.EffectivePercent)
+			newMember.OverallPercent = slot.EffectiveStake.Quo(expectedRoster.TotalEffectiveStake).Mul(StakersShare)
+			expectedRoster.TheirVotingPowerTotalPercentage = expectedRoster.TheirVotingPowerTotalPercentage.Add(newMember.OverallPercent)
 		} else {
 			// Harmony node
 			newMember.IsHarmonyNode = true
-			newMember.EffectivePercent = HarmonysShare.Quo(numeric.NewDec(expectedRoster.HmySlotCount))
-			expectedRoster.OurVotingPowerTotalPercentage = expectedRoster.OurVotingPowerTotalPercentage.Add(newMember.EffectivePercent)
+			newMember.OverallPercent = HarmonysShare.Quo(numeric.NewDec(expectedRoster.HmySlotCount))
+			expectedRoster.OurVotingPowerTotalPercentage = expectedRoster.OurVotingPowerTotalPercentage.Add(newMember.OverallPercent)
 		}
 		expectedRoster.Voters[slot.BlsPublicKey] = newMember
 	}
@@ -111,7 +111,7 @@ func compareRosters(a, b *Roster, t *testing.T) bool {
 	}
 	return a.OurVotingPowerTotalPercentage.Equal(b.OurVotingPowerTotalPercentage) &&
 		a.TheirVotingPowerTotalPercentage.Equal(b.TheirVotingPowerTotalPercentage) &&
-		a.RawStakedTotal.Equal(b.RawStakedTotal) &&
+		a.TotalEffectiveStake.Equal(b.TotalEffectiveStake) &&
 		a.HmySlotCount == b.HmySlotCount && voterMatch
 }
 
@@ -119,23 +119,23 @@ func compareStakedVoter(a, b stakedVoter) bool {
 	return a.IsActive == b.IsActive &&
 		a.IsHarmonyNode == b.IsHarmonyNode &&
 		a.EarningAccount == b.EarningAccount &&
-		a.EffectivePercent.Equal(b.EffectivePercent) &&
+		a.OverallPercent.Equal(b.OverallPercent) &&
 		a.EffectiveStake.Equal(b.EffectiveStake)
 }
 
 func (s *stakedVoter) formatString() string {
 	type t struct {
-		IsActive         string `json:"active"`
-		IsHarmony        string `json:"harmony-node"`
-		EarningAccount   string `json:"one-address"`
-		EffectivePercent string `json:"effective-percent"`
-		EffectiveStake   string `json:"eposed-stake"`
+		IsActive       string `json:"active"`
+		IsHarmony      string `json:"harmony-node"`
+		EarningAccount string `json:"one-address"`
+		OverallPercent string `json:"effective-percent"`
+		EffectiveStake string `json:"eposed-stake"`
 	}
 	data := t{
 		strconv.FormatBool(s.IsActive),
 		strconv.FormatBool(s.IsHarmonyNode),
 		s.EarningAccount.String(),
-		s.EffectivePercent.String(),
+		s.OverallPercent.String(),
 		s.EffectiveStake.String(),
 	}
 	output, _ := json.Marshal(data)

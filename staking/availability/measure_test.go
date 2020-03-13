@@ -58,13 +58,13 @@ func TestCompute(t *testing.T) {
 	// state := defaultStateWithAccountsApplied()
 	// const junkValue = 0
 
-	// if err := compute(
+	// if err := checkUptime(
 	// 	fakerAuctioneer{}, state, validatorS0,
 	// ); err != nil {
 	// 	//
 	// }
 
-	// if err := compute(
+	// if err := checkUptime(
 	// 	fakerAuctioneer{}, state, validatorS2,
 	// ); err != nil {
 	// 	//

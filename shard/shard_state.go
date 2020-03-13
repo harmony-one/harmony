@@ -384,6 +384,8 @@ func (c *Committee) DeepCopy() Committee {
 }
 
 // BLSPublicKeys ..
+// TODO(audit): ToLibBLSPublicKey is very expensive.
+//              Cache the deserialized pubKeys of committee.
 func (c *Committee) BLSPublicKeys() ([]*bls.PublicKey, error) {
 	if c == nil {
 		return nil, ErrCommitteeNil

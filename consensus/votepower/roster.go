@@ -65,13 +65,13 @@ func NewRound() *Round {
 }
 
 type stakedVoter struct {
-	IsActive         bool               `json:"is-active"`
-	IsHarmonyNode    bool               `json:"is-harmony"`
-	EarningAccount   common.Address     `json:"earning-account"`
-	Identity         shard.BlsPublicKey `json:"bls-public-key"`
-	RawPercent       numeric.Dec        `json:"voting-power-unnormalized"`
-	EffectivePercent numeric.Dec        `json:"voting"`
-	EffectiveStake   numeric.Dec        `json:"effective-stake"`
+	IsActive       bool               `json:"is-active"`
+	IsHarmonyNode  bool               `json:"is-harmony"`
+	EarningAccount common.Address     `json:"earning-account"`
+	Identity       shard.BlsPublicKey `json:"bls-public-key"`
+	GroupPercent   numeric.Dec        `json:"voting-power-unnormalized"`
+	OverallPercent numeric.Dec        `json:"voting-power"`
+	EffectiveStake numeric.Dec        `json:"effective-stake"`
 }
 
 // Roster ..
@@ -79,7 +79,7 @@ type Roster struct {
 	Voters                          map[shard.BlsPublicKey]stakedVoter
 	OurVotingPowerTotalPercentage   numeric.Dec
 	TheirVotingPowerTotalPercentage numeric.Dec
-	RawStakedTotal                  numeric.Dec
+	TotalEffectiveStake             numeric.Dec
 	HmySlotCount                    int64
 }
 
@@ -114,8 +114,8 @@ func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
 					payload.VotingPower = append(payload.VotingPower,
 						staking.VotePerShard{
 							ShardID:             roster.ShardID,
-							VotingPowerRaw:      value.RawPercent,
-							VotingPowerAdjusted: value.EffectivePercent,
+							VotingPowerRaw:      value.GroupPercent,
+							VotingPowerAdjusted: value.OverallPercent,
 							EffectiveStake:      value.EffectiveStake,
 						},
 					)
@@ -130,8 +130,8 @@ func AggregateRosters(rosters []RosterPerShard) map[common.Address]Staker {
 					result[value.EarningAccount] = Staker{
 						TotalEffectiveStake: value.EffectiveStake,
 						VotingPower: []staking.VotePerShard{
-							{roster.ShardID, value.RawPercent,
-								value.EffectivePercent, value.EffectiveStake},
+							{roster.ShardID, value.GroupPercent,
+								value.OverallPercent, value.EffectiveStake},
 						},
 						BLSPublicKeysOwned: []staking.KeysPerShard{
 							{roster.ShardID, []shard.BlsPublicKey{key}}},
@@ -154,30 +154,30 @@ func (r *Roster) JSON() string {
 		Voters map[string]stakedVoter `json:"voters"`
 		Our    string                 `json:"ours"`
 		Their  string                 `json:"theirs"`
-		Raw    string                 `json:"raw-total"`
+		Raw    string                 `json:"total-effective-stake"`
 	}{
 		v,
 		r.OurVotingPowerTotalPercentage.String(),
 		r.TheirVotingPowerTotalPercentage.String(),
-		r.RawStakedTotal.String(),
+		r.TotalEffectiveStake.String(),
 	}
 	b, _ := json.Marshal(&c)
 	return string(b)
 }
 
 // Compute creates a new roster based off the shard.SlotList
+// TODO(audit): the decimal computation is memory and cpu intensive.
 func Compute(staked shard.SlotList) (*Roster, error) {
 	roster := NewRoster()
 	for i := range staked {
 		if staked[i].EffectiveStake == nil {
 			roster.HmySlotCount++
 		} else {
-			roster.RawStakedTotal = roster.RawStakedTotal.Add(
+			roster.TotalEffectiveStake = roster.TotalEffectiveStake.Add(
 				*staked[i].EffectiveStake,
 			)
 		}
 	}
-	// TODO Check for duplicate BLS Keys
 	ourCount := numeric.NewDec(roster.HmySlotCount)
 	ourPercentage := numeric.ZeroDec()
 	theirPercentage := numeric.ZeroDec()
@@ -185,27 +185,27 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 
 	for i := range staked {
 		member := stakedVoter{
-			IsActive:         true,
-			IsHarmonyNode:    true,
-			EarningAccount:   staked[i].EcdsaAddress,
-			Identity:         staked[i].BlsPublicKey,
-			RawPercent:       numeric.ZeroDec(),
-			EffectivePercent: numeric.ZeroDec(),
-			EffectiveStake:   numeric.ZeroDec(),
+			IsActive:       true,
+			IsHarmonyNode:  true,
+			EarningAccount: staked[i].EcdsaAddress,
+			Identity:       staked[i].BlsPublicKey,
+			GroupPercent:   numeric.ZeroDec(),
+			OverallPercent: numeric.ZeroDec(),
+			EffectiveStake: numeric.ZeroDec(),
 		}
 
 		// Real Staker
 		if staked[i].EffectiveStake != nil {
 			member.IsHarmonyNode = false
 			member.EffectiveStake = member.EffectiveStake.Add(*staked[i].EffectiveStake)
-			member.RawPercent = staked[i].EffectiveStake.Quo(roster.RawStakedTotal)
-			member.EffectivePercent = member.RawPercent.Mul(StakersShare)
-			theirPercentage = theirPercentage.Add(member.EffectivePercent)
+			member.GroupPercent = staked[i].EffectiveStake.Quo(roster.TotalEffectiveStake)
+			member.OverallPercent = member.GroupPercent.Mul(StakersShare)
+			theirPercentage = theirPercentage.Add(member.OverallPercent)
 			lastStakedVoter = &member
 		} else { // Our node
-			member.EffectivePercent = HarmonysShare.Quo(ourCount)
-			member.RawPercent = member.EffectivePercent.Quo(HarmonysShare)
-			ourPercentage = ourPercentage.Add(member.EffectivePercent)
+			member.OverallPercent = HarmonysShare.Quo(ourCount)
+			member.GroupPercent = member.OverallPercent.Quo(HarmonysShare)
+			ourPercentage = ourPercentage.Add(member.OverallPercent)
 		}
 
 		roster.Voters[staked[i].BlsPublicKey] = member
@@ -215,7 +215,7 @@ func Compute(staked shard.SlotList) (*Roster, error) {
 	if diff := numeric.OneDec().Sub(
 		ourPercentage.Add(theirPercentage),
 	); !diff.IsZero() && lastStakedVoter != nil {
-		lastStakedVoter.EffectivePercent = lastStakedVoter.EffectivePercent.Add(diff)
+		lastStakedVoter.OverallPercent = lastStakedVoter.OverallPercent.Add(diff)
 		theirPercentage = theirPercentage.Add(diff)
 	}
 

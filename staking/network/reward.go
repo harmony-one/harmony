@@ -51,9 +51,8 @@ func WhatPercentStakedNow(
 	beaconchain engine.ChainReader,
 	timestamp int64,
 ) (*big.Int, *numeric.Dec, error) {
-	stakedNow := numeric.ZeroDec()
 	// Only elected validators' stake is counted in stake ratio because only their stake is under slashing risk
-	active, err := beaconchain.ReadElectedValidatorList()
+	elected, err := beaconchain.ReadElectedValidatorList()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -68,8 +67,10 @@ func WhatPercentStakedNow(
 
 	dole := numeric.NewDecFromBigInt(soFarDoledOut)
 
-	for i := range active {
-		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
+	// TODO(audit): save total amount staked in db.
+	stakedNow := numeric.ZeroDec()
+	for i := range elected {
+		wrapper, err := beaconchain.ReadValidatorInformation(elected[i])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -77,6 +78,7 @@ func WhatPercentStakedNow(
 			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
 		)
 	}
+	// TODO(audit): may need to change to use total supply, not circulating supply, as denominator.
 	percentage := stakedNow.Quo(totalTokens.Mul(
 		reward.PercentageForTimeStamp(timestamp),
 	).Add(dole))
