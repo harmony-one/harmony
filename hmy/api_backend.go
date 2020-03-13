@@ -335,21 +335,17 @@ func (b *APIBackend) GetValidatorInformation(
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
 	}
 
-	totalDelegation := big.NewInt(0)
-	for i := range wrapper.Delegations {
-		totalDelegation.Add(totalDelegation, wrapper.Delegations[i].Amount)
-	}
-
+	now := b.hmy.BlockChain().CurrentHeader().Epoch()
 	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
-		b.hmy.BlockChain().CurrentHeader().Epoch(),
-		addr,
+		now, addr,
 	)
 	defaultReply := &staking.ValidatorRPCEnchanced{
-		Wrapper:     *wrapper,
-		Performance: staking.EmptyPerformance,
+		CurrentlyInCommittee: now.Cmp(snapshot.LastEpochInCommittee) == 0,
+		Wrapper:              *wrapper,
+		Performance:          staking.EmptyPerformance,
 		ComputedMetrics: staking.Metrics{
 			ValidatorStats: &staking.ValidatorStats{},
-			TotalDelegated: totalDelegation,
+			TotalDelegated: wrapper.TotalDelegation(),
 		},
 	}
 	if err != nil {

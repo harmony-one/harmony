@@ -139,9 +139,10 @@ type Metrics struct {
 
 // ValidatorRPCEnchanced contains extra information for RPC consumer
 type ValidatorRPCEnchanced struct {
-	Wrapper         ValidatorWrapper        `json:"validator"`
-	Performance     CurrentEpochPerformance `json:"current-epoch-performance"`
-	ComputedMetrics Metrics                 `json:"metrics"`
+	Wrapper              ValidatorWrapper        `json:"validator"`
+	Performance          CurrentEpochPerformance `json:"current-epoch-performance"`
+	ComputedMetrics      Metrics                 `json:"metrics"`
+	CurrentlyInCommittee bool                    `json:"currently-in-committee"`
 }
 
 func (w ValidatorWrapper) String() string {

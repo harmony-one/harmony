@@ -24,11 +24,11 @@ const (
 func (e Eligibility) String() string {
 	switch e {
 	case Active:
-		return "active"
+		return "epos-candidate"
 	case Inactive:
-		return "inactive"
+		return "below-signing-threshold"
 	case Banned:
-		return "banned"
+		return "banned-from-network"
 	default:
 		return "nil"
 	}
