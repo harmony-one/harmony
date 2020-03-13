@@ -846,3 +846,8 @@ func (s *PublicBlockChainAPI) GetStakingNetworkInfo(ctx context.Context) (*Staki
 		MedianRawStake:    medianRawStake,
 	}, nil
 }
+
+// GetLastCrossLinks ..
+func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.RPCCrossLink, error) {
+	return s.b.GetLastCrossLinks()
+}
