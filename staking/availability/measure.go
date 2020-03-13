@@ -117,6 +117,7 @@ func bumpCount(
 	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
+	blocksPerEpoch := shard.Schedule.BlocksPerEpoch()
 	for _, subset := range signers {
 		for i := range subset.committee {
 			addr := subset.committee[i].EcdsaAddress
@@ -142,7 +143,9 @@ func bumpCount(
 				)
 			}
 
-			if err := computeAndMutateEPOSStatus(bc, state, wrapper); err != nil {
+			if err := computeAndMutateEPOSStatus(
+				bc, state, wrapper, blocksPerEpoch,
+			); err != nil {
 				return err
 			}
 
@@ -180,7 +183,7 @@ type Reader interface {
 // ComputeCurrentSigning returns (signed, toSign, quotient, error)
 func ComputeCurrentSigning(
 	snapshot, wrapper *staking.ValidatorWrapper,
-	blocksPerEpoch *big.Int,
+	blocksPerEpoch uint64,
 ) (*staking.Computed, error) {
 	statsNow, snapSigned, snapToSign :=
 		wrapper.Counters,
@@ -190,7 +193,7 @@ func ComputeCurrentSigning(
 	signed, toSign :=
 		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
 		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
-	missedSoFar := new(big.Int).Sub(blocksPerEpoch, signed)
+	missedSoFar := blocksPerEpoch - signed.Uint64()
 
 	computed := &staking.Computed{
 		signed, toSign, missedSoFar, numeric.ZeroDec(), true,
@@ -237,6 +240,7 @@ func computeAndMutateEPOSStatus(
 	bc Reader,
 	state *state.DB,
 	wrapper *staking.ValidatorWrapper,
+	blocksPerEpoch uint64,
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")
 
@@ -245,7 +249,7 @@ func computeAndMutateEPOSStatus(
 		return err
 	}
 
-	computed, err := ComputeCurrentSigning(snapshot, wrapper, big.NewInt(75))
+	computed, err := ComputeCurrentSigning(snapshot, wrapper, blocksPerEpoch)
 
 	if err != nil {
 		return err

@@ -28,9 +28,40 @@ func ballotResultBeaconchain(
 }
 
 var (
-	superCommitteeCache  singleflight.Group
-	maxMemoryBehindShard = big.NewInt(5)
+	superCommitteeCache, votingPowerCache singleflight.Group
+	maxMemoryBehindShard                  = big.NewInt(5)
 )
+
+func lookupVotingPower(
+	epochIncoming *big.Int, shardID uint32,
+	epochNow *big.Int, beaconChain engine.ChainReader,
+) (*votepower.Roster, error) {
+	key := fmt.Sprintf("%s-%d", epochIncoming.String(), shardID)
+	results, err, _ := votingPowerCache.Do(
+		key, func() (interface{}, error) {
+			subComm, err := lookupSubCommittee(
+				epochIncoming, shardID, epochNow, beaconChain,
+			)
+			if err != nil {
+				return nil, err
+			}
+			votingPower, err := votepower.Compute(subComm.Slots)
+			if err != nil {
+				return nil, err
+			}
+			return votingPower, nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if epochIncoming.Abs(new(big.Int).Sub(
+		epochNow, epochIncoming,
+	)).Cmp(maxMemoryBehindShard) == 1 {
+		votingPowerCache.Forget(key)
+	}
+	return results.(*votepower.Roster), nil
+}
 
 func lookupSubCommittee(
 	epochIncoming *big.Int, shardID uint32,
@@ -198,7 +229,10 @@ func AccumulateRewards(
 					return network.EmptyPayout, err
 				}
 
-				votingPower, err := votepower.Compute(payableSigners)
+				votingPower, err := lookupVotingPower(
+					epoch, shardID, beaconEpochNow, beaconChain,
+				)
+
 				if err != nil {
 					return network.EmptyPayout, err
 				}

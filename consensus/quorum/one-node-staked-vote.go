@@ -193,7 +193,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	}
 
 	type t struct {
-		Policy            string `json"policy"`
+		Policy            string `json:"policy"`
 		Count             int    `json:"count"`
 		Participants      []u    `json:"committee-members"`
 		HmyVotingPower    string `json:"hmy-voting-power"`

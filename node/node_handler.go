@@ -495,7 +495,9 @@ func (node *Node) PostConsensusProcessing(
 					return
 				}
 				computed, err :=
-					availability.ComputeCurrentSigning(snapshot, wrapper, big.NewInt(75))
+					availability.ComputeCurrentSigning(
+						snapshot, wrapper, shard.Schedule.BlocksPerEpoch(),
+					)
 				if err != nil && computed.IsBelowThreshold {
 					url := h.Availability.OnDroppedBelowThreshold
 					go func() {

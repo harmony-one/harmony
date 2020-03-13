@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/pkg/errors"
 )
@@ -89,7 +90,7 @@ type ValidatorWrapper struct {
 type Computed struct {
 	Signed           *big.Int    `json:"current-epoch-signed"`
 	ToSign           *big.Int    `json:"current-epoch-to-sign"`
-	Missed           *big.Int    `json:"current-epoch-blocks-missed"`
+	Missed           uint64      `json:"current-epoch-blocks-missed"`
 	Percentage       numeric.Dec `json:"percentage"`
 	IsBelowThreshold bool        `json:"is-below-epos-threshold"`
 }
@@ -99,7 +100,7 @@ type Computed struct {
 var (
 	// NoSigningDone ..
 	NoSigningDone = Computed{
-		common.Big0, common.Big0, common.Big0, numeric.ZeroDec(), true,
+		common.Big0, common.Big0, 0, numeric.ZeroDec(), true,
 	}
 	// EmptyVotingPower ..
 	EmptyVotingPower = []VotePerShard{}
@@ -107,12 +108,14 @@ var (
 	EmptyPerformance = CurrentEpochPerformance{NoSigningDone, EmptyVotingPower}
 	// EmptyKeysPerShard ..
 	EmptyKeysPerShard = []KeysPerShard{}
+	// EmptyAPR ..
+	EmptyAPR = apr.Computed{}
 )
 
 // NewEmptyStats ..
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
-		big.NewInt(0), numeric.ZeroDec(),
+		big.NewInt(0), EmptyAPR, numeric.ZeroDec(),
 		EmptyVotingPower, EmptyKeysPerShard,
 	}
 }
@@ -124,16 +127,17 @@ type CurrentEpochPerformance struct {
 	CurrentVotingPower       []VotePerShard `json:"current-epoch-voting-power"`
 }
 
-// CurrentStakes ..
-type CurrentStakes struct {
+// Metrics ..
+type Metrics struct {
+	*ValidatorStats
 	TotalDelegated *big.Int `json:"total-delegation"`
 }
 
 // ValidatorRPCEnchanced contains extra information for RPC consumer
 type ValidatorRPCEnchanced struct {
-	Wrapper     ValidatorWrapper        `json:"validator"`
-	Performance CurrentEpochPerformance `json:"current-epoch-performance"`
-	Stakes      CurrentStakes           `json:"aggregated"`
+	Wrapper         ValidatorWrapper        `json:"validator"`
+	Performance     CurrentEpochPerformance `json:"current-epoch-performance"`
+	ComputedMetrics Metrics                 `json:"metrics"`
 }
 
 func (w ValidatorWrapper) String() string {
@@ -174,7 +178,10 @@ type KeysPerShard struct {
 
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
+	// BlockReward ..
 	BlockReward *big.Int `json:"block-reward-accumulated"`
+	// APR ..
+	APR apr.Computed `json:"current-apr"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `rlp:"nil"`
 	// VotingPowerPerShard ..

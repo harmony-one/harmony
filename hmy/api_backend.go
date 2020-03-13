@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -346,15 +347,19 @@ func (b *APIBackend) GetValidatorInformation(
 	defaultReply := &staking.ValidatorRPCEnchanced{
 		Wrapper:     *wrapper,
 		Performance: staking.EmptyPerformance,
-		Stakes:      staking.CurrentStakes{totalDelegation},
+		ComputedMetrics: staking.Metrics{
+			ValidatorStats: &staking.ValidatorStats{},
+			TotalDelegated: totalDelegation,
+		},
 	}
 	if err != nil {
 		return defaultReply, nil
 	}
 
 	computed, err := availability.ComputeCurrentSigning(
-		snapshot, wrapper, big.NewInt(75),
+		snapshot, wrapper, shard.Schedule.BlocksPerEpoch(),
 	)
+
 	if err != nil {
 		return defaultReply, nil
 	}
@@ -368,6 +373,7 @@ func (b *APIBackend) GetValidatorInformation(
 		CurrentVotingPower:       stats.VotingPowerPerShard,
 	}
 
+	defaultReply.ComputedMetrics.ValidatorStats = stats
 	return defaultReply, nil
 }
 
@@ -503,29 +509,28 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 		return nil, err
 	}
 
-	instanceNow := shard.Schedule.InstanceForEpoch(nowE)
-	stakedSlotsNow :=
-		(instanceNow.NumNodesPerShard() - instanceNow.NumHarmonyOperatedNodesPerShard()) *
-			int(instanceNow.NumShards())
-	instanceThen := shard.Schedule.InstanceForEpoch(thenE)
-	stakedSlotsThen :=
-		(instanceThen.NumNodesPerShard() - instanceThen.NumHarmonyOperatedNodesPerShard()) *
-			int(instanceThen.NumShards())
+	stakedSlotsNow, stakedSlotsThen :=
+		shard.ExternalSlotsAvailableForEpoch(nowE),
+		shard.ExternalSlotsAvailableForEpoch(thenE)
 
-	then, now := quorum.NewRegistry(stakedSlotsThen), quorum.NewRegistry(stakedSlotsNow)
+	then, now :=
+		quorum.NewRegistry(stakedSlotsThen),
+		quorum.NewRegistry(stakedSlotsNow)
 
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
-		shardID := comm.ShardID
-		decider.SetVoters(comm.Slots)
-		then.Deciders[shardID] = decider
+		if _, err := decider.SetVoters(comm.Slots); err != nil {
+			return nil, err
+		}
+		then.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
 
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
-		shardID := comm.ShardID
-		decider.SetVoters(comm.Slots)
-		now.Deciders[shardID] = decider
+		if _, err := decider.SetVoters(comm.Slots); err != nil {
+			return nil, err
+		}
+		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
 	return &quorum.Transition{then, now}, nil
 }
