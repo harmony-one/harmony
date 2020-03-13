@@ -2272,20 +2272,28 @@ func (bc *BlockChain) UpdateValidatorStatsBlockReward(
 
 // UpdateValidatorVotingPower writes the voting power for the committees
 func (bc *BlockChain) UpdateValidatorVotingPower(
-	batch rawdb.DatabaseWriter, state *shard.State,
+	batch rawdb.DatabaseWriter,
+	newEpochSuperCommittee, currentEpochSuperCommittee *shard.State,
 ) error {
-	if state == nil {
+	if newEpochSuperCommittee == nil {
 		return errors.New("[UpdateValidatorVotingPower] Nil shard state")
 	}
 
-	rosters := make([]votepower.RosterPerShard, len(state.Shards))
+	rosters := make(
+		[]votepower.RosterPerShard, len(newEpochSuperCommittee.Shards),
+	)
 
-	for i := range state.Shards {
-		roster, err := votepower.Compute(state.Shards[i].Slots)
+	for i := range newEpochSuperCommittee.Shards {
+		subCommittee := newEpochSuperCommittee.Shards[i]
+		roster, err := votepower.Compute(
+			subCommittee.Slots,
+		)
 		if err != nil {
 			return err
 		}
-		rosters[i] = votepower.RosterPerShard{state.Shards[i].ShardID, roster}
+		rosters[i] = votepower.RosterPerShard{
+			subCommittee.ShardID, roster,
+		}
 	}
 
 	networkWide := votepower.AggregateRosters(rosters)
@@ -2299,6 +2307,9 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			return err
 		}
 	}
+
+	// TODO Need to remove the set difference of those
+	// validators no longer in committee
 
 	return nil
 }
