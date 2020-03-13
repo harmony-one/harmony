@@ -60,7 +60,7 @@ type ChainReader interface {
 	ReadBlockRewardAccumulator(uint64) (*big.Int, error)
 
 	// ReadValidatorStats retrieves the running stats for a validator
-	ReadValidatorStats(addr common.Address) *staking.ValidatorStats
+	ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error)
 
 	// SuperCommitteeForNextEpoch calculates the next epoch's supper committee
 	// isVerify flag is to indicate which stage

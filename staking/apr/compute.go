@@ -49,7 +49,10 @@ func ComputeForValidator(
 	wrapper *staking.ValidatorWrapper,
 	blocksPerEpoch uint64,
 ) (*big.Int, error) {
-	stats := bc.ReadValidatorStats(wrapper.Address)
+	stats, err := bc.ReadValidatorStats(wrapper.Address)
+	if err != nil {
+		return nil, err
+	}
 	snapshot, err := bc.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
 		return nil, err

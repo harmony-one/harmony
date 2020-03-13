@@ -357,7 +357,8 @@ func (b *APIBackend) GetValidatorInformation(
 	if err != nil {
 		return defaultReply, nil
 	}
-	stats := b.hmy.BlockChain().ReadValidatorStats(addr)
+
+	stats, err := b.hmy.BlockChain().ReadValidatorStats(addr)
 	if err != nil {
 		return defaultReply, nil
 	}

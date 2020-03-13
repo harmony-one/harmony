@@ -2257,7 +2257,7 @@ func (bc *BlockChain) writeValidatorSnapshots(
 // ReadValidatorStats reads the stats of a validator
 func (bc *BlockChain) ReadValidatorStats(
 	addr common.Address,
-) *staking.ValidatorStats {
+) (*staking.ValidatorStats, error) {
 	return rawdb.ReadValidatorStats(bc.db, addr)
 }
 
@@ -2265,7 +2265,10 @@ func (bc *BlockChain) ReadValidatorStats(
 func (bc *BlockChain) UpdateValidatorStatsBlockReward(
 	batch rawdb.DatabaseWriter, addr common.Address, newlyEarned *big.Int,
 ) error {
-	stats := bc.ReadValidatorStats(addr)
+	stats, err := bc.ReadValidatorStats(addr)
+	if err != nil {
+		return err
+	}
 	stats.BlockReward.Add(stats.BlockReward, newlyEarned)
 	return rawdb.WriteValidatorStats(batch, addr, stats)
 }
@@ -2299,7 +2302,10 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 	networkWide := votepower.AggregateRosters(rosters)
 
 	for key, value := range networkWide {
-		stats := rawdb.ReadValidatorStats(bc.db, key)
+		stats, err := rawdb.ReadValidatorStats(bc.db, key)
+		if err != nil {
+			stats = staking.NewEmptyStats()
+		}
 		stats.TotalEffectiveStake = value.TotalEffectiveStake
 		stats.VotingPowerPerShard = value.VotingPower
 		stats.BLSKeyPerShard = value.BLSPublicKeysOwned

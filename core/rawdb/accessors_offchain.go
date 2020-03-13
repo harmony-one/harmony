@@ -211,16 +211,16 @@ func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address, epoch *big
 // fresh ValidatorStats made by staking.NewEmptyStats()
 func ReadValidatorStats(
 	db DatabaseReader, addr common.Address,
-) *staking.ValidatorStats {
+) (*staking.ValidatorStats, error) {
 	data, err := db.Get(validatorStatsKey(addr))
 	if err != nil {
-		return staking.NewEmptyStats()
+		return nil, err
 	}
 	stats := staking.ValidatorStats{}
 	if err := rlp.DecodeBytes(data, &stats); err != nil {
-		return staking.NewEmptyStats()
+		return nil, err
 	}
-	return &stats
+	return &stats, nil
 }
 
 // WriteValidatorStats stores validator's stats by its address

@@ -325,6 +325,6 @@ func (cr *fakeChainReader) ValidatorStakingWithDelegation(
 
 func (cr *fakeChainReader) ReadValidatorStats(
 	addr common.Address,
-) *staking.ValidatorStats {
-	return nil
+) (*staking.ValidatorStats, error) {
+	return nil, nil
 }
