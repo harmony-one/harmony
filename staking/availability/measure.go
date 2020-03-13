@@ -193,7 +193,7 @@ func ComputeCurrentSigning(
 	signed, toSign :=
 		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
 		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
-	missedSoFar := blocksPerEpoch - signed.Uint64()
+	missedSoFar := blocksPerEpoch - toSign.Uint64()
 
 	computed := &staking.Computed{
 		signed, toSign, missedSoFar, numeric.ZeroDec(), true,
