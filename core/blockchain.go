@@ -2314,8 +2314,19 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		}
 	}
 
-	// TODO Need to remove the set difference of those
-	// validators no longer in committee
+	existing, replacing :=
+		currentEpochSuperCommittee.StakedValidators(),
+		newEpochSuperCommittee.StakedValidators()
+	for currentValidator := range existing.LookupSet {
+		if _, keptSlot := replacing.LookupSet[currentValidator]; !keptSlot {
+			rawdb.DeleteValidatorSnapshot(
+				bc.db, currentValidator, currentEpochSuperCommittee.Epoch,
+			)
+			rawdb.DeleteValidatorStats(
+				bc.db, currentValidator,
+			)
+		}
+	}
 
 	return nil
 }

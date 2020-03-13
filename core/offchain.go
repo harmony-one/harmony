@@ -198,7 +198,8 @@ func (bc *BlockChain) CommitOffChainData(
 		epoch,
 	).NumShards(); i < c; i++ {
 		if err := bc.LastContinuousCrossLink(batch, i); err != nil {
-			// TODO RJ is this a critical error?
+			utils.Logger().Info().
+				Err(err).Msg("could not batch process last continuous crosslink")
 		}
 	}
 

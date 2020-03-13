@@ -206,6 +206,13 @@ func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address, epoch *big
 	}
 }
 
+// DeleteValidatorStats ..
+func DeleteValidatorStats(db DatabaseDeleter, addr common.Address) {
+	if err := db.Delete(validatorStatsKey(addr)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete stats of a validator")
+	}
+}
+
 // ReadValidatorStats retrieves validator's stats by its address,
 // any errors during its execution are swallowed and it returns a
 // fresh ValidatorStats made by staking.NewEmptyStats()
