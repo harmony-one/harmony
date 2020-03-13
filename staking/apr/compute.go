@@ -13,7 +13,9 @@ import (
 
 // Reader ..
 type Reader interface {
-	ReadValidatorStats(addr common.Address) *staking.ValidatorStats
+	ReadValidatorStats(addr common.Address) (
+		*staking.ValidatorStats, error,
+	)
 	ReadValidatorSnapshot(
 		addr common.Address,
 	) (*staking.ValidatorWrapper, error)
