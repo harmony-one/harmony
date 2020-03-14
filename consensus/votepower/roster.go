@@ -81,14 +81,22 @@ type AccommodateHarmonyVote struct {
 	AdjustedVotingPower numeric.Dec `json:"voting-adjusted"`
 }
 
-// Roster ..
-type Roster struct {
-	Voters                          map[shard.BlsPublicKey]AccommodateHarmonyVote
-	ForEpoch                        *big.Int
-	ShardID                         uint32
+type topLevelRegistry struct {
 	OurVotingPowerTotalPercentage   numeric.Dec
 	TheirVotingPowerTotalPercentage numeric.Dec
 	RawStakedTotal                  *big.Int
+	HMYSlotCount                    int64
+}
+
+// Roster ..
+type Roster struct {
+	Voters map[shard.BlsPublicKey]AccommodateHarmonyVote
+	topLevelRegistry
+}
+
+func (r Roster) String() string {
+	s, _ := json.Marshal(r)
+	return string(s)
 }
 
 // VoteOnSubcomittee ..
@@ -117,8 +125,7 @@ func AggregateRosters(
 					voteCard.EffectiveStake,
 				)
 				payload.Votes = append(payload.Votes, VoteOnSubcomittee{
-					Vote:    voteCard,
-					ShardID: roster.ShardID,
+					Vote: voteCard,
 				})
 			} else {
 				result[voteCard.EarningAccount] = AggregatedAcrossNetwork{
@@ -136,7 +143,7 @@ func AggregateRosters(
 // Compute creates a new roster based off the shard.SlotList
 func Compute(subComm *shard.Committee) (*Roster, error) {
 	roster, staked := NewRoster(), subComm.Slots
-	hmySlotCount := int64(0)
+
 	for i := range staked {
 		if staked[i].EffectiveStake != nil {
 			roster.RawStakedTotal.Add(
@@ -144,12 +151,13 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 				staked[i].EffectiveStake.TruncateInt(),
 			)
 		} else {
-			hmySlotCount++
+			roster.HMYSlotCount++
 		}
 	}
+
 	asDecTotal, asDecHMYSlotCount :=
 		numeric.NewDecFromBigInt(roster.RawStakedTotal),
-		numeric.NewDec(hmySlotCount)
+		numeric.NewDec(roster.HMYSlotCount)
 	// TODO Check for duplicate BLS Keys
 	ourPercentage := numeric.ZeroDec()
 	theirPercentage := numeric.ZeroDec()
@@ -208,9 +216,11 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 func NewRoster() *Roster {
 	m := map[shard.BlsPublicKey]AccommodateHarmonyVote{}
 	return &Roster{
-		Voters:                          m,
-		OurVotingPowerTotalPercentage:   numeric.ZeroDec(),
-		TheirVotingPowerTotalPercentage: numeric.ZeroDec(),
-		RawStakedTotal:                  big.NewInt(0),
+		Voters: m,
+		topLevelRegistry: topLevelRegistry{
+			OurVotingPowerTotalPercentage:   numeric.ZeroDec(),
+			TheirVotingPowerTotalPercentage: numeric.ZeroDec(),
+			RawStakedTotal:                  big.NewInt(0),
+		},
 	}
 }

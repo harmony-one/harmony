@@ -298,13 +298,12 @@ func (pk BlsPublicKey) Hex() string {
 	return hex.EncodeToString(pk[:])
 }
 
-// MarshalJSON ..
-func (pk BlsPublicKey) MarshalJSON() ([]byte, error) {
-	buf := bytes.Buffer{}
-	buf.WriteString(`"`)
-	buf.WriteString(pk.Hex())
-	buf.WriteString(`"`)
-	return buf.Bytes(), nil
+// MarshalText so that we can use this as JSON printable when used as
+// key in a map
+func (pk BlsPublicKey) MarshalText() (text []byte, err error) {
+	text = make([]byte, BLSSignatureSizeInBytes)
+	hex.Encode(text, pk[:])
+	return text, nil
 }
 
 // FromLibBLSPublicKeyUnsafe could give back nil, use only in cases when

@@ -1,10 +1,8 @@
 package votepower
 
 import (
-	"encoding/json"
 	"math/big"
 	"math/rand"
-	"strconv"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -54,33 +52,51 @@ func generateRandomSlot() shard.Slot {
 
 func TestCompute(t *testing.T) {
 	expectedRoster := NewRoster()
-	// Parameterized
-	expectedRoster.HmySlotCount = int64(harmonyNodes)
 	// Calculated when generated
-	expectedRoster.RawStakedTotal = totalStake
-	for _, slot := range slotList {
-		newMember := stakedVoter{
-			IsActive:         true,
-			IsHarmonyNode:    false,
-			EarningAccount:   slot.EcdsaAddress,
-			EffectivePercent: numeric.ZeroDec(),
-			EffectiveStake:   numeric.ZeroDec(),
+	expectedRoster.RawStakedTotal = totalStake.TruncateInt()
+	expectedRoster.HMYSlotCount = int64(harmonyNodes)
+
+	asDecTotal, asDecHMYSlotCount :=
+		numeric.NewDecFromBigInt(expectedRoster.RawStakedTotal),
+		numeric.NewDec(expectedRoster.HMYSlotCount)
+	ourPercentage := numeric.ZeroDec()
+	theirPercentage := numeric.ZeroDec()
+
+	staked := slotList
+	for i := range staked {
+		member := AccommodateHarmonyVote{
+			PureStakedVote: PureStakedVote{
+				EarningAccount: staked[i].EcdsaAddress,
+				Identity:       staked[i].BlsPublicKey,
+				VotingPower:    numeric.ZeroDec(),
+				EffectiveStake: numeric.ZeroDec(),
+			},
+			AdjustedVotingPower: numeric.ZeroDec(),
+			IsHarmonyNode:       true,
 		}
-		// Not Harmony node
-		if slot.EffectiveStake != nil {
-			newMember.EffectiveStake = *slot.EffectiveStake
-			newMember.EffectivePercent = slot.EffectiveStake.Quo(expectedRoster.RawStakedTotal).Mul(StakersShare)
-			expectedRoster.TheirVotingPowerTotalPercentage = expectedRoster.TheirVotingPowerTotalPercentage.Add(newMember.EffectivePercent)
-		} else {
-			// Harmony node
-			newMember.IsHarmonyNode = true
-			newMember.EffectivePercent = HarmonysShare.Quo(numeric.NewDec(expectedRoster.HmySlotCount))
-			expectedRoster.OurVotingPowerTotalPercentage = expectedRoster.OurVotingPowerTotalPercentage.Add(newMember.EffectivePercent)
+
+		// Real Staker
+		if staked[i].EffectiveStake != nil {
+			member.IsHarmonyNode = false
+			member.EffectiveStake = member.EffectiveStake.Add(*staked[i].EffectiveStake)
+			member.VotingPower = staked[i].EffectiveStake.Quo(asDecTotal)
+			member.AdjustedVotingPower = member.VotingPower.Mul(StakersShare)
+			theirPercentage = theirPercentage.Add(member.AdjustedVotingPower)
+		} else { // Our node
+			member.AdjustedVotingPower = HarmonysShare.Quo(asDecHMYSlotCount)
+			member.VotingPower = member.AdjustedVotingPower.Quo(HarmonysShare)
+			ourPercentage = ourPercentage.Add(member.AdjustedVotingPower)
 		}
-		expectedRoster.Voters[slot.BlsPublicKey] = newMember
+
+		expectedRoster.Voters[staked[i].BlsPublicKey] = member
 	}
 
-	computedRoster, err := Compute(slotList)
+	expectedRoster.OurVotingPowerTotalPercentage = ourPercentage
+	expectedRoster.TheirVotingPowerTotalPercentage = theirPercentage
+
+	computedRoster, err := Compute(&shard.Committee{
+		shard.BeaconChainShardID, slotList,
+	})
 	if err != nil {
 		t.Error("Computed Roster failed on vote summation to one")
 	}
@@ -89,55 +105,39 @@ func TestCompute(t *testing.T) {
 		t.Errorf("Compute Roster mismatch with expected Roster")
 	}
 	// Check that voting percents sum to 100
-	if !computedRoster.OurVotingPowerTotalPercentage.Add(computedRoster.TheirVotingPowerTotalPercentage).Equal(numeric.OneDec()) {
-		t.Errorf("Total voting power does not equal 1. Harmony voting power: %s, Staked voting power: %s",
-			computedRoster.OurVotingPowerTotalPercentage, computedRoster.TheirVotingPowerTotalPercentage)
+	if !computedRoster.OurVotingPowerTotalPercentage.Add(
+		computedRoster.TheirVotingPowerTotalPercentage,
+	).Equal(numeric.OneDec()) {
+		t.Errorf(
+			"Total voting power does not equal 1. Harmony voting power: %s, Staked voting power: %s",
+			computedRoster.OurVotingPowerTotalPercentage,
+			computedRoster.TheirVotingPowerTotalPercentage,
+		)
 	}
 }
 
 func compareRosters(a, b *Roster, t *testing.T) bool {
-	// Compare stakedVoter maps
 	voterMatch := true
 	for k, voter := range a.Voters {
 		if other, exists := b.Voters[k]; exists {
 			if !compareStakedVoter(voter, other) {
-				t.Errorf("Expecting %s\n Got %s", voter.formatString(), other.formatString())
+				t.Error("voter slot not match")
 				voterMatch = false
 			}
 		} else {
-			t.Errorf("Computed roster missing %s", voter.formatString())
+			t.Error("computed roster missing")
 			voterMatch = false
 		}
 	}
 	return a.OurVotingPowerTotalPercentage.Equal(b.OurVotingPowerTotalPercentage) &&
 		a.TheirVotingPowerTotalPercentage.Equal(b.TheirVotingPowerTotalPercentage) &&
-		a.RawStakedTotal.Equal(b.RawStakedTotal) &&
-		a.HmySlotCount == b.HmySlotCount && voterMatch
+		a.RawStakedTotal.Cmp(b.RawStakedTotal) == 0 &&
+		a.HMYSlotCount == b.HMYSlotCount && voterMatch
 }
 
-func compareStakedVoter(a, b stakedVoter) bool {
-	return a.IsActive == b.IsActive &&
-		a.IsHarmonyNode == b.IsHarmonyNode &&
+func compareStakedVoter(a, b AccommodateHarmonyVote) bool {
+	return a.IsHarmonyNode == b.IsHarmonyNode &&
 		a.EarningAccount == b.EarningAccount &&
-		a.EffectivePercent.Equal(b.EffectivePercent) &&
+		a.AdjustedVotingPower.Equal(b.AdjustedVotingPower) &&
 		a.EffectiveStake.Equal(b.EffectiveStake)
-}
-
-func (s *stakedVoter) formatString() string {
-	type t struct {
-		IsActive         string `json:"active"`
-		IsHarmony        string `json:"harmony-node"`
-		EarningAccount   string `json:"one-address"`
-		EffectivePercent string `json:"effective-percent"`
-		EffectiveStake   string `json:"eposed-stake"`
-	}
-	data := t{
-		strconv.FormatBool(s.IsActive),
-		strconv.FormatBool(s.IsHarmonyNode),
-		s.EarningAccount.String(),
-		s.EffectivePercent.String(),
-		s.EffectiveStake.String(),
-	}
-	output, _ := json.Marshal(data)
-	return string(output)
 }

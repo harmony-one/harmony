@@ -71,7 +71,6 @@ type ParticipantTracker interface {
 	ParticipantsCount() int64
 	NextAfter(*bls.PublicKey) (bool, *bls.PublicKey)
 	UpdateParticipants(pubKeys []*bls.PublicKey)
-	DumpParticipants() []string
 }
 
 // SignatoryTracker ..
@@ -162,8 +161,12 @@ func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
 	sigs := make([]*bls.Sign, 0, len(ballots))
 	for _, ballot := range ballots {
 		sig := &bls.Sign{}
-		sig.DeserializeHexStr(common.Bytes2Hex(ballot.Signature))
-		sigs = append(sigs, sig)
+		// NOTE invariant that shouldn't happen by now
+		// but pointers are pointers
+		if ballot != nil {
+			sig.DeserializeHexStr(common.Bytes2Hex(ballot.Signature))
+			sigs = append(sigs, sig)
+		}
 	}
 	return bls_cosi.AggregateSig(sigs)
 }
@@ -200,14 +203,6 @@ func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
 }
 
-func (s *cIdentities) DumpParticipants() []string {
-	keys := make([]string, len(s.publicKeys))
-	for i := range s.publicKeys {
-		keys[i] = s.publicKeys[i].SerializeToHexStr()
-	}
-	return keys
-}
-
 func (s *cIdentities) ParticipantsCount() int64 {
 	return int64(len(s.publicKeys))
 }
@@ -231,7 +226,6 @@ func (s *cIdentities) SubmitVote(
 	sig *bls.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
-
 	// Note safe to assume by this point because key has been
 	// checked earlier
 	key := *shard.FromLibBLSPublicKeyUnsafe(PubKey)
@@ -302,9 +296,9 @@ func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 	case ViewChange:
 		m = s.viewChange.BallotBox
 	}
-	ballots := make([]*votepower.Ballot, len(m))
-	for _, ballot := range m {
-		ballots = append(ballots, ballot)
+	ballots := make([]*votepower.Ballot, 0, len(m))
+	for i := range m {
+		ballots = append(ballots, m[i])
 	}
 	return ballots
 }
