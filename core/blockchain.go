@@ -2267,7 +2267,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 	newEpochSuperCommittee, currentEpochSuperCommittee *shard.State,
 ) error {
 	if newEpochSuperCommittee == nil {
-		return errors.New("[UpdateValidatorVotingPower] Nil shard state")
+		return shard.ErrSuperCommitteeNil
 	}
 
 	rosters := make([]*votepower.Roster, len(newEpochSuperCommittee.Shards))
@@ -2279,7 +2279,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			return err
 		}
 		rosters[i] = roster
-
 	}
 
 	networkWide := votepower.AggregateRosters(rosters)
