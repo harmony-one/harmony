@@ -31,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	viperconfig "github.com/harmony-one/harmony/internal/configs/viper"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/memprofiling"
@@ -581,6 +582,68 @@ func setupBlacklist() (map[ethCommon.Address]struct{}, error) {
 	return addrMap, nil
 }
 
+func setupViperConfig() {
+
+	// read from environment
+	envViper := viperconfig.CreateEnvViper()
+
+	//read from config file
+	configFileViper := viperconfig.CreateConfFileViper("./.hmy", "nodeconfig", "json")
+
+	viperconfig.ResetConfString(ip, envViper, configFileViper, "", "ip")
+	viperconfig.ResetConfString(port, envViper, configFileViper, "", "port")
+	viperconfig.ResetConfString(logFolder, envViper, configFileViper, "", "log_folder")
+	viperconfig.ResetConfInt(logMaxSize, envViper, configFileViper, "", "log_max_size")
+	viperconfig.ResetConfBool(freshDB, envViper, configFileViper, "", "fresh_db")
+	viperconfig.ResetConfBool(profile, envViper, configFileViper, "", "profile")
+	viperconfig.ResetConfString(metricsReportURL, envViper, configFileViper, "", "metrics_report_url")
+	viperconfig.ResetConfString(pprof, envViper, configFileViper, "", "pprof")
+
+	viperconfig.ResetConfBool(versionFlag, envViper, configFileViper, "", "version")
+	viperconfig.ResetConfBool(onlyLogTps, envViper, configFileViper, "", "only_log_tps")
+	viperconfig.ResetConfString(dnsZone, envViper, configFileViper, "", "dns_zone")
+	viperconfig.ResetConfBool(dnsFlag, envViper, configFileViper, "", "dns")
+	viperconfig.ResetConfInt(minPeers, envViper, configFileViper, "", "min_peers")
+	viperconfig.ResetConfString(keyFile, envViper, configFileViper, "", "key")
+	viperconfig.ResetConfBool(isGenesis, envViper, configFileViper, "", "is_genesis")
+	viperconfig.ResetConfBool(isArchival, envViper, configFileViper, "", "is_archival")
+	viperconfig.ResetConfString(delayCommit, envViper, configFileViper, "", "delay_commit")
+	viperconfig.ResetConfString(nodeType, envViper, configFileViper, "", "node_type")
+	viperconfig.ResetConfString(networkType, envViper, configFileViper, "", "network_type")
+
+	viperconfig.ResetConfInt(syncFreq, envViper, configFileViper, "", "sync_freq")
+	viperconfig.ResetConfInt(beaconSyncFreq, envViper, configFileViper, "", "beacon_sync_freq")
+	viperconfig.ResetConfInt(blockPeriod, envViper, configFileViper, "", "block_period")
+	viperconfig.ResetConfBool(leaderOverride, envViper, configFileViper, "", "leader_override")
+	viperconfig.ResetConfBool(stakingFlag, envViper, configFileViper, "", "staking")
+	viperconfig.ResetConfInt(shardID, envViper, configFileViper, "", "shard_id")
+	viperconfig.ResetConfBool(enableMemProfiling, envViper, configFileViper, "", "enableMemProfiling")
+	viperconfig.ResetConfBool(enableGC, envViper, configFileViper, "", "enableGC")
+	viperconfig.ResetConfString(blsKeyFile, envViper, configFileViper, "", "blskey_file")
+	viperconfig.ResetConfString(blsFolder, envViper, configFileViper, "", "blsfolder")
+	viperconfig.ResetConfString(blsPass, envViper, configFileViper, "", "blsPass")
+	viperconfig.ResetConfUInt(devnetNumShards, envViper, configFileViper, "", "dn_num_shards")
+	viperconfig.ResetConfInt(devnetShardSize, envViper, configFileViper, "", "dn_shard_size")
+	viperconfig.ResetConfInt(devnetHarmonySize, envViper, configFileViper, "", "dn_hmy_size")
+
+	viperconfig.ResetConfBool(logConn, envViper, configFileViper, "", "log_conn")
+	viperconfig.ResetConfString(keystoreDir, envViper, configFileViper, "", "keystore")
+	viperconfig.ResetConfBool(logP2P, envViper, configFileViper, "", "log_p2p")
+	viperconfig.ResetConfInt(verbosity, envViper, configFileViper, "", "verbosity")
+	viperconfig.ResetConfString(dbDir, envViper, configFileViper, "", "db_dir")
+	viperconfig.ResetConfBool(disableViewChange, envViper, configFileViper, "", "disable_view_change")
+	viperconfig.ResetConfBool(metricsFlag, envViper, configFileViper, "", "metrics")
+	viperconfig.ResetConfString(pushgatewayIP, envViper, configFileViper, "", "pushgateway_ip")
+	viperconfig.ResetConfString(pushgatewayPort, envViper, configFileViper, "", "pushgateway_port")
+	viperconfig.ResetConfBool(publicRPC, envViper, configFileViper, "", "public_rpc")
+	viperconfig.ResetConfInt(doRevertBefore, envViper, configFileViper, "", "do_revert_before")
+	viperconfig.ResetConfInt(revertTo, envViper, configFileViper, "", "revert_to")
+	viperconfig.ResetConfBool(revertBeacon, envViper, configFileViper, "", "revert_beacon")
+	viperconfig.ResetConfString(blacklistPath, envViper, configFileViper, "", "blacklist")
+	viperconfig.ResetConfString(webHookYamlPath, envViper, configFileViper, "", "webhook_yaml")
+
+}
+
 func main() {
 	// HACK Force usage of go implementation rather than the C based one. Do the right way, see the
 	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
@@ -638,6 +701,8 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
 		os.Exit(2)
 	}
+
+	setupViperConfig()
 
 	initSetup()
 
