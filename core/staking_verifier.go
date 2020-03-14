@@ -63,6 +63,7 @@ func VerifyAndCreateValidatorFromMsg(
 	zero := big.NewInt(0)
 	wrapper.Counters.NumBlocksSigned = zero
 	wrapper.Counters.NumBlocksToSign = zero
+	wrapper.BlockReward = big.NewInt(0)
 	maxBLSKeyAllowed := shard.ExternalSlotsAvailableForEpoch(epoch) / 3
 	if err := wrapper.SanityCheck(maxBLSKeyAllowed); err != nil {
 		return nil, err

@@ -82,11 +82,15 @@ type ComputedAPR struct {
 	Result *big.Int
 }
 
-// ValidatorWrapper contains validator and its delegation information
+// ValidatorWrapper contains validator,
+// its delegation information
 type ValidatorWrapper struct {
 	Validator
 	Delegations Delegations
-	Counters    counters
+	//
+	Counters counters
+	// All the rewarded accumulated so far
+	BlockReward *big.Int `json:"block-reward-accumulated"`
 }
 
 // Computed represents current epoch
@@ -119,7 +123,7 @@ var (
 // NewEmptyStats ..
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
-		big.NewInt(0), EmptyAPR, numeric.ZeroDec(),
+		EmptyAPR, numeric.ZeroDec(),
 		EmptyVotingPower, EmptyKeysPerShard,
 	}
 }
@@ -180,16 +184,14 @@ type KeysPerShard struct {
 
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
-	// BlockReward ..
-	BlockReward *big.Int `json:"block-reward-accumulated"`
 	// APR ..
 	APR ComputedAPR `json:"current-apr"`
 	// TotalEffectiveStake is the total effective stake this validator has
-	TotalEffectiveStake numeric.Dec `rlp:"nil"`
+	TotalEffectiveStake numeric.Dec `json:"total-effective-stake"`
 	// VotingPowerPerShard ..
-	VotingPowerPerShard []VotePerShard
+	VotingPowerPerShard []VotePerShard `json:"voting-power-per-shard"`
 	// BLSKeyPerShard ..
-	BLSKeyPerShard []KeysPerShard
+	BLSKeyPerShard []KeysPerShard `json:"bls-keys-per-shard"`
 }
 
 // Validator - data fields for a validator

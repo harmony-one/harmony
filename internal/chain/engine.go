@@ -261,6 +261,25 @@ func (e *engineImpl) Finalize(
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
+	if isBeaconChain && inStakingEra {
+		paid := payout.ReadRoundResult()
+		earners := [...][]reward.Payout{
+			paid.BeaconchainAward, paid.ShardChainAward,
+		}
+		for i := range earners {
+			for j := range earners[i] {
+				payout := &earners[i][j]
+				wrapper, err := state.ValidatorWrapper(payout.Addr)
+				if err != nil {
+					return nil, nil, err
+				}
+				wrapper.BlockReward.Add(wrapper.BlockReward, payout.NewlyEarned)
+				if err := state.UpdateValidatorWrapper(payout.Addr, wrapper); err != nil {
+					return nil, nil, err
+				}
+			}
+		}
+	}
 
 	// Process Undelegations and set LastEpochInCommittee
 	if isBeaconChain && isNewEpoch && inStakingEra {

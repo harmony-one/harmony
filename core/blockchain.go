@@ -2261,18 +2261,6 @@ func (bc *BlockChain) ReadValidatorStats(
 	return rawdb.ReadValidatorStats(bc.db, addr)
 }
 
-// UpdateValidatorStatsBlockReward ..
-func (bc *BlockChain) UpdateValidatorStatsBlockReward(
-	batch rawdb.DatabaseWriter, addr common.Address, newlyEarned *big.Int,
-) error {
-	stats, err := bc.ReadValidatorStats(addr)
-	if err != nil {
-		return err
-	}
-	stats.BlockReward.Add(stats.BlockReward, newlyEarned)
-	return rawdb.WriteValidatorStats(batch, addr, stats)
-}
-
 // UpdateValidatorVotingPower writes the voting power for the committees
 func (bc *BlockChain) UpdateValidatorVotingPower(
 	batch rawdb.DatabaseWriter,
@@ -2322,9 +2310,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			rawdb.DeleteValidatorSnapshot(
 				bc.db, currentValidator, currentEpochSuperCommittee.Epoch,
 			)
-			rawdb.DeleteValidatorStats(
-				bc.db, currentValidator,
-			)
+			rawdb.DeleteValidatorStats(bc.db, currentValidator)
 		}
 	}
 

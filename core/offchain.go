@@ -206,30 +206,11 @@ func (bc *BlockChain) CommitOffChainData(
 	// Update block reward accumulator and slashes
 	if isBeaconChain {
 		if isStaking {
-			paid := payout.ReadRoundResult()
-			earners := [...][]reward.Payout{
-				paid.BeaconchainAward, paid.ShardChainAward,
-			}
-
-			for i := range earners {
-				for j := range earners[i] {
-					payout := &earners[i][j]
-					if err := bc.UpdateValidatorStatsBlockReward(
-						batch, payout.Addr, payout.NewlyEarned,
-					); err != nil {
-						// TODO
-					}
-
-				}
-
-			}
-
 			if err := bc.UpdateBlockRewardAccumulator(
-				batch, paid.Total, block.Number().Uint64(),
+				batch, payout.ReadRoundResult().Total, block.Number().Uint64(),
 			); err != nil {
 				return NonStatTy, err
 			}
-
 			records := slash.Records{}
 			if s := header.Slashes(); len(s) > 0 {
 				if err := rlp.DecodeBytes(s, &records); err != nil {

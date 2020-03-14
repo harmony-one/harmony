@@ -13,6 +13,7 @@ import (
 
 // Reader ..
 type Reader interface {
+	// TODO Remove this field
 	ReadValidatorStats(addr common.Address) (
 		*staking.ValidatorStats, error,
 	)
@@ -51,10 +52,6 @@ func ComputeForValidator(
 	wrapper *staking.ValidatorWrapper,
 	blocksPerEpoch uint64,
 ) (*big.Int, error) {
-	stats, err := bc.ReadValidatorStats(wrapper.Address)
-	if err != nil {
-		return nil, err
-	}
 	snapshot, err := bc.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
 		return nil, err
@@ -62,8 +59,9 @@ func ComputeForValidator(
 	// avg_reward_per_block = total_reward_per_epoch / blocks_per_epoch
 	// estimated_reward_per_year = avg_reward_per_block * blocks_per_year
 	// estimated_reward_per_year / total_stake
+	// TODO use the blockreward diff like in measure
 	perEpoch := new(big.Int).SetUint64(blocksPerEpoch)
-	avgRewardPerBlock := new(big.Int).Div(stats.BlockReward, perEpoch)
+	avgRewardPerBlock := new(big.Int).Div(wrapper.BlockReward, perEpoch)
 	estimatedBlocksPerYear, err := expectedNumBlocksPerYear(
 		nil, nil, blocksPerEpoch,
 	)
