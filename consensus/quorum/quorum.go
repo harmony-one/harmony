@@ -112,7 +112,7 @@ type Decider interface {
 	fmt.Stringer
 	SignatureReader
 	DependencyInjectionWriter
-	SetVoters(shard.SlotList) (*TallyResult, error)
+	SetVoters(subCommittee *shard.Committee) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
@@ -231,20 +231,24 @@ func (s *cIdentities) SubmitVote(
 	sig *bls.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
+
+	// Note safe to assume by this point because key has been
+	// checked earlier
+	key := *shard.FromLibBLSPublicKeyUnsafe(PubKey)
 	ballot := &votepower.Ballot{
-		SignerPubKey:    *shard.FromLibBLSPublicKeyUnsafe(PubKey),
+		SignerPubKey:    key,
 		BlockHeaderHash: headerHash,
 		Signature:       common.Hex2Bytes(sig.SerializeToHexStr()),
 		Height:          height,
 		ViewID:          viewID,
 	}
-	switch hex := PubKey.SerializeToHexStr(); p {
+	switch p {
 	case Prepare:
-		s.prepare.BallotBox[hex] = ballot
+		s.prepare.BallotBox[key] = ballot
 	case Commit:
-		s.commit.BallotBox[hex] = ballot
+		s.commit.BallotBox[key] = ballot
 	case ViewChange:
-		s.viewChange.BallotBox[hex] = ballot
+		s.viewChange.BallotBox[key] = ballot
 	default:
 		return nil, errors.Wrapf(errPhaseUnknown, "given: %s", p.String())
 	}
@@ -269,8 +273,8 @@ func (s *cIdentities) TwoThirdsSignersCount() int64 {
 }
 
 func (s *cIdentities) ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ballot {
-	var ballotBox map[string]*votepower.Ballot
-	hex := PubKey.SerializeToHexStr()
+	ballotBox := map[shard.BlsPublicKey]*votepower.Ballot{}
+	key := *shard.FromLibBLSPublicKeyUnsafe(PubKey)
 
 	switch p {
 	case Prepare:
@@ -281,7 +285,7 @@ func (s *cIdentities) ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ball
 		ballotBox = s.viewChange.BallotBox
 	}
 
-	payload, ok := ballotBox[hex]
+	payload, ok := ballotBox[key]
 	if !ok {
 		return nil
 	}
@@ -289,7 +293,7 @@ func (s *cIdentities) ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ball
 }
 
 func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
-	var m map[string]*votepower.Ballot
+	m := map[shard.BlsPublicKey]*votepower.Ballot{}
 	switch p {
 	case Prepare:
 		m = s.prepare.BallotBox
@@ -298,7 +302,7 @@ func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 	case ViewChange:
 		m = s.viewChange.BallotBox
 	}
-	ballots := make([]*votepower.Ballot, 0, len(m))
+	ballots := make([]*votepower.Ballot, len(m))
 	for _, ballot := range m {
 		ballots = append(ballots, ballot)
 	}

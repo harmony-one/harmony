@@ -523,7 +523,7 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
-		if _, err := decider.SetVoters(comm.Slots); err != nil {
+		if _, err := decider.SetVoters(&comm); err != nil {
 			return nil, err
 		}
 		then.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
@@ -531,7 +531,7 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake)
-		if _, err := decider.SetVoters(comm.Slots); err != nil {
+		if _, err := decider.SetVoters(&comm); err != nil {
 			return nil, err
 		}
 		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider

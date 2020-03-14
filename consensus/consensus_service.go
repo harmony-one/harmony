@@ -558,7 +558,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// Update voters in the committee
 	if _, err := consensus.Decider.SetVoters(
-		committeeToSet.Slots,
+		committeeToSet,
 	); err != nil {
 		utils.Logger().Error().
 			Err(err).

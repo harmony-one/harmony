@@ -45,7 +45,7 @@ func lookupVotingPower(
 			if err != nil {
 				return nil, err
 			}
-			votingPower, err := votepower.Compute(subComm.Slots)
+			votingPower, err := votepower.Compute(subComm)
 			if err != nil {
 				return nil, err
 			}
@@ -144,10 +144,10 @@ func AccumulateRewards(
 		if err != nil {
 			return network.EmptyPayout, err
 		}
-
+		subComm := shard.Committee{shard.BeaconChainShardID, members}
 		if err := availability.IncrementValidatorSigningCounts(
 			beaconChain,
-			shard.Committee{shard.BeaconChainShardID, members}.StakedValidators(),
+			subComm.StakedValidators(),
 			state,
 			payable,
 			missing,
@@ -155,7 +155,8 @@ func AccumulateRewards(
 			return network.EmptyPayout, err
 		}
 
-		votingPower, err := votepower.Compute(members)
+		votingPower, err := votepower.Compute(&subComm)
+
 		if err != nil {
 			return network.EmptyPayout, err
 		}
@@ -170,7 +171,7 @@ func AccumulateRewards(
 					return network.EmptyPayout, err
 				}
 				due := defaultReward.Mul(
-					voter.EffectivePercent.Quo(votepower.StakersShare),
+					voter.AdjustedVotingPower.Quo(votepower.StakersShare),
 				).RoundInt()
 				newRewards = new(big.Int).Add(newRewards, due)
 				if err := state.AddReward(snapshot, due); err != nil {
@@ -238,9 +239,9 @@ func AccumulateRewards(
 				}
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
-					if !voter.IsHarmonyNode && !voter.EffectivePercent.IsZero() {
+					if !voter.IsHarmonyNode && !voter.AdjustedVotingPower.IsZero() {
 						due := defaultReward.Mul(
-							voter.EffectivePercent.Quo(votepower.StakersShare),
+							voter.AdjustedVotingPower.Quo(votepower.StakersShare),
 						)
 						allPayables = append(allPayables, slotPayable{
 							Slot:   payableSigners[j],

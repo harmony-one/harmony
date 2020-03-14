@@ -206,7 +206,9 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		if err != nil {
 			return err
 		}
-		d.SetVoters(subComm.Slots)
+		if _, err := d.SetVoters(subComm); err != nil {
+			return err
+		}
 		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
@@ -471,7 +473,9 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		if err != nil {
 			return err
 		}
-		d.SetVoters(subComm.Slots)
+		if _, err := d.SetVoters(subComm); err != nil {
+			return err
+		}
 		if !d.IsQuorumAchievedByMask(mask) {
 			return ctxerror.New(
 				"[VerifySeal] Not enough voting power in commitSignature from Block Header",

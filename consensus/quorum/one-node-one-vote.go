@@ -36,13 +36,13 @@ func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	threshold := v.TwoThirdsSignersCount()
 	currentTotalPower := utils.CountOneBits(mask.Bitmap)
 	if currentTotalPower < threshold {
-		utils.Logger().Warn().
-			Msgf("[IsQuorumAchievedByMask] Not enough voting power: need %+v, have %+v", threshold, currentTotalPower)
+		const msg = "[IsQuorumAchievedByMask] Not enough voting power: need %+v, have %+v"
+		utils.Logger().Warn().Msgf(msg, threshold, currentTotalPower)
 		return false
 	}
+	const msg = "[IsQuorumAchievedByMask] have enough voting power: need %+v, have %+v"
 	utils.Logger().Debug().
-		Msgf("[IsQuorumAchievedByMask] have enough voting power: need %+v, have %+v",
-			threshold, currentTotalPower)
+		Msgf(msg, threshold, currentTotalPower)
 	return true
 }
 
@@ -56,7 +56,9 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 	return v.SignersCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
 }
 
-func (v *uniformVoteWeight) SetVoters(shard.SlotList) (*TallyResult, error) {
+func (v *uniformVoteWeight) SetVoters(
+	subCommittee *shard.Committee,
+) (*TallyResult, error) {
 	// NO-OP do not add anything here
 	return nil, nil
 }
