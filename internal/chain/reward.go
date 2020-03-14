@@ -237,6 +237,9 @@ func AccumulateRewards(
 				if err != nil {
 					return network.EmptyPayout, err
 				}
+
+				fmt.Println(votingPower.String())
+
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
 					if !voter.IsHarmonyNode && !voter.AdjustedVotingPower.IsZero() {
@@ -259,7 +262,6 @@ func AccumulateRewards(
 						index:  j,
 					})
 				}
-
 			}
 
 			resultsHandle := make([][]slotPayable, len(crossLinks))

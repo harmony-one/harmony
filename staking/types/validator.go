@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -110,29 +111,23 @@ var (
 	NoSigningDone = Computed{
 		common.Big0, common.Big0, 0, numeric.ZeroDec(), true,
 	}
-	// EmptyVotingPower ..
-	EmptyVotingPower = []VotePerShard{}
 	// EmptyPerformance ..
-	EmptyPerformance = CurrentEpochPerformance{NoSigningDone, EmptyVotingPower}
-	// EmptyKeysPerShard ..
-	EmptyKeysPerShard = []KeysPerShard{}
-	// EmptyAPR ..
-	EmptyAPR = ComputedAPR{}
+	EmptyPerformance = CurrentEpochPerformance{NoSigningDone}
 )
 
 // NewEmptyStats ..
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
-		EmptyAPR, numeric.ZeroDec(),
-		EmptyVotingPower, EmptyKeysPerShard,
+		ComputedAPR{},
+		numeric.ZeroDec(),
+		[]ShardMetrics{},
 	}
 }
 
 // CurrentEpochPerformance represents validator performance in the context of
 // whatever current epoch is
 type CurrentEpochPerformance struct {
-	CurrentSigningPercentage Computed       `json:"current-epoch-signing-percent"`
-	CurrentVotingPower       []VotePerShard `json:"current-epoch-voting-power"`
+	CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
 }
 
 // Metrics ..
@@ -168,18 +163,21 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// VotePerShard ..
-type VotePerShard struct {
-	ShardID             uint32      `json:"shard-id"`
-	VotingPowerRaw      numeric.Dec `json:"voting-power-raw"`
-	VotingPowerAdjusted numeric.Dec `json:"voting-power-adjusted"`
-	EffectiveStake      numeric.Dec `json:"effective-stake"`
+// ShardMetrics ..
+type ShardMetrics struct {
+	ShardID uint32 `json:"shard-id"`
+	votepower.AccommodateHarmonyVote
 }
 
-// KeysPerShard ..
-type KeysPerShard struct {
-	ShardID uint32               `json:"shard-id"`
-	Keys    []shard.BlsPublicKey `json:"bls-public-keys"`
+// MarshalJSON ..
+func (s ShardMetrics) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		votepower.AccommodateHarmonyVote
+		ShardID       uint32 `json:"shard-id"`
+		IsHarmonyNode bool   `json:"-"`
+	}{
+		s.AccommodateHarmonyVote, s.ShardID, false,
+	})
 }
 
 // ValidatorStats to record validator's performance and history records
@@ -188,10 +186,8 @@ type ValidatorStats struct {
 	APR ComputedAPR `json:"current-apr"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `json:"total-effective-stake"`
-	// VotingPowerPerShard ..
-	VotingPowerPerShard []VotePerShard `json:"voting-power-per-shard"`
-	// BLSKeyPerShard ..
-	BLSKeyPerShard []KeysPerShard `json:"bls-keys-per-shard"`
+	// MetricsPerShard ..
+	MetricsPerShard []ShardMetrics `json:"metrics-by-shard"`
 }
 
 // Validator - data fields for a validator

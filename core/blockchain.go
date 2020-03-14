@@ -2270,7 +2270,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		return shard.ErrSuperCommitteeNil
 	}
 
-	rosters := make([]*votepower.Roster, len(newEpochSuperCommittee.Shards))
+	rosters := make([]*votepower.Roster, 0, len(newEpochSuperCommittee.Shards))
 
 	for i := range newEpochSuperCommittee.Shards {
 		subCommittee := &newEpochSuperCommittee.Shards[i]
@@ -2289,6 +2289,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			stats = staking.NewEmptyStats()
 		}
 		stats.TotalEffectiveStake = value.TotalEffectiveStake
+
 		// stats.VotingPowerPerShard = value.VotingPower
 		// stats.BLSKeyPerShard = value.BLSPublicKeysOwned
 		if err := rawdb.WriteValidatorStats(batch, key, stats); err != nil {

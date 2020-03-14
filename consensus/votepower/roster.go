@@ -77,7 +77,7 @@ type PureStakedVote struct {
 // AccommodateHarmonyVote ..
 type AccommodateHarmonyVote struct {
 	PureStakedVote
-	IsHarmonyNode       bool        `json:"is-harmony"`
+	IsHarmonyNode       bool        `json:"is-harmony",rlp:"-"`
 	AdjustedVotingPower numeric.Dec `json:"voting-adjusted"`
 }
 

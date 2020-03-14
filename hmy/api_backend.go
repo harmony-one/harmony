@@ -366,7 +366,6 @@ func (b *APIBackend) GetValidatorInformation(
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.Performance = &staking.CurrentEpochPerformance{
 			CurrentSigningPercentage: *computed,
-			CurrentVotingPower:       stats.VotingPowerPerShard,
 		}
 		defaultReply.ComputedMetrics = stats
 	}
