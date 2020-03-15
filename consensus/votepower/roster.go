@@ -123,13 +123,15 @@ func AggregateRosters(
 
 	for _, roster := range rosters {
 		for _, voteCard := range roster.Voters {
-			if payload, ok := result[voteCard.EarningAccount]; ok {
-				payload = append(payload, VoteOnSubcomittee{
-					AccommodateHarmonyVote: *voteCard,
-					ShardID:                roster.ShardID,
-				})
-			} else {
-				result[voteCard.EarningAccount] = []VoteOnSubcomittee{}
+			if !voteCard.IsHarmonyNode {
+				if payload, ok := result[voteCard.EarningAccount]; ok {
+					payload = append(payload, VoteOnSubcomittee{
+						AccommodateHarmonyVote: *voteCard,
+						ShardID:                roster.ShardID,
+					})
+				} else {
+					result[voteCard.EarningAccount] = []VoteOnSubcomittee{}
+				}
 			}
 		}
 	}

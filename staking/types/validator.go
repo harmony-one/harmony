@@ -178,6 +178,11 @@ type ValidatorStats struct {
 	MetricsPerShard []votepower.VoteOnSubcomittee `json:"metrics-by-shard"`
 }
 
+func (s ValidatorStats) String() string {
+	str, _ := json.Marshal(s)
+	return string(str)
+}
+
 // Validator - data fields for a validator
 type Validator struct {
 	// ECDSA address of the validator

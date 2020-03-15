@@ -2293,6 +2293,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		}
 		stats.TotalEffectiveStake = total
 		stats.MetricsPerShard = value
+		fmt.Println("writing stats", stats.String())
 		if err := rawdb.WriteValidatorStats(batch, key, stats); err != nil {
 			return err
 		}
