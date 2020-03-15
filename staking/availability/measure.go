@@ -116,6 +116,7 @@ func bumpCount(
 	state *state.DB,
 	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
+	isNewEpoch bool,
 ) error {
 	blocksPerEpoch := shard.Schedule.BlocksPerEpoch()
 	for _, subset := range signers {
@@ -144,7 +145,7 @@ func bumpCount(
 			}
 
 			if err := computeAndMutateEPOSStatus(
-				bc, state, wrapper, blocksPerEpoch,
+				bc, state, wrapper, blocksPerEpoch, isNewEpoch,
 			); err != nil {
 				return err
 			}
@@ -166,10 +167,12 @@ func IncrementValidatorSigningCounts(
 	staked *shard.StakedSlots,
 	state *state.DB,
 	signers, missing shard.SlotList,
+	isNewEpoch bool,
 ) error {
 	return bumpCount(
 		bc, state, []signerKind{{false, missing}, {true, signers}},
 		staked.LookupSet,
+		isNewEpoch,
 	)
 }
 
@@ -193,11 +196,11 @@ func ComputeCurrentSigning(
 	signed, toSign :=
 		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
 		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
-	missedSoFar := blocksPerEpoch - toSign.Uint64()
+	leftToGo := blocksPerEpoch - toSign.Uint64()
 
-	computed := &staking.Computed{
-		signed, toSign, missedSoFar, numeric.ZeroDec(), true,
-	}
+	computed := staking.NewComputed(
+		signed, toSign, leftToGo, numeric.ZeroDec(), true,
+	)
 
 	if toSign.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().
@@ -241,6 +244,7 @@ func computeAndMutateEPOSStatus(
 	state *state.DB,
 	wrapper *staking.ValidatorWrapper,
 	blocksPerEpoch uint64,
+	isNewEpoch bool,
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")
 
@@ -267,13 +271,12 @@ func computeAndMutateEPOSStatus(
 	const missedTooManyBlocks = true
 
 	switch computed.IsBelowThreshold {
-	case missedTooManyBlocks:
-		wrapper.EPOSStatus = effective.Inactive
-		utils.Logger().Info().
-			Str("threshold", measure.String()).
-			Msg("validator failed availability threshold, set to inactive")
+	case missedTooManyBlocks && isNewEpoch:
+		wrapper.EPOSStatus = effective.NoCandidacy
+	case missedTooManyBlocks && !isNewEpoch:
+		wrapper.EPOSStatus = effective.InCommitteeAndFellBelowThreshold
 	default:
-		wrapper.EPOSStatus = effective.Active
+		wrapper.EPOSStatus = effective.InCommitteeAndSigning
 	}
 
 	return nil

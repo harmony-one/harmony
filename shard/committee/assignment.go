@@ -84,7 +84,7 @@ func prepareOrders(
 		if err != nil {
 			return nil, err
 		}
-		if validator.EPOSStatus != effective.Active {
+		if !staking.IsEligibleForEPoSAuction(validator) {
 			continue
 		}
 		if err := validator.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {

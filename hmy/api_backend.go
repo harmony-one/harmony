@@ -25,7 +25,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/availability"
-	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -404,7 +403,7 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	stakes := big.NewInt(0)
 	for i := range candidates {
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
-		if validator.EPOSStatus != effective.Active {
+		if !staking.IsEligibleForEPoSAuction(validator) {
 			continue
 		}
 		for i := range validator.Delegations {

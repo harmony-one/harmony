@@ -97,11 +97,20 @@ type ValidatorWrapper struct {
 // Computed represents current epoch
 // availability measures, mostly for RPC
 type Computed struct {
-	Signed           *big.Int    `json:"current-epoch-signed"`
-	ToSign           *big.Int    `json:"current-epoch-to-sign"`
-	Missed           uint64      `json:"current-epoch-blocks-missed"`
-	Percentage       numeric.Dec `json:"percentage"`
-	IsBelowThreshold bool        `json:"is-below-epos-threshold"`
+	Signed            *big.Int    `json:"current-epoch-signed"`
+	ToSign            *big.Int    `json:"current-epoch-to-sign"`
+	BlocksLeftInEpoch uint64      `json:"current-epoch-blocks-left"`
+	Percentage        numeric.Dec `json:"current-epoch-signing-percentage"`
+	IsBelowThreshold  bool        `json:"-"`
+}
+
+// NewComputed ..
+func NewComputed(
+	signed, toSign *big.Int,
+	blocksLeft uint64,
+	percent numeric.Dec,
+	isBelowNow bool) *Computed {
+	return &Computed{signed, toSign, blocksLeft, percent, isBelowNow}
 }
 
 // These mostly done for places where a sane default value needed,
@@ -151,13 +160,11 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 		Address     string      `json:"address"`
 		EPOSStatus  string      `json:"epos-eligibility-status"`
 		Delegations Delegations `json:"delegations"`
-		Counters    counters    `json:"availability"`
 	}{
 		w.Validator,
 		common2.MustAddressToBech32(w.Address),
 		w.EPOSStatus.String(),
 		w.Delegations,
-		w.Counters,
 	})
 }
 
@@ -314,7 +321,7 @@ func (w *ValidatorWrapper) SanityCheck(
 			errInvalidSelfDelegation, "no self delegation given at all",
 		)
 	default:
-		if w.EPOSStatus != effective.Banned &&
+		if w.EPOSStatus != effective.BannedForever &&
 			w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidSelfDelegation,
@@ -475,7 +482,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 		LastEpochInCommittee: new(big.Int),
 		MinSelfDelegation:    val.MinSelfDelegation,
 		MaxTotalDelegation:   val.MaxTotalDelegation,
-		EPOSStatus:           effective.Active,
+		EPOSStatus:           effective.FirstTimeCandidate,
 		Commission:           commission,
 		Description:          desc,
 		CreationHeight:       blockNum,
@@ -544,17 +551,27 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 	}
 
 	switch validator.EPOSStatus {
-	case effective.Banned:
+	case effective.BannedForever:
 		return errCannotChangeBannedTaint
 	default:
 		switch edit.EPOSStatus {
-		case effective.Active, effective.Inactive:
+		case effective.Candidate, effective.NoCandidacy:
 			validator.EPOSStatus = edit.EPOSStatus
 		default:
 		}
 	}
 
 	return nil
+}
+
+// IsEligibleForEPoSAuction ..
+func IsEligibleForEPoSAuction(validator *ValidatorWrapper) bool {
+	switch validator.EPOSStatus {
+	case effective.FirstTimeCandidate, effective.Candidate:
+		return true
+	default:
+		return false
+	}
 }
 
 // String returns a human readable string representation of a validator.

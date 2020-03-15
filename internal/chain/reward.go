@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -28,8 +29,11 @@ func ballotResultBeaconchain(
 }
 
 var (
-	votingPowerCache     singleflight.Group
-	maxMemoryBehindShard = big.NewInt(5)
+	votingPowerCache singleflight.Group
+)
+
+const (
+	votepowerCacheTimeLimit = 3 * time.Minute
 )
 
 func lookupVotingPower(
@@ -42,6 +46,10 @@ func lookupVotingPower(
 			if err != nil {
 				return nil, err
 			}
+			go func() {
+				time.Sleep(votepowerCacheTimeLimit)
+				votingPowerCache.Forget(key)
+			}()
 			return votingPower, nil
 		},
 	)
@@ -72,6 +80,7 @@ func AccumulateRewards(
 	// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
+		isNewEpoch := len(header.ShardState()) > 0
 		defaultReward := network.BaseStakedReward
 		// TODO Use cached result in off-chain db instead of full computation
 		_, percentageStaked, err := network.WhatPercentStakedNow(
@@ -102,12 +111,14 @@ func AccumulateRewards(
 			return network.EmptyPayout, err
 		}
 		subComm := shard.Committee{shard.BeaconChainShardID, members}
+
 		if err := availability.IncrementValidatorSigningCounts(
 			beaconChain,
 			subComm.StakedValidators(),
 			state,
 			payable,
 			missing,
+			isNewEpoch,
 		); err != nil {
 			return network.EmptyPayout, err
 		}
@@ -186,7 +197,7 @@ func AccumulateRewards(
 
 				staked := subComm.StakedValidators()
 				if err := availability.IncrementValidatorSigningCounts(
-					beaconChain, staked, state, payableSigners, missing,
+					beaconChain, staked, state, payableSigners, missing, isNewEpoch,
 				); err != nil {
 					return network.EmptyPayout, err
 				}

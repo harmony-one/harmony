@@ -116,7 +116,7 @@ func createNewValidator() Validator {
 		LastEpochInCommittee: big.NewInt(20),
 		MinSelfDelegation:    big.NewInt(1e18),
 		MaxTotalDelegation:   big.NewInt(3e18),
-		EPOSStatus:           effective.Inactive,
+		EPOSStatus:           effective.NoCandidacy,
 		Commission:           c,
 		Description:          d,
 		CreationHeight:       big.NewInt(12306),
