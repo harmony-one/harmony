@@ -102,12 +102,11 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 		}
 		if _, didVote := ballot.voters[w]; !didVote &&
 			v.ReadBallot(p, members[i]) != nil {
-			err := w.FromLibBLSPublicKey(members[i])
-			if err != nil {
+			if err := w.FromLibBLSPublicKey(members[i]); err != nil {
 				return nil, err
 			}
 			ballot.currentTotal = ballot.currentTotal.Add(
-				v.roster.Voters[w].AdjustedVotingPower,
+				v.roster.Voters[w].OverallPercent,
 			)
 			ballot.voters[w] = struct{}{}
 		}
@@ -128,7 +127,7 @@ func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric
 		}
 		if enabled, err := mask.KeyEnabled(pubKeys[i]); err == nil && enabled {
 			currentTotal = currentTotal.Add(
-				v.roster.Voters[w].AdjustedVotingPower,
+				v.roster.Voters[w].OverallPercent,
 			)
 		}
 	}
@@ -210,8 +209,8 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 			voter.IsHarmonyNode,
 			common2.MustAddressToBech32(voter.EarningAccount),
 			identity.Hex(),
-			voter.VotingPower.String(),
-			voter.AdjustedVotingPower.String(),
+			voter.GroupPercent.String(),
+			voter.OverallPercent.String(),
 			"",
 		}
 		if !voter.IsHarmonyNode {

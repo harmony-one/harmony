@@ -68,27 +68,30 @@ func TestCompute(t *testing.T) {
 			PureStakedVote: PureStakedVote{
 				EarningAccount: staked[i].EcdsaAddress,
 				Identity:       staked[i].BlsPublicKey,
-				VotingPower:    numeric.ZeroDec(),
+				GroupPercent:   numeric.ZeroDec(),
 				EffectiveStake: big.NewInt(0),
 			},
-			AdjustedVotingPower: numeric.ZeroDec(),
-			IsHarmonyNode:       true,
+			OverallPercent: numeric.ZeroDec(),
+			IsHarmonyNode:  false,
 		}
 
 		// Real Staker
-		if staked[i].EffectiveStake != nil {
-			member.IsHarmonyNode = false
-			member.EffectiveStake = (*staked[i].EffectiveStake).TruncateInt()
-			member.VotingPower = staked[i].EffectiveStake.Quo(asDecTotal)
-			member.AdjustedVotingPower = member.VotingPower.Mul(StakersShare)
-			theirPercentage = theirPercentage.Add(member.AdjustedVotingPower)
+		if e := staked[i].EffectiveStake; e != nil {
+			member.EffectiveStake.Add(
+				member.EffectiveStake, (*e).TruncateInt(),
+			)
+			member.GroupPercent = e.Quo(asDecTotal)
+			member.OverallPercent = member.GroupPercent.Mul(StakersShare)
+			theirPercentage = theirPercentage.Add(member.OverallPercent)
+
 		} else { // Our node
-			member.AdjustedVotingPower = HarmonysShare.Quo(asDecHMYSlotCount)
-			member.VotingPower = member.AdjustedVotingPower.Quo(HarmonysShare)
-			ourPercentage = ourPercentage.Add(member.AdjustedVotingPower)
+			member.IsHarmonyNode = true
+			member.OverallPercent = HarmonysShare.Quo(asDecHMYSlotCount)
+			member.GroupPercent = member.OverallPercent.Quo(HarmonysShare)
+			ourPercentage = ourPercentage.Add(member.OverallPercent)
 		}
 
-		expectedRoster.Voters[staked[i].BlsPublicKey] = member
+		expectedRoster.Voters[staked[i].BlsPublicKey] = &member
 	}
 
 	expectedRoster.OurVotingPowerTotalPercentage = ourPercentage
@@ -135,9 +138,9 @@ func compareRosters(a, b *Roster, t *testing.T) bool {
 		a.HMYSlotCount == b.HMYSlotCount && voterMatch
 }
 
-func compareStakedVoter(a, b AccommodateHarmonyVote) bool {
+func compareStakedVoter(a, b *AccommodateHarmonyVote) bool {
 	return a.IsHarmonyNode == b.IsHarmonyNode &&
 		a.EarningAccount == b.EarningAccount &&
-		a.AdjustedVotingPower.Equal(b.AdjustedVotingPower) &&
+		a.OverallPercent.Equal(b.OverallPercent) &&
 		a.EffectiveStake.Cmp(b.EffectiveStake) == 0
 }

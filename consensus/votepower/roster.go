@@ -70,15 +70,20 @@ func NewRound() *Round {
 type PureStakedVote struct {
 	EarningAccount common.Address     `json:"earning-account"`
 	Identity       shard.BlsPublicKey `json:"bls-public-key"`
-	VotingPower    numeric.Dec        `json:"voting-power"`
+	GroupPercent   numeric.Dec        `json:"group-percent"`
 	EffectiveStake *big.Int           `json:"effective-stake"`
 }
 
 // AccommodateHarmonyVote ..
 type AccommodateHarmonyVote struct {
 	PureStakedVote
-	IsHarmonyNode       bool        `json:"is-harmony",rlp:"-"`
-	AdjustedVotingPower numeric.Dec `json:"voting-adjusted"`
+	IsHarmonyNode  bool        `json:"is-harmony"`
+	OverallPercent numeric.Dec `json:"overall-percent"`
+}
+
+func (v AccommodateHarmonyVote) String() string {
+	s, _ := json.Marshal(v)
+	return string(s)
 }
 
 type topLevelRegistry struct {
@@ -90,7 +95,7 @@ type topLevelRegistry struct {
 
 // Roster ..
 type Roster struct {
-	Voters map[shard.BlsPublicKey]AccommodateHarmonyVote
+	Voters map[shard.BlsPublicKey]*AccommodateHarmonyVote
 	topLevelRegistry
 	ShardID uint32
 }
@@ -115,7 +120,7 @@ func AggregateRosters(
 		for _, voteCard := range roster.Voters {
 			if payload, ok := result[voteCard.EarningAccount]; ok {
 				payload = append(payload, VoteOnSubcomittee{
-					AccommodateHarmonyVote: voteCard,
+					AccommodateHarmonyVote: *voteCard,
 					ShardID:                roster.ShardID,
 				})
 			} else {
@@ -132,10 +137,9 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 	roster, staked := NewRoster(subComm.ShardID), subComm.Slots
 
 	for i := range staked {
-		if staked[i].EffectiveStake != nil {
+		if e := staked[i].EffectiveStake; e != nil {
 			roster.RawStakedTotal.Add(
-				roster.RawStakedTotal,
-				staked[i].EffectiveStake.TruncateInt(),
+				roster.RawStakedTotal, e.TruncateInt(),
 			)
 		} else {
 			roster.HMYSlotCount++
@@ -155,28 +159,30 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 			PureStakedVote: PureStakedVote{
 				EarningAccount: staked[i].EcdsaAddress,
 				Identity:       staked[i].BlsPublicKey,
-				VotingPower:    numeric.ZeroDec(),
+				GroupPercent:   numeric.ZeroDec(),
 				EffectiveStake: big.NewInt(0),
 			},
-			AdjustedVotingPower: numeric.ZeroDec(),
-			IsHarmonyNode:       true,
+			OverallPercent: numeric.ZeroDec(),
+			IsHarmonyNode:  false,
 		}
 
 		// Real Staker
-		if staked[i].EffectiveStake != nil {
-			member.IsHarmonyNode = false
-			member.EffectiveStake = (*staked[i].EffectiveStake).TruncateInt()
-			member.VotingPower = staked[i].EffectiveStake.Quo(asDecTotal)
-			member.AdjustedVotingPower = member.VotingPower.Mul(StakersShare)
-			theirPercentage = theirPercentage.Add(member.AdjustedVotingPower)
+		if e := staked[i].EffectiveStake; e != nil {
+			member.EffectiveStake.Add(
+				member.EffectiveStake, (*e).TruncateInt(),
+			)
+			member.GroupPercent = e.Quo(asDecTotal)
+			member.OverallPercent = member.GroupPercent.Mul(StakersShare)
+			theirPercentage = theirPercentage.Add(member.OverallPercent)
 			lastStakedVoter = &member
 		} else { // Our node
-			member.AdjustedVotingPower = HarmonysShare.Quo(asDecHMYSlotCount)
-			member.VotingPower = member.AdjustedVotingPower.Quo(HarmonysShare)
-			ourPercentage = ourPercentage.Add(member.AdjustedVotingPower)
+			member.IsHarmonyNode = true
+			member.OverallPercent = HarmonysShare.Quo(asDecHMYSlotCount)
+			member.GroupPercent = member.OverallPercent.Quo(HarmonysShare)
+			ourPercentage = ourPercentage.Add(member.OverallPercent)
 		}
 
-		roster.Voters[staked[i].BlsPublicKey] = member
+		roster.Voters[staked[i].BlsPublicKey] = &member
 	}
 
 	// NOTE Enforce voting power sums to one,
@@ -184,8 +190,8 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 	if diff := numeric.OneDec().Sub(
 		ourPercentage.Add(theirPercentage),
 	); !diff.IsZero() && lastStakedVoter != nil {
-		lastStakedVoter.AdjustedVotingPower =
-			lastStakedVoter.AdjustedVotingPower.Add(diff)
+		lastStakedVoter.OverallPercent =
+			lastStakedVoter.OverallPercent.Add(diff)
 		theirPercentage = theirPercentage.Add(diff)
 	}
 
@@ -201,7 +207,7 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 
 // NewRoster ..
 func NewRoster(shardID uint32) *Roster {
-	m := map[shard.BlsPublicKey]AccommodateHarmonyVote{}
+	m := map[shard.BlsPublicKey]*AccommodateHarmonyVote{}
 	return &Roster{
 		Voters: m,
 		topLevelRegistry: topLevelRegistry{
