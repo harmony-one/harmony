@@ -34,7 +34,9 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+	)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsKey), decider,
 	)
@@ -201,7 +203,9 @@ func TestAddPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+	)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsKey), decider,
 	)
@@ -251,7 +255,9 @@ func TestAddBeaconPeer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+	)
 	consensus, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsKey), decider,
 	)

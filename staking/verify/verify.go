@@ -37,7 +37,9 @@ func AggregateSigForCommittee(
 		return err
 	}
 
-	decider := quorum.NewDecider(quorum.SuperMajorityStake)
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityStake, committee.ShardID,
+	)
 	decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 		return nil, nil
 	})

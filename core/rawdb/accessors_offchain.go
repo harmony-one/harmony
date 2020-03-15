@@ -214,8 +214,6 @@ func DeleteValidatorStats(db DatabaseDeleter, addr common.Address) {
 }
 
 // ReadValidatorStats retrieves validator's stats by its address,
-// any errors during its execution are swallowed and it returns a
-// fresh ValidatorStats made by staking.NewEmptyStats()
 func ReadValidatorStats(
 	db DatabaseReader, addr common.Address,
 ) (*staking.ValidatorStats, error) {

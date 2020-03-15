@@ -119,8 +119,8 @@ var (
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
 		ComputedAPR{},
-		numeric.ZeroDec(),
-		[]ShardMetrics{},
+		big.NewInt(0),
+		[]votepower.VoteOnSubcomittee{},
 	}
 }
 
@@ -129,8 +129,6 @@ func NewEmptyStats() *ValidatorStats {
 type CurrentEpochPerformance struct {
 	CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
 }
-
-// Metrics ..
 
 // ValidatorRPCEnchanced contains extra information for RPC consumer
 type ValidatorRPCEnchanced struct {
@@ -163,31 +161,14 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// ShardMetrics ..
-type ShardMetrics struct {
-	ShardID uint32 `json:"shard-id"`
-	votepower.AccommodateHarmonyVote
-}
-
-// MarshalJSON ..
-func (s ShardMetrics) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		votepower.AccommodateHarmonyVote
-		ShardID       uint32 `json:"shard-id"`
-		IsHarmonyNode bool   `json:"-"`
-	}{
-		s.AccommodateHarmonyVote, s.ShardID, false,
-	})
-}
-
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// APR ..
 	APR ComputedAPR `json:"current-apr"`
 	// TotalEffectiveStake is the total effective stake this validator has
-	TotalEffectiveStake numeric.Dec `json:"total-effective-stake"`
+	TotalEffectiveStake *big.Int `json:"total-effective-stake"`
 	// MetricsPerShard ..
-	MetricsPerShard []ShardMetrics `json:"metrics-by-shard"`
+	MetricsPerShard []votepower.VoteOnSubcomittee `json:"metrics-by-shard"`
 }
 
 // Validator - data fields for a validator

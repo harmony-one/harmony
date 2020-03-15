@@ -196,16 +196,18 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		if err != nil {
 			return errors.Wrapf(err, "cannot decoded shard state")
 		}
-
-		// TODO(audit): reuse a singleton decider and not recreate it for every single block
-		d := quorum.NewDecider(quorum.SuperMajorityStake)
-		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
-			return nil, nil
-		})
 		subComm, err := slotList.FindCommitteeByID(parentHeader.ShardID())
 		if err != nil {
 			return err
 		}
+		// TODO(audit): reuse a singleton decider and not recreate it for every single block
+		d := quorum.NewDecider(
+			quorum.SuperMajorityStake, subComm.ShardID,
+		)
+		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
+			return nil, nil
+		})
+
 		if _, err := d.SetVoters(subComm); err != nil {
 			return err
 		}
@@ -464,15 +466,16 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			return errors.Wrapf(err, "cannot read shard state")
 		}
 
-		// TODO(audit): reuse a singleton decider and not recreate it for every single block
-		d := quorum.NewDecider(quorum.SuperMajorityStake)
-		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
-			return nil, nil
-		})
 		subComm, err := slotList.FindCommitteeByID(header.ShardID())
 		if err != nil {
 			return err
 		}
+		// TODO(audit): reuse a singleton decider and not recreate it for every single block
+		d := quorum.NewDecider(quorum.SuperMajorityStake, subComm.ShardID)
+		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
+			return nil, nil
+		})
+
 		if _, err := d.SetVoters(subComm); err != nil {
 			return err
 		}

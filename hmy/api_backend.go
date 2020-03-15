@@ -521,7 +521,7 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 		quorum.NewRegistry(stakedSlotsNow)
 
 	for _, comm := range prevCommittee.Shards {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm); err != nil {
 			return nil, err
 		}
@@ -529,7 +529,7 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	}
 
 	for _, comm := range nowCommittee.Shards {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm); err != nil {
 			return nil, err
 		}

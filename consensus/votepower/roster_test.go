@@ -51,7 +51,7 @@ func generateRandomSlot() shard.Slot {
 }
 
 func TestCompute(t *testing.T) {
-	expectedRoster := NewRoster()
+	expectedRoster := NewRoster(shard.BeaconChainShardID)
 	// Calculated when generated
 	expectedRoster.RawStakedTotal = totalStake.TruncateInt()
 	expectedRoster.HMYSlotCount = int64(harmonyNodes)
@@ -69,7 +69,7 @@ func TestCompute(t *testing.T) {
 				EarningAccount: staked[i].EcdsaAddress,
 				Identity:       staked[i].BlsPublicKey,
 				VotingPower:    numeric.ZeroDec(),
-				EffectiveStake: numeric.ZeroDec(),
+				EffectiveStake: big.NewInt(0),
 			},
 			AdjustedVotingPower: numeric.ZeroDec(),
 			IsHarmonyNode:       true,
@@ -78,7 +78,7 @@ func TestCompute(t *testing.T) {
 		// Real Staker
 		if staked[i].EffectiveStake != nil {
 			member.IsHarmonyNode = false
-			member.EffectiveStake = member.EffectiveStake.Add(*staked[i].EffectiveStake)
+			member.EffectiveStake = (*staked[i].EffectiveStake).TruncateInt()
 			member.VotingPower = staked[i].EffectiveStake.Quo(asDecTotal)
 			member.AdjustedVotingPower = member.VotingPower.Mul(StakersShare)
 			theirPercentage = theirPercentage.Add(member.AdjustedVotingPower)
@@ -139,5 +139,5 @@ func compareStakedVoter(a, b AccommodateHarmonyVote) bool {
 	return a.IsHarmonyNode == b.IsHarmonyNode &&
 		a.EarningAccount == b.EarningAccount &&
 		a.AdjustedVotingPower.Equal(b.AdjustedVotingPower) &&
-		a.EffectiveStake.Equal(b.EffectiveStake)
+		a.EffectiveStake.Cmp(b.EffectiveStake) == 0
 }

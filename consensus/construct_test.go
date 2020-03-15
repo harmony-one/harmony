@@ -22,7 +22,9 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+	)
 	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
@@ -48,7 +50,9 @@ func TestConstructPreparedMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+	)
 	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,

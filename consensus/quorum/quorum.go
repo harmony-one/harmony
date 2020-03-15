@@ -327,7 +327,7 @@ func (d *depInject) MyPublicKey() func() (*multibls.PublicKey, error) {
 }
 
 // NewDecider ..
-func NewDecider(p Policy) Decider {
+func NewDecider(p Policy, shardID uint32) Decider {
 	signatureStore := newBallotsBackedSignatureReader()
 	deps := &depInject{}
 	c := &composite{deps, deps, signatureStore}
@@ -341,7 +341,7 @@ func NewDecider(p Policy) Decider {
 			c.SignatureReader,
 			c.DependencyInjectionWriter,
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
-			*votepower.NewRoster(),
+			*votepower.NewRoster(shardID),
 			newBallotBox(),
 		}
 	default:

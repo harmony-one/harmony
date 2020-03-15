@@ -29,7 +29,7 @@ var (
 type secretKeyMap map[shard.BlsPublicKey]bls.SecretKey
 
 func init() {
-	basicDecider = NewDecider(SuperMajorityStake)
+	basicDecider = NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 }
 
 func generateRandomSlot() (shard.Slot, bls.SecretKey) {
@@ -63,7 +63,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 		pubKeys = append(pubKeys, sKey.GetPublicKey())
 	}
 
-	decider := NewDecider(SuperMajorityStake)
+	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 	decider.UpdateParticipants(pubKeys)
 	tally, err := decider.SetVoters(&shard.Committee{
 		shard.BeaconChainShardID, slotList,
@@ -90,7 +90,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 		pubKeys = append(pubKeys, sKey.GetPublicKey())
 	}
 
-	decider := NewDecider(SuperMajorityStake)
+	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 	decider.UpdateParticipants(pubKeys)
 	tally, err := decider.SetVoters(&shard.Committee{
 		shard.BeaconChainShardID, slotList,
