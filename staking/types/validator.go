@@ -80,7 +80,7 @@ type counters struct {
 
 // ComputedAPR ..
 type ComputedAPR struct {
-	Result *big.Int
+	Result *big.Int `json:"current-apr"`
 }
 
 // ValidatorWrapper contains validator,
