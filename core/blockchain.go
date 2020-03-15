@@ -2446,7 +2446,9 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 // including the full validator list and delegation indexes.
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateStakingMetaData(
-	batch rawdb.DatabaseWriter, txns staking.StakingTransactions, state *state.DB, epoch *big.Int) error {
+	batch rawdb.DatabaseWriter, txns staking.StakingTransactions,
+	state *state.DB, epoch *big.Int,
+) error {
 	newValidators, newDelegations, err := bc.prepareStakingMetaData(txns, state)
 	if err != nil {
 		utils.Logger().Warn().Msgf("oops, prepareStakingMetaData failed, err: %+v", err)

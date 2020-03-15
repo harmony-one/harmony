@@ -1,7 +1,6 @@
 package apr
 
 import (
-	"errors"
 	"math/big"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // Reader ..
@@ -17,7 +17,9 @@ type Reader interface {
 	ReadValidatorStats(addr common.Address) (
 		*staking.ValidatorStats, error,
 	)
-	ReadValidatorSnapshot(
+
+	ReadValidatorSnapshotAtEpoch(
+		epoch *big.Int,
 		addr common.Address,
 	) (*staking.ValidatorWrapper, error)
 }
@@ -28,46 +30,67 @@ const (
 
 var (
 	oneYear = big.NewInt(int64(nanoSecondsInYear))
+	// ErrNotTwoEpochsAgo ..
+	ErrNotTwoEpochsAgo = errors.New("not two epochs ago yet")
+	// ErrNotOneEpochsAgo ..
+	ErrNotOneEpochsAgo = errors.New("not one epoch ago yet")
 )
 
-func expectedNumBlocksPerYear(
-	oneEpochAgo, twoEpochAgo *block.Header, blocksPerEpoch uint64,
+func expectedRewardPerYear(
+	oneEpochAgo, twoEpochAgo *block.Header,
+	oneSnapshotAgo, twoSnapshotAgo *staking.ValidatorWrapper,
+	blocksPerEpoch uint64,
 ) (*big.Int, error) {
 	oneTAgo, twoTAgo := oneEpochAgo.Time(), twoEpochAgo.Time()
-	diff := new(big.Int).Sub(twoTAgo, oneTAgo)
+	diffTime, diffReward :=
+		new(big.Int).Sub(twoTAgo, oneTAgo),
+		new(big.Int).Sub(twoSnapshotAgo.BlockReward, oneSnapshotAgo.BlockReward)
+
 	// impossibility but keep sane
-	if diff.Sign() == -1 {
+	if diffTime.Sign() == -1 {
 		return nil, errors.New("time stamp diff cannot be negative")
 	}
-	avgBlockTimePerEpoch := new(big.Int).Div(
-		diff, big.NewInt(int64(blocksPerEpoch)),
-	)
-	return new(big.Int).Div(oneYear, avgBlockTimePerEpoch), nil
+
+	expectedValue := new(big.Int).Div(diffReward, diffTime)
+	return new(big.Int).Mul(expectedValue, oneYear), nil
 }
 
 // ComputeForValidator ..
 func ComputeForValidator(
 	bc Reader,
+	now *big.Int,
 	state *state.DB,
-	wrapper *staking.ValidatorWrapper,
+	validatorNow *staking.ValidatorWrapper,
 	blocksPerEpoch uint64,
 ) (*big.Int, error) {
-	snapshot, err := bc.ReadValidatorSnapshot(wrapper.Address)
+	twoSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
+		new(big.Int).Sub(now, common.Big2),
+		validatorNow.Address,
+	)
+
 	if err != nil {
-		return nil, err
+		return nil, ErrNotTwoEpochsAgo
 	}
+
+	oneSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
+		new(big.Int).Sub(now, common.Big1),
+		validatorNow.Address,
+	)
+
+	if err != nil {
+		return nil, ErrNotOneEpochsAgo
+	}
+
 	// avg_reward_per_block = total_reward_per_epoch / blocks_per_epoch
 	// estimated_reward_per_year = avg_reward_per_block * blocks_per_year
 	// estimated_reward_per_year / total_stake
-	// TODO use the blockreward diff like in measure
-	perEpoch := new(big.Int).SetUint64(blocksPerEpoch)
-	avgRewardPerBlock := new(big.Int).Div(wrapper.BlockReward, perEpoch)
-	estimatedBlocksPerYear, err := expectedNumBlocksPerYear(
-		nil, nil, blocksPerEpoch,
-	)
-	estimatedRewardPerYear := new(big.Int).Mul(
-		avgRewardPerBlock, estimatedBlocksPerYear,
+	estimatedRewardPerYear, err := expectedRewardPerYear(
+		nil, nil,
+		oneSnapshotAgo, twoSnapshotAgo,
+		blocksPerEpoch,
 	)
 
-	return new(big.Int).Div(estimatedRewardPerYear, snapshot.TotalDelegation()), nil
+	return new(big.Int).Div(
+		estimatedRewardPerYear, validatorNow.TotalDelegation(),
+	), nil
 }
