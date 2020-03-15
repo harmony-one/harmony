@@ -104,6 +104,11 @@ type Computed struct {
 	IsBelowThreshold  bool        `json:"-"`
 }
 
+func (c Computed) String() string {
+	s, _ := json.Marshal(c)
+	return string(s)
+}
+
 // NewComputed ..
 func NewComputed(
 	signed, toSign *big.Int,

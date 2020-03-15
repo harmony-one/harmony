@@ -80,7 +80,6 @@ func AccumulateRewards(
 	// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		isNewEpoch := len(header.ShardState()) > 0
 		defaultReward := network.BaseStakedReward
 		// TODO Use cached result in off-chain db instead of full computation
 		_, percentageStaked, err := network.WhatPercentStakedNow(
@@ -118,7 +117,6 @@ func AccumulateRewards(
 			state,
 			payable,
 			missing,
-			isNewEpoch,
 		); err != nil {
 			return network.EmptyPayout, err
 		}
@@ -173,20 +171,20 @@ func AccumulateRewards(
 
 			for i := range crossLinks {
 				cxLink := crossLinks[i]
-				if !bc.Config().IsStaking(cxLink.Epoch()) {
+				epoch, shardID := cxLink.Epoch(), cxLink.ShardID()
+				if !bc.Config().IsStaking(epoch) {
 					continue
 				}
-				epoch, shardID := cxLink.Epoch(), cxLink.ShardID()
 				shardState, err := bc.ReadShardState(epoch)
 
 				if err != nil {
 					return network.EmptyPayout, err
 				}
 
+				subComm, err := shardState.FindCommitteeByID(shardID)
 				if err != nil {
 					return network.EmptyPayout, err
 				}
-				subComm, err := shardState.FindCommitteeByID(shardID)
 
 				payableSigners, missing, err := availability.BlockSigners(
 					cxLink.Bitmap(), subComm,
@@ -197,7 +195,7 @@ func AccumulateRewards(
 
 				staked := subComm.StakedValidators()
 				if err := availability.IncrementValidatorSigningCounts(
-					beaconChain, staked, state, payableSigners, missing, isNewEpoch,
+					beaconChain, staked, state, payableSigners, missing,
 				); err != nil {
 					return network.EmptyPayout, err
 				}

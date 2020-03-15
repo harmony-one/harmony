@@ -116,7 +116,6 @@ func bumpCount(
 	state *state.DB,
 	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
-	isNewEpoch bool,
 ) error {
 	blocksPerEpoch := shard.Schedule.BlocksPerEpoch()
 	for _, subset := range signers {
@@ -145,7 +144,7 @@ func bumpCount(
 			}
 
 			if err := computeAndMutateEPOSStatus(
-				bc, state, wrapper, blocksPerEpoch, isNewEpoch,
+				bc, state, wrapper, blocksPerEpoch,
 			); err != nil {
 				return err
 			}
@@ -167,12 +166,10 @@ func IncrementValidatorSigningCounts(
 	staked *shard.StakedSlots,
 	state *state.DB,
 	signers, missing shard.SlotList,
-	isNewEpoch bool,
 ) error {
 	return bumpCount(
 		bc, state, []signerKind{{false, missing}, {true, signers}},
 		staked.LookupSet,
-		isNewEpoch,
 	)
 }
 
@@ -244,7 +241,6 @@ func computeAndMutateEPOSStatus(
 	state *state.DB,
 	wrapper *staking.ValidatorWrapper,
 	blocksPerEpoch uint64,
-	isNewEpoch bool,
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")
 
@@ -259,21 +255,20 @@ func computeAndMutateEPOSStatus(
 		return err
 	}
 
-	quotient := computed.Percentage
-
 	utils.Logger().Info().
 		Str("signed", computed.Signed.String()).
 		Str("to-sign", computed.ToSign.String()).
-		Str("percentage-signed", quotient.String()).
+		Str("percentage-signed", computed.Percentage.String()).
 		Bool("meets-threshold", computed.IsBelowThreshold).
 		Msg("check if signing percent is meeting required threshold")
 
 	const missedTooManyBlocks = true
 
 	switch computed.IsBelowThreshold {
-	case missedTooManyBlocks && isNewEpoch:
+	// TODO This is off, not hitting this case, come back and fix
+	case missedTooManyBlocks && computed.BlocksLeftInEpoch == 0:
 		wrapper.EPOSStatus = effective.NoCandidacy
-	case missedTooManyBlocks && !isNewEpoch:
+	case missedTooManyBlocks && computed.BlocksLeftInEpoch > 1:
 		wrapper.EPOSStatus = effective.InCommitteeAndFellBelowThreshold
 	default:
 		wrapper.EPOSStatus = effective.InCommitteeAndSigning

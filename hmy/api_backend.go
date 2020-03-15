@@ -335,19 +335,23 @@ func (b *APIBackend) GetValidatorInformation(
 	}
 
 	now := b.hmy.BlockChain().CurrentHeader().Epoch()
-	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
-		now, addr,
-	)
 	defaultReply := &staking.ValidatorRPCEnchanced{
-		CurrentlyInCommittee: now.Cmp(snapshot.LastEpochInCommittee) == 0,
+		CurrentlyInCommittee: false,
 		Wrapper:              *wrapper,
 		Performance:          nil,
 		ComputedMetrics:      nil,
 		TotalDelegated:       wrapper.TotalDelegation(),
 	}
+
+	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
+		now, addr,
+	)
+
 	if err != nil {
 		return defaultReply, nil
 	}
+
+	defaultReply.CurrentlyInCommittee = now.Cmp(snapshot.LastEpochInCommittee) == 0
 
 	computed, err := availability.ComputeCurrentSigning(
 		snapshot, wrapper, shard.Schedule.BlocksPerEpoch(),
