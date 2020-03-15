@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -116,6 +117,10 @@ func AggregateRosters(
 	rosters []*Roster,
 ) map[common.Address][]VoteOnSubcomittee {
 	result := map[common.Address][]VoteOnSubcomittee{}
+	sort.SliceStable(rosters, func(i, j int) bool {
+		return rosters[i].ShardID < rosters[j].ShardID
+	})
+
 	for _, roster := range rosters {
 		for _, voteCard := range roster.Voters {
 			if payload, ok := result[voteCard.EarningAccount]; ok {

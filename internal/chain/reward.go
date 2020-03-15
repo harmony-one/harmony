@@ -28,23 +28,16 @@ func ballotResultBeaconchain(
 }
 
 var (
-	superCommitteeCache, votingPowerCache singleflight.Group
-	maxMemoryBehindShard                  = big.NewInt(5)
+	votingPowerCache     singleflight.Group
+	maxMemoryBehindShard = big.NewInt(5)
 )
 
 func lookupVotingPower(
-	epochIncoming *big.Int, shardID uint32,
-	epochNow *big.Int, beaconChain engine.ChainReader,
+	epoch *big.Int, subComm *shard.Committee,
 ) (*votepower.Roster, error) {
-	key := fmt.Sprintf("%s-%d", epochIncoming.String(), shardID)
+	key := fmt.Sprintf("%s-%d", epoch.String(), subComm.ShardID)
 	results, err, _ := votingPowerCache.Do(
 		key, func() (interface{}, error) {
-			subComm, err := lookupSubCommittee(
-				epochIncoming, shardID, epochNow, beaconChain,
-			)
-			if err != nil {
-				return nil, err
-			}
 			votingPower, err := votepower.Compute(subComm)
 			if err != nil {
 				return nil, err
@@ -55,42 +48,7 @@ func lookupVotingPower(
 	if err != nil {
 		return nil, err
 	}
-	if epochIncoming.Abs(new(big.Int).Sub(
-		epochNow, epochIncoming,
-	)).Cmp(maxMemoryBehindShard) == 1 {
-		votingPowerCache.Forget(key)
-	}
 	return results.(*votepower.Roster), nil
-}
-
-func lookupSubCommittee(
-	epochIncoming *big.Int, shardID uint32,
-	epochNow *big.Int, beaconChain engine.ChainReader,
-) (*shard.Committee, error) {
-	key := fmt.Sprintf("%s-%d", epochIncoming.String(), shardID)
-	results, err, _ := superCommitteeCache.Do(
-		key, func() (interface{}, error) {
-			superCommittee, err := beaconChain.ReadShardState(epochIncoming)
-			if err != nil {
-				return nil, err
-			}
-			subComm, err := superCommittee.FindCommitteeByID(shardID)
-			if err != nil {
-				return nil, err
-			}
-			return subComm, nil
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	if epochIncoming.Abs(new(big.Int).Sub(
-		epochNow, epochIncoming,
-	)).Cmp(maxMemoryBehindShard) == 1 {
-		superCommitteeCache.Forget(key)
-	}
-
-	return results.(*shard.Committee), nil
 }
 
 // AccumulateRewards credits the coinbase of the given block with the mining
@@ -100,7 +58,6 @@ func AccumulateRewards(
 	header *block.Header, beaconChain engine.ChainReader,
 ) (reward.Reader, error) {
 	blockNum := header.Number().Uint64()
-	beaconEpochNow := beaconChain.CurrentHeader().Epoch()
 
 	if blockNum == 0 {
 		// genesis block has no parent to reward.
@@ -154,21 +111,18 @@ func AccumulateRewards(
 		); err != nil {
 			return network.EmptyPayout, err
 		}
-
-		justPayable := shard.Committee{shard.BeaconChainShardID, payable}
-		votingPower, err := votepower.Compute(&justPayable)
-
+		// votingPower, err := votepower.Compute(&comm)
+		votingPower, err := lookupVotingPower(
+			header.Epoch(), &subComm,
+		)
 		if err != nil {
 			return network.EmptyPayout, err
 		}
-
-		fmt.Println(votingPower.String())
 
 		for beaconMember := range payable {
 			// TODO Give out whatever leftover to the last voter/handle
 			// what to do about share of those that didn't sign
 			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
-			fmt.Println(voter.String())
 			if !voter.IsHarmonyNode {
 				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
 				if err != nil {
@@ -212,14 +166,17 @@ func AccumulateRewards(
 					continue
 				}
 				epoch, shardID := cxLink.Epoch(), cxLink.ShardID()
-
-				subComm, err := lookupSubCommittee(
-					epoch, shardID, beaconEpochNow, beaconChain,
-				)
+				shardState, err := bc.ReadShardState(epoch)
 
 				if err != nil {
 					return network.EmptyPayout, err
 				}
+
+				if err != nil {
+					return network.EmptyPayout, err
+				}
+				subComm, err := shardState.FindCommitteeByID(shardID)
+
 				payableSigners, missing, err := availability.BlockSigners(
 					cxLink.Bitmap(), subComm,
 				)
@@ -234,19 +191,14 @@ func AccumulateRewards(
 					return network.EmptyPayout, err
 				}
 
-				votingPower, err := lookupVotingPower(
-					epoch, shardID, beaconEpochNow, beaconChain,
-				)
+				votingPower, err := lookupVotingPower(epoch, subComm)
 
 				if err != nil {
 					return network.EmptyPayout, err
 				}
 
-				fmt.Println(votingPower.String())
-
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
-					fmt.Println(voter.String())
 					if !voter.IsHarmonyNode && !voter.OverallPercent.IsZero() {
 						due := defaultReward.Mul(
 							voter.OverallPercent.Quo(votepower.StakersShare),
