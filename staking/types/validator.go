@@ -175,7 +175,7 @@ type ValidatorStats struct {
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake *big.Int `json:"total-effective-stake"`
 	// MetricsPerShard ..
-	MetricsPerShard []votepower.VoteOnSubcomittee `json:"metrics-by-shard"`
+	MetricsPerShard []votepower.VoteOnSubcomittee `json:"by-shard"`
 }
 
 func (s ValidatorStats) String() string {

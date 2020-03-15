@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -78,10 +79,11 @@ type PureStakedVote struct {
 // AccommodateHarmonyVote ..
 type AccommodateHarmonyVote struct {
 	PureStakedVote
-	IsHarmonyNode  bool        `json:"is-harmony"`
+	IsHarmonyNode  bool        `json:"-"`
 	OverallPercent numeric.Dec `json:"overall-percent"`
 }
 
+// String ..
 func (v AccommodateHarmonyVote) String() string {
 	s, _ := json.Marshal(v)
 	return string(s)
@@ -109,7 +111,22 @@ func (r Roster) String() string {
 // VoteOnSubcomittee ..
 type VoteOnSubcomittee struct {
 	AccommodateHarmonyVote
-	ShardID uint32 `json:"shard-id"`
+	ShardID uint32
+}
+
+// MarshalJSON ..
+func (v VoteOnSubcomittee) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		PureStakedVote
+		EarningAccount string      `json:"earning-account"`
+		OverallPercent numeric.Dec `json:"overall-percent"`
+		ShardID        uint32      `json:"shard-id"`
+	}{
+		v.PureStakedVote,
+		common2.MustAddressToBech32(v.EarningAccount),
+		v.OverallPercent,
+		v.ShardID,
+	})
 }
 
 // AggregateRosters ..
@@ -124,13 +141,16 @@ func AggregateRosters(
 	for _, roster := range rosters {
 		for _, voteCard := range roster.Voters {
 			if !voteCard.IsHarmonyNode {
-				if payload, ok := result[voteCard.EarningAccount]; ok {
-					payload = append(payload, VoteOnSubcomittee{
-						AccommodateHarmonyVote: *voteCard,
-						ShardID:                roster.ShardID,
-					})
+				voterID := VoteOnSubcomittee{
+					AccommodateHarmonyVote: *voteCard,
+					ShardID:                roster.ShardID,
+				}
+				if _, ok := result[voteCard.EarningAccount]; ok {
+					result[voteCard.EarningAccount] = append(
+						result[voteCard.EarningAccount], voterID,
+					)
 				} else {
-					result[voteCard.EarningAccount] = []VoteOnSubcomittee{}
+					result[voteCard.EarningAccount] = []VoteOnSubcomittee{voterID}
 				}
 			}
 		}

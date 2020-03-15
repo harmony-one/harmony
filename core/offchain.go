@@ -128,9 +128,8 @@ func (bc *BlockChain) CommitOffChainData(
 
 	// Update voting power of validators for all shards
 	if isNewEpoch && isBeaconChain {
-		shardState := &shard.State{}
 		currentSuperCommittee, _ := bc.ReadShardState(bc.CurrentHeader().Epoch())
-		if shardState, err = shard.DecodeWrapper(
+		if shardState, err := shard.DecodeWrapper(
 			header.ShardState(),
 		); err == nil {
 			if err := bc.UpdateValidatorVotingPower(
