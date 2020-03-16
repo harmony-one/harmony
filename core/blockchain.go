@@ -2305,10 +2305,10 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			bc, newEpochSuperCommittee.Epoch,
 			state, wrapper, blkPerEpoch,
 		)
-		stats.APR = *aprComputed
-		if err != nil {
-			return err
+		if err == nil && aprComputed != nil {
+			stats.APR = *aprComputed
 		}
+
 		if err := rawdb.WriteValidatorStats(
 			batch, key, stats,
 		); err != nil {
