@@ -78,11 +78,6 @@ type counters struct {
 	NumBlocksSigned *big.Int `json:"num-blocks-signed",rlp:"nil"`
 }
 
-// ComputedAPR ..
-type ComputedAPR struct {
-	Result *big.Int `json:"current-apr"`
-}
-
 // ValidatorWrapper contains validator,
 // its delegation information
 type ValidatorWrapper struct {
@@ -121,7 +116,7 @@ func NewComputed(
 // NewEmptyStats ..
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
-		ComputedAPR{},
+		numeric.ZeroDec(),
 		numeric.ZeroDec(),
 		[]votepower.VoteOnSubcomittee{},
 	}
@@ -166,7 +161,7 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// APR ..
-	APR ComputedAPR `json:"current-apr"`
+	APR numeric.Dec `json:"current-apr"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `json:"total-effective-stake"`
 	// MetricsPerShard ..

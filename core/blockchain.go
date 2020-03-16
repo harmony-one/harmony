@@ -50,6 +50,7 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
@@ -2266,6 +2267,8 @@ func (bc *BlockChain) ReadValidatorStats(
 func (bc *BlockChain) UpdateValidatorVotingPower(
 	batch rawdb.DatabaseWriter,
 	newEpochSuperCommittee, currentEpochSuperCommittee *shard.State,
+	// NOTE Do not update this state, only read from
+	state *state.DB,
 ) error {
 	if newEpochSuperCommittee == nil {
 		return shard.ErrSuperCommitteeNil
@@ -2281,7 +2284,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		}
 		rosters[i] = roster
 	}
-
+	blkPerEpoch := shard.Schedule.BlocksPerEpoch()
 	networkWide := votepower.AggregateRosters(rosters)
 	for key, value := range networkWide {
 		stats, err := rawdb.ReadValidatorStats(bc.db, key)
@@ -2294,6 +2297,18 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		}
 		stats.TotalEffectiveStake = total
 		stats.MetricsPerShard = value
+		wrapper, err := state.ValidatorWrapper(key)
+		if err != nil {
+			return err
+		}
+		aprComputed, err := apr.ComputeForValidator(
+			bc, newEpochSuperCommittee.Epoch,
+			state, wrapper, blkPerEpoch,
+		)
+		stats.APR = *aprComputed
+		if err != nil {
+			return err
+		}
 		if err := rawdb.WriteValidatorStats(
 			batch, key, stats,
 		); err != nil {
@@ -2306,12 +2321,10 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		newEpochSuperCommittee.StakedValidators()
 	for currentValidator := range existing.LookupSet {
 		if _, keptSlot := replacing.LookupSet[currentValidator]; !keptSlot {
-
 			// TODO Someone: collect and then delete every 30 epochs
 			// rawdb.DeleteValidatorSnapshot(
 			// 	bc.db, currentValidator, currentEpochSuperCommittee.Epoch,
 			// )
-
 			rawdb.DeleteValidatorStats(bc.db, currentValidator)
 		}
 	}
