@@ -139,7 +139,7 @@ func AccumulateRewards(
 				due := defaultReward.Mul(
 					voter.OverallPercent.Quo(votepower.StakersShare),
 				).RoundInt()
-				newRewards = new(big.Int).Add(newRewards, due)
+				newRewards.Add(newRewards, due)
 				if err := state.AddReward(snapshot, due); err != nil {
 					return network.EmptyPayout, err
 				}
