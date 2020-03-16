@@ -47,6 +47,7 @@ func expectedRewardPerYear(
 	if diffTime.Sign() == -1 {
 		return nil, errors.New("time stamp diff cannot be negative")
 	}
+	// TODO some more sanity checks of some sort?
 
 	expectedValue := new(big.Int).Div(diffReward, diffTime)
 	return new(big.Int).Mul(expectedValue, oneYear), nil
@@ -81,10 +82,6 @@ func ComputeForValidator(
 	if err != nil {
 		return nil, ErrNotOneEpochsAgo
 	}
-
-	// avg_reward_per_block = total_reward_per_epoch / blocks_per_epoch
-	// estimated_reward_per_year = avg_reward_per_block * blocks_per_year
-	// estimated_reward_per_year / total_stake
 
 	blockNumAtTwoEpochAgo, blockNumAtOneEpochAgo :=
 		shard.Schedule.EpochLastBlock(twoEpochAgo.Uint64()),

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -32,12 +31,8 @@ var (
 	votingPowerCache singleflight.Group
 )
 
-const (
-	votepowerCacheTimeLimit = 3 * time.Minute
-)
-
 func lookupVotingPower(
-	epoch *big.Int, subComm *shard.Committee,
+	epoch, currentEpoch *big.Int, subComm *shard.Committee,
 ) (*votepower.Roster, error) {
 	key := fmt.Sprintf("%s-%d", epoch.String(), subComm.ShardID)
 	results, err, _ := votingPowerCache.Do(
@@ -46,16 +41,19 @@ func lookupVotingPower(
 			if err != nil {
 				return nil, err
 			}
-			go func() {
-				time.Sleep(votepowerCacheTimeLimit)
-				votingPowerCache.Forget(key)
-			}()
 			return votingPower, nil
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	if new(big.Int).Sub(currentEpoch, epoch).Cmp(common.Big3) == 1 {
+		go func() {
+			votingPowerCache.Forget(key)
+		}()
+	}
+
 	return results.(*votepower.Roster), nil
 }
 
@@ -81,6 +79,7 @@ func AccumulateRewards(
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		defaultReward := network.BaseStakedReward
+		beaconCurrentEpoch := beaconChain.CurrentHeader().Epoch()
 		// TODO Use cached result in off-chain db instead of full computation
 		_, percentageStaked, err := network.WhatPercentStakedNow(
 			beaconChain, header.Time().Int64(),
@@ -122,7 +121,7 @@ func AccumulateRewards(
 		}
 		// votingPower, err := votepower.Compute(&comm)
 		votingPower, err := lookupVotingPower(
-			header.Epoch(), &subComm,
+			header.Epoch(), beaconCurrentEpoch, &subComm,
 		)
 		if err != nil {
 			return network.EmptyPayout, err
@@ -200,7 +199,9 @@ func AccumulateRewards(
 					return network.EmptyPayout, err
 				}
 
-				votingPower, err := lookupVotingPower(epoch, subComm)
+				votingPower, err := lookupVotingPower(
+					epoch, beaconCurrentEpoch, subComm,
+				)
 
 				if err != nil {
 					return network.EmptyPayout, err
