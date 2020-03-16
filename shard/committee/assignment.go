@@ -11,6 +11,7 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -46,7 +47,7 @@ type CandidatesForEPoS struct {
 
 // CompletedEPoSRound ..
 type CompletedEPoSRound struct {
-	MedianStake                *big.Int                 `json:"median-stake"`
+	MedianStake                numeric.Dec              `json:"median-stake"`
 	MaximumExternalSlotAllowed int                      `json:"max-external-slots"`
 	AuctionWinners             []effective.SlotPurchase `json:"epos-slot-winners"`
 }
@@ -85,9 +86,6 @@ func prepareOrders(
 			return nil, err
 		}
 		if !staking.IsEligibleForEPoSAuction(validator) {
-			continue
-		}
-		if err := validator.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {
 			continue
 		}
 
@@ -223,12 +221,6 @@ func eposStakedCommittee(
 	}
 
 	completedEPoSRound, err := NewEPoSRound(stakerReader)
-
-	if completedEPoSRound.MaximumExternalSlotAllowed == 0 {
-		utils.Logger().Info().
-			Msg("committe composed only of harmony node")
-		return shardState, nil
-	}
 
 	if err != nil {
 		return nil, err

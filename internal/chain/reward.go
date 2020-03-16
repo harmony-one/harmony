@@ -48,6 +48,7 @@ func lookupVotingPower(
 		return nil, err
 	}
 
+	// TODO consider if this is the best way to clear the cache
 	if new(big.Int).Sub(currentEpoch, epoch).Cmp(common.Big3) == 1 {
 		go func() {
 			votingPowerCache.Forget(key)

@@ -821,7 +821,9 @@ func (s *PublicBlockChainAPI) GetCirculatingSupply() (numeric.Dec, error) {
 }
 
 // GetStakingNetworkInfo ..
-func (s *PublicBlockChainAPI) GetStakingNetworkInfo(ctx context.Context) (*StakingNetworkInfo, error) {
+func (s *PublicBlockChainAPI) GetStakingNetworkInfo(
+	ctx context.Context,
+) (*StakingNetworkInfo, error) {
 	if s.b.GetShardID() != shard.BeaconChainShardID {
 		return nil, errNotBeaconChainShard
 	}

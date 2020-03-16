@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -22,11 +23,11 @@ type Reader interface {
 }
 
 const (
-	nanoSecondsInYear = time.Nanosecond * 3.154e+16
+	secondsInYear = time.Second * 3.154e+7
 )
 
 var (
-	oneYear = big.NewInt(int64(nanoSecondsInYear))
+	oneYear = big.NewInt(int64(secondsInYear))
 	// ErrNotTwoEpochsAgo ..
 	ErrNotTwoEpochsAgo = errors.New("not two epochs ago yet")
 	// ErrNotOneEpochsAgo ..
@@ -48,7 +49,6 @@ func expectedRewardPerYear(
 		return nil, errors.New("time stamp diff cannot be negative")
 	}
 	// TODO some more sanity checks of some sort?
-
 	expectedValue := new(big.Int).Div(diffReward, diffTime)
 	return new(big.Int).Mul(expectedValue, oneYear), nil
 }
@@ -60,7 +60,7 @@ func ComputeForValidator(
 	state *state.DB,
 	validatorNow *staking.ValidatorWrapper,
 	blocksPerEpoch uint64,
-) (*big.Int, error) {
+) (*numeric.Dec, error) {
 	twoEpochAgo, oneEpochAgo :=
 		new(big.Int).Sub(now, common.Big2),
 		new(big.Int).Sub(now, common.Big1)
@@ -95,7 +95,12 @@ func ComputeForValidator(
 		blocksPerEpoch,
 	)
 
-	return new(big.Int).Div(
-		estimatedRewardPerYear, validatorNow.TotalDelegation(),
-	), nil
+	if err != nil {
+		return nil, err
+	}
+
+	result := numeric.NewDecFromBigInt(estimatedRewardPerYear).Quo(
+		numeric.NewDecFromBigInt(validatorNow.TotalDelegation()),
+	)
+	return &result, nil
 }

@@ -487,5 +487,5 @@ type StakingNetworkInfo struct {
 	CirculatingSupply numeric.Dec `json:"circulating-supply"`
 	EpochLastBlock    uint64      `json:"epoch-last-block"`
 	TotalStaking      *big.Int    `json:"total-staking"`
-	MedianRawStake    *big.Int    `json:"median-raw-stake"`
+	MedianRawStake    numeric.Dec `json:"median-raw-stake"`
 }
