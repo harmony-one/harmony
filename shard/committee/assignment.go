@@ -68,7 +68,9 @@ func NewEPoSRound(stakedReader StakingCandidatesReader) (
 		eligibleCandidate, maxExternalSlots,
 	)
 
-	return &CompletedEPoSRound{median, maxExternalSlots, winners}, nil
+	// TODO + 1 because we use it as index in assigment,
+	// but as count in semantics
+	return &CompletedEPoSRound{median, maxExternalSlots + 1, winners}, nil
 }
 
 func prepareOrders(
