@@ -164,7 +164,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			Msg("[OnPrepared] BlockHash not match")
 		return false
 	}
-	if consensus.current.Mode() == Normal || consensus.current.Mode() == Syncing {
+	if consensus.current.Mode() == Normal {
 		err := chain.Engine.VerifyHeader(consensus.ChainReader, blockObj.Header(), true)
 		if err != nil {
 			consensus.getLogger().Error().
