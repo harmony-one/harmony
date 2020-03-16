@@ -2305,9 +2305,12 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		newEpochSuperCommittee.StakedValidators()
 	for currentValidator := range existing.LookupSet {
 		if _, keptSlot := replacing.LookupSet[currentValidator]; !keptSlot {
-			rawdb.DeleteValidatorSnapshot(
-				bc.db, currentValidator, currentEpochSuperCommittee.Epoch,
-			)
+
+			// TODO Someone: collect and then delete every 30 epochs
+			// rawdb.DeleteValidatorSnapshot(
+			// 	bc.db, currentValidator, currentEpochSuperCommittee.Epoch,
+			// )
+
 			rawdb.DeleteValidatorStats(bc.db, currentValidator)
 		}
 	}
