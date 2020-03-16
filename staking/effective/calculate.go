@@ -48,8 +48,9 @@ func (p SlotPurchase) MarshalJSON() ([]byte, error) {
 
 // SlotOrder ..
 type SlotOrder struct {
-	Stake       *big.Int
-	SpreadAmong []shard.BlsPublicKey
+	Stake       *big.Int             `json:"stake"`
+	SpreadAmong []shard.BlsPublicKey `json:"keys-at-auction"`
+	Percentage  numeric.Dec          `json:"percentage-of-total-auction-stake"`
 }
 
 // Median ..
@@ -77,7 +78,7 @@ func Median(stakes []SlotPurchase) numeric.Dec {
 
 // Compute ..
 func Compute(
-	shortHand map[common.Address]SlotOrder, pull int,
+	shortHand map[common.Address]*SlotOrder, pull int,
 ) (numeric.Dec, []SlotPurchase) {
 	eposedSlots := []SlotPurchase{}
 	if len(shortHand) == 0 {
@@ -86,7 +87,7 @@ func Compute(
 
 	type t struct {
 		addr common.Address
-		slot SlotOrder
+		slot *SlotOrder
 	}
 
 	shorter := []t{}
@@ -138,7 +139,7 @@ func Compute(
 }
 
 // Apply ..
-func Apply(shortHand map[common.Address]SlotOrder, pull int) (
+func Apply(shortHand map[common.Address]*SlotOrder, pull int) (
 	numeric.Dec, []SlotPurchase,
 ) {
 	median, picks := Compute(shortHand, pull)

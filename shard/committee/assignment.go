@@ -47,9 +47,10 @@ type CandidatesForEPoS struct {
 
 // CompletedEPoSRound ..
 type CompletedEPoSRound struct {
-	MedianStake                numeric.Dec              `json:"median-stake"`
-	MaximumExternalSlotAllowed int                      `json:"max-external-slots"`
-	AuctionWinners             []effective.SlotPurchase `json:"epos-slot-winners"`
+	MedianStake         numeric.Dec              `json:"median-stake"`
+	MaximumExternalSlot int                      `json:"max-external-slots"`
+	AuctionWinners      []effective.SlotPurchase `json:"epos-slot-winners"`
+	AuctionCandidates   []*effective.SlotOrder   `json:"epos-slot-candidates"`
 }
 
 // NewEPoSRound runs a fresh computation of EPoS using
@@ -67,18 +68,31 @@ func NewEPoSRound(stakedReader StakingCandidatesReader) (
 	median, winners := effective.Apply(
 		eligibleCandidate, maxExternalSlots,
 	)
+	auctionCandidates := make([]*effective.SlotOrder, len(eligibleCandidate))
 
-	// TODO + 1 because we use it as index in assigment,
-	// but as count in semantics
-	return &CompletedEPoSRound{median, maxExternalSlots + 1, winners}, nil
+	i := 0
+	for key := range eligibleCandidate {
+		auctionCandidates[i] = eligibleCandidate[key]
+		i++
+	}
+
+	return &CompletedEPoSRound{
+		MedianStake: median,
+		// NOTE + 1 because we use it as index in assigment,
+		// but as count in semantics
+		MaximumExternalSlot: maxExternalSlots + 1,
+		AuctionWinners:      winners,
+		AuctionCandidates:   auctionCandidates,
+	}, nil
 }
 
 func prepareOrders(
 	stakedReader StakingCandidatesReader,
-) (map[common.Address]effective.SlotOrder, error) {
+) (map[common.Address]*effective.SlotOrder, error) {
 	candidates := stakedReader.ValidatorCandidates()
 	blsKeys := map[shard.BlsPublicKey]struct{}{}
-	essentials := map[common.Address]effective.SlotOrder{}
+	essentials := map[common.Address]*effective.SlotOrder{}
+	totalStaked, tempZero := big.NewInt(0), numeric.ZeroDec()
 
 	for i := range candidates {
 		validator, err := stakedReader.ReadValidatorInformation(
@@ -98,6 +112,8 @@ func prepareOrders(
 			)
 		}
 
+		totalStaked.Add(totalStaked, validatorStake)
+
 		found := false
 		for _, key := range validator.SlotPubKeys {
 			if _, ok := blsKeys[key]; ok {
@@ -111,10 +127,16 @@ func prepareOrders(
 			continue
 		}
 
-		essentials[validator.Address] = effective.SlotOrder{
+		essentials[validator.Address] = &effective.SlotOrder{
 			validatorStake,
 			validator.SlotPubKeys,
+			tempZero,
 		}
+	}
+	totalStakedDec := numeric.NewDecFromBigInt(totalStaked)
+
+	for _, value := range essentials {
+		value.Percentage = numeric.NewDecFromBigInt(value.Stake).Quo(totalStakedDec)
 	}
 
 	return essentials, nil
