@@ -97,11 +97,9 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		intendedForLeader &&
 		consensus.leaderSanityChecks(msg):
 		consensus.onCommit(msg)
-	case t == msg_pb.MessageType_VIEWCHANGE &&
-		consensus.viewChangeSanityCheck(msg):
+	case t == msg_pb.MessageType_VIEWCHANGE:
 		consensus.onViewChange(msg)
-	case t == msg_pb.MessageType_NEWVIEW &&
-		consensus.viewChangeSanityCheck(msg):
+	case t == msg_pb.MessageType_NEWVIEW:
 		consensus.onNewView(msg)
 	}
 }
