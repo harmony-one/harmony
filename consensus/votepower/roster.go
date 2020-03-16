@@ -3,7 +3,6 @@ package votepower
 import (
 	"encoding/hex"
 	"encoding/json"
-	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -73,7 +72,7 @@ type PureStakedVote struct {
 	EarningAccount common.Address     `json:"earning-account"`
 	Identity       shard.BlsPublicKey `json:"bls-public-key"`
 	GroupPercent   numeric.Dec        `json:"group-percent"`
-	EffectiveStake *big.Int           `json:"effective-stake"`
+	EffectiveStake numeric.Dec        `json:"effective-stake"`
 }
 
 // AccommodateHarmonyVote ..
@@ -92,7 +91,7 @@ func (v AccommodateHarmonyVote) String() string {
 type topLevelRegistry struct {
 	OurVotingPowerTotalPercentage   numeric.Dec
 	TheirVotingPowerTotalPercentage numeric.Dec
-	RawStakedTotal                  *big.Int
+	TotalEffectiveStake             numeric.Dec
 	HMYSlotCount                    int64
 }
 
@@ -165,17 +164,13 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 
 	for i := range staked {
 		if e := staked[i].EffectiveStake; e != nil {
-			roster.RawStakedTotal.Add(
-				roster.RawStakedTotal, e.TruncateInt(),
-			)
+			roster.TotalEffectiveStake = roster.TotalEffectiveStake.Add(*e)
 		} else {
 			roster.HMYSlotCount++
 		}
 	}
 
-	asDecTotal, asDecHMYSlotCount :=
-		numeric.NewDecFromBigInt(roster.RawStakedTotal),
-		numeric.NewDec(roster.HMYSlotCount)
+	asDecHMYSlotCount := numeric.NewDec(roster.HMYSlotCount)
 	// TODO Check for duplicate BLS Keys
 	ourPercentage := numeric.ZeroDec()
 	theirPercentage := numeric.ZeroDec()
@@ -187,7 +182,7 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 				EarningAccount: staked[i].EcdsaAddress,
 				Identity:       staked[i].BlsPublicKey,
 				GroupPercent:   numeric.ZeroDec(),
-				EffectiveStake: big.NewInt(0),
+				EffectiveStake: numeric.ZeroDec(),
 			},
 			OverallPercent: numeric.ZeroDec(),
 			IsHarmonyNode:  false,
@@ -195,10 +190,8 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 
 		// Real Staker
 		if e := staked[i].EffectiveStake; e != nil {
-			member.EffectiveStake.Add(
-				member.EffectiveStake, (*e).TruncateInt(),
-			)
-			member.GroupPercent = e.Quo(asDecTotal)
+			member.EffectiveStake = member.EffectiveStake.Add(*e)
+			member.GroupPercent = e.Quo(roster.TotalEffectiveStake)
 			member.OverallPercent = member.GroupPercent.Mul(StakersShare)
 			theirPercentage = theirPercentage.Add(member.OverallPercent)
 			lastStakedVoter = &member
@@ -240,7 +233,7 @@ func NewRoster(shardID uint32) *Roster {
 		topLevelRegistry: topLevelRegistry{
 			OurVotingPowerTotalPercentage:   numeric.ZeroDec(),
 			TheirVotingPowerTotalPercentage: numeric.ZeroDec(),
-			RawStakedTotal:                  big.NewInt(0),
+			TotalEffectiveStake:             numeric.ZeroDec(),
 		},
 		ShardID: shardID,
 	}

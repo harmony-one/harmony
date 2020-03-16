@@ -91,7 +91,7 @@ type ValidatorWrapper struct {
 	//
 	Counters counters
 	// All the rewarded accumulated so far
-	BlockReward *big.Int `json:"block-reward-accumulated"`
+	BlockReward *big.Int
 }
 
 // Computed represents current epoch
@@ -118,22 +118,11 @@ func NewComputed(
 	return &Computed{signed, toSign, blocksLeft, percent, isBelowNow}
 }
 
-// These mostly done for places where a sane default value needed,
-// like at the RPC layer
-var (
-	// NoSigningDone ..
-	NoSigningDone = Computed{
-		common.Big0, common.Big0, 0, numeric.ZeroDec(), true,
-	}
-	// EmptyPerformance ..
-	EmptyPerformance = CurrentEpochPerformance{NoSigningDone}
-)
-
 // NewEmptyStats ..
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
 		ComputedAPR{},
-		big.NewInt(0),
+		numeric.ZeroDec(),
 		[]votepower.VoteOnSubcomittee{},
 	}
 }
@@ -165,10 +154,12 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 		Validator
 		Address     string      `json:"address"`
 		Delegations Delegations `json:"delegations"`
+		BlockReward *big.Int    `json:"block-reward-accumulated"`
 	}{
 		w.Validator,
 		common2.MustAddressToBech32(w.Address),
 		w.Delegations,
+		w.BlockReward,
 	})
 }
 
@@ -177,7 +168,7 @@ type ValidatorStats struct {
 	// APR ..
 	APR ComputedAPR `json:"current-apr"`
 	// TotalEffectiveStake is the total effective stake this validator has
-	TotalEffectiveStake *big.Int `json:"total-effective-stake"`
+	TotalEffectiveStake numeric.Dec `json:"total-effective-stake"`
 	// MetricsPerShard ..
 	MetricsPerShard []votepower.VoteOnSubcomittee `json:"by-shard"`
 }

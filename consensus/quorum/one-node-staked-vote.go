@@ -181,6 +181,8 @@ func (v *stakedVoteWeight) String() string {
 	return string(s)
 }
 
+// TODO remove this large method, use roster's own Marshal, mix it
+// specific logic here
 func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	voterCount := len(v.roster.Voters)
 	type u struct {
@@ -226,7 +228,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 		parts,
 		v.roster.OurVotingPowerTotalPercentage.String(),
 		v.roster.TheirVotingPowerTotalPercentage.String(),
-		v.roster.RawStakedTotal.String(),
+		v.roster.TotalEffectiveStake.String(),
 	})
 }
 

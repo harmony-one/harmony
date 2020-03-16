@@ -47,6 +47,7 @@ import (
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -2287,9 +2288,9 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		if err != nil {
 			stats = staking.NewEmptyStats()
 		}
-		total := big.NewInt(0)
+		total := numeric.ZeroDec()
 		for i := range value {
-			total.Add(total, value[i].EffectiveStake)
+			total = total.Add(value[i].EffectiveStake)
 		}
 		stats.TotalEffectiveStake = total
 		stats.MetricsPerShard = value
