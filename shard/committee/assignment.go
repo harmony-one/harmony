@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -47,10 +48,26 @@ type CandidatesForEPoS struct {
 
 // CompletedEPoSRound ..
 type CompletedEPoSRound struct {
-	MedianStake         numeric.Dec              `json:"median-stake"`
+	MedianStake         numeric.Dec              `json:"epos-median-stake"`
 	MaximumExternalSlot int                      `json:"max-external-slots"`
 	AuctionWinners      []effective.SlotPurchase `json:"epos-slot-winners"`
-	AuctionCandidates   []*effective.SlotOrder   `json:"epos-slot-candidates"`
+	AuctionCandidates   []*CandidateOrder        `json:"epos-slot-candidates"`
+}
+
+// CandidateOrder ..
+type CandidateOrder struct {
+	*effective.SlotOrder
+	Validator common.Address
+}
+
+// MarshalJSON ..
+func (p CandidateOrder) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		*effective.SlotOrder
+		Validator string `json:"validator"`
+	}{
+		p.SlotOrder, common2.MustAddressToBech32(p.Validator),
+	})
 }
 
 // NewEPoSRound runs a fresh computation of EPoS using
@@ -68,11 +85,14 @@ func NewEPoSRound(stakedReader StakingCandidatesReader) (
 	median, winners := effective.Apply(
 		eligibleCandidate, maxExternalSlots,
 	)
-	auctionCandidates := make([]*effective.SlotOrder, len(eligibleCandidate))
+	auctionCandidates := make([]*CandidateOrder, len(eligibleCandidate))
 
 	i := 0
 	for key := range eligibleCandidate {
-		auctionCandidates[i] = eligibleCandidate[key]
+		auctionCandidates[i] = &CandidateOrder{
+			SlotOrder: eligibleCandidate[key],
+			Validator: key,
+		}
 		i++
 	}
 
