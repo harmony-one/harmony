@@ -160,7 +160,7 @@ func Verify(
 		return err
 	}
 
-	if wrapper.EPOSStatus == effective.BannedForever {
+	if wrapper.Status == effective.Banned {
 		return errAlreadyBannedValidator
 	}
 
@@ -459,7 +459,7 @@ func Apply(
 		}
 
 		// finally, kick them off forever
-		current.EPOSStatus = effective.BannedForever
+		current.Status = effective.Banned
 		utils.Logger().Info().
 			RawJSON("delegation-current", []byte(current.String())).
 			RawJSON("slash", []byte(slash.String())).

@@ -25,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/availability"
+	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -335,12 +336,16 @@ func (b *APIBackend) GetValidatorInformation(
 	}
 
 	now := b.hmy.BlockChain().CurrentHeader().Epoch()
+	inCommittee := now.Cmp(wrapper.LastEpochInCommittee) == 0
 	defaultReply := &staking.ValidatorRPCEnchanced{
-		CurrentlyInCommittee: false,
+		CurrentlyInCommittee: inCommittee,
 		Wrapper:              *wrapper,
 		Performance:          nil,
 		ComputedMetrics:      nil,
 		TotalDelegated:       wrapper.TotalDelegation(),
+		EPoSStatus: effective.ValidatorStatus(
+			inCommittee, wrapper.Status == effective.Active,
+		).String(),
 	}
 
 	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
@@ -350,8 +355,6 @@ func (b *APIBackend) GetValidatorInformation(
 	if err != nil {
 		return defaultReply, nil
 	}
-
-	defaultReply.CurrentlyInCommittee = now.Cmp(snapshot.LastEpochInCommittee) == 0
 
 	computed, err := availability.ComputeCurrentSigning(
 		snapshot, wrapper, shard.Schedule.BlocksPerEpoch(),

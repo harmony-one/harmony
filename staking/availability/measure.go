@@ -265,13 +265,13 @@ func computeAndMutateEPOSStatus(
 	const missedTooManyBlocks = true
 
 	switch computed.IsBelowThreshold {
-	// TODO This is off, not hitting this case, come back and fix
-	case missedTooManyBlocks && computed.BlocksLeftInEpoch == 0:
-		wrapper.EPOSStatus = effective.NoCandidacy
-	case missedTooManyBlocks && computed.BlocksLeftInEpoch > 1:
-		wrapper.EPOSStatus = effective.InCommitteeAndFellBelowThreshold
+	case missedTooManyBlocks:
+		wrapper.Status = effective.Inactive
+		utils.Logger().Info().
+			Str("threshold", measure.String()).
+			Msg("validator failed availability threshold, set to inactive")
 	default:
-		wrapper.EPOSStatus = effective.InCommitteeAndSigning
+		wrapper.Status = effective.Active
 	}
 
 	return nil

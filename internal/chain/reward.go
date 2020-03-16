@@ -119,7 +119,6 @@ func AccumulateRewards(
 		); err != nil {
 			return network.EmptyPayout, err
 		}
-		// votingPower, err := votepower.Compute(&comm)
 		votingPower, err := lookupVotingPower(
 			header.Epoch(), beaconCurrentEpoch, &subComm,
 		)

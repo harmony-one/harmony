@@ -151,6 +151,7 @@ type ValidatorRPCEnchanced struct {
 	ComputedMetrics      *ValidatorStats          `json:"metrics"`
 	TotalDelegated       *big.Int                 `json:"total-delegation"`
 	CurrentlyInCommittee bool                     `json:"currently-in-committee"`
+	EPoSStatus           string                   `json:"epos-status"`
 }
 
 func (w ValidatorWrapper) String() string {
@@ -163,12 +164,10 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Validator
 		Address     string      `json:"address"`
-		EPOSStatus  string      `json:"epos-eligibility-status"`
 		Delegations Delegations `json:"delegations"`
 	}{
 		w.Validator,
 		common2.MustAddressToBech32(w.Address),
-		w.EPOSStatus.String(),
 		w.Delegations,
 	})
 }
@@ -203,7 +202,7 @@ type Validator struct {
 	MaxTotalDelegation *big.Int `json:"max-total-delegation"`
 	// Is the validator active in participating
 	// committee selection process or not
-	EPOSStatus effective.Eligibility `json:"epos-eligibility-status"`
+	Status effective.Eligibility `json:"-"`
 	// commission parameters
 	Commission
 	// description for the validator
@@ -331,7 +330,7 @@ func (w *ValidatorWrapper) SanityCheck(
 			errInvalidSelfDelegation, "no self delegation given at all",
 		)
 	default:
-		if w.EPOSStatus != effective.BannedForever &&
+		if w.Status != effective.Banned &&
 			w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidSelfDelegation,
@@ -492,7 +491,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 		LastEpochInCommittee: new(big.Int),
 		MinSelfDelegation:    val.MinSelfDelegation,
 		MaxTotalDelegation:   val.MaxTotalDelegation,
-		EPOSStatus:           effective.FirstTimeCandidate,
+		Status:               effective.Active,
 		Commission:           commission,
 		Description:          desc,
 		CreationHeight:       blockNum,
@@ -560,13 +559,13 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		}
 	}
 
-	switch validator.EPOSStatus {
-	case effective.BannedForever:
+	switch validator.Status {
+	case effective.Banned:
 		return errCannotChangeBannedTaint
 	default:
 		switch edit.EPOSStatus {
-		case effective.Candidate, effective.NoCandidacy:
-			validator.EPOSStatus = edit.EPOSStatus
+		case effective.Active, effective.Inactive:
+			validator.Status = edit.EPOSStatus
 		default:
 		}
 	}
@@ -576,8 +575,8 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 
 // IsEligibleForEPoSAuction ..
 func IsEligibleForEPoSAuction(validator *ValidatorWrapper) bool {
-	switch validator.EPOSStatus {
-	case effective.FirstTimeCandidate, effective.Candidate:
+	switch validator.Status {
+	case effective.Active:
 		return true
 	default:
 		return false
