@@ -7,17 +7,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
 // Reader ..
 type Reader interface {
-	// TODO Remove this field
-	ReadValidatorStats(addr common.Address) (
-		*staking.ValidatorStats, error,
-	)
-
+	GetHeaderByNumber(number uint64) *block.Header
 	ReadValidatorSnapshotAtEpoch(
 		epoch *big.Int,
 		addr common.Address,
@@ -63,8 +60,12 @@ func ComputeForValidator(
 	validatorNow *staking.ValidatorWrapper,
 	blocksPerEpoch uint64,
 ) (*big.Int, error) {
-	twoSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
+	twoEpochAgo, oneEpochAgo :=
 		new(big.Int).Sub(now, common.Big2),
+		new(big.Int).Sub(now, common.Big1)
+
+	twoSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
+		twoEpochAgo,
 		validatorNow.Address,
 	)
 
@@ -73,7 +74,7 @@ func ComputeForValidator(
 	}
 
 	oneSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
-		new(big.Int).Sub(now, common.Big1),
+		oneEpochAgo,
 		validatorNow.Address,
 	)
 
@@ -84,9 +85,16 @@ func ComputeForValidator(
 	// avg_reward_per_block = total_reward_per_epoch / blocks_per_epoch
 	// estimated_reward_per_year = avg_reward_per_block * blocks_per_year
 	// estimated_reward_per_year / total_stake
+
+	blockNumAtTwoEpochAgo, blockNumAtOneEpochAgo :=
+		shard.Schedule.EpochLastBlock(twoEpochAgo.Uint64()),
+		shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64())
+
 	estimatedRewardPerYear, err := expectedRewardPerYear(
-		nil, nil,
-		oneSnapshotAgo, twoSnapshotAgo,
+		bc.GetHeaderByNumber(blockNumAtOneEpochAgo),
+		bc.GetHeaderByNumber(blockNumAtTwoEpochAgo),
+		oneSnapshotAgo,
+		twoSnapshotAgo,
 		blocksPerEpoch,
 	)
 
