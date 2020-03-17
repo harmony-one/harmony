@@ -96,6 +96,7 @@ func ComputeForValidator(
 		bc.GetHeaderByNumber(blockNumAtOneEpochAgo),
 		bc.GetHeaderByNumber(blockNumAtTwoEpochAgo)
 
+	// TODO Figure out why this is happening
 	if headerOneEpochAgo == nil || headerTwoEpochAgo == nil {
 		utils.Logger().Debug().
 			Msgf("apr compute headers epochs ago %+v %+v %+v %+v %+v %+v",
@@ -103,6 +104,7 @@ func ComputeForValidator(
 				blockNumAtTwoEpochAgo, blockNumAtOneEpochAgo,
 				headerOneEpochAgo, headerTwoEpochAgo,
 			)
+		return &zero, nil
 	}
 
 	estimatedRewardPerYear, err := expectedRewardPerYear(
