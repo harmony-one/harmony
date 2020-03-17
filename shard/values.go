@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
@@ -27,5 +28,10 @@ func ExternalSlotsAvailableForEpoch(epoch *big.Int) int {
 		(instance.NumNodesPerShard() -
 			instance.NumHarmonyOperatedNodesPerShard()) *
 			int(instance.NumShards())
+	if stakedSlots == 0 {
+		utils.Logger().Debug().
+			Uint64("epoch", epoch.Uint64()).
+			Msg("have 0 external slots for in this epoch - perhaps bad config")
+	}
 	return stakedSlots
 }

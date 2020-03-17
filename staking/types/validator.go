@@ -206,7 +206,6 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 		return err
 	}
 
-	// TODO(audit): add limit on the number of bls keys one can have.
 	if len(v.SlotPubKeys) == 0 {
 		return errNeedAtLeastOneSlotKey
 	}
