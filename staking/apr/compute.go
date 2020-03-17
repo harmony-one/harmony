@@ -48,6 +48,10 @@ func expectedRewardPerYear(
 	if diffTime.Sign() == -1 {
 		return nil, errors.New("time stamp diff cannot be negative")
 	}
+	if diffTime.Cmp(common.Big0) == 0 {
+		return nil, errors.New("cannot div by zero of diff in time")
+	}
+
 	// TODO some more sanity checks of some sort?
 	expectedValue := new(big.Int).Div(diffReward, diffTime)
 	return new(big.Int).Mul(expectedValue, oneYear), nil
@@ -61,9 +65,10 @@ func ComputeForValidator(
 	validatorNow *staking.ValidatorWrapper,
 	blocksPerEpoch uint64,
 ) (*numeric.Dec, error) {
-	twoEpochAgo, oneEpochAgo :=
+	twoEpochAgo, oneEpochAgo, zero :=
 		new(big.Int).Sub(now, common.Big2),
-		new(big.Int).Sub(now, common.Big1)
+		new(big.Int).Sub(now, common.Big1),
+		numeric.ZeroDec()
 
 	twoSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
 		twoEpochAgo,
@@ -71,7 +76,7 @@ func ComputeForValidator(
 	)
 
 	if err != nil {
-		return nil, ErrNotTwoEpochsAgo
+		return &zero, nil
 	}
 
 	oneSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
@@ -80,7 +85,7 @@ func ComputeForValidator(
 	)
 
 	if err != nil {
-		return nil, ErrNotOneEpochsAgo
+		return &zero, nil
 	}
 
 	blockNumAtTwoEpochAgo, blockNumAtOneEpochAgo :=
@@ -99,8 +104,17 @@ func ComputeForValidator(
 		return nil, err
 	}
 
+	if estimatedRewardPerYear.Cmp(common.Big0) == 0 {
+		return &zero, nil
+	}
+
+	total := numeric.NewDecFromBigInt(validatorNow.TotalDelegation())
+	if total.IsZero() {
+		return nil, errors.New("zero total delegation will cause div by zero")
+	}
+
 	result := numeric.NewDecFromBigInt(estimatedRewardPerYear).Quo(
-		numeric.NewDecFromBigInt(validatorNow.TotalDelegation()),
+		total,
 	)
 	return &result, nil
 }
