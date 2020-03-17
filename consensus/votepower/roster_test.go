@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
@@ -25,6 +27,7 @@ var (
 )
 
 func init() {
+	shard.Schedule = shardingconfig.LocalnetSchedule
 	for i := 0; i < harmonyNodes; i++ {
 		newSlot := generateRandomSlot()
 		newSlot.EffectiveStake = nil
@@ -74,15 +77,17 @@ func TestCompute(t *testing.T) {
 		}
 
 		// Real Staker
+		harmonyPercent := shard.Schedule.InstanceForEpoch(big.NewInt(3)).HarmonyVotePercent()
+		externalPercent := shard.Schedule.InstanceForEpoch(big.NewInt(3)).ExternalVotePercent()
 		if e := staked[i].EffectiveStake; e != nil {
 			member.EffectiveStake = member.EffectiveStake.Add(*e)
 			member.GroupPercent = e.Quo(expectedRoster.TotalEffectiveStake)
-			member.OverallPercent = member.GroupPercent.Mul(StakersShare)
+			member.OverallPercent = member.GroupPercent.Mul(externalPercent)
 			theirPercentage = theirPercentage.Add(member.OverallPercent)
 		} else { // Our node
 			member.IsHarmonyNode = true
-			member.OverallPercent = HarmonysShare.Quo(asDecHMYSlotCount)
-			member.GroupPercent = member.OverallPercent.Quo(HarmonysShare)
+			member.OverallPercent = harmonyPercent.Quo(asDecHMYSlotCount)
+			member.GroupPercent = member.OverallPercent.Quo(harmonyPercent)
 			ourPercentage = ourPercentage.Add(member.OverallPercent)
 		}
 
@@ -94,7 +99,7 @@ func TestCompute(t *testing.T) {
 
 	computedRoster, err := Compute(&shard.Committee{
 		shard.BeaconChainShardID, slotList,
-	})
+	}, big.NewInt(3))
 	if err != nil {
 		t.Error("Computed Roster failed on vote summation to one")
 	}

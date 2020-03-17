@@ -3,6 +3,8 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/params"
 )
@@ -80,5 +82,5 @@ var stressnetReshardingEpoch = []*big.Int{
 	params.StressnetChainConfig.StakingEpoch,
 }
 
-var stressnetV0 = MustNewInstance(2, 30, 30, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
-var stressnetV1 = MustNewInstance(2, 50, 30, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
+var stressnetV0 = MustNewInstance(2, 30, 30, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
+var stressnetV1 = MustNewInstance(2, 50, 30, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())

@@ -2,6 +2,7 @@ package quorum
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -111,7 +112,7 @@ type Decider interface {
 	fmt.Stringer
 	SignatureReader
 	DependencyInjectionWriter
-	SetVoters(subCommittee *shard.Committee) (*TallyResult, error)
+	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
 	IsQuorumAchieved(Phase) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool

@@ -1,6 +1,7 @@
 package quorum
 
 import (
+	"github.com/harmony-one/harmony/internal/configs/sharding"
 	"math/big"
 	"math/rand"
 	"strconv"
@@ -30,6 +31,7 @@ type secretKeyMap map[shard.BlsPublicKey]bls.SecretKey
 
 func init() {
 	basicDecider = NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
+	shard.Schedule = shardingconfig.LocalnetSchedule
 }
 
 func generateRandomSlot() (shard.Slot, bls.SecretKey) {
@@ -67,7 +69,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 	decider.UpdateParticipants(pubKeys)
 	tally, err := decider.SetVoters(&shard.Committee{
 		shard.BeaconChainShardID, slotList,
-	})
+	}, big.NewInt(3))
 	if err != nil {
 		panic("Unable to SetVoters for Base Case")
 	}
@@ -94,7 +96,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	decider.UpdateParticipants(pubKeys)
 	tally, err := decider.SetVoters(&shard.Committee{
 		shard.BeaconChainShardID, slotList,
-	})
+	}, big.NewInt(3))
 	if err != nil {
 		panic("Unable to SetVoters for Edge Case")
 	}

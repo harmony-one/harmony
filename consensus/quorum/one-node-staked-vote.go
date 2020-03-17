@@ -2,6 +2,7 @@ package quorum
 
 import (
 	"encoding/json"
+	"math/big"
 
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -156,12 +157,12 @@ var (
 )
 
 func (v *stakedVoteWeight) SetVoters(
-	subCommittee *shard.Committee,
+	subCommittee *shard.Committee, epoch *big.Int,
 ) (*TallyResult, error) {
 	v.ResetPrepareAndCommitVotes()
 	v.ResetViewChangeVotes()
 
-	roster, err := votepower.Compute(subCommittee)
+	roster, err := votepower.Compute(subCommittee, epoch)
 	if err != nil {
 		return nil, err
 	}

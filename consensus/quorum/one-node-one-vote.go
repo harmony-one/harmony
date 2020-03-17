@@ -2,6 +2,7 @@ package quorum
 
 import (
 	"encoding/json"
+	"math/big"
 
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -57,7 +58,7 @@ func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
 }
 
 func (v *uniformVoteWeight) SetVoters(
-	subCommittee *shard.Committee,
+	subCommittee *shard.Committee, epoch *big.Int,
 ) (*TallyResult, error) {
 	// NO-OP do not add anything here
 	return nil, nil

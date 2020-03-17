@@ -3,6 +3,8 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 )
@@ -25,6 +27,8 @@ type instance struct {
 	numShards                       uint32
 	numNodesPerShard                int
 	numHarmonyOperatedNodesPerShard int
+	harmonyVotePercent              numeric.Dec
+	externalVotePercent             numeric.Dec
 	hmyAccounts                     []genesis.DeployAccount
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
@@ -34,7 +38,7 @@ type instance struct {
 // NewInstance creates and validates a new sharding configuration based
 // upon given parameters.
 func NewInstance(
-	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
+	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int, harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	reshardingEpoch []*big.Int, blocksE uint64,
@@ -58,10 +62,17 @@ func NewInstance(
 			"numHarmonyOperatedNodesPerShard", numHarmonyOperatedNodesPerShard,
 			"numNodesPerShard", numNodesPerShard)
 	}
+	if harmonyVotePercent.LT(numeric.ZeroDec()) || harmonyVotePercent.GT(numeric.OneDec()) {
+		return nil, ctxerror.New("" +
+			"total voting power of harmony nodes should be within [0, 1]")
+	}
+
 	return instance{
 		numShards:                       numShards,
 		numNodesPerShard:                numNodesPerShard,
 		numHarmonyOperatedNodesPerShard: numHarmonyOperatedNodesPerShard,
+		harmonyVotePercent:              harmonyVotePercent,
+		externalVotePercent:             numeric.OneDec().Sub(harmonyVotePercent),
 		hmyAccounts:                     hmyAccounts,
 		fnAccounts:                      fnAccounts,
 		reshardingEpoch:                 reshardingEpoch,
@@ -73,13 +84,13 @@ func NewInstance(
 // given parameters.  It panics if parameter validation fails.
 // It is intended to be used for static initialization.
 func MustNewInstance(
-	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int,
+	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int, harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	reshardingEpoch []*big.Int, blocksPerEpoch uint64,
 ) Instance {
 	sc, err := NewInstance(
-		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard,
+		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, harmonyVotePercent,
 		hmyAccounts, fnAccounts, reshardingEpoch, blocksPerEpoch,
 	)
 	if err != nil {
@@ -96,6 +107,16 @@ func (sc instance) BlocksPerEpoch() uint64 {
 // NumShards returns the number of shards in the network.
 func (sc instance) NumShards() uint32 {
 	return sc.numShards
+}
+
+// HarmonyVotePercent returns total percentage of voting power harmony nodes possess.
+func (sc instance) HarmonyVotePercent() numeric.Dec {
+	return sc.harmonyVotePercent
+}
+
+// ExternalVotePercent returns total percentage of voting power external validators possess.
+func (sc instance) ExternalVotePercent() numeric.Dec {
+	return sc.externalVotePercent
 }
 
 // NumNodesPerShard returns number of nodes in each shard.

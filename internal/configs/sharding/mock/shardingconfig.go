@@ -8,6 +8,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	sharding "github.com/harmony-one/harmony/internal/configs/sharding"
 	genesis "github.com/harmony-one/harmony/internal/genesis"
+	numeric "github.com/harmony-one/harmony/numeric"
 	big "math/big"
 	reflect "reflect"
 )
@@ -238,6 +239,34 @@ func (m *MockInstance) NumHarmonyOperatedNodesPerShard() int {
 func (mr *MockInstanceMockRecorder) NumHarmonyOperatedNodesPerShard() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NumHarmonyOperatedNodesPerShard", reflect.TypeOf((*MockInstance)(nil).NumHarmonyOperatedNodesPerShard))
+}
+
+// HarmonyVotePercent mocks base method
+func (m *MockInstance) HarmonyVotePercent() numeric.Dec {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HarmonyVotePercent")
+	ret0, _ := ret[0].(numeric.Dec)
+	return ret0
+}
+
+// HarmonyVotePercent indicates an expected call of HarmonyVotePercent
+func (mr *MockInstanceMockRecorder) HarmonyVotePercent() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HarmonyVotePercent", reflect.TypeOf((*MockInstance)(nil).HarmonyVotePercent))
+}
+
+// ExternalVotePercent mocks base method
+func (m *MockInstance) ExternalVotePercent() numeric.Dec {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExternalVotePercent")
+	ret0, _ := ret[0].(numeric.Dec)
+	return ret0
+}
+
+// ExternalVotePercent indicates an expected call of ExternalVotePercent
+func (mr *MockInstanceMockRecorder) ExternalVotePercent() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExternalVotePercent", reflect.TypeOf((*MockInstance)(nil).ExternalVotePercent))
 }
 
 // HmyAccounts mocks base method

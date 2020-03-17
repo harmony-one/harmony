@@ -208,7 +208,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 			return nil, nil
 		})
 
-		if _, err := d.SetVoters(subComm); err != nil {
+		if _, err := d.SetVoters(subComm, slotList.Epoch); err != nil {
 			return err
 		}
 		if !d.IsQuorumAchievedByMask(mask) {
@@ -457,7 +457,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			return nil, nil
 		})
 
-		if _, err := d.SetVoters(subComm); err != nil {
+		if _, err := d.SetVoters(subComm, e); err != nil {
 			return err
 		}
 		if !d.IsQuorumAchievedByMask(mask) {

@@ -3,6 +3,8 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/params"
 )
@@ -78,5 +80,5 @@ var pangaeaReshardingEpoch = []*big.Int{
 	params.PangaeaChainConfig.StakingEpoch,
 }
 
-var pangaeaV0 = MustNewInstance(4, 27, 27, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())
-var pangaeaV1 = MustNewInstance(4, 50, 27, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())
+var pangaeaV0 = MustNewInstance(4, 27, 27, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())
+var pangaeaV1 = MustNewInstance(4, 50, 27, numeric.MustNewDecFromStr("0.68"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())

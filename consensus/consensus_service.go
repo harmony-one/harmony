@@ -484,6 +484,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	committeeToSet := &shard.Committee{}
+	epochToSet := curEpoch
 	hasError := false
 
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
@@ -526,7 +527,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 
 		committeeToSet = subComm
-
+		epochToSet = nextEpoch
 	} else {
 		consensus.SetEpochNum(curEpoch.Uint64())
 		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
@@ -558,7 +559,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// Update voters in the committee
 	if _, err := consensus.Decider.SetVoters(
-		committeeToSet,
+		committeeToSet, epochToSet,
 	); err != nil {
 		utils.Logger().Error().
 			Err(err).
