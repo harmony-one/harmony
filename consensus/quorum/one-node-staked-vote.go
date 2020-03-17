@@ -102,9 +102,6 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 		}
 		if _, didVote := ballot.voters[w]; !didVote &&
 			v.ReadBallot(p, members[i]) != nil {
-			if err := w.FromLibBLSPublicKey(members[i]); err != nil {
-				return nil, err
-			}
 			ballot.currentTotal = ballot.currentTotal.Add(
 				v.roster.Voters[w].OverallPercent,
 			)

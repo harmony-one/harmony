@@ -92,7 +92,7 @@ func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
 	everyone := v.Participants()
 	for _, key := range identity.PublicKey {
 		for i := range everyone {
-			if everyone[i] == key {
+			if key.IsEqual(everyone[i]) {
 				return true
 			}
 		}
