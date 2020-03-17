@@ -2278,7 +2278,10 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 
 	for i := range newEpochSuperCommittee.Shards {
 		subCommittee := &newEpochSuperCommittee.Shards[i]
-		roster, err := votepower.Compute(subCommittee)
+		if newEpochSuperCommittee.Epoch == nil {
+			return errors.New("nil epoch for voting power computation")
+		}
+		roster, err := votepower.Compute(subCommittee, newEpochSuperCommittee.Epoch)
 		if err != nil {
 			return err
 		}

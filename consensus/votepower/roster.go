@@ -3,6 +3,7 @@ package votepower
 import (
 	"encoding/hex"
 	"encoding/json"
+	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -14,10 +15,6 @@ import (
 )
 
 var (
-	// HarmonysShare ..
-	HarmonysShare = numeric.MustNewDecFromStr("0.68")
-	// StakersShare ..
-	StakersShare = numeric.MustNewDecFromStr("0.32")
 	// ErrVotingPowerNotEqualOne ..
 	ErrVotingPowerNotEqualOne = errors.New("voting power not equal to one")
 )
@@ -159,7 +156,10 @@ func AggregateRosters(
 }
 
 // Compute creates a new roster based off the shard.SlotList
-func Compute(subComm *shard.Committee) (*Roster, error) {
+func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
+	if epoch == nil {
+		return nil, errors.New("nil epoch for roster compute")
+	}
 	roster, staked := NewRoster(subComm.ShardID), subComm.Slots
 
 	for i := range staked {
@@ -176,6 +176,8 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 	theirPercentage := numeric.ZeroDec()
 	var lastStakedVoter *AccommodateHarmonyVote
 
+	harmonyPercent := shard.Schedule.InstanceForEpoch(epoch).HarmonyVotePercent()
+	externalPercent := shard.Schedule.InstanceForEpoch(epoch).ExternalVotePercent()
 	for i := range staked {
 		member := AccommodateHarmonyVote{
 			PureStakedVote: PureStakedVote{
@@ -192,13 +194,13 @@ func Compute(subComm *shard.Committee) (*Roster, error) {
 		if e := staked[i].EffectiveStake; e != nil {
 			member.EffectiveStake = member.EffectiveStake.Add(*e)
 			member.GroupPercent = e.Quo(roster.TotalEffectiveStake)
-			member.OverallPercent = member.GroupPercent.Mul(StakersShare)
+			member.OverallPercent = member.GroupPercent.Mul(externalPercent)
 			theirPercentage = theirPercentage.Add(member.OverallPercent)
 			lastStakedVoter = &member
 		} else { // Our node
 			member.IsHarmonyNode = true
-			member.OverallPercent = HarmonysShare.Quo(asDecHMYSlotCount)
-			member.GroupPercent = member.OverallPercent.Quo(HarmonysShare)
+			member.OverallPercent = harmonyPercent.Quo(asDecHMYSlotCount)
+			member.GroupPercent = member.OverallPercent.Quo(harmonyPercent)
 			ourPercentage = ourPercentage.Add(member.OverallPercent)
 		}
 

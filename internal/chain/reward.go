@@ -32,12 +32,12 @@ var (
 )
 
 func lookupVotingPower(
-	epoch, currentEpoch *big.Int, subComm *shard.Committee,
+	epoch, beaconCurrentEpoch *big.Int, subComm *shard.Committee,
 ) (*votepower.Roster, error) {
 	key := fmt.Sprintf("%s-%d", epoch.String(), subComm.ShardID)
 	results, err, _ := votingPowerCache.Do(
 		key, func() (interface{}, error) {
-			votingPower, err := votepower.Compute(subComm)
+			votingPower, err := votepower.Compute(subComm, epoch)
 			if err != nil {
 				return nil, err
 			}
@@ -49,7 +49,7 @@ func lookupVotingPower(
 	}
 
 	// TODO consider if this is the best way to clear the cache
-	if new(big.Int).Sub(currentEpoch, epoch).Cmp(common.Big3) == 1 {
+	if new(big.Int).Sub(beaconCurrentEpoch, epoch).Cmp(common.Big3) == 1 {
 		go func() {
 			votingPowerCache.Forget(key)
 		}()
@@ -127,6 +127,7 @@ func AccumulateRewards(
 			return network.EmptyPayout, err
 		}
 
+		beaconExternalShare := shard.Schedule.InstanceForEpoch(header.Epoch()).ExternalVotePercent()
 		for beaconMember := range payable {
 			// TODO Give out whatever leftover to the last voter/handle
 			// what to do about share of those that didn't sign
@@ -137,7 +138,7 @@ func AccumulateRewards(
 					return network.EmptyPayout, err
 				}
 				due := defaultReward.Mul(
-					voter.OverallPercent.Quo(votepower.StakersShare),
+					voter.OverallPercent.Quo(beaconExternalShare),
 				).RoundInt()
 				newRewards.Add(newRewards, due)
 				if err := state.AddReward(snapshot, due); err != nil {
@@ -169,6 +170,7 @@ func AccumulateRewards(
 			allPayables, allMissing := []slotPayable{}, []slotMissing{}
 
 			for i := range crossLinks {
+
 				cxLink := crossLinks[i]
 				epoch, shardID := cxLink.Epoch(), cxLink.ShardID()
 				if !bc.Config().IsStaking(epoch) {
@@ -207,11 +209,12 @@ func AccumulateRewards(
 					return network.EmptyPayout, err
 				}
 
+				shardExternalShare := shard.Schedule.InstanceForEpoch(cxLink.Epoch()).ExternalVotePercent()
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
 					if !voter.IsHarmonyNode && !voter.OverallPercent.IsZero() {
 						due := defaultReward.Mul(
-							voter.OverallPercent.Quo(votepower.StakersShare),
+							voter.OverallPercent.Quo(shardExternalShare),
 						)
 						allPayables = append(allPayables, slotPayable{
 							Slot:   payableSigners[j],

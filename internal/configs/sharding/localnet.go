@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
@@ -15,7 +18,6 @@ type localnetSchedule struct{}
 
 const (
 	localnetV1Epoch = 1
-	localnetV2Epoch = 2
 
 	localnetEpochBlock1 = 10
 	twoOne              = 5
@@ -28,7 +30,7 @@ const (
 
 func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
-	case epoch.Cmp(big.NewInt(localnetV2Epoch)) >= 0:
+	case epoch.Cmp(params.LocalnetChainConfig.StakingEpoch) >= 0:
 		return localnetV2
 	case epoch.Cmp(big.NewInt(localnetV1Epoch)) >= 0:
 		return localnetV1
@@ -108,10 +110,10 @@ func (ls localnetSchedule) GetShardingStructure(numShard, shardID int) []map[str
 
 var (
 	localnetReshardingEpoch = []*big.Int{
-		big.NewInt(0), big.NewInt(localnetV1Epoch), big.NewInt(localnetV2Epoch),
+		big.NewInt(0), big.NewInt(localnetV1Epoch), params.LocalnetChainConfig.StakingEpoch,
 	}
 	// Number of shards, how many slots on each , how many slots owned by Harmony
-	localnetV0 = MustNewInstance(2, 7, 5, genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
-	localnetV1 = MustNewInstance(2, 8, 5, genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
-	localnetV2 = MustNewInstance(2, 9, 6, genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
+	localnetV0 = MustNewInstance(2, 7, 5, numeric.OneDec(), genesis.LocalHarmonyAccounts, genesis.LocalFnAccounts, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
+	localnetV1 = MustNewInstance(2, 8, 5, numeric.OneDec(), genesis.LocalHarmonyAccountsV1, genesis.LocalFnAccountsV1, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
+	localnetV2 = MustNewInstance(2, 9, 6, numeric.MustNewDecFromStr("0.68"), genesis.LocalHarmonyAccountsV2, genesis.LocalFnAccountsV2, localnetReshardingEpoch, LocalnetSchedule.BlocksPerEpoch())
 )
