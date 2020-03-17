@@ -97,15 +97,13 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 	}()
 
 	for i := range members {
-		w.FromLibBLSPublicKey(members[i])
+		if err := w.FromLibBLSPublicKey(members[i]); err != nil {
+			return nil, err
+		}
 		if _, didVote := ballot.voters[w]; !didVote &&
 			v.ReadBallot(p, members[i]) != nil {
-			err := w.FromLibBLSPublicKey(members[i])
-			if err != nil {
-				return nil, err
-			}
 			ballot.currentTotal = ballot.currentTotal.Add(
-				v.roster.Voters[w].EffectivePercent,
+				v.roster.Voters[w].OverallPercent,
 			)
 			ballot.voters[w] = struct{}{}
 		}
@@ -121,13 +119,12 @@ func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric
 	currentTotal := numeric.ZeroDec()
 
 	for i := range pubKeys {
-		err := w.FromLibBLSPublicKey(pubKeys[i])
-		if err != nil {
+		if err := w.FromLibBLSPublicKey(pubKeys[i]); err != nil {
 			return nil
 		}
 		if enabled, err := mask.KeyEnabled(pubKeys[i]); err == nil && enabled {
 			currentTotal = currentTotal.Add(
-				v.roster.Voters[w].EffectivePercent,
+				v.roster.Voters[w].OverallPercent,
 			)
 		}
 	}
@@ -159,12 +156,12 @@ var (
 )
 
 func (v *stakedVoteWeight) SetVoters(
-	staked shard.SlotList,
+	subCommittee *shard.Committee,
 ) (*TallyResult, error) {
 	v.ResetPrepareAndCommitVotes()
 	v.ResetViewChangeVotes()
 
-	roster, err := votepower.Compute(staked)
+	roster, err := votepower.Compute(subCommittee)
 	if err != nil {
 		return nil, err
 	}
@@ -181,6 +178,8 @@ func (v *stakedVoteWeight) String() string {
 	return string(s)
 }
 
+// TODO remove this large method, use roster's own Marshal, mix it
+// specific logic here
 func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	voterCount := len(v.roster.Voters)
 	type u struct {
@@ -193,7 +192,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	}
 
 	type t struct {
-		Policy            string `json"policy"`
+		Policy            string `json:"policy"`
 		Count             int    `json:"count"`
 		Participants      []u    `json:"committee-members"`
 		HmyVotingPower    string `json:"hmy-voting-power"`
@@ -209,8 +208,8 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 			voter.IsHarmonyNode,
 			common2.MustAddressToBech32(voter.EarningAccount),
 			identity.Hex(),
-			voter.RawPercent.String(),
-			voter.EffectivePercent.String(),
+			voter.GroupPercent.String(),
+			voter.OverallPercent.String(),
 			"",
 		}
 		if !voter.IsHarmonyNode {
@@ -226,7 +225,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 		parts,
 		v.roster.OurVotingPowerTotalPercentage.String(),
 		v.roster.TheirVotingPowerTotalPercentage.String(),
-		v.roster.RawStakedTotal.String(),
+		v.roster.TotalEffectiveStake.String(),
 	})
 }
 

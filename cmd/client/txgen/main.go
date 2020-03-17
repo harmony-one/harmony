@@ -95,7 +95,9 @@ func setUpTXGen() *node.Node {
 		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
-	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityVote, uint32(shardID),
+	)
 	consensusObj, err := consensus.New(myhost, uint32(shardID), p2p.Peer{}, nil, decider)
 	chainDBFactory := &shardchain.MemDBFactory{}
 	txGen := node.New(myhost, consensusObj, chainDBFactory, nil, false) //Changed it : no longer archival node.

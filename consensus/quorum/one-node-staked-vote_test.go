@@ -29,7 +29,7 @@ var (
 type secretKeyMap map[shard.BlsPublicKey]bls.SecretKey
 
 func init() {
-	basicDecider = NewDecider(SuperMajorityStake)
+	basicDecider = NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 }
 
 func generateRandomSlot() (shard.Slot, bls.SecretKey) {
@@ -46,9 +46,9 @@ func generateRandomSlot() (shard.Slot, bls.SecretKey) {
 // 50 Harmony Nodes, 50 Staked Nodes
 func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKeyMap) {
 	slotList := shard.SlotList{}
-	sKeys := make(map[string]secretKeyMap)
-	sKeys[hmy] = make(secretKeyMap)
-	sKeys[reg] = make(secretKeyMap)
+	sKeys := map[string]secretKeyMap{}
+	sKeys[hmy] = secretKeyMap{}
+	sKeys[reg] = secretKeyMap{}
 	pubKeys := []*bls.PublicKey{}
 
 	for i := 0; i < quorumNodes; i++ {
@@ -63,9 +63,11 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 		pubKeys = append(pubKeys, sKey.GetPublicKey())
 	}
 
-	decider := NewDecider(SuperMajorityStake)
+	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 	decider.UpdateParticipants(pubKeys)
-	tally, err := decider.SetVoters(slotList)
+	tally, err := decider.SetVoters(&shard.Committee{
+		shard.BeaconChainShardID, slotList,
+	})
 	if err != nil {
 		panic("Unable to SetVoters for Base Case")
 	}
@@ -75,7 +77,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 // 33 Harmony Nodes, 67 Staked Nodes
 func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	slotList := shard.SlotList{}
-	sKeys := make(secretKeyMap)
+	sKeys := secretKeyMap{}
 	pubKeys := []*bls.PublicKey{}
 
 	for i := 0; i < quorumNodes; i++ {
@@ -88,9 +90,11 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 		pubKeys = append(pubKeys, sKey.GetPublicKey())
 	}
 
-	decider := NewDecider(SuperMajorityStake)
+	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 	decider.UpdateParticipants(pubKeys)
-	tally, err := decider.SetVoters(slotList)
+	tally, err := decider.SetVoters(&shard.Committee{
+		shard.BeaconChainShardID, slotList,
+	})
 	if err != nil {
 		panic("Unable to SetVoters for Edge Case")
 	}

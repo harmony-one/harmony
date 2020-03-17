@@ -19,7 +19,9 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
-	decider := quorum.NewDecider(quorum.SuperMajorityVote)
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityVote, shard.BeaconChainShardID,
+	)
 	consensus, err := New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(bls.RandPrivateKey()), decider,
 	)

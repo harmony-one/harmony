@@ -206,20 +206,23 @@ func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address, epoch *big
 	}
 }
 
-// ReadValidatorStats retrieves validator's stats by its address
+// DeleteValidatorStats ..
+func DeleteValidatorStats(db DatabaseDeleter, addr common.Address) {
+	if err := db.Delete(validatorStatsKey(addr)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete stats of a validator")
+	}
+}
+
+// ReadValidatorStats retrieves validator's stats by its address,
 func ReadValidatorStats(
 	db DatabaseReader, addr common.Address,
 ) (*staking.ValidatorStats, error) {
 	data, err := db.Get(validatorStatsKey(addr))
-	if err != nil || len(data) == 0 {
-		utils.Logger().Info().Err(err).Msg("ReadValidatorStats")
+	if err != nil {
 		return nil, err
 	}
 	stats := staking.ValidatorStats{}
 	if err := rlp.DecodeBytes(data, &stats); err != nil {
-		utils.Logger().Error().Err(err).
-			Str("address", addr.Hex()).
-			Msg("Unable to decode validator stats from database")
 		return nil, err
 	}
 	return &stats, nil

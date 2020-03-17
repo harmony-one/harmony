@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -20,12 +21,15 @@ func (bc *BlockChain) CommitOffChainData(
 	block *types.Block,
 	receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
-	payout *big.Int,
+	payout reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
 	// Write receipts of the block
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
-
+	isBeaconChain := bc.CurrentHeader().ShardID() == shard.BeaconChainShardID
+	isStaking := bc.chainConfig.IsStaking(block.Epoch())
+	header := block.Header()
+	isNewEpoch := len(header.ShardState()) > 0
 	// Cross-shard txns
 	epoch := block.Header().Epoch()
 	if bc.chainConfig.HasCrossTxFields(block.Epoch()) {
@@ -86,14 +90,15 @@ func (bc *BlockChain) CommitOffChainData(
 	//}
 
 	// Do bookkeeping for new staking txns
-	if err := bc.UpdateStakingMetaData(batch, block.StakingTransactions(), state, epoch); err != nil {
-		utils.Logger().Warn().Msgf("Oops, UpdateStakingMetaData failed, err: %+v", err)
+	if err := bc.UpdateStakingMetaData(
+		batch, block.StakingTransactions(), state, epoch,
+	); err != nil {
+		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")
 		return NonStatTy, err
 	}
 
 	// Shard State and Validator Update
-	header := block.Header()
-	if len(header.ShardState()) > 0 {
+	if isNewEpoch {
 		// Write shard state for the new epoch
 		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
 		shardState, err := block.Header().GetShardState()
@@ -122,11 +127,14 @@ func (bc *BlockChain) CommitOffChainData(
 	}
 
 	// Update voting power of validators for all shards
-	if ss := block.Header().ShardState(); len(ss) > 0 &&
-		block.ShardID() == shard.BeaconChainShardID {
-		shardState := &shard.State{}
-		if shardState, err = shard.DecodeWrapper(ss); err == nil {
-			if err = bc.UpdateValidatorVotingPower(batch, shardState); err != nil {
+	if isNewEpoch && isBeaconChain {
+		currentSuperCommittee, _ := bc.ReadShardState(bc.CurrentHeader().Epoch())
+		if shardState, err := shard.DecodeWrapper(
+			header.ShardState(),
+		); err == nil {
+			if err := bc.UpdateValidatorVotingPower(
+				batch, shardState, currentSuperCommittee, state,
+			); err != nil {
 				utils.Logger().
 					Err(err).
 					Msg("[UpdateValidatorVotingPower] Failed to update voting power")
@@ -146,14 +154,12 @@ func (bc *BlockChain) CommitOffChainData(
 		if err := rlp.DecodeBytes(
 			header.CrossLinks(), crossLinks,
 		); err != nil {
-			header.Logger(utils.Logger()).
-				Warn().Err(err).
+			header.Logger(utils.Logger()).Err(err).
 				Msg("[insertChain/crosslinks] cannot parse cross links")
 			return NonStatTy, err
 		}
 		if !crossLinks.IsSorted() {
-			header.Logger(utils.Logger()).
-				Warn().Err(err).
+			header.Logger(utils.Logger()).Err(err).
 				Msg("[insertChain/crosslinks] cross links are not sorted")
 			return NonStatTy, errors.New("proposed cross links are not sorted")
 		}
@@ -187,15 +193,20 @@ func (bc *BlockChain) CommitOffChainData(
 		utils.Logger().Debug().Msgf(msg, len(*crossLinks), num)
 	}
 	// Roll up latest crosslinks
-	for i := uint32(0); i < shard.Schedule.InstanceForEpoch(epoch).NumShards(); i++ {
-		bc.LastContinuousCrossLink(batch, i)
+	for i, c := uint32(0), shard.Schedule.InstanceForEpoch(
+		epoch,
+	).NumShards(); i < c; i++ {
+		if err := bc.LastContinuousCrossLink(batch, i); err != nil {
+			utils.Logger().Info().
+				Err(err).Msg("could not batch process last continuous crosslink")
+		}
 	}
 
 	// Update block reward accumulator and slashes
-	if bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		if bc.chainConfig.IsStaking(block.Epoch()) {
+	if isBeaconChain {
+		if isStaking {
 			if err := bc.UpdateBlockRewardAccumulator(
-				batch, payout, block.Number().Uint64(),
+				batch, payout.ReadRoundResult().Total, block.Number().Uint64(),
 			); err != nil {
 				return NonStatTy, err
 			}

@@ -2,13 +2,13 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
+	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -57,7 +57,8 @@ var (
 	errSlotKeyToRemoveNotFound = errors.New("slot key to remove not found")
 	errSlotKeyToAddExists      = errors.New("slot key to add already exists")
 	errDuplicateSlotKeys       = errors.New("slot keys can not have duplicates")
-	errExcessiveBLSKeys        = errors.New("more slot keys provided than allowed")
+	// ErrExcessiveBLSKeys ..
+	ErrExcessiveBLSKeys        = errors.New("more slot keys provided than allowed")
 	errCannotChangeBannedTaint = errors.New("cannot change validator banned status")
 )
 
@@ -77,26 +78,64 @@ type counters struct {
 	NumBlocksSigned *big.Int `json:"num-blocks-signed",rlp:"nil"`
 }
 
-// ValidatorWrapper contains validator and its delegation information
+// ValidatorWrapper contains validator,
+// its delegation information
 type ValidatorWrapper struct {
 	Validator
 	Delegations Delegations
-	Counters    counters
+	//
+	Counters counters
+	// All the rewarded accumulated so far
+	BlockReward *big.Int
 }
 
 // Computed represents current epoch
 // availability measures, mostly for RPC
 type Computed struct {
-	Signed     *big.Int    `json:"current-epoch-signed"`
-	ToSign     *big.Int    `json:"current-epoch-to-sign"`
-	Percentage numeric.Dec `json:"percentage"`
+	Signed            *big.Int    `json:"current-epoch-signed"`
+	ToSign            *big.Int    `json:"current-epoch-to-sign"`
+	BlocksLeftInEpoch uint64      `json:"current-epoch-blocks-left"`
+	Percentage        numeric.Dec `json:"current-epoch-signing-percentage"`
+	IsBelowThreshold  bool        `json:"-"`
+}
+
+func (c Computed) String() string {
+	s, _ := json.Marshal(c)
+	return string(s)
+}
+
+// NewComputed ..
+func NewComputed(
+	signed, toSign *big.Int,
+	blocksLeft uint64,
+	percent numeric.Dec,
+	isBelowNow bool) *Computed {
+	return &Computed{signed, toSign, blocksLeft, percent, isBelowNow}
+}
+
+// NewEmptyStats ..
+func NewEmptyStats() *ValidatorStats {
+	return &ValidatorStats{
+		numeric.ZeroDec(),
+		numeric.ZeroDec(),
+		[]votepower.VoteOnSubcomittee{},
+	}
+}
+
+// CurrentEpochPerformance represents validator performance in the context of
+// whatever current epoch is
+type CurrentEpochPerformance struct {
+	CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
 }
 
 // ValidatorRPCEnchanced contains extra information for RPC consumer
 type ValidatorRPCEnchanced struct {
-	Wrapper                  ValidatorWrapper `json:"validator"`
-	CurrentSigningPercentage Computed         `json:"current-epoch-signing-percent"`
-	CurrentVotingPower       []VotePerShard   `json:"current-epoch-voting-power"`
+	Wrapper              ValidatorWrapper         `json:"validator"`
+	Performance          *CurrentEpochPerformance `json:"current-epoch-performance"`
+	ComputedMetrics      *ValidatorStats          `json:"metrics"`
+	TotalDelegated       *big.Int                 `json:"total-delegation"`
+	CurrentlyInCommittee bool                     `json:"currently-in-committee"`
+	EPoSStatus           string                   `json:"epos-status"`
 }
 
 func (w ValidatorWrapper) String() string {
@@ -109,42 +148,29 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Validator
 		Address     string      `json:"address"`
-		EPOSStatus  string      `json:"epos-eligibility-status"`
 		Delegations Delegations `json:"delegations"`
-		Counters    counters    `json:"availability"`
+		BlockReward *big.Int    `json:"block-reward-accumulated"`
 	}{
 		w.Validator,
 		common2.MustAddressToBech32(w.Address),
-		w.EPOSStatus.String(),
 		w.Delegations,
-		w.Counters,
+		w.BlockReward,
 	})
-}
-
-// VotePerShard ..
-type VotePerShard struct {
-	ShardID             uint32      `json:"shard-id"`
-	VotingPowerRaw      numeric.Dec `json:"voting-power-raw"`
-	VotingPowerAdjusted numeric.Dec `json:"voting-power-adjusted"`
-	EffectiveStake      numeric.Dec `json:"effective-stake"`
-}
-
-// KeysPerShard ..
-type KeysPerShard struct {
-	ShardID uint32               `json:"shard-id"`
-	Keys    []shard.BlsPublicKey `json:"bls-public-keys"`
 }
 
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
-	// The number of times they validator is jailed due to extensive downtime
-	NumJailed *big.Int `rlp:"nil"`
+	// APR ..
+	APR numeric.Dec `json:"current-apr"`
 	// TotalEffectiveStake is the total effective stake this validator has
-	TotalEffectiveStake numeric.Dec `rlp:"nil"`
-	// VotingPowerPerShard ..
-	VotingPowerPerShard []VotePerShard
-	// BLSKeyPerShard ..
-	BLSKeyPerShard []KeysPerShard
+	TotalEffectiveStake numeric.Dec `json:"total-effective-stake"`
+	// MetricsPerShard ..
+	MetricsPerShard []votepower.VoteOnSubcomittee `json:"by-shard"`
+}
+
+func (s ValidatorStats) String() string {
+	str, _ := json.Marshal(s)
+	return string(str)
 }
 
 // Validator - data fields for a validator
@@ -162,7 +188,7 @@ type Validator struct {
 	MaxTotalDelegation *big.Int `json:"max-total-delegation"`
 	// Is the validator active in participating
 	// committee selection process or not
-	EPOSStatus effective.Eligibility `json:"epos-eligibility-status"`
+	Status effective.Eligibility `json:"-"`
 	// commission parameters
 	Commission
 	// description for the validator
@@ -180,7 +206,6 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 		return err
 	}
 
-	// TODO(audit): add limit on the number of bls keys one can have.
 	if len(v.SlotPubKeys) == 0 {
 		return errNeedAtLeastOneSlotKey
 	}
@@ -188,7 +213,7 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 	if c := len(v.SlotPubKeys); oneThirdExtrn != DoNotEnforceMaxBLS &&
 		c > oneThirdExtrn {
 		return errors.Wrapf(
-			errExcessiveBLSKeys, "have: %d allowed: %d",
+			ErrExcessiveBLSKeys, "have: %d allowed: %d",
 			c, oneThirdExtrn,
 		)
 	}
@@ -260,31 +285,6 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 	return nil
 }
 
-// MarshalJSON ..
-func (v *ValidatorStats) MarshalJSON() ([]byte, error) {
-	type t struct {
-		NumJailed           uint64         `json:"blocks-jailed"`
-		TotalEffectiveStake numeric.Dec    `json:"total-effective-stake"`
-		VotingPowerPerShard []VotePerShard `json:"voting-power-per-shard"`
-		BLSKeyPerShard      []KeysPerShard `json:"bls-keys-per-shard"`
-	}
-	return json.Marshal(t{
-		NumJailed:           v.NumJailed.Uint64(),
-		TotalEffectiveStake: v.TotalEffectiveStake,
-		VotingPowerPerShard: v.VotingPowerPerShard,
-		BLSKeyPerShard:      v.BLSKeyPerShard,
-	})
-}
-
-func printSlotPubKeys(pubKeys []shard.BlsPublicKey) string {
-	str := "["
-	for i := range pubKeys {
-		str += fmt.Sprintf("%d: %s,", i, pubKeys[i].Hex())
-	}
-	str += "]"
-	return str
-}
-
 // TotalDelegation - return the total amount of token in delegation
 func (w *ValidatorWrapper) TotalDelegation() *big.Int {
 	total := big.NewInt(0)
@@ -315,7 +315,7 @@ func (w *ValidatorWrapper) SanityCheck(
 			errInvalidSelfDelegation, "no self delegation given at all",
 		)
 	default:
-		if w.EPOSStatus != effective.Banned &&
+		if w.Status != effective.Banned &&
 			w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidSelfDelegation,
@@ -383,35 +383,38 @@ func UpdateDescription(d1, d2 Description) (Description, error) {
 // EnsureLength ensures the length of a validator's description.
 func (d Description) EnsureLength() (Description, error) {
 	if len(d.Name) > MaxNameLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.Name), "maxNameLen", MaxNameLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have",
+			len(d.Name), "maxNameLen", MaxNameLength,
+		)
 	}
 	if len(d.Identity) > MaxIdentityLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.Identity), "maxIdentityLen", MaxIdentityLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have",
+			len(d.Identity), "maxIdentityLen", MaxIdentityLength,
+		)
 	}
 	if len(d.Website) > MaxWebsiteLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.Website), "maxWebsiteLen", MaxWebsiteLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have", len(d.Website),
+			"maxWebsiteLen", MaxWebsiteLength,
+		)
 	}
 	if len(d.SecurityContact) > MaxSecurityContactLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.SecurityContact), "maxSecurityContactLen", MaxSecurityContactLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have",
+			len(d.SecurityContact), "maxSecurityContactLen", MaxSecurityContactLength,
+		)
 	}
 	if len(d.Details) > MaxDetailsLength {
-		return d, ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(d.Details), "maxDetailsLen", MaxDetailsLength)
+		return d, ctxerror.New(
+			"[EnsureLength] Exceed Maximum Length", "have", len(d.Details),
+			"maxDetailsLen", MaxDetailsLength,
+		)
 	}
 
 	return d, nil
 }
-
-// GetAddress returns address
-func (v *Validator) GetAddress() common.Address { return v.Address }
-
-// GetName returns the name of validator in the description
-func (v *Validator) GetName() string { return v.Description.Name }
-
-// GetCommissionRate returns the commission rate of the validator
-func (v *Validator) GetCommissionRate() numeric.Dec { return v.Commission.Rate }
-
-// GetMinSelfDelegation returns the minimum amount the validator must stake
-func (v *Validator) GetMinSelfDelegation() *big.Int { return v.MinSelfDelegation }
 
 // VerifyBLSKeys checks if the public BLS key at index i of pubKeys matches the
 // BLS key signature at index i of pubKeysSigs.
@@ -473,7 +476,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 		LastEpochInCommittee: new(big.Int),
 		MinSelfDelegation:    val.MinSelfDelegation,
 		MaxTotalDelegation:   val.MaxTotalDelegation,
-		EPOSStatus:           effective.Active,
+		Status:               effective.Active,
 		Commission:           commission,
 		Description:          desc,
 		CreationHeight:       blockNum,
@@ -541,18 +544,28 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 		}
 	}
 
-	switch validator.EPOSStatus {
+	switch validator.Status {
 	case effective.Banned:
 		return errCannotChangeBannedTaint
 	default:
 		switch edit.EPOSStatus {
 		case effective.Active, effective.Inactive:
-			validator.EPOSStatus = edit.EPOSStatus
+			validator.Status = edit.EPOSStatus
 		default:
 		}
 	}
 
 	return nil
+}
+
+// IsEligibleForEPoSAuction ..
+func IsEligibleForEPoSAuction(validator *ValidatorWrapper) bool {
+	switch validator.Status {
+	case effective.Active:
+		return true
+	default:
+		return false
+	}
 }
 
 // String returns a human readable string representation of a validator.

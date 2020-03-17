@@ -62,6 +62,7 @@ require (
 	go.uber.org/atomic v1.5.1 // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/lint v0.0.0-20190930215403-16217165b5de
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	golang.org/x/tools v0.0.0-20191113232020-e2727e816f5a
 	google.golang.org/grpc v1.22.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15

@@ -20,7 +20,7 @@ const eposTestingFile = "epos.json"
 var (
 	testingNumber    = 20
 	testingSlots     slotsData
-	testingPurchases Slots
+	testingPurchases []SlotPurchase
 	expectedMedian   numeric.Dec
 	maxAccountGen    = int64(98765654323123134)
 	accountGen       = rand.New(rand.NewSource(1337))
@@ -53,8 +53,8 @@ func init() {
 	testingPurchases = generateRandomSlots(testingNumber)
 }
 
-func generateRandomSlots(num int) Slots {
-	randomSlots := Slots{}
+func generateRandomSlots(num int) []SlotPurchase {
+	randomSlots := []SlotPurchase{}
 	for i := 0; i < num; i++ {
 		addr := common.Address{}
 		addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
@@ -71,12 +71,16 @@ func generateRandomSlots(num int) Slots {
 func TestMedian(t *testing.T) {
 	copyPurchases := append([]SlotPurchase{}, testingPurchases...)
 	sort.SliceStable(copyPurchases,
-		func(i, j int) bool { return copyPurchases[i].Dec.LTE(copyPurchases[j].Dec) })
+		func(i, j int) bool {
+			return copyPurchases[i].Stake.LTE(copyPurchases[j].Stake)
+		})
 	numPurchases := len(copyPurchases) / 2
 	if len(copyPurchases)%2 == 0 {
-		expectedMedian = copyPurchases[numPurchases-1].Dec.Add(copyPurchases[numPurchases].Dec).Quo(two)
+		expectedMedian = copyPurchases[numPurchases-1].Stake.Add(
+			copyPurchases[numPurchases].Stake,
+		).Quo(two)
 	} else {
-		expectedMedian = copyPurchases[numPurchases].Dec
+		expectedMedian = copyPurchases[numPurchases].Stake
 	}
 	med := Median(testingPurchases)
 	if !med.Equal(expectedMedian) {
@@ -86,11 +90,14 @@ func TestMedian(t *testing.T) {
 
 func TestEffectiveStake(t *testing.T) {
 	for _, val := range testingPurchases {
-		expectedStake := numeric.MaxDec(numeric.MinDec(numeric.OneDec().Add(c).Mul(expectedMedian), val.Dec),
+		expectedStake := numeric.MaxDec(
+			numeric.MinDec(numeric.OneDec().Add(c).Mul(expectedMedian), val.Stake),
 			numeric.OneDec().Sub(c).Mul(expectedMedian))
-		calculatedStake := effectiveStake(expectedMedian, val.Dec)
+		calculatedStake := effectiveStake(expectedMedian, val.Stake)
 		if !expectedStake.Equal(calculatedStake) {
-			t.Errorf("Expected: %s, Got: %s", expectedStake.String(), calculatedStake.String())
+			t.Errorf(
+				"Expected: %s, Got: %s", expectedStake.String(), calculatedStake.String(),
+			)
 		}
 	}
 }

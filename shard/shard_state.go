@@ -298,13 +298,12 @@ func (pk BlsPublicKey) Hex() string {
 	return hex.EncodeToString(pk[:])
 }
 
-// MarshalJSON ..
-func (pk BlsPublicKey) MarshalJSON() ([]byte, error) {
-	buf := bytes.Buffer{}
-	buf.WriteString(`"`)
-	buf.WriteString(pk.Hex())
-	buf.WriteString(`"`)
-	return buf.Bytes(), nil
+// MarshalText so that we can use this as JSON printable when used as
+// key in a map
+func (pk BlsPublicKey) MarshalText() (text []byte, err error) {
+	text = make([]byte, BLSSignatureSizeInBytes)
+	hex.Encode(text, pk[:])
+	return text, nil
 }
 
 // FromLibBLSPublicKeyUnsafe could give back nil, use only in cases when
@@ -386,7 +385,7 @@ func (c *Committee) DeepCopy() Committee {
 // BLSPublicKeys ..
 func (c *Committee) BLSPublicKeys() ([]*bls.PublicKey, error) {
 	if c == nil {
-		return nil, ErrCommitteeNil
+		return nil, ErrSubCommitteeNil
 	}
 
 	slice := make([]*bls.PublicKey, len(c.Slots))
@@ -405,14 +404,16 @@ func (c *Committee) BLSPublicKeys() ([]*bls.PublicKey, error) {
 var (
 	// ErrValidNotInCommittee ..
 	ErrValidNotInCommittee = errors.New("slot signer not this slot's subcommittee")
-	// ErrCommitteeNil ..
-	ErrCommitteeNil = errors.New("subcommittee is nil pointer")
+	// ErrSubCommitteeNil ..
+	ErrSubCommitteeNil = errors.New("subcommittee is nil pointer")
+	// ErrSuperCommitteeNil ..
+	ErrSuperCommitteeNil = errors.New("supercommittee is nil pointer")
 )
 
 // AddressForBLSKey ..
 func (c *Committee) AddressForBLSKey(key BlsPublicKey) (*common.Address, error) {
 	if c == nil {
-		return nil, ErrCommitteeNil
+		return nil, ErrSubCommitteeNil
 	}
 
 	for _, slot := range c.Slots {

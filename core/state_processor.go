@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -47,7 +48,9 @@ type StateProcessor struct {
 }
 
 // NewStateProcessor initialises a new StateProcessor.
-func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consensus_engine.Engine) *StateProcessor {
+func NewStateProcessor(
+	config *params.ChainConfig, bc *BlockChain, engine consensus_engine.Engine,
+) *StateProcessor {
 	return &StateProcessor{
 		config: config,
 		bc:     bc,
@@ -66,7 +69,7 @@ func (p *StateProcessor) Process(
 	block *types.Block, statedb *state.DB, cfg vm.Config,
 ) (
 	types.Receipts, types.CXReceipts,
-	[]*types.Log, uint64, *big.Int, error,
+	[]*types.Log, uint64, reward.Reader, error,
 ) {
 	var (
 		receipts types.Receipts
@@ -103,8 +106,9 @@ func (p *StateProcessor) Process(
 	L := len(block.Transactions())
 	for i, tx := range block.StakingTransactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
-		receipt, _, err :=
-			ApplyStakingTransaction(p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg)
+		receipt, _, err := ApplyStakingTransaction(
+			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+		)
 
 		if err != nil {
 			return nil, nil, nil, 0, nil, err
@@ -116,8 +120,9 @@ func (p *StateProcessor) Process(
 	// incomingReceipts should always be processed
 	// after transactions (to be consistent with the block proposal)
 	for _, cx := range block.IncomingReceipts() {
-		err := ApplyIncomingReceipt(p.config, statedb, header, cx)
-		if err != nil {
+		if err := ApplyIncomingReceipt(
+			p.config, statedb, header, cx,
+		); err != nil {
 			return nil, nil,
 				nil, 0, nil, ctxerror.New("[Process] Cannot apply incoming receipts").WithCause(err)
 		}
@@ -126,7 +131,9 @@ func (p *StateProcessor) Process(
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, 0, nil, ctxerror.New("[Process] Cannot finalize block").WithCause(err)
+			return nil, nil, nil, 0, nil, ctxerror.New(
+				"[Process] Cannot finalize block",
+			).WithCause(err)
 		}
 	}
 

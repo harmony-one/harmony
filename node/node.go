@@ -19,7 +19,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
@@ -507,8 +506,15 @@ func New(
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
 		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
+
+			shardID := node.NodeConfig.ShardID
+			// HACK get the real error reason
+			_, err := node.shardChains.ShardChain(shardID)
+
 			fmt.Fprintf(
-				os.Stderr, "beaconchain-is-nil:%t shardchain-is-nil:%t", b1, b2,
+				os.Stderr,
+				"reason:%s beaconchain-is-nil:%t shardchain-is-nil:%t",
+				err.Error(), b1, b2,
 			)
 			os.Exit(-1)
 		}
@@ -549,9 +555,7 @@ func New(
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
-		chain.Engine.SetRewarder(node.Consensus.Decider.(reward.Distributor))
 		chain.Engine.SetBeaconchain(beaconChain)
-
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
@@ -658,7 +662,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	if err != nil {
 		return err
 	}
-	pubKeys, err := committee.WithStakingEnabled.GetCommitteePublicKeys(subComm)
+	pubKeys, err := subComm.BLSPublicKeys()
 	if err != nil {
 		utils.Logger().Error().
 			Uint32("shardID", shardID).

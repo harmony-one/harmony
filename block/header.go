@@ -1,8 +1,9 @@
 package block
 
 import (
-	"fmt"
+	"encoding/json"
 	"io"
+	"math/big"
 	"reflect"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -22,6 +23,23 @@ import (
 // Header represents a block header in the Harmony blockchain.
 type Header struct {
 	blockif.Header
+}
+
+// MarshalJSON ..
+func (h Header) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		S uint32   `json:"shard-id"`
+		H string   `json:"block-header-hash"`
+		N *big.Int `json:"block-number"`
+		V *big.Int `json:"view-id"`
+		E *big.Int `json:"epoch"`
+	}{
+		h.Header.ShardID(),
+		h.Header.Hash().Hex(),
+		h.Header.Number(),
+		h.Header.ViewID(),
+		h.Header.Epoch(),
+	})
 }
 
 // EncodeRLP encodes the header using tagged RLP representation.
@@ -49,14 +67,6 @@ func (h *Header) DecodeRLP(s *rlp.Stream) error {
 // choose and return the right tagged RLP form of the header.
 func (h *Header) Hash() ethcommon.Hash {
 	return hash.FromRLP(h)
-}
-
-// String ..
-func (h *Header) String() string {
-	return fmt.Sprintf(
-		"[ShardID:%v Hash:%s Num:%v View:%v Epoch:%v]",
-		h.ShardID(), h.Hash().Hex(), h.Number(), h.ViewID(), h.Epoch(),
-	)
 }
 
 // Logger returns a sub-logger with block contexts added.

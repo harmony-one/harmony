@@ -21,15 +21,56 @@ const (
 	Banned
 )
 
-func (e Eligibility) String() string {
-	switch e {
-	case Active:
-		return "active"
-	case Inactive:
-		return "inactive"
-	case Banned:
-		return "banned"
+// Candidacy is a more semantically meaningful
+// value that is derived from core protocol logic but
+// meant more for the presentation of user, like at RPC
+type Candidacy byte
+
+const (
+	// Unknown ..
+	Unknown Candidacy = iota
+	// Candidate ..
+	Candidate = iota
+	// NotCandidate ..
+	NotCandidate
+	// ElectedAndSigning ..
+	ElectedAndSigning
+	// ElectedAndFellBelowThreshold ..
+	ElectedAndFellBelowThreshold
+)
+
+const (
+	eAndFell = "elected in current epoch committee " +
+		"but sustained current rate will evict epos candidacy"
+)
+
+func (c Candidacy) String() string {
+	switch c {
+	case Candidate:
+		return "candidate for upcoming epoch's epos-auction"
+	case NotCandidate:
+		return "not a valid candidate for upcoming epoch's epos-auction"
+	case ElectedAndSigning:
+		return "elected in current epoch committee and signing above required epos threshold"
+	case ElectedAndFellBelowThreshold:
+		return eAndFell
 	default:
-		return "nil"
+		return "unknown"
+	}
+}
+
+// ValidatorStatus ..
+func ValidatorStatus(currentlyInCommittee, isActive bool) Candidacy {
+	switch {
+	case currentlyInCommittee && isActive:
+		return ElectedAndSigning
+	case !currentlyInCommittee && isActive:
+		return Candidate
+	case currentlyInCommittee && !isActive:
+		return ElectedAndFellBelowThreshold
+	case !currentlyInCommittee && !isActive:
+		return NotCandidate
+	default:
+		return Unknown
 	}
 }

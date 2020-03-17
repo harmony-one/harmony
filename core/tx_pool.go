@@ -778,7 +778,11 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			chainContext = nil // might use testing blockchain, set to nil for verifier to handle.
 		}
 		pendingBlockNumber := new(big.Int).Add(pool.chain.CurrentBlock().Number(), big.NewInt(1))
-		_, err = VerifyAndEditValidatorFromMsg(pool.currentState, chainContext, pendingBlockNumber, stkMsg)
+		_, err = VerifyAndEditValidatorFromMsg(
+			pool.currentState, chainContext,
+			pool.chain.CurrentBlock().Epoch(),
+			pendingBlockNumber, stkMsg,
+		)
 		return err
 	case staking.DirectiveDelegate:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
@@ -1090,7 +1094,7 @@ func (pool *TxPool) addTxs(txs types.PoolTransactions, local bool) []error {
 // whilst assuming the transaction pool lock is already held.
 func (pool *TxPool) addTxsLocked(txs types.PoolTransactions, local bool) []error {
 	// Add the batch of transaction, tracking the accepted ones
-	dirty := make(map[common.Address]struct{})
+	dirty := map[common.Address]struct{}{}
 	errs := make([]error, txs.Len())
 
 	for i, tx := range txs {
@@ -1107,9 +1111,11 @@ func (pool *TxPool) addTxsLocked(txs types.PoolTransactions, local bool) []error
 	}
 	// Only reprocess the internal state if something was actually added
 	if len(dirty) > 0 {
-		addrs := make([]common.Address, 0, len(dirty))
+		addrs := make([]common.Address, len(dirty))
+		i := 0
 		for addr := range dirty {
-			addrs = append(addrs, addr)
+			addrs[i] = addr
+			i++
 		}
 		pool.promoteExecutables(addrs)
 	}
@@ -1207,9 +1213,11 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 
 	// Gather all the accounts potentially needing updates
 	if accounts == nil {
-		accounts = make([]common.Address, 0, len(pool.queue))
+		accounts = make([]common.Address, len(pool.queue))
+		i := 0
 		for addr := range pool.queue {
-			accounts = append(accounts, addr)
+			accounts[i] = addr
+			i++
 		}
 	}
 	// Iterate over all accounts and promote any executable transactions

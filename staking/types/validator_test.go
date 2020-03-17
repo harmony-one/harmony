@@ -116,7 +116,7 @@ func createNewValidator() Validator {
 		LastEpochInCommittee: big.NewInt(20),
 		MinSelfDelegation:    big.NewInt(1e18),
 		MaxTotalDelegation:   big.NewInt(3e18),
-		EPOSStatus:           effective.Inactive,
+		Status:               effective.Active,
 		Commission:           c,
 		Description:          d,
 		CreationHeight:       big.NewInt(12306),
@@ -146,11 +146,6 @@ func TestMarshalUnmarshalValidator(t *testing.T) {
 	if err != nil {
 		t.Errorf("UnmarshalValidator failed!")
 	}
-}
-
-// Test Print Slot Public Keys
-func TestPrintSlotPubKeys(t *testing.T) {
-	printSlotPubKeys(validator.SlotPubKeys)
 }
 
 func TestTotalDelegation(t *testing.T) {
@@ -367,34 +362,6 @@ func compareTwoDescription(d1, d2 Description) bool {
 		strings.Compare(d1.Details, d2.Details) != 0)
 }
 
-// test get validator's address
-func TestGetAddress(t *testing.T) {
-	if validator.GetAddress() != validator.Address {
-		t.Errorf("validator GetAddress failed")
-	}
-}
-
-// test get validator's name
-func TestGetName(t *testing.T) {
-	if strings.Compare(validator.GetName(), validator.Name) != 0 {
-		t.Errorf("validator GetName failed")
-	}
-}
-
-// test get validator's commission Rate
-func TestGetCommissionRate(t *testing.T) {
-	if validator.GetCommissionRate() != validator.Commission.Rate {
-		t.Errorf("validator GetCommissionRate failed")
-	}
-}
-
-// test get validator's min self delegation
-func TestGetMinSelfDelegation(t *testing.T) {
-	if validator.GetMinSelfDelegation().Cmp(validator.MinSelfDelegation) != 0 {
-		t.Errorf("validator GetMinSelfDelegation failed")
-	}
-}
-
 func TestVerifyBLSKeys(t *testing.T) {
 	// test verify bls for valid single key/sig pair
 	val := CreateValidator{
@@ -404,8 +371,7 @@ func TestVerifyBLSKeys(t *testing.T) {
 		SlotKeySigs:      slotKeySigs,
 		Amount:           big.NewInt(1e18),
 	}
-	err := VerifyBLSKeys(val.SlotPubKeys, val.SlotKeySigs)
-	if err != nil {
+	if err := VerifyBLSKeys(val.SlotPubKeys, val.SlotKeySigs); err != nil {
 		t.Errorf("VerifyBLSKeys failed")
 	}
 

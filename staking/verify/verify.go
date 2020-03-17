@@ -37,11 +37,13 @@ func AggregateSigForCommittee(
 		return err
 	}
 
-	decider := quorum.NewDecider(quorum.SuperMajorityStake)
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityStake, committee.ShardID,
+	)
 	decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 		return nil, nil
 	})
-	if _, err := decider.SetVoters(committee.Slots); err != nil {
+	if _, err := decider.SetVoters(committee); err != nil {
 		return err
 	}
 	if !decider.IsQuorumAchievedByMask(mask) {

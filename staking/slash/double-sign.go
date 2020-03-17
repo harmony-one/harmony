@@ -101,8 +101,8 @@ func (e Evidence) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Moment
 		ConflictingBallots
-		ProposalHeader string `json:"header"`
-	}{e.Moment, e.ConflictingBallots, e.ProposalHeader.String()})
+		ProposalHeader *block.Header `json:"header"`
+	}{e.Moment, e.ConflictingBallots, e.ProposalHeader})
 }
 
 // Records ..
@@ -160,7 +160,7 @@ func Verify(
 		return err
 	}
 
-	if wrapper.EPOSStatus == effective.Banned {
+	if wrapper.Status == effective.Banned {
 		return errAlreadyBannedValidator
 	}
 
@@ -267,18 +267,18 @@ func (r Record) Hash() common.Hash {
 
 // SetDifference returns all the records that are in ys but not in r
 func (r Records) SetDifference(ys Records) Records {
-	diff := Records{}
-	xsHashed, ysHashed :=
-		make([]common.Hash, len(r)), make([]common.Hash, len(ys))
+	diff, set := Records{}, map[common.Hash]struct{}{}
 	for i := range r {
-		xsHashed[i] = r[i].Hash()
+		h := r[i].Hash()
+		if _, ok := set[h]; !ok {
+			set[h] = struct{}{}
+		}
 	}
+
 	for i := range ys {
-		ysHashed[i] = ys[i].Hash()
-		for j := range xsHashed {
-			if ysHashed[i] != xsHashed[j] {
-				diff = append(diff, ys[i])
-			}
+		h := ys[i].Hash()
+		if _, ok := set[h]; !ok {
+			diff = append(diff, ys[i])
 		}
 	}
 
@@ -459,7 +459,7 @@ func Apply(
 		}
 
 		// finally, kick them off forever
-		current.EPOSStatus = effective.Banned
+		current.Status = effective.Banned
 		utils.Logger().Info().
 			RawJSON("delegation-current", []byte(current.String())).
 			RawJSON("slash", []byte(slash.String())).

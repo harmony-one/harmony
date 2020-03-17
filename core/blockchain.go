@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
@@ -49,6 +50,7 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
@@ -1054,7 +1056,8 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 // WriteBlockWithState writes the block and all associated state to the database.
 func (bc *BlockChain) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
-	cxReceipts []*types.CXReceipt, payout *big.Int,
+	cxReceipts []*types.CXReceipt,
+	paid reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
 	bc.wg.Add(1)
@@ -1134,7 +1137,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	// Write offchain data
 	if status, err := bc.CommitOffChainData(
 		batch, block, receipts,
-		cxReceipts, payout, state,
+		cxReceipts, paid, state,
 	); err != nil {
 		return status, err
 	}
@@ -1490,10 +1493,10 @@ type BadBlock struct {
 // MarshalJSON ..
 func (b BadBlock) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Block  string `json:"header"`
-		Reason string `json:"error-cause"`
+		Block  *block.Header `json:"header"`
+		Reason string        `json:"error-cause"`
 	}{
-		b.Block.Header().String(),
+		b.Block.Header(),
 		b.Reason.Error(),
 	})
 }
@@ -1959,7 +1962,6 @@ func (bc *BlockChain) DeleteFromPendingSlashingCandidates(
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
 	current := bc.ReadPendingSlashingCandidates()
-	// TODO(audit): fix SetDifference impl mistake
 	bc.pendingSlashes = current.SetDifference(processed)
 	return bc.writeSlashes(bc.pendingSlashes)
 }
@@ -2263,38 +2265,67 @@ func (bc *BlockChain) ReadValidatorStats(
 
 // UpdateValidatorVotingPower writes the voting power for the committees
 func (bc *BlockChain) UpdateValidatorVotingPower(
-	batch rawdb.DatabaseWriter, state *shard.State,
+	batch rawdb.DatabaseWriter,
+	newEpochSuperCommittee, currentEpochSuperCommittee *shard.State,
+	// NOTE Do not update this state, only read from
+	state *state.DB,
 ) error {
-	if state == nil {
-		return errors.New("[UpdateValidatorVotingPower] Nil shard state")
+	if newEpochSuperCommittee == nil {
+		return shard.ErrSuperCommitteeNil
 	}
 
-	rosters := make([]votepower.RosterPerShard, len(state.Shards))
+	rosters := make([]*votepower.Roster, len(newEpochSuperCommittee.Shards))
 
-	for i := range state.Shards {
-		roster, err := votepower.Compute(state.Shards[i].Slots)
+	for i := range newEpochSuperCommittee.Shards {
+		subCommittee := &newEpochSuperCommittee.Shards[i]
+		roster, err := votepower.Compute(subCommittee)
 		if err != nil {
 			return err
 		}
-		rosters[i] = votepower.RosterPerShard{state.Shards[i].ShardID, roster}
+		rosters[i] = roster
+	}
+	blkPerEpoch := shard.Schedule.BlocksPerEpoch()
+	networkWide := votepower.AggregateRosters(rosters)
+	for key, value := range networkWide {
+		stats, err := rawdb.ReadValidatorStats(bc.db, key)
+		if err != nil {
+			stats = staking.NewEmptyStats()
+		}
+		total := numeric.ZeroDec()
+		for i := range value {
+			total = total.Add(value[i].EffectiveStake)
+		}
+		stats.TotalEffectiveStake = total
+		stats.MetricsPerShard = value
+		wrapper, err := state.ValidatorWrapper(key)
+		if err != nil {
+			return err
+		}
+		aprComputed, err := apr.ComputeForValidator(
+			bc, newEpochSuperCommittee.Epoch,
+			state, wrapper, blkPerEpoch,
+		)
+		if err == nil && aprComputed != nil {
+			stats.APR = *aprComputed
+		}
+
+		if err := rawdb.WriteValidatorStats(
+			batch, key, stats,
+		); err != nil {
+			return err
+		}
 	}
 
-	networkWide := votepower.AggregateRosters(rosters)
-
-	for key, value := range networkWide {
-		statsFromDB, _ := rawdb.ReadValidatorStats(bc.db, key)
-		if statsFromDB == nil {
-			statsFromDB = &staking.ValidatorStats{
-				big.NewInt(0), numeric.NewDec(0),
-				[]staking.VotePerShard{}, []staking.KeysPerShard{},
-			}
-		}
-		statsFromDB.TotalEffectiveStake = value.TotalEffectiveStake
-		statsFromDB.VotingPowerPerShard = value.VotingPower
-		statsFromDB.BLSKeyPerShard = value.BLSPublicKeysOwned
-		// TODO(audit): should clear the voting power of those validators who are not elected.
-		if err := rawdb.WriteValidatorStats(batch, key, statsFromDB); err != nil {
-			return err
+	existing, replacing :=
+		currentEpochSuperCommittee.StakedValidators(),
+		newEpochSuperCommittee.StakedValidators()
+	for currentValidator := range existing.LookupSet {
+		if _, keptSlot := replacing.LookupSet[currentValidator]; !keptSlot {
+			// TODO Someone: collect and then delete every 30 epochs
+			// rawdb.DeleteValidatorSnapshot(
+			// 	bc.db, currentValidator, currentEpochSuperCommittee.Epoch,
+			// )
+			rawdb.DeleteValidatorStats(bc.db, currentValidator)
 		}
 	}
 
@@ -2432,7 +2463,9 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 // including the full validator list and delegation indexes.
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateStakingMetaData(
-	batch rawdb.DatabaseWriter, txns staking.StakingTransactions, state *state.DB, epoch *big.Int) error {
+	batch rawdb.DatabaseWriter, txns staking.StakingTransactions,
+	state *state.DB, epoch *big.Int,
+) error {
 	newValidators, newDelegations, err := bc.prepareStakingMetaData(txns, state)
 	if err != nil {
 		utils.Logger().Warn().Msgf("oops, prepareStakingMetaData failed, err: %+v", err)
@@ -2486,7 +2519,10 @@ func (bc *BlockChain) UpdateStakingMetaData(
 // newDelegations - the map of delegator address and their updated delegation indexes
 func (bc *BlockChain) prepareStakingMetaData(
 	txns staking.StakingTransactions, state *state.DB,
-) (newValidators []common.Address, newDelegations map[common.Address]staking.DelegationIndexes, err error) {
+) (newValidators []common.Address,
+	newDelegations map[common.Address]staking.DelegationIndexes,
+	err error,
+) {
 	newDelegations = map[common.Address]staking.DelegationIndexes{}
 	for _, txn := range txns {
 		payload, err := txn.RLPEncodeStakeMsg()
@@ -2501,8 +2537,9 @@ func (bc *BlockChain) prepareStakingMetaData(
 		switch txn.StakingType() {
 		case staking.DirectiveCreateValidator:
 			createValidator := decodePayload.(*staking.CreateValidator)
-
-			newList, appended := utils.AppendIfMissing(newValidators, createValidator.ValidatorAddress)
+			newList, appended := utils.AppendIfMissing(
+				newValidators, createValidator.ValidatorAddress,
+			)
 			if !appended {
 				return nil, nil, errValidatorExist
 			}

@@ -375,7 +375,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 				url := p.OnCannotCommit
 				go func() {
 					webhooks.DoPost(url, map[string]interface{}{
-						"bad-header": newBlock.Header().String(),
+						"bad-header": newBlock.Header(),
 						"reason":     err.Error(),
 					})
 				}()
@@ -494,12 +494,14 @@ func (node *Node) PostConsensusProcessing(
 				if err != nil {
 					return
 				}
-				signed, toSign, quotient, err :=
-					availability.ComputeCurrentSigning(snapshot, wrapper)
-				if err != nil && availability.IsBelowSigningThreshold(quotient) {
+				computed, err :=
+					availability.ComputeCurrentSigning(
+						snapshot, wrapper, shard.Schedule.BlocksPerEpoch(),
+					)
+				if err != nil && computed.IsBelowThreshold {
 					url := h.Availability.OnDroppedBelowThreshold
 					go func() {
-						webhooks.DoPost(url, staking.Computed{signed, toSign, quotient})
+						webhooks.DoPost(url, computed)
 					}()
 				}
 			}

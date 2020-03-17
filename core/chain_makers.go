@@ -307,8 +307,24 @@ func (cr *fakeChainReader) ReadValidatorSnapshotAtEpoch(
 	return nil, nil
 }
 
-func (cr *fakeChainReader) ReadBlockRewardAccumulator(uint64) (*big.Int, error)         { return nil, nil }
-func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) *big.Int { return nil }
-func (cr *fakeChainReader) ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error) {
+func (cr *fakeChainReader) ReadBlockRewardAccumulator(
+	uint64,
+) (*big.Int, error) {
+	return nil, nil
+}
+
+func (cr *fakeChainReader) CurrentBlock() *types.Block {
+	return nil
+}
+
+func (cr *fakeChainReader) ValidatorStakingWithDelegation(
+	addr common.Address,
+) *big.Int {
+	return nil
+}
+
+func (cr *fakeChainReader) ReadValidatorStats(
+	addr common.Address,
+) (*staking.ValidatorStats, error) {
 	return nil, nil
 }

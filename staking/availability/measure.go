@@ -106,47 +106,57 @@ func BallotResult(
 	return parentCommittee.Slots, payable, missing, err
 }
 
+type signerKind struct {
+	didSign   bool
+	committee shard.SlotList
+}
+
 func bumpCount(
 	bc Reader,
 	state *state.DB,
-	signers shard.SlotList,
-	didSign bool,
+	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
-	for i := range signers {
-		addr := signers[i].EcdsaAddress
-		// NOTE if the signer address is not part of the staked addrs,
-		// then it must be a harmony operated node running,
-		// hence keep on going
-		if _, isAddrForStaked := stakedAddrSet[addr]; !isAddrForStaked {
-			continue
-		}
+	blocksPerEpoch := shard.Schedule.BlocksPerEpoch()
+	for _, subset := range signers {
+		for i := range subset.committee {
+			addr := subset.committee[i].EcdsaAddress
+			// NOTE if the signer address is not part of the staked addrs,
+			// then it must be a harmony operated node running,
+			// hence keep on going
+			if _, isAddrForStaked := stakedAddrSet[addr]; !isAddrForStaked {
+				continue
+			}
 
-		wrapper, err := state.ValidatorWrapper(addr)
-		if err != nil {
-			return err
-		}
+			wrapper, err := state.ValidatorWrapper(addr)
+			if err != nil {
+				return err
+			}
 
-		wrapper.Counters.NumBlocksToSign.Add(
-			wrapper.Counters.NumBlocksToSign, common.Big1,
-		)
-
-		if didSign {
-			wrapper.Counters.NumBlocksSigned.Add(
-				wrapper.Counters.NumBlocksSigned, common.Big1,
+			wrapper.Counters.NumBlocksToSign.Add(
+				wrapper.Counters.NumBlocksToSign, common.Big1,
 			)
-		}
 
-		if err := compute(bc, state, wrapper); err != nil {
-			return err
-		}
+			if subset.didSign {
+				wrapper.Counters.NumBlocksSigned.Add(
+					wrapper.Counters.NumBlocksSigned, common.Big1,
+				)
+			}
 
-		if err := state.UpdateValidatorWrapper(
-			addr, wrapper,
-		); err != nil {
-			return err
+			if err := computeAndMutateEPOSStatus(
+				bc, state, wrapper, blocksPerEpoch,
+			); err != nil {
+				return err
+			}
+
+			if err := state.UpdateValidatorWrapper(
+				addr, wrapper,
+			); err != nil {
+				return err
+			}
 		}
 	}
+
 	return nil
 }
 
@@ -157,12 +167,10 @@ func IncrementValidatorSigningCounts(
 	state *state.DB,
 	signers, missing shard.SlotList,
 ) error {
-	if err := bumpCount(
-		bc, state, signers, true, staked.LookupSet,
-	); err != nil {
-		return err
-	}
-	return bumpCount(bc, state, missing, false, staked.LookupSet)
+	return bumpCount(
+		bc, state, []signerKind{{false, missing}, {true, signers}},
+		staked.LookupSet,
+	)
 }
 
 // Reader ..
@@ -175,7 +183,8 @@ type Reader interface {
 // ComputeCurrentSigning returns (signed, toSign, quotient, error)
 func ComputeCurrentSigning(
 	snapshot, wrapper *staking.ValidatorWrapper,
-) (*big.Int, *big.Int, numeric.Dec, error) {
+	blocksPerEpoch uint64,
+) (*staking.Computed, error) {
 	statsNow, snapSigned, snapToSign :=
 		wrapper.Counters,
 		snapshot.Counters.NumBlocksSigned,
@@ -184,22 +193,27 @@ func ComputeCurrentSigning(
 	signed, toSign :=
 		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
 		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
+	leftToGo := blocksPerEpoch - toSign.Uint64()
+
+	computed := staking.NewComputed(
+		signed, toSign, leftToGo, numeric.ZeroDec(), true,
+	)
 
 	if toSign.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().
 			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
-		return signed, toSign, numeric.ZeroDec(), nil
+		return computed, nil
 	}
 
 	if signed.Sign() == -1 {
-		return nil, nil, numeric.ZeroDec(), errors.Wrapf(
+		return nil, errors.Wrapf(
 			errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
 			statsNow.NumBlocksSigned.String(), snapSigned.String(),
 		)
 	}
 
 	if toSign.Sign() == -1 {
-		return nil, nil, numeric.ZeroDec(), errors.Wrapf(
+		return nil, errors.Wrapf(
 			errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
 			statsNow.NumBlocksToSign.String(), snapToSign.String(),
 		)
@@ -207,9 +221,9 @@ func ComputeCurrentSigning(
 
 	s1, s2 :=
 		numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
-
-	quotient := s1.Quo(s2)
-	return signed, toSign, quotient, nil
+	computed.Percentage = s1.Quo(s2)
+	computed.IsBelowThreshold = IsBelowSigningThreshold(computed.Percentage)
+	return computed, nil
 }
 
 // IsBelowSigningThreshold ..
@@ -217,15 +231,16 @@ func IsBelowSigningThreshold(quotient numeric.Dec) bool {
 	return quotient.LTE(measure)
 }
 
-// compute sets the validator to
+// computeAndMutateEPOSStatus sets the validator to
 // inactive and thereby keeping it out of
 // consideration in the pool of validators for
 // whenever committee selection happens in future, the
 // signing threshold is 66%
-func compute(
+func computeAndMutateEPOSStatus(
 	bc Reader,
 	state *state.DB,
 	wrapper *staking.ValidatorWrapper,
+	blocksPerEpoch uint64,
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")
 
@@ -234,29 +249,33 @@ func compute(
 		return err
 	}
 
-	signed, toSign, quotient, err := ComputeCurrentSigning(snapshot, wrapper)
+	computed, err := ComputeCurrentSigning(snapshot, wrapper, blocksPerEpoch)
 
 	if err != nil {
 		return err
 	}
 
 	utils.Logger().Info().
-		Str("signed", signed.String()).
-		Str("to-sign", toSign.String()).
-		Str("percentage-signed", quotient.String()).
-		Bool("meets-threshold", quotient.LTE(measure)).
+		Str("signed", computed.Signed.String()).
+		Str("to-sign", computed.ToSign.String()).
+		Str("percentage-signed", computed.Percentage.String()).
+		Bool("meets-threshold", computed.IsBelowThreshold).
 		Msg("check if signing percent is meeting required threshold")
 
 	const missedTooManyBlocks = true
 
-	switch IsBelowSigningThreshold(quotient) {
+	switch computed.IsBelowThreshold {
 	case missedTooManyBlocks:
-		wrapper.EPOSStatus = effective.Inactive
+		wrapper.Status = effective.Inactive
 		utils.Logger().Info().
 			Str("threshold", measure.String()).
 			Msg("validator failed availability threshold, set to inactive")
 	default:
-		wrapper.EPOSStatus = effective.Active
+		// TODO we need to take care of the situation when a validator
+		// wants to stop validating, but if they turns their validator
+		// to inactive and his node is still running,
+		// then the status will be turned back to active automatically.
+		wrapper.Status = effective.Active
 	}
 
 	return nil

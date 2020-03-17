@@ -7,11 +7,22 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-// Distributor ..
-type Distributor interface {
-	Award(
-		pie *big.Int,
-		earners shard.SlotList,
-		hook func(earner common.Address, due *big.Int),
-	) *big.Int
+// Payout ..
+type Payout struct {
+	ShardID     uint32
+	Addr        common.Address
+	NewlyEarned *big.Int
+}
+
+// CompletedRound ..
+type CompletedRound struct {
+	Total            *big.Int
+	BeaconchainAward []Payout
+	ShardChainAward  []Payout
+}
+
+// Reader ..
+type Reader interface {
+	ReadRoundResult() *CompletedRound
+	MissingSigners() shard.SlotList
 }

@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -21,8 +22,8 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/network"
@@ -333,88 +334,56 @@ func (b *APIBackend) GetValidatorInformation(
 		s, _ := internal_common.AddressToBech32(addr)
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
 	}
-	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
-		b.hmy.BlockChain().CurrentHeader().Epoch(),
-		addr,
-	)
+
+	now := b.hmy.BlockChain().CurrentHeader().Epoch()
+	inCommittee := now.Cmp(wrapper.LastEpochInCommittee) == 0
 	defaultReply := &staking.ValidatorRPCEnchanced{
-		Wrapper: *wrapper,
-		CurrentSigningPercentage: staking.Computed{
-			common.Big0, common.Big0, numeric.ZeroDec(),
-		},
-		CurrentVotingPower: []staking.VotePerShard{},
+		CurrentlyInCommittee: inCommittee,
+		Wrapper:              *wrapper,
+		Performance:          nil,
+		ComputedMetrics:      nil,
+		TotalDelegated:       wrapper.TotalDelegation(),
+		EPoSStatus: effective.ValidatorStatus(
+			inCommittee, wrapper.Status == effective.Active,
+		).String(),
 	}
+
+	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
+		now, addr,
+	)
+
 	if err != nil {
 		return defaultReply, nil
 	}
 
-	signed, toSign, quotient, err := availability.ComputeCurrentSigning(snapshot, wrapper)
+	computed, err := availability.ComputeCurrentSigning(
+		snapshot, wrapper, shard.Schedule.BlocksPerEpoch(),
+	)
+
 	if err != nil {
 		return defaultReply, nil
 	}
+
 	stats, err := b.hmy.BlockChain().ReadValidatorStats(addr)
 	if err != nil {
 		return defaultReply, nil
 	}
 
-	defaultReply.CurrentSigningPercentage = staking.Computed{signed, toSign, quotient}
-	defaultReply.CurrentVotingPower = stats.VotingPowerPerShard
+	if defaultReply.CurrentlyInCommittee {
+		defaultReply.Performance = &staking.CurrentEpochPerformance{
+			CurrentSigningPercentage: *computed,
+		}
+		defaultReply.ComputedMetrics = stats
+	}
+
 	return defaultReply, nil
 }
 
 // GetMedianRawStakeSnapshot ..
-func (b *APIBackend) GetMedianRawStakeSnapshot() (*big.Int, error) {
-	candidates := b.hmy.BlockChain().ValidatorCandidates()
-	essentials := map[common.Address]effective.SlotOrder{}
-	blsKeys := map[shard.BlsPublicKey]struct{}{}
-	for i := range candidates {
-		validator, err := b.hmy.BlockChain().ReadValidatorInformation(
-			candidates[i],
-		)
-		if err != nil {
-			return nil, err
-		}
-		if validator.EPOSStatus != effective.Active {
-			continue
-		}
-		if err := validator.SanityCheck(
-			staking.DoNotEnforceMaxBLS,
-		); err != nil {
-			continue
-		}
-
-		validatorStake := big.NewInt(0)
-		for i := range validator.Delegations {
-			validatorStake.Add(
-				validatorStake, validator.Delegations[i].Amount,
-			)
-		}
-
-		found := false
-		for _, key := range validator.SlotPubKeys {
-			if _, ok := blsKeys[key]; ok {
-				found = true
-			} else {
-				blsKeys[key] = struct{}{}
-			}
-		}
-
-		if found {
-			continue
-		}
-
-		essentials[validator.Address] = effective.SlotOrder{
-			validatorStake,
-			validator.SlotPubKeys,
-		}
-	}
-
-	instance := shard.Schedule.InstanceForEpoch(b.CurrentBlock().Epoch())
-	stakedSlots :=
-		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
-			int(instance.NumShards())
-	median, _ := effective.Compute(essentials, stakedSlots)
-	return median.TruncateInt(), nil
+func (b *APIBackend) GetMedianRawStakeSnapshot() (
+	*committee.CompletedEPoSRound, error,
+) {
+	return committee.NewEPoSRound(b.hmy.BlockChain())
 }
 
 // GetTotalStakingSnapshot ..
@@ -434,7 +403,7 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	stakes := big.NewInt(0)
 	for i := range candidates {
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
-		if validator.EPOSStatus != effective.Active {
+		if !staking.IsEligibleForEPoSAuction(validator) {
 			continue
 		}
 		for i := range validator.Delegations {
@@ -443,12 +412,6 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	}
 	b.TotalStakingCache.TotalStaking = stakes
 	return b.TotalStakingCache.TotalStaking
-}
-
-// GetValidatorStats returns the stats of validator
-func (b *APIBackend) GetValidatorStats(addr common.Address) *staking.ValidatorStats {
-	val, _ := b.hmy.BlockChain().ReadValidatorStats(addr)
-	return val
 }
 
 // GetDelegationsByValidator returns all delegation information of a validator
@@ -548,29 +511,28 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 		return nil, err
 	}
 
-	instanceNow := shard.Schedule.InstanceForEpoch(nowE)
-	stakedSlotsNow :=
-		(instanceNow.NumNodesPerShard() - instanceNow.NumHarmonyOperatedNodesPerShard()) *
-			int(instanceNow.NumShards())
-	instanceThen := shard.Schedule.InstanceForEpoch(thenE)
-	stakedSlotsThen :=
-		(instanceThen.NumNodesPerShard() - instanceThen.NumHarmonyOperatedNodesPerShard()) *
-			int(instanceThen.NumShards())
+	stakedSlotsNow, stakedSlotsThen :=
+		shard.ExternalSlotsAvailableForEpoch(nowE),
+		shard.ExternalSlotsAvailableForEpoch(thenE)
 
-	then, now := quorum.NewRegistry(stakedSlotsThen), quorum.NewRegistry(stakedSlotsNow)
+	then, now :=
+		quorum.NewRegistry(stakedSlotsThen),
+		quorum.NewRegistry(stakedSlotsNow)
 
 	for _, comm := range prevCommittee.Shards {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake)
-		shardID := comm.ShardID
-		decider.SetVoters(comm.Slots)
-		then.Deciders[shardID] = decider
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
+		if _, err := decider.SetVoters(&comm); err != nil {
+			return nil, err
+		}
+		then.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
 
 	for _, comm := range nowCommittee.Shards {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake)
-		shardID := comm.ShardID
-		decider.SetVoters(comm.Slots)
-		now.Deciders[shardID] = decider
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
+		if _, err := decider.SetVoters(&comm); err != nil {
+			return nil, err
+		}
+		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
 	return &quorum.Transition{then, now}, nil
 }
