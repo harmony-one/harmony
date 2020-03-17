@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"math/big"
 	"sort"
 
@@ -22,16 +23,6 @@ type CrossLink struct {
 	BitmapF      []byte   //corresponding bitmap mask for agg signature
 	ShardIDF     uint32   //will be verified with signature on |blockNumber|blockHash| is correct
 	EpochF       *big.Int
-}
-
-// RPCCrossLink is used for returning data to RPC calls, converting byte arrays to hex encoded strings
-type RPCCrossLink struct {
-	HashF        common.Hash `json:"parentHash"`
-	BlockNumberF *big.Int    `json:"blockNumber"`
-	SignatureF   string      `json:"signature"`
-	BitmapF      string      `json:"signatureBitmap"`
-	ShardIDF     uint32      `json:"shardId"`
-	EpochF       *big.Int    `json:"epochNumber"`
 }
 
 // NewCrossLink returns a new cross link object
@@ -80,16 +71,23 @@ func (cl CrossLink) Signature() [96]byte {
 	return cl.SignatureF
 }
 
-// ConvertForRPC converts CrossLink into RPCCrossLink
-func (cl CrossLink) ConvertForRPC() *RPCCrossLink {
-	return &RPCCrossLink{
-		HashF:        cl.HashF,
-		BlockNumberF: cl.BlockNumberF,
-		SignatureF:   hex.EncodeToString(cl.SignatureF[:]),
-		BitmapF:      hex.EncodeToString(cl.BitmapF),
-		ShardIDF:     cl.ShardIDF,
-		EpochF:       cl.EpochF,
-	}
+// MarshalJSON ..
+func (cl CrossLink) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Hash        common.Hash `json:"hash"`
+		BlockNumber *big.Int    `json:"block-number"`
+		Signature   string      `json:"signature"`
+		Bitmap      string      `json:"signature-bitmap"`
+		ShardID     uint32      `json:"shard-id"`
+		EpochNumber *big.Int    `json:"epoch-number"`
+	}{
+		cl.HashF,
+		cl.BlockNumberF,
+		hex.EncodeToString(cl.SignatureF[:]),
+		hex.EncodeToString(cl.BitmapF),
+		cl.ShardIDF,
+		cl.EpochF,
+	})
 }
 
 // Serialize returns bytes of cross link rlp-encoded content
