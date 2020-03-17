@@ -97,10 +97,8 @@ func NewEPoSRound(stakedReader StakingCandidatesReader) (
 	}
 
 	return &CompletedEPoSRound{
-		MedianStake: median,
-		// NOTE + 1 because we use it as index in assigment,
-		// but as count in semantics
-		MaximumExternalSlot: maxExternalSlots + 1,
+		MedianStake:         median,
+		MaximumExternalSlot: maxExternalSlots,
 		AuctionWinners:      winners,
 		AuctionCandidates:   auctionCandidates,
 	}, nil
