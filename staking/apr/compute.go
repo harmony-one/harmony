@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -91,11 +92,22 @@ func ComputeForValidator(
 		shard.Schedule.EpochLastBlock(twoEpochAgo.Uint64()),
 		shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64())
 
-	estimatedRewardPerYear, err := expectedRewardPerYear(
+	headerOneEpochAgo, headerTwoEpochAgo :=
 		bc.GetHeaderByNumber(blockNumAtOneEpochAgo),
-		bc.GetHeaderByNumber(blockNumAtTwoEpochAgo),
-		oneSnapshotAgo,
-		twoSnapshotAgo,
+		bc.GetHeaderByNumber(blockNumAtTwoEpochAgo)
+
+	if headerOneEpochAgo == nil || headerTwoEpochAgo == nil {
+		utils.Logger().Debug().
+			Msgf("apr compute headers epochs ago %+v %+v %+v %+v %+v %+v",
+				twoEpochAgo, oneEpochAgo,
+				blockNumAtTwoEpochAgo, blockNumAtOneEpochAgo,
+				headerOneEpochAgo, headerTwoEpochAgo,
+			)
+	}
+
+	estimatedRewardPerYear, err := expectedRewardPerYear(
+		headerOneEpochAgo, headerTwoEpochAgo,
+		oneSnapshotAgo, twoSnapshotAgo,
 		blocksPerEpoch,
 	)
 
