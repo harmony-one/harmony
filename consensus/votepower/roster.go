@@ -15,10 +15,6 @@ import (
 )
 
 var (
-	// HarmonysShare ..
-	HarmonysShare = numeric.MustNewDecFromStr("0.68")
-	// StakersShare ..
-	StakersShare = numeric.MustNewDecFromStr("0.32")
 	// ErrVotingPowerNotEqualOne ..
 	ErrVotingPowerNotEqualOne = errors.New("voting power not equal to one")
 )
