@@ -456,7 +456,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, true)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
