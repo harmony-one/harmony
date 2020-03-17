@@ -813,6 +813,9 @@ func (s *PublicBlockChainAPI) GetStakingNetworkInfo(ctx context.Context) (*Staki
 }
 
 // GetLastCrossLinks ..
-func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.RPCCrossLink, error) {
-	return s.b.GetLastCrossLinks()
+func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.CrossLink, error) {
+	if s.b.GetShardID() == shard.BeaconChainShardID {
+		return s.b.GetLastCrossLinks()
+	}
+	return nil, errNotBeaconChainShard
 }

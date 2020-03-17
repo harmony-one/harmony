@@ -581,15 +581,15 @@ func (b *APIBackend) GetCurrentBadBlocks() []core.BadBlock {
 }
 
 // GetLastCrossLinks ..
-func (b *APIBackend) GetLastCrossLinks() ([]*types.RPCCrossLink, error) {
-	lastCrossLinks := []*types.RPCCrossLink{}
+func (b *APIBackend) GetLastCrossLinks() ([]*types.CrossLink, error) {
+	crossLinks := []*types.CrossLink{}
 	for i := uint32(1); i < shard.Schedule.InstanceForEpoch(b.CurrentBlock().Epoch()).NumShards(); i++ {
 		link, err := b.hmy.BlockChain().ReadShardLastCrossLink(i)
 		if err != nil {
 			return nil, err
 		}
-		lastCrossLinks = append(lastCrossLinks, link.ConvertForRPC())
+		crossLinks = append(crossLinks, link)
 	}
 
-	return lastCrossLinks, nil
+	return crossLinks, nil
 }

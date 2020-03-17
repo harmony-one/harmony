@@ -89,7 +89,7 @@ type Backend interface {
 	GetSuperCommittees() (*quorum.Transition, error)
 	GetTotalStakingSnapshot() *big.Int
 	GetCurrentBadBlocks() []core.BadBlock
-	GetLastCrossLinks() ([]*types.RPCCrossLink, error)
+	GetLastCrossLinks() ([]*types.CrossLink, error)
 }
 
 // GetAPIs returns all the APIs.
