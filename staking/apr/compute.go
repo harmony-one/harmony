@@ -2,7 +2,6 @@ package apr
 
 import (
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
@@ -23,7 +22,7 @@ type Reader interface {
 }
 
 const (
-	secondsInYear = time.Second * 3.154e+7
+	secondsInYear = int64(3.154e+7)
 )
 
 var (
