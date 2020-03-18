@@ -15,8 +15,8 @@ var PangaeaSchedule pangaeaSchedule
 type pangaeaSchedule struct{}
 
 const (
-	// 10 minutes per epoch (at 8s/block)
-	pangaeaBlocksPerEpoch = 75
+	// ~64 sec epochs for P1 of open staking
+	pangaeaBlocksPerEpoch = 8
 
 	pangaeaVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
