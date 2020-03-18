@@ -26,7 +26,7 @@ type Reader interface {
 }
 
 const (
-	secondsInYear = int64(3.154e+7)
+	secondsInYear = int64(31_557_600)
 )
 
 var (
@@ -53,7 +53,14 @@ func expectedRewardPerYear(
 
 	// TODO some more sanity checks of some sort?
 	expectedValue := new(big.Int).Div(diffReward, diffTime)
-	return new(big.Int).Mul(expectedValue, oneYear), nil
+	expectedPerYear := new(big.Int).Mul(expectedValue, oneYear)
+	utils.Logger().Info().
+		Uint64("diff-reward", diffReward.Uint64()).
+		Uint64("diff-time", diffTime.Uint64()).
+		Uint64("expected-value", expectedValue.Uint64()).
+		Uint64("expected-per-year", expectedPerYear.Uint64()).
+		Msg("expected reward per year computed")
+	return expectedPerYear, nil
 }
 
 func pastTwoEpochHeaders(
@@ -120,12 +127,21 @@ func ComputeForValidator(
 		new(big.Int).Sub(now, common.Big1),
 		numeric.ZeroDec()
 
+	utils.Logger().Info().
+		Uint64("now", now.Uint64()).
+		Uint64("two-epoch-ago", twoEpochAgo.Uint64()).
+		Uint64("one-epoch-ago", oneEpochAgo.Uint64()).
+		Msg("apr - begin compute for validator ")
+
 	twoSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
 		twoEpochAgo,
 		validatorNow.Address,
 	)
 
 	if err != nil {
+		utils.Logger().Debug().
+			RawJSON("validator-now", []byte(validatorNow.String())).
+			Err(err).Msg("could not retrieve two snapshot ago")
 		return &zero, nil
 	}
 
@@ -135,6 +151,9 @@ func ComputeForValidator(
 	)
 
 	if err != nil {
+		utils.Logger().Debug().
+			RawJSON("validator-now", []byte(validatorNow.String())).
+			Err(err).Msg("could not retrieve one snapshot ago")
 		return &zero, nil
 	}
 
@@ -145,6 +164,7 @@ func ComputeForValidator(
 	headerOneEpochAgo, headerTwoEpochAgo, err := pastTwoEpochHeaders(bc)
 
 	if err != nil {
+		utils.Logger().Debug().Err(err).Msg("could not retrieve past two epoch headers")
 		return &zero, nil
 	}
 
@@ -158,6 +178,12 @@ func ComputeForValidator(
 			)
 		return &zero, nil
 	}
+
+	utils.Logger().Info().
+		RawJSON("current-epoch-header", []byte(bc.CurrentHeader().String())).
+		RawJSON("one-epoch-ago-header", []byte(headerOneEpochAgo.String())).
+		RawJSON("two-epoch-ago-header", []byte(headerTwoEpochAgo.String())).
+		Msg("headers used for apr computation")
 
 	estimatedRewardPerYear, err := expectedRewardPerYear(
 		headerOneEpochAgo, headerTwoEpochAgo,
