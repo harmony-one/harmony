@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -15,7 +16,9 @@ import (
 
 // Reader ..
 type Reader interface {
-	GetHeaderByNumber(number uint64) *block.Header
+	Config() *params.ChainConfig
+	GetHeaderByHash(hash common.Hash) *block.Header
+	CurrentHeader() *block.Header
 	ReadValidatorSnapshotAtEpoch(
 		epoch *big.Int,
 		addr common.Address,
@@ -28,10 +31,6 @@ const (
 
 var (
 	oneYear = big.NewInt(int64(secondsInYear))
-	// ErrNotTwoEpochsAgo ..
-	ErrNotTwoEpochsAgo = errors.New("not two epochs ago yet")
-	// ErrNotOneEpochsAgo ..
-	ErrNotOneEpochsAgo = errors.New("not one epoch ago yet")
 )
 
 func expectedRewardPerYear(
@@ -55,6 +54,57 @@ func expectedRewardPerYear(
 	// TODO some more sanity checks of some sort?
 	expectedValue := new(big.Int).Div(diffReward, diffTime)
 	return new(big.Int).Mul(expectedValue, oneYear), nil
+}
+
+func pastTwoEpochHeaders(
+	bc Reader,
+) (*block.Header, *block.Header, error) {
+	current := bc.CurrentHeader()
+	epochNow := current.Epoch()
+	oneEpochAgo, twoEpochAgo :=
+		new(big.Int).Sub(epochNow, common.Big1),
+		new(big.Int).Sub(epochNow, common.Big2)
+
+	bottomOut := new(big.Int).Add(
+		bc.Config().StakingEpoch,
+		common.Big3,
+	)
+
+	var oneAgoHeader, twoAgoHeader **block.Header
+
+	for e1, e2 := false, false; ; {
+		current = bc.GetHeaderByHash(current.ParentHash())
+
+		if current == nil {
+			return nil, nil, errors.New("could not go up parent")
+		}
+
+		if current.Epoch().Cmp(bottomOut) == 0 {
+			if twoAgoHeader == nil || oneAgoHeader == nil {
+				return nil, nil, errors.New(
+					"could not find headers for apr computation",
+				)
+			}
+		}
+
+		switch {
+		// haven't found either epoch yet
+		case !e1 && !e2:
+			if current.Epoch().Cmp(oneEpochAgo) == 0 {
+				e1 = true
+				oneAgoHeader = &current
+				continue
+			}
+		case e1 && !e2:
+			if current.Epoch().Cmp(twoEpochAgo) == 0 {
+				e2 = true
+				twoAgoHeader = &current
+				break
+			}
+		}
+	}
+
+	return *oneAgoHeader, *twoAgoHeader, nil
 }
 
 // ComputeForValidator ..
@@ -92,12 +142,14 @@ func ComputeForValidator(
 		shard.Schedule.EpochLastBlock(twoEpochAgo.Uint64()),
 		shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64())
 
-	headerOneEpochAgo, headerTwoEpochAgo :=
-		bc.GetHeaderByNumber(blockNumAtOneEpochAgo),
-		bc.GetHeaderByNumber(blockNumAtTwoEpochAgo)
+	headerOneEpochAgo, headerTwoEpochAgo, err := pastTwoEpochHeaders(bc)
+
+	if err != nil {
+		return &zero, nil
+	}
 
 	// TODO Figure out why this is happening
-	if headerOneEpochAgo == nil || headerTwoEpochAgo == nil {
+	if headerOneEpochAgo == nil || headerTwoEpochAgo == nil || err != nil {
 		utils.Logger().Debug().
 			Msgf("apr compute headers epochs ago %+v %+v %+v %+v %+v %+v",
 				twoEpochAgo, oneEpochAgo,
