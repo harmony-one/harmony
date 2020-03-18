@@ -712,7 +712,11 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 		return err
 	}
 	if pool.currentState.GetBalance(from).Cmp(cost) < 0 {
-		return ErrInsufficientFunds
+		return errors.Wrapf(
+			ErrInsufficientFunds,
+			"current shard-id: %d",
+			pool.chain.CurrentBlock().ShardID(),
+		)
 	}
 	intrGas := uint64(0)
 	stakingTx, isStakingTx := tx.(*staking.StakingTransaction)
