@@ -271,11 +271,7 @@ func computeAndMutateEPOSStatus(
 			Str("threshold", measure.String()).
 			Msg("validator failed availability threshold, set to inactive")
 	default:
-		// TODO we need to take care of the situation when a validator
-		// wants to stop validating, but if they turns their validator
-		// to inactive and his node is still running,
-		// then the status will be turned back to active automatically.
-		wrapper.Status = effective.Active
+		// NOTE We explicitly leave the default case a NOOP
 	}
 
 	return nil
