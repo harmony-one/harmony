@@ -16,8 +16,8 @@ var StressNetSchedule stressnetSchedule
 type stressnetSchedule struct{}
 
 const (
-	// ~64 sec epochs for P1 of open staking
-	stressnetBlocksPerEpoch = 8
+	// ~304 sec epochs for P2 of open staking
+	stressnetBlocksPerEpoch = 38
 
 	stressnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
