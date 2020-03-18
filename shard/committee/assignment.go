@@ -344,11 +344,14 @@ func (def partialStakingEnabled) Compute(
 			Msg("Tried to compute committee for epoch in past")
 		return nil, ErrComputeForEpochInPast
 	}
+	utils.AnalysisStart("computeEPoSStakedCommittee")
 	shardState, err := eposStakedCommittee(instance, stakerReader)
+	utils.AnalysisEnd("computeEPoSStakedCommittee")
 
 	if err != nil {
 		return nil, err
 	}
+
 	// Set the epoch of shard state
 	shardState.Epoch = big.NewInt(0).Set(epoch)
 	utils.Logger().Info().

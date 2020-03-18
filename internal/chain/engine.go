@@ -309,6 +309,9 @@ func (e *engineImpl) Finalize(
 func payoutUndelegations(
 	chain engine.ChainReader, header *block.Header, state *state.DB,
 ) error {
+	utils.AnalysisStart("payoutUndelegations")
+	defer utils.AnalysisEnd("payoutUndelegations")
+
 	validators, err := chain.ReadValidatorList()
 	countTrack := map[common.Address]int{}
 	if err != nil {

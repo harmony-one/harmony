@@ -13,6 +13,7 @@ import (
 	"github.com/natefinch/lumberjack"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/diode"
+	"golang.org/x/sync/singleflight"
 )
 
 var (
@@ -115,6 +116,50 @@ func setZeroLoggerFileOutput(filepath string, maxSize int) error {
 	zeroLogger = &childLogger
 
 	return nil
+}
+
+const (
+	dataScienceTopic = "ds"
+)
+
+var (
+	loggersByTopic singleflight.Group
+)
+
+func lookupLogger(key string) (*zerolog.Logger, error) {
+	results, err, _ := loggersByTopic.Do(
+		key, func() (interface{}, error) {
+			log := Logger().With().
+				Str("log-topic", dataScienceTopic).
+				Timestamp().
+				Logger()
+			return &log, nil
+		},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return results.(*zerolog.Logger), nil
+}
+
+func ds() *zerolog.Logger {
+	logger, err := lookupLogger(dataScienceTopic)
+	if err != nil {
+		return Logger()
+	}
+	return logger
+}
+
+// AnalysisStart ..
+func AnalysisStart(name string, more ...interface{}) {
+	ds().Debug().Msgf("ds-%s-start %s", name, fmt.Sprint(more...))
+}
+
+// AnalysisEnd ..
+func AnalysisEnd(name string, more ...interface{}) {
+	ds().Debug().Msgf("ds-%s-end %s", name, fmt.Sprint(more...))
 }
 
 // Logger returns a zerolog.Logger singleton

@@ -98,6 +98,7 @@ func AccumulateRewards(
 	// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
+		utils.AnalysisStart("accumulateRewardBeaconchainSelfPayout")
 		defaultReward := network.BaseStakedReward
 		beaconCurrentEpoch := beaconChain.CurrentHeader().Epoch()
 		// TODO Use cached result in off-chain db instead of full computation
@@ -165,7 +166,9 @@ func AccumulateRewards(
 				}
 			}
 		}
+		utils.AnalysisEnd("accumulateRewardBeaconchainSelfPayout")
 
+		utils.AnalysisStart("accumulateRewardShardchainPayout")
 		// Handle rewards for shardchain
 		if cxLinks := header.CrossLinks(); len(cxLinks) > 0 {
 			crossLinks := types.CrossLinks{}
@@ -288,7 +291,7 @@ func AccumulateRewards(
 					}
 				}
 			}
-
+			utils.AnalysisEnd("accumulateRewardShardchainPayout")
 			return network.NewStakingEraRewardForRound(newRewards, missing), nil
 		}
 		return network.EmptyPayout, nil
