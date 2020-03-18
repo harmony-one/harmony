@@ -259,7 +259,7 @@ func computeAndMutateEPOSStatus(
 		Str("signed", computed.Signed.String()).
 		Str("to-sign", computed.ToSign.String()).
 		Str("percentage-signed", computed.Percentage.String()).
-		Bool("meets-threshold", computed.IsBelowThreshold).
+		Bool("is-below-threshold", computed.IsBelowThreshold).
 		Msg("check if signing percent is meeting required threshold")
 
 	const missedTooManyBlocks = true
