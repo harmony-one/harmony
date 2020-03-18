@@ -126,7 +126,7 @@ options:
    -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
    -R address     start a pprof profiling server listening on the specified address
-   -I             use statically linked Harmony binary
+   -I             use statically linked Harmony binary (default: true)
 
 examples:
 
@@ -188,7 +188,7 @@ multi_key=false
 archival=false
 blacklist=./.hmy/blacklist.txt
 pprof=""
-static=false
+static=true
 verify=false
 ${BLSKEYFILE=}
 
