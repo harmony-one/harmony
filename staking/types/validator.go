@@ -73,9 +73,9 @@ type ValidatorSnapshotReader interface {
 type counters struct {
 	// The number of blocks the validator
 	// should've signed when in active mode (selected in committee)
-	NumBlocksToSign *big.Int `json:"num-blocks-to-sign",rlp:"nil"`
+	NumBlocksToSign *big.Int `json:"to-sign",rlp:"nil"`
 	// The number of blocks the validator actually signed
-	NumBlocksSigned *big.Int `json:"num-blocks-signed",rlp:"nil"`
+	NumBlocksSigned *big.Int `json:"signed",rlp:"nil"`
 }
 
 // ValidatorWrapper contains validator,
@@ -138,6 +138,11 @@ type ValidatorRPCEnchanced struct {
 	EPoSStatus           string                   `json:"epos-status"`
 }
 
+type accumulatedOverLifetime struct {
+	BlockReward *big.Int `json:"reward-accumulated"`
+	Signing     counters `json:"blocks"`
+}
+
 func (w ValidatorWrapper) String() string {
 	s, _ := json.Marshal(w)
 	return string(s)
@@ -147,14 +152,14 @@ func (w ValidatorWrapper) String() string {
 func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Validator
-		Address     string      `json:"address"`
-		Delegations Delegations `json:"delegations"`
-		BlockReward *big.Int    `json:"block-reward-accumulated"`
+		Address     string                  `json:"address"`
+		Delegations Delegations             `json:"delegations"`
+		Lifetime    accumulatedOverLifetime `json:"lifetime"`
 	}{
 		w.Validator,
 		common2.MustAddressToBech32(w.Address),
 		w.Delegations,
-		w.BlockReward,
+		accumulatedOverLifetime{w.BlockReward, w.Counters},
 	})
 }
 
