@@ -39,22 +39,22 @@ func TestIsEpochBlock(t *testing.T) {
 		},
 		{
 			shardingconfig.TestnetSchedule,
-			blockNumbered(7),
+			blockNumbered(37),
 			false,
 		},
 		{
 			shardingconfig.TestnetSchedule,
-			blockNumbered(8),
+			blockNumbered(38),
 			true,
 		},
 		{
 			shardingconfig.TestnetSchedule,
-			blockNumbered(15),
+			blockNumbered(75),
 			false,
 		},
 		{
 			shardingconfig.TestnetSchedule,
-			blockNumbered(16),
+			blockNumbered(76),
 			true,
 		},
 	}
