@@ -2309,7 +2309,16 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			state, wrapper, blkPerEpoch,
 		)
 		if err == nil && aprComputed != nil {
-			stats.APR = *aprComputed
+			a := *aprComputed
+			utils.Logger().Info().
+				Str("return-rate", a.String()).
+				Uint64("new-epoch", newEpochSuperCommittee.Epoch.Uint64()).
+				Msg("apr computed")
+			stats.APR = a
+		}
+
+		if err != nil {
+			utils.Logger().Debug().Err(err).Msg("issue with compute of apr")
 		}
 
 		if err := rawdb.WriteValidatorStats(

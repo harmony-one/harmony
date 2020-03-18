@@ -16,8 +16,8 @@ var TestnetSchedule testnetSchedule
 type testnetSchedule struct{}
 
 const (
-	// 10 minutes per epoch (at 8s/block)
-	testnetBlocksPerEpoch = 75
+	// ~64 sec epochs for P1 of open staking
+	testnetBlocksPerEpoch = 8
 
 	testnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 

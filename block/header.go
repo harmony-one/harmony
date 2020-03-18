@@ -42,6 +42,12 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// String ..
+func (h Header) String() string {
+	s, _ := json.Marshal(h)
+	return string(s)
+}
+
 // EncodeRLP encodes the header using tagged RLP representation.
 func (h *Header) EncodeRLP(w io.Writer) error {
 	return HeaderRegistry.Encode(w, h.Header)
