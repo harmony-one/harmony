@@ -465,12 +465,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	curHeader := consensus.ChainReader.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
-	prevSubCommitteeDump := consensus.Decider.String()
-
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
 		len(curHeader.ShardState()) > 0 &&
 		!consensus.ChainReader.Config().IsStaking(curEpoch)
-
 	haventUpdatedDecider := consensus.ChainReader.Config().IsStaking(curEpoch) &&
 		consensus.Decider.Policy() != quorum.SuperMajorityStake
 
@@ -486,7 +483,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	committeeToSet := &shard.Committee{}
 	epochToSet := curEpoch
 	hasError := false
-
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
 		curEpoch, consensus.ChainReader,
 	)
@@ -572,8 +568,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		Uint64("block-number", curHeader.Number().Uint64()).
 		Uint64("curEpoch", curHeader.Epoch().Uint64()).
 		Uint32("shard-id", consensus.ShardID).
-		RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
-		RawJSON("current-subcommittee", []byte(consensus.Decider.String())).
 		Msg("[UpdateConsensusInformation] changing committee")
 
 	// take care of possible leader change during the curEpoch
