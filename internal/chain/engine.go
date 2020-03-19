@@ -278,15 +278,15 @@ func (e *engineImpl) Finalize(
 			return nil, nil, err
 		}
 
-		if curShardState, err := chain.ReadShardState(chain.CurrentBlock().Epoch()); err != nil {
+		curShardState, err := chain.ReadShardState(chain.CurrentBlock().Epoch())
+		if err != nil {
 			return nil, nil, err
-		} else {
-			for _, addr := range curShardState.StakedValidators().Addrs {
-				if err := availability.ComputeAndMutateEPOSStatus(
-					chain, state, addr,
-				); err != nil {
-					return nil, nil, err
-				}
+		}
+		for _, addr := range curShardState.StakedValidators().Addrs {
+			if err := availability.ComputeAndMutateEPOSStatus(
+				chain, state, addr,
+			); err != nil {
+				return nil, nil, err
 			}
 		}
 	}
