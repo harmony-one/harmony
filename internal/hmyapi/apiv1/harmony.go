@@ -52,6 +52,7 @@ type NodeMetadata struct {
 	IsLeader     bool   `json:"is-leader"`
 	ShardID      uint32 `json:"shard-id"`
 	Role         string `json:"role"`
+	Archival     bool   `json:"is-archival"`
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
@@ -65,5 +66,6 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		s.b.IsLeader(),
 		s.b.GetShardID(),
 		cfg.Role().String(),
+		cfg.GetArchival(),
 	}
 }
