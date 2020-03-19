@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/harmony-one/harmony/staking/availability"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
@@ -119,7 +121,13 @@ func prepareOrders(
 		if err != nil {
 			return nil, err
 		}
-		if !staking.IsEligibleForEPoSAuction(validator) {
+		snapshot, err := stakedReader.ReadValidatorSnapshot(
+			candidates[i],
+		)
+		if err != nil {
+			return nil, err
+		}
+		if !IsEligibleForEPoSAuction(snapshot, validator) {
 			continue
 		}
 
@@ -158,6 +166,25 @@ func prepareOrders(
 	}
 
 	return essentials, nil
+}
+
+// IsEligibleForEPoSAuction ..
+func IsEligibleForEPoSAuction(snapshot, validator *staking.ValidatorWrapper) bool {
+	if snapshot.Counters.NumBlocksToSign.Cmp(validator.Counters.NumBlocksToSign) == 0 {
+		// validator was not in last epoch's committee
+		switch validator.Status {
+		case effective.Active:
+			return true
+		default:
+			return false
+		}
+	} else {
+		// validator was in last epoch's committee
+		// validator with below-threshold signing activity won't be considered for next epoch
+		// and their status will be turned to inactive in FinalizeNewBlock
+		computed := availability.ComputeCurrentSigning(snapshot, validator)
+		return !computed.IsBelowThreshold
+	}
 }
 
 // ChainReader is a subset of Engine.ChainReader, just enough to do assignment

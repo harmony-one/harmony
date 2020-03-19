@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/harmony-one/harmony/internal/ctxerror"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
@@ -24,7 +26,24 @@ import (
 func ballotResultBeaconchain(
 	bc engine.ChainReader, header *block.Header,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
-	return availability.BallotResult(bc, header, shard.BeaconChainShardID)
+	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
+	//  while it is okay with hash.  Sounds like DB inconsistency.
+	//  Figure out why.
+	parentHeader := bc.GetHeaderByHash(header.ParentHash())
+	if parentHeader == nil {
+		return nil, nil, nil, ctxerror.New(
+			"cannot find parent block header in DB",
+			"parentHash", header.ParentHash(),
+		)
+	}
+	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
+	if err != nil {
+		return nil, nil, nil, ctxerror.New(
+			"cannot read shard state", "epoch", parentHeader.Epoch(),
+		).WithCause(err)
+	}
+
+	return availability.BallotResult(parentHeader, header, parentShardState, shard.BeaconChainShardID)
 }
 
 var (
@@ -276,14 +295,28 @@ func AccumulateRewards(
 	}
 
 	// Before staking
+	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
+	//  while it is okay with hash.  Sounds like DB inconsistency.
+	//  Figure out why.
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
+	if parentHeader == nil {
+		return network.EmptyPayout, ctxerror.New(
+			"cannot find parent block header in DB",
+			"parentHash", header.ParentHash(),
+		)
+	}
 	if parentHeader.Number().Cmp(common.Big0) == 0 {
 		// Parent is an epoch block,
 		// which is not signed in the usual manner therefore rewards nothing.
 		return network.EmptyPayout, nil
 	}
-
-	_, signers, _, err := availability.BallotResult(bc, header, header.ShardID())
+	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
+	if err != nil {
+		return nil, ctxerror.New(
+			"cannot read shard state", "epoch", parentHeader.Epoch(),
+		).WithCause(err)
+	}
+	_, signers, _, err := availability.BallotResult(parentHeader, header, parentShardState, header.ShardID())
 
 	if err != nil {
 		return network.EmptyPayout, err
