@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"github.com/harmony-one/harmony/staking/availability"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -266,7 +268,7 @@ func (e *engineImpl) Finalize(
 	isNewEpoch := len(header.ShardState()) > 0
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 
-	// Process Undelegations and set LastEpochInCommittee
+	// Process Undelegations, set LastEpochInCommittee and set EPoS status
 	if isBeaconChain && isNewEpoch && inStakingEra {
 		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, err
@@ -274,6 +276,18 @@ func (e *engineImpl) Finalize(
 
 		if err := setLastEpochInCommittee(header, state); err != nil {
 			return nil, nil, err
+		}
+
+		curShardState, err := chain.ReadShardState(chain.CurrentBlock().Epoch())
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, addr := range curShardState.StakedValidators().Addrs {
+			if err := availability.ComputeAndMutateEPOSStatus(
+				chain, state, addr,
+			); err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 

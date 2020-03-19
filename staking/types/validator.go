@@ -563,16 +563,6 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 	return nil
 }
 
-// IsEligibleForEPoSAuction ..
-func IsEligibleForEPoSAuction(validator *ValidatorWrapper) bool {
-	switch validator.Status {
-	case effective.Active:
-		return true
-	default:
-		return false
-	}
-}
-
 // String returns a human readable string representation of a validator.
 func (v Validator) String() string {
 	s, _ := json.Marshal(v)

@@ -356,13 +356,10 @@ func (b *APIBackend) GetValidatorInformation(
 		return defaultReply, nil
 	}
 
-	computed, err := availability.ComputeCurrentSigning(
-		snapshot, wrapper, shard.Schedule.BlocksPerEpoch(),
+	computed := availability.ComputeCurrentSigning(
+		snapshot, wrapper,
 	)
-
-	if err != nil {
-		return defaultReply, nil
-	}
+	computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - computed.ToSign.Uint64()
 
 	stats, err := b.hmy.BlockChain().ReadValidatorStats(addr)
 	if err != nil {
@@ -402,8 +399,9 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	}
 	stakes := big.NewInt(0)
 	for i := range candidates {
+		snapshot, _ := b.hmy.BlockChain().ReadValidatorSnapshot(candidates[i])
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
-		if !staking.IsEligibleForEPoSAuction(validator) {
+		if !committee.IsEligibleForEPoSAuction(snapshot, validator) {
 			continue
 		}
 		for i := range validator.Delegations {

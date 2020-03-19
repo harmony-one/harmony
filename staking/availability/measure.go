@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
-	engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -22,7 +21,6 @@ var (
 	errValidatorEpochDeviation = errors.New(
 		"validator snapshot epoch not exactly one epoch behind",
 	)
-	errNegativeSign = errors.New("impossible period of signing")
 	// ErrDivByZero ..
 	ErrDivByZero = errors.New("toSign of availability cannot be 0, mistake in protocol")
 )
@@ -71,25 +69,8 @@ func BlockSigners(
 // BallotResult returns
 // (parentCommittee.Slots, payable, missing, err)
 func BallotResult(
-	bc engine.ChainReader, header *block.Header, shardID uint32,
+	parentHeader, header *block.Header, parentShardState *shard.State, shardID uint32,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
-	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
-	//  while it is okay with hash.  Sounds like DB inconsistency.
-	//  Figure out why.
-	parentHeader := bc.GetHeaderByHash(header.ParentHash())
-	if parentHeader == nil {
-		return nil, nil, nil, ctxerror.New(
-			"cannot find parent block header in DB",
-			"parentHash", header.ParentHash(),
-		)
-	}
-	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
-	if err != nil {
-		return nil, nil, nil, ctxerror.New(
-			"cannot read shard state", "epoch", parentHeader.Epoch(),
-		).WithCause(err)
-	}
-
 	parentCommittee, err := parentShardState.FindCommitteeByID(shardID)
 
 	if err != nil {
@@ -117,7 +98,6 @@ func bumpCount(
 	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
-	blocksPerEpoch := shard.Schedule.BlocksPerEpoch()
 	for _, subset := range signers {
 		for i := range subset.committee {
 			addr := subset.committee[i].EcdsaAddress
@@ -141,12 +121,6 @@ func bumpCount(
 				wrapper.Counters.NumBlocksSigned.Add(
 					wrapper.Counters.NumBlocksSigned, common.Big1,
 				)
-			}
-
-			if err := computeAndMutateEPOSStatus(
-				bc, state, wrapper, blocksPerEpoch,
-			); err != nil {
-				return err
 			}
 
 			if err := state.UpdateValidatorWrapper(
@@ -183,8 +157,7 @@ type Reader interface {
 // ComputeCurrentSigning returns (signed, toSign, quotient, error)
 func ComputeCurrentSigning(
 	snapshot, wrapper *staking.ValidatorWrapper,
-	blocksPerEpoch uint64,
-) (*staking.Computed, error) {
+) *staking.Computed {
 	statsNow, snapSigned, snapToSign :=
 		wrapper.Counters,
 		snapshot.Counters.NumBlocksSigned,
@@ -193,37 +166,32 @@ func ComputeCurrentSigning(
 	signed, toSign :=
 		new(big.Int).Sub(statsNow.NumBlocksSigned, snapSigned),
 		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
-	leftToGo := blocksPerEpoch - toSign.Uint64()
 
 	computed := staking.NewComputed(
-		signed, toSign, leftToGo, numeric.ZeroDec(), true,
+		signed, toSign, 0, numeric.ZeroDec(), true,
 	)
 
 	if toSign.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().
 			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
-		return computed, nil
+		return computed
 	}
 
 	if signed.Sign() == -1 {
-		return nil, errors.Wrapf(
-			errNegativeSign, "diff for signed period wrong: stat %s, snapshot %s",
-			statsNow.NumBlocksSigned.String(), snapSigned.String(),
-		)
+		// Shouldn't happen
+		utils.Logger().Error().Msg("negative number of signed blocks")
 	}
 
 	if toSign.Sign() == -1 {
-		return nil, errors.Wrapf(
-			errNegativeSign, "diff for toSign period wrong: stat %s, snapshot %s",
-			statsNow.NumBlocksToSign.String(), snapToSign.String(),
-		)
+		// Shouldn't happen
+		utils.Logger().Error().Msg("negative number of blocks to sign")
 	}
 
 	s1, s2 :=
 		numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
 	computed.Percentage = s1.Quo(s2)
 	computed.IsBelowThreshold = IsBelowSigningThreshold(computed.Percentage)
-	return computed, nil
+	return computed
 }
 
 // IsBelowSigningThreshold ..
@@ -231,29 +199,29 @@ func IsBelowSigningThreshold(quotient numeric.Dec) bool {
 	return quotient.LTE(measure)
 }
 
-// computeAndMutateEPOSStatus sets the validator to
+// ComputeAndMutateEPOSStatus sets the validator to
 // inactive and thereby keeping it out of
 // consideration in the pool of validators for
 // whenever committee selection happens in future, the
 // signing threshold is 66%
-func computeAndMutateEPOSStatus(
+func ComputeAndMutateEPOSStatus(
 	bc Reader,
 	state *state.DB,
-	wrapper *staking.ValidatorWrapper,
-	blocksPerEpoch uint64,
+	addr common.Address,
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")
+
+	wrapper, err := state.ValidatorWrapper(addr)
+	if err != nil {
+		return err
+	}
 
 	snapshot, err := bc.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
 		return err
 	}
 
-	computed, err := ComputeCurrentSigning(snapshot, wrapper, blocksPerEpoch)
-
-	if err != nil {
-		return err
-	}
+	computed := ComputeCurrentSigning(snapshot, wrapper)
 
 	utils.Logger().Info().
 		Str("signed", computed.Signed.String()).
@@ -271,11 +239,14 @@ func computeAndMutateEPOSStatus(
 			Str("threshold", measure.String()).
 			Msg("validator failed availability threshold, set to inactive")
 	default:
-		// TODO we need to take care of the situation when a validator
-		// wants to stop validating, but if they turns their validator
-		// to inactive and his node is still running,
-		// then the status will be turned back to active automatically.
-		wrapper.Status = effective.Active
+		// Default is no-op so validator who wants to leave the committee can actually leave.
+	}
+
+	if err := state.UpdateValidatorWrapper(
+		addr, wrapper,
+	); err != nil {
+		const msg = "[ComputeAndMutateEPOSStatus] failed update validator info"
+		return ctxerror.New(msg).WithCause(err)
 	}
 
 	return nil

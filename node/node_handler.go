@@ -494,10 +494,11 @@ func (node *Node) PostConsensusProcessing(
 				if err != nil {
 					return
 				}
-				computed, err :=
-					availability.ComputeCurrentSigning(
-						snapshot, wrapper, shard.Schedule.BlocksPerEpoch(),
-					)
+				computed := availability.ComputeCurrentSigning(
+					snapshot, wrapper,
+				)
+				computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - computed.ToSign.Uint64()
+
 				if err != nil && computed.IsBelowThreshold {
 					url := h.Availability.OnDroppedBelowThreshold
 					go func() {
