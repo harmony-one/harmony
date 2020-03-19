@@ -39,21 +39,16 @@ const (
 	ElectedAndFellBelowThreshold
 )
 
-const (
-	eAndFell = "elected in current epoch committee " +
-		"but sustained current rate will evict epos candidacy"
-)
-
 func (c Candidacy) String() string {
 	switch c {
 	case Candidate:
-		return "candidate for upcoming epoch's epos-auction"
+		return "eligible to be elected next epoch"
 	case NotCandidate:
-		return "not a valid candidate for upcoming epoch's epos-auction"
+		return "not eligible to be elected next epoch"
 	case ElectedAndSigning:
-		return "elected in current epoch committee and signing above required epos threshold"
+		return "currently elected and signing enough blocks to be eligible for election next epoch"
 	case ElectedAndFellBelowThreshold:
-		return eAndFell
+		return "currently elected and not signing enough blocks to be eligible for election next epoch"
 	default:
 		return "unknown"
 	}
