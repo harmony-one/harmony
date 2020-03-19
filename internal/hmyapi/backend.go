@@ -61,7 +61,7 @@ type Backend interface {
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
 	// Get balance
-	GetBalance(address common.Address) (*big.Int, error)
+	GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error)
 	// Get validators for a particular epoch
 	GetCommittee(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
@@ -74,6 +74,7 @@ type Backend interface {
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
 	GetPendingCrossLinks() []*block.Header
 	GetPendingCXReceipts() []*types.CXReceiptsProof
+	GetCrossShardTransactionsHistory(address string) ([]types.CrossShardTx, error)
 }
 
 // GetAPIs returns all the APIs.

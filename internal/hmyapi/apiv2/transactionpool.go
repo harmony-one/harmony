@@ -46,7 +46,6 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 // GetTransactionsHistory returns the list of transactions hashes that involve a particular address.
 func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
 	address := args.Address
-	result := []common.Hash{}
 	var err error
 	if strings.HasPrefix(args.Address, "one1") {
 		address = args.Address
@@ -61,21 +60,47 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 	if err != nil {
 		return nil, err
 	}
-	result = ReturnWithPagination(hashes, args)
+	length, args := ReturnPagination(len(hashes), args)
+	result := hashes[args.PageSize*args.PageIndex : length]
 	if !args.FullTx {
 		return map[string]interface{}{"transactions": result}, nil
 	}
 	txs := []*RPCTransaction{}
 	for _, hash := range result {
 		tx := s.GetTransactionByHash(ctx, hash)
+		if tx == nil {
+			continue
+		}
 		txs = append(txs, tx)
 	}
 	return map[string]interface{}{"transactions": txs}, nil
 }
 
+// GetCrossShardTransactionsHistory returns the list of cross shard transactions that involve a particular address.
+func (s *PublicTransactionPoolAPI) GetCrossShardTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
+	address := args.Address
+	var err error
+	if strings.HasPrefix(args.Address, "one1") {
+		address = args.Address
+	} else {
+		addr := internal_common.ParseAddr(args.Address)
+		address, err = internal_common.AddressToBech32(addr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	crossTxs, err := s.b.GetCrossShardTransactionsHistory(address)
+	if err != nil {
+		return nil, err
+	}
+	length, args := ReturnPagination(len(crossTxs), args)
+	result := crossTxs[args.PageSize*args.PageIndex : length]
+	return map[string]interface{}{"transactions": result}, nil
+}
+
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
-func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) int {
-	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr uint64) int {
+	if block, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
 		return len(block.Transactions())
 	}
 	return 0
@@ -90,8 +115,8 @@ func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Co
 }
 
 // GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
-func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index uint64) *RPCTransaction {
-	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr uint64, index uint64) *RPCTransaction {
+	if block, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
 		return newRPCTransactionFromBlockIndex(block, index)
 	}
 	return nil
@@ -125,10 +150,10 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 }
 
 // GetTransactionCount returns the number of transactions the given address has sent for the given block number
-func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr string, blockNr rpc.BlockNumber) (uint64, error) {
+func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr string, blockNr uint64) (uint64, error) {
 	address := internal_common.ParseAddr(addr)
 	// Ask transaction pool for the nonce which includes pending transactions
-	if blockNr == rpc.PendingBlockNumber {
+	if rpc.BlockNumber(blockNr) == rpc.PendingBlockNumber {
 		nonce, err := s.b.GetPoolNonce(ctx, address)
 		if err != nil {
 			return 0, err
@@ -136,7 +161,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr
 		return nonce, nil
 	}
 	// Resolve block number and use its state to ask for the nonce
-	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(blockNr))
 	if state == nil || err != nil {
 		return 0, err
 	}

@@ -4,6 +4,7 @@ import (
 	"container/ring"
 	"crypto/ecdsa"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -285,15 +286,16 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 }
 
 // Add new transactions to the pending transaction list.
-func (node *Node) addPendingTransactions(newTxs types.Transactions) {
+func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 	node.pendingTxMutex.Lock()
 
-	node.TxPool.AddRemotes(newTxs)
+	errs := node.TxPool.AddRemotes(newTxs)
 
 	node.pendingTxMutex.Unlock()
 
 	pendingCount, queueCount := node.TxPool.Stats()
 	utils.Logger().Info().Int("length of newTxs", len(newTxs)).Int("totalPending", pendingCount).Int("totalQueued", queueCount).Msg("Got more transactions")
+	return errs
 }
 
 // Add new staking transactions to the pending staking transaction list.
@@ -323,12 +325,20 @@ func (node *Node) AddPendingStakingTransaction(
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 // This is only called from SDK.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) {
-	if node.Consensus.IsLeader() && newTx.ShardID() == node.NodeConfig.ShardID {
-		node.addPendingTransactions(types.Transactions{newTx})
-	} else {
-		utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
-		node.tryBroadcast(newTx)
+	role := node.NodeConfig.Role()
+	if newTx.ShardID() == node.NodeConfig.ShardID && (node.Consensus.IsLeader() || role == nodeconfig.ExplorerNode) {
+		errs := node.addPendingTransactions(types.Transactions{newTx})
+		if role != nodeconfig.ExplorerNode {
+			return
+		}
+		for i := range errs {
+			if errs[i] != nil {
+				return
+			}
+		}
 	}
+	utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
+	node.tryBroadcast(newTx)
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
@@ -439,7 +449,8 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 }
 
 // New creates a new node.
-func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardchain.DBFactory, isArchival bool) *Node {
+func New(host p2p.Host, consensusObj *consensus.Consensus,
+	chainDBFactory shardchain.DBFactory, blacklist *map[common.Address]struct{}, isArchival bool) *Node {
 	node := Node{}
 	const sinkSize = 4096
 	node.syncFreq = SyncFrequency
@@ -490,7 +501,19 @@ func New(host p2p.Host, consensusObj *consensus.Consensus, chainDBFactory shardc
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		node.recentTxsStats = make(types.RecentTxsStats)
-		node.TxPool = core.NewTxPool(core.DefaultTxPoolConfig, node.Blockchain().Config(), blockchain)
+		txPoolConfig := core.DefaultTxPoolConfig
+		txPoolConfig.Blacklist = blacklist
+		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain,
+			func(payload []types.RPCTransactionError) {
+				if len(payload) > 0 {
+					node.errorSink.Lock()
+					for i := range payload {
+						node.errorSink.failedTxns.Value = payload[i]
+						node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
+					}
+					node.errorSink.Unlock()
+				}
+			})
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
@@ -567,7 +590,7 @@ func (node *Node) CalculateInitShardState() (err error) {
 	}
 
 	for _, key := range pubKeys {
-		if key.IsEqual(node.Consensus.PubKey) {
+		if node.Consensus.PubKey.Contains(key) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
@@ -665,4 +688,14 @@ func (node *Node) SetSyncFreq(syncFreq int) {
 // SetBeaconSyncFreq sets the syncing frequency in the loop
 func (node *Node) SetBeaconSyncFreq(syncFreq int) {
 	node.beaconSyncFreq = syncFreq
+}
+
+// ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.
+func (node *Node) ShutDown() {
+	node.Blockchain().Stop()
+	node.Beaconchain().Stop()
+	msg := "Successfully shut down!\n"
+	utils.Logger().Print(msg)
+	fmt.Print(msg)
+	os.Exit(0)
 }

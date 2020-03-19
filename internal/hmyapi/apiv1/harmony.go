@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
-	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
@@ -69,9 +68,4 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		cfg.Role().String(),
 		cfg.GetArchival(),
 	}
-}
-
-// GetCurrentTransactionErrorSink ..
-func (s *PublicHarmonyAPI) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
-	return s.b.GetCurrentTransactionErrorSink()
 }

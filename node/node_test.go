@@ -15,6 +15,7 @@ import (
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/drand"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -35,12 +36,12 @@ func TestNewNode(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, testDBFactory, false)
+	node := New(host, consensus, testDBFactory, nil, false)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}
@@ -202,14 +203,14 @@ func TestAddPeers(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
-	node := New(host, consensus, testDBFactory, false)
+	node := New(host, consensus, testDBFactory, nil, false)
 	node.DRand = dRand
 	r1 := node.AddPeers(peers1)
 	e1 := 2
@@ -252,14 +253,14 @@ func TestAddBeaconPeer(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
-	node := New(host, consensus, testDBFactory, false)
+	node := New(host, consensus, testDBFactory, nil, false)
 	node.DRand = dRand
 	for _, p := range peers1 {
 		ret := node.AddBeaconPeer(p)

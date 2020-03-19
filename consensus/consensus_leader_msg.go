@@ -12,7 +12,7 @@ import (
 )
 
 // Constructs the announce message
-func (consensus *Consensus) constructAnnounceMessage() []byte {
+func (consensus *Consensus) constructAnnounceMessage(priKey *bls.SecretKey) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_ANNOUNCE,
@@ -21,10 +21,10 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 		},
 	}
 	consensusMsg := message.GetConsensus()
-	consensus.populateMessageFields(consensusMsg)
+	consensus.populateMessageFields(consensusMsg, priKey.GetPublicKey())
 	consensusMsg.Payload = consensus.blockHeader
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Announce message")
 	}
@@ -32,7 +32,7 @@ func (consensus *Consensus) constructAnnounceMessage() []byte {
 }
 
 // Construct the prepared message, returning prepared message in bytes.
-func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
+func (consensus *Consensus) constructPreparedMessage(priKey *bls.SecretKey) ([]byte, *bls.Sign) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_PREPARED,
@@ -42,7 +42,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	}
 
 	consensusMsg := message.GetConsensus()
-	consensus.populateMessageFields(consensusMsg)
+	consensus.populateMessageFields(consensusMsg, consensus.LeaderPubKey)
 	// add block content in prepared message for slow validators to catchup
 	consensusMsg.Block = consensus.block
 
@@ -59,7 +59,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 	consensusMsg.Payload = buffer.Bytes()
 	//// END Payload
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Prepared message")
 	}
@@ -67,7 +67,7 @@ func (consensus *Consensus) constructPreparedMessage() ([]byte, *bls.Sign) {
 }
 
 // Construct the committed message, returning committed message in bytes.
-func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
+func (consensus *Consensus) constructCommittedMessage(priKey *bls.SecretKey, pubKey *bls.PublicKey) ([]byte, *bls.Sign) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_COMMITTED,
@@ -77,7 +77,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	}
 
 	consensusMsg := message.GetConsensus()
-	consensus.populateMessageFields(consensusMsg)
+	consensus.populateMessageFields(consensusMsg, pubKey)
 
 	//// Payload
 	buffer := bytes.NewBuffer([]byte{})
@@ -92,7 +92,7 @@ func (consensus *Consensus) constructCommittedMessage() ([]byte, *bls.Sign) {
 	consensusMsg.Payload = buffer.Bytes()
 	//// END Payload
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to sign and marshal the Committed message")
 	}

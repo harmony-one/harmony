@@ -78,7 +78,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 
 func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Update worker's current header and state data in preparation to propose/process new transactions
-	coinbase := node.Consensus.SelfAddress
+	coinbase := node.Consensus.SelfAddress[node.Consensus.LeaderPubKey.SerializeToHexStr()]
 
 	// Prepare transactions including staking transactions
 	pending, err := node.TxPool.Pending()
@@ -88,15 +88,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	node.Worker.UpdateCurrent(coinbase)
-	if err := node.Worker.CommitTransactions(pending, coinbase,
-		func(payload []types.RPCTransactionError) {
-			node.errorSink.Lock()
-			for i := range payload {
-				node.errorSink.failedTxns.Value = payload[i]
-				node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
-			}
-			node.errorSink.Unlock()
-		}); err != nil {
+	if err := node.Worker.CommitTransactions(pending, coinbase); err != nil {
 		ctxerror.Log15(utils.GetLogger().Error,
 			ctxerror.New("cannot commit transactions").
 				WithCause(err))

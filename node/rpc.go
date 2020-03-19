@@ -42,7 +42,7 @@ var (
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
 	httpOrigins      = []string{"*"}
 
-	wsModules = []string{"net", "netv2", "web3"}
+	wsModules = []string{"hmy", "hmyv2", "net", "netv2", "web3"}
 	wsOrigins = []string{"*"}
 
 	harmony *hmy.Harmony
@@ -205,7 +205,7 @@ func (node *Node) APIs() []rpc.API {
 			Public:    true,
 		},
 		{
-			Namespace: "netv2",
+			Namespace: "net_v2",
 			Version:   "1.0",
 			Service:   apiv2.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
 			Public:    true,

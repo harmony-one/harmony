@@ -235,6 +235,11 @@ func (db *DB) GetCode(addr common.Address) []byte {
 	return nil
 }
 
+// GetTrie ...
+func (db *DB) GetTrie() Trie {
+	return db.trie
+}
+
 // GetCodeSize ...
 func (db *DB) GetCodeSize(addr common.Address) int {
 	stateObject := db.getStateObject(addr)

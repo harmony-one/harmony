@@ -56,7 +56,7 @@ func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error
 }
 
 // Populates the common basic fields for all consensus message.
-func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusRequest) {
+func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusRequest, pubKey *bls.PublicKey) {
 	request.ViewId = consensus.viewID
 	request.BlockNum = consensus.blockNum
 	request.ShardId = consensus.ShardID
@@ -65,15 +65,15 @@ func (consensus *Consensus) populateMessageFields(request *msg_pb.ConsensusReque
 	request.BlockHash = consensus.blockHash[:]
 
 	// sender address
-	request.SenderPubkey = consensus.PubKey.Serialize()
+	request.SenderPubkey = pubKey.Serialize()
 	consensus.getLogger().Debug().
-		Str("senderKey", consensus.PubKey.SerializeToHexStr()).
+		Str("senderKey", pubKey.SerializeToHexStr()).
 		Msg("[populateMessageFields]")
 }
 
 // Signs the consensus message and returns the marshaled message.
-func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message) ([]byte, error) {
-	err := consensus.signConsensusMessage(message)
+func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message, priKey *bls.SecretKey) ([]byte, error) {
+	err := consensus.signConsensusMessage(message, priKey)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -137,14 +137,14 @@ func NewFaker() *Consensus {
 }
 
 // Sign on the hash of the message
-func (consensus *Consensus) signMessage(message []byte) []byte {
+func (consensus *Consensus) signMessage(message []byte, priKey *bls.SecretKey) []byte {
 	hash := hash.Keccak256(message)
-	signature := consensus.priKey.SignHash(hash[:])
+	signature := priKey.SignHash(hash[:])
 	return signature.Serialize()
 }
 
 // Sign on the consensus message signature field.
-func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message) error {
+func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message, priKey *bls.SecretKey) error {
 	message.Signature = nil
 	// TODO: use custom serialization method rather than protobuf
 	marshaledMessage, err := protobuf.Marshal(message)
@@ -152,7 +152,7 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message) error 
 		return err
 	}
 	// 64 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage)
+	signature := consensus.signMessage(marshaledMessage, priKey)
 	message.Signature = signature
 	return nil
 }
@@ -389,7 +389,7 @@ func (consensus *Consensus) reportMetrics(block types.Block) {
 		txHashes = append(txHashes, hex.EncodeToString(txHash[:]))
 	}
 	metrics := map[string]interface{}{
-		"key":             hex.EncodeToString(consensus.PubKey.Serialize()),
+		"key":             hex.EncodeToString(consensus.LeaderPubKey.Serialize()),
 		"tps":             tps,
 		"txCount":         numOfTxs,
 		"nodeCount":       consensus.Decider.ParticipantsCount() + 1,
@@ -510,13 +510,13 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	for _, key := range pubKeys {
 		// in committee
-		if key.IsEqual(consensus.PubKey) {
+		if consensus.PubKey.Contains(key) {
 			if hasError {
 				return Syncing
 			}
 
 			// If the leader changed and I myself become the leader
-			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.LeaderPubKey.IsEqual(consensus.PubKey) {
+			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.IsLeader() {
 				go func() {
 					utils.Logger().Debug().
 						Str("myKey", consensus.PubKey.SerializeToHexStr()).
@@ -536,8 +536,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	if consensus.PubKey != nil && consensus.LeaderPubKey != nil {
-		return consensus.PubKey.IsEqual(consensus.LeaderPubKey)
+	for _, key := range consensus.PubKey.PublicKey {
+		if key.IsEqual(consensus.LeaderPubKey) {
+			return true
+		}
 	}
 	return false
 }

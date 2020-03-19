@@ -130,7 +130,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						Msg("block sync")
 				} else {
 					// for non-beaconchain node, subscribe to beacon block broadcast
-					if node.Blockchain().ShardID() != 0 {
+					if node.Blockchain().ShardID() != 0 && node.NodeConfig.Role() != nodeconfig.ExplorerNode {
 						for _, block := range blocks {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
@@ -344,7 +344,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
 	// TODO: refactor the asynchronous calls to separate go routine.
 	node.lastConsensusTime = time.Now().Unix()
-	if node.Consensus.PubKey.IsEqual(node.Consensus.LeaderPubKey) {
+	if node.Consensus.IsLeader() {
 		if node.NodeConfig.ShardID == 0 {
 			node.BroadcastNewBlock(newBlock)
 		}

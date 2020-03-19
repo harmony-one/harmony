@@ -62,12 +62,12 @@ type Backend interface {
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
 	// Get balance
-	GetBalance(address common.Address) (*big.Int, error)
+	GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error)
 	// Get committee for a particular epoch
 	GetCommittee(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
 	// Get transactions history for an address
-	GetTransactionsHistory(address string, txType, order string) ([]common.Hash, error)
+	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
@@ -75,4 +75,5 @@ type Backend interface {
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
 	GetPendingCrossLinks() []*block.Header
 	GetPendingCXReceipts() []*types.CXReceiptsProof
+	GetCrossShardTransactionsHistory(address string) ([]types.CrossShardTx, error)
 }

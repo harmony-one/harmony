@@ -202,7 +202,7 @@ type RPCBlock struct {
 func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{}, error) {
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
-		"number":           (*hexutil.Big)(head.Number()),
+		"number":           (*big.Int)(head.Number()),
 		"hash":             b.Hash(),
 		"parentHash":       head.ParentHash(),
 		"nonce":            0, // Remove this because we don't have it in our header
@@ -212,10 +212,10 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 		"miner":            head.Coinbase(),
 		"difficulty":       0, // Remove this because we don't have it in our header
 		"extraData":        hexutil.Bytes(head.Extra()),
-		"size":             hexutil.Uint64(b.Size()),
-		"gasLimit":         hexutil.Uint64(head.GasLimit()),
-		"gasUsed":          hexutil.Uint64(head.GasUsed()),
-		"timestamp":        hexutil.Uint64(head.Time().Uint64()),
+		"size":             uint64(b.Size()),
+		"gasLimit":         head.GasLimit(),
+		"gasUsed":          head.GasUsed(),
+		"timestamp":        head.Time().Uint64(),
 		"transactionsRoot": head.TxHash(),
 		"receiptsRoot":     head.ReceiptHash(),
 	}

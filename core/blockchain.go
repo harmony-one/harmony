@@ -296,13 +296,15 @@ func (bc *BlockChain) loadLastState() error {
 	// Everything seems to be fine, set as the head block
 	bc.currentBlock.Store(currentBlock)
 
-	// Restore the last known head header
+	// We don't need the following as we want the current header and block to be consistent
+	// Restore the last known head header		// Restore the last known head header
+	//currentHeader := currentBlock.Header()
+	//if head := rawdb.ReadHeadHeaderHash(bc.db); head != (common.Hash{}) {
+	//	if header := bc.GetHeaderByHash(head); header != nil {
+	//		currentHeader = header
+	//	}
+	//}
 	currentHeader := currentBlock.Header()
-	if head := rawdb.ReadHeadHeaderHash(bc.db); head != (common.Hash{}) {
-		if header := bc.GetHeaderByHash(head); header != nil {
-			currentHeader = header
-		}
-	}
 	bc.hc.SetCurrentHeader(currentHeader)
 
 	// Restore the last known head fast block
@@ -525,6 +527,10 @@ func (bc *BlockChain) repair(head **types.Block) error {
 				Msg("Rewound blockchain to past state")
 			return nil
 		}
+		// Repair last commit sigs
+		lastSig := (*head).Header().LastCommitSignature()
+		sigAndBitMap := append(lastSig[:], (*head).Header().LastCommitBitmap()...)
+		bc.WriteLastCommits(sigAndBitMap)
 		// Otherwise rewind one block and recheck state availability there
 		(*head) = bc.GetBlock((*head).ParentHash(), (*head).NumberU64()-1)
 	}

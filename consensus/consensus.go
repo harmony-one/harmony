@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -89,10 +90,10 @@ type Consensus struct {
 	pubKeyLock sync.Mutex
 
 	// private/public keys of current node
-	priKey *bls.SecretKey
-	PubKey *bls.PublicKey
+	priKey *nodeconfig.MultiBlsPrivateKey
+	PubKey *nodeconfig.MultiBlsPublicKey
 
-	SelfAddress common.Address
+	SelfAddress map[string]common.Address
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 
@@ -203,11 +204,26 @@ func (consensus *Consensus) GetBlockReward() *big.Int {
 	return consensus.lastBlockReward
 }
 
+// GetLeaderPrivateKey returns leader private key if node is the leader
+func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls.PublicKey) (*bls.SecretKey, error) {
+	for i, key := range consensus.PubKey.PublicKey {
+		if key.IsEqual(leaderKey) {
+			return consensus.priKey.PrivateKey[i], nil
+		}
+	}
+	return nil, fmt.Errorf("leader private key not found")
+}
+
+// GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
+func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, error) {
+	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey)
+}
+
 // TODO: put shardId into chain reader's chain config
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, blsPriKey *bls.SecretKey,
+	host p2p.Host, shard uint32, leader p2p.Peer, multiBlsPriKey *nodeconfig.MultiBlsPrivateKey,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 	consensus := Consensus{}
@@ -224,9 +240,9 @@ func New(
 	consensus.CommitteePublicKeys = make(map[string]bool)
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
-	if blsPriKey != nil {
-		consensus.priKey = blsPriKey
-		consensus.PubKey = blsPriKey.GetPublicKey()
+	if multiBlsPriKey != nil {
+		consensus.priKey = multiBlsPriKey
+		consensus.PubKey = multiBlsPriKey.GetPublicKey()
 		utils.Logger().Info().
 			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
 	} else {

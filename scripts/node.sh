@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200114.0"
+version="v1 20200309.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -116,6 +116,11 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -P             enable public rpc end point (default:off)
    -v             print out the version of the node.sh
    -V             print out the version of the Harmony binary
+   -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
+   -I             use statically linked Harmony binary
+   -Y             verify the signature of the downloaded binaries (default: off)
+   -M             support multi-key mode (default: off)
+   -A             enable archival node mode (default: off)
 
 examples:
 
@@ -149,7 +154,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc
+unset upgrade_rel public_rpc blacklist multi_key archival verify
 start_clean=false
 loop=true
 run_as_root=true
@@ -161,11 +166,16 @@ node_type=validator
 shard_id=1
 download_harmony_db=false
 public_rpc=false
+blacklist=./.hmy/blacklist.txt
+static=false
+multi_key=false
+archival=false
+verify=false
 ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvV opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVIMB:AY opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -179,19 +189,24 @@ do
    S) run_as_root=false ;;
    p) blspass="${OPTARG}";;
    d) download_only=true;;
+   M) multi_key=true;;
    D) do_not_download=true;;
    m) metrics=true;;
    N) network="${OPTARG}";;
    t) network=pangaea;;
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
+   I) static=true;;
    a) db_file_to_dl="${OPTARG}";;
    U) upgrade_rel="${OPTARG}";;
    P) public_rpc=true;;
+   B) blacklist="${OPTARG}";;
    v) msg "version: $version"
       exit 0 ;;
    V) LD_LIBRARY_PATH=. ./harmony -version
       exit 0 ;;
+   Y) verify=true;;
+   A) archival=true;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -253,12 +268,17 @@ if [ -n "$upgrade_rel" ]; then
 fi
 
 if [ "$OS" == "Darwin" ]; then
-   FOLDER=release/darwin-x86_64/$REL/
+   FOLDER=release/darwin-x86_64/$REL
    BIN=( harmony libbls384_256.dylib libcrypto.1.0.0.dylib libgmp.10.dylib libgmpxx.4.dylib libmcl.dylib md5sum.txt )
 fi
 if [ "$OS" == "Linux" ]; then
-   FOLDER=release/linux-x86_64/$REL/
-   BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
+   FOLDER=release/linux-x86_64/$REL
+   if [ "$static" == "true" ]; then
+      BIN=( harmony md5sum.txt )
+      FOLDER=${FOLDER}/static
+   else
+      BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
+   fi
 fi
 
 extract_checksum() {
@@ -302,7 +322,19 @@ download_binaries() {
    outdir="${1:-.}"
    mkdir -p "${outdir}"
    for bin in "${BIN[@]}"; do
-      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || return $?
+      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/${bin} -o "${outdir}/${bin}" || return $?
+
+      if $verify; then
+         curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/${bin}.sig -o "${outdir}/${bin}.sig" || status=$?
+         case "${status}" in
+         0) ;;
+         *)
+            msg "cannot download ${bin}.sig (status ${status})"
+            return ${status}
+            ;;
+         esac
+         verify_signature "${outdir}" "${bin}" || return $?
+      fi
       verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
       msg "downloaded ${bin}"
    done
@@ -358,7 +390,7 @@ download_harmony_db_file() {
       err 70 "do not have enough free disk space to download db tarball"
    fi
 
-   url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/md5sum.txt"
+   url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/md5sum.txt"
    rm -f "${outdir}/md5sum.txt"
    if ! _curl_download $url "${outdir}" md5sum.txt; then
       err 70 "cannot download md5sum.txt"
@@ -366,7 +398,7 @@ download_harmony_db_file() {
 
    if [ -n "${file_to_dl}" ]; then
       if grep -q "${file_to_dl}" "${outdir}/md5sum.txt"; then
-         url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/${file_to_dl}"
+         url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/${file_to_dl}"
          if _curl_download $url "${outdir}" ${file_to_dl}; then
             verify_checksum "${outdir}" "${file_to_dl}" md5sum.txt || return $?
             msg "downloaded ${file_to_dl}, extracting ..."
@@ -387,7 +419,7 @@ download_harmony_db_file() {
          echo -n "Do you want to download ${file} (choose one only) [y/n]?"
          read yesno
          if [[ "$yesno" = "y" || "$yesno" = "Y" ]]; then
-            url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/$file"
+            url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/$file"
             if _curl_download $url "${outdir}" $file; then
                verify_checksum "${outdir}" "${file}" md5sum.txt || return $?
                msg "downloaded $file, extracting ..."
@@ -416,42 +448,45 @@ if ${run_as_root}; then
    check_root
 fi
 
-case "${BLSKEYFILE}" in
-"")
-   unset -v f
-   for f in \
-      ~/*--????-??-??T??-??-??.*Z--bls_???????????????????????????????????????????????????????????????????????????????????????????????? \
-      ~/????????????????????????????????????????????????????????????????????????????????????????????????.key \
-      *--????-??-??T??-??-??.*Z--bls_???????????????????????????????????????????????????????????????????????????????????????????????? \
-      ????????????????????????????????????????????????????????????????????????????????????????????????.key
-   do
-      [ -f "${f}" ] || continue
-      case "${BLSKEYFILE}" in
-      "")
-         BLSKEYFILE="${f}"
-         ;;
-      *)
-         [ "${f}" -ef "${BLSKEYFILE}" ] || \
-            err 69 "multiple key files found (${f}, ${BLSKEYFILE}); please use -k to specify"
-         ;;
-      esac
-   done
+# multi_key mode will use specified keys in .hmy/multikeys directory
+if ! ${multi_key}; then
    case "${BLSKEYFILE}" in
-   "") err 69 "could not autodetect BLS key file; please use -k to specify";;
+   "")
+      unset -v f
+      for f in \
+         ~/*--????-??-??T??-??-??.*Z--bls_???????????????????????????????????????????????????????????????????????????????????????????????? \
+         ~/????????????????????????????????????????????????????????????????????????????????????????????????.key \
+         *--????-??-??T??-??-??.*Z--bls_???????????????????????????????????????????????????????????????????????????????????????????????? \
+         ????????????????????????????????????????????????????????????????????????????????????????????????.key
+      do
+         [ -f "${f}" ] || continue
+         case "${BLSKEYFILE}" in
+         "")
+            BLSKEYFILE="${f}"
+            ;;
+         *)
+            [ "${f}" -ef "${BLSKEYFILE}" ] || \
+               err 69 "multiple key files found (${f}, ${BLSKEYFILE}); please use -k to specify"
+            ;;
+         esac
+      done
+      case "${BLSKEYFILE}" in
+      "") err 69 "could not autodetect BLS key file; please use -k to specify";;
+      esac
+      msg "autodetected BLS key file: ${BLSKEYFILE}"
+      ;;
+   *)
+      msg "using manually specified BLS key file: ${BLSKEYFILE}"
+      ;;
    esac
-   msg "autodetected BLS key file: ${BLSKEYFILE}"
-   ;;
-*)
-   msg "using manually specified BLS key file: ${BLSKEYFILE}"
-   ;;
-esac
+fi
 
 any_new_binaries() {
    local outdir
    ${do_not_download} && return 0
    outdir="${1:-.}"
    mkdir -p "${outdir}"
-   curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
+   curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
    if diff $outdir/md5sum.txt.new md5sum.txt
    then
       rm "${outdir}/md5sum.txt.new"
@@ -630,7 +665,16 @@ do
       -blskey_file "${BLSKEYFILE}"
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
+      -blacklist="${blacklist}"
    )
+   args+=(
+      -is_archival="${archival}"
+   )
+   if ! ${multi_key}; then
+      args+=(
+      -blskey_file "${BLSKEYFILE}"
+      )
+   fi
    if ${public_rpc}; then
       args+=(
       -public_rpc

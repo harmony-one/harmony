@@ -26,17 +26,16 @@ func TestAddNewBlock(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
-	node := New(host, consensus, testDBFactory, false)
+	node := New(host, consensus, testDBFactory, nil, false)
 
 	txs := make(map[common.Address]types.Transactions)
-	node.Worker.CommitTransactions(txs, common.Address{},
-		func([]types.RPCTransactionError) {})
+	node.Worker.CommitTransactions(txs, common.Address{})
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
 	err = node.AddNewBlock(block)
@@ -60,16 +59,15 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote)
 	consensus, err := consensus.New(
-		host, values.BeaconChainShardID, leader, blsKey, decider,
+		host, values.BeaconChainShardID, leader, nodeconfig.GetMultiBlsPrivateKey(blsKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, testDBFactory, false)
+	node := New(host, consensus, testDBFactory, nil, false)
 
 	txs := make(map[common.Address]types.Transactions)
-	node.Worker.CommitTransactions(txs, common.Address{},
-		func([]types.RPCTransactionError) {})
+	node.Worker.CommitTransactions(txs, common.Address{})
 	block, _ := node.Worker.FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 
 	if err := node.VerifyNewBlock(block); err != nil {
