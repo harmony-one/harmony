@@ -18,6 +18,8 @@ import (
 type Reader interface {
 	Config() *params.ChainConfig
 	GetHeaderByHash(hash common.Hash) *block.Header
+	// GetHeader retrieves a block header from the database by hash and number.
+	GetHeader(hash common.Hash, number uint64) *block.Header
 	CurrentHeader() *block.Header
 	ReadValidatorSnapshotAtEpoch(
 		epoch *big.Int,
@@ -80,7 +82,7 @@ func pastTwoEpochHeaders(
 	var oneAgoHeader, twoAgoHeader **block.Header
 
 	for e1, e2 := false, false; ; {
-		current = bc.GetHeaderByHash(current.ParentHash())
+		current = bc.GetHeader(current.ParentHash(), current.Number().Uint64()-1)
 
 		if current == nil {
 			return nil, nil, errors.New("could not go up parent")
@@ -139,9 +141,6 @@ func ComputeForValidator(
 	)
 
 	if err != nil {
-		utils.Logger().Debug().
-			RawJSON("validator-now", []byte(validatorNow.String())).
-			Err(err).Msg("could not retrieve two snapshot ago")
 		return &zero, nil
 	}
 
@@ -151,9 +150,6 @@ func ComputeForValidator(
 	)
 
 	if err != nil {
-		utils.Logger().Debug().
-			RawJSON("validator-now", []byte(validatorNow.String())).
-			Err(err).Msg("could not retrieve one snapshot ago")
 		return &zero, nil
 	}
 
@@ -162,11 +158,6 @@ func ComputeForValidator(
 		shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64())
 
 	headerOneEpochAgo, headerTwoEpochAgo, err := pastTwoEpochHeaders(bc)
-
-	if err != nil {
-		utils.Logger().Debug().Err(err).Msg("could not retrieve past two epoch headers")
-		return &zero, nil
-	}
 
 	// TODO Figure out why this is happening
 	if headerOneEpochAgo == nil || headerTwoEpochAgo == nil || err != nil {

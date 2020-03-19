@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/harmony-one/harmony/staking/availability"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
@@ -119,7 +121,13 @@ func prepareOrders(
 		if err != nil {
 			return nil, err
 		}
-		if !staking.IsEligibleForEPoSAuction(validator) {
+		snapshot, err := stakedReader.ReadValidatorSnapshot(
+			candidates[i],
+		)
+		if err != nil {
+			return nil, err
+		}
+		if !IsEligibleForEPoSAuction(snapshot, validator) {
 			continue
 		}
 
@@ -158,6 +166,28 @@ func prepareOrders(
 	}
 
 	return essentials, nil
+}
+
+// IsEligibleForEPoSAuction ..
+func IsEligibleForEPoSAuction(snapshot, validator *staking.ValidatorWrapper) bool {
+	if snapshot.Counters.NumBlocksToSign.Cmp(validator.Counters.NumBlocksToSign) != 0 {
+		// validator was in last epoch's committee
+		// validator with below-threshold signing activity won't be considered for next epoch
+		// and their status will be turned to inactive in FinalizeNewBlock
+		computed := availability.ComputeCurrentSigning(snapshot, validator)
+		if computed.IsBelowThreshold {
+			return false
+		}
+	}
+	// For validators who were not in last epoch's committee
+	// or for those who were and signed enough blocks,
+	// the decision is based on the status
+	switch validator.Status {
+	case effective.Active:
+		return true
+	default:
+		return false
+	}
 }
 
 // ChainReader is a subset of Engine.ChainReader, just enough to do assignment
@@ -314,11 +344,14 @@ func (def partialStakingEnabled) Compute(
 			Msg("Tried to compute committee for epoch in past")
 		return nil, ErrComputeForEpochInPast
 	}
+	utils.AnalysisStart("computeEPoSStakedCommittee")
 	shardState, err := eposStakedCommittee(instance, stakerReader)
+	utils.AnalysisEnd("computeEPoSStakedCommittee")
 
 	if err != nil {
 		return nil, err
 	}
+
 	// Set the epoch of shard state
 	shardState.Epoch = big.NewInt(0).Set(epoch)
 	utils.Logger().Info().
