@@ -170,20 +170,23 @@ func prepareOrders(
 
 // IsEligibleForEPoSAuction ..
 func IsEligibleForEPoSAuction(snapshot, validator *staking.ValidatorWrapper) bool {
-	if snapshot.Counters.NumBlocksToSign.Cmp(validator.Counters.NumBlocksToSign) == 0 {
-		// validator was not in last epoch's committee
-		switch validator.Status {
-		case effective.Active:
-			return true
-		default:
-			return false
-		}
-	} else {
+	if snapshot.Counters.NumBlocksToSign.Cmp(validator.Counters.NumBlocksToSign) != 0 {
 		// validator was in last epoch's committee
 		// validator with below-threshold signing activity won't be considered for next epoch
 		// and their status will be turned to inactive in FinalizeNewBlock
 		computed := availability.ComputeCurrentSigning(snapshot, validator)
-		return !computed.IsBelowThreshold
+		if computed.IsBelowThreshold {
+			return false
+		}
+	}
+	// For validators who were not in last epoch's committee
+	// or for those who were and signed enough blocks,
+	// the decision is based on the status
+	switch validator.Status {
+	case effective.Active:
+		return true
+	default:
+		return false
 	}
 }
 
