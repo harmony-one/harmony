@@ -57,6 +57,7 @@ type NodeMetadata struct {
 	BlocksPerEpoch *uint64            `json:"blocks-per-epoch,omitempty"`
 	Role           string             `json:"role"`
 	DNSZone        string             `json:"dns-zone"`
+	Archival       bool               `json:"is-archival"`
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
@@ -82,5 +83,6 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		blockEpoch,
 		cfg.Role().String(),
 		cfg.DNSZone,
+		cfg.GetArchival(),
 	}
 }
