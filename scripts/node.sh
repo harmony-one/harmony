@@ -606,7 +606,7 @@ if [[ "${start_clean}" == "true" && "${network_type}" != "mainnet" ]]
 then
    msg "cleaning up old database/logs (-c)"
    # set a 2s timeout, and set its default return value to Y (true)
-   read -rp -t 2 "Remove old database/logs? (Y/n) " yesno
+   read -t 2 -rp "Remove old database/logs? (Y/n) " yesno
    yesno=${yesno:-Y}
    echo
    if [[ "$yesno" == "y" || "$yesno" == "Y" ]]; then
