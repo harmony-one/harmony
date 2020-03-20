@@ -123,6 +123,7 @@ options:
    -y             run in legacy, foundational-node mode (default)
    -Y             verify the signature of the downloaded binaries (default: off)
    -M             support multi-key mode (default: off)
+   -f blsfolder   folder that stores the bls keys and corresponding passphrases (default: ./.hmy/blskeys)
    -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
    -R address     start a pprof profiling server listening on the specified address
@@ -153,9 +154,16 @@ examples:
 # e.g. <blskey>.key and <blskey>.pass
    ${progname} -S -M 
 
+# multi-bls: specify folder that contains bls keys
+   ${progname} -S -M -f /home/xyz/myfolder
+
 # multi-bls using default passphrase: place all keys under .hmy/blskeys
 # supply passphrase file using -p option (single passphrase will be used for all bls keys)
    ${progname} -S -M -p blspass.txt
+
+# multi-bls using user input passphrase: place all keys under .hmy/blskeys
+# supply passphrase for each of the bls key file when prompted
+   ${progname} -S -M
 
 ENDEND
 }
@@ -171,7 +179,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blacklist verify
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify
 start_clean=false
 loop=true
 run_as_root=true
@@ -185,6 +193,7 @@ download_harmony_db=false
 public_rpc=false
 staking_mode=false
 multi_key=false
+blsfolder=./.hmy/blskeys
 archival=false
 blacklist=./.hmy/blacklist.txt
 pprof=""
@@ -194,7 +203,7 @@ ${BLSKEYFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAIB:R:Y opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAIB:R:Y:f: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -210,6 +219,7 @@ do
    d) download_only=true;;
    D) do_not_download=true;;
    M) multi_key=true;;
+   f) blsfolder="${OPTARG}";;
    m) metrics=true;;
    N) network="${OPTARG}";;
    n) pub_port="${OPTARG}";;
@@ -700,6 +710,51 @@ kill_node() {
    done
 }
 
+unset -v save_pass_file
+save_pass_file=true
+prompt_save=false
+read_bls_pass() {
+   for f in ${blsfolder}/*.key
+   do
+      if [ ! -f $f ]; then
+         err 10 "could not find bls key file: $f"
+      fi
+      passfile=${blsfolder}/$(basename "${f%.*}").pass
+      if [ ! -f "$passfile" ]; then
+         unset -v passphrase
+         read -rsp "Enter passphrase for the BLS key file $f: " passphrase
+         echo ${passphrase} | tee $passfile
+         echo "Passphrase is temporarely saved to: $passfile"
+         prompt_save=true
+      fi
+   done
+   if ${prompt_save} ; then
+      while true
+      do
+         read -p "Do you wish to delete the saved passphrase files after successful start of node? (y|n):" yn
+         case $yn in
+            [Yy]*) save_pass_file=false
+            break;;
+            [Nn]*) save_pass_file=true
+            break;;
+            *) echo "Please answer yes (y|Y) or no (n|N)";;
+         esac
+      done
+      prompt_save=false
+   fi
+}
+
+rm_bls_pass() {
+   if ! ${save_pass_file} ; then
+      for f in ${blsfolder}/*.pass
+      do
+         if [ -f $f ]; then
+            rm $f
+         fi
+      done
+   fi
+}
+
 {
    while ${loop}
    do
@@ -736,6 +791,8 @@ if ! ${multi_key}; then
    elif [ ! -f "${blspass}" ]; then
       err 10 "can't find the ${blspass} file"
    fi
+else
+   read_bls_pass
 fi
 
 while :
@@ -756,6 +813,11 @@ do
    if ! ${multi_key}; then
       args+=(
       -blskey_file "${BLSKEYFILE}"
+      )
+   fi
+   if ${multi_key}; then
+      args+=(
+         -blsfolder "${blsfolder}"
       )
    fi
    if ${public_rpc}; then
@@ -804,6 +866,7 @@ do
    *) ld_path_var=LD_LIBRARY_PATH;;
    esac
    run() {
+      (sleep 30 && rm_bls_pass)&
       env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
    }
    case "${blspass:+set}" in
@@ -812,5 +875,10 @@ do
    esac || msg "node process finished with status $?"
    ${loop} || break
    msg "restarting in 10s..."
+   save_pass_file=false
+   rm_bls_pass
    sleep 10
+   if ${multi_key}; then
+      read_bls_pass
+   fi
 done

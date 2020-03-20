@@ -110,6 +110,7 @@ var (
 	blsFolder          = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 	blsPassphrase      string
+	maxBlsKeysPerNode  = flag.Int("max_bls_keys_per_node", 4, "maximum number of bls keys allowed per node (default 4)")
 	// Sharding configuration parameters for devnet
 	devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
 	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
@@ -307,17 +308,20 @@ func readMultiBlsKeys(consensusMultiBlsPriKey *multibls.PrivateKey, consensusMul
 		)
 		os.Exit(100)
 	}
+	if len(blsKeyFiles) > *maxBlsKeysPerNode {
+		fmt.Fprintf(os.Stderr,
+			"[Multi-BLS] maximum number of bls keys per node is %d, found: %d\n",
+			*maxBlsKeysPerNode,
+			len(blsKeyFiles),
+		)
+		os.Exit(100)
+	}
 	for _, blsKeyFile := range blsKeyFiles {
 		fullName := blsKeyFile.Name()
 		ext := filepath.Ext(fullName)
 		name := fullName[:len(fullName)-len(ext)]
 		if val, ok := keyPasses[name]; ok {
 			blsPassphrase = val
-		} else {
-			fmt.Printf("[Multi-BLS] could not find passphrase for bls key file: %s, using passphrase from %s\n",
-				fullName,
-				*blsPass,
-			)
 		}
 		blsKeyFilePath := path.Join(*blsFolder, blsKeyFile.Name())
 		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
