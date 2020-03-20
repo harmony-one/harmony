@@ -211,7 +211,6 @@ func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscripti
 }
 
 // GetPoolTransactions returns pool transactions.
-// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	pending, err := b.hmy.txPool.Pending()
 	if err != nil {
@@ -236,6 +235,12 @@ func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blo
 // GetTransactionsHistory returns list of transactions hashes of address.
 func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
 	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
+	return hashes, err
+}
+
+// GetStakingTransactionsHistory returns list of staking transactions hashes of address.
+func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+	hashes, err := b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
 	return hashes, err
 }
 

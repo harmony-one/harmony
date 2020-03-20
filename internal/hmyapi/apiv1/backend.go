@@ -68,6 +68,8 @@ type Backend interface {
 	GetShardID() uint32
 	// Get transactions history for an address
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	// Get staking transactions history for an address
+	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool

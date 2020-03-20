@@ -203,7 +203,7 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	return result
 }
 
-// newRPCStakingTransaction returns a transaction that will serialize to the RPC
+// newRPCStakingTransaction returns a staking transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
 func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, index uint64) *RPCStakingTransaction {
 	from, err := tx.SenderAddress()
@@ -350,7 +350,7 @@ func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
 	return newRPCTransaction(tx, common.Hash{}, 0, 0, 0)
 }
 
-// newRPCPendingStakingTransaction returns a pending transaction that will serialize to the RPC representation
+// newRPCPendingStakingTransaction returns a pending staking transaction that will serialize to the RPC representation
 func newRPCPendingStakingTransaction(tx *types2.StakingTransaction) *RPCStakingTransaction {
 	return newRPCStakingTransaction(tx, common.Hash{}, 0, 0, 0)
 }
@@ -474,7 +474,7 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64) *RPCTransacti
 	return newRPCTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
 }
 
-// newRPCStakingTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.
+// newRPCStakingTransactionFromBlockHash returns a staking transaction that will serialize to the RPC representation.
 func newRPCStakingTransactionFromBlockHash(b *types.Block, hash common.Hash) *RPCStakingTransaction {
 	for idx, tx := range b.StakingTransactions() {
 		if tx.Hash() == hash {
@@ -484,7 +484,7 @@ func newRPCStakingTransactionFromBlockHash(b *types.Block, hash common.Hash) *RP
 	return nil
 }
 
-// newRPCStakingTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
+// newRPCStakingTransactionFromBlockIndex returns a staking transaction that will serialize to the RPC representation.
 func newRPCStakingTransactionFromBlockIndex(b *types.Block, index uint64) *RPCStakingTransaction {
 	txs := b.StakingTransactions()
 	if index >= uint64(len(txs)) {
