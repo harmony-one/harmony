@@ -39,6 +39,14 @@ var (
 		SecurityContact: "someoneD",
 		Details:         "someoneE",
 	}
+
+	fiveKOnes            = new(big.Int).Mul(big.NewInt(5000), big.NewInt(1e18))
+	tenKOnes             = new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18))
+	onePointNineSixKOnes = new(big.Int).Mul(big.NewInt(19600), big.NewInt(1e18))
+	twentyKOnes          = new(big.Int).Mul(big.NewInt(20000), big.NewInt(1e18))
+	twentyfiveKOnes      = new(big.Int).Mul(big.NewInt(25000), big.NewInt(1e18))
+	thirtyKOnes          = new(big.Int).Mul(big.NewInt(30000), big.NewInt(1e18))
+	hundredKOnes         = new(big.Int).Mul(big.NewInt(1000000), big.NewInt(1e18))
 )
 
 const (
@@ -180,11 +188,17 @@ var (
 )
 
 func totalSlashedExpected(slashRate float64) *big.Int {
-	return big.NewInt(int64(slashRate * 5.0 * denominations.One))
+	t := int64(50000 * slashRate)
+	res := new(big.Int).Mul(big.NewInt(t), big.NewInt(denominations.One))
+	return res
+	//return big.NewInt(int64(slashRate * 50000 * denominations.One)) // 5.0 * denominations.One
 }
 
 func totalSnitchRewardExpected(slashRate float64) *big.Int {
-	return big.NewInt(int64(slashRate * 2.5 * denominations.One))
+	t := int64(25000 * slashRate)
+	res := new(big.Int).Mul(big.NewInt(t), big.NewInt(denominations.One))
+	return res
+	//return big.NewInt(int64(slashRate * 2.5 * denominations.One))
 }
 
 func init() {
@@ -284,8 +298,8 @@ func (s *scenario) defaultValidatorPair(
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
 			LastEpochInCommittee: big.NewInt(lastEpochInComm),
-			MinSelfDelegation:    new(big.Int).SetUint64(1 * denominations.One),
-			MaxTotalDelegation:   new(big.Int).SetUint64(10 * denominations.One),
+			MinSelfDelegation:    tenKOnes,     //new(big.Int).SetUint64(1 * denominations.One),
+			MaxTotalDelegation:   hundredKOnes, //new(big.Int).SetUint64(10 * denominations.One),
 			Status:               effective.Active,
 			Commission:           commonCommission,
 			Description:          commonDescr,
@@ -299,8 +313,8 @@ func (s *scenario) defaultValidatorPair(
 			Address:              offenderAddr,
 			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
 			LastEpochInCommittee: big.NewInt(lastEpochInComm + 1),
-			MinSelfDelegation:    new(big.Int).SetUint64(1 * denominations.One),
-			MaxTotalDelegation:   new(big.Int).SetUint64(10 * denominations.One),
+			MinSelfDelegation:    tenKOnes,     // new(big.Int).SetUint64(1 * denominations.One),
+			MaxTotalDelegation:   hundredKOnes, // new(big.Int).SetUint64(10 * denominations.One),
 			Status:               effective.Active,
 			Commission:           commonCommission,
 			Description:          commonDescr,
@@ -318,13 +332,13 @@ func (s *scenario) defaultDelegationPair() (
 		// NOTE  delegation is the validator themselves
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           new(big.Int).SetUint64(2 * denominations.One),
+			Amount:           twentyKOnes, // new(big.Int).SetUint64(2 * denominations.One),
 			Reward:           common.Big0,
 			Undelegations:    staking.Undelegations{},
 		},
 		staking.Delegation{
 			DelegatorAddress: randoDel,
-			Amount:           new(big.Int).SetUint64(3 * denominations.One),
+			Amount:           thirtyKOnes, //new(big.Int).SetUint64(3 * denominations.One),
 			Reward:           common.Big0,
 			Undelegations:    staking.Undelegations{},
 		},
@@ -333,11 +347,11 @@ func (s *scenario) defaultDelegationPair() (
 	delegationsCurrent := staking.Delegations{
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           new(big.Int).SetUint64(1.96 * denominations.One),
+			Amount:           onePointNineSixKOnes, //new(big.Int).SetUint64(1.96 * denominations.One),
 			Reward:           common.Big0,
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
-					Amount: new(big.Int).SetUint64(1 * denominations.One),
+					Amount: tenKOnes, //new(big.Int).SetUint64(1 * denominations.One),
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
@@ -345,11 +359,11 @@ func (s *scenario) defaultDelegationPair() (
 		// some external delegator
 		staking.Delegation{
 			DelegatorAddress: randoDel,
-			Amount:           new(big.Int).SetUint64(0.5 * denominations.One),
+			Amount:           fiveKOnes, //new(big.Int).SetUint64(0.5 * denominations.One),
 			Reward:           common.Big0,
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
-					Amount: new(big.Int).SetUint64(2.5 * denominations.One),
+					Amount: twentyfiveKOnes, //new(big.Int).SetUint64(2.5 * denominations.One),
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
@@ -516,11 +530,11 @@ func TestTwoPercentSlashed(t *testing.T) {
 	testScenario(t, stateHandle, slashes, scenarioTwoPercent)
 }
 
-func TestEightyPercentSlashed(t *testing.T) {
-	slashes := exampleSlashRecords()
-	stateHandle := defaultStateWithAccountsApplied()
-	testScenario(t, stateHandle, slashes, scenarioEightyPercent)
-}
+// func TestEightyPercentSlashed(t *testing.T) {
+// 	slashes := exampleSlashRecords()
+// 	stateHandle := defaultStateWithAccountsApplied()
+// 	testScenario(t, stateHandle, slashes, scenarioEightyPercent)
+// }
 
 func TestDoubleSignSlashRates(t *testing.T) {
 	for _, scenario := range doubleSignScenarios {
