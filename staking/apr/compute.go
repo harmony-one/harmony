@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -116,6 +115,10 @@ func pastTwoEpochHeaders(
 	return *oneAgoHeader, *twoAgoHeader, nil
 }
 
+var (
+	zero = numeric.ZeroDec()
+)
+
 // ComputeForValidator ..
 func ComputeForValidator(
 	bc Reader,
@@ -124,79 +127,80 @@ func ComputeForValidator(
 	validatorNow *staking.ValidatorWrapper,
 	blocksPerEpoch uint64,
 ) (*numeric.Dec, error) {
-	twoEpochAgo, oneEpochAgo, zero :=
-		new(big.Int).Sub(now, common.Big2),
-		new(big.Int).Sub(now, common.Big1),
-		numeric.ZeroDec()
+	return &zero, nil
+	// twoEpochAgo, oneEpochAgo, zero :=
+	// 	new(big.Int).Sub(now, common.Big2),
+	// 	new(big.Int).Sub(now, common.Big1),
+	// 	numeric.ZeroDec()
 
-	utils.Logger().Info().
-		Uint64("now", now.Uint64()).
-		Uint64("two-epoch-ago", twoEpochAgo.Uint64()).
-		Uint64("one-epoch-ago", oneEpochAgo.Uint64()).
-		Msg("apr - begin compute for validator ")
+	// utils.Logger().Info().
+	// 	Uint64("now", now.Uint64()).
+	// 	Uint64("two-epoch-ago", twoEpochAgo.Uint64()).
+	// 	Uint64("one-epoch-ago", oneEpochAgo.Uint64()).
+	// 	Msg("apr - begin compute for validator ")
 
-	twoSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
-		twoEpochAgo,
-		validatorNow.Address,
-	)
+	// twoSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
+	// 	twoEpochAgo,
+	// 	validatorNow.Address,
+	// )
 
-	if err != nil {
-		return &zero, nil
-	}
+	// if err != nil {
+	// 	return &zero, nil
+	// }
 
-	oneSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
-		oneEpochAgo,
-		validatorNow.Address,
-	)
+	// oneSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
+	// 	oneEpochAgo,
+	// 	validatorNow.Address,
+	// )
 
-	if err != nil {
-		return &zero, nil
-	}
+	// if err != nil {
+	// 	return &zero, nil
+	// }
 
-	blockNumAtTwoEpochAgo, blockNumAtOneEpochAgo :=
-		shard.Schedule.EpochLastBlock(twoEpochAgo.Uint64()),
-		shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64())
+	// blockNumAtTwoEpochAgo, blockNumAtOneEpochAgo :=
+	// 	shard.Schedule.EpochLastBlock(twoEpochAgo.Uint64()),
+	// 	shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64())
 
-	headerOneEpochAgo, headerTwoEpochAgo, err := pastTwoEpochHeaders(bc)
+	// headerOneEpochAgo, headerTwoEpochAgo, err := pastTwoEpochHeaders(bc)
 
-	// TODO Figure out why this is happening
-	if headerOneEpochAgo == nil || headerTwoEpochAgo == nil || err != nil {
-		utils.Logger().Debug().
-			Msgf("apr compute headers epochs ago %+v %+v %+v %+v %+v %+v",
-				twoEpochAgo, oneEpochAgo,
-				blockNumAtTwoEpochAgo, blockNumAtOneEpochAgo,
-				headerOneEpochAgo, headerTwoEpochAgo,
-			)
-		return &zero, nil
-	}
+	// // TODO Figure out why this is happening
+	// if headerOneEpochAgo == nil || headerTwoEpochAgo == nil || err != nil {
+	// 	utils.Logger().Debug().
+	// 		Msgf("apr compute headers epochs ago %+v %+v %+v %+v %+v %+v",
+	// 			twoEpochAgo, oneEpochAgo,
+	// 			blockNumAtTwoEpochAgo, blockNumAtOneEpochAgo,
+	// 			headerOneEpochAgo, headerTwoEpochAgo,
+	// 		)
+	// 	return &zero, nil
+	// }
 
-	utils.Logger().Info().
-		RawJSON("current-epoch-header", []byte(bc.CurrentHeader().String())).
-		RawJSON("one-epoch-ago-header", []byte(headerOneEpochAgo.String())).
-		RawJSON("two-epoch-ago-header", []byte(headerTwoEpochAgo.String())).
-		Msg("headers used for apr computation")
+	// utils.Logger().Info().
+	// 	RawJSON("current-epoch-header", []byte(bc.CurrentHeader().String())).
+	// 	RawJSON("one-epoch-ago-header", []byte(headerOneEpochAgo.String())).
+	// 	RawJSON("two-epoch-ago-header", []byte(headerTwoEpochAgo.String())).
+	// 	Msg("headers used for apr computation")
 
-	estimatedRewardPerYear, err := expectedRewardPerYear(
-		headerOneEpochAgo, headerTwoEpochAgo,
-		oneSnapshotAgo, twoSnapshotAgo,
-		blocksPerEpoch,
-	)
+	// estimatedRewardPerYear, err := expectedRewardPerYear(
+	// 	headerOneEpochAgo, headerTwoEpochAgo,
+	// 	oneSnapshotAgo, twoSnapshotAgo,
+	// 	blocksPerEpoch,
+	// )
 
-	if err != nil {
-		return nil, err
-	}
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	if estimatedRewardPerYear.Cmp(common.Big0) == 0 {
-		return &zero, nil
-	}
+	// if estimatedRewardPerYear.Cmp(common.Big0) == 0 {
+	// 	return &zero, nil
+	// }
 
-	total := numeric.NewDecFromBigInt(validatorNow.TotalDelegation())
-	if total.IsZero() {
-		return nil, errors.New("zero total delegation will cause div by zero")
-	}
+	// total := numeric.NewDecFromBigInt(validatorNow.TotalDelegation())
+	// if total.IsZero() {
+	// 	return nil, errors.New("zero total delegation will cause div by zero")
+	// }
 
-	result := numeric.NewDecFromBigInt(estimatedRewardPerYear).Quo(
-		total,
-	)
-	return &result, nil
+	// result := numeric.NewDecFromBigInt(estimatedRewardPerYear).Quo(
+	// 	total,
+	// )
+	// return &result, nil
 }
