@@ -309,8 +309,10 @@ func (e *engineImpl) Finalize(
 func payoutUndelegations(
 	chain engine.ChainReader, header *block.Header, state *state.DB,
 ) error {
-	utils.AnalysisStart("payoutUndelegations")
-	defer utils.AnalysisEnd("payoutUndelegations")
+	currentHeader := chain.CurrentHeader()
+	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
+	utils.AnalysisStart("payoutUndelegations", nowEpoch, blockNow)
+	defer utils.AnalysisEnd("payoutUndelegations", nowEpoch, blockNow)
 
 	validators, err := chain.ReadValidatorList()
 	countTrack := map[common.Address]int{}
