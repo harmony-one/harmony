@@ -805,7 +805,7 @@ Loop:
 			}
 			ss.purgeOldBlocksFromCache()
 			if consensus != nil {
-				consensus.UpdateConsensusInformation()
+				consensus.SetMode(consensus.UpdateConsensusInformation())
 			}
 		}
 	}

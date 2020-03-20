@@ -203,54 +203,56 @@ func (node *Node) DoBeaconSyncing() {
 
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
-
+	ticker := time.NewTicker(time.Duration(node.syncFreq) * time.Second)
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 SyncingLoop:
 	for {
-		if node.stateSync == nil {
-			node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
-			utils.Logger().Debug().Msg("[SYNC] initialized state sync")
-		}
-		if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
-			shardID := bc.ShardID()
-			peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
-			if err != nil {
-				utils.Logger().Warn().
-					Err(err).
-					Uint32("shard_id", shardID).
-					Msg("cannot retrieve syncing peers")
-				continue SyncingLoop
+		select {
+		case <-ticker.C:
+		case <-node.Consensus.BlockNumLowChan:
+			if node.stateSync == nil {
+				node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+				utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 			}
-			if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
-				utils.Logger().Warn().
-					Err(err).
-					Interface("peers", peers).
-					Msg("[SYNC] create peers error")
-				continue SyncingLoop
+			if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
+				shardID := bc.ShardID()
+				peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
+				if err != nil {
+					utils.Logger().Warn().
+						Err(err).
+						Uint32("shard_id", shardID).
+						Msg("cannot retrieve syncing peers")
+					continue SyncingLoop
+				}
+				if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
+					utils.Logger().Warn().
+						Err(err).
+						Interface("peers", peers).
+						Msg("[SYNC] create peers error")
+					continue SyncingLoop
+				}
+				utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 			}
-			utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
-		}
-		// TODO: treat fake maximum height
-		if node.stateSync.IsOutOfSync(bc) {
-			node.stateMutex.Lock()
-			node.State = NodeNotInSync
-			node.stateMutex.Unlock()
-			if willJoinConsensus {
-				node.Consensus.BlocksNotSynchronized()
-			}
-			node.stateSync.SyncLoop(bc, worker, false, node.Consensus)
-			if willJoinConsensus {
+			// TODO: treat fake maximum height
+			if node.stateSync.IsOutOfSync(bc) {
 				node.stateMutex.Lock()
-				node.State = NodeReadyForConsensus
+				node.State = NodeNotInSync
 				node.stateMutex.Unlock()
-				node.Consensus.BlocksSynchronized()
+				if willJoinConsensus {
+					node.Consensus.BlocksNotSynchronized()
+				}
+				node.stateSync.SyncLoop(bc, worker, false, node.Consensus)
+				if willJoinConsensus {
+					node.stateMutex.Lock()
+					node.State = NodeReadyForConsensus
+					node.stateMutex.Unlock()
+					node.Consensus.BlocksSynchronized()
+				}
 			}
+			node.stateMutex.Lock()
+			node.State = NodeReadyForConsensus
+			node.stateMutex.Unlock()
 		}
-		node.stateMutex.Lock()
-		node.State = NodeReadyForConsensus
-		node.stateMutex.Unlock()
-		// TODO on demand syncing
-		time.Sleep(time.Duration(node.syncFreq) * time.Second)
 	}
 }
 
