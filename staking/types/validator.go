@@ -84,9 +84,9 @@ type ValidatorWrapper struct {
 	Validator
 	Delegations Delegations
 	//
-	Counters counters
+	Counters counters `json:"-"`
 	// All the rewarded accumulated so far
-	BlockReward *big.Int
+	BlockReward *big.Int `json:"-"`
 }
 
 // Computed represents current epoch
@@ -136,11 +136,14 @@ type ValidatorRPCEnchanced struct {
 	TotalDelegated       *big.Int                 `json:"total-delegation"`
 	CurrentlyInCommittee bool                     `json:"currently-in-committee"`
 	EPoSStatus           string                   `json:"epos-status"`
+	Lifetime             *AccumulatedOverLifetime `json:"lifetime"`
 }
 
-type accumulatedOverLifetime struct {
-	BlockReward *big.Int `json:"reward-accumulated"`
-	Signing     counters `json:"blocks"`
+// AccumulatedOverLifetime ..
+type AccumulatedOverLifetime struct {
+	BlockReward *big.Int    `json:"reward-accumulated"`
+	Signing     counters    `json:"blocks"`
+	APR         numeric.Dec `json:"apr"`
 }
 
 func (w ValidatorWrapper) String() string {
@@ -152,21 +155,19 @@ func (w ValidatorWrapper) String() string {
 func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Validator
-		Address     string                  `json:"address"`
-		Delegations Delegations             `json:"delegations"`
-		Lifetime    accumulatedOverLifetime `json:"lifetime"`
+		Address     string      `json:"address"`
+		Delegations Delegations `json:"delegations"`
 	}{
 		w.Validator,
 		common2.MustAddressToBech32(w.Address),
 		w.Delegations,
-		accumulatedOverLifetime{w.BlockReward, w.Counters},
 	})
 }
 
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// APR ..
-	APR numeric.Dec `json:"current-apr"`
+	APR numeric.Dec `json:"-"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `json:"total-effective-stake"`
 	// MetricsPerShard ..
