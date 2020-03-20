@@ -20,6 +20,8 @@ import (
 var (
 	validatorAddress = common.Address(common2.MustBech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"))
 	postStakingEpoch = big.NewInt(200)
+	tenK             = new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18))
+	twelveK          = new(big.Int).Mul(big.NewInt(12000), big.NewInt(1e18))
 )
 
 func generateBlsKeySigPair() (shard.BlsPublicKey, shard.BLSSignature) {
@@ -53,12 +55,12 @@ func createValidator() *staking.CreateValidator {
 		MaxRate:       maxRate,
 		MaxChangeRate: maxChangeRate,
 	}
-	minSelfDel := big.NewInt(1e18)
-	maxTotalDel := big.NewInt(9e18)
+	minSelfDel := tenK
+	maxTotalDel := twelveK
 	pubKey, pubSig := generateBlsKeySigPair()
 	slotPubKeys := []shard.BlsPublicKey{pubKey}
 	slotKeySigs := []shard.BLSSignature{pubSig}
-	amount := big.NewInt(5e18)
+	amount := tenK
 	v := staking.CreateValidator{
 		ValidatorAddress:   validatorAddress,
 		Description:        desc,
@@ -76,7 +78,7 @@ func createValidator() *staking.CreateValidator {
 func TestCV1(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
@@ -88,7 +90,7 @@ func TestCV1(t *testing.T) {
 func TestCV3(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
@@ -107,7 +109,7 @@ func TestCV3(t *testing.T) {
 func TestCV5(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// identity length: 200 characters
 	msg.Identity = "adsfwryuiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfhuewhfiuewhfefhshfrhfhifhwbfvberhbvihfwuoefhusioehfeuwiafhaiobcfwfhceirui"
 	identitylengthCtxError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Identity), "maxIdentityLen", staking.MaxIdentityLength)
@@ -130,7 +132,7 @@ func TestCV5(t *testing.T) {
 func TestCV6(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// Website length: 200 characters
 	msg.Website = "https://www.iwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceirui.com"
 	websiteLengthCtxError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Website), "maxWebsiteLen", staking.MaxWebsiteLength)
@@ -153,7 +155,7 @@ func TestCV6(t *testing.T) {
 func TestCV7(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// Security Contact length: 200 characters
 	msg.SecurityContact = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdf"
 	securityContactLengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.SecurityContact), "maxSecurityContactLen", staking.MaxSecurityContactLength)
@@ -174,7 +176,7 @@ func TestCV7(t *testing.T) {
 func TestCV8(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// Details length: 300 characters
 	msg.Details = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdfjiusngognoherugbounviesrbgufhuoshcofwevusguahferhgvuervurehniwjvseivusehvsghjvorsugjvsiovjpsevsvvvvv"
 	detailsLenCtxError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Details), "maxDetailsLen", staking.MaxDetailsLength)
@@ -199,7 +201,7 @@ func TestCV9(t *testing.T) {
 	msg := createValidator()
 	// name length: 140 characters
 	msg.Name = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
@@ -213,7 +215,7 @@ func TestCV10(t *testing.T) {
 	msg := createValidator()
 	// identity length: 140 characters
 	msg.Identity = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
@@ -227,7 +229,7 @@ func TestCV11(t *testing.T) {
 	msg := createValidator()
 	// website length: 140 characters
 	msg.Website = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
@@ -241,7 +243,7 @@ func TestCV12(t *testing.T) {
 	msg := createValidator()
 	// security contact length: 140 characters
 	msg.SecurityContact = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
@@ -255,7 +257,7 @@ func TestCV13(t *testing.T) {
 	msg := createValidator()
 	// details length: 280 characters
 	msg.Details = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjoweHlloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuedbfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
@@ -267,7 +269,7 @@ func TestCV13(t *testing.T) {
 func TestCV14(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate == max rate &&  max change rate == max rate
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("0.5")
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("0.5")
@@ -282,7 +284,7 @@ func TestCV14(t *testing.T) {
 func TestCV15(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate: 0.6 > max rate: 0.5
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("0.6")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -296,7 +298,7 @@ func TestCV15(t *testing.T) {
 func TestCV16(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max change rate: 0.6 > max rate: 0.5
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("0.6")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -310,7 +312,7 @@ func TestCV16(t *testing.T) {
 func TestCV17(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max rate == 1
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("1")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -324,7 +326,7 @@ func TestCV17(t *testing.T) {
 func TestCV18(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max rate == 1 && max change rate == 1 && commission rate == 0
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("1")
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("1")
@@ -340,7 +342,7 @@ func TestCV18(t *testing.T) {
 func TestCV19(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate == 0
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("0")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -354,7 +356,7 @@ func TestCV19(t *testing.T) {
 func TestCV20(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate == 0
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("0")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -368,7 +370,7 @@ func TestCV20(t *testing.T) {
 func TestCV21(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max change rate == 0 & max rate == 0 & commission rate == 0
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("0")
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("0")
@@ -384,7 +386,7 @@ func TestCV21(t *testing.T) {
 func TestCV22(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max change rate == 1 & max rate == 1
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("1")
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("1")
@@ -399,7 +401,7 @@ func TestCV22(t *testing.T) {
 func TestCV23(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate < 0
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("-0.1")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -413,7 +415,7 @@ func TestCV23(t *testing.T) {
 func TestCV24(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max rate < 0
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("-0.001")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -427,7 +429,7 @@ func TestCV24(t *testing.T) {
 func TestCV25(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max rate < 0
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("-0.001")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -441,7 +443,7 @@ func TestCV25(t *testing.T) {
 func TestCV26(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate > 1
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("1.01")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -455,7 +457,7 @@ func TestCV26(t *testing.T) {
 func TestCV27(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max rate > 1
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("1.01")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -469,7 +471,7 @@ func TestCV27(t *testing.T) {
 func TestCV28(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max change rate > 1
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("1.01")
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -483,10 +485,10 @@ func TestCV28(t *testing.T) {
 func TestCV29(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, twelveK)
 	// amount > MinSelfDelegation
-	msg.Amount = big.NewInt(4e18)
-	msg.MinSelfDelegation = big.NewInt(1e18)
+	msg.Amount = twelveK
+	msg.MinSelfDelegation = tenK
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
@@ -498,10 +500,10 @@ func TestCV29(t *testing.T) {
 func TestCV30(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// amount > MinSelfDelegation
-	msg.Amount = big.NewInt(4e18)
-	msg.MinSelfDelegation = big.NewInt(4e18)
+	msg.Amount = tenK
+	msg.MinSelfDelegation = tenK
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
@@ -513,10 +515,10 @@ func TestCV30(t *testing.T) {
 func TestCV31(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// amount > MinSelfDelegation
-	msg.Amount = big.NewInt(4e18)
-	msg.MinSelfDelegation = big.NewInt(5e18)
+	msg.Amount = twelveK
+	msg.MinSelfDelegation = tenK
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
@@ -528,10 +530,10 @@ func TestCV31(t *testing.T) {
 func TestCV32(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// MaxTotalDelegation < MinSelfDelegation
-	msg.MaxTotalDelegation = big.NewInt(2e18)
-	msg.MinSelfDelegation = big.NewInt(3e18)
+	msg.MaxTotalDelegation = tenK
+	msg.MinSelfDelegation = twelveK
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
@@ -543,13 +545,13 @@ func TestCV32(t *testing.T) {
 func TestCV33(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
-	// MinSelfDelegation < 1 ONE
-	msg.MinSelfDelegation = big.NewInt(1e18 - 1)
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
+	// MinSelfDelegation < 10,000 ONE
+	msg.MinSelfDelegation = big.NewInt(1e18)
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
-		t.Error("expected", "delegation-given 999999999999999999: min_self_delegation has to be greater than 1 ONE", "got", nil)
+		t.Error("expected", "delegation-given 1000000000000000000: min_self_delegation has to be greater than 10,000 ONE", "got", nil)
 	}
 }
 
@@ -557,7 +559,7 @@ func TestCV33(t *testing.T) {
 func TestCV34(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// MinSelfDelegation not specified
 	msg.MinSelfDelegation = nil
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -571,7 +573,7 @@ func TestCV34(t *testing.T) {
 func TestCV35(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// MinSelfDelegation < 0
 	msg.MinSelfDelegation = big.NewInt(-1)
 	if _, err := VerifyAndCreateValidatorFromMsg(
@@ -585,7 +587,7 @@ func TestCV35(t *testing.T) {
 func TestCV36(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// amount > MaxTotalDelegation
 	msg.Amount = big.NewInt(4e18)
 	msg.MaxTotalDelegation = big.NewInt(3e18)
@@ -600,7 +602,7 @@ func TestCV36(t *testing.T) {
 func TestCV39(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
+	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// MaxTotalDelegation < 0
 	msg.MaxTotalDelegation = big.NewInt(-1)
 	if _, err := VerifyAndCreateValidatorFromMsg(
