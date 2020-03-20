@@ -59,8 +59,33 @@ func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 			utils.Logger().Error().Err(err).Msg("Failed to store transaction lookup entry")
 		}
 	}
+}
+
+// DeleteTxLookupEntry removes all transaction data associated with a hash.
+func DeleteTxLookupEntry(db DatabaseDeleter, hash common.Hash) {
+	db.Delete(txLookupKey(hash))
+}
+
+// ReadStakingTxLookupEntry retrieves the positional metadata associated with a staking transaction
+// hash to allow retrieving the staking transaction or receipt by hash.
+func ReadStakingTxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64, uint64) {
+	data, _ := db.Get(stakingTxLookupKey(hash))
+	if len(data) == 0 {
+		return common.Hash{}, 0, 0
+	}
+	var entry StakingTxLookupEntry
+	if err := rlp.DecodeBytes(data, &entry); err != nil {
+		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid staking transaction lookup entry RLP")
+		return common.Hash{}, 0, 0
+	}
+	return entry.BlockHash, entry.BlockIndex, entry.Index
+}
+
+// WriteStakingTxLookupEntries stores a positional metadata for every staking transaction from
+// a block, enabling hash based transaction and receipt lookups.
+func WriteStakingTxLookupEntries(db DatabaseWriter, block *types.Block) {
 	for i, tx := range block.StakingTransactions() {
-		entry := TxLookupEntry{
+		entry := StakingTxLookupEntry{
 			BlockHash:  block.Hash(),
 			BlockIndex: block.NumberU64(),
 			Index:      uint64(i),
@@ -69,21 +94,21 @@ func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("Failed to encode staking transaction lookup entry")
 		}
-		if err := db.Put(txLookupKey(tx.Hash()), data); err != nil {
+		if err := db.Put(stakingTxLookupKey(tx.Hash()), data); err != nil {
 			utils.Logger().Error().Err(err).Msg("Failed to store staking transaction lookup entry")
 		}
 	}
 }
 
-// DeleteTxLookupEntry removes all transaction data associated with a hash.
-func DeleteTxLookupEntry(db DatabaseDeleter, hash common.Hash) {
+// DeleteStakingTxLookupEntry removes all staking transaction data associated with a hash.
+func DeleteStakingTxLookupEntry(db DatabaseDeleter, hash common.Hash) {
 	db.Delete(txLookupKey(hash))
 }
 
 // ReadTransaction retrieves a specific transaction from the database, along with
 // its added positional metadata.
 func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, common.Hash, uint64, uint64) {
-	blockHash, blockNumber, txIndex := ReadTxLookupEntry(db, hash)
+	blockHash, blockNumber, index := ReadTxLookupEntry(db, hash)
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
@@ -92,26 +117,26 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
-			Uint64("index", txIndex).
+			Uint64("index", index).
 			Msg("block Body referenced missing")
 		return nil, common.Hash{}, 0, 0
 	}
-	tx := body.TransactionAt(int(txIndex))
+	tx := body.TransactionAt(int(index))
 	if tx == nil || bytes.Compare(hash.Bytes(), tx.Hash().Bytes()) != 0 {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
-			Uint64("index", txIndex).
+			Uint64("index", index).
 			Msg("Transaction referenced missing")
 		return nil, common.Hash{}, 0, 0
 	}
-	return tx, blockHash, blockNumber, txIndex
+	return tx, blockHash, blockNumber, index
 }
 
 // ReadStakingTransaction retrieves a specific staking transaction from the database, along with
 // its added positional metadata.
 func ReadStakingTransaction(db DatabaseReader, hash common.Hash) (*staking.StakingTransaction, common.Hash, uint64, uint64) {
-	blockHash, blockNumber, txIndex := ReadTxLookupEntry(db, hash)
+	blockHash, blockNumber, index := ReadStakingTxLookupEntry(db, hash)
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
@@ -120,20 +145,20 @@ func ReadStakingTransaction(db DatabaseReader, hash common.Hash) (*staking.Staki
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
-			Uint64("index", txIndex).
+			Uint64("index", index).
 			Msg("block Body referenced missing")
 		return nil, common.Hash{}, 0, 0
 	}
-	tx := body.StakingTransactionAt(int(txIndex))
+	tx := body.StakingTransactionAt(int(index))
 	if tx == nil || bytes.Compare(hash.Bytes(), tx.Hash().Bytes()) != 0 {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
-			Uint64("index", txIndex).
+			Uint64("index", index).
 			Msg("StakingTransaction referenced missing")
 		return nil, common.Hash{}, 0, 0
 	}
-	return tx, blockHash, blockNumber, txIndex
+	return tx, blockHash, blockNumber, index
 }
 
 // ReadReceipt retrieves a specific transaction receipt from the database, along with
@@ -141,8 +166,12 @@ func ReadStakingTransaction(db DatabaseReader, hash common.Hash) (*staking.Staki
 func ReadReceipt(db DatabaseReader, hash common.Hash) (*types.Receipt, common.Hash, uint64, uint64) {
 	blockHash, blockNumber, receiptIndex := ReadTxLookupEntry(db, hash)
 	if blockHash == (common.Hash{}) {
-		return nil, common.Hash{}, 0, 0
+		blockHash, blockNumber, receiptIndex = ReadStakingTxLookupEntry(db, hash)
+		if blockHash == (common.Hash{}) {
+			return nil, common.Hash{}, 0, 0
+		}
 	}
+
 	receipts := ReadReceipts(db, blockHash, blockNumber)
 	if len(receipts) <= int(receiptIndex) {
 		utils.Logger().Error().
