@@ -993,6 +993,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 		rawdb.WriteBody(batch, block.Hash(), block.NumberU64(), block.Body())
 		rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
 		rawdb.WriteTxLookupEntries(batch, block)
+		rawdb.WriteStakingTxLookupEntries(batch, block)
 
 		stats.processed++
 
@@ -1144,6 +1145,7 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	// Write the positional metadata for transaction/receipt lookups and preimages
 	rawdb.WriteTxLookupEntries(batch, block)
+	rawdb.WriteStakingTxLookupEntries(batch, block)
 	rawdb.WriteCxLookupEntries(batch, block)
 	rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages())
 
@@ -2188,6 +2190,13 @@ func (bc *BlockChain) IsSpent(cxp *types.CXReceiptsProof) bool {
 // returns 0, 0 if not found
 func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64) {
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
+}
+
+// ReadStakingTxLookupEntry returns where the given staking transaction resides in the chain,
+// as a (block hash, block number, index in transaction list) triple.
+// returns 0, 0 if not found
+func (bc *BlockChain) ReadStakingTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64) {
+	return rawdb.ReadStakingTxLookupEntry(bc.db, txID)
 }
 
 // ReadValidatorInformationAt reads staking
