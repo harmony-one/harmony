@@ -84,8 +84,10 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 }
 
 func (node *Node) proposeNewBlock() (*types.Block, error) {
-	utils.AnalysisStart("proposeNewBlock")
-	defer utils.AnalysisEnd("proposeNewBlock")
+	currentHeader := node.Blockchain().CurrentHeader()
+	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
+	utils.AnalysisStart("proposeNewBlock", nowEpoch, blockNow)
+	defer utils.AnalysisEnd("proposeNewBlock", nowEpoch, blockNow)
 
 	node.Worker.UpdateCurrent()
 
