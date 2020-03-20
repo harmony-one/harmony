@@ -92,10 +92,11 @@ type ConfigType struct {
 	DBDir            string
 	networkType      NetworkType
 	shardingSchedule shardingconfig.Schedule
+	DNSZone          string
+	isArchival       bool
 	WebHooks         struct {
 		Hooks *webhooks.Hooks
 	}
-	DNSZone string
 }
 
 // configs is a list of node configuration.
@@ -217,6 +218,11 @@ func (conf *ConfigType) GetClientGroupID() GroupID {
 	return conf.client
 }
 
+// GetArchival returns archival mode
+func (conf *ConfigType) GetArchival() bool {
+	return conf.isArchival
+}
+
 // IsClient returns the isClient configuration
 func (conf *ConfigType) IsClient() bool {
 	return conf.isClient
@@ -234,6 +240,11 @@ func SetNetworkType(networkType NetworkType) {
 	for i := range shardConfigs {
 		shardConfigs[i].networkType = networkType
 	}
+}
+
+// SetArchival set archival mode
+func (conf *ConfigType) SetArchival(archival bool) {
+	defaultConfig.isArchival = archival
 }
 
 // GetNetworkType gets the networkType
