@@ -381,6 +381,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	nodeConfig.SetPushgatewayIP(*pushgatewayIP)
 	nodeConfig.SetPushgatewayPort(*pushgatewayPort)
 	nodeConfig.SetMetricsFlag(*metricsFlag)
+	nodeConfig.SetArchival(*isArchival)
 
 	// P2p private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)

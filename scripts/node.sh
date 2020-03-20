@@ -605,7 +605,9 @@ done
 if [[ "${start_clean}" == "true" && "${network_type}" != "mainnet" ]]
 then
    msg "cleaning up old database/logs (-c)"
-   read -rp "Remove old database/logs? (Y/n) " yesno
+   # set a 2s timeout, and set its default return value to Y (true)
+   read -rp -t 2 "Remove old database/logs? (Y/n) " yesno
+   yesno=${yesno:-Y}
    echo
    if [[ "$yesno" == "y" || "$yesno" == "Y" ]]; then
       unset -v backup_dir now
