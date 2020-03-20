@@ -84,6 +84,8 @@ func AccumulateRewards(
 	header *block.Header, beaconChain engine.ChainReader,
 ) (reward.Reader, error) {
 	blockNum := header.Number().Uint64()
+	currentHeader := beaconChain.CurrentHeader()
+	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
 
 	if blockNum == 0 {
 		// genesis block has no parent to reward.
@@ -98,7 +100,7 @@ func AccumulateRewards(
 	// After staking
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		utils.AnalysisStart("accumulateRewardBeaconchainSelfPayout")
+		utils.AnalysisStart("accumulateRewardBeaconchainSelfPayout", nowEpoch, blockNow)
 		defaultReward := network.BaseStakedReward
 		beaconCurrentEpoch := beaconChain.CurrentHeader().Epoch()
 		// TODO Use cached result in off-chain db instead of full computation
@@ -166,9 +168,9 @@ func AccumulateRewards(
 				}
 			}
 		}
-		utils.AnalysisEnd("accumulateRewardBeaconchainSelfPayout")
+		utils.AnalysisEnd("accumulateRewardBeaconchainSelfPayout", nowEpoch, blockNow)
 
-		utils.AnalysisStart("accumulateRewardShardchainPayout")
+		utils.AnalysisStart("accumulateRewardShardchainPayout", nowEpoch, blockNow)
 		// Handle rewards for shardchain
 		if cxLinks := header.CrossLinks(); len(cxLinks) > 0 {
 			crossLinks := types.CrossLinks{}
@@ -291,7 +293,7 @@ func AccumulateRewards(
 					}
 				}
 			}
-			utils.AnalysisEnd("accumulateRewardShardchainPayout")
+			utils.AnalysisEnd("accumulateRewardShardchainPayout", nowEpoch, blockNow)
 			return network.NewStakingEraRewardForRound(newRewards, missing), nil
 		}
 		return network.EmptyPayout, nil
