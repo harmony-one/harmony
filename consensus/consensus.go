@@ -112,7 +112,7 @@ type Consensus struct {
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// will trigger state syncing when blockNum is low
-	blockNumLowChan chan struct{}
+	BlockNumLowChan chan struct{}
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
 	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -163,11 +163,6 @@ func (consensus *Consensus) BlocksNotSynchronized() {
 	consensus.syncNotReadyChan <- struct{}{}
 }
 
-// WaitForSyncing informs the node syncing service to start syncing
-func (consensus *Consensus) WaitForSyncing() {
-	<-consensus.blockNumLowChan
-}
-
 // VdfSeedSize returns the number of VRFs for VDF computation
 func (consensus *Consensus) VdfSeedSize() int {
 	return int(consensus.Decider.ParticipantsCount()) * 2 / 3
@@ -204,7 +199,7 @@ func New(
 	consensus.Decider = Decider
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
-	consensus.blockNumLowChan = make(chan struct{})
+	consensus.BlockNumLowChan = make(chan struct{})
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce
