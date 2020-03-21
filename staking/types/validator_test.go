@@ -73,6 +73,8 @@ var (
 		SecurityContact: "wenSecurity",
 		Details:         "wenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswwenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetails",
 	}
+	tenK    = new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18))
+	twelveK = new(big.Int).Mul(big.NewInt(12000), big.NewInt(1e18))
 )
 
 // Using public keys to create slot for validator
@@ -114,8 +116,8 @@ func createNewValidator() Validator {
 		Address:              validatorAddr,
 		SlotPubKeys:          slotPubKeys,
 		LastEpochInCommittee: big.NewInt(20),
-		MinSelfDelegation:    big.NewInt(1e18),
-		MaxTotalDelegation:   big.NewInt(3e18),
+		MinSelfDelegation:    tenK,
+		MaxTotalDelegation:   twelveK,
 		Status:               effective.Active,
 		Commission:           c,
 		Description:          d,
@@ -178,12 +180,12 @@ func TestValidatorSanityCheck(t *testing.T) {
 	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errNilMinSelfDelegation {
 		t.Error("expected", errNilMinSelfDelegation, "got", err)
 	}
-	v.MinSelfDelegation = big.NewInt(1e18)
+	v.MinSelfDelegation = tenK
 	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errNilMaxTotalDelegation {
 		t.Error("expected", errNilMaxTotalDelegation, "got", err)
 	}
-	v.MinSelfDelegation = big.NewInt(1e17)
-	v.MaxTotalDelegation = big.NewInt(3e18)
+	v.MinSelfDelegation = big.NewInt(1e18)
+	v.MaxTotalDelegation = twelveK
 	e := errors.Wrapf(
 		errMinSelfDelegationTooSmall,
 		"delegation-given %s", v.MinSelfDelegation.String(),
@@ -192,8 +194,8 @@ func TestValidatorSanityCheck(t *testing.T) {
 		t.Error("expected", e, "got", err)
 	}
 
-	v.MinSelfDelegation = big.NewInt(3e18)
-	v.MaxTotalDelegation = big.NewInt(1e18)
+	v.MinSelfDelegation = twelveK
+	v.MaxTotalDelegation = tenK
 	e = errors.Wrapf(
 		errInvalidMaxTotalDelegation,
 		"max-total-delegation %s min-self-delegation %s",
@@ -203,8 +205,8 @@ func TestValidatorSanityCheck(t *testing.T) {
 	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
 		t.Error("expected", e, "got", err)
 	}
-	v.MinSelfDelegation = big.NewInt(1e18)
-	v.MaxTotalDelegation = big.NewInt(3e18)
+	v.MinSelfDelegation = tenK
+	v.MaxTotalDelegation = twelveK
 	minusOneDec, _ := numeric.NewDecFromStr("-1")
 	plusTwoDec, _ := numeric.NewDecFromStr("2")
 	cr := CommissionRates{Rate: minusOneDec, MaxRate: numeric.OneDec(), MaxChangeRate: numeric.ZeroDec()}
@@ -284,15 +286,22 @@ func TestValidatorWrapperSanityCheck(t *testing.T) {
 	}
 
 	// valid self delegation must not fail
-	valDel := NewDelegation(validatorAddr, big.NewInt(1e18))
+	wrapper.Validator.MaxTotalDelegation = tenK
+	valDel := NewDelegation(validatorAddr, tenK)
 	wrapper.Delegations = []Delegation{valDel}
 	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err != nil {
 		t.Errorf("validator wrapper SanityCheck failed: %s", err)
 	}
 
 	// invalid self delegation must fail
-	valDel = NewDelegation(validatorAddr, big.NewInt(1e17))
+	valDel = NewDelegation(validatorAddr, big.NewInt(1e18))
 	wrapper.Delegations = []Delegation{valDel}
+	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
+		t.Error("expected", errInvalidSelfDelegation, "got", err)
+	}
+
+	// invalid self delegation of less than 10K ONE must fail
+	valDel = NewDelegation(validatorAddr, big.NewInt(1e18))
 	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
 		t.Error("expected", errInvalidSelfDelegation, "got", err)
 	}
@@ -401,12 +410,12 @@ func TestUpdateValidatorFromEditMsg(t *testing.T) {
 	ev := EditValidator{
 		ValidatorAddress:   validatorAddr,
 		Description:        desc,
-		MinSelfDelegation:  big.NewInt(2e18),
-		MaxTotalDelegation: big.NewInt(6e18),
+		MinSelfDelegation:  tenK,
+		MaxTotalDelegation: twelveK,
 	}
 	UpdateValidatorFromEditMsg(&validator, &ev)
 
-	if validator.MinSelfDelegation.Cmp(big.NewInt(2e18)) != 0 {
+	if validator.MinSelfDelegation.Cmp(tenK) != 0 {
 		t.Errorf("UpdateValidatorFromEditMsg failed")
 	}
 }

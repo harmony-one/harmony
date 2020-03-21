@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/vm"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -127,6 +128,14 @@ func VerifyAndEditValidatorFromMsg(
 	return wrapper, nil
 }
 
+const oneThousand = 1000
+
+var (
+	oneAsBigInt           = big.NewInt(denominations.One)
+	minimumDelegation     = new(big.Int).Mul(oneAsBigInt, big.NewInt(oneThousand))
+	errDelegationTooSmall = errors.New("minimum delegation amount for a delegator has to be at least 1000 ONE")
+)
+
 // VerifyAndDelegateFromMsg verifies the delegate message using the stateDB
 // and returns the balance to be deducted by the delegator as well as the
 // validatorWrapper with the delegation applied to it.
@@ -140,6 +149,9 @@ func VerifyAndDelegateFromMsg(
 	}
 	if msg.Amount.Sign() == -1 {
 		return nil, nil, errNegativeAmount
+	}
+	if msg.Amount.Cmp(minimumDelegation) < 0 {
+		return nil, nil, errDelegationTooSmall
 	}
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
 		return nil, nil, errValidatorNotExist
