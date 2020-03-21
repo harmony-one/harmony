@@ -28,6 +28,13 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		consensus.getLogger().Error().Err(err).Msg("Failed to unmarshal message payload.")
 		return
 	}
+	if msg.GetConsensus() != nil {
+		consensus.getLogger().Info().
+			Uint64("blockNum", msg.GetConsensus().BlockNum).
+			Uint64("viewID", msg.GetConsensus().ViewId).
+			Str("msgType", msg.Type.String()).
+			Msg("[handleMessageUpdate] MsgChan")
+	}
 
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
@@ -474,7 +481,6 @@ func (consensus *Consensus) Start(
 				consensus.announce(newBlock)
 
 			case msg := <-consensus.MsgChan:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] MsgChan")
 				consensus.handleMessageUpdate(msg)
 
 			case viewID := <-consensus.commitFinishChan:
