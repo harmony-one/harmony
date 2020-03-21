@@ -11,6 +11,11 @@ import (
 const MaxBlockNumDiff = 100
 
 func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
+	consensus.getLogger().Debug().
+		Uint64("blockNum", msg.GetConsensus().BlockNum).
+		Uint64("viewID", msg.GetConsensus().ViewId).
+		Str("msgType", msg.Type.String()).
+		Msg("[validatorSanityChecks] Checking new message")
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
@@ -42,6 +47,11 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 }
 
 func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
+	consensus.getLogger().Debug().
+		Uint64("blockNum", msg.GetConsensus().BlockNum).
+		Uint64("viewID", msg.GetConsensus().ViewId).
+		Str("msgType", msg.Type.String()).
+		Msg("[leaderSanityChecks] Checking new message")
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
@@ -186,6 +196,11 @@ func (consensus *Consensus) onPreparedSanityChecks(
 }
 
 func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
+	consensus.getLogger().Debug().
+		Uint64("blockNum", msg.GetConsensus().BlockNum).
+		Uint64("viewID", msg.GetConsensus().ViewId).
+		Str("msgType", msg.Type.String()).
+		Msg("[viewChangeSanityCheck] Checking new message")
 	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msgf(

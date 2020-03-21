@@ -147,7 +147,7 @@ func (bc *BlockChain) CommitOffChainData(
 	}
 
 	// Writing beacon chain cross links
-	if header.ShardID() == shard.BeaconChainShardID &&
+	if isBeaconChain &&
 		bc.chainConfig.IsCrossLink(block.Epoch()) &&
 		len(header.CrossLinks()) > 0 {
 		crossLinks := &types.CrossLinks{}
@@ -192,13 +192,16 @@ func (bc *BlockChain) CommitOffChainData(
 			Msgf(msg, len(*crossLinks), num)
 		utils.Logger().Debug().Msgf(msg, len(*crossLinks), num)
 	}
-	// Roll up latest crosslinks
-	for i, c := uint32(0), shard.Schedule.InstanceForEpoch(
-		epoch,
-	).NumShards(); i < c; i++ {
-		if err := bc.LastContinuousCrossLink(batch, i); err != nil {
-			utils.Logger().Info().
-				Err(err).Msg("could not batch process last continuous crosslink")
+
+	if isBeaconChain {
+		// Roll up latest crosslinks
+		for i, c := uint32(0), shard.Schedule.InstanceForEpoch(
+			epoch,
+		).NumShards(); i < c; i++ {
+			if err := bc.LastContinuousCrossLink(batch, i); err != nil {
+				utils.Logger().Info().
+					Err(err).Msg("could not batch process last continuous crosslink")
+			}
 		}
 	}
 
