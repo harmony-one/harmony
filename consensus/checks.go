@@ -11,7 +11,7 @@ import (
 const MaxBlockNumDiff = 100
 
 func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
-	consensus.getLogger().Info().
+	consensus.getLogger().Debug().
 		Uint64("blockNum", msg.GetConsensus().BlockNum).
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
@@ -47,7 +47,7 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 }
 
 func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
-	consensus.getLogger().Info().
+	consensus.getLogger().Debug().
 		Uint64("blockNum", msg.GetConsensus().BlockNum).
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
@@ -196,7 +196,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 }
 
 func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
-	consensus.getLogger().Info().
+	consensus.getLogger().Debug().
 		Uint64("blockNum", msg.GetConsensus().BlockNum).
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
