@@ -32,12 +32,9 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
-	switch {
-	case (consensus.current.Mode() == ViewChanging) &&
+	if (consensus.current.Mode() == ViewChanging) &&
 		(msg.Type == msg_pb.MessageType_PREPARE ||
-			msg.Type == msg_pb.MessageType_COMMIT):
-		return
-	case consensus.current.Mode() == Listening:
+			msg.Type == msg_pb.MessageType_COMMIT) {
 		return
 	}
 
@@ -62,16 +59,8 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		}
 	}
 
-	notMemberButStillCatchup := !consensus.Decider.AmIMemberOfCommitee() &&
-		msg.Type == msg_pb.MessageType_COMMITTED
-
-	if notMemberButStillCatchup {
-		consensus.onCommitted(msg)
-		return
-	}
-
 	intendedForValidator, intendedForLeader :=
-		!(consensus.IsLeader() && consensus.current.Mode() == Normal),
+		!consensus.IsLeader(),
 		consensus.IsLeader()
 
 	switch t := msg.Type; true {
@@ -485,7 +474,6 @@ func (consensus *Consensus) Start(
 				consensus.announce(newBlock)
 
 			case msg := <-consensus.MsgChan:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] MsgChan")
 				consensus.handleMessageUpdate(msg)
 
 			case viewID := <-consensus.commitFinishChan:

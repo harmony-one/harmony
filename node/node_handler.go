@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
@@ -456,23 +458,25 @@ func (node *Node) PostConsensusProcessing(
 		}
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
-		utils.Logger().Info().
-			Uint64("blockNum", newBlock.NumberU64()).
-			Uint64("epochNum", newBlock.Epoch().Uint64()).
-			Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
-			Str("blockHash", newBlock.Hash().String()).
-			Int("numTxns", len(newBlock.Transactions())).
-			Int("numStakingTxns", len(newBlock.StakingTransactions())).
-			Msg("BINGO !!! Reached Consensus")
-		// 1% of the validator also need to do broadcasting
-		rand.Seed(time.Now().UTC().UnixNano())
-		rnd := rand.Intn(100)
-		if rnd < 1 {
-			// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
-			if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-				node.BroadcastNewBlock(newBlock)
+		if node.Consensus.Mode() != consensus.Listening {
+			utils.Logger().Info().
+				Uint64("blockNum", newBlock.NumberU64()).
+				Uint64("epochNum", newBlock.Epoch().Uint64()).
+				Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
+				Str("blockHash", newBlock.Hash().String()).
+				Int("numTxns", len(newBlock.Transactions())).
+				Int("numStakingTxns", len(newBlock.StakingTransactions())).
+				Msg("BINGO !!! Reached Consensus")
+			// 1% of the validator also need to do broadcasting
+			rand.Seed(time.Now().UTC().UnixNano())
+			rnd := rand.Intn(100)
+			if rnd < 1 {
+				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
+				if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+					node.BroadcastNewBlock(newBlock)
+				}
+				node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 			}
-			node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 		}
 	}
 
@@ -481,7 +485,7 @@ func (node *Node) PostConsensusProcessing(
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
-		node.Consensus.UpdateConsensusInformation()
+		node.Consensus.SetMode(node.Consensus.UpdateConsensusInformation())
 	}
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
 		if h.Availability != nil {
