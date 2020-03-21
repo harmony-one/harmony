@@ -197,9 +197,6 @@ func (consensus *Consensus) onPreparedSanityChecks(
 
 func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
 	consensus.getLogger().Debug().
-		Uint64("blockNum", msg.GetConsensus().BlockNum).
-		Uint64("viewID", msg.GetConsensus().ViewId).
-		Str("msgType", msg.Type.String()).
 		Msg("[viewChangeSanityCheck] Checking new message")
 	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
