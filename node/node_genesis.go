@@ -28,7 +28,7 @@ const (
 	// TestAccountNumber is the number of test accounts for testnet/devnet/
 	TestAccountNumber = 100
 	// ContractDeployerInitFund is the initial fund for the contract deployer account in testnet/devnet.
-	ContractDeployerInitFund = 100000000
+	ContractDeployerInitFund = 10000000000
 	// InitFreeFund is the initial fund for permissioned accounts for testnet/devnet/
 	InitFreeFund = 100
 )
