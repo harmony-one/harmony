@@ -26,6 +26,7 @@ const (
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
 	BlsVerificationStr       = "harmony-one"
+	TenThousand              = 10000
 )
 
 var (
@@ -37,7 +38,7 @@ var (
 		"total delegation can not be bigger than max_total_delegation",
 	)
 	errMinSelfDelegationTooSmall = errors.New(
-		"min_self_delegation has to be greater than 1 ONE",
+		"min_self_delegation has to be greater than 10,000 ONE",
 	)
 	errInvalidMaxTotalDelegation = errors.New(
 		"max_total_delegation can not be less than min_self_delegation",
@@ -206,6 +207,11 @@ type Validator struct {
 // DoNotEnforceMaxBLS ..
 const DoNotEnforceMaxBLS = -1
 
+var (
+	oneAsBigInt  = big.NewInt(denominations.One)
+	minimumStake = new(big.Int).Mul(oneAsBigInt, big.NewInt(TenThousand))
+)
+
 // SanityCheck checks basic requirements of a validator
 func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 	if _, err := v.EnsureLength(); err != nil {
@@ -233,7 +239,7 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 	}
 
 	// MinSelfDelegation must be >= 1 ONE
-	if v.MinSelfDelegation.Cmp(big.NewInt(denominations.One)) < 0 {
+	if v.MinSelfDelegation.Cmp(minimumStake) < 0 {
 		return errors.Wrapf(
 			errMinSelfDelegationTooSmall,
 			"delegation-given %s", v.MinSelfDelegation.String(),
