@@ -113,12 +113,12 @@ func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingT
 				MaxRate:       maxRate,
 				MaxChangeRate: maxChangeRate,
 			},
-			MinSelfDelegation:  tenK,
-			MaxTotalDelegation: twelveK,
+			MinSelfDelegation:  big.NewInt(1e18),
+			MaxTotalDelegation: big.NewInt(3e18),
 			ValidatorAddress:   crypto.PubkeyToAddress(key.PublicKey),
 			SlotPubKeys:        []shard.BlsPublicKey{pub},
 			SlotKeySigs:        []shard.BLSSignature{sig},
-			Amount:             tenK,
+			Amount:             big.NewInt(1e18),
 		}
 	}
 
@@ -337,7 +337,7 @@ func TestCreateValidatorTransaction(t *testing.T) {
 		t.Errorf("cannot create new staking transaction, %v\n", err)
 	}
 	senderAddr, _ := stx.SenderAddress()
-	pool.currentState.AddBalance(senderAddr, tenK)
+	pool.currentState.AddBalance(senderAddr, big.NewInt(1e18))
 	// Add additional create validator tx cost
 	pool.currentState.AddBalance(senderAddr, cost)
 
@@ -364,7 +364,7 @@ func TestMixedTransactions(t *testing.T) {
 		t.Errorf("cannot create new staking transaction, %v\n", err)
 	}
 	stxAddr, _ := stx.SenderAddress()
-	pool.currentState.AddBalance(stxAddr, tenK)
+	pool.currentState.AddBalance(stxAddr, big.NewInt(1e18))
 	// Add additional create validator tx cost
 	pool.currentState.AddBalance(stxAddr, cost)
 
