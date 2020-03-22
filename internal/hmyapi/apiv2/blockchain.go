@@ -533,15 +533,30 @@ func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 func (s *PublicBlockChainAPI) GetValidatorInformation(
 	ctx context.Context, address string,
 ) (*staking.ValidatorRPCEnchanced, error) {
+	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(rpc.LatestBlockNumber))
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not retrieve the latest block information")
+	}
 	return s.b.GetValidatorInformation(
-		internal_common.ParseAddr(address),
+		internal_common.ParseAddr(address), block,
 	)
 }
 
-// GetAllValidatorInformation returns information about all validators.
-// If page is -1, return all else return the pagination.
-func (s *PublicBlockChainAPI) GetAllValidatorInformation(
-	ctx context.Context, page int,
+// GetValidatorInformationByBlockNumber ..
+func (s *PublicBlockChainAPI) GetValidatorInformationByBlockNumber(
+	ctx context.Context, address string, blockNr rpc.BlockNumber,
+) (*staking.ValidatorRPCEnchanced, error) {
+	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not retrieve the block information for block number: %d", blockNr)
+	}
+	return s.b.GetValidatorInformation(
+		internal_common.ParseAddr(address), block,
+	)
+}
+
+func (s *PublicBlockChainAPI) getAllValidatorInformation(
+	ctx context.Context, page int, blockNr rpc.BlockNumber,
 ) ([]*staking.ValidatorRPCEnchanced, error) {
 	if page < -1 {
 		return nil, errors.Errorf("page given %d cannot be less than -1", page)
@@ -560,14 +575,34 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 		}
 	}
 	validators := make([]*staking.ValidatorRPCEnchanced, validatorsNum)
+	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not retrieve the block information for block number: %d", blockNr)
+	}
 	for i := start; i < start+validatorsNum; i++ {
-		information, err := s.b.GetValidatorInformation(addresses[i])
+		information, err := s.b.GetValidatorInformation(addresses[i], block)
 		if err != nil {
 			return nil, err
 		}
 		validators[i-start] = information
 	}
 	return validators, nil
+}
+
+// GetAllValidatorInformation returns information about all validators.
+// If page is -1, return all else return the pagination.
+func (s *PublicBlockChainAPI) GetAllValidatorInformation(
+	ctx context.Context, page int,
+) ([]*staking.ValidatorRPCEnchanced, error) {
+	return s.getAllValidatorInformation(ctx, page, rpc.LatestBlockNumber)
+}
+
+// GetAllValidatorInformationByBlockNumber returns information about all validators.
+// If page is -1, return all else return the pagination.
+func (s *PublicBlockChainAPI) GetAllValidatorInformationByBlockNumber(
+	ctx context.Context, page int, blockNr rpc.BlockNumber,
+) ([]*staking.ValidatorRPCEnchanced, error) {
+	return s.getAllValidatorInformation(ctx, page, blockNr)
 }
 
 // GetAllDelegationInformation returns delegation information about `validatorsPageSize` validators,
