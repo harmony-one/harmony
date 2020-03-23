@@ -332,15 +332,16 @@ var (
 
 // GetValidatorInformation returns the information of validator
 func (b *APIBackend) GetValidatorInformation(
-	addr common.Address,
+	addr common.Address, block *types.Block,
 ) (*staking.ValidatorRPCEnchanced, error) {
-	wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(addr)
+	bc := b.hmy.BlockChain()
+	wrapper, err := bc.ReadValidatorInformationAt(addr, block.Root())
 	if err != nil {
 		s, _ := internal_common.AddressToBech32(addr)
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
 	}
 
-	now := b.hmy.BlockChain().CurrentHeader().Epoch()
+	now := block.Epoch()
 	inCommittee := now.Cmp(wrapper.LastEpochInCommittee) == 0
 	defaultReply := &staking.ValidatorRPCEnchanced{
 		CurrentlyInCommittee: inCommittee,
@@ -358,7 +359,7 @@ func (b *APIBackend) GetValidatorInformation(
 		},
 	}
 
-	snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(
+	snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
 		now, addr,
 	)
 
@@ -371,7 +372,7 @@ func (b *APIBackend) GetValidatorInformation(
 	)
 	computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - computed.ToSign.Uint64()
 
-	stats, err := b.hmy.BlockChain().ReadValidatorStats(addr)
+	stats, err := bc.ReadValidatorStats(addr)
 	if err != nil {
 		return defaultReply, nil
 	}
