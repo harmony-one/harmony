@@ -2056,7 +2056,7 @@ func (bc *BlockChain) AddPendingSlashingCandidates(
 			errExceedMaxPendingSlashes, "current %d with-additional %d", c, l,
 		)
 	}
-	bc.pendingSlashes = pendingSlashes
+	bc.pendingSlashes = valid
 	return bc.writeSlashes(bc.pendingSlashes)
 }
 
