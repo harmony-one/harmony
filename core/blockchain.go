@@ -2036,27 +2036,29 @@ func (bc *BlockChain) AddPendingSlashingCandidates(
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
 	current := bc.ReadPendingSlashingCandidates()
-	pendingSlashes := append(
-		bc.pendingSlashes, current.SetDifference(candidates)...,
-	)
+
 	state, err := bc.State()
 	if err != nil {
 		return err
 	}
 
 	valid := slash.Records{}
-
-	for i := range pendingSlashes {
-		if err := slash.Verify(bc, state, &pendingSlashes[i]); err == nil {
-			valid = append(valid, pendingSlashes[i])
+	for i := range candidates {
+		if err := slash.Verify(bc, state, &candidates[i]); err == nil {
+			valid = append(valid, candidates[i])
 		}
 	}
-	if l, c := len(valid), len(current); l > maxPendingSlashes {
+
+	pendingSlashes := append(
+		bc.pendingSlashes, current.SetDifference(valid)...,
+	)
+
+	if l, c := len(pendingSlashes), len(current); l > maxPendingSlashes {
 		return errors.Wrapf(
 			errExceedMaxPendingSlashes, "current %d with-additional %d", c, l,
 		)
 	}
-	bc.pendingSlashes = valid
+	bc.pendingSlashes = pendingSlashes
 	return bc.writeSlashes(bc.pendingSlashes)
 }
 

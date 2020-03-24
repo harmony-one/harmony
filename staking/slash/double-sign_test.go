@@ -397,7 +397,6 @@ func defaultSlashRecord() Record {
 				TimeUnixNano: big.NewInt(doubleSignUnixNano),
 				ShardID:      doubleSignShardID,
 			},
-			ProposalHeader: &header,
 		},
 		Reporter: reporterAddr,
 		Offender: offenderAddr,
