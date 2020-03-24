@@ -2266,6 +2266,7 @@ func (bc *BlockChain) ReadValidatorStats(
 // UpdateValidatorVotingPower writes the voting power for the committees
 func (bc *BlockChain) UpdateValidatorVotingPower(
 	batch rawdb.DatabaseWriter,
+	block *types.Block,
 	newEpochSuperCommittee, currentEpochSuperCommittee *shard.State,
 	// NOTE Do not update this state, only read from
 	state *state.DB,
@@ -2287,7 +2288,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		}
 		rosters[i] = roster
 	}
-	blkPerEpoch := shard.Schedule.BlocksPerEpoch()
 	networkWide := votepower.AggregateRosters(rosters)
 	for key, value := range networkWide {
 		stats, err := rawdb.ReadValidatorStats(bc.db, key)
@@ -2304,9 +2304,9 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		if err != nil {
 			return err
 		}
+
 		aprComputed, err := apr.ComputeForValidator(
-			bc, newEpochSuperCommittee.Epoch,
-			state, wrapper, blkPerEpoch,
+			bc, block, wrapper,
 		)
 		if err == nil && aprComputed != nil {
 			a := *aprComputed

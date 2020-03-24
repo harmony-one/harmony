@@ -292,6 +292,7 @@ func eposStakedCommittee(
 		}
 	}
 
+	// TODO: make sure external validator BLS key are also not duplicate to Harmony's keys
 	completedEPoSRound, err := NewEPoSRound(stakerReader)
 
 	if err != nil {
