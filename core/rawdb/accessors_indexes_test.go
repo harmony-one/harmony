@@ -50,7 +50,14 @@ func TestLookupStorage(t *testing.T) {
 	stx := sampleCreateValidatorStakingTxn()
 	stxs := []*staking.StakingTransaction{stx}
 
-	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, types.Receipts{&types.Receipt{}, &types.Receipt{}, &types.Receipt{}}, nil, nil, stxs)
+	receipts := types.Receipts{
+		&types.Receipt{},
+		&types.Receipt{},
+		&types.Receipt{},
+		&types.Receipt{},
+	}
+
+	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, receipts, nil, nil, stxs)
 
 	// Check that no transactions entries are in a pristine database
 	for i, tx := range txs {
@@ -66,7 +73,6 @@ func TestLookupStorage(t *testing.T) {
 	// Insert all the transactions into the database, and verify contents
 	WriteBlock(db, block)
 	WriteTxLookupEntries(db, block)
-	WriteStakingTxLookupEntries(db, block)
 
 	for i, tx := range txs {
 		if txn, hash, number, index := ReadTransaction(db, tx.Hash()); txn == nil {
@@ -99,9 +105,9 @@ func TestLookupStorage(t *testing.T) {
 			t.Fatalf("tx #%d [%x]: deleted transaction returned: %v", i, tx.Hash(), txn)
 		}
 	}
-	for i, stx := range txs {
-		DeleteStakingTxLookupEntry(db, stx.Hash())
-		if stxn, _, _, _ := ReadStakingTransaction(db, stx.Hash()); stxn != nil {
+	for i, tx := range txs {
+		DeleteTxLookupEntry(db, tx.Hash())
+		if stxn, _, _, _ := ReadStakingTransaction(db, tx.Hash()); stxn != nil {
 			t.Fatalf("stx #%d [%x]: deleted staking transaction returned: %v", i, stx.Hash(), stxn)
 		}
 	}
@@ -120,7 +126,6 @@ func TestMixedLookupStorage(t *testing.T) {
 
 	WriteBlock(db, block)
 	WriteTxLookupEntries(db, block)
-	WriteStakingTxLookupEntries(db, block)
 
 	if recTx, _, _, _ := ReadStakingTransaction(db, tx.Hash()); recTx != nil {
 		t.Fatal("got staking transactions with plain tx hash")

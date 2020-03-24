@@ -48,10 +48,9 @@ var (
 	blockBodyPrefix     = []byte("b") // blockBodyPrefix + num (uint64 big endian) + hash -> block body
 	blockReceiptsPrefix = []byte("r") // blockReceiptsPrefix + num (uint64 big endian) + hash -> block receipts
 
-	txLookupPrefix        = []byte("l")  // txLookupPrefix + hash -> transaction/receipt lookup metadata
-	stakingTxLookupPrefix = []byte("st") // stakingTxLookupPrefix + hash -> staking transaction lookup metadataasd
-	cxLookupPrefix        = []byte("cx") // cxLookupPrefix + hash -> cxReceipt lookup metadata
-	bloomBitsPrefix       = []byte("B")  // bloomBitsPrefix + bit (uint16 big endian) + section (uint64 big endian) + hash -> bloom bits
+	txLookupPrefix  = []byte("l")  // txLookupPrefix + hash -> transaction/receipt lookup metadata
+	cxLookupPrefix  = []byte("cx") // cxLookupPrefix + hash -> cxReceipt lookup metadata
+	bloomBitsPrefix = []byte("B")  // bloomBitsPrefix + bit (uint16 big endian) + section (uint64 big endian) + hash -> bloom bits
 
 	shardStatePrefix = []byte("ss") // shardStatePrefix + num (uint64 big endian) + hash -> shardState
 	lastCommitsKey   = []byte("LastCommits")
@@ -104,14 +103,6 @@ type TxLookupEntry struct {
 	Index      uint64
 }
 
-// StakingTxLookupEntry is a positional metadata to help looking up the data content of
-// a staking transaction or receipt given only its hash.
-type StakingTxLookupEntry struct {
-	BlockHash  common.Hash
-	BlockIndex uint64
-	Index      uint64
-}
-
 // encodeBlockNumber encodes a block number as big endian uint64
 func encodeBlockNumber(number uint64) []byte {
 	enc := make([]byte, 8)
@@ -152,11 +143,6 @@ func blockReceiptsKey(number uint64, hash common.Hash) []byte {
 // txLookupKey = txLookupPrefix + hash
 func txLookupKey(hash common.Hash) []byte {
 	return append(txLookupPrefix, hash.Bytes()...)
-}
-
-// stakingTxLookupKey = stakingTxLookupPrefix + hash
-func stakingTxLookupKey(hash common.Hash) []byte {
-	return append(stakingTxLookupPrefix, hash.Bytes()...)
 }
 
 // cxLookupKey = cxLookupPrefix + hash
