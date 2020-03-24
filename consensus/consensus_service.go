@@ -278,6 +278,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 // SetViewID set the viewID to the height of the blockchain
 func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID = height
+	consensus.current.viewID = height
 }
 
 // SetMode sets the mode of consensus
