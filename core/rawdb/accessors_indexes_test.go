@@ -50,7 +50,14 @@ func TestLookupStorage(t *testing.T) {
 	stx := sampleCreateValidatorStakingTxn()
 	stxs := []*staking.StakingTransaction{stx}
 
-	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, types.Receipts{&types.Receipt{}, &types.Receipt{}, &types.Receipt{}}, nil, nil, stxs)
+	receipts := types.Receipts{
+		&types.Receipt{},
+		&types.Receipt{},
+		&types.Receipt{},
+		&types.Receipt{},
+	}
+
+	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, receipts, nil, nil, stxs)
 
 	// Check that no transactions entries are in a pristine database
 	for i, tx := range txs {
