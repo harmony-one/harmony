@@ -204,7 +204,10 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 			ourPercentage = ourPercentage.Add(member.OverallPercent)
 		}
 
-		roster.Voters[staked[i].BlsPublicKey] = &member
+		// TODO: make sure external user's BLS key can be same as harmony's bls keys
+		if _, ok := roster.Voters[staked[i].BlsPublicKey]; !ok {
+			roster.Voters[staked[i].BlsPublicKey] = &member
+		}
 	}
 
 	// NOTE Enforce voting power sums to one,
