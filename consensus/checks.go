@@ -242,8 +242,8 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 	if recvMsg.ViewID-consensus.current.ViewID() > MaxViewIDDiff {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
-			Uint64("MaxViewIDDiff", MaxViewIDDiff).
-			Msg("Received viewID that is MaxViewIDDiff further from the current viewID!")
+			Uint64("CurrentViewID", consensus.current.ViewID()).
+			Msg("Received viewID that is MaxViewIDDiff (100) further from the current viewID!")
 		return false
 	}
 	return true
