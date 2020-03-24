@@ -79,7 +79,7 @@ func ComputeForValidator(
 		new(big.Int).Sub(block.Epoch(), common.Big1),
 		numeric.ZeroDec()
 
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		Uint64("now", block.Epoch().Uint64()).
 		Uint64("one-epoch-ago", oneEpochAgo.Uint64()).
 		Msg("apr - begin compute for validator ")
@@ -90,23 +90,23 @@ func ComputeForValidator(
 	)
 
 	if err != nil {
-		return &zero, nil
+		return &zero, err
 	}
 
 	blockNumAtOneEpochAgo := shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64())
 
 	headerOneEpochAgo := bc.GetHeaderByNumber(blockNumAtOneEpochAgo)
-	if block.Header() == nil || headerOneEpochAgo == nil || err != nil {
+	if block.Header() == nil || headerOneEpochAgo == nil {
 		utils.Logger().Debug().
 			Msgf("apr compute headers epochs ago %+v %+v %+v",
 				oneEpochAgo,
 				blockNumAtOneEpochAgo,
 				headerOneEpochAgo,
 			)
-		return &zero, nil
+		return &zero, errors.New("can't get headers for APR computation")
 	}
 
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		RawJSON("current-epoch-header", []byte(bc.CurrentHeader().String())).
 		RawJSON("one-epoch-ago-header", []byte(headerOneEpochAgo.String())).
 		Msg("headers used for apr computation")
