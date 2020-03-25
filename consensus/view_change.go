@@ -152,6 +152,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[onViewChange] Unable To Parse Viewchange Message")
 		return
 	}
+	// if not leader, noop
+	newLeaderKey := recvMsg.LeaderPubkey
+	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey)
+	if err != nil {
+		return
+	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.ViewChange) {
 		consensus.getLogger().Debug().
@@ -167,11 +173,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 
 	senderKey := recvMsg.SenderPubkey
-	newLeaderKey := recvMsg.LeaderPubkey
-	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey)
-	if err != nil {
-		return
-	}
 
 	consensus.vcLock.Lock()
 	defer consensus.vcLock.Unlock()
