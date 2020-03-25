@@ -184,10 +184,17 @@ func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
 		Msg("[viewChangeSanityCheck] Checking new message")
 	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Error().Err(err).Msgf(
-			"[%s] VerifySenderKey Failed",
-			msg.GetType().String(),
-		)
+		if err == shard.ErrValidNotInCommittee {
+			consensus.getLogger().Info().Msgf(
+				"[%s] sender key not in this slot's subcommittee",
+				msg.GetType().String(),
+			)
+		} else {
+			consensus.getLogger().Error().Err(err).Msgf(
+				"[%s] VerifySenderKey Failed",
+				msg.GetType().String(),
+			)
+		}
 		return false
 	}
 	if err := verifyMessageSig(senderKey, msg); err != nil {
