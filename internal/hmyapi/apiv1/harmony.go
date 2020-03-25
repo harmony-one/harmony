@@ -72,9 +72,11 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		blockEpoch = &b
 	}
 
-	var blsKeys []string
-	for _, key := range cfg.ConsensusPubKey.PublicKey {
-		blsKeys = append(blsKeys, key.SerializeToHexStr())
+	blsKeys := []string{}
+	if cfg.ConsensusPubKey != nil {
+		for _, key := range cfg.ConsensusPubKey.PublicKey {
+			blsKeys = append(blsKeys, key.SerializeToHexStr())
+		}
 	}
 
 	return NodeMetadata{
