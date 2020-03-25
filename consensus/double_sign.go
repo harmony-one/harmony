@@ -105,13 +105,13 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) {
 func (consensus *Consensus) couldThisBeADoubleSigner(
 	recvMsg *FBFTMessage,
 ) bool {
-	num, hash, now := consensus.blockNum, recvMsg.BlockHash, consensus.blockNum
+	num, hash := consensus.blockNum, recvMsg.BlockHash
 	suspicious := !consensus.FBFTLog.HasMatchingAnnounce(num, hash) ||
 		!consensus.FBFTLog.HasMatchingPrepared(num, hash)
 	if suspicious {
 		consensus.getLogger().Debug().
 			Str("message", recvMsg.String()).
-			Uint64("block-on-consensus", now).
+			Uint64("block-on-consensus", num).
 			Msg("possible double signer")
 		return true
 	}
