@@ -92,22 +92,6 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 	return true
 }
 
-func (consensus *Consensus) couldThisBeADoubleSigner(
-	recvMsg *FBFTMessage,
-) bool {
-	num, hash, now := consensus.blockNum, recvMsg.BlockHash, consensus.blockNum
-	suspicious := !consensus.FBFTLog.HasMatchingAnnounce(num, hash) ||
-		!consensus.FBFTLog.HasMatchingPrepared(num, hash)
-	if suspicious {
-		consensus.getLogger().Debug().
-			Str("message", recvMsg.String()).
-			Uint64("block-on-consensus", now).
-			Msg("possible double signer")
-		return true
-	}
-	return false
-}
-
 func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 	logMsgs := consensus.FBFTLog.GetMessagesByTypeSeqView(
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
