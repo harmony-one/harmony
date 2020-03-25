@@ -119,6 +119,7 @@ var (
 	errAlreadyBannedValidator  = errors.New("cannot slash on already banned validator")
 	errSignerKeyNotRightSize   = errors.New("bls keys from slash candidate not right side")
 	errSlashFromFutureEpoch    = errors.New("cannot have slash from future epoch")
+	errSlashBlockNoConflict    = errors.New("cannot slash for signing on non-conflicting blocks")
 )
 
 // MarshalJSON ..
@@ -179,6 +180,10 @@ func Verify(
 		)
 	}
 
+	if first.ViewID != second.ViewID || first.Height != second.Height || first.BlockHeaderHash == second.BlockHeaderHash {
+		return errors.Wrapf(errSlashBlockNoConflict, "first %v+ second %v+", first, second)
+	}
+
 	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
 		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
 		return errors.Wrapf(
@@ -226,7 +231,7 @@ func Verify(
 		if err := signature.Deserialize(ballot.Signature); err != nil {
 			return err
 		}
-		if err := first.SignerPubKey.ToLibBLSPublicKey(publicKey); err != nil {
+		if err := ballot.SignerPubKey.ToLibBLSPublicKey(publicKey); err != nil {
 			return err
 		}
 
