@@ -46,7 +46,7 @@ func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*big.Int, error) {
 
 // NodeMetadata captures select metadata of the RPC answering node
 type NodeMetadata struct {
-	BLSPublicKey   string             `json:"blskey"`
+	BLSPublicKey   []string           `json:"blskey"`
 	Version        string             `json:"version"`
 	NetworkType    string             `json:"network"`
 	ChainConfig    params.ChainConfig `json:"chain-config"`
@@ -71,8 +71,13 @@ func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 		blockEpoch = &b
 	}
 
+	var blsKeys []string
+	for _, key := range cfg.ConsensusPubKey.PublicKey {
+		blsKeys = append(blsKeys, key.SerializeToHexStr())
+	}
+
 	return NodeMetadata{
-		cfg.ConsensusPubKey.SerializeToHexStr(),
+		blsKeys,
 		nodeconfig.GetVersion(),
 		string(cfg.GetNetworkType()),
 		*s.b.ChainConfig(),
