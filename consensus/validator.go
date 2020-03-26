@@ -184,6 +184,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
+	// TODO: genesis account node delay for 1 second,
+	// this is a temp fix for allows FN nodes to earning reward
+	if consensus.delayCommit > 0 {
+		time.Sleep(consensus.delayCommit)
+	}
+
 	// add preparedSig field
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
@@ -203,11 +209,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			append(blockNumBytes, consensus.blockHash[:]...),
 			key, consensus.priKey.PrivateKey[i],
 		)
-		// TODO: genesis account node delay for 1 second,
-		// this is a temp fix for allows FN nodes to earning reward
-		if consensus.delayCommit > 0 {
-			time.Sleep(consensus.delayCommit)
-		}
 
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
