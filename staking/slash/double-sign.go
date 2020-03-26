@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
@@ -68,7 +67,6 @@ type Moment struct {
 type Evidence struct {
 	Moment
 	ConflictingBallots
-	ProposalHeader *block.Header `json:"header"`
 }
 
 // ConflictingBallots ..
@@ -101,8 +99,7 @@ func (e Evidence) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Moment
 		ConflictingBallots
-		ProposalHeader *block.Header `json:"header"`
-	}{e.Moment, e.ConflictingBallots, e.ProposalHeader})
+	}{e.Moment, e.ConflictingBallots})
 }
 
 // Records ..

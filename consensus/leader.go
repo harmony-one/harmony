@@ -1,9 +1,7 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/binary"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -11,12 +9,9 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p/host"
-	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/slash"
 )
 
 func (consensus *Consensus) announce(block *types.Block) {
@@ -195,7 +190,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	recvMsg, err := ParseFBFTMessage(msg)
-	log := consensus.getLogger()
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Parse pbft message failed")
 		return
@@ -208,95 +202,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-
-	// TODO(audit): refactor into a new func
-	if key := (bls.PublicKey{}); consensus.couldThisBeADoubleSigner(recvMsg) {
-		if alreadyCastBallot := consensus.Decider.ReadBallot(
-			quorum.Commit, recvMsg.SenderPubkey,
-		); alreadyCastBallot != nil {
-			for _, blk := range consensus.FBFTLog.GetBlocksByNumber(recvMsg.BlockNum) {
-				alreadyCastBallot.SignerPubKey.ToLibBLSPublicKey(&key)
-				if recvMsg.SenderPubkey.IsEqual(&key) {
-					signed := blk.Header()
-					areHeightsEqual := signed.Number().Uint64() == recvMsg.BlockNum
-					areViewIDsEqual := signed.ViewID().Uint64() == recvMsg.ViewID
-					areHeadersEqual := bytes.Compare(
-						signed.Hash().Bytes(), recvMsg.BlockHash.Bytes(),
-					) == 0
-					// If signer already signed, and the block height is the same
-					// and the viewID is the same, then we need to verify the block
-					// hash, and if block hash is different, then that is a clear
-					// case of double signing
-					if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
-						var doubleSign bls.Sign
-						if err := doubleSign.Deserialize(recvMsg.Payload); err != nil {
-							log.Err(err).Str("msg", recvMsg.String()).
-								Msg("could not deserialize potential double signer")
-							return
-						}
-
-						curHeader := consensus.ChainReader.CurrentHeader()
-						committee, err := consensus.ChainReader.ReadShardState(curHeader.Epoch())
-						if err != nil {
-							log.Err(err).
-								Uint32("shard", consensus.ShardID).
-								Uint64("epoch", curHeader.Epoch().Uint64()).
-								Msg("could not read shard state")
-							return
-						}
-						offender := *shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
-						subComm, err := committee.FindCommitteeByID(
-							consensus.ShardID,
-						)
-						if err != nil {
-							log.Err(err).
-								Str("msg", recvMsg.String()).
-								Msg("could not find subcommittee for bls key")
-							return
-						}
-
-						addr, err := subComm.AddressForBLSKey(offender)
-
-						if err != nil {
-							log.Err(err).Str("msg", recvMsg.String()).
-								Msg("could not find address for bls key")
-							return
-						}
-
-						now := big.NewInt(time.Now().UnixNano())
-
-						go func(reporter common.Address) {
-							evid := slash.Evidence{
-								ConflictingBallots: slash.ConflictingBallots{
-									*alreadyCastBallot,
-									votepower.Ballot{
-										SignerPubKey:    offender,
-										BlockHeaderHash: recvMsg.BlockHash,
-										Signature:       common.Hex2Bytes(doubleSign.SerializeToHexStr()),
-										Height:          recvMsg.BlockNum,
-										ViewID:          recvMsg.ViewID,
-									}},
-								Moment: slash.Moment{
-									Epoch:        curHeader.Epoch(),
-									ShardID:      consensus.ShardID,
-									TimeUnixNano: now,
-								},
-								ProposalHeader: signed,
-							}
-							proof := slash.Record{
-								Evidence: evid,
-								Reporter: reporter,
-								Offender: *addr,
-							}
-							consensus.SlashChan <- proof
-						}(consensus.SelfAddresses[consensus.LeaderPubKey.SerializeToHexStr()])
-						return
-					}
-				}
-			}
-		}
-		return
-	}
 
 	validatorPubKey, commitSig, commitBitmap :=
 		recvMsg.SenderPubkey, recvMsg.Payload, consensus.commitBitmap
@@ -325,6 +230,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		logger.Error().Msg("[OnCommit] Cannot verify commit message")
 		return
 	}
+
+	// Check for potential double signing
+	consensus.checkDoubleSign(recvMsg)
 
 	logger = logger.With().
 		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).
