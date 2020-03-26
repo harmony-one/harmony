@@ -3,6 +3,8 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
+	"math/big"
+	"sort"
 
 	"github.com/harmony-one/harmony/staking/availability"
 
@@ -383,37 +385,87 @@ func applySlashes(
 	state *state.DB,
 	doubleSigners slash.Records,
 ) error {
-	// TODO(audit): should read from the epoch when the slash happened
-	superCommittee, err := chain.ReadShardState(chain.CurrentHeader().Epoch())
-
-	if err != nil {
-		return errors.New("could not read shard state")
+	type keyStruct struct {
+		height  uint64
+		viewID  uint64
+		shardID uint32
+		epoch   uint64
 	}
 
-	staked := superCommittee.StakedValidators()
-	// Apply the slashes, invariant: assume been verified as legit slash by this point
-	var slashApplied *slash.Application
-	// TODO(audit): need to group doubleSigners by the target (block) and slash them separately
-	//              the rate of slash should be based on num_keys_signed_on_same_block/total_bls_key
-	rate := slash.Rate(len(doubleSigners), staked.CountStakedBLSKey)
-	utils.Logger().Info().
-		Str("rate", rate.String()).
-		RawJSON("records", []byte(doubleSigners.String())).
-		Msg("now applying slash to state during block finalization")
-	if slashApplied, err = slash.Apply(
-		chain,
-		state,
-		doubleSigners,
-		rate,
-	); err != nil {
-		return ctxerror.New("[Finalize] could not apply slash").WithCause(err)
+	groupedRecords := map[keyStruct]slash.Records{}
+
+	// First group slashes by same signed blocks
+	for i := range doubleSigners {
+		thisKey := keyStruct{
+			height:  doubleSigners[i].Evidence.AlreadyCastBallot.Height,
+			viewID:  doubleSigners[i].Evidence.AlreadyCastBallot.ViewID,
+			shardID: doubleSigners[i].Evidence.Moment.ShardID,
+			epoch:   doubleSigners[i].Evidence.Moment.Epoch.Uint64(),
+		}
+
+		if _, ok := groupedRecords[thisKey]; ok {
+			groupedRecords[thisKey] = append(groupedRecords[thisKey], doubleSigners[i])
+		} else {
+			groupedRecords[thisKey] = slash.Records{doubleSigners[i]}
+		}
 	}
 
-	utils.Logger().Info().
-		Str("rate", rate.String()).
-		RawJSON("records", []byte(doubleSigners.String())).
-		RawJSON("applied", []byte(slashApplied.String())).
-		Msg("slash applied successfully")
+	sortedKeys := []keyStruct{}
+
+	for key := range groupedRecords {
+		sortedKeys = append(sortedKeys, key)
+	}
+
+	// Sort them so the slashes are always consistent
+	sort.SliceStable(sortedKeys, func(i, j int) bool {
+		if sortedKeys[i].shardID < sortedKeys[j].shardID {
+			return true
+		} else if sortedKeys[i].height < sortedKeys[j].height {
+			return true
+		} else if sortedKeys[i].viewID < sortedKeys[j].viewID {
+			return true
+		}
+		return false
+	})
+
+	// Do the slashing by groups in the sorted order
+	for _, key := range sortedKeys {
+		records := groupedRecords[key]
+		superCommittee, err := chain.ReadShardState(big.NewInt(int64(key.epoch)))
+
+		if err != nil {
+			return errors.New("could not read shard state")
+		}
+
+		shardCommittee, err := superCommittee.FindCommitteeByID(key.shardID)
+
+		if err != nil {
+			return errors.New("could not find shard committee")
+		}
+
+		staked := shardCommittee.StakedValidators()
+		// Apply the slashes, invariant: assume been verified as legit slash by this point
+		var slashApplied *slash.Application
+		rate := slash.Rate(len(records), staked.CountStakedBLSKey)
+		utils.Logger().Info().
+			Str("rate", rate.String()).
+			RawJSON("records", []byte(records.String())).
+			Msg("now applying slash to state during block finalization")
+		if slashApplied, err = slash.Apply(
+			chain,
+			state,
+			records,
+			rate,
+		); err != nil {
+			return ctxerror.New("[Finalize] could not apply slash").WithCause(err)
+		}
+
+		utils.Logger().Info().
+			Str("rate", rate.String()).
+			RawJSON("records", []byte(records.String())).
+			RawJSON("applied", []byte(slashApplied.String())).
+			Msg("slash applied successfully")
+	}
 	return nil
 }
 

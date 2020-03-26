@@ -92,22 +92,6 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 	return true
 }
 
-func (consensus *Consensus) couldThisBeADoubleSigner(
-	recvMsg *FBFTMessage,
-) bool {
-	num, hash, now := consensus.blockNum, recvMsg.BlockHash, consensus.blockNum
-	suspicious := !consensus.FBFTLog.HasMatchingAnnounce(num, hash) ||
-		!consensus.FBFTLog.HasMatchingPrepared(num, hash)
-	if suspicious {
-		consensus.getLogger().Debug().
-			Str("message", recvMsg.String()).
-			Uint64("block-on-consensus", now).
-			Msg("possible double signer")
-		return true
-	}
-	return false
-}
-
 func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 	logMsgs := consensus.FBFTLog.GetMessagesByTypeSeqView(
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
@@ -200,10 +184,17 @@ func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
 		Msg("[viewChangeSanityCheck] Checking new message")
 	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Error().Err(err).Msgf(
-			"[%s] VerifySenderKey Failed",
-			msg.GetType().String(),
-		)
+		if err == shard.ErrValidNotInCommittee {
+			consensus.getLogger().Info().Msgf(
+				"[%s] sender key not in this slot's subcommittee",
+				msg.GetType().String(),
+			)
+		} else {
+			consensus.getLogger().Error().Err(err).Msgf(
+				"[%s] VerifySenderKey Failed",
+				msg.GetType().String(),
+			)
+		}
 		return false
 	}
 	if err := verifyMessageSig(senderKey, msg); err != nil {
