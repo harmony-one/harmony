@@ -203,6 +203,11 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
+	// Check for potential double signing
+	if consensus.checkDoubleSign(recvMsg) {
+		return
+	}
+
 	validatorPubKey, commitSig, commitBitmap :=
 		recvMsg.SenderPubkey, recvMsg.Payload, consensus.commitBitmap
 	logger := consensus.getLogger().With().
@@ -230,9 +235,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		logger.Error().Msg("[OnCommit] Cannot verify commit message")
 		return
 	}
-
-	// Check for potential double signing
-	consensus.checkDoubleSign(recvMsg)
 
 	logger = logger.With().
 		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).

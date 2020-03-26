@@ -13,7 +13,8 @@ import (
 )
 
 // Check for double sign and if any, send it out to beacon chain for slashing.
-func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) {
+// Returns true when it is a double-sign or there is error, otherwise, false.
+func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 	if consensus.couldThisBeADoubleSigner(recvMsg) {
 		if alreadyCastBallot := consensus.Decider.ReadBallot(
 			quorum.Commit, recvMsg.SenderPubkey,
@@ -36,7 +37,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) {
 						if err := doubleSign.Deserialize(recvMsg.Payload); err != nil {
 							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not deserialize potential double signer")
-							return
+							return true
 						}
 
 						curHeader := consensus.ChainReader.CurrentHeader()
@@ -46,7 +47,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) {
 								Uint32("shard", consensus.ShardID).
 								Uint64("epoch", curHeader.Epoch().Uint64()).
 								Msg("could not read shard state")
-							return
+							return true
 						}
 						offender := *shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
 						subComm, err := committee.FindCommitteeByID(
@@ -56,7 +57,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) {
 							consensus.getLogger().Err(err).
 								Str("msg", recvMsg.String()).
 								Msg("could not find subcommittee for bls key")
-							return
+							return true
 						}
 
 						addr, err := subComm.AddressForBLSKey(offender)
@@ -64,7 +65,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) {
 						if err != nil {
 							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not find address for bls key")
-							return
+							return true
 						}
 
 						now := big.NewInt(time.Now().UnixNano())
@@ -93,13 +94,14 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) {
 							}
 							consensus.SlashChan <- proof
 						}(consensus.SelfAddresses[consensus.LeaderPubKey.SerializeToHexStr()])
-						return
+						return true
 					}
 				}
 			}
 		}
-		return
+		return true
 	}
+	return false
 }
 
 func (consensus *Consensus) couldThisBeADoubleSigner(
