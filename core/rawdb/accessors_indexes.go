@@ -114,7 +114,7 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 // TODO remove this duplicate function that is inevitable at the moment until the optimization on staking txn with
 // unification of txn vs staking txn data structure.
 func ReadStakingTransaction(db DatabaseReader, hash common.Hash) (*staking.StakingTransaction, common.Hash, uint64, uint64) {
-	blockHash, blockNumber, index := ReadTxLookupEntry(db, hash)
+	blockHash, blockNumber, txIndex := ReadTxLookupEntry(db, hash)
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
@@ -123,20 +123,20 @@ func ReadStakingTransaction(db DatabaseReader, hash common.Hash) (*staking.Staki
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
-			Uint64("index", index).
+			Uint64("index", txIndex).
 			Msg("block Body referenced missing")
 		return nil, common.Hash{}, 0, 0
 	}
-	tx := body.StakingTransactionAt(int(index))
+	tx := body.StakingTransactionAt(int(txIndex))
 	if tx == nil || bytes.Compare(hash.Bytes(), tx.Hash().Bytes()) != 0 {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
-			Uint64("index", index).
+			Uint64("index", txIndex).
 			Msg("StakingTransaction referenced missing")
 		return nil, common.Hash{}, 0, 0
 	}
-	return tx, blockHash, blockNumber, index
+	return tx, blockHash, blockNumber, txIndex
 }
 
 // ReadReceipt retrieves a specific transaction receipt from the database, along with

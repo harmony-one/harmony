@@ -153,6 +153,7 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
 	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
 		return make([]common.Hash, 0), nil
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
@@ -184,6 +185,7 @@ func (node *Node) GetStakingTransactionsHistory(address, txType, order string) (
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
 	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
 		return make([]common.Hash, 0), nil
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
