@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200309.0"
+version="v1 20200327.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -215,7 +215,8 @@ shift $((${OPTIND} - 1))
 unset -v bootnodes REL network_type dns_zone
 
 case "${node_type}" in
-validator|explorer) ;;
+validator) ;;
+explorer) archival=true;;
 *)
    usage ;;
 esac
