@@ -522,7 +522,7 @@ func TestCV31(t *testing.T) {
 	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
-		t.Error("expected", "have 4000000000000000000 want 5000000000000000000: self delegation can not be less than min_self_delegation", "got", nil)
+		t.Error("expected", "min_self_delegation 5000000000000000000, after delegation amount 4000000000000000000: self delegation can not be less than min_self_delegation", "got", nil)
 	}
 }
 
