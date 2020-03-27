@@ -414,7 +414,7 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	for i := range candidates {
 		snapshot, _ := b.hmy.BlockChain().ReadValidatorSnapshot(candidates[i])
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
-		if !committee.IsEligibleForEPoSAuction(snapshot, validator) {
+		if !committee.IsEligibleForEPoSAuction(snapshot, validator, b.hmy.BlockChain().CurrentBlock().Epoch()) {
 			continue
 		}
 		for i := range validator.Delegations {
