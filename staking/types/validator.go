@@ -331,7 +331,7 @@ func (w *ValidatorWrapper) SanityCheck(
 			w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidSelfDelegation,
-				"min_self_delegation %s, after undelegation amount %s",
+				"min_self_delegation %s, amount %s",
 				w.Validator.MinSelfDelegation, w.Delegations[0].Amount.String(),
 			)
 		}
