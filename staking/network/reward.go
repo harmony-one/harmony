@@ -16,9 +16,9 @@ import (
 var (
 	// BlockReward is the block reward, to be split evenly among block signers.
 	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
-	// BaseStakedReward is the base block reward for epos.
+	// BaseStakedReward is the flat-rate block reward for epos staking launch.
 	BaseStakedReward = numeric.NewDecFromBigInt(new(big.Int).Mul(
-		big.NewInt(18), big.NewInt(denominations.One),
+		big.NewInt(28), big.NewInt(denominations.One),
 	))
 	// BlockRewardStakedCase is the baseline block reward in staked case -
 	totalTokens = numeric.NewDecFromBigInt(
