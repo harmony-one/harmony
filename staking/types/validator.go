@@ -95,7 +95,7 @@ type ValidatorWrapper struct {
 type Computed struct {
 	Signed            *big.Int    `json:"current-epoch-signed"`
 	ToSign            *big.Int    `json:"current-epoch-to-sign"`
-	BlocksLeftInEpoch uint64      `json:"current-epoch-blocks-left"`
+	BlocksLeftInEpoch uint64      `json:"num-beacon-blocks-until-next-epoch"`
 	Percentage        numeric.Dec `json:"current-epoch-signing-percentage"`
 	IsBelowThreshold  bool        `json:"-"`
 }
@@ -331,7 +331,8 @@ func (w *ValidatorWrapper) SanityCheck(
 			w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
 			return errors.Wrapf(
 				errInvalidSelfDelegation,
-				"have %s want %s", w.Delegations[0].Amount.String(), w.Validator.MinSelfDelegation,
+				"min_self_delegation %s, amount %s",
+				w.Validator.MinSelfDelegation, w.Delegations[0].Amount.String(),
 			)
 		}
 	}
