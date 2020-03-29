@@ -282,7 +282,7 @@ func TestValidatorWrapperSanityCheck(t *testing.T) {
 	// no delegation must fail
 	wrapper := createNewValidatorWrapper(createNewValidator())
 	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
-		t.Error("expected", errInvalidSelfDelegation, "got", err)
+		t.Error("expected", ErrInvalidSelfDelegation, "got", err)
 	}
 
 	// valid self delegation must not fail
@@ -297,13 +297,13 @@ func TestValidatorWrapperSanityCheck(t *testing.T) {
 	valDel = NewDelegation(validatorAddr, big.NewInt(1e18))
 	wrapper.Delegations = []Delegation{valDel}
 	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
-		t.Error("expected", errInvalidSelfDelegation, "got", err)
+		t.Error("expected", ErrInvalidSelfDelegation, "got", err)
 	}
 
 	// invalid self delegation of less than 10K ONE must fail
 	valDel = NewDelegation(validatorAddr, big.NewInt(1e18))
 	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
-		t.Error("expected", errInvalidSelfDelegation, "got", err)
+		t.Error("expected", ErrInvalidSelfDelegation, "got", err)
 	}
 }
 

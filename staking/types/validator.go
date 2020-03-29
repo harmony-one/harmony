@@ -31,8 +31,9 @@ const (
 )
 
 var (
-	errAddressNotMatch       = errors.New("Validator key not match")
-	errInvalidSelfDelegation = errors.New(
+	errAddressNotMatch = errors.New("validator key not match")
+	// ErrInvalidSelfDelegation ..
+	ErrInvalidSelfDelegation = errors.New(
 		"self delegation can not be less than min_self_delegation",
 	)
 	errInvalidTotalDelegation = errors.New(
@@ -325,16 +326,18 @@ func (w *ValidatorWrapper) SanityCheck(
 	switch len(w.Delegations) {
 	case 0:
 		return errors.Wrapf(
-			errInvalidSelfDelegation, "no self delegation given at all",
+			ErrInvalidSelfDelegation, "no self delegation given at all",
 		)
 	default:
 		if w.Status != effective.Banned &&
 			w.Delegations[0].Amount.Cmp(w.Validator.MinSelfDelegation) < 0 {
-			return errors.Wrapf(
-				errInvalidSelfDelegation,
-				"min_self_delegation %s, amount %s",
-				w.Validator.MinSelfDelegation, w.Delegations[0].Amount.String(),
-			)
+			if w.Status == effective.Active {
+				return errors.Wrapf(
+					ErrInvalidSelfDelegation,
+					"min_self_delegation %s, amount %s",
+					w.Validator.MinSelfDelegation, w.Delegations[0].Amount.String(),
+				)
+			}
 		}
 	}
 	totalDelegation := w.TotalDelegation()
