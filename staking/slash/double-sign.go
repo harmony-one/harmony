@@ -177,7 +177,9 @@ func Verify(
 		)
 	}
 
-	if first.ViewID != second.ViewID || first.Height != second.Height || first.BlockHeaderHash == second.BlockHeaderHash {
+	if first.ViewID != second.ViewID ||
+		first.Height != second.Height ||
+		first.BlockHeaderHash == second.BlockHeaderHash {
 		return errors.Wrapf(errSlashBlockNoConflict, "first %v+ second %v+", first, second)
 	}
 
@@ -217,6 +219,20 @@ func Verify(
 		return err
 	}
 
+	// last ditch check
+	if hash.FromRLPNew256(
+		candidate.Evidence.AlreadyCastBallot,
+	) == hash.FromRLPNew256(
+		candidate.Evidence.DoubleSignedBallot,
+	) {
+		return errors.Wrapf(
+			errBallotsNotDiff,
+			"%s %s",
+			candidate.Evidence.AlreadyCastBallot.SignerPubKey.Hex(),
+			candidate.Evidence.DoubleSignedBallot.SignerPubKey.Hex(),
+		)
+	}
+
 	for _, ballot := range [...]votepower.Ballot{
 		candidate.Evidence.AlreadyCastBallot,
 		candidate.Evidence.DoubleSignedBallot,
@@ -251,6 +267,7 @@ var (
 	errSlashDebtCannotBeNegative    = errors.New("slash debt cannot be negative")
 	errValidatorNotFoundDuringSlash = errors.New("validator not found")
 	errFailVerifySlash              = errors.New("could not verify bls key signature on slash")
+	errBallotsNotDiff               = errors.New("ballots submitted must be different")
 	zero                            = numeric.ZeroDec()
 	oneDoubleSignerRate             = numeric.MustNewDecFromStr("0.02")
 )
