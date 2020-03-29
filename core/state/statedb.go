@@ -29,8 +29,10 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/staking"
+	"github.com/harmony-one/harmony/staking/effective"
 	stk "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -748,12 +750,19 @@ func (db *DB) IsValidator(addr common.Address) bool {
 
 // AddReward distributes the reward to all the delegators based on stake percentage.
 func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
-	rewardPool := big.NewInt(0).Set(reward)
 	curValidator, err := db.ValidatorWrapper(snapshot.Address)
 	if err != nil {
 		return errors.Wrapf(err, "failed to distribute rewards: validator does not exist")
 	}
 
+	if curValidator.Status == effective.Banned {
+		utils.Logger().Info().
+			RawJSON("slashed-validator", []byte(curValidator.String())).
+			Msg("cannot add reward to banned validator")
+		return nil
+	}
+
+	rewardPool := big.NewInt(0).Set(reward)
 	curValidator.BlockReward.Add(curValidator.BlockReward, reward)
 	// Payout commission
 	commissionInt := snapshot.Validator.CommissionRates.Rate.MulInt(reward).RoundInt()
@@ -778,5 +787,5 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 		curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, rewardPool)
 	}
 
-	return db.UpdateValidatorWrapper(curValidator.Validator.Address, curValidator)
+	return db.UpdateValidatorWrapper(curValidator.Address, curValidator)
 }
