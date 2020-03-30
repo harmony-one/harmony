@@ -471,31 +471,55 @@ func VerifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BLSSignature) err
 	return nil
 }
 
-func containsHarmonyBlsKeys(blsKeys []shard.BlsPublicKey,
-	hmyAccounts []genesis.DeployAccount) error {
+func containsHarmonyBLSKeys(
+	blsKeys []shard.BlsPublicKey,
+	hmyAccounts []genesis.DeployAccount,
+	epoch *big.Int,
+) error {
 	for i := range blsKeys {
-		if err := matchesHarmonyBlsKey(&blsKeys[i], hmyAccounts); err != nil {
+		if err := matchesHarmonyBLSKey(
+			&blsKeys[i], hmyAccounts, epoch,
+		); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func matchesHarmonyBlsKey(blsKey *shard.BlsPublicKey,
-	hmyAccounts []genesis.DeployAccount) error {
-	for i := range hmyAccounts {
-		if blsKey.Hex() == hmyAccounts[i].BlsPublicKey {
-			return errors.Wrapf(errDuplicateSlotKeys,
-				"slot key %#v conflicts with internal keys",
-				hmyAccounts[i].BlsPublicKey,
+func matchesHarmonyBLSKey(
+	blsKey *shard.BlsPublicKey,
+	hmyAccounts []genesis.DeployAccount,
+	epoch *big.Int,
+) error {
+	type publicKeyAsHex = string
+	cache := map[string]map[publicKeyAsHex]struct{}{}
+	return func() error {
+		key := epoch.String()
+		if _, ok := cache[key]; !ok {
+			// one time cost per epoch
+			cache[key] = map[publicKeyAsHex]struct{}{}
+			for i := range hmyAccounts {
+				// invariant assume it is hex
+				cache[key][hmyAccounts[i].BlsPublicKey] = struct{}{}
+			}
+		}
+
+		hex := blsKey.Hex()
+		if _, exists := cache[key][hex]; exists {
+			return errors.Wrapf(
+				errDuplicateSlotKeys,
+				"slot key %s conflicts with internal keys",
+				hex,
 			)
 		}
-	}
-	return nil
+		return nil
+	}()
 }
 
 // CreateValidatorFromNewMsg creates validator from NewValidator message
-func CreateValidatorFromNewMsg(val *CreateValidator, blockNum, epoch *big.Int) (*Validator, error) {
+func CreateValidatorFromNewMsg(
+	val *CreateValidator, blockNum, epoch *big.Int,
+) (*Validator, error) {
 	desc, err := val.Description.EnsureLength()
 	if err != nil {
 		return nil, err
@@ -504,7 +528,9 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum, epoch *big.Int) (
 	pubKeys := append(val.SlotPubKeys[0:0], val.SlotPubKeys...)
 
 	instance := shard.Schedule.InstanceForEpoch(epoch)
-	if err := containsHarmonyBlsKeys(pubKeys, instance.HmyAccounts()); err != nil {
+	if err := containsHarmonyBLSKeys(
+		pubKeys, instance.HmyAccounts(), epoch,
+	); err != nil {
 		return nil, err
 	}
 
@@ -578,7 +604,9 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator, epoch
 		}
 		if !found {
 			instance := shard.Schedule.InstanceForEpoch(epoch)
-			if err := matchesHarmonyBlsKey(edit.SlotKeyToAdd, instance.HmyAccounts()); err != nil {
+			if err := matchesHarmonyBLSKey(
+				edit.SlotKeyToAdd, instance.HmyAccounts(), epoch,
+			); err != nil {
 				return err
 			}
 			if err := VerifyBLSKey(edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
