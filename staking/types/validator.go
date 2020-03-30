@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -470,14 +471,42 @@ func VerifyBLSKey(pubKey *shard.BlsPublicKey, pubKeySig *shard.BLSSignature) err
 	return nil
 }
 
+func containsHarmonyBlsKeys(blsKeys []shard.BlsPublicKey,
+	hmyAccounts []genesis.DeployAccount) error {
+	for i := range blsKeys {
+		if err := matchesHarmonyBlsKey(&blsKeys[i], hmyAccounts); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func matchesHarmonyBlsKey(blsKey *shard.BlsPublicKey,
+	hmyAccounts []genesis.DeployAccount) error {
+	for i := range hmyAccounts {
+		if blsKey.Hex() == hmyAccounts[i].BlsPublicKey {
+			return errors.Wrapf(errDuplicateSlotKeys,
+				"slot key %#v conflicts with internal keys",
+				hmyAccounts[i].BlsPublicKey,
+			)
+		}
+	}
+	return nil
+}
+
 // CreateValidatorFromNewMsg creates validator from NewValidator message
-func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Validator, error) {
+func CreateValidatorFromNewMsg(val *CreateValidator, blockNum, epoch *big.Int) (*Validator, error) {
 	desc, err := val.Description.EnsureLength()
 	if err != nil {
 		return nil, err
 	}
 	commission := Commission{val.CommissionRates, blockNum}
 	pubKeys := append(val.SlotPubKeys[0:0], val.SlotPubKeys...)
+
+	instance := shard.Schedule.InstanceForEpoch(epoch)
+	if err := containsHarmonyBlsKeys(pubKeys, instance.HmyAccounts()); err != nil {
+		return nil, err
+	}
 
 	if err = VerifyBLSKeys(pubKeys, val.SlotKeySigs); err != nil {
 		return nil, err
@@ -498,7 +527,7 @@ func CreateValidatorFromNewMsg(val *CreateValidator, blockNum *big.Int) (*Valida
 }
 
 // UpdateValidatorFromEditMsg updates validator from EditValidator message
-func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error {
+func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator, epoch *big.Int) error {
 	if validator.Address != edit.ValidatorAddress {
 		return errAddressNotMatch
 	}
@@ -548,6 +577,10 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator) error
 			}
 		}
 		if !found {
+			instance := shard.Schedule.InstanceForEpoch(epoch)
+			if err := matchesHarmonyBlsKey(edit.SlotKeyToAdd, instance.HmyAccounts()); err != nil {
+				return err
+			}
 			if err := VerifyBLSKey(edit.SlotKeyToAdd, edit.SlotKeyToAddSig); err != nil {
 				return err
 			}
