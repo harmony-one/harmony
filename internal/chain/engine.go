@@ -428,6 +428,7 @@ func applySlashes(
 		return false
 	})
 
+	beaconCurrentEpoch := chain.CurrentHeader().Epoch()
 	// Do the slashing by groups in the sorted order
 	for _, key := range sortedKeys {
 		records := groupedRecords[key]
@@ -437,16 +438,21 @@ func applySlashes(
 			return errors.New("could not read shard state")
 		}
 
-		shardCommittee, err := superCommittee.FindCommitteeByID(key.shardID)
+		subComm, err := superCommittee.FindCommitteeByID(key.shardID)
 
 		if err != nil {
 			return errors.New("could not find shard committee")
 		}
 
-		staked := shardCommittee.StakedValidators()
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
-		rate := slash.Rate(len(records), staked.CountStakedBLSKey)
+		votingPower, err := lookupVotingPower(
+			header.Epoch(), beaconCurrentEpoch, subComm,
+		)
+		if err != nil {
+			return errors.Wrapf(err, "could not lookup cached voting power in slash application")
+		}
+		rate := slash.Rate(votingPower, records)
 		utils.Logger().Info().
 			Str("rate", rate.String()).
 			RawJSON("records", []byte(records.String())).

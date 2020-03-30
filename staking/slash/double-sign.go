@@ -494,16 +494,24 @@ func Apply(
 }
 
 // Rate is the slashing % rate
-func Rate(doubleSignerCount, committeeSize int) numeric.Dec {
-	if doubleSignerCount == 0 || committeeSize == 0 {
-		return zero
+func Rate(votingPower *votepower.Roster, records Records) numeric.Dec {
+	rate := numeric.ZeroDec()
+
+	for i := range records {
+		key := records[i].Evidence.DoubleSignedBallot.SignerPubKey
+		if card, exists := votingPower.Voters[key]; exists {
+			rate = rate.Add(card.GroupPercent)
+		} else {
+			utils.Logger().Debug().
+				RawJSON("roster", []byte(votingPower.String())).
+				RawJSON("double-sign-record", []byte(records[i].String())).
+				Msg("did not have offenders voter card in roster as expected")
+		}
 	}
-	switch doubleSignerCount {
-	case 1:
-		return oneDoubleSignerRate
-	default:
-		return numeric.NewDec(
-			int64(doubleSignerCount),
-		).Quo(numeric.NewDec(int64(committeeSize)))
+
+	if rate.Equal(zero) {
+		rate = oneDoubleSignerRate
 	}
+
+	return rate
 }
