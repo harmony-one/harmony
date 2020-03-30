@@ -52,7 +52,7 @@ func VerifyAndCreateValidatorFromMsg(
 	if !CanTransfer(stateDB, msg.ValidatorAddress, msg.Amount) {
 		return nil, errInsufficientBalanceForStake
 	}
-	v, err := staking.CreateValidatorFromNewMsg(msg, blockNum)
+	v, err := staking.CreateValidatorFromNewMsg(msg, blockNum, epoch)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func VerifyAndEditValidatorFromMsg(
 	if err != nil {
 		return nil, err
 	}
-	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, msg); err != nil {
+	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, msg, epoch); err != nil {
 		return nil, err
 	}
 	newRate := wrapper.Validator.Rate

@@ -400,7 +400,7 @@ func TestCreateValidatorFromNewMsg(t *testing.T) {
 		Amount:           big.NewInt(1e18),
 	}
 	blockNum := big.NewInt(1000)
-	_, err := CreateValidatorFromNewMsg(&v, blockNum)
+	_, err := CreateValidatorFromNewMsg(&v, blockNum, new(big.Int))
 	if err != nil {
 		t.Errorf("CreateValidatorFromNewMsg failed")
 	}
@@ -413,7 +413,7 @@ func TestUpdateValidatorFromEditMsg(t *testing.T) {
 		MinSelfDelegation:  tenK,
 		MaxTotalDelegation: twelveK,
 	}
-	UpdateValidatorFromEditMsg(&validator, &ev)
+	UpdateValidatorFromEditMsg(&validator, &ev, new(big.Int))
 
 	if validator.MinSelfDelegation.Cmp(tenK) != 0 {
 		t.Errorf("UpdateValidatorFromEditMsg failed")

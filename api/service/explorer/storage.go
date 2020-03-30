@@ -30,7 +30,8 @@ var once sync.Once
 
 // Storage dump the block info into leveldb.
 type Storage struct {
-	db *leveldb.DB
+	db   *leveldb.DB
+	lock sync.Mutex
 }
 
 // GetStorageInstance returns attack model by using singleton pattern.
@@ -72,6 +73,8 @@ func (storage *Storage) GetDB() *leveldb.DB {
 
 // Dump extracts information from block and index them into lvdb for explorer.
 func (storage *Storage) Dump(block *types.Block, height uint64) {
+	storage.lock.Lock()
+	defer storage.lock.Unlock()
 	if block == nil {
 		return
 	}

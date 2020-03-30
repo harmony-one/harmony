@@ -21,6 +21,7 @@ type Harmony struct {
 	shutdownChan   chan bool                      // Channel for shutting down the Harmony
 	bloomRequests  chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
 	blockchain     *core.BlockChain
+	beaconchain    *core.BlockChain
 	txPool         *core.TxPool
 	cxPool         *core.CxPool
 	accountManager *accounts.Manager
@@ -44,6 +45,7 @@ type NodeAPI interface {
 	AddPendingStakingTransaction(*staking.StakingTransaction) error
 	AddPendingTransaction(newTx *types.Transaction) error
 	Blockchain() *core.BlockChain
+	Beaconchain() *core.BlockChain
 	AccountManager() *accounts.Manager
 	GetBalanceOfAddress(address common.Address) (*big.Int, error)
 	GetNonceOfAddress(address common.Address) uint64
@@ -65,6 +67,7 @@ func New(
 		shutdownChan:   make(chan bool),
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		blockchain:     nodeAPI.Blockchain(),
+		beaconchain:    nodeAPI.Beaconchain(),
 		txPool:         txPool,
 		cxPool:         cxPool,
 		accountManager: nodeAPI.AccountManager(),
@@ -96,6 +99,9 @@ func (s *Harmony) CxPool() *core.CxPool { return s.cxPool }
 
 // BlockChain ...
 func (s *Harmony) BlockChain() *core.BlockChain { return s.blockchain }
+
+//BeaconChain ...
+func (s *Harmony) BeaconChain() *core.BlockChain { return s.beaconchain }
 
 // NetVersion returns the network version, i.e. network ID identifying which network we are using
 func (s *Harmony) NetVersion() uint64 { return s.networkID }

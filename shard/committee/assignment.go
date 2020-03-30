@@ -127,7 +127,7 @@ func prepareOrders(
 		if err != nil {
 			return nil, err
 		}
-		if !IsEligibleForEPoSAuction(snapshot, validator) {
+		if !IsEligibleForEPoSAuction(snapshot, validator, stakedReader.CurrentBlock().Epoch()) {
 			continue
 		}
 
@@ -169,8 +169,14 @@ func prepareOrders(
 }
 
 // IsEligibleForEPoSAuction ..
-func IsEligibleForEPoSAuction(snapshot, validator *staking.ValidatorWrapper) bool {
-	if snapshot.Counters.NumBlocksToSign.Cmp(validator.Counters.NumBlocksToSign) != 0 {
+func IsEligibleForEPoSAuction(snapshot, validator *staking.ValidatorWrapper, curEpoch *big.Int) bool {
+	// This original condition to check whether a validator is in last committee is not stable
+	// because cross-links may arrive after the epoch ends and it still got counted into the
+	// NumBlocksToSign, making this condition to be true when the validator is actually not in committee
+	//if snapshot.Counters.NumBlocksToSign.Cmp(validator.Counters.NumBlocksToSign) != 0 {
+
+	// Check whether the validator is in current committee
+	if validator.LastEpochInCommittee.Cmp(curEpoch) == 0 {
 		// validator was in last epoch's committee
 		// validator with below-threshold signing activity won't be considered for next epoch
 		// and their status will be turned to inactive in FinalizeNewBlock

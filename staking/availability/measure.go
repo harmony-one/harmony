@@ -215,6 +215,10 @@ func ComputeAndMutateEPOSStatus(
 	if err != nil {
 		return err
 	}
+	if wrapper.Status == effective.Banned {
+		utils.Logger().Debug().Msg("Can't update EPoS status on a banned validator")
+		return nil
+	}
 
 	snapshot, err := bc.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
