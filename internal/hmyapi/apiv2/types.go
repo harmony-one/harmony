@@ -207,16 +207,22 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 // newRPCStakingTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
 func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, index uint64) *RPCStakingTransaction {
-	from, _ := tx.SenderAddress()
+	from, err := tx.SenderAddress()
+	if err != nil {
+		return nil
+	}
 	v, r, s := tx.RawSignatureValues()
 
-	stakingTxType := tx.StakingType().String()
+	stakingTxType := tx.StakingType()
 	message := tx.StakingMessage()
 	fields := make(map[string]interface{}, 0)
 
 	switch stakingTxType {
-	case "CreateValidator":
-		msg := message.(types2.CreateValidator)
+	case types2.DirectiveCreateValidator:
+		msg, ok := message.(types2.CreateValidator)
+		if !ok {
+			return nil
+		}
 		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
 		if err != nil {
 			return nil
@@ -224,30 +230,38 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 		fields = map[string]interface{}{
 			"validatorAddress":   validatorAddress,
 			"name":               msg.Description.Name,
-			"commissionRate":     (*big.Int)(msg.CommissionRates.Rate.Int),
-			"maxCommissionRate":  (*big.Int)(msg.CommissionRates.MaxRate.Int),
-			"maxChangeRate":      (*big.Int)(msg.CommissionRates.MaxChangeRate.Int),
-			"minSelfDelegation":  (*big.Int)(msg.MinSelfDelegation),
-			"maxTotalDelegation": (*big.Int)(msg.MaxTotalDelegation),
-			"amount":             (*big.Int)(msg.Amount),
+			"commissionRate":     msg.CommissionRates.Rate.Int,
+			"maxCommissionRate":  msg.CommissionRates.MaxRate.Int,
+			"maxChangeRate":      msg.CommissionRates.MaxChangeRate.Int,
+			"minSelfDelegation":  msg.MinSelfDelegation,
+			"maxTotalDelegation": msg.MaxTotalDelegation,
+			"amount":             msg.Amount,
 			"website":            msg.Description.Website,
 			"identity":           msg.Description.Identity,
 			"securityContact":    msg.Description.SecurityContact,
 			"details":            msg.Description.Details,
 			"slotPubKeys":        msg.SlotPubKeys,
 		}
-	case "EditValidator":
-		msg := message.(types2.EditValidator)
+	case types2.DirectiveEditValidator:
+		msg, ok := message.(types2.EditValidator)
+		if !ok {
+			return nil
+		}
 		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
 		if err != nil {
 			return nil
 		}
+		// Edit validators txs need not have commission rates to edit
+		commissionRate := &big.Int{}
+		if msg.CommissionRate != nil {
+			commissionRate = msg.CommissionRate.Int
+		}
 		fields = map[string]interface{}{
 			"validatorAddress":   validatorAddress,
-			"commisionRate":      (*big.Int)(msg.CommissionRate.Int),
+			"commisionRate":      commissionRate,
 			"name":               msg.Description.Name,
-			"minSelfDelegation":  (*big.Int)(msg.MinSelfDelegation),
-			"maxTotalDelegation": (*big.Int)(msg.MaxTotalDelegation),
+			"minSelfDelegation":  msg.MinSelfDelegation,
+			"maxTotalDelegation": msg.MaxTotalDelegation,
 			"website":            msg.Description.Website,
 			"identity":           msg.Description.Identity,
 			"securityContact":    msg.Description.SecurityContact,
@@ -255,8 +269,11 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 			"slotPubKeyToAdd":    msg.SlotKeyToAdd,
 			"slotPubKeyToRemove": msg.SlotKeyToRemove,
 		}
-	case "CollectRewards":
-		msg := message.(types2.CollectRewards)
+	case types2.DirectiveCollectRewards:
+		msg, ok := message.(types2.CollectRewards)
+		if !ok {
+			return nil
+		}
 		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
 		if err != nil {
 			return nil
@@ -264,23 +281,11 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 		fields = map[string]interface{}{
 			"delegatorAddress": delegatorAddress,
 		}
-	case "Delegate":
-		msg := message.(types2.Delegate)
-		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
-		if err != nil {
+	case types2.DirectiveDelegate:
+		msg, ok := message.(types2.Delegate)
+		if !ok {
 			return nil
 		}
-		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
-		if err != nil {
-			return nil
-		}
-		fields = map[string]interface{}{
-			"delegatorAddress": delegatorAddress,
-			"validatorAddress": validatorAddress,
-			"amount":           (*big.Int)(msg.Amount),
-		}
-	case "Undelegate":
-		msg := message.(types2.Undelegate)
 		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
 		if err != nil {
 			return nil
@@ -292,7 +297,25 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 		fields = map[string]interface{}{
 			"delegatorAddress": delegatorAddress,
 			"validatorAddress": validatorAddress,
-			"amount":           (*big.Int)(msg.Amount),
+			"amount":           msg.Amount,
+		}
+	case types2.DirectiveUndelegate:
+		msg, ok := message.(types2.Undelegate)
+		if !ok {
+			return nil
+		}
+		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
+		if err != nil {
+			return nil
+		}
+		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
+		if err != nil {
+			return nil
+		}
+		fields = map[string]interface{}{
+			"delegatorAddress": delegatorAddress,
+			"validatorAddress": validatorAddress,
+			"amount":           msg.Amount,
 		}
 	}
 
@@ -305,7 +328,7 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 		V:         (*hexutil.Big)(v),
 		R:         (*hexutil.Big)(r),
 		S:         (*hexutil.Big)(s),
-		Type:      stakingTxType,
+		Type:      stakingTxType.String(),
 		Msg:       fields,
 	}
 	if blockHash != (common.Hash{}) {
