@@ -121,7 +121,8 @@ func WhatPercentStakedNow(
 	timestamp int64,
 ) (*big.Int, *numeric.Dec, error) {
 	stakedNow := numeric.ZeroDec()
-	// Only elected validators' stake is counted in stake ratio because only their stake is under slashing risk
+	// Only elected validators' stake is counted
+	// in stake ratio because only their stake is under slashing risk
 	active, err := beaconchain.ReadElectedValidatorList()
 	if err != nil {
 		return nil, nil, err
@@ -149,10 +150,6 @@ func WhatPercentStakedNow(
 	percentage := stakedNow.Quo(totalTokens.Mul(
 		reward.PercentageForTimeStamp(timestamp),
 	).Add(dole))
-	utils.Logger().Info().
-		Str("so-far-doled-out", dole.String()).
-		Str("staked-percentage", percentage.String()).
-		Str("currently-staked", stakedNow.String()).
-		Msg("Computed how much staked right now")
+	utils.Logger().Info().Msg("Computed how much staked right now")
 	return soFarDoledOut, &percentage, nil
 }

@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"github.com/harmony-one/harmony/staking/availability"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
@@ -16,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -38,8 +37,16 @@ type Reader interface {
 type StakingCandidatesReader interface {
 	CurrentBlock() *types.Block
 	ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error)
-	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
+	ReadValidatorSnapshot(
+		addr common.Address,
+	) (*staking.ValidatorWrapper, error)
 	ValidatorCandidates() []common.Address
+}
+
+// StakingEpochAwareReader ..
+type StakingEpochAwareReader interface {
+	StakingCandidatesReader
+	staking.ValidatorSnapshotReader
 }
 
 // CandidatesForEPoS ..
@@ -78,7 +85,7 @@ func (p CandidateOrder) MarshalJSON() ([]byte, error) {
 
 // NewEPoSRound runs a fresh computation of EPoS using
 // latest data always
-func NewEPoSRound(stakedReader StakingCandidatesReader) (
+func NewEPoSRound(stakedReader StakingEpochAwareReader) (
 	*CompletedEPoSRound, error,
 ) {
 	eligibleCandidate, err := prepareOrders(stakedReader)
@@ -123,13 +130,13 @@ func NewEPoSRound(stakedReader StakingCandidatesReader) (
 }
 
 func prepareOrders(
-	stakedReader StakingCandidatesReader,
+	stakedReader StakingEpochAwareReader,
 ) (map[common.Address]*effective.SlotOrder, error) {
 	candidates := stakedReader.ValidatorCandidates()
 	blsKeys := map[shard.BLSPublicKey]struct{}{}
 	essentials := map[common.Address]*effective.SlotOrder{}
-	totalStaked, tempZero := big.NewInt(0), numeric.ZeroDec()
-
+	totalStaked, tempZero, currentEpoch :=
+		big.NewInt(0), numeric.ZeroDec(), stakedReader.CurrentBlock().Epoch()
 	for i := range candidates {
 		validator, err := stakedReader.ReadValidatorInformation(
 			candidates[i],
@@ -137,13 +144,14 @@ func prepareOrders(
 		if err != nil {
 			return nil, err
 		}
-		snapshot, err := stakedReader.ReadValidatorSnapshot(
+		snapshot, err := stakedReader.ReadValidatorSnapshotAtEpoch(
+			currentEpoch,
 			candidates[i],
 		)
 		if err != nil {
 			return nil, err
 		}
-		if !IsEligibleForEPoSAuction(snapshot, validator, stakedReader.CurrentBlock().Epoch()) {
+		if !IsEligibleForEPoSAuction(snapshot, validator, currentEpoch) {
 			continue
 		}
 
@@ -228,7 +236,7 @@ type ChainReader interface {
 
 // DataProvider ..
 type DataProvider interface {
-	StakingCandidatesReader
+	StakingEpochAwareReader
 	ChainReader
 }
 
