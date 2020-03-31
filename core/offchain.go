@@ -208,11 +208,41 @@ func (bc *BlockChain) CommitOffChainData(
 	// Update block reward accumulator and slashes
 	if isBeaconChain {
 		if isStaking {
+			roundResult := payout.ReadRoundResult()
 			if err := bc.UpdateBlockRewardAccumulator(
-				batch, payout.ReadRoundResult().Total, block.Number().Uint64(),
+				batch, roundResult.Total, block.Number().Uint64(),
 			); err != nil {
 				return NonStatTy, err
 			}
+
+			for _, paid := range [...][]reward.Payout{
+				roundResult.BeaconchainAward, roundResult.ShardChainAward,
+			} {
+				for i := range paid {
+					if stats, err := bc.ReadValidatorStats(paid[i].Addr); err == nil {
+						doUpdate := false
+						for j := range stats.MetricsPerShard {
+							if stats.MetricsPerShard[j].Identity == paid[i].EarningKey {
+								doUpdate = true
+								stats.MetricsPerShard[j].Earned.Add(
+									stats.MetricsPerShard[j].Earned,
+									paid[i].NewlyEarned,
+								)
+							}
+						}
+						if !doUpdate {
+							if err := rawdb.WriteValidatorStats(batch, paid[i].Addr, stats); err != nil {
+								utils.Logger().Info().
+									Err(err).Msg("could not update earning per key in stats")
+							}
+						}
+					} else {
+						utils.Logger().Info().
+							Err(err).Msg("could not read validator stats to update for earning per key")
+					}
+				}
+			}
+
 			records := slash.Records{}
 			if s := header.Slashes(); len(s) > 0 {
 				if err := rlp.DecodeBytes(s, &records); err != nil {
