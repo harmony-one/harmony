@@ -350,7 +350,7 @@ func (b *APIBackend) GetValidatorInformation(
 		ComputedMetrics:      nil,
 		TotalDelegated:       wrapper.TotalDelegation(),
 		EPoSStatus: effective.ValidatorStatus(
-			inCommittee, wrapper.Status == effective.Active,
+			inCommittee, wrapper.Status,
 		).String(),
 		Lifetime: &staking.AccumulatedOverLifetime{
 			wrapper.BlockReward,
