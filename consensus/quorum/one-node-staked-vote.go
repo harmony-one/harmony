@@ -195,6 +195,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	type t struct {
 		Policy            string `json:"policy"`
 		Count             int    `json:"count"`
+		Externals         int    `json:"external-validator-slot-count"`
 		Participants      []u    `json:"committee-members"`
 		HmyVotingPower    string `json:"hmy-voting-power"`
 		StakedVotingPower string `json:"staked-voting-power"`
@@ -202,7 +203,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	}
 
 	parts := make([]u, voterCount)
-	i := 0
+	i, externalCount := 0, 0
 
 	for identity, voter := range v.roster.Voters {
 		member := u{
@@ -214,6 +215,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 			"",
 		}
 		if !voter.IsHarmonyNode {
+			externalCount++
 			member.EffectiveStake = voter.EffectiveStake.String()
 		}
 		parts[i] = member
@@ -223,6 +225,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t{
 		v.Policy().String(),
 		voterCount,
+		externalCount,
 		parts,
 		v.roster.OurVotingPowerTotalPercentage.String(),
 		v.roster.TheirVotingPowerTotalPercentage.String(),
