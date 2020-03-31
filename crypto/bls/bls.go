@@ -19,10 +19,10 @@ func RandPrivateKey() *bls.SecretKey {
 	return &sec
 }
 
-// BytesToBlsPublicKey converts bytes into bls.PublicKey pointer.
-func BytesToBlsPublicKey(bytes []byte) (*bls.PublicKey, error) {
+// BytesToBLSPublicKey converts bytes into bls.PublicKey pointer.
+func BytesToBLSPublicKey(bytes []byte) (*bls.PublicKey, error) {
 	if len(bytes) == 0 {
-		return nil, fmt.Errorf("[BytesToBlsPublicKey] bytes is empty")
+		return nil, fmt.Errorf("[BytesToBLSPublicKey] bytes is empty")
 	}
 	pubKey := &bls.PublicKey{}
 	err := pubKey.Deserialize(bytes)

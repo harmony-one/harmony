@@ -116,12 +116,12 @@ var (
 	blsPass            = blsrecoveryCommand.String("pass", "", "Passphrase to decrypt the bls file.")
 	blsFile            = blsrecoveryCommand.String("file", "", "Non-human readable bls file.")
 
-	blsImportCommand = flag.NewFlagSet("importBls", flag.ExitOnError)
+	blsImportCommand = flag.NewFlagSet("importBLS", flag.ExitOnError)
 	blsKey           = blsImportCommand.String("key", "", "The raw private key.")
 
-	getBlsPublicCommand = flag.NewFlagSet("getBlsPublic", flag.ExitOnError)
-	blsKey2             = getBlsPublicCommand.String("key", "", "The raw private key.")
-	blsFile2            = getBlsPublicCommand.String("file", "", "The encrypted bls file.")
+	getBLSPublicCommand = flag.NewFlagSet("getBLSPublic", flag.ExitOnError)
+	blsKey2             = getBLSPublicCommand.String("key", "", "The raw private key.")
+	blsFile2            = getBLSPublicCommand.String("file", "", "The encrypted bls file.")
 )
 
 var (
@@ -184,9 +184,9 @@ func main() {
 		fmt.Println("   12. blsRecovery    - Recover non-human readable file.")
 		fmt.Println("        --pass           - The file containg the passphrase to decrypt the bls key.")
 		fmt.Println("        --file           - Non-human readable bls file.")
-		fmt.Println("   13. importBls      - Convert raw private key into encrypted bls key.")
+		fmt.Println("   13. importBLS      - Convert raw private key into encrypted bls key.")
 		fmt.Println("        --key            - Raw private key.")
-		fmt.Println("   14. getBlsPublic   - Show Bls public key given raw private bls key.")
+		fmt.Println("   14. getBLSPublic   - Show BLS public key given raw private bls key.")
 		fmt.Println("        --key            - Raw private key.")
 		fmt.Println("        --file           - encrypted bls file.")
 		os.Exit(1)
@@ -235,7 +235,7 @@ ARG:
 	case "exportPriKey":
 		processExportPriKeyCommand()
 	case "blsgen":
-		processBlsgenCommand()
+		processBLSgenCommand()
 	case "removeAll":
 		clearKeystore()
 	case "import":
@@ -253,10 +253,10 @@ ARG:
 		formatAddressCommand()
 	case "blsRecovery":
 		blsRecoveryCommand()
-	case "importBls":
-		importBls()
-	case "getBlsPublic":
-		getBlsPublic()
+	case "importBLS":
+		importBLS()
+	case "getBLSPublic":
+		getBLSPublic()
 	default:
 		fmt.Printf("Unknown action: %s\n", os.Args[1])
 		flag.PrintDefaults()
@@ -438,7 +438,7 @@ func processExportPriKeyCommand() {
 	}
 }
 
-func processBlsgenCommand() {
+func processBLSgenCommand() {
 	newCommand.Parse(os.Args[2:])
 	noPass := *newCommandNoPassPtr
 	pass := *newCommandPassPtr
@@ -461,14 +461,14 @@ func processBlsgenCommand() {
 		}
 	}
 
-	privateKey, fileName, err := blsgen.GenBlsKeyWithPassPhrase(password)
+	privateKey, fileName, err := blsgen.GenBLSKeyWithPassPhrase(password)
 	if err != nil {
 		fmt.Printf("error when generating bls key: %v\n", err)
 		os.Exit(100)
 	}
 	publickKey := privateKey.GetPublicKey()
-	fmt.Printf("Bls private key: %s\n", privateKey.SerializeToHexStr())
-	fmt.Printf("Bls public key: %s\n", publickKey.SerializeToHexStr())
+	fmt.Printf("BLS private key: %s\n", privateKey.SerializeToHexStr())
+	fmt.Printf("BLS public key: %s\n", publickKey.SerializeToHexStr())
 	fmt.Printf("File storing the ENCRYPTED private key with your passphrase: %s\n", fileName)
 }
 
@@ -586,7 +586,7 @@ func blsRecoveryCommand() {
 	if *blsPass == "" || *blsFile == "" {
 		fmt.Println("Please specify the --file and --pass for bls passphrase.")
 	} else {
-		priKey, err := blsgen.LoadNonHumanReadableBlsKeyWithPassPhrase(*blsFile, *blsPass)
+		priKey, err := blsgen.LoadNonHumanReadableBLSKeyWithPassPhrase(*blsFile, *blsPass)
 		if err != nil {
 			fmt.Printf("Not able to load non-human readable bls key. err:%v", err)
 			os.Exit(100)
@@ -599,7 +599,7 @@ func blsRecoveryCommand() {
 	}
 }
 
-func importBls() {
+func importBLS() {
 	if err := blsImportCommand.Parse(os.Args[2:]); err != nil {
 		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
 		return
@@ -626,7 +626,7 @@ func importBls() {
 		} else {
 			fmt.Printf("Your encrypted bls file with the passphrased is written at %s.\n", fileName)
 		}
-		privateKey2, err := blsgen.LoadBlsKeyWithPassPhrase(fileName, passphrase)
+		privateKey2, err := blsgen.LoadBLSKeyWithPassPhrase(fileName, passphrase)
 		if err != nil {
 			fmt.Printf("Error when loading the private key with the passphrase. Err: %v", err)
 			os.Exit(101)
@@ -641,8 +641,8 @@ func importBls() {
 	}
 }
 
-func getBlsPublic() {
-	if err := getBlsPublicCommand.Parse(os.Args[2:]); err != nil {
+func getBLSPublic() {
+	if err := getBLSPublicCommand.Parse(os.Args[2:]); err != nil {
 		fmt.Println(ctxerror.New("failed to parse flags").WithCause(err))
 		return
 	}
@@ -662,7 +662,7 @@ func getBlsPublic() {
 			fmt.Printf("Passphrase doesn't match. Please try again!\n")
 			os.Exit(100)
 		}
-		privateKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsFile2, password)
+		privateKey, err := blsgen.LoadBLSKeyWithPassPhrase(*blsFile2, password)
 		if err != nil {
 			fmt.Printf("error when loading bls key, err :%v\n", err)
 			os.Exit(100)

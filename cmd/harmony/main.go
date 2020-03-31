@@ -111,7 +111,7 @@ var (
 	blsFolder          = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
 	blsPassphrase      string
-	maxBlsKeysPerNode  = flag.Int("max_bls_keys_per_node", 4, "maximum number of bls keys allowed per node (default 4)")
+	maxBLSKeysPerNode  = flag.Int("max_bls_keys_per_node", 4, "maximum number of bls keys allowed per node (default 4)")
 	// Sharding configuration parameters for devnet
 	devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
 	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
@@ -154,7 +154,7 @@ func initSetup() {
 	}
 
 	// maybe request passphrase for bls key.
-	passphraseForBls()
+	passphraseForBLS()
 
 	// Configure log parameters
 	utils.SetLogContext(*port, *ip)
@@ -195,7 +195,7 @@ func initSetup() {
 	}
 }
 
-func passphraseForBls() {
+func passphraseForBLS() {
 	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
 	// However, explorer or non-validator nodes need no blskey
 	if *nodeType != "validator" {
@@ -230,23 +230,23 @@ func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys []*bls.Public
 
 func setupLegacyNodeAccount() error {
 	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
-	multiBlsPubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
+	multiBLSPubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
 	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
-			findAccountsByPubKeys(config, multiBlsPubKey.PublicKey)
+			findAccountsByPubKeys(config, multiBLSPubKey.PublicKey)
 			if len(initialAccounts) != 0 {
 				break
 			}
 		}
 	} else {
-		findAccountsByPubKeys(genesisShardingConfig, multiBlsPubKey.PublicKey)
+		findAccountsByPubKeys(genesisShardingConfig, multiBLSPubKey.PublicKey)
 	}
 
 	if len(initialAccounts) == 0 {
-		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", multiBlsPubKey.SerializeToHexStr())
+		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", multiBLSPubKey.SerializeToHexStr())
 		os.Exit(100)
 	}
 
@@ -268,14 +268,14 @@ func setupStakingNodeAccount() error {
 	for _, blsKey := range pubKey.PublicKey {
 		initialAccount := &genesis.DeployAccount{}
 		initialAccount.ShardID = shardID
-		initialAccount.BlsPublicKey = blsKey.SerializeToHexStr()
+		initialAccount.BLSPublicKey = blsKey.SerializeToHexStr()
 		initialAccount.Address = ""
 		initialAccounts = append(initialAccounts, initialAccount)
 	}
 	return nil
 }
 
-func readMultiBlsKeys(consensusMultiBlsPriKey *multibls.PrivateKey, consensusMultiBlsPubKey *multibls.PublicKey) error {
+func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMultiBLSPubKey *multibls.PublicKey) error {
 	keyPasses := map[string]string{}
 	blsKeyFiles := []os.FileInfo{}
 	if err := filepath.Walk(*blsFolder, func(path string, info os.FileInfo, err error) error {
@@ -309,10 +309,10 @@ func readMultiBlsKeys(consensusMultiBlsPriKey *multibls.PrivateKey, consensusMul
 		)
 		os.Exit(100)
 	}
-	if len(blsKeyFiles) > *maxBlsKeysPerNode {
+	if len(blsKeyFiles) > *maxBLSKeysPerNode {
 		fmt.Fprintf(os.Stderr,
 			"[Multi-BLS] maximum number of bls keys per node is %d, found: %d\n",
-			*maxBlsKeysPerNode,
+			*maxBLSKeysPerNode,
 			len(blsKeyFiles),
 		)
 		os.Exit(100)
@@ -325,13 +325,13 @@ func readMultiBlsKeys(consensusMultiBlsPriKey *multibls.PrivateKey, consensusMul
 			blsPassphrase = val
 		}
 		blsKeyFilePath := path.Join(*blsFolder, blsKeyFile.Name())
-		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
+		consensusPriKey, err := blsgen.LoadBLSKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
 		if err != nil {
 			return err
 		}
 		// TODO: assumes order between public/private key pairs
-		multibls.AppendPriKey(consensusMultiBlsPriKey, consensusPriKey)
-		multibls.AppendPubKey(consensusMultiBlsPubKey, consensusPriKey.GetPublicKey())
+		multibls.AppendPriKey(consensusMultiBLSPriKey, consensusPriKey)
+		multibls.AppendPubKey(consensusMultiBLSPubKey, consensusPriKey.GetPublicKey())
 	}
 
 	return nil
@@ -342,7 +342,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 	consensusMultiPubKey := &multibls.PublicKey{}
 
 	if *blsKeyFile != "" {
-		consensusPriKey, err := blsgen.LoadBlsKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
+		consensusPriKey, err := blsgen.LoadBLSKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
 			os.Exit(100)
@@ -350,7 +350,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 		multibls.AppendPriKey(consensusMultiPriKey, consensusPriKey)
 		multibls.AppendPubKey(consensusMultiPubKey, consensusPriKey.GetPublicKey())
 	} else {
-		err := readMultiBlsKeys(consensusMultiPriKey, consensusMultiPubKey)
+		err := readMultiBLSKeys(consensusMultiPriKey, consensusMultiPubKey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[Multi-BLS] ERROR when loading bls keys, err :%v\n", err)
 			os.Exit(100)
@@ -437,7 +437,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// staking validator doesn't have to specify ECDSA address
 	currentConsensus.SelfAddresses = map[string]ethCommon.Address{}
 	for _, initialAccount := range initialAccounts {
-		currentConsensus.SelfAddresses[initialAccount.BlsPublicKey] = common.ParseAddr(initialAccount.Address)
+		currentConsensus.SelfAddresses[initialAccount.BLSPublicKey] = common.ParseAddr(initialAccount.Address)
 	}
 
 	if err != nil {
@@ -800,7 +800,7 @@ func main() {
 	}
 
 	utils.Logger().Info().
-		Str("BlsPubKey", nodeConfig.ConsensusPubKey.SerializeToHexStr()).
+		Str("BLSPubKey", nodeConfig.ConsensusPubKey.SerializeToHexStr()).
 		Uint32("ShardID", nodeConfig.ShardID).
 		Str("ShardGroupID", nodeConfig.GetShardGroupID().String()).
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).

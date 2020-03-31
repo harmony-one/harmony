@@ -29,7 +29,7 @@ func effectiveStake(median, actual numeric.Dec) numeric.Dec {
 // SlotPurchase ..
 type SlotPurchase struct {
 	Addr  common.Address     `json:"slot-owner"`
-	Key   shard.BlsPublicKey `json:"bls-public-key"`
+	Key   shard.BLSPublicKey `json:"bls-public-key"`
 	Stake numeric.Dec        `json:"eposed-stake"`
 }
 
@@ -49,7 +49,7 @@ func (p SlotPurchase) MarshalJSON() ([]byte, error) {
 // SlotOrder ..
 type SlotOrder struct {
 	Stake       *big.Int             `json:"stake"`
-	SpreadAmong []shard.BlsPublicKey `json:"keys-at-auction"`
+	SpreadAmong []shard.BLSPublicKey `json:"keys-at-auction"`
 	Percentage  numeric.Dec          `json:"percentage-of-total-auction-stake"`
 }
 

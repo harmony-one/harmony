@@ -31,7 +31,7 @@ func main() {
 			fmt.Println()
 			fmt.Printf("// %d - %d\n", i, i+9)
 		}
-		fmt.Printf("{Address: \"%s\", BlsPriKey: \"%s\"},\n", genesis.NewNodeAccounts[i].Address, sec.SerializeToHexStr())
+		fmt.Printf("{Address: \"%s\", BLSPriKey: \"%s\"},\n", genesis.NewNodeAccounts[i].Address, sec.SerializeToHexStr())
 		if i == 0 {
 			aggSig = sec.Sign(m)
 			aggPub = sec.GetPublicKey()

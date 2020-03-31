@@ -250,7 +250,7 @@ var (
 	reporterAddr, offenderAddr = common.Address{}, common.Address{}
 	randoDel                   = common.Address{}
 	header                     = block.Header{}
-	subCommittee               = []shard.BlsPublicKey{}
+	subCommittee               = []shard.BLSPublicKey{}
 	doubleSignEpochBig         = big.NewInt(doubleSignEpoch)
 
 	unit = func() interface{} {
@@ -296,7 +296,7 @@ func (s *scenario) defaultValidatorPair(
 	validatorSnapshot := &staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
-			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
+			SlotPubKeys:          []shard.BLSPublicKey{blsWrapA},
 			LastEpochInCommittee: big.NewInt(lastEpochInComm),
 			MinSelfDelegation:    tenKOnes,     //new(big.Int).SetUint64(1 * denominations.One),
 			MaxTotalDelegation:   hundredKOnes, //new(big.Int).SetUint64(10 * denominations.One),
@@ -311,7 +311,7 @@ func (s *scenario) defaultValidatorPair(
 	validatorCurrent := &staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
-			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
+			SlotPubKeys:          []shard.BLSPublicKey{blsWrapA},
 			LastEpochInCommittee: big.NewInt(lastEpochInComm + 1),
 			MinSelfDelegation:    tenKOnes,     // new(big.Int).SetUint64(1 * denominations.One),
 			MaxTotalDelegation:   hundredKOnes, // new(big.Int).SetUint64(10 * denominations.One),
@@ -435,7 +435,7 @@ func (mockOutChainReader) ReadShardState(epoch *big.Int) (*shard.State, error) {
 				Slots: shard.SlotList{
 					shard.Slot{
 						EcdsaAddress:   offenderAddr,
-						BlsPublicKey:   blsWrapA,
+						BLSPublicKey:   blsWrapA,
 						EffectiveStake: nil,
 					},
 				},

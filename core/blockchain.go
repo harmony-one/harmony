@@ -2725,7 +2725,7 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 			return member.EcdsaAddress, nil
 		}
 
-		if utils.GetAddressFromBlsPubKeyBytes(member.BlsPublicKey[:]) == coinbase {
+		if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == coinbase {
 			return member.EcdsaAddress, nil
 		}
 	}

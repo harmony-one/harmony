@@ -29,8 +29,8 @@ func toISO8601(t time.Time) string {
 		t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), tz)
 }
 
-// GenBlsKeyWithPassPhrase generates bls key with passphrase and write into disk.
-func GenBlsKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, error) {
+// GenBLSKeyWithPassPhrase generates bls key with passphrase and write into disk.
+func GenBLSKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, error) {
 	privateKey := bls.RandPrivateKey()
 	publickKey := privateKey.GetPublicKey()
 	fileName := publickKey.SerializeToHexStr() + ".key"
@@ -75,8 +75,8 @@ func WriteToFile(filename string, data string) error {
 	return file.Sync()
 }
 
-// LoadBlsKeyWithPassPhrase loads bls key with passphrase.
-func LoadBlsKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
+// LoadBLSKeyWithPassPhrase loads bls key with passphrase.
+func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, err
@@ -169,8 +169,8 @@ func decryptNonHumanReadable(data []byte, passphrase string) ([]byte, error) {
 	return plaintext, nil
 }
 
-// LoadNonHumanReadableBlsKeyWithPassPhrase loads bls key with passphrase.
-func LoadNonHumanReadableBlsKeyWithPassPhrase(fileName, passFile string) (*ffi_bls.SecretKey, error) {
+// LoadNonHumanReadableBLSKeyWithPassPhrase loads bls key with passphrase.
+func LoadNonHumanReadableBLSKeyWithPassPhrase(fileName, passFile string) (*ffi_bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, err

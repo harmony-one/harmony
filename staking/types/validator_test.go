@@ -78,17 +78,17 @@ var (
 )
 
 // Using public keys to create slot for validator
-func setSlotPubKeys() []shard.BlsPublicKey {
+func setSlotPubKeys() []shard.BLSPublicKey {
 	p := &bls.PublicKey{}
 	p.DeserializeHexStr(blsPubKey)
-	pub := shard.BlsPublicKey{}
+	pub := shard.BLSPublicKey{}
 	pub.FromLibBLSPublicKey(p)
-	return []shard.BlsPublicKey{pub}
+	return []shard.BLSPublicKey{pub}
 }
 
 // Using private keys to create sign slot for message.CreateValidator
 func setSlotKeySigs() []shard.BLSSignature {
-	messageBytes := []byte(BlsVerificationStr)
+	messageBytes := []byte(BLSVerificationStr)
 	privateKey := &bls.SecretKey{}
 	privateKey.DeserializeHexStr(blsPriKey)
 	msgHash := hash.Keccak256(messageBytes)

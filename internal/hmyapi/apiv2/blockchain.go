@@ -190,7 +190,7 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr uint6
 	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
 	for i, validator := range committee.Slots {
 		pubkeys[i] = new(bls.PublicKey)
-		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
+		validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
 	result := make([]string, 0)
 	mask, err := internal_bls.NewMask(pubkeys, nil)
@@ -210,7 +210,7 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr uint6
 			return result, err
 		}
 		blsPublicKey := new(bls.PublicKey)
-		validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
+		validator.BLSPublicKey.ToLibBLSPublicKey(blsPublicKey)
 		if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
 			result = append(result, oneAddress)
 		}
@@ -238,7 +238,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr uint64,
 	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
 	for i, validator := range committee.Slots {
 		pubkeys[i] = new(bls.PublicKey)
-		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
+		validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
 	mask, err := internal_bls.NewMask(pubkeys, nil)
 	if err != nil {
@@ -257,7 +257,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr uint64,
 			continue
 		}
 		blsPublicKey := new(bls.PublicKey)
-		validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
+		validator.BLSPublicKey.ToLibBLSPublicKey(blsPublicKey)
 		if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
 			return true, nil
 		}

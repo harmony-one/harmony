@@ -47,7 +47,7 @@ func generateRandomSlot() shard.Slot {
 	addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
 	secretKey := bls.SecretKey{}
 	secretKey.Deserialize(big.NewInt(int64(keyGen.Int63n(maxKeyGen))).Bytes())
-	key := shard.BlsPublicKey{}
+	key := shard.BLSPublicKey{}
 	key.FromLibBLSPublicKey(secretKey.GetPublicKey())
 	stake := numeric.NewDecFromBigInt(big.NewInt(int64(stakeGen.Int63n(maxStakeGen))))
 	return shard.Slot{addr, key, &stake}
@@ -68,7 +68,7 @@ func TestCompute(t *testing.T) {
 		member := AccommodateHarmonyVote{
 			PureStakedVote: PureStakedVote{
 				EarningAccount: staked[i].EcdsaAddress,
-				Identity:       staked[i].BlsPublicKey,
+				Identity:       staked[i].BLSPublicKey,
 				GroupPercent:   numeric.ZeroDec(),
 				EffectiveStake: numeric.ZeroDec(),
 			},
@@ -91,7 +91,7 @@ func TestCompute(t *testing.T) {
 			ourPercentage = ourPercentage.Add(member.OverallPercent)
 		}
 
-		expectedRoster.Voters[staked[i].BlsPublicKey] = &member
+		expectedRoster.Voters[staked[i].BLSPublicKey] = &member
 	}
 
 	expectedRoster.OurVotingPowerTotalPercentage = ourPercentage

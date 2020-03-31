@@ -28,7 +28,7 @@ var (
 	stakeGen      = rand.New(rand.NewSource(541))
 )
 
-type secretKeyMap map[shard.BlsPublicKey]bls.SecretKey
+type secretKeyMap map[shard.BLSPublicKey]bls.SecretKey
 
 func init() {
 	basicDecider = NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
@@ -40,7 +40,7 @@ func generateRandomSlot() (shard.Slot, bls.SecretKey) {
 	addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
 	secretKey := bls.SecretKey{}
 	secretKey.Deserialize(big.NewInt(int64(keyGen.Int63n(maxKeyGen))).Bytes())
-	key := shard.BlsPublicKey{}
+	key := shard.BLSPublicKey{}
 	key.FromLibBLSPublicKey(secretKey.GetPublicKey())
 	stake := numeric.NewDecFromBigInt(big.NewInt(int64(stakeGen.Int63n(maxStakeGen))))
 	return shard.Slot{addr, key, &stake}, secretKey
@@ -58,9 +58,9 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 		newSlot, sKey := generateRandomSlot()
 		if i < 50 {
 			newSlot.EffectiveStake = nil
-			sKeys[hmy][newSlot.BlsPublicKey] = sKey
+			sKeys[hmy][newSlot.BLSPublicKey] = sKey
 		} else {
-			sKeys[reg][newSlot.BlsPublicKey] = sKey
+			sKeys[reg][newSlot.BLSPublicKey] = sKey
 		}
 		slotList = append(slotList, newSlot)
 		pubKeys = append(pubKeys, sKey.GetPublicKey())
@@ -87,7 +87,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 		newSlot, sKey := generateRandomSlot()
 		if i < 33 {
 			newSlot.EffectiveStake = nil
-			sKeys[newSlot.BlsPublicKey] = sKey
+			sKeys[newSlot.BLSPublicKey] = sKey
 		}
 		slotList = append(slotList, newSlot)
 		pubKeys = append(pubKeys, sKey.GetPublicKey())

@@ -40,7 +40,7 @@ func CreateTestNewTransaction() (*StakingTransaction, error) {
 	stakePayloadMaker := func() (Directive, interface{}) {
 		p := &bls.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
-		pub := shard.BlsPublicKey{}
+		pub := shard.BLSPublicKey{}
 		pub.FromLibBLSPublicKey(p)
 
 		ra, _ := numeric.NewDecFromStr("0.7")
@@ -62,7 +62,7 @@ func CreateTestNewTransaction() (*StakingTransaction, error) {
 			MinSelfDelegation:  big.NewInt(10),
 			MaxTotalDelegation: big.NewInt(3000),
 			ValidatorAddress:   common.Address(dAddr),
-			SlotPubKeys:        []shard.BlsPublicKey{pub},
+			SlotPubKeys:        []shard.BLSPublicKey{pub},
 			Amount:             big.NewInt(100),
 		}
 	}
@@ -88,7 +88,7 @@ func TestTransactionCopy(t *testing.T) {
 
 	p := &bls.PublicKey{}
 	p.DeserializeHexStr(testBLSPubKey2)
-	pub := shard.BlsPublicKey{}
+	pub := shard.BLSPublicKey{}
 	pub.FromLibBLSPublicKey(p)
 	cv1.SlotPubKeys = append(cv1.SlotPubKeys, pub)
 

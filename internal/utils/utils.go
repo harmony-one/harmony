@@ -82,17 +82,17 @@ func GetUniqueIDFromIPPort(ip, port string) uint32 {
 	return uint32(value)
 }
 
-// GetAddressFromBlsPubKey return the address object from bls pub key.
-func GetAddressFromBlsPubKey(pubKey *bls.PublicKey) common.Address {
+// GetAddressFromBLSPubKey return the address object from bls pub key.
+func GetAddressFromBLSPubKey(pubKey *bls.PublicKey) common.Address {
 	addr := common.Address{}
 	addrBytes := pubKey.GetAddress()
 	addr.SetBytes(addrBytes[:])
 	return addr
 }
 
-// GetAddressFromBlsPubKeyBytes return the address object from bls pub key.
-func GetAddressFromBlsPubKeyBytes(pubKeyBytes []byte) common.Address {
-	pubKey, err := bls2.BytesToBlsPublicKey(pubKeyBytes[:])
+// GetAddressFromBLSPubKeyBytes return the address object from bls pub key.
+func GetAddressFromBLSPubKeyBytes(pubKeyBytes []byte) common.Address {
+	pubKey, err := bls2.BytesToBLSPublicKey(pubKeyBytes[:])
 	addr := common.Address{}
 	if err == nil {
 		addrBytes := pubKey.GetAddress()

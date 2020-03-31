@@ -183,7 +183,7 @@ func Verify(
 		return errors.Wrapf(errSlashBlockNoConflict, "first %v+ second %v+", first, second)
 	}
 
-	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
+	if shard.CompareBLSPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
 		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
 		return errors.Wrapf(
 			errBallotSignerKeysNotSame, "%s %s", k1, k2,

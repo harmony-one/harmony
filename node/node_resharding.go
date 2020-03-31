@@ -42,7 +42,7 @@ func (node *Node) transitionIntoNextEpoch(shardState types.State) {
 	var publicKeys []*bls.PublicKey
 	for idx, nodeID := range myShardState.Slots {
 		key := &bls.PublicKey{}
-		err := key.Deserialize(nodeID.BlsPublicKey[:])
+		err := key.Deserialize(nodeID.BLSPublicKey[:])
 		if err != nil {
 			getLogger().Error("Failed to deserialize BLS public key in shard state",
 				"idx", idx,
@@ -71,7 +71,7 @@ func findRoleInShardState(
 	keyBytes := key.Serialize()
 	for idx, shard := range state.Shards {
 		for nodeIdx, nodeID := range shard.Slots {
-			if bytes.Compare(nodeID.BlsPublicKey[:], keyBytes) == 0 {
+			if bytes.Compare(nodeID.BLSPublicKey[:], keyBytes) == 0 {
 				return uint32(idx), nodeIdx == 0
 			}
 		}

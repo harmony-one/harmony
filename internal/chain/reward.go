@@ -157,7 +157,7 @@ func AccumulateRewards(
 		for beaconMember := range payable {
 			// TODO Give out whatever leftover to the last voter/handle
 			// what to do about share of those that didn't sign
-			voter := votingPower.Voters[payable[beaconMember].BlsPublicKey]
+			voter := votingPower.Voters[payable[beaconMember].BLSPublicKey]
 			if !voter.IsHarmonyNode {
 				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
 				if err != nil {
@@ -239,7 +239,7 @@ func AccumulateRewards(
 
 				shardExternalShare := shard.Schedule.InstanceForEpoch(cxLink.Epoch()).ExternalVotePercent()
 				for j := range payableSigners {
-					voter := votingPower.Voters[payableSigners[j].BlsPublicKey]
+					voter := votingPower.Voters[payableSigners[j].BLSPublicKey]
 					if !voter.IsHarmonyNode && !voter.OverallPercent.IsZero() {
 						due := defaultReward.Mul(
 							voter.OverallPercent.Quo(shardExternalShare),

@@ -542,7 +542,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 
 	utils.Logger().Debug().
 		Str("Version", ping.NodeVer).
-		Str("BlsKey", peer.ConsensusPubKey.SerializeToHexStr()).
+		Str("BLSKey", peer.ConsensusPubKey.SerializeToHexStr()).
 		Str("IP", peer.IP).
 		Str("Port", peer.Port).
 		Interface("PeerID", peer.PeerID).

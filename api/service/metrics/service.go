@@ -30,7 +30,7 @@ const (
 
 // Service is the struct for metrics service.
 type Service struct {
-	BlsPublicKey    string
+	BLSPublicKey    string
 	IP              string
 	Port            string
 	PushgatewayIP   string
@@ -88,7 +88,7 @@ var (
 // New returns metrics service.
 func New(selfPeer *p2p.Peer, blsPublicKey, pushgatewayIP, pushgatewayPort string) *Service {
 	return &Service{
-		BlsPublicKey:    blsPublicKey,
+		BLSPublicKey:    blsPublicKey,
 		IP:              selfPeer.IP,
 		Port:            selfPeer.Port,
 		PushgatewayIP:   pushgatewayIP,
@@ -124,7 +124,7 @@ func (s *Service) Run() {
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(blockHeightGauge, connectionsNumberGauge, nodeBalanceGauge, lastConsensusGauge, blockRewardGauge, blocksAcceptedGauge, txPoolGauge, isLeaderGauge)
 
-	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("instance", s.IP+":"+s.Port).Grouping("bls_key", s.BlsPublicKey)
+	s.pusher = push.New("http://"+s.PushgatewayIP+":"+s.PushgatewayPort, "node_metrics").Gatherer(registry).Grouping("instance", s.IP+":"+s.Port).Grouping("bls_key", s.BLSPublicKey)
 	go s.PushMetrics()
 }
 
