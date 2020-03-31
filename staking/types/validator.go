@@ -121,7 +121,7 @@ func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
 		numeric.ZeroDec(),
 		numeric.ZeroDec(),
-		[]votepower.VoteOnSubcomittee{},
+		[]VoteWithCurrentEpochEarning{},
 	}
 }
 
@@ -167,6 +167,12 @@ func (w ValidatorWrapper) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// VoteWithCurrentEpochEarning ..
+type VoteWithCurrentEpochEarning struct {
+	votepower.VoteOnSubcomittee
+	Earned *big.Int `json:"earned-reward"`
+}
+
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// APR ..
@@ -174,7 +180,7 @@ type ValidatorStats struct {
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `json:"total-effective-stake"`
 	// MetricsPerShard ..
-	MetricsPerShard []votepower.VoteOnSubcomittee `json:"by-shard"`
+	MetricsPerShard []VoteWithCurrentEpochEarning `json:"by-shard"`
 }
 
 func (s ValidatorStats) String() string {

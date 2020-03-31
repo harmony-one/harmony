@@ -91,6 +91,7 @@ func NewStakingEraRewardForRound(
 	}
 }
 
+// MissingSigners ..
 func (r *stakingEra) MissingSigners() shard.SlotList {
 	return r.missingSigners
 }
