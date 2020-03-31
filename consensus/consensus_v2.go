@@ -609,6 +609,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
+	// TODO: genesis account node delay for 1 second, this is a temp fix for allows FN nodes to earning reward
+	if consensus.delayCommit > 0 {
+		time.Sleep(consensus.delayCommit)
+	}
+
 	// add block field
 	blockPayload := make([]byte, len(block))
 	copy(blockPayload[:], block[:])
@@ -633,11 +638,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	for i, key := range consensus.PubKey.PublicKey {
 		msgToSend := consensus.constructCommitMessage(commitPayload, key, consensus.priKey.PrivateKey[i])
-
-		// TODO: genesis account node delay for 1 second, this is a temp fix for allows FN nodes to earning reward
-		if consensus.delayCommit > 0 {
-			time.Sleep(consensus.delayCommit)
-		}
 
 		if err := consensus.msgSender.SendWithoutRetry(groupID, host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
 			utils.Logger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
