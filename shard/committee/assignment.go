@@ -59,16 +59,20 @@ type CompletedEPoSRound struct {
 // CandidateOrder ..
 type CandidateOrder struct {
 	*effective.SlotOrder
-	Validator common.Address
+	StakePerKey *big.Int
+	Validator   common.Address
 }
 
 // MarshalJSON ..
 func (p CandidateOrder) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		*effective.SlotOrder
-		Validator string `json:"validator"`
+		StakePerKey *big.Int `json:"stake-per-key"`
+		Validator   string   `json:"validator"`
 	}{
-		p.SlotOrder, common2.MustAddressToBech32(p.Validator),
+		p.SlotOrder,
+		p.StakePerKey,
+		common2.MustAddressToBech32(p.Validator),
 	})
 }
 
@@ -91,9 +95,21 @@ func NewEPoSRound(stakedReader StakingCandidatesReader) (
 
 	i := 0
 	for key := range eligibleCandidate {
+		// NOTE in principle, a div-by-zero should not
+		// happen by this point but the risk of not being explicit about
+		// checking is a panic, so the check is worth it
+		perKey := big.NewInt(0)
+		if l := len(eligibleCandidate[key].SpreadAmong); l > 0 {
+			perKey.Set(
+				new(big.Int).Div(
+					eligibleCandidate[key].Stake, big.NewInt(int64(l)),
+				),
+			)
+		}
 		auctionCandidates[i] = &CandidateOrder{
-			SlotOrder: eligibleCandidate[key],
-			Validator: key,
+			SlotOrder:   eligibleCandidate[key],
+			StakePerKey: perKey,
+			Validator:   key,
 		}
 		i++
 	}
