@@ -171,7 +171,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	AccountQueue: 64,
 	GlobalQueue:  1024,
 
-	Lifetime: 3 * time.Hour,
+	Lifetime: 30 * time.Minute,
 
 	Blacklist: &map[common.Address]struct{}{},
 }
@@ -623,8 +623,8 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
-	// Heuristic limit, reject transactions over 32KB to prevent DOS attacks
-	if tx.Size() > 32*1024 {
+	// For DOS prevention, reject excessively large transactions.
+	if tx.Size() >= types.MaxPoolTransactionDataSize {
 		return errors.WithMessagef(ErrOversizedData, "transaction size is %s", tx.Size().String())
 	}
 	// Transactions can't be negative. This may never happen using RLP decoded
