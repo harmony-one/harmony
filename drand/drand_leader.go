@@ -129,7 +129,7 @@ func (dRand *DRand) processCommitMessage(message *msg_pb.Message) {
 
 	drandMsg := message.GetDrand()
 
-	senderPubKey, err := bls.BytesToBlsPublicKey(drandMsg.SenderPubkey)
+	senderPubKey, err := bls.BytesToBLSPublicKey(drandMsg.SenderPubkey)
 	if err != nil {
 		utils.Logger().Debug().Err(err).Msg("Failed to deserialize BLS public key")
 		return

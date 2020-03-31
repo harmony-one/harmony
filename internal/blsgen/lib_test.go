@@ -8,11 +8,11 @@ import (
 // TestUpdateStakingList creates a bls key with passphrase and compare it with the one loaded from the generated file.
 func TestUpdateStakingList(t *testing.T) {
 	var err error
-	privateKey, fileName, err := GenBlsKeyWithPassPhrase("abcd")
+	privateKey, fileName, err := GenBLSKeyWithPassPhrase("abcd")
 	if err != nil {
 		t.Error(err)
 	}
-	anotherPriKey, err := LoadBlsKeyWithPassPhrase(fileName, "abcd")
+	anotherPriKey, err := LoadBLSKeyWithPassPhrase(fileName, "abcd")
 	if err != nil {
 		t.Error(err)
 	}

@@ -15,7 +15,7 @@ package types
 // 	maxRate := NewDecWithPrec(2, 2)        // 20%
 // 	maxChangeRate := NewDecWithPrec(1, 3)  // 1%
 
-// 	blsPublickey := shard.BlsPublicKey{}
+// 	blsPublickey := shard.BLSPublicKey{}
 // 	blsPublickey.FromLibBLSPublicKey(blsPubKey)
 
 // 	msgCreateValidator := NewMsgCreateValidator(Description{
@@ -66,7 +66,7 @@ package types
 // 		t.Error("StakingAddress does not match")
 // 	}
 
-// 	if shard.CompareBlsPublicKey(decodedMsg.ValidatingPubKey, msgCreateValidator.ValidatingPubKey) != 0 {
+// 	if shard.CompareBLSPublicKey(decodedMsg.ValidatingPubKey, msgCreateValidator.ValidatingPubKey) != 0 {
 // 		t.Error("ValidatingPubKey does not match")
 // 	}
 
@@ -78,7 +78,7 @@ package types
 // func TestMsgEditValidatorRLP(t *testing.T) {
 // 	commissionRate := NewDecWithPrec(1, 2) // 10%
 
-// 	blsPublickey := shard.BlsPublicKey{}
+// 	blsPublickey := shard.BLSPublicKey{}
 // 	blsPublickey.FromLibBLSPublicKey(blsPubKey)
 
 // 	msgEditValidator := NewMsgEditValidator(Description{

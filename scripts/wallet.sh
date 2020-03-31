@@ -44,9 +44,9 @@ Commands:
     12. blsRecovery    - Recover non-human readable file.
         --pass           - The file containg the passphrase to decrypt the bls key.
         --file           - Non-human readable bls file.
-    13. importBls      - Convert raw private key into encrypted bls key.
+    13. importBLS      - Convert raw private key into encrypted bls key.
         --key            - Raw private key.
-    14. getBlsPublic   - Show Bls public key given raw private bls key.
+    14. getBLSPublic   - Show BLS public key given raw private bls key.
         --key            - Raw private key.
         --file           - encrypted bls file.
 EOT

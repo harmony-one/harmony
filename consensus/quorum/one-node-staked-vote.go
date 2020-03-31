@@ -27,7 +27,7 @@ type TallyResult struct {
 }
 
 type voteBox struct {
-	voters       map[shard.BlsPublicKey]struct{}
+	voters       map[shard.BLSPublicKey]struct{}
 	currentTotal numeric.Dec
 }
 
@@ -81,7 +81,7 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	return (*currentTotalPower).GT(threshold)
 }
 func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, error) {
-	w := shard.BlsPublicKey{}
+	w := shard.BLSPublicKey{}
 	members := v.Participants()
 	ballot := func() *voteBox {
 		switch p {
@@ -116,7 +116,7 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	pubKeys := mask.Publics
-	w := shard.BlsPublicKey{}
+	w := shard.BLSPublicKey{}
 	currentTotal := numeric.ZeroDec()
 
 	for i := range pubKeys {
@@ -240,7 +240,7 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 	}
 	identity, _ := pubKeyFunc()
 	for _, key := range identity.PublicKey {
-		if w := (shard.BlsPublicKey{}); w.FromLibBLSPublicKey(key) != nil {
+		if w := (shard.BLSPublicKey{}); w.FromLibBLSPublicKey(key) != nil {
 			_, ok := v.roster.Voters[w]
 			if ok {
 				return true
@@ -251,7 +251,7 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 }
 
 func newBox() *voteBox {
-	return &voteBox{map[shard.BlsPublicKey]struct{}{}, numeric.ZeroDec()}
+	return &voteBox{map[shard.BLSPublicKey]struct{}{}, numeric.ZeroDec()}
 }
 
 func newBallotBox() box {

@@ -178,8 +178,8 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 }
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
-func (dRand *DRand) IsValidatorInCommittee(validatorBlsPubKey string) bool {
-	_, ok := dRand.CommitteePublicKeys[validatorBlsPubKey]
+func (dRand *DRand) IsValidatorInCommittee(validatorBLSPubKey string) bool {
+	_, ok := dRand.CommitteePublicKeys[validatorBLSPubKey]
 	return ok
 }
 

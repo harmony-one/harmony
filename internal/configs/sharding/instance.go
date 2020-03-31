@@ -144,13 +144,13 @@ func (sc instance) FnAccounts() []genesis.DeployAccount {
 // or not in the bootstrapping process.
 func (sc instance) FindAccount(blsPubKey string) (bool, *genesis.DeployAccount) {
 	for i, item := range sc.hmyAccounts {
-		if item.BlsPublicKey == blsPubKey {
+		if item.BLSPublicKey == blsPubKey {
 			item.ShardID = uint32(i) % sc.numShards
 			return uint32(i) < sc.numShards, &item
 		}
 	}
 	for i, item := range sc.fnAccounts {
-		if item.BlsPublicKey == blsPubKey {
+		if item.BLSPublicKey == blsPubKey {
 			item.ShardID = uint32(i) % sc.numShards
 			return false, &item
 		}

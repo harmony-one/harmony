@@ -24,12 +24,12 @@ var (
 	twelveK          = new(big.Int).Mul(big.NewInt(12000), big.NewInt(1e18))
 )
 
-func generateBlsKeySigPair() (shard.BlsPublicKey, shard.BLSSignature) {
+func generateBLSKeySigPair() (shard.BLSPublicKey, shard.BLSSignature) {
 	p := &bls.PublicKey{}
 	p.DeserializeHexStr(testBLSPubKey)
-	pub := shard.BlsPublicKey{}
+	pub := shard.BLSPublicKey{}
 	pub.FromLibBLSPublicKey(p)
-	messageBytes := []byte(staking.BlsVerificationStr)
+	messageBytes := []byte(staking.BLSVerificationStr)
 	privateKey := &bls.SecretKey{}
 	privateKey.DeserializeHexStr(testBLSPrvKey)
 	msgHash := hash.Keccak256(messageBytes)
@@ -57,8 +57,8 @@ func createValidator() *staking.CreateValidator {
 	}
 	minSelfDel := tenK
 	maxTotalDel := twelveK
-	pubKey, pubSig := generateBlsKeySigPair()
-	slotPubKeys := []shard.BlsPublicKey{pubKey}
+	pubKey, pubSig := generateBLSKeySigPair()
+	slotPubKeys := []shard.BLSPublicKey{pubKey}
 	slotKeySigs := []shard.BLSSignature{pubSig}
 	amount := tenK
 	v := staking.CreateValidator{

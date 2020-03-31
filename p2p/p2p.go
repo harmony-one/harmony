@@ -24,11 +24,11 @@ type Peer struct {
 }
 
 func (p Peer) String() string {
-	BlsPubKey := "nil"
+	BLSPubKey := "nil"
 	if p.ConsensusPubKey != nil {
-		BlsPubKey = p.ConsensusPubKey.SerializeToHexStr()
+		BLSPubKey = p.ConsensusPubKey.SerializeToHexStr()
 	}
-	return fmt.Sprintf("BlsPubKey:%s-%s/%s[%d]", BlsPubKey, net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs))
+	return fmt.Sprintf("BLSPubKey:%s-%s/%s[%d]", BLSPubKey, net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs))
 }
 
 // GroupReceiver is a multicast group message receiver interface.

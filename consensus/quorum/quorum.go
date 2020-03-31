@@ -198,7 +198,7 @@ func (s *cIdentities) Participants() []*bls.PublicKey {
 
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 	for i := range pubKeys {
-		k := shard.BlsPublicKey{}
+		k := shard.BLSPublicKey{}
 		k.FromLibBLSPublicKey(pubKeys[i])
 	}
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
@@ -268,7 +268,7 @@ func (s *cIdentities) TwoThirdsSignersCount() int64 {
 }
 
 func (s *cIdentities) ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ballot {
-	ballotBox := map[shard.BlsPublicKey]*votepower.Ballot{}
+	ballotBox := map[shard.BLSPublicKey]*votepower.Ballot{}
 	key := *shard.FromLibBLSPublicKeyUnsafe(PubKey)
 
 	switch p {
@@ -288,7 +288,7 @@ func (s *cIdentities) ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ball
 }
 
 func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
-	m := map[shard.BlsPublicKey]*votepower.Ballot{}
+	m := map[shard.BLSPublicKey]*votepower.Ballot{}
 	switch p {
 	case Prepare:
 		m = s.prepare.BallotBox

@@ -23,7 +23,7 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	SignerPubKey    shard.BlsPublicKey `json:"bls-public-key"`
+	SignerPubKey    shard.BLSPublicKey `json:"bls-public-key"`
 	BlockHeaderHash common.Hash        `json:"block-header-hash"`
 	Signature       []byte             `json:"bls-signature"`
 	Height          uint64             `json:"block-height"`
@@ -50,7 +50,7 @@ func (b Ballot) MarshalJSON() ([]byte, error) {
 // Round is a round of voting in any FBFT phase
 type Round struct {
 	AggregatedVote *bls.Sign
-	BallotBox      map[shard.BlsPublicKey]*Ballot
+	BallotBox      map[shard.BLSPublicKey]*Ballot
 }
 
 func (b Ballot) String() string {
@@ -62,14 +62,14 @@ func (b Ballot) String() string {
 func NewRound() *Round {
 	return &Round{
 		AggregatedVote: &bls.Sign{},
-		BallotBox:      map[shard.BlsPublicKey]*Ballot{},
+		BallotBox:      map[shard.BLSPublicKey]*Ballot{},
 	}
 }
 
 // PureStakedVote ..
 type PureStakedVote struct {
 	EarningAccount common.Address     `json:"earning-account"`
-	Identity       shard.BlsPublicKey `json:"bls-public-key"`
+	Identity       shard.BLSPublicKey `json:"bls-public-key"`
 	GroupPercent   numeric.Dec        `json:"group-percent"`
 	EffectiveStake numeric.Dec        `json:"effective-stake"`
 }
@@ -96,7 +96,7 @@ type topLevelRegistry struct {
 
 // Roster ..
 type Roster struct {
-	Voters map[shard.BlsPublicKey]*AccommodateHarmonyVote
+	Voters map[shard.BLSPublicKey]*AccommodateHarmonyVote
 	topLevelRegistry
 	ShardID uint32
 }
@@ -184,7 +184,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 		member := AccommodateHarmonyVote{
 			PureStakedVote: PureStakedVote{
 				EarningAccount: staked[i].EcdsaAddress,
-				Identity:       staked[i].BlsPublicKey,
+				Identity:       staked[i].BLSPublicKey,
 				GroupPercent:   numeric.ZeroDec(),
 				EffectiveStake: numeric.ZeroDec(),
 			},
@@ -207,10 +207,10 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 		}
 
 		// TODO: make sure external user's BLS key can be same as harmony's bls keys
-		if _, ok := roster.Voters[staked[i].BlsPublicKey]; !ok {
-			roster.Voters[staked[i].BlsPublicKey] = &member
+		if _, ok := roster.Voters[staked[i].BLSPublicKey]; !ok {
+			roster.Voters[staked[i].BLSPublicKey] = &member
 		} else {
-			utils.Logger().Debug().Str("blsKey", staked[i].BlsPublicKey.Hex()).Msg("Duplicate BLS key found")
+			utils.Logger().Debug().Str("blsKey", staked[i].BLSPublicKey.Hex()).Msg("Duplicate BLS key found")
 		}
 	}
 
@@ -236,7 +236,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 
 // NewRoster ..
 func NewRoster(shardID uint32) *Roster {
-	m := map[shard.BlsPublicKey]*AccommodateHarmonyVote{}
+	m := map[shard.BLSPublicKey]*AccommodateHarmonyVote{}
 	return &Roster{
 		Voters: m,
 		topLevelRegistry: topLevelRegistry{

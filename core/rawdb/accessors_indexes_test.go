@@ -88,9 +88,9 @@ func TestMixedLookupStorage(t *testing.T) {
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
 		p := &bls.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
-		pub := shard.BlsPublicKey{}
+		pub := shard.BLSPublicKey{}
 		pub.FromLibBLSPublicKey(p)
-		messageBytes := []byte(staking.BlsVerificationStr)
+		messageBytes := []byte(staking.BLSVerificationStr)
 		privateKey := &bls.SecretKey{}
 		privateKey.DeserializeHexStr(testBLSPrvKey)
 		msgHash := hash.Keccak256(messageBytes)
@@ -117,7 +117,7 @@ func TestMixedLookupStorage(t *testing.T) {
 			MinSelfDelegation:  big.NewInt(1e18),
 			MaxTotalDelegation: big.NewInt(3e18),
 			ValidatorAddress:   crypto.PubkeyToAddress(key.PublicKey),
-			SlotPubKeys:        []shard.BlsPublicKey{pub},
+			SlotPubKeys:        []shard.BLSPublicKey{pub},
 			SlotKeySigs:        []shard.BLSSignature{sig},
 			Amount:             big.NewInt(1e18),
 		}

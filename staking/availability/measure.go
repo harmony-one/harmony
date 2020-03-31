@@ -17,10 +17,7 @@ import (
 )
 
 var (
-	measure                    = numeric.NewDec(2).Quo(numeric.NewDec(3))
-	errValidatorEpochDeviation = errors.New(
-		"validator snapshot epoch not exactly one epoch behind",
-	)
+	measure = numeric.NewDec(2).Quo(numeric.NewDec(3))
 	// ErrDivByZero ..
 	ErrDivByZero = errors.New("toSign of availability cannot be 0, mistake in protocol")
 )
@@ -227,12 +224,8 @@ func ComputeAndMutateEPOSStatus(
 
 	computed := ComputeCurrentSigning(snapshot, wrapper)
 
-	utils.Logger().Info().
-		Str("signed", computed.Signed.String()).
-		Str("to-sign", computed.ToSign.String()).
-		Str("percentage-signed", computed.Percentage.String()).
-		Bool("is-below-threshold", computed.IsBelowThreshold).
-		Msg("check if signing percent is meeting required threshold")
+	utils.Logger().
+		Info().Msg("check if signing percent is meeting required threshold")
 
 	const missedTooManyBlocks = true
 

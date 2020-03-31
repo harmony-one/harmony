@@ -87,9 +87,9 @@ func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingT
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
 		p := &bls.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
-		pub := shard.BlsPublicKey{}
+		pub := shard.BLSPublicKey{}
 		pub.FromLibBLSPublicKey(p)
-		messageBytes := []byte(staking.BlsVerificationStr)
+		messageBytes := []byte(staking.BLSVerificationStr)
 		privateKey := &bls.SecretKey{}
 		privateKey.DeserializeHexStr(testBLSPrvKey)
 		msgHash := hash.Keccak256(messageBytes)
@@ -116,7 +116,7 @@ func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingT
 			MinSelfDelegation:  tenK,
 			MaxTotalDelegation: twelveK,
 			ValidatorAddress:   crypto.PubkeyToAddress(key.PublicKey),
-			SlotPubKeys:        []shard.BlsPublicKey{pub},
+			SlotPubKeys:        []shard.BLSPublicKey{pub},
 			SlotKeySigs:        []shard.BLSSignature{sig},
 			Amount:             tenK,
 		}
