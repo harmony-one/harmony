@@ -12,6 +12,7 @@ type Payout struct {
 	ShardID     uint32
 	Addr        common.Address
 	NewlyEarned *big.Int
+	EarningKey  shard.BLSPublicKey
 }
 
 // CompletedRound ..
