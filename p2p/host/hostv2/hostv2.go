@@ -211,35 +211,34 @@ func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
 }
 
 // New creates a host for p2p communication
-func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
+func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
-	// TODO: Convert to zerolog or internal logger interface
-	logger := utils.Logger()
 	if err != nil {
-		logger.Error().Str("IP", self.IP).Str("Port", self.Port).Msg("New MA Error")
-		return nil
+		utils.Logger().Error().Str("IP", self.IP).Str("Port", self.Port).Msg("New MA Error")
+		return nil, err
 	}
 	// TODO – use WithCancel for orderly host teardown (which we don't have yet)
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey),
 	)
-	catchError(err)
+	if err != nil {
+		return nil, err
+	}
 	traceFile := os.Getenv("P2P_TRACEFILE")
 	var options = make([]libp2p_pubsub.Option, 0, 0)
 	// increase the peer outbound queue size from default 32 to 64
 	options = append(options, libp2p_pubsub.WithPeerOutboundQueueSize(64))
-
 	if len(traceFile) > 0 {
 		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
 		options = append(options, libp2p_pubsub.WithEventTracer(tracer))
 	}
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
-	catchError(err)
-
+	if err != nil {
+		return nil, err
+	}
 	self.PeerID = p2pHost.ID()
-
-	subLogger := logger.With().Str("hostID", p2pHost.ID().Pretty()).Logger()
+	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 	// has to save the private key for host
 	h := &HostV2{
 		h:      p2pHost,
@@ -257,7 +256,7 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) *HostV2 {
 		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
 		Msg("HostV2 is up!")
 
-	return h
+	return h, nil
 }
 
 // GetID returns ID.Pretty
