@@ -121,6 +121,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -Y             verify the signature of the downloaded binaries (default: off)
    -M             support multi-key mode (default: off)
    -A             enable archival node mode (default: off)
+   -R tracefile   enable p2p trace using tracefile (default: off)
 
 examples:
 
@@ -154,7 +155,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc blacklist multi_key archival verify
+unset upgrade_rel public_rpc blacklist multi_key archival verify TRACEFILE
 start_clean=false
 loop=true
 run_as_root=true
@@ -172,10 +173,11 @@ multi_key=false
 archival=false
 verify=false
 ${BLSKEYFILE=}
+${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVIMB:AY opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVIMB:AYR: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -207,6 +209,7 @@ do
       exit 0 ;;
    Y) verify=true;;
    A) archival=true;;
+   R) TRACEFILE="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -699,6 +702,11 @@ do
       )
       ;;
    esac
+   case "${TRACEFILE}" in
+      "") msg "not enabling p2p trace" ;;
+      *) msg "WARN: enabled p2p tracefile: $TRACEFILE. Be aware of the file size."
+         export P2P_TRACEFILE=${TRACEFILE} ;;
+   esac
    case "$OS" in
    Darwin) ld_path_var=DYLD_FALLBACK_LIBRARY_PATH;;
    *) ld_path_var=LD_LIBRARY_PATH;;
@@ -714,3 +722,5 @@ do
    msg "restarting in 10s..."
    sleep 10
 done
+
+# vim: set expandtab:ts=3
