@@ -6,15 +6,14 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/taggedrlp"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
-
 	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
 	v2 "github.com/harmony-one/harmony/block/v2"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/taggedrlp"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 // Header represents a block header in the Harmony blockchain.
@@ -22,13 +21,24 @@ type Header struct {
 	blockif.Header
 }
 
+var (
+	// ErrHeaderIsNil ..
+	ErrHeaderIsNil = errors.New("cannot encode nil header receiver")
+)
+
 // EncodeRLP encodes the header using tagged RLP representation.
 func (h *Header) EncodeRLP(w io.Writer) error {
+	if h == nil {
+		return ErrHeaderIsNil
+	}
 	return HeaderRegistry.Encode(w, h.Header)
 }
 
 // DecodeRLP decodes the header using tagged RLP representation.
 func (h *Header) DecodeRLP(s *rlp.Stream) error {
+	if h == nil {
+		return ErrHeaderIsNil
+	}
 	decoded, err := HeaderRegistry.Decode(s)
 	if err != nil {
 		return err

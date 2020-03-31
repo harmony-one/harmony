@@ -44,25 +44,35 @@ func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*big.Int, error) {
 
 // NodeMetadata captures select metadata of the RPC answering node
 type NodeMetadata struct {
-	BLSPublicKey string `json:"blskey"`
-	Version      string `json:"version"`
-	NetworkType  string `json:"network"`
-	ChainID      string `json:"chainid"`
-	IsLeader     bool   `json:"is-leader"`
-	ShardID      uint32 `json:"shard-id"`
-	Role         string `json:"role"`
+	BLSPublicKey []string `json:"blskey"`
+	Version      string   `json:"version"`
+	NetworkType  string   `json:"network"`
+	ChainID      string   `json:"chainid"`
+	IsLeader     bool     `json:"is-leader"`
+	ShardID      uint32   `json:"shard-id"`
+	Role         string   `json:"role"`
+	Archival     bool     `json:"is-archival"`
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
 func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
 	cfg := nodeconfig.GetDefaultConfig()
+
+	blsKeys := []string{}
+	if cfg.ConsensusPubKey != nil {
+		for _, key := range cfg.ConsensusPubKey.PublicKey {
+			blsKeys = append(blsKeys, key.SerializeToHexStr())
+		}
+	}
+
 	return NodeMetadata{
-		cfg.ConsensusPubKey.SerializeToHexStr(),
+		blsKeys,
 		nodeconfig.GetVersion(),
 		string(cfg.GetNetworkType()),
 		s.b.ChainConfig().ChainID.String(),
 		s.b.IsLeader(),
 		s.b.GetShardID(),
 		cfg.Role().String(),
+		cfg.GetArchival(),
 	}
 }
