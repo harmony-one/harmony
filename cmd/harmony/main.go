@@ -107,6 +107,7 @@ var (
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
 	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
 	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
+	cmkEncryptedBLSKey = flag.String("aws_blskey", "", "The aws CMK encrypted bls private key file.")
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
 	blsFolder          = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
 	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
@@ -144,6 +145,8 @@ var (
 	webHookYamlPath = flag.String(
 		"webhook_yaml", "", "path for yaml config reporting double signing",
 	)
+	// aws credentials
+	awsSettingString = ""
 )
 
 func initSetup() {
@@ -154,7 +157,9 @@ func initSetup() {
 	}
 
 	// maybe request passphrase for bls key.
-	passphraseForBLS()
+	if *cmkEncryptedBLSKey == "" {
+		passphraseForBLS()
+	}
 
 	// Configure log parameters
 	utils.SetLogContext(*port, *ip)
@@ -278,6 +283,8 @@ func setupStakingNodeAccount() error {
 func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMultiBLSPubKey *multibls.PublicKey) error {
 	keyPasses := map[string]string{}
 	blsKeyFiles := []os.FileInfo{}
+	awsEncryptedBLSKeyFiles := []os.FileInfo{}
+
 	if err := filepath.Walk(*blsFolder, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
@@ -294,9 +301,11 @@ func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMul
 			}
 			name := fullName[:len(fullName)-len(ext)]
 			keyPasses[name] = passphrase
+		} else if ext == ".bls" {
+			awsEncryptedBLSKeyFiles = append(awsEncryptedBLSKeyFiles, info)
 		} else {
 			return errors.Errorf(
-				"[Multi-BLS] found file: %s that does not have .key or .pass file extension",
+				"[Multi-BLS] found file: %s that does not have .bls, .key or .pass file extension",
 				path,
 			)
 		}
@@ -309,23 +318,41 @@ func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMul
 		)
 		os.Exit(100)
 	}
-	if len(blsKeyFiles) > *maxBLSKeysPerNode {
+
+	keyFiles := []os.FileInfo{}
+	legacyBLSFile := true
+
+	if len(awsEncryptedBLSKeyFiles) > 0 {
+		keyFiles = awsEncryptedBLSKeyFiles
+		legacyBLSFile = false
+	} else {
+		keyFiles = blsKeyFiles
+	}
+
+	if len(keyFiles) > *maxBLSKeysPerNode {
 		fmt.Fprintf(os.Stderr,
 			"[Multi-BLS] maximum number of bls keys per node is %d, found: %d\n",
 			*maxBLSKeysPerNode,
-			len(blsKeyFiles),
+			len(keyFiles),
 		)
 		os.Exit(100)
 	}
-	for _, blsKeyFile := range blsKeyFiles {
-		fullName := blsKeyFile.Name()
-		ext := filepath.Ext(fullName)
-		name := fullName[:len(fullName)-len(ext)]
-		if val, ok := keyPasses[name]; ok {
-			blsPassphrase = val
-		}
+
+	for _, blsKeyFile := range keyFiles {
+		var consensusPriKey *bls.SecretKey
+		var err error
 		blsKeyFilePath := path.Join(*blsFolder, blsKeyFile.Name())
-		consensusPriKey, err := blsgen.LoadBLSKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
+		if legacyBLSFile {
+			fullName := blsKeyFile.Name()
+			ext := filepath.Ext(fullName)
+			name := fullName[:len(fullName)-len(ext)]
+			if val, ok := keyPasses[name]; ok {
+				blsPassphrase = val
+			}
+			consensusPriKey, err = blsgen.LoadBLSKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
+		} else {
+			consensusPriKey, err = blsgen.LoadAwsCMKEncryptedBLSKey(blsKeyFilePath, awsSettingString)
+		}
 		if err != nil {
 			return err
 		}
@@ -347,6 +374,15 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 			fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
 			os.Exit(100)
 		}
+		multibls.AppendPriKey(consensusMultiPriKey, consensusPriKey)
+		multibls.AppendPubKey(consensusMultiPubKey, consensusPriKey.GetPublicKey())
+	} else if *cmkEncryptedBLSKey != "" {
+		consensusPriKey, err := blsgen.LoadAwsCMKEncryptedBLSKey(*cmkEncryptedBLSKey, awsSettingString)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR when loading aws CMK encrypted bls key, err :%v\n", err)
+			os.Exit(100)
+		}
+
 		multibls.AppendPriKey(consensusMultiPriKey, consensusPriKey)
 		multibls.AppendPubKey(consensusMultiPubKey, consensusPriKey.GetPublicKey())
 	} else {
@@ -653,6 +689,9 @@ func main() {
 	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
 	// build time.
 	os.Setenv("GODEBUG", "netdns=go")
+
+	// Get aws credentials from prompt timeout 1 second if there's no input
+	awsSettingString, _ = blsgen.Readln(1 * time.Second)
 
 	flag.Var(&p2putils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
