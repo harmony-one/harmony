@@ -207,14 +207,6 @@ function release
          return ;;
    esac
 
-   for bin in "${!SRC[@]}"; do
-      if [ -e $BINDIR/$bin ]; then
-         $AWSCLI s3 cp $BINDIR/$bin s3://${PUBBUCKET}/$FOLDER/$bin --acl public-read
-      else
-         echo "!! MISSGING $bin !!"
-      fi
-   done
-
    if [ "$STATIC" != "true" ]; then
       for lib in "${!LIB[@]}"; do
          if [ -e ${LIB[$lib]} ]; then
@@ -223,7 +215,17 @@ function release
             echo "!! MISSING ${LIB[$lib]} !!"
          fi
       done
+   else
+      FOLDER+='/static'
    fi
+
+   for bin in "${!SRC[@]}"; do
+      if [ -e $BINDIR/$bin ]; then
+         $AWSCLI s3 cp $BINDIR/$bin s3://${PUBBUCKET}/$FOLDER/$bin --acl public-read
+      else
+         echo "!! MISSGING $bin !!"
+      fi
+   done
 
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${PUBBUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
