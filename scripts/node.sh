@@ -866,7 +866,7 @@ do
       ;;
    esac
    case "${TRACEFILE}" in
-      "") msg "not enabling p2p trace" ;;
+      "") ;;
       *) msg "WARN: enabled p2p tracefile: $TRACEFILE. Be aware of the file size."
          export P2P_TRACEFILE=${TRACEFILE} ;;
    esac
