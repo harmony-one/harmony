@@ -96,11 +96,10 @@ type BlockMessageType int
 
 // Block sync message subtype
 const (
-	Sync BlockMessageType = iota
-
-	CrossLink      // used for crosslink from beacon chain to shard chain
-	Receipt        // cross-shard transaction receipts
-	SlashCandidate // A report of a double-signing event
+	Sync           BlockMessageType = iota
+	CrossLink                       // used for crosslink from beacon chain to shard chain
+	Receipt                         // cross-shard transaction receipts
+	SlashCandidate                  // A report of a double-signing event
 )
 
 var (

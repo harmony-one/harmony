@@ -46,58 +46,21 @@ func (s *SupportSyncingTest) APIs() []rpc.API { return nil }
 func TestTakeAction(t *testing.T) {
 	m := &Manager{}
 	m.SetupServiceManager()
-	m.RegisterService(SupportSyncing, &SupportSyncingTest{})
 
 	for i := 0; i < 2; i++ {
 		select {
 		case <-time.After(100 * time.Millisecond):
-			m.SendAction(&Action{Action: Start, ServiceType: SupportSyncing})
+			return
 		}
 	}
 
-	m.SendAction(&Action{ServiceType: Done})
 }
 
 func TestMessageChan(t *testing.T) {
 	m := &Manager{}
 	m.SetupServiceManager()
-	m.RegisterService(SupportSyncing, &SupportSyncingTest{})
 	msgChans := make(map[Type]chan *msg_pb.Message)
 	m.SetupServiceMessageChan(msgChans)
-
-	m.SendAction(&Action{
-		Action:      Notify,
-		ServiceType: SupportSyncing,
-		Params: map[string]interface{}{
-			"chan": msgChans[SupportSyncing],
-			"test": t,
-		},
-	})
-
-	m.SendAction(&Action{ServiceType: Done})
-}
-
-func TestStopServices(t *testing.T) {
-	m := &Manager{}
-	m.SetupServiceManager()
-	status := 0
-	m.RegisterService(SupportSyncing, &SupportSyncingTest{status: &status})
-	msgChans := make(map[Type]chan *msg_pb.Message)
-	m.SetupServiceMessageChan(msgChans)
-
-	m.SendAction(&Action{
-		Action:      Notify,
-		ServiceType: SupportSyncing,
-		Params: map[string]interface{}{
-			"chan": msgChans[SupportSyncing],
-			"test": t,
-		},
-	})
-
-	m.StopServicesByRole([]Type{})
-	if status != 2 {
-		t.Error("Service did not stop")
-	}
 }
 
 func TestInit(t *testing.T) {
