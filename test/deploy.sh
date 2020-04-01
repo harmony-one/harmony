@@ -72,7 +72,6 @@ function usage {
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
-   -D duration    test run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
@@ -90,26 +89,16 @@ EOU
    exit 0
 }
 
-DEFAULT_DURATION_NOSYNC=60
-DEFAULT_DURATION_SYNC=200
 
-DOTEST=true
-DURATION=
 MIN=3
 SHARDS=2
 DRYRUN=
 SYNC=true
 NETWORK=localnet
-NUM_TEST=10
-ACC1=one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj
-ACC2=one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg
-ACC3=one1r4zyyjqrulf935a479sgqlpa78kz7zlcg2jfen
 
-while getopts "htD:m:s:nBN:" option; do
+while getopts "ht:m:s:nBN:" option; do
    case $option in
       h) usage ;;
-      t) DOTEST=false ;;
-      D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
       n) DRYRUN=echo ;;
@@ -125,15 +114,6 @@ shift 1 || usage
 unset -v extra_args
 declare -a extra_args
 extra_args=("$@")
-
-case "${DURATION-}" in
-"")
-    case "${SYNC}" in
-    false) DURATION="${DEFAULT_DURATION_NOSYNC}";;
-    true) DURATION="${DEFAULT_DURATION_SYNC}";;
-    esac
-    ;;
-esac
 
 # Kill nodes if any
 cleanup
@@ -194,7 +174,6 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   i=$((i+1))
 done < $config
 
-
-sleep $DURATION
+sleep 60000
 
 cleanup_and_result
