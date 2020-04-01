@@ -72,6 +72,7 @@ function usage {
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
+   -D duration    test run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -n             dryrun mode (default: $DRYRUN)
@@ -89,16 +90,17 @@ EOU
    exit 0
 }
 
-
+DURATION=3000
 MIN=3
 SHARDS=2
 DRYRUN=
 SYNC=true
 NETWORK=localnet
 
-while getopts "ht:m:s:nBN:" option; do
+while getopts "hD:m:s:nBN:" option; do
    case $option in
       h) usage ;;
+      D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
       n) DRYRUN=echo ;;
@@ -174,6 +176,6 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   i=$((i+1))
 done < $config
 
-sleep 60000
+sleep $DURATION
 
 cleanup_and_result
