@@ -18,7 +18,11 @@ func TestUpdateStakingList(t *testing.T) {
 	}
 
 	if !privateKey.IsEqual(anotherPriKey) {
-		t.Error("Error when generating bls key.")
+		t.Errorf("Error when generating bls key \n%s\n%s\n%s",
+			fileName,
+			privateKey.SerializeToHexStr(),
+			anotherPriKey.SerializeToHexStr(),
+		)
 	}
 
 	// Clean up the testing file.

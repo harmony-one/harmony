@@ -58,7 +58,9 @@ func GenBLSKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, err
 }
 
 // WritePriKeyWithPassPhrase writes encrypted key with passphrase.
-func WritePriKeyWithPassPhrase(privateKey *ffi_bls.SecretKey, passphrase string) (string, error) {
+func WritePriKeyWithPassPhrase(
+	privateKey *ffi_bls.SecretKey, passphrase string,
+) (string, error) {
 	publickKey := privateKey.GetPublicKey()
 	fileName := publickKey.SerializeToHexStr() + ".key"
 	privateKeyHex := privateKey.SerializeToHexStr()
@@ -68,8 +70,10 @@ func WritePriKeyWithPassPhrase(privateKey *ffi_bls.SecretKey, passphrase string)
 		return "", err
 	}
 	// Write to file.
-	err = WriteToFile(fileName, encryptedPrivateKeyStr)
-	return fileName, err
+	if err := WriteToFile(fileName, encryptedPrivateKeyStr); err != nil {
+		return fileName, err
+	}
+	return fileName, nil
 }
 
 // WriteToFile will print any string of text to a file safely by
@@ -91,7 +95,7 @@ func WriteToFile(filename string, data string) error {
 func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "attemped to load from %s", fileName)
 	}
 	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
 		passphrase = passphrase[:len(passphrase)-1]
@@ -102,7 +106,11 @@ func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 	}
 
 	priKey := &ffi_bls.SecretKey{}
-	priKey.DeserializeHexStr(string(decryptedBytes))
+	if err := priKey.DeserializeHexStr(string(decryptedBytes)); err != nil {
+		return nil, errors.Wrapf(
+			err, "could not deserialize byte content of %s as BLS secret key", fileName,
+		)
+	}
 	return priKey, nil
 }
 
