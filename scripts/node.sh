@@ -126,8 +126,9 @@ options:
    -f blsfolder   folder that stores the bls keys and corresponding passphrases (default: ./.hmy/blskeys)
    -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
-   -R address     start a pprof profiling server listening on the specified address
+   -r address     start a pprof profiling server listening on the specified address
    -I             use statically linked Harmony binary (default: true)
+   -R tracefile   enable p2p trace using tracefile (default: off)
 
 examples:
 
@@ -179,7 +180,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE
 start_clean=false
 loop=true
 run_as_root=true
@@ -200,10 +201,11 @@ pprof=""
 static=true
 verify=false
 ${BLSKEYFILE=}
+${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAIB:R:Y:f: opt
+while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAIB:r:Y:f:R: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -231,7 +233,7 @@ do
    U) upgrade_rel="${OPTARG}";;
    P) public_rpc=true;;
    B) blacklist="${OPTARG}";;
-   R) pprof="${OPTARG}";;
+   r) pprof="${OPTARG}";;
    v) msg "version: $version"
       exit 0 ;;
    V) LD_LIBRARY_PATH=. ./harmony -version
@@ -240,6 +242,7 @@ do
    z) staking_mode=true;;
    y) staking_mode=false;;
    A) archival=true;;
+   R) TRACEFILE="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -862,6 +865,11 @@ do
       )
       ;;
    esac
+   case "${TRACEFILE}" in
+      "") msg "not enabling p2p trace" ;;
+      *) msg "WARN: enabled p2p tracefile: $TRACEFILE. Be aware of the file size."
+         export P2P_TRACEFILE=${TRACEFILE} ;;
+   esac
    case "$OS" in
    Darwin) ld_path_var=DYLD_FALLBACK_LIBRARY_PATH;;
    *) ld_path_var=LD_LIBRARY_PATH;;
@@ -883,3 +891,5 @@ do
       read_bls_pass
    fi
 done
+
+# vim: set expandtab:ts=3
