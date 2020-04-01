@@ -35,10 +35,8 @@ const (
 	Candidate = iota
 	// NotCandidate ..
 	NotCandidate
-	// ElectedAndSigning ..
-	ElectedAndSigning
-	// ElectedAndFellBelowThreshold ..
-	ElectedAndFellBelowThreshold
+	// Elected ..
+	Elected
 )
 
 func (c Candidacy) String() string {
@@ -49,12 +47,8 @@ func (c Candidacy) String() string {
 		return "eligible to be elected next epoch"
 	case NotCandidate:
 		return "not eligible to be elected next epoch"
-	case ElectedAndSigning:
-		return "currently elected and signing enough blocks to " +
-			"be eligible for election next epoch"
-	case ElectedAndFellBelowThreshold:
-		return "currently elected and not signing enough " +
-			"blocks to be eligible for election next epoch"
+	case Elected:
+		return "currently elected"
 	default:
 		return "unknown"
 	}
@@ -65,12 +59,10 @@ func ValidatorStatus(currentlyInCommittee bool, status Eligibility) Candidacy {
 	switch {
 	case status == Banned:
 		return ForeverBanned
-	case currentlyInCommittee && status == Active:
-		return ElectedAndSigning
+	case currentlyInCommittee:
+		return Elected
 	case !currentlyInCommittee && status == Active:
 		return Candidate
-	case currentlyInCommittee && status != Active:
-		return ElectedAndFellBelowThreshold
 	case !currentlyInCommittee && status != Active:
 		return NotCandidate
 	default:
