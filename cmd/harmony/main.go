@@ -319,50 +319,46 @@ func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMul
 		os.Exit(100)
 	}
 
+	keyFiles := []os.FileInfo{}
+	legacyBLSFile := true
+
 	if len(awsEncryptedBLSKeyFiles) > 0 {
-		if len(awsEncryptedBLSKeyFiles) > *maxBLSKeysPerNode {
-			fmt.Fprintf(os.Stderr,
-				"[Multi-BLS] maximum number of bls keys per node is %d, found: %d\n",
-				*maxBLSKeysPerNode,
-				len(awsEncryptedBLSKeyFiles),
-			)
-			os.Exit(100)
-		}
-		for _, blsKeyFile := range awsEncryptedBLSKeyFiles {
-			blsKeyFilePath := path.Join(*blsFolder, blsKeyFile.Name())
-			consensusPriKey, err := blsgen.LoadAwsCMKEncryptedBLSKey(blsKeyFilePath, awsSettingString)
-			if err != nil {
-				return err
-			}
-			// TODO: assumes order between public/private key pairs
-			multibls.AppendPriKey(consensusMultiBLSPriKey, consensusPriKey)
-			multibls.AppendPubKey(consensusMultiBLSPubKey, consensusPriKey.GetPublicKey())
-		}
+		keyFiles = awsEncryptedBLSKeyFiles
+		legacyBLSFile = false
 	} else {
-		if len(blsKeyFiles) > *maxBLSKeysPerNode {
-			fmt.Fprintf(os.Stderr,
-				"[Multi-BLS] maximum number of bls keys per node is %d, found: %d\n",
-				*maxBLSKeysPerNode,
-				len(blsKeyFiles),
-			)
-			os.Exit(100)
-		}
-		for _, blsKeyFile := range blsKeyFiles {
+		keyFiles = blsKeyFiles
+	}
+
+	if len(keyFiles) > *maxBLSKeysPerNode {
+		fmt.Fprintf(os.Stderr,
+			"[Multi-BLS] maximum number of bls keys per node is %d, found: %d\n",
+			*maxBLSKeysPerNode,
+			len(keyFiles),
+		)
+		os.Exit(100)
+	}
+
+	for _, blsKeyFile := range keyFiles {
+		var consensusPriKey *bls.SecretKey
+		var err error
+		blsKeyFilePath := path.Join(*blsFolder, blsKeyFile.Name())
+		if legacyBLSFile {
 			fullName := blsKeyFile.Name()
 			ext := filepath.Ext(fullName)
 			name := fullName[:len(fullName)-len(ext)]
 			if val, ok := keyPasses[name]; ok {
 				blsPassphrase = val
 			}
-			blsKeyFilePath := path.Join(*blsFolder, blsKeyFile.Name())
-			consensusPriKey, err := blsgen.LoadBLSKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
-			if err != nil {
-				return err
-			}
-			// TODO: assumes order between public/private key pairs
-			multibls.AppendPriKey(consensusMultiBLSPriKey, consensusPriKey)
-			multibls.AppendPubKey(consensusMultiBLSPubKey, consensusPriKey.GetPublicKey())
+			consensusPriKey, err = blsgen.LoadBLSKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
+		} else {
+			consensusPriKey, err = blsgen.LoadAwsCMKEncryptedBLSKey(blsKeyFilePath, awsSettingString)
 		}
+		if err != nil {
+			return err
+		}
+		// TODO: assumes order between public/private key pairs
+		multibls.AppendPriKey(consensusMultiBLSPriKey, consensusPriKey)
+		multibls.AppendPubKey(consensusMultiBLSPubKey, consensusPriKey.GetPublicKey())
 	}
 
 	return nil

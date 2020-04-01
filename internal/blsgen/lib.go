@@ -8,26 +8,25 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"time"
 
-	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
+	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/pkg/errors"
 )
 
 type awsConfiguration struct {
-	AccessKey string `json:"aws_access_key_id"`
-	SecretKey string `json:"aws_secret_access_key"`
-	Region    string `json:"aws_region"`
+	AccessKey string `json:"aws-access-key-id"`
+	SecretKey string `json:"aws-secret-access-key"`
+	Region    string `json:"aws-region"`
 }
 
 func toISO8601(t time.Time) string {
@@ -141,15 +140,18 @@ func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.Secr
 	}
 
 	var awsConfig awsConfiguration
-	err := json.Unmarshal([]byte(awsSettingString), &awsConfig)
-	if err != nil {
+	if err := json.Unmarshal([]byte(awsSettingString), &awsConfig); err != nil {
 		return nil, errors.New(awsSettingString + " is not a valid JSON string for setting aws configuration.")
 	}
 
 	// Initialize a session that the aws SDK uses to load
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
+	sess, err := session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
-	}))
+	})
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create aws session")
+	}
 
 	// Create KMS service client
 	svc := kms.New(sess, &aws.Config{
@@ -160,12 +162,11 @@ func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.Secr
 
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "fail read at: %s", fileName)
 	}
 
 	unhexed := make([]byte, hex.DecodedLen(len(encryptedPrivateKeyBytes)))
-	_, err = hex.Decode(unhexed, encryptedPrivateKeyBytes)
-	if err != nil {
+	if _, err = hex.Decode(unhexed, encryptedPrivateKeyBytes); err != nil {
 		return nil, err
 	}
 
@@ -178,9 +179,9 @@ func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.Secr
 	}
 
 	priKey := &ffi_bls.SecretKey{}
-	priKey.DeserializeHexStr(hex.EncodeToString(clearKey.Plaintext))
-
-	fmt.Println(hex.EncodeToString(priKey.GetPublicKey().Serialize()))
+	if err = priKey.DeserializeHexStr(hex.EncodeToString(clearKey.Plaintext)); err != nil {
+		return nil, errors.Wrapf(err, "failed to deserialize the decrypted bls private key")
+	}
 
 	return priKey, nil
 }
