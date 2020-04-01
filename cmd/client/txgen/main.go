@@ -116,7 +116,7 @@ func setUpTXGen() *node.Node {
 		pubs = append(pubs, pub)
 	}
 	consensusObj.Decider.UpdateParticipants(pubs)
-	txGen.NodeConfig.SetRole(nodeconfig.ClientNode)
+	txGen.NodeConfig.SetRole(nodeconfig.Validator)
 	if shardID == 0 {
 		txGen.NodeConfig.SetShardGroupID(nodeconfig.GroupIDBeacon)
 	} else {

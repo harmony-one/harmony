@@ -719,7 +719,6 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 }
 
 // isBeacon = true if the node is beacon node
-// isClient = true if the node light client(wallet)
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 

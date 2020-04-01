@@ -395,7 +395,11 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 			*keyFile)
 	}
 
-	selfPeer := p2p.Peer{IP: *ip, Port: *port, ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0]}
+	selfPeer := p2p.Peer{
+		IP:              *ip,
+		Port:            *port,
+		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
+	}
 
 	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
 	if err != nil {

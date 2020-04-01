@@ -6,8 +6,6 @@ declare -A SRC
 SRC[harmony]=cmd/harmony/main.go
 # SRC[txgen]=cmd/client/txgen/main.go
 SRC[bootnode]=cmd/bootnode/main.go
-SRC[wallet]="cmd/client/wallet/main.go cmd/client/wallet/generated_wallet.ini.go"
-# SRC[wallet_stress_test]="cmd/client/wallet_stress_test/main.go cmd/client/wallet_stress_test/generated_wallet.ini.go"
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
@@ -69,10 +67,9 @@ OPTIONS:
 ACTION:
    build       build binaries only (default action)
    upload      upload binaries to s3
-   pubwallet   upload wallet to public bucket (bucket: $PUBBUCKET)
    release     upload binaries to release bucket
 
-   harmony|txgen|bootnode|wallet
+   harmony|txgen|bootnode|
                only build the specified binary
 
 EXAMPLES:
@@ -231,39 +228,6 @@ function release
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${PUBBUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
 
-function upload_wallet
-{
-   AWSCLI=aws
-
-   if [ -n "$PROFILE" ]; then
-      AWSCLI+=" --profile $PROFILE"
-   fi
-
-
-   OS=$(uname -s)
-
-   case "$OS" in
-      "Linux")
-         FOLDER=release/linux-x86_64/$REL ;;
-      "Darwin")
-         FOLDER=release/darwin-x86_64/$REL ;;
-      *)
-         echo "Unsupported OS: $OS"
-         return ;;
-   esac
-
-   $AWSCLI s3 cp $BINDIR/wallet s3://$PUBBUCKET/$FOLDER/wallet --acl public-read
-
-   for lib in "${!LIB[@]}"; do
-      if [ -e ${LIB[$lib]} ]; then
-         $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$FOLDER/$lib --acl public-read
-      else
-         echo "!! MISSING ${LIB[$lib]} !!"
-      fi
-   done
-
-
-}
 
 ################################ MAIN FUNCTION ##############################
 while getopts "hp:a:o:b:f:rvsdN:" option; do
@@ -308,7 +272,6 @@ case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
    "release") release ;;
-   "pubwallet") upload_wallet ;;
-   "harmony"|"wallet"|"txgen"|"bootnode") build_only $ACTION ;;
+   "harmony"|"txgen"|"bootnode") build_only $ACTION ;;
    *) usage ;;
 esac
