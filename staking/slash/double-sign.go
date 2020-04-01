@@ -509,7 +509,7 @@ func Rate(votingPower *votepower.Roster, records Records) numeric.Dec {
 		}
 	}
 
-	if rate.Equal(zero) {
+	if rate.LT(oneDoubleSignerRate) {
 		rate = oneDoubleSignerRate
 	}
 
