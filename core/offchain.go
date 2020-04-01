@@ -222,7 +222,7 @@ func (bc *BlockChain) CommitOffChainData(
 					if stats, err := bc.ReadValidatorStats(paid[i].Addr); err == nil {
 						doUpdate := false
 						for j := range stats.MetricsPerShard {
-							if stats.MetricsPerShard[j].Identity == paid[i].EarningKey {
+							if stats.MetricsPerShard[j].Vote.Identity == paid[i].EarningKey {
 								doUpdate = true
 								stats.MetricsPerShard[j].Earned.Add(
 									stats.MetricsPerShard[j].Earned,
