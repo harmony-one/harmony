@@ -29,8 +29,7 @@ function cleanup() {
 }
 
 function cleanup_and_result() {
-   "${ROOT}/test/kill_node.sh" 2> /dev/null
-   [ -e $RESULT_FILE ] && cat $RESULT_FILE
+   "${ROOT}/test/kill_node.sh" 2> /dev/null || true
 }
 
 function debug_staking() {
@@ -137,7 +136,6 @@ log_folder="tmp_log/log-$t"
 
 mkdir -p $log_folder
 LOG_FILE=$log_folder/r.log
-RESULT_FILE=$log_folder/result.txt
 
 echo "launching boot node ..."
 $DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
