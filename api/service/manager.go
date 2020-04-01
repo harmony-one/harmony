@@ -23,25 +23,17 @@ type Type byte
 
 // Constants for Type.
 const (
-	SupportSyncing Type = iota
-	ClientSupport
+	ClientSupport Type = iota
 	SupportExplorer
 	Consensus
 	Metrics
-	Randomness
 	BlockProposal
 	NetworkInfo
 	PeerDiscovery
-	Resharding
-	Staking
-	Test
-	Done
 )
 
 func (t Type) String() string {
 	switch t {
-	case SupportSyncing:
-		return "SyncingSupport"
 	case SupportExplorer:
 		return "SupportExplorer"
 	case ClientSupport:
@@ -50,22 +42,12 @@ func (t Type) String() string {
 		return "Metrics"
 	case Consensus:
 		return "Consensus"
-	case Randomness:
-		return "Randomness"
 	case BlockProposal:
 		return "BlockProposal"
 	case NetworkInfo:
 		return "NetworkInfo"
-	case Staking:
-		return "Staking"
 	case PeerDiscovery:
 		return "PeerDiscovery"
-	case Resharding:
-		return "Resharding"
-	case Test:
-		return "Test"
-	case Done:
-		return "Done"
 	default:
 		return "Unknown"
 	}
@@ -166,9 +148,6 @@ func (m *Manager) StartServiceManager() chan *Action {
 			select {
 			case action := <-ch:
 				m.TakeAction(action)
-				if action.ServiceType == Done {
-					return
-				}
 			case <-time.After(WaitForStatusUpdate):
 				utils.Logger().Info().Msg("Waiting for new action")
 			}
@@ -189,7 +168,9 @@ func (m *Manager) RunServices() {
 }
 
 // SetupServiceMessageChan sets up message channel to services.
-func (m *Manager) SetupServiceMessageChan(mapServiceTypeChan map[Type]chan *msg_pb.Message) {
+func (m *Manager) SetupServiceMessageChan(
+	mapServiceTypeChan map[Type]chan *msg_pb.Message,
+) {
 	for serviceType, service := range m.services {
 		// TODO(minhdoan): for performance, consider buffered channel.
 		mapServiceTypeChan[serviceType] = make(chan *msg_pb.Message)

@@ -24,39 +24,12 @@ else
    touch .hmy/blspass.txt
 fi
 
-function check_result() {
-   err=false
-
-   echo "====== WALLET BALANCES ======" > $RESULT_FILE
-   $ROOT/bin/wallet -p local balances --address $ACC1  >> $RESULT_FILE
-   $ROOT/bin/wallet -p local balances --address $ACC2  >> $RESULT_FILE
-   $ROOT/bin/wallet -p local balances --address $ACC3  >> $RESULT_FILE
-   echo "====== RESULTS ======" >> $RESULT_FILE
-
-   TEST_ACC1=$($ROOT/bin/wallet -p local balances --address $ACC1 | grep 'Shard 0' | grep -oE 'nonce:.[0-9]+' | awk ' { print $2 } ')
-   TEST_ACC2=$($ROOT/bin/wallet -p local balances --address $ACC2 | grep 'Shard 1' | grep -oE 'nonce:.[0-9]+' | awk ' { print $2 } ')
-   BAL0_ACC3=$($ROOT/bin/wallet -p local balances --address $ACC3 | grep 'Shard 0' | grep -oE '[0-9]\.[0-9]+,' | awk -F\. ' { print $1 } ')
-   BAL1_ACC3=$($ROOT/bin/wallet -p local balances --address $ACC3 | grep 'Shard 1' | grep -oE '[0-9]\.[0-9]+,' | awk -F\. ' { print $1 } ')
-
-   if [[ $TEST_ACC1 -ne $NUM_TEST || $TEST_ACC2 -ne $NUM_TEST ]]; then
-      echo -e "FAIL number of nonce. Expected Result: $NUM_TEST.\nAccount1:$TEST_ACC1\nAccount2:$TEST_ACC2\n" >> $RESULT_FILE
-      err=true
-   fi
-   if [[ $BAL0_ACC3 -ne 1 || $BAL1_ACC3 -ne 1 ]]; then
-      echo "FAIL balance of $ACC3. Expected Result: 1.\nShard0:$BAL0_ACC3\nShard1:$BAL1_ACC3\n" >> $RESULT_FILE
-      err=true
-   fi
-
-   $err || echo "PASS" >> $RESULT_FILE
-}
-
 function cleanup() {
    "${progdir}/kill_node.sh"
 }
 
 function cleanup_and_result() {
-   "${ROOT}/test/kill_node.sh" 2> /dev/null
-   [ -e $RESULT_FILE ] && cat $RESULT_FILE
+   "${ROOT}/test/kill_node.sh" 2> /dev/null || true
 }
 
 function debug_staking() {
@@ -98,7 +71,6 @@ function usage {
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
-   -t             disable wallet test (default: $DOTEST)
    -D duration    test run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
@@ -117,25 +89,16 @@ EOU
    exit 0
 }
 
-DEFAULT_DURATION_NOSYNC=60
-DEFAULT_DURATION_SYNC=200
-
-DOTEST=true
-DURATION=
+DURATION=60000
 MIN=3
 SHARDS=2
 DRYRUN=
 SYNC=true
 NETWORK=localnet
-NUM_TEST=10
-ACC1=one1spshr72utf6rwxseaz339j09ed8p6f8ke370zj
-ACC2=one1uyshu2jgv8w465yc8kkny36thlt2wvel89tcmg
-ACC3=one1r4zyyjqrulf935a479sgqlpa78kz7zlcg2jfen
 
-while getopts "htD:m:s:nBN:" option; do
+while getopts "hD:m:s:nBN:" option; do
    case $option in
       h) usage ;;
-      t) DOTEST=false ;;
       D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
@@ -152,15 +115,6 @@ shift 1 || usage
 unset -v extra_args
 declare -a extra_args
 extra_args=("$@")
-
-case "${DURATION-}" in
-"")
-    case "${SYNC}" in
-    false) DURATION="${DEFAULT_DURATION_NOSYNC}";;
-    true) DURATION="${DEFAULT_DURATION_SYNC}";;
-    esac
-    ;;
-esac
 
 # Kill nodes if any
 cleanup
@@ -182,7 +136,6 @@ log_folder="tmp_log/log-$t"
 
 mkdir -p $log_folder
 LOG_FILE=$log_folder/r.log
-RESULT_FILE=$log_folder/result.txt
 
 echo "launching boot node ..."
 $DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
@@ -220,24 +173,6 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   esac
   i=$((i+1))
 done < $config
-
-if [ "$DOTEST" == "true" ]; then
-   # debug_staking
-   echo "waiting for some block rewards"
-   sleep 60
-   i=1
-   echo "launching wallet cross shard transfer test"
-   while [ $i -le $NUM_TEST ]; do
-      "${ROOT}/bin/wallet" -p local transfer --from $ACC1 --to $ACC3 --shardID 0 --toShardID 1 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
-      "${ROOT}/bin/wallet" -p local transfer --from $ACC2 --to $ACC3 --shardID 1 --toShardID 0 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
-      sleep 25
-      i=$((i+1))
-   done
-   echo "waiting for the result"
-   sleep 20
-   check_result
-   [ -e $RESULT_FILE ] && cat $RESULT_FILE
-fi
 
 sleep $DURATION
 

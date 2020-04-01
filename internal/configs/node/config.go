@@ -25,25 +25,18 @@ type Role byte
 const (
 	Unknown Role = iota
 	Validator
-	ClientNode
-	WalletNode
 	ExplorerNode
 )
 
 func (role Role) String() string {
 	switch role {
-	case Unknown:
-		return "Unknown"
 	case Validator:
 		return "Validator"
-	case ClientNode:
-		return "ClientNode"
-	case WalletNode:
-		return "WalletNode"
 	case ExplorerNode:
 		return "ExplorerNode"
+	default:
+		return "Unknown"
 	}
-	return "Unknown"
 }
 
 // NetworkType describes the type of Harmony network

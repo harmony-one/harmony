@@ -2316,8 +2316,8 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		earningWrapping := make([]staking.VoteWithCurrentEpochEarning, len(value))
 		for i := range value {
 			earningWrapping[i] = staking.VoteWithCurrentEpochEarning{
-				VoteOnSubcomittee: value[i],
-				Earned:            common.Big0,
+				Vote:   value[i],
+				Earned: common.Big0,
 			}
 		}
 		stats.MetricsPerShard = earningWrapping
