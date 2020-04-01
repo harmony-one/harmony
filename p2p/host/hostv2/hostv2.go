@@ -227,10 +227,7 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 	traceFile := os.Getenv("P2P_TRACEFILE")
-	var options = make([]libp2p_pubsub.Option, 0, 0)
-	// increase the peer outbound queue size from default 32 to 64
-	options = append(options, libp2p_pubsub.WithPeerOutboundQueueSize(64))
-
+	options := []libp2p_pubsub.Option{libp2p_pubsub.WithPeerOutboundQueueSize(64)}
 	if len(traceFile) > 0 {
 		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
 		options = append(options, libp2p_pubsub.WithEventTracer(tracer))

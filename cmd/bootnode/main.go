@@ -10,13 +10,10 @@ import (
 	"path"
 
 	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
-
 	badger "github.com/ipfs/go-ds-badger"
-
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
@@ -58,7 +55,7 @@ func main() {
 		utils.FatalErrMsg(err, "cannot load key from %s", *keyFile)
 	}
 
-	var selfPeer = p2p.Peer{IP: *ip, Port: *port}
+	selfPeer := p2p.Peer{IP: *ip, Port: *port}
 
 	host, err := p2pimpl.NewHost(&selfPeer, privKey)
 	if err != nil {

@@ -45,25 +45,6 @@ func (node *Node) setupForValidator() {
 
 }
 
-func (node *Node) setupForNewNode() {
-	// TODO determine the role of new node, currently assume it is beacon node
-	nodeConfig, chanPeer := node.initNodeConfiguration()
-
-	// Register peer discovery service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer))
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, node.NodeConfig.GetBeaconGroupID(), chanPeer, nil, node.networkInfoDHTPath()))
-	// Register new metrics service
-	if node.NodeConfig.GetMetricsFlag() {
-		node.serviceManager.RegisterService(service.Metrics, metrics.New(&node.SelfPeer, node.NodeConfig.ConsensusPubKey.SerializeToHexStr(), node.NodeConfig.GetPushgatewayIP(), node.NodeConfig.GetPushgatewayPort()))
-	}
-}
-
-func (node *Node) setupForClientNode() {
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(service.NetworkInfo, networkinfo.MustNew(node.host, nodeconfig.NewGroupIDByShardID(0), nil, nil, ""))
-}
-
 func (node *Node) setupForExplorerNode() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
@@ -83,8 +64,6 @@ func (node *Node) ServiceManagerSetup() {
 	switch node.NodeConfig.Role() {
 	case nodeconfig.Validator:
 		node.setupForValidator()
-	case nodeconfig.ClientNode:
-		node.setupForClientNode()
 	case nodeconfig.ExplorerNode:
 		node.setupForExplorerNode()
 	}
