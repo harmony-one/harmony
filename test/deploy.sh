@@ -24,32 +24,6 @@ else
    touch .hmy/blspass.txt
 fi
 
-function check_result() {
-   err=false
-
-   echo "====== WALLET BALANCES ======" > $RESULT_FILE
-   $ROOT/bin/wallet -p local balances --address $ACC1  >> $RESULT_FILE
-   $ROOT/bin/wallet -p local balances --address $ACC2  >> $RESULT_FILE
-   $ROOT/bin/wallet -p local balances --address $ACC3  >> $RESULT_FILE
-   echo "====== RESULTS ======" >> $RESULT_FILE
-
-   TEST_ACC1=$($ROOT/bin/wallet -p local balances --address $ACC1 | grep 'Shard 0' | grep -oE 'nonce:.[0-9]+' | awk ' { print $2 } ')
-   TEST_ACC2=$($ROOT/bin/wallet -p local balances --address $ACC2 | grep 'Shard 1' | grep -oE 'nonce:.[0-9]+' | awk ' { print $2 } ')
-   BAL0_ACC3=$($ROOT/bin/wallet -p local balances --address $ACC3 | grep 'Shard 0' | grep -oE '[0-9]\.[0-9]+,' | awk -F\. ' { print $1 } ')
-   BAL1_ACC3=$($ROOT/bin/wallet -p local balances --address $ACC3 | grep 'Shard 1' | grep -oE '[0-9]\.[0-9]+,' | awk -F\. ' { print $1 } ')
-
-   if [[ $TEST_ACC1 -ne $NUM_TEST || $TEST_ACC2 -ne $NUM_TEST ]]; then
-      echo -e "FAIL number of nonce. Expected Result: $NUM_TEST.\nAccount1:$TEST_ACC1\nAccount2:$TEST_ACC2\n" >> $RESULT_FILE
-      err=true
-   fi
-   if [[ $BAL0_ACC3 -ne 1 || $BAL1_ACC3 -ne 1 ]]; then
-      echo "FAIL balance of $ACC3. Expected Result: 1.\nShard0:$BAL0_ACC3\nShard1:$BAL1_ACC3\n" >> $RESULT_FILE
-      err=true
-   fi
-
-   $err || echo "PASS" >> $RESULT_FILE
-}
-
 function cleanup() {
    "${progdir}/kill_node.sh"
 }
@@ -98,7 +72,6 @@ function usage {
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
-   -t             disable wallet test (default: $DOTEST)
    -D duration    test run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
@@ -221,23 +194,6 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
   i=$((i+1))
 done < $config
 
-if [ "$DOTEST" == "true" ]; then
-   # debug_staking
-   echo "waiting for some block rewards"
-   sleep 60
-   i=1
-   echo "launching wallet cross shard transfer test"
-   while [ $i -le $NUM_TEST ]; do
-      "${ROOT}/bin/wallet" -p local transfer --from $ACC1 --to $ACC3 --shardID 0 --toShardID 1 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
-      "${ROOT}/bin/wallet" -p local transfer --from $ACC2 --to $ACC3 --shardID 1 --toShardID 0 --amount 0.1 --pass pass:"" 2>&1 | tee -a "${LOG_FILE}"
-      sleep 25
-      i=$((i+1))
-   done
-   echo "waiting for the result"
-   sleep 20
-   check_result
-   [ -e $RESULT_FILE ] && cat $RESULT_FILE
-fi
 
 sleep $DURATION
 
