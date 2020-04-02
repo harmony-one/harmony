@@ -19,7 +19,7 @@ function check_result() {
 }
 
 function cleanup() {
-   for pid in `/bin/ps -fu $USER| grep "harmony\|txgen\|soldier\|commander\|profiler\|beacon\|bootnode" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
+   for pid in `/bin/ps -fu $USER| grep "harmony\|soldier\|commander\|profiler\|beacon\|bootnode" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
    do
        echo 'Killed process: '$pid
        $DRYRUN kill -9 $pid 2> /dev/null
@@ -50,15 +50,13 @@ USAGE: $ME [OPTIONS] config_file_name
 
    -h             print this help message
    -d             enable db support (default: $DB)
-   -t             toggle txgen (default: $TXGEN)
-   -D duration    txgen run duration (default: $DURATION)
    -m min_peers   minimal number of peers to start consensus (default: $MIN)
    -s shards      number of shards (default: $SHARDS)
    -k nodeport    kill the node with specified port number (default: $KILLPORT)
    -n             dryrun mode (default: $DRYRUN)
    -S             enable sync test (default: $SYNC)
 
-This script will build all the binaries and start harmony and txgen based on the configuration file.
+This script will build all the binaries and start harmony and based on the configuration file.
 
 EXAMPLES:
 
@@ -70,20 +68,16 @@ EOU
 }
 
 DB=
-TXGEN=true
-DURATION=90
 MIN=5
 SHARDS=2
 KILLPORT=9004
 SYNC=true
 DRYRUN=
 
-while getopts "hdtD:m:s:k:nSP" option; do
+while getopts "hd:m:s:k:nSP" option; do
    case $option in
       h) usage ;;
       d) DB='-db_supported' ;;
-      t) TXGEN=false ;;
-      D) DURATION=$OPTARG ;;
       m) MIN=$OPTARG ;;
       s) SHARDS=$OPTARG ;;
       k) KILLPORT=$OPTARG ;;

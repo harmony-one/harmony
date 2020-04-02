@@ -13,7 +13,7 @@ type NodeConfig struct {
 	Beacon          nodeconfig.GroupID                           // the beacon group ID
 	ShardGroupID    nodeconfig.GroupID                           // the group ID of the shard
 	Client          nodeconfig.GroupID                           // the client group ID of the shard
-	IsClient        bool                                         // whether this node is a client node, such as wallet/txgen
+	IsClient        bool                                         // whether this node is a client node
 	IsBeacon        bool                                         // whether this node is a beacon node or not
 	ShardID         uint32                                       // shardID of this node
 	Actions         map[nodeconfig.GroupID]nodeconfig.ActionType // actions on the groups
@@ -26,14 +26,11 @@ type NodeConfig struct {
 // key is the shard ID
 // value is the corresponding group ID
 var (
-	GroupIDShards       map[nodeconfig.ShardID]nodeconfig.GroupID
-	GroupIDShardClients map[nodeconfig.ShardID]nodeconfig.GroupID
+	GroupIDShards       = map[nodeconfig.ShardID]nodeconfig.GroupID{}
+	GroupIDShardClients = map[nodeconfig.ShardID]nodeconfig.GroupID{}
 )
 
 func init() {
-	GroupIDShards = make(map[nodeconfig.ShardID]nodeconfig.GroupID)
-	GroupIDShardClients = make(map[nodeconfig.ShardID]nodeconfig.GroupID)
-
 	// init beacon chain group IDs
 	GroupIDShards[0] = nodeconfig.NewGroupIDByShardID(0)
 	GroupIDShardClients[0] = nodeconfig.NewClientGroupIDByShardID(0)
