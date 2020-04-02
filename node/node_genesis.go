@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
-	"math/rand"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -97,7 +96,6 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 
 	// All non-mainnet chains get test accounts
 	if netType != nodeconfig.Mainnet {
-		node.AddTestingAddresses(genesisAlloc, TestAccountNumber)
 		gasLimit = params.TestGenesisGasLimit
 		// Smart contract deployer account used to deploy initial smart contract
 		contractDeployerKey, _ := ecdsa.GenerateKey(
@@ -127,35 +125,6 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 
 	// Store genesis block into db.
 	gspec.MustCommit(db)
-}
-
-// CreateTestBankKeys deterministically generates testing addresses.
-func CreateTestBankKeys(numAddresses int) (keys []*ecdsa.PrivateKey, err error) {
-	rand.Seed(0)
-	bytes := make([]byte, 1000000)
-	for i := range bytes {
-		bytes[i] = byte(rand.Intn(100))
-	}
-	reader := strings.NewReader(string(bytes))
-	for i := 0; i < numAddresses; i++ {
-		key, err := ecdsa.GenerateKey(crypto.S256(), reader)
-		if err != nil {
-			return nil, err
-		}
-		keys = append(keys, key)
-	}
-	return keys, nil
-}
-
-// AddTestingAddresses create the genesis block allocation that contains deterministically
-// generated testing addresses with tokens.
-func (node *Node) AddTestingAddresses(gAlloc core.GenesisAlloc, numAddress int) {
-	for _, testBankKey := range node.TestBankKeys {
-		testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
-		testBankFunds := big.NewInt(InitFreeFund)
-		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
-		gAlloc[testBankAddress] = core.GenesisAccount{Balance: testBankFunds}
-	}
 }
 
 // AddNodeAddressesToGenesisAlloc adds to the genesis block allocation the accounts used for network validators/nodes,

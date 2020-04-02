@@ -51,11 +51,13 @@ func (node *Node) receiveGroupMessage(
 		}
 		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+		// TODO sanity check that message isn't too big, have access to core txn constants
 		if len(msg) < p2pMsgPrefixSize {
 			utils.Logger().Warn().Err(err).Int("msg size", len(msg)).
 				Msg("invalid p2p message size")
 			continue
 		}
+		// NOTE non-blocking dispatches the message as fast as possiblee
 		if err := rxQueue.AddMessage(msg[p2pMsgPrefixSize:], sender); err != nil {
 			utils.Logger().Warn().Err(err).
 				Str("sender", sender.Pretty()).
@@ -447,7 +449,6 @@ func (node *Node) PostConsensusProcessing(
 	// Update last consensus time for metrics
 	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
 	// TODO: refactor the asynchronous calls to separate go routine.
-	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.IsLeader() {
 		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)
@@ -577,30 +578,26 @@ func (node *Node) bootstrapConsensus() {
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
 	lastPeerNum := node.numPeers
-	for {
-		select {
-		case <-tick.C:
-			numPeersNow := node.numPeers
-			// no peers, wait for another tick
-			if numPeersNow == 0 {
-				utils.Logger().Info().
-					Int("numPeersNow", numPeersNow).
-					Msg("No peers, continue")
-				continue
-			} else if numPeersNow > lastPeerNum {
-				utils.Logger().Info().
-					Int("previousNumPeers", lastPeerNum).
-					Int("numPeersNow", numPeersNow).
-					Int("targetNumPeers", node.Consensus.MinPeers).
-					Msg("New peers increased")
-				lastPeerNum = numPeersNow
-			}
-
-			if numPeersNow >= node.Consensus.MinPeers {
-				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
-				node.startConsensus <- struct{}{}
-				return
-			}
+	for range tick.C {
+		numPeersNow := node.numPeers
+		// no peers, wait for another tick
+		if numPeersNow == 0 {
+			utils.Logger().Info().
+				Int("numPeersNow", numPeersNow).
+				Msg("No peers, continue")
+			continue
+		} else if numPeersNow > lastPeerNum {
+			utils.Logger().Info().
+				Int("previousNumPeers", lastPeerNum).
+				Int("numPeersNow", numPeersNow).
+				Int("targetNumPeers", node.Consensus.MinPeers).
+				Msg("New peers increased")
+			lastPeerNum = numPeersNow
+		}
+		if numPeersNow >= node.Consensus.MinPeers {
+			utils.Logger().Info().Msg("[bootstrap] StartConsensus")
+			node.startConsensus <- struct{}{}
+			return
 		}
 	}
 }
