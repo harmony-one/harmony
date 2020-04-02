@@ -162,14 +162,13 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 func (node *Node) DoBeaconSyncing() {
 	go func(node *Node) {
 		// TODO ek – infinite loop; add shutdown/cleanup logic
-		for {
-			select {
-			case beaconBlock := <-node.BeaconBlockChannel:
-				if node.beaconSync != nil {
-					err := node.beaconSync.UpdateBlockAndStatus(beaconBlock, node.Beaconchain(), node.BeaconWorker, true)
-					if err != nil {
-						node.beaconSync.AddLastMileBlock(beaconBlock)
-					}
+		for beaconBlock := range node.BeaconBlockChannel {
+			if node.beaconSync != nil {
+				err := node.beaconSync.UpdateBlockAndStatus(
+					beaconBlock, node.Beaconchain(), node.BeaconWorker, true,
+				)
+				if err != nil {
+					node.beaconSync.AddLastMileBlock(beaconBlock)
 				}
 			}
 		}

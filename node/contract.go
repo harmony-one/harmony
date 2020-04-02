@@ -1,7 +1,6 @@
 package node
 
 import (
-	"crypto/ecdsa"
 	"math/big"
 	"strings"
 	"sync/atomic"
@@ -22,14 +21,6 @@ import (
 // Constants related to smart contract.
 const (
 	FaucetContractFund = 80000000
-)
-
-// BuiltInSC is the type of built-in smart contract in blockchain
-type builtInSC uint
-
-// List of smart contract type built-in
-const (
-	scFaucet builtInSC = iota
 )
 
 // GetNonceOfAddress returns nonce of an address.
@@ -87,11 +78,6 @@ func (node *Node) CallFaucetContract(address common.Address) common.Hash {
 	return node.callGetFreeTokenWithNonce(address, nonce-1)
 }
 
-func (node *Node) callGetFreeToken(address common.Address) common.Hash {
-	nonce := atomic.AddUint64(&node.ContractDeployerCurrentNonce, 1)
-	return node.callGetFreeTokenWithNonce(address, nonce-1)
-}
-
 func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64) common.Hash {
 	abi, err := abi.JSON(strings.NewReader(contracts.FaucetABI))
 	if err != nil {
@@ -112,18 +98,4 @@ func (node *Node) callGetFreeTokenWithNonce(address common.Address, nonce uint64
 
 	node.addPendingTransactions(types.Transactions{tx})
 	return tx.Hash()
-}
-
-// AddContractKeyAndAddress is used to add smart contract related information when node restart and resume with previous state
-// It supports three kinds of on-chain smart contracts for now.
-func (node *Node) AddContractKeyAndAddress(t builtInSC) {
-	switch t {
-	case scFaucet:
-		// faucet contract
-		contractDeployerKey, _ := ecdsa.GenerateKey(crypto.S256(), strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"))
-		node.ContractDeployerKey = contractDeployerKey
-		node.ContractAddresses = append(node.ContractAddresses, crypto.CreateAddress(crypto.PubkeyToAddress(contractDeployerKey.PublicKey), uint64(0)))
-	default:
-		utils.Logger().Error().Interface("unknown SC", t).Msg("AddContractKeyAndAddress")
-	}
 }

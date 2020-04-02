@@ -222,7 +222,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare shard state
-	shardState := new(shard.State)
+	var shardState *shard.State
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
 		node.Beaconchain(), node.Worker.GetCurrentHeader(), false,
 	); err != nil {
@@ -269,7 +269,7 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		return shardCMP || (shardEQ && blockCMP)
 	})
 
-	m := make(map[common.Hash]bool)
+	m := map[common.Hash]struct{}{}
 
 Loop:
 	for _, cxp := range node.pendingCXReceipts {
@@ -287,7 +287,7 @@ Loop:
 		if _, ok := m[hash]; ok {
 			continue
 		} else {
-			m[hash] = true
+			m[hash] = struct{}{}
 		}
 
 		for _, item := range cxp.Receipts {

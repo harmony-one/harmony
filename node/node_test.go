@@ -2,13 +2,9 @@ package node
 
 import (
 	"errors"
-	"fmt"
-	"os"
 	"sync"
 	"testing"
-	"time"
 
-	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
@@ -280,26 +276,4 @@ func TestAddBeaconPeer(t *testing.T) {
 			t.Errorf("AddBeaconPeer Failed, expecting true, got %v, peer %v", ret, p)
 		}
 	}
-}
-
-func sendPingMessage(node *Node, leader p2p.Peer) {
-	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
-
-	p1 := p2p.Peer{
-		IP:              "127.0.0.1",
-		Port:            "9999",
-		ConsensusPubKey: pubKey1,
-	}
-
-	ping1 := proto_discovery.NewPingMessage(p1, true)
-	ping2 := proto_discovery.NewPingMessage(p1, false)
-	_ = ping1.ConstructPingMessage()
-	_ = ping2.ConstructPingMessage()
-}
-
-func exitServer() {
-	fmt.Println("wait 5 seconds to terminate the process ...")
-	time.Sleep(5 * time.Second)
-
-	os.Exit(0)
 }

@@ -83,10 +83,11 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			utils.Logger().Error().Err(err).Msg("[Explorer] Unable to parse Prepared msg")
 			return
 		}
-		block := recvMsg.Block
-
-		blockObj := &types.Block{}
-		err = rlp.DecodeBytes(block, blockObj)
+		block, blockObj := recvMsg.Block, &types.Block{}
+		if err := rlp.DecodeBytes(block, blockObj); err != nil {
+			utils.Logger().Error().Err(err).Msg("explorer could not rlp decode block")
+			return
+		}
 		// Add the block into FBFT log.
 		node.Consensus.FBFTLog.AddBlock(blockObj)
 		// Try to search for MessageType_COMMITTED message from pbft log.
@@ -101,7 +102,6 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			node.commitBlockForExplorer(blockObj)
 		}
 	}
-	return
 }
 
 // AddNewBlockForExplorer add new block for explorer.
