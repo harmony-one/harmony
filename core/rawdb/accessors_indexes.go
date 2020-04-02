@@ -45,7 +45,9 @@ func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64
 // WriteTxLookupEntries stores a positional metadata for every transaction from
 // a block, enabling hash based transaction and receipt lookups.
 func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
-	for i, tx := range block.Transactions() {
+	// TODO: remove this hack with Tx and StakingTx structure unitification later
+	f := func(i int, tx *types.Transaction, stx *staking.StakingTransaction) {
+		isStaking := (stx != nil && tx == nil)
 		entry := TxLookupEntry{
 			BlockHash:  block.Hash(),
 			BlockIndex: block.NumberU64(),
@@ -53,25 +55,24 @@ func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 		}
 		data, err := rlp.EncodeToBytes(entry)
 		if err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to encode transaction lookup entry")
+			utils.Logger().Error().Err(err).Bool("isStaking", isStaking).Msg("Failed to encode transaction lookup entry")
 		}
-		if err := db.Put(txLookupKey(tx.Hash()), data); err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to store transaction lookup entry")
+
+		var putErr error
+		if isStaking {
+			putErr = db.Put(txLookupKey(stx.Hash()), data)
+		} else {
+			putErr = db.Put(txLookupKey(tx.Hash()), data)
+		}
+		if putErr != nil {
+			utils.Logger().Error().Err(err).Bool("isStaking", isStaking).Msg("Failed to store transaction lookup entry")
 		}
 	}
+	for i, tx := range block.Transactions() {
+		f(i, tx, nil)
+	}
 	for i, tx := range block.StakingTransactions() {
-		entry := TxLookupEntry{
-			BlockHash:  block.Hash(),
-			BlockIndex: block.NumberU64(),
-			Index:      uint64(i),
-		}
-		data, err := rlp.EncodeToBytes(entry)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to encode staking transaction lookup entry")
-		}
-		if err := db.Put(txLookupKey(tx.Hash()), data); err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to store staking transaction lookup entry")
-		}
+		f(i, nil, tx)
 	}
 }
 
@@ -110,6 +111,8 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 
 // ReadStakingTransaction retrieves a specific staking transaction from the database, along with
 // its added positional metadata.
+// TODO remove this duplicate function that is inevitable at the moment until the optimization on staking txn with
+// unification of txn vs staking txn data structure.
 func ReadStakingTransaction(db DatabaseReader, hash common.Hash) (*staking.StakingTransaction, common.Hash, uint64, uint64) {
 	blockHash, blockNumber, txIndex := ReadTxLookupEntry(db, hash)
 	if blockHash == (common.Hash{}) {
@@ -143,6 +146,7 @@ func ReadReceipt(db DatabaseReader, hash common.Hash) (*types.Receipt, common.Ha
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
+
 	receipts := ReadReceipts(db, blockHash, blockNumber)
 	if len(receipts) <= int(receiptIndex) {
 		utils.Logger().Error().
