@@ -66,10 +66,6 @@ func expectedRewardPerYear(
 	return expectedPerYear, nil
 }
 
-var (
-	zero = numeric.ZeroDec()
-)
-
 // ComputeForValidator ..
 func ComputeForValidator(
 	bc Reader,
