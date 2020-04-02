@@ -157,8 +157,6 @@ func (consensus *Consensus) finalizeCommits() {
 			Msg("[Finalizing] Sent Committed Message")
 	}
 
-	consensus.reportMetrics(*block)
-
 	// Dump new block into level db
 	// In current code, we add signatures in block in tryCatchup, the block dump to explorer does not contains signatures
 	// but since explorer doesn't need signatures, it should be fine

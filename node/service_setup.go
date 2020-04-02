@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
-	"github.com/harmony-one/harmony/api/service/metrics"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -49,17 +48,6 @@ func (node *Node) setupForValidator() {
 			clientsupport.New(
 				node.Blockchain().State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port,
 			),
-		)
-	}
-	// Register new metrics service
-	if node.NodeConfig.GetMetricsFlag() {
-		node.serviceManager.RegisterService(
-			service.Metrics,
-			metrics.New(
-				&node.SelfPeer,
-				node.NodeConfig.ConsensusPubKey.SerializeToHexStr(),
-				node.NodeConfig.GetPushgatewayIP(),
-				node.NodeConfig.GetPushgatewayPort()),
 		)
 	}
 }

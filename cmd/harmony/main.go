@@ -34,7 +34,6 @@ import (
 	viperconfig "github.com/harmony-one/harmony/internal/configs/viper"
 	"github.com/harmony-one/harmony/internal/genesis"
 	hmykey "github.com/harmony-one/harmony/internal/keystore"
-	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
@@ -105,8 +104,6 @@ var (
 	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
 	// shardID indicates the shard ID of this node
 	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
-	enableMemProfiling = flag.Bool("enableMemProfiling", false, "Enable memsize logging.")
-	enableGC           = flag.Bool("enableGC", true, "Enable calling garbage collector manually .")
 	cmkEncryptedBLSKey = flag.String("aws_blskey", "", "The aws CMK encrypted bls private key file.")
 	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
 	blsFolder          = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
@@ -131,11 +128,7 @@ var (
 	dbDir = flag.String("db_dir", "", "blockchain database directory")
 	// Disable view change.
 	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
-	// metrics flag to collct meetrics or not, pushgateway ip and port for metrics
-	metricsFlag     = flag.Bool("metrics", false, "Collect and upload node metrics")
-	pushgatewayIP   = flag.String("pushgateway_ip", "grafana.harmony.one", "Metrics view ip")
-	pushgatewayPort = flag.String("pushgateway_port", "9091", "Metrics view port")
-	publicRPC       = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+	publicRPC         = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
 	// Bad block revert
 	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
@@ -180,9 +173,6 @@ func initSetup() {
 
 	// Set sharding schedule
 	nodeconfig.SetShardingSchedule(shard.Schedule)
-
-	// Setup mem profiling.
-	memprofiling.GetMemProfiling().Config()
 
 	// Set default keystore Dir
 	hmykey.DefaultKeyStoreDir = *keystoreDir
@@ -419,13 +409,10 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	// Set network type
 	netType := nodeconfig.NetworkType(*networkType)
 	nodeconfig.SetNetworkType(netType) // sets for both global and shard configs
-	nodeConfig.SetPushgatewayIP(*pushgatewayIP)
-	nodeConfig.SetPushgatewayPort(*pushgatewayPort)
-	nodeConfig.SetMetricsFlag(*metricsFlag)
 	nodeConfig.SetArchival(*isArchival)
 
-	// P2p private key is used for secure message transfer between p2p nodes.
-	nodeConfig.P2pPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
+	// P2P private key is used for secure message transfer between p2p nodes.
+	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot load or create P2P key at %#v",
 			*keyFile)
@@ -437,7 +424,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
 	}
 
-	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2pPriKey)
+	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2PPriKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
 	}
@@ -530,10 +517,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
 	currentNode.NodeConfig.DNSZone = *dnsZone
-	// Set up prometheus pushgateway for metrics monitoring serivce.
-	currentNode.NodeConfig.SetPushgatewayIP(nodeConfig.PushgatewayIP)
-	currentNode.NodeConfig.SetPushgatewayPort(nodeConfig.PushgatewayPort)
-	currentNode.NodeConfig.SetMetricsFlag(nodeConfig.MetricsFlag)
 
 	currentNode.NodeConfig.SetBeaconGroupID(
 		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
@@ -595,10 +578,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
-
-	// Watching currentNode and currentConsensus.
-	memprofiling.GetMemProfiling().Add("currentNode", currentNode)
-	memprofiling.GetMemProfiling().Add("currentConsensus", currentConsensus)
 	return currentNode
 }
 
@@ -623,13 +602,10 @@ func setupBlacklist() (map[ethCommon.Address]struct{}, error) {
 }
 
 func setupViperConfig() {
-
 	// read from environment
 	envViper := viperconfig.CreateEnvViper()
-
 	//read from config file
 	configFileViper := viperconfig.CreateConfFileViper("./.hmy", "nodeconfig", "json")
-
 	viperconfig.ResetConfString(ip, envViper, configFileViper, "", "ip")
 	viperconfig.ResetConfString(port, envViper, configFileViper, "", "port")
 	viperconfig.ResetConfString(logFolder, envViper, configFileViper, "", "log_folder")
@@ -638,7 +614,6 @@ func setupViperConfig() {
 	viperconfig.ResetConfBool(profile, envViper, configFileViper, "", "profile")
 	viperconfig.ResetConfString(metricsReportURL, envViper, configFileViper, "", "metrics_report_url")
 	viperconfig.ResetConfString(pprof, envViper, configFileViper, "", "pprof")
-
 	viperconfig.ResetConfBool(versionFlag, envViper, configFileViper, "", "version")
 	viperconfig.ResetConfBool(onlyLogTps, envViper, configFileViper, "", "only_log_tps")
 	viperconfig.ResetConfString(dnsZone, envViper, configFileViper, "", "dns_zone")
@@ -650,38 +625,30 @@ func setupViperConfig() {
 	viperconfig.ResetConfString(delayCommit, envViper, configFileViper, "", "delay_commit")
 	viperconfig.ResetConfString(nodeType, envViper, configFileViper, "", "node_type")
 	viperconfig.ResetConfString(networkType, envViper, configFileViper, "", "network_type")
-
 	viperconfig.ResetConfInt(syncFreq, envViper, configFileViper, "", "sync_freq")
 	viperconfig.ResetConfInt(beaconSyncFreq, envViper, configFileViper, "", "beacon_sync_freq")
 	viperconfig.ResetConfInt(blockPeriod, envViper, configFileViper, "", "block_period")
 	viperconfig.ResetConfBool(leaderOverride, envViper, configFileViper, "", "leader_override")
 	viperconfig.ResetConfBool(stakingFlag, envViper, configFileViper, "", "staking")
 	viperconfig.ResetConfInt(shardID, envViper, configFileViper, "", "shard_id")
-	viperconfig.ResetConfBool(enableMemProfiling, envViper, configFileViper, "", "enableMemProfiling")
-	viperconfig.ResetConfBool(enableGC, envViper, configFileViper, "", "enableGC")
 	viperconfig.ResetConfString(blsKeyFile, envViper, configFileViper, "", "blskey_file")
 	viperconfig.ResetConfString(blsFolder, envViper, configFileViper, "", "blsfolder")
 	viperconfig.ResetConfString(blsPass, envViper, configFileViper, "", "blsPass")
 	viperconfig.ResetConfUInt(devnetNumShards, envViper, configFileViper, "", "dn_num_shards")
 	viperconfig.ResetConfInt(devnetShardSize, envViper, configFileViper, "", "dn_shard_size")
 	viperconfig.ResetConfInt(devnetHarmonySize, envViper, configFileViper, "", "dn_hmy_size")
-
 	viperconfig.ResetConfBool(logConn, envViper, configFileViper, "", "log_conn")
 	viperconfig.ResetConfString(keystoreDir, envViper, configFileViper, "", "keystore")
 	viperconfig.ResetConfBool(logP2P, envViper, configFileViper, "", "log_p2p")
 	viperconfig.ResetConfInt(verbosity, envViper, configFileViper, "", "verbosity")
 	viperconfig.ResetConfString(dbDir, envViper, configFileViper, "", "db_dir")
 	viperconfig.ResetConfBool(disableViewChange, envViper, configFileViper, "", "disable_view_change")
-	viperconfig.ResetConfBool(metricsFlag, envViper, configFileViper, "", "metrics")
-	viperconfig.ResetConfString(pushgatewayIP, envViper, configFileViper, "", "pushgateway_ip")
-	viperconfig.ResetConfString(pushgatewayPort, envViper, configFileViper, "", "pushgateway_port")
 	viperconfig.ResetConfBool(publicRPC, envViper, configFileViper, "", "public_rpc")
 	viperconfig.ResetConfInt(doRevertBefore, envViper, configFileViper, "", "do_revert_before")
 	viperconfig.ResetConfInt(revertTo, envViper, configFileViper, "", "revert_to")
 	viperconfig.ResetConfBool(revertBeacon, envViper, configFileViper, "", "revert_beacon")
 	viperconfig.ResetConfString(blacklistPath, envViper, configFileViper, "", "blacklist")
 	viperconfig.ResetConfString(webHookYamlPath, envViper, configFileViper, "", "webhook_yaml")
-
 }
 
 func main() {
@@ -748,11 +715,6 @@ func main() {
 	setupViperConfig()
 
 	initSetup()
-
-	// Set up manual call for garbage collection.
-	if *enableGC {
-		memprofiling.MaybeCallGCPeriodically()
-	}
 
 	if *nodeType == "validator" {
 		var err error
@@ -852,10 +814,6 @@ func main() {
 		Str("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, myHost.GetID().Pretty())).
 		Msg(startMsg)
 
-	if *enableMemProfiling {
-		memprofiling.GetMemProfiling().Start()
-	}
-
 	if *logP2P {
 		f, err := os.OpenFile(path.Join(*logFolder, "libp2p.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -870,19 +828,12 @@ func main() {
 
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
-
 	currentNode.RunServices()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("StartRPC failed")
-	}
-
-	// Run additional node collectors
-	// Collect node metrics if metrics flag is set
-	if currentNode.NodeConfig.GetMetricsFlag() {
-		go currentNode.CollectMetrics()
 	}
 
 	currentNode.StartServer()
