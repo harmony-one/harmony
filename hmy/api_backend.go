@@ -239,6 +239,12 @@ func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]co
 	return hashes, err
 }
 
+// GetStakingTransactionsHistory returns list of staking transactions hashes of address.
+func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+	hashes, err := b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
+	return hashes, err
+}
+
 // NetVersion returns net version
 func (b *APIBackend) NetVersion() uint64 {
 	return b.hmy.NetVersion()
@@ -281,18 +287,26 @@ func (b *APIBackend) GetValidators(epoch *big.Int) (*shard.Committee, error) {
 }
 
 // ResendCx retrieve blockHash from txID and add blockHash to CxPool for resending
+// Note that cross shard txn is only for regular txns, not for staking txns, so the input txn hash
+// is expected to be regular txn hash
 func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bool) {
 	blockHash, blockNum, index := b.hmy.BlockChain().ReadTxLookupEntry(txID)
+	if blockHash == (common.Hash{}) {
+		return 0, false
+	}
+
 	blk := b.hmy.BlockChain().GetBlockByHash(blockHash)
 	if blk == nil {
 		return 0, false
 	}
+
 	txs := blk.Transactions()
 	// a valid index is from 0 to len-1
 	if int(index) > len(txs)-1 {
 		return 0, false
 	}
 	tx := txs[int(index)]
+
 	// check whether it is a valid cross shard tx
 	if tx.ShardID() == tx.ToShardID() || blk.Header().ShardID() != tx.ShardID() {
 		return 0, false

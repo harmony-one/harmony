@@ -22,13 +22,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	haveEnoughToPayOff               = 1
-	paidOffExact                     = 0
-	debtCollectionsRepoUndelegations = -1
-	validatorsOwnDel                 = 0
-)
-
 // invariant assumes snapshot, current can be rlp.EncodeToBytes
 func payDebt(
 	snapshot, current *staking.ValidatorWrapper,
@@ -261,14 +254,10 @@ func Verify(
 }
 
 var (
-	errBLSKeysNotEqual = errors.New(
-		"bls keys in ballots accompanying slash evidence not equal ",
-	)
 	errSlashDebtCannotBeNegative    = errors.New("slash debt cannot be negative")
 	errValidatorNotFoundDuringSlash = errors.New("validator not found")
 	errFailVerifySlash              = errors.New("could not verify bls key signature on slash")
 	errBallotsNotDiff               = errors.New("ballots submitted must be different")
-	zero                            = numeric.ZeroDec()
 	oneDoubleSignerRate             = numeric.MustNewDecFromStr("0.02")
 )
 

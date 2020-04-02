@@ -150,37 +150,6 @@ func defaultFundingScenario() *scenario {
 	}
 }
 
-func scenarioRealWorldSample1() *scenario {
-	const (
-		snapshotBytes = "f90108f8be94110dde181c2434f6d8eaa869154a4d07a910ce19f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a06880de0b6b3a764000088b469471f8014000001e0dec9880254cc1f20ad395cc988027c97536ea18970c988021cc4b33cdff1601df83e945f546573745f6b65795f76616c696461746f72308c746573745f6163636f756e748b6861726d6f6e792e6f6e658a44616e69656c2d56444d846e6f6e651d80f842e094110dde181c2434f6d8eaa869154a4d07a910ce19880f43fc2c04ee000080c0e0949832c677128929f5f3297d364ac30e251dc02f3c8814d1120d7b16000080c0c3060180"
-
-		currentBytes = "f90118f8be94110dde181c2434f6d8eaa869154a4d07a910ce19f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a06880de0b6b3a764000088b469471f8014000001e0dec9880254cc1f20ad395cc988027c97536ea18970c988021cc4b33cdff1601df83e945f546573745f6b65795f76616c696461746f72308c746573745f6163636f756e748b6861726d6f6e792e6f6e658a44616e69656c2d56444d846e6f6e651d80f852e894110dde181c2434f6d8eaa869154a4d07a910ce19880f43fc2c04ee000088e6ec131ed55ec404c0e8949832c677128929f5f3297d364ac30e251dc02f3c8814d1120d7b16000088d52ac35139f06a2cc0c3070280"
-	)
-
-	snapshotData, _ := hex.DecodeString(snapshotBytes)
-	currentData, _ := hex.DecodeString(currentBytes)
-
-	var snapshot, current staking.ValidatorWrapper
-
-	if err := rlp.DecodeBytes(snapshotData, &snapshot); err != nil {
-		panic("test case has bad input")
-	}
-
-	if err := rlp.DecodeBytes(currentData, &current); err != nil {
-		panic("test case has bad input")
-	}
-
-	return &scenario{
-		slashRate: 0.02,
-		result: &Application{
-			TotalSlashed:      big.NewInt(0.052 * denominations.One),
-			TotalSnitchReward: big.NewInt(0.026 * denominations.One),
-		},
-		snapshot: &snapshot,
-		current:  &current,
-	}
-}
-
 var (
 	scenarioTwoPercent    = defaultFundingScenario()
 	scenarioEightyPercent = defaultFundingScenario()

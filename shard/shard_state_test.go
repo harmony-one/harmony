@@ -51,7 +51,7 @@ func TestGetHashFromNodeList(t *testing.T) {
 	h1 := GetHashFromNodeList(l1)
 	h2 := GetHashFromNodeList(l2)
 
-	if bytes.Compare(h1, h2) == 0 {
+	if bytes.Equal(h1, h2) {
 		t.Error("node list l1 and l2 should be different")
 	}
 }
@@ -96,7 +96,7 @@ func TestHash(t *testing.T) {
 	shardState2 := State{nil, []Committee{com3, com4}}
 	h2 := shardState2.Hash()
 
-	if bytes.Compare(h1[:], h2[:]) != 0 {
+	if !bytes.Equal(h1[:], h2[:]) {
 		t.Error("shardState1 and shardState2 should have equal hash")
 	}
 }

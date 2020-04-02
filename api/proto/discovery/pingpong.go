@@ -33,8 +33,7 @@ func (p PingMessageType) String() string {
 
 // NewPingMessage creates a new Ping message based on the p2p.Peer input
 func NewPingMessage(peer p2p.Peer, isClient bool) *PingMessageType {
-	ping := new(PingMessageType)
-
+	ping := PingMessageType{}
 	ping.Version = proto.ProtocolVersion
 	ping.NodeVer = nodeconfig.GetVersion()
 	ping.Node.IP = peer.IP
@@ -48,33 +47,27 @@ func NewPingMessage(peer p2p.Peer, isClient bool) *PingMessageType {
 		ping.Node.Role = node.ClientRole
 	}
 
-	return ping
+	return &ping
 }
 
 // GetPingMessage deserializes the Ping Message from a list of byte
 func GetPingMessage(payload []byte) (*PingMessageType, error) {
-	ping := new(PingMessageType)
-
+	ping := PingMessageType{}
 	r := bytes.NewBuffer(payload)
 	decoder := gob.NewDecoder(r)
-	err := decoder.Decode(ping)
-
-	if err != nil {
+	if err := decoder.Decode(&ping); err != nil {
 		utils.Logger().Error().Err(err).Msg("[GetPingMessage] Decode")
 		return nil, fmt.Errorf("Decode Ping Error")
 	}
 
-	return ping, nil
+	return &ping, nil
 }
 
 // ConstructPingMessage contructs ping message from node to leader
 func (p PingMessageType) ConstructPingMessage() []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node)})
-	byteBuffer.WriteByte(byte(node.PING))
-
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto.Node), byte(node.PING)})
 	encoder := gob.NewEncoder(byteBuffer)
-	err := encoder.Encode(p)
-	if err != nil {
+	if err := encoder.Encode(p); err != nil {
 		utils.Logger().Error().Err(err).Msg("[ConstructPingMessage] Encode")
 		return nil
 	}

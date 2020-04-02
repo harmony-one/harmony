@@ -78,7 +78,7 @@ USAGE: $ME [OPTIONS] config_file_name [extra args to node]
    -N network     network type (default: $NETWORK)
    -B             don't build the binary
 
-This script will build all the binaries and start harmony and txgen based on the configuration file.
+This script will build all the binaries and start harmony and based on the configuration file.
 
 EXAMPLES:
 

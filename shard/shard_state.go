@@ -293,7 +293,7 @@ func (pk BLSPublicKey) Big() *big.Int {
 
 // IsEmpty returns whether the bls public key is empty 0 bytes
 func (pk BLSPublicKey) IsEmpty() bool {
-	return bytes.Compare(pk[:], emptyBLSPubKey[:]) == 0
+	return bytes.Equal(pk[:], emptyBLSPubKey[:])
 }
 
 // Hex returns the hex string of bls public key
@@ -474,7 +474,7 @@ func CompareCommittee(c1, c2 *Committee) int {
 // NOTE: do not modify the underlining content for hash
 func GetHashFromNodeList(nodeList []Slot) []byte {
 	// in general, nodeList should not be empty
-	if nodeList == nil || len(nodeList) == 0 {
+	if len(nodeList) == 0 {
 		return []byte{}
 	}
 

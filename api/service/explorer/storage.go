@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -83,25 +84,40 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	// Store txs
 	for _, tx := range block.Transactions() {
 		explorerTransaction := GetTransaction(tx, block)
-		storage.UpdateAddress(batch, explorerTransaction, tx)
+		storage.UpdateTxAddress(batch, explorerTransaction, tx)
+	}
+	// Store staking txns
+	for _, tx := range block.StakingTransactions() {
+		explorerTransaction := GetStakingTransaction(tx, block)
+		storage.UpdateStakingTxAddress(batch, explorerTransaction, tx)
 	}
 	if err := storage.db.Write(batch, nil); err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot write batch")
 	}
 }
 
-// UpdateAddress ...
-func (storage *Storage) UpdateAddress(batch *leveldb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
+// UpdateTxAddress ...
+func (storage *Storage) UpdateTxAddress(batch *leveldb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
 	if explorerTransaction.To != "" {
-		storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+		storage.UpdateTxAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
 	}
 	explorerTransaction.Type = Sent
-	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
+	storage.UpdateTxAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
 }
 
-// UpdateAddressStorage updates specific addr Address.
-func (storage *Storage) UpdateAddressStorage(batch *leveldb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
+// UpdateStakingTxAddress ...
+func (storage *Storage) UpdateStakingTxAddress(batch *leveldb.Batch, explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
+	explorerTransaction.Type = Received
+	if explorerTransaction.To != "" {
+		storage.UpdateStakingTxAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+	}
+	explorerTransaction.Type = Sent
+	storage.UpdateStakingTxAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
+}
+
+// UpdateTxAddressStorage updates specific addr tx Address.
+func (storage *Storage) UpdateTxAddressStorage(batch *leveldb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	var address Address
 	key := GetAddressKey(addr)
 	if data, err := storage.db.Get([]byte(key), nil); err == nil {
@@ -111,6 +127,25 @@ func (storage *Storage) UpdateAddressStorage(batch *leveldb.Batch, addr string, 
 	}
 	address.ID = addr
 	address.TXs = append(address.TXs, explorerTransaction)
+	encoded, err := rlp.EncodeToBytes(address)
+	if err == nil {
+		batch.Put([]byte(key), encoded)
+	} else {
+		utils.Logger().Error().Err(err).Msg("cannot encode address")
+	}
+}
+
+// UpdateStakingTxAddressStorage updates specific addr staking tx Address.
+func (storage *Storage) UpdateStakingTxAddressStorage(batch *leveldb.Batch, addr string, explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
+	var address Address
+	key := GetAddressKey(addr)
+	if data, err := storage.db.Get([]byte(key), nil); err == nil {
+		if err = rlp.DecodeBytes(data, &address); err != nil {
+			utils.Logger().Error().Err(err).Msg("Failed due to error")
+		}
+	}
+	address.ID = addr
+	address.StakingTXs = append(address.StakingTXs, explorerTransaction)
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
 		batch.Put([]byte(key), encoded)
