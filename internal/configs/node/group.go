@@ -16,7 +16,7 @@ import (
 type GroupID string
 
 func (id GroupID) String() string {
-	return fmt.Sprintf("%s", string(id))
+	return string(id)
 }
 
 // Const of group ID

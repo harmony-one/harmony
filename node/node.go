@@ -719,12 +719,10 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
-		PushgatewayIP:   node.NodeConfig.GetPushgatewayIP(),
-		PushgatewayPort: node.NodeConfig.GetPushgatewayPort(),
-		IsClient:        node.NodeConfig.IsClient(),
-		Beacon:          nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
-		ShardGroupID:    node.NodeConfig.GetShardGroupID(),
-		Actions:         make(map[nodeconfig.GroupID]nodeconfig.ActionType),
+		IsClient:     node.NodeConfig.IsClient(),
+		Beacon:       nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
+		ShardGroupID: node.NodeConfig.GetShardGroupID(),
+		Actions:      make(map[nodeconfig.GroupID]nodeconfig.ActionType),
 	}
 
 	if nodeConfig.IsClient {
