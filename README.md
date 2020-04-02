@@ -178,18 +178,6 @@ Harmony server / main node:
 
 ```
 
-Wallet:
-
-```bash
-./scripts/go_executable_build.sh wallet
-```
-
-Tx Generator:
-
-```bash
-./scripts/go_executable_build.sh txgen
-```
-
 ### Harmony docs and guides
 
 https://docs.harmony.one

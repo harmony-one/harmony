@@ -26,7 +26,6 @@ const (
 	ClientSupport Type = iota
 	SupportExplorer
 	Consensus
-	Metrics
 	BlockProposal
 	NetworkInfo
 	PeerDiscovery
@@ -38,8 +37,6 @@ func (t Type) String() string {
 		return "SupportExplorer"
 	case ClientSupport:
 		return "ClientSupport"
-	case Metrics:
-		return "Metrics"
 	case Consensus:
 		return "Consensus"
 	case BlockProposal:

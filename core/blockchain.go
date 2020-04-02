@@ -64,6 +64,7 @@ var (
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 	// errExceedMaxPendingSlashes ..
 	errExceedMaxPendingSlashes = errors.New("exceeed max pending slashes")
+	errNilEpoch                = errors.New("nil epoch for voting power computation")
 )
 
 const (
@@ -2282,7 +2283,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 	batch rawdb.DatabaseWriter,
 	block *types.Block,
 	newEpochSuperCommittee, currentEpochSuperCommittee *shard.State,
-	// NOTE Do not update this state, only read from
 	state *state.DB,
 ) error {
 	if newEpochSuperCommittee == nil {
@@ -2294,7 +2294,12 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 	for i := range newEpochSuperCommittee.Shards {
 		subCommittee := &newEpochSuperCommittee.Shards[i]
 		if newEpochSuperCommittee.Epoch == nil {
-			return errors.New("nil epoch for voting power computation")
+			return errors.Wrapf(
+				errNilEpoch,
+				"block epoch %v current-committee-epoch %v",
+				block.Epoch(),
+				currentEpochSuperCommittee.Epoch,
+			)
 		}
 		roster, err := votepower.Compute(subCommittee, newEpochSuperCommittee.Epoch)
 		if err != nil {

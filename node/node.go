@@ -426,17 +426,13 @@ func (node *Node) startRxPipeline(
 
 // StartServer starts a server and process the requests by a handler.
 func (node *Node) StartServer() {
-
-	// client messages are sent by clients, like txgen, wallet
+	// client messages are for just spectators, like plain observers
 	node.startRxPipeline(node.clientReceiver, node.clientRxQueue, ClientRxWorkers)
-
-	// start the goroutine to receive group message
+	// start the goroutine to receive in my subcommittee messages
 	node.startRxPipeline(node.shardGroupReceiver, node.shardRxQueue, ShardRxWorkers)
-
-	// start the goroutine to receive global message, used for cross-shard TX
+	// start the goroutine to receive supercommittee level messages
 	// FIXME (leo): we use beacon client topic as the global topic for now
 	node.startRxPipeline(node.globalGroupReceiver, node.globalRxQueue, GlobalRxWorkers)
-
 	select {}
 }
 
@@ -723,12 +719,10 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	chanPeer := make(chan p2p.Peer)
 
 	nodeConfig := service.NodeConfig{
-		PushgatewayIP:   node.NodeConfig.GetPushgatewayIP(),
-		PushgatewayPort: node.NodeConfig.GetPushgatewayPort(),
-		IsClient:        node.NodeConfig.IsClient(),
-		Beacon:          nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
-		ShardGroupID:    node.NodeConfig.GetShardGroupID(),
-		Actions:         make(map[nodeconfig.GroupID]nodeconfig.ActionType),
+		IsClient:     node.NodeConfig.IsClient(),
+		Beacon:       nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
+		ShardGroupID: node.NodeConfig.GetShardGroupID(),
+		Actions:      make(map[nodeconfig.GroupID]nodeconfig.ActionType),
 	}
 
 	if nodeConfig.IsClient {

@@ -230,15 +230,19 @@ func (bc *BlockChain) CommitOffChainData(
 								)
 							}
 						}
-						if !doUpdate {
-							if err := rawdb.WriteValidatorStats(batch, paid[i].Addr, stats); err != nil {
-								utils.Logger().Info().
-									Err(err).Msg("could not update earning per key in stats")
+						if doUpdate {
+							if err := rawdb.WriteValidatorStats(
+								batch, paid[i].Addr, stats,
+							); err != nil {
+								utils.Logger().Info().Err(err).
+									Str("bls-earning-key", paid[i].EarningKey.Hex()).
+									Msg("could not update earning per key in stats")
 							}
 						}
 					} else {
-						utils.Logger().Info().
-							Err(err).Msg("could not read validator stats to update for earning per key")
+						utils.Logger().Info().Err(err).
+							Str("bls-earning-key", paid[i].EarningKey.Hex()).
+							Msg("could not read validator stats to update for earning per key")
 					}
 				}
 			}
