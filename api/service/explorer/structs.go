@@ -123,7 +123,7 @@ func GetStakingTransaction(tx *staking.StakingTransaction, addressBlock *types.B
 		To:        to,
 		Value:     msg.Value(),
 		Bytes:     strconv.Itoa(int(tx.Size())),
-		Data:      string(msg.Data()),
+		Data:      hex.EncodeToString(msg.Data()),
 		GasFee:    gasFee,
 		FromShard: tx.ShardID(),
 		ToShard:   0,
