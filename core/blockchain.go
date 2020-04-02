@@ -885,12 +885,12 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) error {
 	signer := types.MakeSigner(config, block.Epoch())
 
-	transactions, logIndex := block.Transactions(), uint(0)
-	if len(transactions) != len(receipts) {
-		return errors.New("transaction and receipt count mismatch")
+	transactions, stakingTransactions, logIndex := block.Transactions(), block.StakingTransactions(), uint(0)
+	if len(transactions)+len(stakingTransactions) != len(receipts) {
+		return errors.New("transaction+stakingTransactions and receipt count mismatch")
 	}
 
-	for j := 0; j < len(receipts); j++ {
+	for j := 0; j < len(transactions); j++ {
 		// The transaction hash can be retrieved from the transaction itself
 		receipts[j].TxHash = transactions[j].Hash()
 
@@ -912,6 +912,27 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 			receipts[j].Logs[k].BlockHash = block.Hash()
 			receipts[j].Logs[k].TxHash = receipts[j].TxHash
 			receipts[j].Logs[k].TxIndex = uint(j)
+			receipts[j].Logs[k].Index = logIndex
+			logIndex++
+		}
+	}
+	// in a block, txns are processed before staking txns
+	for j := len(transactions); j < len(transactions)+len(stakingTransactions); j++ {
+		// The transaction hash can be retrieved from the staking transaction itself
+		receipts[j].TxHash = stakingTransactions[j].Hash()
+
+		// The used gas can be calculated based on previous receipts
+		if j == 0 {
+			receipts[j].GasUsed = receipts[j].CumulativeGasUsed
+		} else {
+			receipts[j].GasUsed = receipts[j].CumulativeGasUsed - receipts[j-1].CumulativeGasUsed
+		}
+		// The derived log fields can simply be set from the block and transaction
+		for k := 0; k < len(receipts[j].Logs); k++ {
+			receipts[j].Logs[k].BlockNumber = block.NumberU64()
+			receipts[j].Logs[k].BlockHash = block.Hash()
+			receipts[j].Logs[k].TxHash = receipts[j].TxHash
+			receipts[j].Logs[k].TxIndex = uint(j) + uint(len(transactions))
 			receipts[j].Logs[k].Index = logIndex
 			logIndex++
 		}
@@ -1334,6 +1355,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 			Str("hash", block.Hash().Hex()).
 			Int("uncles", len(block.Uncles())).
 			Int("txs", len(block.Transactions())).
+			Int("stakingTxs", len(block.StakingTransactions())).
 			Uint64("gas", block.GasUsed()).
 			Str("elapsed", common.PrettyDuration(time.Since(bstart)).String()).
 			Logger()

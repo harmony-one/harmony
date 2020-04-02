@@ -373,11 +373,11 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Int("numStakingTx", len(newBlock.StakingTransactions())).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
-		return errors.Errorf(
-			"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
-			newBlock.Hash().Hex(),
-			len(newBlock.Transactions()),
-		)
+		return ctxerror.New("[VerifyNewBlock] Cannot Verify New Block!!!",
+			"blockHash", newBlock.Hash(),
+			"numTx", len(newBlock.Transactions()),
+			"numStakingTx", len(newBlock.StakingTransactions()),
+		).WithCause(err)
 	}
 
 	// Verify cross links

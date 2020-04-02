@@ -473,6 +473,7 @@ func (consensus *Consensus) Start(
 
 				consensus.getLogger().Debug().
 					Int("numTxs", len(newBlock.Transactions())).
+					Int("numStakingTxs", len(newBlock.StakingTransactions())).
 					Time("startTime", startTime).
 					Int64("publicKeys", consensus.Decider.ParticipantsCount()).
 					Msg("[ConsensusMainLoop] STARTING CONSENSUS")
