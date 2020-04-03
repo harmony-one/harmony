@@ -366,6 +366,8 @@ func (b *APIBackend) GetValidatorInformation(
 		EPoSStatus: effective.ValidatorStatus(
 			inCommittee, wrapper.Status,
 		).String(),
+		EPoSWinningStake: nil,
+		BootedStatus:     nil,
 		Lifetime: &staking.AccumulatedOverLifetime{
 			wrapper.BlockReward,
 			wrapper.Counters,
@@ -384,7 +386,9 @@ func (b *APIBackend) GetValidatorInformation(
 	computed := availability.ComputeCurrentSigning(
 		snapshot, wrapper,
 	)
-	beaconChainBlocks := uint64(b.hmy.BeaconChain().CurrentBlock().Header().Number().Int64()) % shard.Schedule.BlocksPerEpoch()
+	beaconChainBlocks := uint64(
+		b.hmy.BeaconChain().CurrentBlock().Header().Number().Int64(),
+	) % shard.Schedule.BlocksPerEpoch()
 	computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
 
 	stats, err := bc.ReadValidatorStats(addr)
@@ -399,6 +403,12 @@ func (b *APIBackend) GetValidatorInformation(
 			CurrentSigningPercentage: *computed,
 		}
 		defaultReply.ComputedMetrics = stats
+		defaultReply.EPoSWinningStake = &stats.TotalEffectiveStake
+	}
+
+	if !defaultReply.CurrentlyInCommittee {
+		reason := stats.BootedStatus.String()
+		defaultReply.BootedStatus = &reason
 	}
 
 	return defaultReply, nil
