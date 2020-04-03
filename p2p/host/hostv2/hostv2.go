@@ -227,7 +227,9 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 	traceFile := os.Getenv("P2P_TRACEFILE")
-	options := []libp2p_pubsub.Option{libp2p_pubsub.WithPeerOutboundQueueSize(64)}
+	options := []libp2p_pubsub.Option{
+		libp2p_pubsub.WithPeerOutboundQueueSize(64),
+	}
 	if len(traceFile) > 0 {
 		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
 		options = append(options, libp2p_pubsub.WithEventTracer(tracer))
