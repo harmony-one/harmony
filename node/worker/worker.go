@@ -7,8 +7,6 @@ import (
 	"sort"
 	"time"
 
-	common2 "github.com/harmony-one/harmony/internal/common"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
@@ -18,12 +16,14 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -63,7 +63,6 @@ func (w *Worker) CommitTransactions(
 	}
 
 	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
-	coalescedLogs := []*types.Log{}
 	// NORMAL
 	for {
 		// If we don't have enough gas for any further transactions then we're done
@@ -95,7 +94,7 @@ func (w *Worker) CommitTransactions(
 			continue
 		}
 
-		logs, err := w.commitTransaction(tx, coinbase)
+		_, err := w.commitTransaction(tx, coinbase)
 
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
@@ -116,7 +115,6 @@ func (w *Worker) CommitTransactions(
 
 		case nil:
 			// Everything ok, collect the logs and shift in the next transaction from the same account
-			coalescedLogs = append(coalescedLogs, logs...)
 			txs.Shift()
 
 		default:
@@ -148,16 +146,13 @@ func (w *Worker) CommitTransactions(
 			// Start executing the transaction
 			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
 			// THESE CODE ARE DUPLICATED AS ABOVE>>
-
-			logs, err := w.commitStakingTransaction(tx, coinbase)
-			if err != nil {
+			if _, err := w.commitStakingTransaction(tx, coinbase); err != nil {
 				txID := tx.Hash().Hex()
 				utils.Logger().Error().Err(err).
 					Str("stakingTxID", txID).
 					Interface("stakingTx", tx).
 					Msg("Failed committing staking transaction")
 			} else {
-				coalescedLogs = append(coalescedLogs, logs...)
 				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).
 					Uint64("txGasLimit", tx.Gas()).
 					Msg("Successfully committed staking transaction")
@@ -197,20 +192,37 @@ func (w *Worker) commitStakingTransaction(
 	return receipt.Logs, nil
 }
 
-func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
-	snap := w.current.state.Snapshot()
+var (
+	errNilReceipt = errors.New("nil receipt")
+)
 
+func (w *Worker) commitTransaction(
+	tx *types.Transaction, coinbase common.Address,
+) ([]*types.Log, error) {
+	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, cx, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	receipt, cx, _, err := core.ApplyTransaction(
+		w.config,
+		w.chain,
+		&coinbase,
+		w.current.gasPool,
+		w.current.state,
+		w.current.header,
+		tx,
+		&gasUsed,
+		vm.Config{},
+	)
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
-		utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Offchain ValidatorMap Read/Write Error")
-		return nil, err
+		utils.Logger().Error().
+			Err(err).Str("stakingTxId", tx.Hash().Hex()).
+			Msg("Offchain ValidatorMap Read/Write Error")
+		return nil, errNilReceipt
 	}
 	if receipt == nil {
 		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
-		return nil, fmt.Errorf("Receipt is Nil")
+		return nil, errNilReceipt
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
@@ -236,15 +248,13 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 	}
 
 	for _, cx := range receiptsList {
-		err := core.ApplyIncomingReceipt(w.config, w.current.state, w.current.header, cx)
-		if err != nil {
+		if err := core.ApplyIncomingReceipt(
+			w.config, w.current.state, w.current.header, cx,
+		); err != nil {
 			return ctxerror.New("Failed applying cross-shard receipts").WithCause(err)
 		}
 	}
-
-	for _, cx := range receiptsList {
-		w.current.incxs = append(w.current.incxs, cx)
-	}
+	w.current.incxs = append(w.current.incxs, receiptsList...)
 	return nil
 }
 

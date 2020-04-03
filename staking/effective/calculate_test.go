@@ -19,7 +19,6 @@ const eposTestingFile = "epos.json"
 
 var (
 	testingNumber    = 20
-	testingSlots     slotsData
 	testingPurchases []SlotPurchase
 	expectedMedian   numeric.Dec
 	maxAccountGen    = int64(98765654323123134)

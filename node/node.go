@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
-	clientService "github.com/harmony-one/harmony/api/client/service"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
@@ -135,17 +134,14 @@ type Node struct {
 
 	CxPool *core.CxPool // pool for missing cross shard receipts resend
 
-	Worker       *worker.Worker
-	BeaconWorker *worker.Worker // worker for beacon chain
-
-	// Client server (for wallet requests)
-	clientServer *clientService.Server
+	Worker, BeaconWorker *worker.Worker
+	downloaderServer     *downloader.Server
 
 	// Syncing component.
-	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-	downloaderServer       *downloader.Server
-	stateSync              *syncing.StateSync
-	beaconSync             *syncing.StateSync
+	syncID [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
+
+	stateSync, beaconSync *syncing.StateSync
+
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 
@@ -157,30 +153,14 @@ type Node struct {
 	host p2p.Host
 
 	// Incoming messages to process.
-	clientRxQueue *msgq.Queue
-	shardRxQueue  *msgq.Queue
-	globalRxQueue *msgq.Queue
+	clientRxQueue, shardRxQueue, globalRxQueue *msgq.Queue
 
 	// Service manager.
 	serviceManager *service.Manager
 
-	// Demo account.
-	DemoContractAddress      common.Address
-	LotteryManagerPrivateKey *ecdsa.PrivateKey
-
-	// Puzzle account.
-	PuzzleContractAddress   common.Address
-	PuzzleManagerPrivateKey *ecdsa.PrivateKey
-
-	// For test only; TODO ek – remove this
-	TestBankKeys []*ecdsa.PrivateKey
-
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-
-	// For puzzle contracts
-	AddressNonce sync.Map
 
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
@@ -206,15 +186,10 @@ type Node struct {
 
 	// map of service type to its message channel.
 	serviceMessageChan map[service.Type]chan *msg_pb.Message
-
-	accountManager *accounts.Manager
-
-	isFirstTime bool // the node was started with a fresh database
+	accountManager     *accounts.Manager
+	isFirstTime        bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
-
-	// last time consensus reached for metrics
-	lastConsensusTime int64
 	// Last 1024 staking transaction error, only in memory
 	errorSink struct {
 		sync.Mutex
@@ -436,16 +411,6 @@ func (node *Node) StartServer() {
 	select {}
 }
 
-// Count the total number of transactions in the blockchain
-// Currently used for stats reporting purpose
-func (node *Node) countNumTransactionsInBlockchain() int {
-	count := 0
-	for block := node.Blockchain().CurrentBlock(); block != nil; block = node.Blockchain().GetBlockByHash(block.Header().ParentHash()) {
-		count += len(block.Transactions())
-	}
-	return count
-}
-
 // GetSyncID returns the syncID of this node
 func (node *Node) GetSyncID() [SyncIDLength]byte {
 	return node.syncID
@@ -561,14 +526,6 @@ func New(
 			if node.isFirstTime {
 				// Setup one time smart contracts
 				node.AddFaucetContractToPendingTransactions()
-			} else {
-				node.AddContractKeyAndAddress(scFaucet)
-			}
-			// Create test keys.  Genesis will later need this.
-			var err error
-			node.TestBankKeys, err = CreateTestBankKeys(TestAccountNumber)
-			if err != nil {
-				utils.Logger().Error().Err(err).Msg("Error while creating test keys")
 			}
 		}
 	}
@@ -588,33 +545,30 @@ func New(
 	// Broadcast double-signers reported by consensus
 	if node.Consensus != nil {
 		go func() {
-			for {
-				select {
-				case doubleSign := <-node.Consensus.SlashChan:
-					utils.Logger().Info().
-						RawJSON("double-sign-candidate", []byte(doubleSign.String())).
-						Msg("double sign notified by consensus leader")
-					// no point to broadcast the slash if we aren't even in the right epoch yet
-					if !node.Blockchain().Config().IsStaking(
-						node.Blockchain().CurrentHeader().Epoch(),
-					) {
-						return
+			for doubleSign := range node.Consensus.SlashChan {
+				utils.Logger().Info().
+					RawJSON("double-sign-candidate", []byte(doubleSign.String())).
+					Msg("double sign notified by consensus leader")
+				// no point to broadcast the slash if we aren't even in the right epoch yet
+				if !node.Blockchain().Config().IsStaking(
+					node.Blockchain().CurrentHeader().Epoch(),
+				) {
+					return
+				}
+				if hooks := node.NodeConfig.WebHooks.Hooks; hooks != nil {
+					if s := hooks.Slashing; s != nil {
+						url := s.OnNoticeDoubleSign
+						go func() { webhooks.DoPost(url, &doubleSign) }()
 					}
-					if hooks := node.NodeConfig.WebHooks.Hooks; hooks != nil {
-						if s := hooks.Slashing; s != nil {
-							url := s.OnNoticeDoubleSign
-							go func() { webhooks.DoPost(url, &doubleSign) }()
-						}
-					}
-					if node.NodeConfig.ShardID != shard.BeaconChainShardID {
-						go node.BroadcastSlash(&doubleSign)
-					} else {
-						records := slash.Records{doubleSign}
-						if err := node.Blockchain().AddPendingSlashingCandidates(
-							records,
-						); err != nil {
-							utils.Logger().Err(err).Msg("could not add new slash to ending slashes")
-						}
+				}
+				if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+					go node.BroadcastSlash(&doubleSign)
+				} else {
+					records := slash.Records{doubleSign}
+					if err := node.Blockchain().AddPendingSlashingCandidates(
+						records,
+					); err != nil {
+						utils.Logger().Err(err).Msg("could not add new slash to ending slashes")
 					}
 				}
 			}
