@@ -65,6 +65,10 @@ go get -u github.com/golang/mock/mockgen; \
 go get -u github.com/stamblerre/gocode; \
 go get -u golang.org/x/tools/...
 
+
+RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; . ~/.bash_profile; \
+go get -u honnef.co/go/tools/cmd/staticcheck/...
+
 WORKDIR ${HMY_PATH}/harmony
 
 RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/install_build_tools.sh

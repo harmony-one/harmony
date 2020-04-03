@@ -18,8 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/harmony-one/harmony/numeric"
-
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -38,12 +36,12 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
-	golog "github.com/ipfs/go-log"
 	"github.com/pkg/errors"
 	gologging "github.com/whyrusleeping/go-logging"
 )
@@ -811,18 +809,22 @@ func main() {
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).
 		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
 		Str("Role", currentNode.NodeConfig.Role().String()).
-		Str("multiaddress", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, myHost.GetID().Pretty())).
+		Str("multiaddress",
+			fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, myHost.GetID().Pretty()),
+		).
 		Msg(startMsg)
 
 	if *logP2P {
-		f, err := os.OpenFile(path.Join(*logFolder, "libp2p.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(
+			path.Join(*logFolder, "libp2p.log"),
+			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644,
+		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to open libp2p.log. %v\n", err)
 		} else {
 			defer f.Close()
 			backend1 := gologging.NewLogBackend(f, "", 0)
 			gologging.SetBackend(backend1)
-			golog.SetAllLoggers(gologging.DEBUG) // Change to DEBUG for extra info
 		}
 	}
 
