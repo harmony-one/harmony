@@ -8,13 +8,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
-
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-host"
@@ -22,6 +18,8 @@ import (
 	libp2p_peerstore "github.com/libp2p/go-libp2p-peerstore"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -227,8 +225,11 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 	traceFile := os.Getenv("P2P_TRACEFILE")
+	// TODO unify someone with tx_pool.go from which it came
+	const MaxPoolTransactionDataSize = 32 * 1024
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithPeerOutboundQueueSize(64),
+		libp2p_pubsub.WithMaxMessageSize(MaxPoolTransactionDataSize),
 	}
 	if len(traceFile) > 0 {
 		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
