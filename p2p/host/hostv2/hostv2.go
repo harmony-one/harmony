@@ -231,7 +231,8 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 
 	// TODO first starting with some huge number to see update of libp2p
 	// and also to dump some values about the p2p message sizes
-	const MaxSize = 32 * 1024 * 5000
+	// 3MB
+	const MaxSize = 3_145_728
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithPeerOutboundQueueSize(64),
 		libp2p_pubsub.WithMaxMessageSize(MaxSize),
