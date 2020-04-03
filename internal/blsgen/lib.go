@@ -163,7 +163,6 @@ func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.Secr
 
 	// Create KMS service client
 	svc := kms.New(sess, &aws.Config{
-		//Region: aws.String("us-east-1"),
 		Region:      aws.String(awsConfig.Region),
 		Credentials: credentials.NewStaticCredentials(awsConfig.AccessKey, awsConfig.SecretKey, ""),
 	})

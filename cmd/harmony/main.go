@@ -152,6 +152,9 @@ func initSetup() {
 	// maybe request passphrase for bls key.
 	if *cmkEncryptedBLSKey == "" {
 		passphraseForBLS()
+	} else {
+		// Get aws credentials from stdin prompt
+		awsSettingString, _ = blsgen.Readln(1 * time.Second)
 	}
 
 	// Configure log parameters
@@ -656,9 +659,6 @@ func main() {
 	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
 	// build time.
 	os.Setenv("GODEBUG", "netdns=go")
-
-	// Get aws credentials from prompt timeout 1 second if there's no input
-	awsSettingString, _ = blsgen.Readln(1 * time.Second)
 
 	flag.Var(&p2putils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
