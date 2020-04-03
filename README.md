@@ -186,11 +186,7 @@ https://docs.harmony.one
 
 https://docs.harmony.one/home/developers/api
 
-## Usage
-
-You may build the src/harmony.go locally and run local test.
-
-### Running local test
+### Running locally
 
 The debug.sh script calls test/deploy.sh script to create a local environment of Harmony blockchain devnet based on the configuration file.
 The configuration file configures number of nodes and their IP/Port.
@@ -198,14 +194,6 @@ The script starts 2 shards and 7 nodes in each shard.
 
 ```bash
 ./test/debug.sh
-```
-
-### Test local blockchain
-
-```bash
-source scripts/setup_bls_build_flags.sh
-./bin/wallet list
-./bin/wallet -p local balances
 ```
 
 ### Terminate the local blockchain
@@ -252,17 +240,14 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 - Cross-shard transaction
 - VRF (Verifiable Random Function) and VDF (Verifiable Delay Function)
 - Cross-links
-- Information disposal algorithm using erasure encoding (to be integrated)
-- Transaction generator for loadtesting
-- Cuckoo-rule based resharding
+- EPoS staking mechanism
+- Kademlia routing
 
 ### Features To Be Implemented
 
-- EPoS staking mechanism
 - Leader rotation
 
 ### Features Planned after Mainnet
 
 - Integration with WASM
 - Fast state synchronization
-- Kademlia routing
