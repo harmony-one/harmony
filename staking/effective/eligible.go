@@ -39,10 +39,14 @@ const (
 	Elected
 )
 
+const (
+	doubleSigningBanned = "banned forever from network because was caught double-signing"
+)
+
 func (c Candidacy) String() string {
 	switch c {
 	case ForeverBanned:
-		return "banned forever from network because was caught double-signing"
+		return doubleSigningBanned
 	case Candidate:
 		return "eligible to be elected next epoch"
 	case NotCandidate:
@@ -67,5 +71,32 @@ func ValidatorStatus(currentlyInCommittee bool, status Eligibility) Candidacy {
 		return NotCandidate
 	default:
 		return Unknown
+	}
+}
+
+// BootedStatus ..
+type BootedStatus byte
+
+const (
+	// NotBooted ..
+	NotBooted BootedStatus = iota
+	// LostEPoSAuction ..
+	LostEPoSAuction
+	// InsufficientUptimeDuringEpoch ..
+	InsufficientUptimeDuringEpoch
+	// BannedForDoubleSigning ..
+	BannedForDoubleSigning
+)
+
+func (r BootedStatus) String() string {
+	switch r {
+	case LostEPoSAuction:
+		return "lost epos auction"
+	case InsufficientUptimeDuringEpoch:
+		return "bad uptime"
+	case BannedForDoubleSigning:
+		return doubleSigningBanned
+	default:
+		return "not booted"
 	}
 }

@@ -248,10 +248,13 @@ func (bc *BlockChain) CommitOffChainData(
 				addr  common.Address
 				stats *staking.ValidatorStats
 			}
-			sortedStats := []t{}
-			for key, value := range tempValidatorStats {
-				sortedStats = append(sortedStats, t{key, value})
+
+			sortedStats, i := make([]t, len(tempValidatorStats)), 0
+			for key := range tempValidatorStats {
+				sortedStats[i] = t{key, tempValidatorStats[key]}
+				i++
 			}
+
 			sort.SliceStable(
 				sortedStats,
 				func(i, j int) bool {

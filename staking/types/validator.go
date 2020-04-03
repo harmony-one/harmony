@@ -122,6 +122,7 @@ func NewEmptyStats() *ValidatorStats {
 		numeric.ZeroDec(),
 		numeric.ZeroDec(),
 		[]VoteWithCurrentEpochEarning{},
+		effective.NotBooted,
 	}
 }
 
@@ -139,6 +140,8 @@ type ValidatorRPCEnchanced struct {
 	TotalDelegated       *big.Int                 `json:"total-delegation"`
 	CurrentlyInCommittee bool                     `json:"currently-in-committee"`
 	EPoSStatus           string                   `json:"epos-status"`
+	EPoSWinningStake     *numeric.Dec             `json:"epos-winning-stake"`
+	BootedStatus         *string                  `json:"booted-status"`
 	Lifetime             *AccumulatedOverLifetime `json:"lifetime"`
 }
 
@@ -178,9 +181,11 @@ type ValidatorStats struct {
 	// APR ..
 	APR numeric.Dec `json:"-"`
 	// TotalEffectiveStake is the total effective stake this validator has
-	TotalEffectiveStake numeric.Dec `json:"total-effective-stake"`
+	TotalEffectiveStake numeric.Dec `json:"-"`
 	// MetricsPerShard ..
 	MetricsPerShard []VoteWithCurrentEpochEarning `json:"by-bls-key"`
+	// BootedStatus
+	BootedStatus effective.BootedStatus `json:"boot-from-committee-status"`
 }
 
 func (s ValidatorStats) String() string {

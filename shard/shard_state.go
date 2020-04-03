@@ -150,29 +150,28 @@ func EncodeWrapper(shardState State, isStaking bool) ([]byte, error) {
 	return data, err
 }
 
-// StakedSlots gives overview of subset of shard state that is
-// coming via an stake, that is, view epos
+// StakedSlots gives overview of members
+// in a subcommittee (aka a shard)
 type StakedSlots struct {
 	CountStakedValidator int
 	CountStakedBLSKey    int
 	Addrs                []common.Address
 	LookupSet            map[common.Address]struct{}
+	TotalEffectiveStaked numeric.Dec
 }
 
-// StakedValidators filters for non-harmony operated nodes,
-// returns (
-//   totalStakedValidatorsCount, totalStakedBLSKeys,
-//   addrsOnNetworkSlice, addrsOnNetworkSet,
-// )
+// StakedValidators ..
 func (c Committee) StakedValidators() *StakedSlots {
 	countStakedValidator, countStakedBLSKey := 0, 0
 	networkWideSlice, networkWideSet :=
 		[]common.Address{}, map[common.Address]struct{}{}
-	for _, slot := range c.Slots {
+	totalEffectiveStake := numeric.ZeroDec()
 
+	for _, slot := range c.Slots {
 		// an external validator,
 		// non-nil EffectiveStake is how we known
 		if addr := slot.EcdsaAddress; slot.EffectiveStake != nil {
+			totalEffectiveStake = totalEffectiveStake.Add(*slot.EffectiveStake)
 			countStakedBLSKey++
 			if _, seen := networkWideSet[addr]; !seen {
 				countStakedValidator++
@@ -187,19 +186,27 @@ func (c Committee) StakedValidators() *StakedSlots {
 		CountStakedBLSKey:    countStakedBLSKey,
 		Addrs:                networkWideSlice,
 		LookupSet:            networkWideSet,
+		TotalEffectiveStaked: totalEffectiveStake,
 	}
 }
 
-// StakedValidators filters for non-harmony operated nodes,
-// returns (
-//   totalStakedValidatorsCount, totalStakedBLSKeys,
-//   addrsOnNetworkSlice, addrsOnNetworkSet,
-// )
+// TODO refactor with and update corresponding places
+// func (ss *State) StakedValidators() []*StakedSlots {
+// 	networkWide := make([]*StakedSlots, len(ss.Shards))
+// 	for i := range ss.Shards {
+// 		networkWide[i] = ss.Shards[i].StakedValidators()
+// 	}
+// 	return networkWide
+// }
+
+// StakedValidators here is supercommittee wide
 func (ss *State) StakedValidators() *StakedSlots {
 	countStakedValidator, countStakedBLSKey := 0, 0
 	networkWideSlice, networkWideSet :=
 		[]common.Address{},
 		map[common.Address]struct{}{}
+
+	totalEffectiveStake := numeric.ZeroDec()
 
 	for i := range ss.Shards {
 		shard := ss.Shards[i]
@@ -209,6 +216,7 @@ func (ss *State) StakedValidators() *StakedSlots {
 			// an external validator,
 			// non-nil EffectiveStake is how we known
 			if addr := slot.EcdsaAddress; slot.EffectiveStake != nil {
+				totalEffectiveStake = totalEffectiveStake.Add(*slot.EffectiveStake)
 				countStakedBLSKey++
 				if _, seen := networkWideSet[addr]; !seen {
 					countStakedValidator++
@@ -224,6 +232,7 @@ func (ss *State) StakedValidators() *StakedSlots {
 		CountStakedBLSKey:    countStakedBLSKey,
 		Addrs:                networkWideSlice,
 		LookupSet:            networkWideSet,
+		TotalEffectiveStaked: totalEffectiveStake,
 	}
 }
 
