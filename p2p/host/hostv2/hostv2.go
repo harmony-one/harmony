@@ -145,6 +145,9 @@ func (r *GroupReceiverImpl) Receive(ctx context.Context) (
 		msg = m.Data
 		sender = libp2p_peer.ID(m.From)
 	}
+
+	utils.Logger().Info().Int("size", len(msg)).Msg("receive p2p message")
+
 	return msg, sender, err
 }
 
@@ -225,11 +228,13 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 	traceFile := os.Getenv("P2P_TRACEFILE")
-	// TODO unify someone with tx_pool.go from which it came
-	const MaxPoolTransactionDataSize = 32 * 1024
+
+	// TODO first starting with some huge number to see update of libp2p
+	// and also to dump some values about the p2p message sizes
+	const MaxSize = 32 * 1024 * 5000
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithPeerOutboundQueueSize(64),
-		libp2p_pubsub.WithMaxMessageSize(MaxPoolTransactionDataSize),
+		libp2p_pubsub.WithMaxMessageSize(MaxSize),
 	}
 	if len(traceFile) > 0 {
 		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
