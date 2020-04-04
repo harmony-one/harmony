@@ -770,14 +770,14 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 	rewardPool := big.NewInt(0).Set(reward)
 	curValidator.BlockReward.Add(curValidator.BlockReward, reward)
 	// Payout commission
-	commissionInt := snapshot.Validator.CommissionRates.Rate.MulInt(reward).RoundInt()
-	if commissionInt.Cmp(common.Big0) == 1 {
+	if r := snapshot.Validator.CommissionRates.Rate; r.GT(zero) {
+		commissionInt := r.MulInt(reward).RoundInt()
 		curValidator.Delegations[0].Reward.Add(
 			curValidator.Delegations[0].Reward,
 			commissionInt,
 		)
+		rewardPool.Sub(rewardPool, commissionInt)
 	}
-	rewardPool.Sub(rewardPool, commissionInt)
 	totalRewardForDelegators := big.NewInt(0).Set(rewardPool)
 	// Payout each delegator's reward pro-rata
 	totalDelegationDec := numeric.NewDecFromBigInt(snapshot.TotalDelegation())
