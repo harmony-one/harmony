@@ -523,6 +523,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 	)
 
+	nodeconfig.GetDefaultConfig().DBDir = nodeConfig.DBDir
 	switch *nodeType {
 	case "explorer":
 		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
