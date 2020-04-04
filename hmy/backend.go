@@ -33,8 +33,6 @@ type Harmony struct {
 	nodeAPI      NodeAPI
 	// aka network version, which is used to identify which network we are using
 	networkID uint64
-	// TODO(ricl): put this into config object
-	// TODO(ricl): this is never set. Will result in nil pointer bug
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap *big.Int `toml:",omitempty"`
 	shardID   uint32

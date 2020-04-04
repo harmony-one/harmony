@@ -31,17 +31,11 @@ import (
 type Backend interface {
 	// NOTE(ricl): this is not in ETH Backend inteface. They put it directly in eth object.
 	NetVersion() uint64
-	// General Ethereum API
-	// Downloader() *downloader.Downloader
 	ProtocolVersion() int
-	// SuggestPrice(ctx context.Context) (*big.Int, error)
 	ChainDb() ethdb.Database
 	EventMux() *event.TypeMux
 	AccountManager() *accounts.Manager
-	// ExtRPCEnabled() bool
 	RPCGasCap() *big.Int // global gas cap for hmy_call over rpc: DoS protection
-	// BlockChain API
-	// SetHead(number uint64)
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error)
 	BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)
 	StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *block.Header, error)
@@ -92,6 +86,7 @@ type Backend interface {
 	GetTotalStakingSnapshot() *big.Int
 	GetCurrentBadBlocks() []core.BadBlock
 	GetLastCrossLinks() ([]*types.CrossLink, error)
+	GetLatestChainHeaders() *block.HeaderPair
 }
 
 // GetAPIs returns all the APIs.

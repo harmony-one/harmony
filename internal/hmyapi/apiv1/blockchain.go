@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -542,6 +543,11 @@ func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (
 		return s.b.GetMedianRawStakeSnapshot()
 	}
 	return nil, errNotBeaconChainShard
+}
+
+// GetLatestChainHeaders ..
+func (s *PublicBlockChainAPI) GetLatestChainHeaders() *block.HeaderPair {
+	return s.b.GetLatestChainHeaders()
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
