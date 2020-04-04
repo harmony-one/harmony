@@ -24,6 +24,12 @@ type Header struct {
 	blockif.Header
 }
 
+// HeaderPair ..
+type HeaderPair struct {
+	BeaconHeader *Header `json:"beacon-chain-header"`
+	ShardHeader  *Header `json:"shard-chain-header"`
+}
+
 var (
 	// ErrHeaderIsNil ..
 	ErrHeaderIsNil = errors.New("cannot encode nil header receiver")

@@ -421,6 +421,14 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (
 	return committee.NewEPoSRound(b.hmy.BlockChain())
 }
 
+// GetLatestChainHeaders ..
+func (b *APIBackend) GetLatestChainHeaders() *block.HeaderPair {
+	return &block.HeaderPair{
+		BeaconHeader: b.hmy.BeaconChain().CurrentHeader(),
+		ShardHeader:  b.hmy.BlockChain().CurrentHeader(),
+	}
+}
+
 // GetTotalStakingSnapshot ..
 func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	b.TotalStakingCache.Lock()
@@ -439,7 +447,9 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	for i := range candidates {
 		snapshot, _ := b.hmy.BlockChain().ReadValidatorSnapshot(candidates[i])
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
-		if !committee.IsEligibleForEPoSAuction(snapshot, validator, b.hmy.BlockChain().CurrentBlock().Epoch()) {
+		if !committee.IsEligibleForEPoSAuction(
+			snapshot, validator, b.hmy.BlockChain().CurrentBlock().Epoch(),
+		) {
 			continue
 		}
 		for i := range validator.Delegations {
