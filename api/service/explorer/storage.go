@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -46,7 +47,7 @@ func GetStorageInstance(ip, port string, remove bool) *Storage {
 
 // Init initializes the block update.
 func (storage *Storage) Init(ip, port string, remove bool) {
-	dbFileName := "/tmp/explorer_storage_" + ip + "_" + port
+	dbFileName := nodeconfig.GetDefaultConfig().DBDir + "/explorer_storage_" + ip + "_" + port
 	var err error
 	if remove {
 		var err = os.RemoveAll(dbFileName)
