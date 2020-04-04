@@ -751,10 +751,19 @@ func (db *DB) IsValidator(addr common.Address) bool {
 var (
 	zero                      = numeric.ZeroDec()
 	errTotalDelegationDivZero = errors.New("total delegation cannot be 0")
+	errZeroReward             = errors.New("reward cannot be zero")
 )
 
 // AddReward distributes the reward to all the delegators based on stake percentage.
 func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
+	if reward.Cmp(common.Big0) == 0 {
+		return errors.Wrapf(
+			errZeroReward,
+			"addr %s",
+			common2.MustAddressToBech32(snapshot.Address),
+		)
+	}
+
 	curValidator, err := db.ValidatorWrapper(snapshot.Address)
 	if err != nil {
 		return errors.Wrapf(err, "failed to distribute rewards: validator does not exist")
