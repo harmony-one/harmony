@@ -482,6 +482,11 @@ func Apply(
 	return slashDiff, nil
 }
 
+// IsBanned ..
+func IsBanned(wrapper *staking.ValidatorWrapper) bool {
+	return wrapper.Status == effective.Banned
+}
+
 // Rate is the slashing % rate
 func Rate(votingPower *votepower.Roster, records Records) numeric.Dec {
 	rate := numeric.ZeroDec()
