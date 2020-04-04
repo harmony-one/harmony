@@ -90,4 +90,5 @@ type Backend interface {
 	GetTotalStakingSnapshot() *big.Int
 	GetCurrentBadBlocks() []core.BadBlock
 	GetLastCrossLinks() ([]*types.CrossLink, error)
+	GetLatestChainHeaders() *block.HeaderPair
 }

@@ -185,7 +185,7 @@ type ValidatorStats struct {
 	// MetricsPerShard ..
 	MetricsPerShard []VoteWithCurrentEpochEarning `json:"by-bls-key"`
 	// BootedStatus
-	BootedStatus effective.BootedStatus `json:"boot-from-committee-status"`
+	BootedStatus effective.BootedStatus `json:"-"`
 }
 
 func (s ValidatorStats) String() string {
