@@ -748,6 +748,11 @@ func (db *DB) IsValidator(addr common.Address) bool {
 	return so.IsValidator(db.db)
 }
 
+var (
+	zero                      = numeric.ZeroDec()
+	errTotalDelegationDivZero = errors.New("total delegation cannot be 0")
+)
+
 // AddReward distributes the reward to all the delegators based on stake percentage.
 func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 	curValidator, err := db.ValidatorWrapper(snapshot.Address)
@@ -774,6 +779,13 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 	for i := range snapshot.Delegations {
 		delegation := snapshot.Delegations[i]
 		// NOTE percentage = <this_delegator_amount>/<total_delegation>
+		if totalDelegationDec.Equal(zero) {
+			return errors.Wrapf(
+				errTotalDelegationDivZero,
+				"addr %s",
+				common2.MustAddressToBech32(curValidator.Address),
+			)
+		}
 		percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec)
 		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
 		curDelegation := curValidator.Delegations[i]
