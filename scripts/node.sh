@@ -248,7 +248,7 @@ do
 done
 shift $((${OPTIND} - 1))
 
-unset -v bootnodes REL network_type dns_zone
+unset -v bootnodes REL network_type dns_zone syncdir
 
 case "${node_type}" in
 validator) ;;
@@ -268,6 +268,7 @@ mainnet)
   REL=mainnet
   network_type=mainnet
   dns_zone=t.hmny.io
+  syncdir=mainnet.min
   ;;
 testnet)  # TODO: update Testnet configs once LRTN is upgraded
   bootnodes=(
@@ -277,6 +278,7 @@ testnet)  # TODO: update Testnet configs once LRTN is upgraded
   REL=testnet
   network_type=testnet
   dns_zone=p.hmny.io
+  syncdir=lrtn
   ;;
 staking)
   bootnodes=(
@@ -286,6 +288,7 @@ staking)
   REL=pangaea
   network_type=pangaea
   dns_zone=os.hmny.io
+  syncdir=ostn
   ;;
 partner)
   bootnodes=(
@@ -295,6 +298,7 @@ partner)
   REL=partner
   network_type=partner
   dns_zone=ps.hmny.io
+  syncdir=pstn
   ;;
 stress)
   bootnodes=(
@@ -303,6 +307,7 @@ stress)
   REL=stressnet
   network_type=stressnet
   dns_zone=stn.hmny.io
+  syncdir=stn
   ;;
 devnet)
   bootnodes=(
@@ -312,6 +317,7 @@ devnet)
   REL=devnet
   network_type=devnet
   dns_zone=pga.hmny.io
+  syncdir=devnet
   ;;
 *)
   err 64 "${network}: invalid network"
@@ -631,6 +637,24 @@ then
       mv -f harmony_db_* latest .dht* "${backup_dir}/" 2>/dev/null || :
       rm -rf latest
    fi
+
+   # do rclone sync
+   if ! which rclone > /dev/null; then
+      msg "installing rclone to fast sync db"
+      msg "curl https://rclone.org/install.sh | sudo bash"
+      curl https://rclone.org/install.sh | sudo bash
+      mkdir -p ~/.config/rclone
+      cat<<-EOT>~/.config/rclone/rclone.conf
+[hmy]
+type = s3
+provider = AWS
+env_auth = false
+region = us-west-1
+acl = public-read
+EOT
+   fi
+   msg "Syncing harmony_db_0"
+   rclone sync -P hmy://pub.harmony.one/$syncdir/harmony_db_0 harmony_db_0
 fi
 mkdir -p latest
 
