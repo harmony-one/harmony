@@ -126,8 +126,9 @@ func (bc *BlockChain) CommitOffChainData(
 
 	// Snapshot for all validators at the second to last block
 	// This snapshot of the state is consistent with the state used for election
-	if isBeaconChain && shard.Schedule.IsLastBlock(header.Number().Uint64() + 1) {
+	if isBeaconChain && shard.Schedule.IsLastBlock(header.Number().Uint64()+1) {
 		// Update snapshots for all validators
+		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
 		if err := bc.UpdateValidatorSnapshots(batch, epoch, state); err != nil {
 			return NonStatTy, err
 		}
