@@ -2352,47 +2352,51 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			}
 		}
 		stats.MetricsPerShard = earningWrapping
-		wrapper, err := state.ValidatorWrapper(key)
-		if err != nil {
-			return err
-		}
 
-		aprComputed, err := apr.ComputeForValidator(
-			bc, block, wrapper,
-		)
-		if err == nil && aprComputed != nil {
-			a := *aprComputed
-			utils.Logger().Info().
-				Str("return-rate", a.String()).
-				Uint64("new-epoch", newEpochSuperCommittee.Epoch.Uint64()).
-				Msg("apr computed")
-			stats.APR = a
-		}
+		// This means it's already in staking epoch
+		if currentEpochSuperCommittee.Epoch != nil {
+			wrapper, err := state.ValidatorWrapper(key)
+			if err != nil {
+				return err
+			}
 
-		if err != nil {
-			utils.Logger().Debug().Err(err).Msg("issue with compute of apr")
-		}
+			aprComputed, err := apr.ComputeForValidator(
+				bc, block, wrapper,
+			)
+			if err == nil && aprComputed != nil {
+				a := *aprComputed
+				utils.Logger().Info().
+					Str("return-rate", a.String()).
+					Uint64("new-epoch", newEpochSuperCommittee.Epoch.Uint64()).
+					Msg("apr computed")
+				stats.APR = a
+			}
 
-		snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
-			currentEpochSuperCommittee.Epoch, wrapper.Address,
-		)
+			if err != nil {
+				utils.Logger().Debug().Err(err).Msg("issue with compute of apr")
+			}
 
-		if err != nil {
-			return err
-		}
+			snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
+				currentEpochSuperCommittee.Epoch, wrapper.Address,
+			)
 
-		computed := availability.ComputeCurrentSigning(snapshot, wrapper)
+			if err != nil {
+				return err
+			}
 
-		if _, wasBooted := bootedFromSuperCommittee[wrapper.Address]; wasBooted {
-			stats.BootedStatus = effective.LostEPoSAuction
-		}
+			computed := availability.ComputeCurrentSigning(snapshot, wrapper)
 
-		if computed.IsBelowThreshold {
-			stats.BootedStatus = effective.InsufficientUptimeDuringEpoch
-		}
+			if _, wasBooted := bootedFromSuperCommittee[wrapper.Address]; wasBooted {
+				stats.BootedStatus = effective.LostEPoSAuction
+			}
 
-		if slash.IsBanned(wrapper) {
-			stats.BootedStatus = effective.BannedForDoubleSigning
+			if computed.IsBelowThreshold {
+				stats.BootedStatus = effective.InsufficientUptimeDuringEpoch
+			}
+
+			if slash.IsBanned(wrapper) {
+				stats.BootedStatus = effective.BannedForDoubleSigning
+			}
 		}
 
 		if err := rawdb.WriteValidatorStats(
