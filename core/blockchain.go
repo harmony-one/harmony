@@ -2430,7 +2430,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 // UpdateValidatorSnapshots updates the content snapshot of all validators
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateValidatorSnapshots(
-	batch rawdb.DatabaseWriter, epoch *big.Int, state *state.DB,
+	batch rawdb.DatabaseWriter, epoch *big.Int, state *state.DB, newValidators []common.Address,
 ) error {
 	// Note this is reading the validator list from last block.
 	// It's fine since the new validators from this block is already snapshot when created.
@@ -2439,6 +2439,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 		return err
 	}
 
+	allValidators = append(allValidators, newValidators...)
 	// TODO: enable this once we allow validator to delete itself.
 	//err = bc.deleteValidatorSnapshots(allValidators)
 	//if err != nil {
@@ -2544,49 +2545,49 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 func (bc *BlockChain) UpdateStakingMetaData(
 	batch rawdb.DatabaseWriter, txns staking.StakingTransactions,
 	state *state.DB, epoch *big.Int,
-) error {
+) (newValidators []common.Address, err error) {
 	newValidators, newDelegations, err := bc.prepareStakingMetaData(txns, state)
 	if err != nil {
 		utils.Logger().Warn().Msgf("oops, prepareStakingMetaData failed, err: %+v", err)
-		return err
+		return newValidators, err
 	}
 
 	if len(newValidators) > 0 {
 		list, err := bc.ReadValidatorList()
 		if err != nil {
-			return err
+			return newValidators, err
 		}
 
 		for _, addr := range newValidators {
 			newList, appended := utils.AppendIfMissing(list, addr)
 			if !appended {
-				return errValidatorExist
+				return newValidators, errValidatorExist
 			}
 			list = newList
 
 			// Update validator snapshot for the new validator
 			validator, err := state.ValidatorWrapper(addr)
 			if err != nil {
-				return err
+				return newValidators, err
 			}
 
 			if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
-				return err
+				return newValidators, err
 			}
 		}
 
 		// Update validator list
 		if err = bc.WriteValidatorList(batch, list); err != nil {
-			return err
+			return newValidators, err
 		}
 	}
 
 	for addr, delegations := range newDelegations {
 		if err := bc.writeDelegationsByDelegator(batch, addr, delegations); err != nil {
-			return err
+			return newValidators, err
 		}
 	}
-	return nil
+	return newValidators, nil
 }
 
 // prepareStakingMetaData prepare the updates of validator's
