@@ -10,7 +10,6 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -265,13 +264,7 @@ func VerifyAndUndelegateFromMsg(
 			if err := wrapper.SanityCheck(
 				staking.DoNotEnforceMaxBLS,
 			); err != nil {
-				// allow self delegation to go below min self delegation
-				// but set the status to inactive
-				if errors.Cause(err) == staking.ErrInvalidSelfDelegation {
-					wrapper.Status = effective.Inactive
-				} else {
-					return nil, err
-				}
+				return nil, err
 			}
 			return wrapper, nil
 		}
