@@ -93,9 +93,10 @@ func (bc *BlockChain) CommitOffChainData(
 	//}
 
 	// Do bookkeeping for new staking txns
-	if err := bc.UpdateStakingMetaData(
+	newVals, err := bc.UpdateStakingMetaData(
 		batch, block.StakingTransactions(), state, epoch,
-	); err != nil {
+	)
+	if err != nil {
 		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")
 		return NonStatTy, err
 	}
@@ -129,7 +130,7 @@ func (bc *BlockChain) CommitOffChainData(
 	if isBeaconChain && shard.Schedule.IsLastBlock(header.Number().Uint64()+1) {
 		// Update snapshots for all validators
 		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
-		if err := bc.UpdateValidatorSnapshots(batch, epoch, state); err != nil {
+		if err := bc.UpdateValidatorSnapshots(batch, epoch, state, newVals); err != nil {
 			return NonStatTy, err
 		}
 	}
