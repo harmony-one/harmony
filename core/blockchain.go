@@ -2229,7 +2229,8 @@ func (bc *BlockChain) ReadValidatorSnapshotAtEpoch(
 func (bc *BlockChain) ReadValidatorSnapshot(
 	addr common.Address,
 ) (*staking.ValidatorWrapper, error) {
-	if cached, ok := bc.validatorCache.Get("validator-snapshot-" + string(addr.Bytes())); ok {
+	epoch := bc.CurrentBlock().Epoch()
+	if cached, ok := bc.validatorCache.Get("validator-snapshot-" + string(addr.Bytes()) + epoch.String()); ok {
 		by := cached.([]byte)
 		v := staking.ValidatorWrapper{}
 		if err := rlp.DecodeBytes(by, &v); err != nil {
@@ -2238,7 +2239,7 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 		return &v, nil
 	}
 
-	return rawdb.ReadValidatorSnapshot(bc.db, addr, bc.CurrentBlock().Epoch())
+	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
 }
 
 // writeValidatorSnapshots writes the snapshot of provided list of validators
@@ -2266,7 +2267,7 @@ func (bc *BlockChain) writeValidatorSnapshots(
 	for i := range validators {
 		by, err := rlp.EncodeToBytes(validators[i])
 		if err == nil {
-			key := "validator-snapshot-" + string(validators[i].Address.Bytes())
+			key := "validator-snapshot-" + string(validators[i].Address.Bytes()) + epoch.String()
 			bc.validatorCache.Add(key, by)
 		}
 	}
