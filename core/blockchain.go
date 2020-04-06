@@ -2544,7 +2544,7 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateStakingMetaData(
 	batch rawdb.DatabaseWriter, txns staking.StakingTransactions,
-	state *state.DB, epoch *big.Int,
+	state *state.DB, epoch *big.Int, isNewEpoch bool,
 ) (newValidators []common.Address, err error) {
 	newValidators, newDelegations, err := bc.prepareStakingMetaData(txns, state)
 	if err != nil {
@@ -2573,6 +2573,14 @@ func (bc *BlockChain) UpdateStakingMetaData(
 
 			if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
 				return newValidators, err
+			}
+			// For validator created at exactly the last block of an epoch, we should create the snapshot
+			// for next epoch too.
+			if isNewEpoch {
+				newEpoch := new(big.Int).Add(epoch, common.Big1)
+				if err := rawdb.WriteValidatorSnapshot(batch, validator, newEpoch); err != nil {
+					return newValidators, err
+				}
 			}
 		}
 

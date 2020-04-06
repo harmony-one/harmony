@@ -94,7 +94,7 @@ func (bc *BlockChain) CommitOffChainData(
 
 	// Do bookkeeping for new staking txns
 	newVals, err := bc.UpdateStakingMetaData(
-		batch, block.StakingTransactions(), state, epoch,
+		batch, block.StakingTransactions(), state, epoch, isNewEpoch,
 	)
 	if err != nil {
 		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")
