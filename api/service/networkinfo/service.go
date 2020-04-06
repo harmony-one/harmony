@@ -201,10 +201,14 @@ func (s *Service) DoService() {
 			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
 			// 0 is beacon chain FIXME: use a constant
 			libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
-			utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Successfully announced!")
+			utils.Logger().Info().
+				Str("Rendezvous", string(s.Rendezvous)).
+				Msg("Successfully announced!")
 		default:
 			var err error
-			s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous), coredis.Limit(discoveryLimit))
+			s.peerInfo, err = s.discovery.FindPeers(
+				ctx, string(s.Rendezvous), coredis.Limit(discoveryLimit),
+			)
 			if err != nil {
 				utils.Logger().Error().Err(err).Msg("FindPeers")
 				return
@@ -224,11 +228,6 @@ func (s *Service) findPeers(ctx context.Context) {
 	}
 	for peer := range s.peerInfo {
 		if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
-			// utils.Logger().Info().
-			// 	Interface("peer", peer.ID).
-			// 	Interface("addr", peer.Addrs).
-			// 	Interface("my ID", s.Host.GetP2PHost().ID()).
-			// 	Msg("Found Peer")
 			if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
 				utils.Logger().Warn().Err(err).Interface("peer", peer).Msg("can't connect to peer node")
 				// break if the node can't connect to peers, waiting for another peer
@@ -260,7 +259,6 @@ func (s *Service) findPeers(ctx context.Context) {
 	}
 
 	utils.Logger().Info().Msg("PeerInfo Channel Closed")
-	return
 }
 
 // StopService stops network info service.
@@ -279,9 +277,7 @@ func (s *Service) StopService() {
 }
 
 // NotifyService notify service
-func (s *Service) NotifyService(params map[string]interface{}) {
-	return
-}
+func (s *Service) NotifyService(params map[string]interface{}) {}
 
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
