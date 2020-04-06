@@ -138,7 +138,6 @@ type BlockChain struct {
 	pendingCrossLinksMutex      sync.RWMutex // pending crosslinks lock
 	pendingSlashingCandidatesMU sync.RWMutex // pending slashing candidates
 
-	checkpoint       int          // checkpoint counts towards the new checkpoint
 	currentBlock     atomic.Value // Current head of the block chain
 	currentFastBlock atomic.Value // Current head of the fast-sync chain (may be above the block chain!)
 
@@ -1590,26 +1589,6 @@ func (bc *BlockChain) InsertHeaderChain(chain []*block.Header, checkFreq int) (i
 	return bc.hc.InsertHeaderChain(chain, whFunc, start)
 }
 
-// writeHeader writes a header into the local chain, given that its parent is
-// already known. If the total difficulty of the newly inserted header becomes
-// greater than the current known TD, the canonical chain is re-routed.
-//
-// Note: This method is not concurrent-safe with inserting blocks simultaneously
-// into the chain, as side effects caused by reorganisations cannot be emulated
-// without the real blocks. Hence, writing headers directly should only be done
-// in two scenarios: pure-header mode of operation (light clients), or properly
-// separated header/block phases (non-archive clients).
-func (bc *BlockChain) writeHeader(header *block.Header) error {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
-
-	_, err := bc.hc.WriteHeader(header)
-	return err
-}
-
 // CurrentHeader retrieves the current head header of the canonical chain. The
 // header is retrieved from the HeaderChain's internal cache.
 func (bc *BlockChain) CurrentHeader() *block.Header {
@@ -2180,10 +2159,7 @@ func (bc *BlockChain) IsSpent(cxp *types.CXReceiptsProof) bool {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()
 	by, _ := rawdb.ReadCXReceiptsProofSpent(bc.db, shardID, blockNum)
-	if by == rawdb.SpentByte {
-		return true
-	}
-	return false
+	return by == rawdb.SpentByte
 }
 
 // ReadTxLookupEntry returns where the given transaction resides in the chain,
@@ -2349,7 +2325,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		for i := range value {
 			earningWrapping[i] = staking.VoteWithCurrentEpochEarning{
 				Vote:   value[i],
-				Earned: common.Big0,
+				Earned: big.NewInt(0),
 			}
 		}
 		stats.MetricsPerShard = earningWrapping
@@ -2714,7 +2690,7 @@ func (bc *BlockChain) addDelegationIndex(
 	// If there is an existing delegation, just return
 	validatorAddressBytes := validatorAddress.Bytes()
 	for _, delegation := range delegations {
-		if bytes.Compare(delegation.ValidatorAddress.Bytes(), validatorAddressBytes) == 0 {
+		if bytes.Equal(delegation.ValidatorAddress[:], validatorAddressBytes[:]) {
 			return delegations, nil
 		}
 	}
@@ -2726,7 +2702,9 @@ func (bc *BlockChain) addDelegationIndex(
 		return delegations, err
 	}
 	for i := range wrapper.Delegations {
-		if bytes.Compare(wrapper.Delegations[i].DelegatorAddress.Bytes(), delegatorAddress.Bytes()) == 0 {
+		if bytes.Equal(
+			wrapper.Delegations[i].DelegatorAddress[:], delegatorAddress[:],
+		) {
 			// TODO(audit): change the way of indexing if we allow delegation deletion.
 			delegations = append(delegations, staking.DelegationIndex{
 				validatorAddress,
@@ -2778,7 +2756,7 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 	}
 	for _, member := range committee.Slots {
 		// After staking the coinbase address will be the address of bls public key
-		if bytes.Compare(member.EcdsaAddress[:], coinbase[:]) == 0 {
+		if bytes.Equal(member.EcdsaAddress[:], coinbase[:]) {
 			return member.EcdsaAddress, nil
 		}
 
