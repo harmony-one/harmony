@@ -2,8 +2,9 @@ package core
 
 import (
 	"bytes"
-	"github.com/ethereum/go-ethereum/common"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/vm"
