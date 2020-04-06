@@ -138,8 +138,7 @@ func TestBlockStorage(t *testing.T) {
 	if entry := ReadBody(db, block.Hash(), block.NumberU64()); entry == nil {
 		t.Fatalf("Stored body not found")
 	} else if types.DeriveSha(types.Transactions(entry.Transactions())) != types.DeriveSha(block.Transactions()) ||
-		types.DeriveSha(staking.StakingTransactions(entry.StakingTransactions())) != types.DeriveSha(block.StakingTransactions()) ||
-		types.CalcUncleHash(entry.Uncles()) != types.CalcUncleHash(block.Uncles()) {
+		types.DeriveSha(staking.StakingTransactions(entry.StakingTransactions())) != types.DeriveSha(block.StakingTransactions()) {
 		t.Fatalf("Retrieved body mismatch: have %v, want %v", entry, block.Body())
 	}
 	//if actual, err := ReadEpochBlockNumber(db, big.NewInt(0)); err != nil {
