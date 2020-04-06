@@ -192,7 +192,6 @@ func TestAddPeers(t *testing.T) {
 	blsKey := bls2.RandPrivateKey()
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
@@ -242,7 +241,6 @@ func TestAddBeaconPeer(t *testing.T) {
 	blsKey := bls2.RandPrivateKey()
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
