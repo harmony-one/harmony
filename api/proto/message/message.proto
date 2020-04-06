@@ -1,7 +1,6 @@
 syntax = "proto3";
 package message;
 
-
 // Client is the service used for any client-facing requests.
 service ClientService {
   rpc Process(Message) returns (Response) {}
@@ -10,24 +9,18 @@ service ClientService {
 // ServiceType indicates which service used to generate this message.
 enum ServiceType {
   CONSENSUS = 0;
-  STAKING = 1;
-  DRAND = 2;
   CLIENT_SUPPORT = 3;
 }
 
 // MessageType indicates what is the type of this message.
 enum MessageType {
-  NEWNODE_BEACON_STAKING = 0;
-  ANNOUNCE = 1;
-  PREPARE = 2;
-  PREPARED = 3;
-  COMMIT = 4;
-  COMMITTED = 5;
-  VIEWCHANGE = 6;
-  NEWVIEW = 7;
-  DRAND_INIT = 10;
-  DRAND_COMMIT = 11; 
-  LOTTERY_REQUEST = 12; // it should be either ENTER or GETPLAYERS but it will be removed later.
+  ANNOUNCE = 0;
+  PREPARE = 1;
+  PREPARED = 2;
+  COMMIT = 3;
+  COMMITTED = 4;
+  VIEWCHANGE = 5;
+  NEWVIEW = 6;
 }
 
 // This is universal message for all communication protocols.
@@ -40,43 +33,14 @@ message Message {
   MessageType type = 2;
   bytes signature = 3;
   oneof request {
-      StakingRequest staking = 4;
-      ConsensusRequest consensus = 5;
-      DrandRequest drand = 6;
-      ViewChangeRequest viewchange = 7;
-      // Refactor this later after demo.
-      LotteryRequest lottery_request = 8;
+      ConsensusRequest consensus = 4;
+      ViewChangeRequest viewchange = 5;
   }
 }
 
 message Response {
   ServiceType service_type = 1;
   MessageType type = 2;
-  oneof response {
-    LotteryResponse lottery_response = 3;
-  }
-}
-
-message LotteryResponse {
-  repeated string players = 2;
-  repeated string balances = 3;
-}
-
-message LotteryRequest {
-  enum Type {
-    ENTER = 0;
-    RESULT = 1;
-    PICK_WINNER = 2;
-  }
-  Type type = 1;
-  string private_key = 2;
-  int64 amount = 3;
-}
-
-// Staking Request from new node to beacon node.
-message StakingRequest {
-  bytes transaction = 1;
-  string node_id = 2;
 }
 
 message ConsensusRequest {
@@ -89,13 +53,6 @@ message ConsensusRequest {
   bytes payload = 7;
 }
 
-message DrandRequest {
-  uint32 shard_id = 1;
-  bytes sender_pubkey = 2;
-  bytes block_hash = 3;
-  bytes payload = 4;
-}
-
 message ViewChangeRequest {
     uint64 view_id = 1;
     uint64 block_num = 2;
@@ -105,12 +62,10 @@ message ViewChangeRequest {
     bytes payload = 6; // message payload: either m1 type or m2 type
     bytes viewchange_sig = 7; // signature on payload
     bytes viewid_sig = 8; // signature on view_id
-                        
     // below is for newview message only
     // only need 1 valid m1 type message which is in payload
     bytes m2_aggsigs = 9; // m2: |nil|
     bytes m2_bitmap = 10;
     bytes m3_aggsigs = 11; // m3: |viewID|
     bytes m3_bitmap= 12;
-
 }
