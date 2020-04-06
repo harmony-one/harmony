@@ -2358,7 +2358,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		if currentEpochSuperCommittee.Epoch != nil {
 			wrapper, err := state.ValidatorWrapper(key)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			aprComputed, err := apr.ComputeForValidator(
@@ -2382,7 +2382,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			)
 
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			computed := availability.ComputeCurrentSigning(snapshot, wrapper)
@@ -2394,6 +2394,11 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			if computed.IsBelowThreshold {
 				stats.BootedStatus = effective.InsufficientUptimeDuringEpoch
 			}
+
+			if slash.IsBanned(wrapper) {
+				stats.BootedStatus = effective.BannedForDoubleSigning
+			}
+		}
 
 			if slash.IsBanned(wrapper) {
 				stats.BootedStatus = effective.BannedForDoubleSigning
