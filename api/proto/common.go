@@ -30,8 +30,6 @@ const (
 	Consensus MessageCategory = iota
 	Node
 	Client
-	DRand
-	// TODO: add more types
 )
 
 const (
@@ -75,32 +73,9 @@ func GetConsensusMessagePayload(message []byte) ([]byte, error) {
 	return message[MessageCategoryBytes:], nil
 }
 
-// GetDRandMessagePayload gets the randomness message payload from the p2p message content
-func GetDRandMessagePayload(message []byte) ([]byte, error) {
-	if len(message) < MessageCategoryBytes {
-		return []byte{}, errors.New("failed to get message payload: no data available")
-	}
-	return message[MessageCategoryBytes:], nil
-}
-
-// GetStakingMessagePayload gets the staking message payload from the p2p message content
-func GetStakingMessagePayload(message []byte) ([]byte, error) {
-	if len(message) < MessageCategoryBytes {
-		return []byte{}, errors.New("failed to get message payload: no data available")
-	}
-	return message[MessageCategoryBytes:], nil
-}
-
 // ConstructConsensusMessage creates a message with the payload and returns as byte array.
 func ConstructConsensusMessage(payload []byte) []byte {
 	byteBuffer := bytes.NewBuffer([]byte{byte(Consensus)})
-	byteBuffer.Write(payload)
-	return byteBuffer.Bytes()
-}
-
-// ConstructDRandMessage creates a message with the payload and returns as byte array.
-func ConstructDRandMessage(payload []byte) []byte {
-	byteBuffer := bytes.NewBuffer([]byte{byte(DRand)})
 	byteBuffer.Write(payload)
 	return byteBuffer.Bytes()
 }

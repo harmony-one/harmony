@@ -551,14 +551,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Setup block period for currentNode.
 	currentNode.BlockPeriod = time.Duration(*blockPeriod) * time.Second
 
-	// TODO: Disable drand. Currently drand isn't functioning but we want to compeletely turn it off for full protection.
-	// Enable it back after mainnet.
-	// dRand := drand.New(nodeConfig.Host, nodeConfig.ShardID, []p2p.Peer{}, nodeConfig.Leader, currentNode.ConfirmedBlockChannel, nodeConfig.ConsensusPriKey)
-	// currentNode.Consensus.RegisterPRndChannel(dRand.PRndChannel)
-	// currentNode.Consensus.RegisterRndChannel(dRand.RndChannel)
-	// currentNode.DRand = dRand
-
-	// This needs to be executed after consensus and drand are setup
+	// This needs to be executed after consensus setup
 	if err := currentNode.InitConsensusWithValidators(); err != nil {
 		utils.Logger().Warn().
 			Int("shardID", *shardID).
