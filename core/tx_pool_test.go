@@ -176,34 +176,6 @@ func validateTxPoolInternals(pool *TxPool) error {
 	return nil
 }
 
-// validateEvents checks that the correct number of transaction addition events
-// were fired on the pool's event feed.
-func validateEvents(events chan NewTxsEvent, count int) error {
-	var received []*types.Transaction
-
-	for len(received) < count {
-		select {
-		case ev := <-events:
-			received = append(received, ev.Txs...)
-		case <-time.After(time.Second):
-			return fmt.Errorf("event #%d not fired", len(received))
-		}
-	}
-	if len(received) > count {
-		return fmt.Errorf("more than %d events fired: %v", count, received[count:])
-	}
-	select {
-	case ev := <-events:
-		return fmt.Errorf("more than %d events fired: %v", count, ev.Txs)
-
-	case <-time.After(50 * time.Millisecond):
-		// This branch should be "default", but it's a data race between goroutines,
-		// reading the event channel and pushing into it, so better wait a bit ensuring
-		// really nothing gets injected.
-	}
-	return nil
-}
-
 func deriveSender(tx types.PoolTransaction) (common.Address, error) {
 	return types.PoolTransactionSender(types.HomesteadSigner{}, tx)
 }
