@@ -2287,9 +2287,9 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 	block *types.Block,
 	newEpochSuperCommittee, currentEpochSuperCommittee *shard.State,
 	state *state.DB,
-) (map[common.Address]*staking.ValidatorStats, error) {
+) error {
 	if newEpochSuperCommittee == nil {
-		return nil, shard.ErrSuperCommitteeNil
+		return shard.ErrSuperCommitteeNil
 	}
 
 	rosters, bootedFromSuperCommittee :=
@@ -2319,7 +2319,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 	for i := range newEpochSuperCommittee.Shards {
 		subCommittee := &newEpochSuperCommittee.Shards[i]
 		if newEpochSuperCommittee.Epoch == nil {
-			return nil, errors.Wrapf(
+			return errors.Wrapf(
 				errNilEpoch,
 				"block epoch %v current-committee-epoch %v",
 				block.Epoch(),
@@ -2328,13 +2328,13 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		}
 		roster, err := votepower.Compute(subCommittee, newEpochSuperCommittee.Epoch)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		rosters[i] = roster
 	}
 
-	validatorStats := map[common.Address]*staking.ValidatorStats{}
 	networkWide := votepower.AggregateRosters(rosters)
+
 	for key, value := range networkWide {
 		stats, err := rawdb.ReadValidatorStats(bc.db, key)
 		if err != nil {
@@ -2358,7 +2358,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		if currentEpochSuperCommittee.Epoch != nil {
 			wrapper, err := state.ValidatorWrapper(key)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			aprComputed, err := apr.ComputeForValidator(
@@ -2382,7 +2382,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			)
 
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			computed := availability.ComputeCurrentSigning(snapshot, wrapper)
@@ -2399,10 +2399,15 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				stats.BootedStatus = effective.BannedForDoubleSigning
 			}
 		}
-		validatorStats[key] = stats
+
+		if err := rawdb.WriteValidatorStats(
+			batch, key, stats,
+		); err != nil {
+			return err
+		}
 	}
 
-	return validatorStats, nil
+	return nil
 }
 
 // deleteValidatorSnapshots deletes the snapshot staking information of given validator address
