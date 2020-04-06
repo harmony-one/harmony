@@ -92,26 +92,17 @@ func (bc *BlockChain) CommitOffChainData(
 	//	}
 	//}
 
-	// Do bookkeeping for new staking txns
-	newVals, err := bc.UpdateStakingMetaData(
-		batch, block.StakingTransactions(), state, epoch, isNewEpoch,
-	)
-	if err != nil {
-		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")
-		return NonStatTy, err
-	}
-
+	newEpoch := new(big.Int).Add(header.Epoch(), common.Big1)
 	// Shard State and Validator Update
 	if isNewEpoch {
 		// Write shard state for the new epoch
-		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
 		shardState, err := block.Header().GetShardState()
 		if err == nil && shardState.Epoch != nil && bc.chainConfig.IsStaking(shardState.Epoch) {
 			// After staking, the epoch will be decided by the epoch in the shard state.
-			epoch = new(big.Int).Set(shardState.Epoch)
+			newEpoch = new(big.Int).Set(shardState.Epoch)
 		}
 
-		newShardState, err := bc.WriteShardStateBytes(batch, epoch, header.ShardState())
+		newShardState, err := bc.WriteShardStateBytes(batch, newEpoch, header.ShardState())
 		if err != nil {
 			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
 			return NonStatTy, err
@@ -125,12 +116,20 @@ func (bc *BlockChain) CommitOffChainData(
 		}
 	}
 
-	// Snapshot for all validators at the second to last block
+	// Do bookkeeping for new staking txns
+	newVals, err := bc.UpdateStakingMetaData(
+		batch, block.StakingTransactions(), state, epoch, newEpoch,
+	)
+	if err != nil {
+		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")
+		return NonStatTy, err
+	}
+
+	// Snapshot for all validators for new epoch at the second to last block
 	// This snapshot of the state is consistent with the state used for election
 	if isBeaconChain && shard.Schedule.IsLastBlock(header.Number().Uint64()+1) {
 		// Update snapshots for all validators
-		epoch := new(big.Int).Add(header.Epoch(), common.Big1)
-		if err := bc.UpdateValidatorSnapshots(batch, epoch, state, newVals); err != nil {
+		if err := bc.UpdateValidatorSnapshots(batch, newEpoch, state, newVals); err != nil {
 			return NonStatTy, err
 		}
 	}
@@ -187,12 +186,11 @@ func (bc *BlockChain) CommitOffChainData(
 		for i, c := uint32(0), shard.Schedule.InstanceForEpoch(
 			epoch,
 		).NumShards(); i < c; i++ {
-			if err := bc.LastContinuousCrossLink(batch, i); err != nil {
-				utils.Logger().Info().
-					Err(err).Msg("could not batch process last continuous crosslink")
-			}
+			bc.LastContinuousCrossLink(batch, i)
 		}
 	}
+
+	// BELOW ARE NON-MISSION-CRITICAL COMMITS
 
 	// Update voting power of validators for all shards
 	tempValidatorStats := map[common.Address]*staking.ValidatorStats{}

@@ -185,6 +185,11 @@ func ComputeCurrentSigning(
 	}
 
 	s1, s2 := numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
+	if s2.IsNil() || s2.IsZero() {
+		// Shouldn't happen
+		utils.Logger().Debug().Interface("toSign", toSign).Msg("s2 is nil or zero")
+		return computed
+	}
 	computed.Percentage = s1.Quo(s2)
 	computed.IsBelowThreshold = IsBelowSigningThreshold(computed.Percentage)
 	return computed
