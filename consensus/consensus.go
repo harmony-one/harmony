@@ -90,8 +90,6 @@ type Consensus struct {
 	block []byte
 	// BlockHeader to run consensus on
 	blockHeader []byte
-	// Array of block hashes.
-	blockHashes [][32]byte
 	// Shard Id which this node belongs to
 	ShardID uint32
 	// whether to ignore viewID check

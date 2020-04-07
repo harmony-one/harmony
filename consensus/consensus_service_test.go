@@ -50,7 +50,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	if !bytes.Equal(consensusMsg.BlockHash[:], blockHash[:]) {
 		t.Errorf("Block hash is not populated correctly")
 	}
-	if bytes.Compare(consensusMsg.SenderPubkey, blsPriKey.GetPublicKey().Serialize()) != 0 {
+	if !bytes.Equal(consensusMsg.SenderPubkey, blsPriKey.GetPublicKey().Serialize()) {
 		t.Errorf("Sender ID is not populated correctly")
 	}
 }

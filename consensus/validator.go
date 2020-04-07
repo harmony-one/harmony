@@ -196,12 +196,14 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	// Optimistically add blockhash field of prepare message
 	emptyHash := [32]byte{}
-	if bytes.Compare(consensus.blockHash[:], emptyHash[:]) == 0 {
+	if bytes.Equal(consensus.blockHash[:], emptyHash[:]) {
 		copy(consensus.blockHash[:], blockHash[:])
 	}
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
-	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+	groupID := []nodeconfig.GroupID{
+		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+	}
 	for i, key := range consensus.PubKey.PublicKey {
 		networkMessage, _ := consensus.construct(
 			// TODO(audit): sign signature on hash+blockNum+viewID (add a hard fork)
