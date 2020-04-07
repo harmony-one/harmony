@@ -30,6 +30,7 @@ const (
 	Consensus MessageCategory = iota
 	Node
 	Client
+	DRand
 )
 
 const (
