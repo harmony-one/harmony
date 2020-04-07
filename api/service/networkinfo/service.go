@@ -201,10 +201,14 @@ func (s *Service) DoService() {
 			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
 			// 0 is beacon chain FIXME: use a constant
 			libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
-			utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Successfully announced!")
+			utils.Logger().Info().
+				Str("Rendezvous", string(s.Rendezvous)).
+				Msg("Successfully announced!")
 		default:
 			var err error
-			s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous), coredis.Limit(discoveryLimit))
+			s.peerInfo, err = s.discovery.FindPeers(
+				ctx, string(s.Rendezvous), coredis.Limit(discoveryLimit),
+			)
 			if err != nil {
 				utils.Logger().Error().Err(err).Msg("FindPeers")
 				return
