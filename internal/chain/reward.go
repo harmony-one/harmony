@@ -74,9 +74,10 @@ func lookupVotingPower(
 	return results.(*votepower.Roster), nil
 }
 
-// AccumulateRewards credits the coinbase of the given block with the mining
+// AccumulateRewardsAndCountSigs credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward
-func AccumulateRewards(
+// This func also do IncrementValidatorSigningCounts for validators
+func AccumulateRewardsAndCountSigs(
 	bc engine.ChainReader, state *state.DB,
 	header *block.Header, beaconChain engine.ChainReader,
 ) (reward.Reader, error) {

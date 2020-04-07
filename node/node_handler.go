@@ -125,15 +125,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 		} else {
 			node.ConsensusMessageHandler(msgPayload)
 		}
-	case proto.DRand:
-		msgPayload, _ := proto.GetDRandMessagePayload(content)
-		if node.DRand != nil {
-			if node.DRand.IsLeader {
-				node.DRand.ProcessMessageLeader(msgPayload)
-			} else {
-				node.DRand.ProcessMessageValidator(msgPayload)
-			}
-		}
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
@@ -153,9 +144,8 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			switch blockMsgType := proto_node.BlockMessageType(msgPayload[0]); blockMsgType {
 			case proto_node.Sync:
 				utils.Logger().Debug().Msg("NET: received message: Node/Sync")
-				var blocks []*types.Block
-				err := rlp.DecodeBytes(msgPayload[1:], &blocks)
-				if err != nil {
+				blocks := []*types.Block{}
+				if err := rlp.DecodeBytes(msgPayload[1:], &blocks); err != nil {
 					utils.Logger().Error().
 						Err(err).
 						Msg("block sync")

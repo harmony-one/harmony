@@ -35,8 +35,11 @@ func TestCompareSyncPeerConfigByblockHashes(t *testing.T) {
 	assert.Equal(t, CompareSyncPeerConfigByblockHashes(syncPeerConfig1, syncPeerConfig2), 0, "syncPeerConfig1 is equal to syncPeerConfig2")
 
 	// syncPeerConfig1 is less than syncPeerConfig2
-	blockHashes1 = blockHashes1[:1]
-	assert.Equal(t, CompareSyncPeerConfigByblockHashes(syncPeerConfig1, syncPeerConfig2), 0, "syncPeerConfig1 is less than syncPeerConfig2")
+	assert.Equal(t,
+		CompareSyncPeerConfigByblockHashes(
+			syncPeerConfig1, syncPeerConfig2,
+		),
+		0, "syncPeerConfig1 is less than syncPeerConfig2")
 }
 
 func TestCreateStateSync(t *testing.T) {
