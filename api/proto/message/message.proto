@@ -10,14 +10,14 @@ service ClientService {
 // ServiceType indicates which service used to generate this message.
 enum ServiceType {
   CONSENSUS = 0;
-  STAKING = 1;
-  DRAND = 2;
+  STAKING = 1 [deprecated=true];
+  DRAND = 2 [deprecated=true];
   CLIENT_SUPPORT = 3;
 }
 
 // MessageType indicates what is the type of this message.
 enum MessageType {
-  NEWNODE_BEACON_STAKING = 0;
+  NEWNODE_BEACON_STAKING = 0 [deprecated=true];
   ANNOUNCE = 1;
   PREPARE = 2;
   PREPARED = 3;
@@ -25,9 +25,9 @@ enum MessageType {
   COMMITTED = 5;
   VIEWCHANGE = 6;
   NEWVIEW = 7;
-  DRAND_INIT = 10;
-  DRAND_COMMIT = 11; 
-  LOTTERY_REQUEST = 12; // it should be either ENTER or GETPLAYERS but it will be removed later.
+  DRAND_INIT = 10 [deprecated=true];
+  DRAND_COMMIT = 11 [deprecated=true];
+  LOTTERY_REQUEST = 12 [deprecated=true]; // it should be either ENTER or GETPLAYERS but it will be removed later.
 }
 
 // This is universal message for all communication protocols.
@@ -40,12 +40,12 @@ message Message {
   MessageType type = 2;
   bytes signature = 3;
   oneof request {
-      StakingRequest staking = 4;
-      ConsensusRequest consensus = 5;
-      DrandRequest drand = 6;
-      ViewChangeRequest viewchange = 7;
-      // Refactor this later after demo.
-      LotteryRequest lottery_request = 8;
+    StakingRequest staking = 4 [deprecated=true];
+    ConsensusRequest consensus = 5 ;
+    DrandRequest drand = 6 [deprecated=true];
+    ViewChangeRequest viewchange = 7;
+    // Refactor this later after demo.
+    LotteryRequest lottery_request = 8 [deprecated=true];
   }
 }
 
@@ -53,30 +53,30 @@ message Response {
   ServiceType service_type = 1;
   MessageType type = 2;
   oneof response {
-    LotteryResponse lottery_response = 3;
+    LotteryResponse lottery_response = 3 [deprecated=true];
   }
 }
 
 message LotteryResponse {
-  repeated string players = 2;
-  repeated string balances = 3;
+  repeated string players = 2 [deprecated=true];
+  repeated string balances = 3 [deprecated=true];
 }
 
 message LotteryRequest {
   enum Type {
-    ENTER = 0;
-    RESULT = 1;
-    PICK_WINNER = 2;
+    ENTER = 0 [deprecated=true];
+    RESULT = 1 [deprecated=true];
+    PICK_WINNER = 2 [deprecated=true];
   }
-  Type type = 1;
-  string private_key = 2;
-  int64 amount = 3;
+  Type type = 1 [deprecated=true];
+  string private_key = 2 [deprecated=true];
+  int64 amount = 3 [deprecated=true];
 }
 
 // Staking Request from new node to beacon node.
 message StakingRequest {
-  bytes transaction = 1;
-  string node_id = 2;
+  bytes transaction = 1 [deprecated=true];
+  string node_id = 2 [deprecated=true];
 }
 
 message ConsensusRequest {
@@ -90,27 +90,27 @@ message ConsensusRequest {
 }
 
 message DrandRequest {
-  uint32 shard_id = 1;
-  bytes sender_pubkey = 2;
-  bytes block_hash = 3;
-  bytes payload = 4;
+  uint32 shard_id = 1 [deprecated=true];
+  bytes sender_pubkey = 2 [deprecated=true];
+  bytes block_hash = 3 [deprecated=true];
+  bytes payload = 4 [deprecated=true];
 }
 
 message ViewChangeRequest {
-    uint64 view_id = 1;
-    uint64 block_num = 2;
-    uint32 shard_id = 3;
-    bytes sender_pubkey = 4;
-    bytes leader_pubkey = 5;
-    bytes payload = 6; // message payload: either m1 type or m2 type
-    bytes viewchange_sig = 7; // signature on payload
-    bytes viewid_sig = 8; // signature on view_id
-                        
-    // below is for newview message only
-    // only need 1 valid m1 type message which is in payload
-    bytes m2_aggsigs = 9; // m2: |nil|
-    bytes m2_bitmap = 10;
-    bytes m3_aggsigs = 11; // m3: |viewID|
-    bytes m3_bitmap= 12;
+  uint64 view_id = 1;
+  uint64 block_num = 2;
+  uint32 shard_id = 3;
+  bytes sender_pubkey = 4;
+  bytes leader_pubkey = 5;
+  bytes payload = 6; // message payload: either m1 type or m2 type
+  bytes viewchange_sig = 7; // signature on payload
+  bytes viewid_sig = 8; // signature on view_id
+
+  // below is for newview message only
+  // only need 1 valid m1 type message which is in payload
+  bytes m2_aggsigs = 9; // m2: |nil|
+  bytes m2_bitmap = 10;
+  bytes m3_aggsigs = 11; // m3: |viewID|
+  bytes m3_bitmap= 12;
 
 }
