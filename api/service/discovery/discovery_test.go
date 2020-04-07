@@ -12,7 +12,11 @@ import (
 	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
-var dService *Service
+var (
+	ip       = "127.0.0.1"
+	port     = "7099"
+	dService *Service
+)
 
 func TestDiscoveryService(t *testing.T) {
 	nodePriKey, _, err := utils.LoadKeyFromFile("/tmp/127.0.0.1.12345.key")

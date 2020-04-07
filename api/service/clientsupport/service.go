@@ -52,7 +52,9 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 }
 
 // NotifyService notify service
-func (s *Service) NotifyService(params map[string]interface{}) {}
+func (s *Service) NotifyService(params map[string]interface{}) {
+	return
+}
 
 // APIs for the services.
 func (s *Service) APIs() []rpc.API {

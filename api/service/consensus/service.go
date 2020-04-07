@@ -41,7 +41,9 @@ func (s *Service) StopService() {
 }
 
 // NotifyService notify service
-func (s *Service) NotifyService(params map[string]interface{}) {}
+func (s *Service) NotifyService(params map[string]interface{}) {
+	return
+}
 
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
