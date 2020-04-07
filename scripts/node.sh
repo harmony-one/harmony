@@ -56,6 +56,7 @@ function check_root
    if [[ $EUID -ne 0 ]]; then
       msg "this script must be run as root to setup environment"
       msg please use \"sudo ${progname}\"
+      msg "you may use -S option to run as normal user"
       exit 1
    fi
 }
