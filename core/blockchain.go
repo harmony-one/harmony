@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/harmony-one/harmony/internal/configs/node"
 	"io"
 	"math/big"
 	"sync"
@@ -55,7 +54,7 @@ import (
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )
 
@@ -1960,10 +1959,6 @@ func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 	} else {
 		bytes, err := rawdb.ReadPendingCrossLinks(bc.db)
 		if err != nil || len(bytes) == 0 {
-			if nodeconfig.GetDefaultConfig().ShardID == shard.BeaconChainShardID {
-				// Only beacon chain worries about this
-				utils.Logger().Info().Err(err).Int("dataLen", len(bytes)).Msg("ReadPendingCrossLinks")
-			}
 			return nil, err
 		}
 	}
