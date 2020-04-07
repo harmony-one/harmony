@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"fmt"
-	"sync"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,7 +17,6 @@ type FBFTLog struct {
 	blocks     mapset.Set //store blocks received in FBFT
 	messages   mapset.Set // store messages received in FBFT
 	maxLogSize uint32
-	mutex      sync.Mutex
 }
 
 // FBFTMessage is the record of pbft messages received by a node during FBFT process

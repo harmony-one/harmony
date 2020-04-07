@@ -339,7 +339,7 @@ func (consensus *Consensus) Start(
 			select {
 			case <-ticker.C:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ticker")
-				if toStart == false && isInitialLeader {
+				if !toStart && isInitialLeader {
 					continue
 				}
 				for k, v := range consensus.consensusTimeout {
@@ -452,12 +452,9 @@ func (consensus *Consensus) Start(
 									Uint64("MsgBlockNum", newBlock.NumberU64()).
 									Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
 									Msg("[ConsensusMainLoop] Generated a new VDF")
-
 								newBlock.AddVdf(vdfOutput[:])
 							}
 						}
-					} else {
-						//consensus.getLogger().Error().Err(err). Msg("[ConsensusMainLoop] Failed to get randomness")
 					}
 				}
 
@@ -585,7 +582,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 		outputChannel := vdf.GetOutputChannel()
 		start := time.Now()
 		vdf.Execute()
-		duration := time.Now().Sub(start)
+		duration := time.Since(start)
 		consensus.getLogger().Info().
 			Dur("duration", duration).
 			Msg("[ConsensusMainLoop] VDF computation finished")
