@@ -742,6 +742,7 @@ func main() {
 		os.Exit(1)
 	}
 	currentNode := setupConsensusAndNode(nodeConfig)
+	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 
 	// Prepare for graceful shutdown from os signals
 	osSignal := make(chan os.Signal)
