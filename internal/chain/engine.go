@@ -257,25 +257,20 @@ func (e *engineImpl) Finalize(
 	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
 	doubleSigners slash.Records,
 ) (*types.Block, reward.Reader, error) {
-	// Accumulate block rewards and commit the final state root
-	// Header seems complete, assemble into a block and return
-	payout, err := AccumulateRewards(
-		chain, state, header, e.Beaconchain(),
-	)
-	if err != nil {
-		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
-	}
 
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 
 	// Process Undelegations, set LastEpochInCommittee and set EPoS status
+	// Needs to be before AccumulateRewardsAndCountSigs
 	if isBeaconChain && isNewEpoch && inStakingEra {
 		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, err
 		}
 
+		// Needs to be after payoutUndelegations because payoutUndelegations
+		// depends on the old LastEpochInCommittee
 		if err := setLastEpochInCommittee(header, state); err != nil {
 			return nil, nil, err
 		}
@@ -284,6 +279,10 @@ func (e *engineImpl) Finalize(
 		if err != nil {
 			return nil, nil, err
 		}
+		// Needs to be before AccumulateRewardsAndCountSigs because
+		// ComputeAndMutateEPOSStatus depends on the signing counts that's
+		// consistent with the counts when the new shardState was proposed.
+		// Refer to committee.IsEligibleForEPoSAuction()
 		for _, addr := range curShardState.StakedValidators().Addrs {
 			if err := availability.ComputeAndMutateEPOSStatus(
 				chain, state, addr,
@@ -291,6 +290,15 @@ func (e *engineImpl) Finalize(
 				return nil, nil, err
 			}
 		}
+	}
+
+	// Accumulate block rewards and commit the final state root
+	// Header seems complete, assemble into a block and return
+	payout, err := AccumulateRewardsAndCountSigs(
+		chain, state, header, e.Beaconchain(),
+	)
+	if err != nil {
+		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
 	}
 
 	// Apply slashes

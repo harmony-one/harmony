@@ -356,7 +356,9 @@ func (b *APIBackend) GetValidatorInformation(
 	}
 
 	now := block.Epoch()
-	inCommittee := now.Cmp(wrapper.LastEpochInCommittee) == 0
+	// At the last block of epoch, block epoch is e while val.LastEpochInCommittee
+	// is already updated to e+1. So need the >= check rather than ==
+	inCommittee := wrapper.LastEpochInCommittee.Cmp(now) >= 0
 	defaultReply := &staking.ValidatorRPCEnchanced{
 		CurrentlyInCommittee: inCommittee,
 		Wrapper:              *wrapper,

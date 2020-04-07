@@ -51,7 +51,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/apr"
-	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -2214,7 +2213,6 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 		}
 		return &v, nil
 	}
-
 	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
 }
 
@@ -2232,6 +2230,7 @@ func (bc *BlockChain) writeValidatorSnapshots(
 		}
 		validators = append(validators, validator)
 	}
+
 	// Batch write the current data as snapshot
 	for i := range validators {
 		if err := rawdb.WriteValidatorSnapshot(batch, validators[i], epoch); err != nil {
@@ -2353,22 +2352,16 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				utils.Logger().Debug().Err(err).Msg("issue with compute of apr")
 			}
 
-			snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
-				currentEpochSuperCommittee.Epoch, wrapper.Address,
-			)
-
 			if err != nil {
 				return nil, err
 			}
-
-			computed := availability.ComputeCurrentSigning(snapshot, wrapper)
 
 			if _, wasBooted := bootedFromSuperCommittee[wrapper.Address]; wasBooted {
 				stats.BootedStatus = effective.LostEPoSAuction
 			}
 
-			if computed.IsBelowThreshold {
-				stats.BootedStatus = effective.InsufficientUptimeDuringEpoch
+			if wrapper.Status == effective.Inactive {
+				stats.BootedStatus = effective.TurnedInactiveOrInsufficientUptime
 			}
 
 			if slash.IsBanned(wrapper) {
@@ -2380,23 +2373,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 
 	return validatorStats, nil
 }
-
-// deleteValidatorSnapshots deletes the snapshot staking information of given validator address
-// TODO: delete validator snapshots from X epochs ago
-// NOTE Use when needed but don't compile at all until then
-// func (bc *BlockChain) deleteValidatorSnapshots(addrs []common.Address) error {
-// 	batch := bc.db.NewBatch()
-// 	for i := range addrs {
-// 		rawdb.DeleteValidatorSnapshot(batch, addrs[i], bc.CurrentBlock().Epoch())
-// 	}
-// 	if err := batch.Write(); err != nil {
-// 		return err
-// 	}
-// 	for i := range addrs {
-// 		bc.validatorCache.Remove("validator-snapshot-" + string(addrs[i].Bytes()))
-// 	}
-// 	return nil
-// }
 
 // UpdateValidatorSnapshots updates the content snapshot of all validators
 // Note: this should only be called within the blockchain insert process.
@@ -2411,11 +2387,6 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 	}
 
 	allValidators = append(allValidators, newValidators...)
-	// TODO: enable this once we allow validator to delete itself.
-	//err = bc.deleteValidatorSnapshots(allValidators)
-	//if err != nil {
-	//	return err
-	//}
 
 	return bc.writeValidatorSnapshots(batch, allValidators, epoch, state)
 }
@@ -2515,7 +2486,7 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateStakingMetaData(
 	batch rawdb.DatabaseWriter, txns staking.StakingTransactions,
-	state *state.DB, epoch *big.Int, isNewEpoch bool,
+	state *state.DB, epoch, newEpoch *big.Int,
 ) (newValidators []common.Address, err error) {
 	newValidators, newDelegations, err := bc.prepareStakingMetaData(txns, state)
 	if err != nil {
@@ -2547,8 +2518,7 @@ func (bc *BlockChain) UpdateStakingMetaData(
 			}
 			// For validator created at exactly the last block of an epoch, we should create the snapshot
 			// for next epoch too.
-			if isNewEpoch {
-				newEpoch := new(big.Int).Add(epoch, common.Big1)
+			if newEpoch.Cmp(epoch) > 0 {
 				if err := rawdb.WriteValidatorSnapshot(batch, validator, newEpoch); err != nil {
 					return newValidators, err
 				}
@@ -2646,7 +2616,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 // ReadBlockRewardAccumulator must only be called on beaconchain
 func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
 	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
-		return common.Big0, nil
+		return big.NewInt(0), nil
 	}
 	if cached, ok := bc.blockAccumulatorCache.Get(number); ok {
 		return cached.(*big.Int), nil
