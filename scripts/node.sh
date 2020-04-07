@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200327.0"
+version="v1 20200407.0"
 
 unset -v progname
 progname="${0##*/}"
