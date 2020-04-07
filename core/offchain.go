@@ -215,29 +215,6 @@ func (bc *BlockChain) CommitOffChainData(
 		}
 	}
 
-	// Update voting power of validators for all shards
-	tempValidatorStats := map[common.Address]*staking.ValidatorStats{}
-	if isNewEpoch && isBeaconChain {
-		currentSuperCommittee, _ := bc.ReadShardState(bc.CurrentHeader().Epoch())
-		if shardState, err := shard.DecodeWrapper(
-			header.ShardState(),
-		); err == nil {
-			if stats, err := bc.UpdateValidatorVotingPower(
-				batch, block, shardState, currentSuperCommittee, state,
-			); err != nil {
-				utils.Logger().
-					Err(err).
-					Msg("[UpdateValidatorVotingPower] Failed to update voting power")
-			} else {
-				tempValidatorStats = stats
-			}
-		} else {
-			utils.Logger().
-				Err(err).
-				Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
-		}
-	}
-
 	// Update block reward accumulator and slashes
 	if isBeaconChain {
 		if isStaking {
