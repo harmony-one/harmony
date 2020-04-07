@@ -107,10 +107,8 @@ options:
    -p passfile    use the given BLS passphrase file
    -d             just download the Harmony binaries (default: off)
    -D             do not download Harmony binaries (default: download when start)
-   -m             collect and upload node metrics to harmony prometheus + grafana
    -N network     join the given network (mainnet, testnet, staking, partner, stress, devnet; default: mainnet)
    -n port        specify the public base port of the node (default: 9000)
-   -t             equivalent to -N testnet (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
    -b             download harmony_db files from shard specified by -i <shardid> (default: off)
@@ -179,14 +177,13 @@ usage() {
 BUCKET=pub.harmony.one
 OS=$(uname -s)
 
-unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
+unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id download_harmony_db db_file_to_dl
 unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE
 start_clean=false
 loop=true
 run_as_root=true
 do_not_download=false
 download_only=false
-metrics=false
 network=mainnet
 node_type=validator
 shard_id=-1
@@ -205,7 +202,7 @@ ${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAIB:r:Y:f:R: opt
+while getopts :1chk:sSp:dDN:T:i:ba:U:PvVyzn:MAIB:r:Y:f:R: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -222,10 +219,8 @@ do
    D) do_not_download=true;;
    M) multi_key=true;;
    f) blsfolder="${OPTARG}";;
-   m) metrics=true;;
    N) network="${OPTARG}";;
    n) pub_port="${OPTARG}";;
-   t) network=devnet;;
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
    I) static=true;;
@@ -601,7 +596,6 @@ fi
 
 NODE_PORT=${pub_port:-9000}
 PUB_IP=
-METRICS=
 PUSHGATEWAY_IP=
 PUSHGATEWAY_PORT=
 
@@ -877,15 +871,6 @@ do
       args+=(
       -node_type="${node_type}"
       -shard_id="${shard_id}"
-      )
-      ;;
-   esac
-   case "${metrics}" in
-   true)
-      args+=(
-         -metrics "${metrics}"
-         -pushgateway_ip "${PUSHGATEWAY_IP}"
-         -pushgateway_port "${PUSHGATEWAY_PORT}"
       )
       ;;
    esac
