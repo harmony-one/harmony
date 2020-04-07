@@ -31,7 +31,6 @@ const (
 	Node
 	Client
 	DRand
-	// TODO: add more types
 )
 
 const (

@@ -255,7 +255,6 @@ func (s *Service) findPeers(ctx context.Context) {
 	}
 
 	utils.Logger().Info().Msg("PeerInfo Channel Closed")
-	return
 }
 
 // StopService stops network info service.
@@ -274,9 +273,7 @@ func (s *Service) StopService() {
 }
 
 // NotifyService notify service
-func (s *Service) NotifyService(params map[string]interface{}) {
-	return
-}
+func (s *Service) NotifyService(params map[string]interface{}) {}
 
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
