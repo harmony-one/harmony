@@ -82,8 +82,8 @@ const (
 	NotBooted BootedStatus = iota
 	// LostEPoSAuction ..
 	LostEPoSAuction
-	// InsufficientUptimeDuringEpoch ..
-	InsufficientUptimeDuringEpoch
+	// TurnedInactiveOrInsufficientUptime ..
+	TurnedInactiveOrInsufficientUptime
 	// BannedForDoubleSigning ..
 	BannedForDoubleSigning
 )
@@ -92,8 +92,8 @@ func (r BootedStatus) String() string {
 	switch r {
 	case LostEPoSAuction:
 		return "lost epos auction"
-	case InsufficientUptimeDuringEpoch:
-		return "bad uptime"
+	case TurnedInactiveOrInsufficientUptime:
+		return "manually turned inactive or insufficient uptime"
 	case BannedForDoubleSigning:
 		return doubleSigningBanned
 	default:

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -31,7 +30,7 @@ var (
 		"total payout not equal to blockreward",
 	)
 	// NoReward ..
-	NoReward = common.Big0
+	NoReward = big.NewInt(0)
 	// EmptyPayout ..
 	EmptyPayout = noReward{}
 )
@@ -46,7 +45,7 @@ type noReward struct{ ignoreMissing }
 
 func (noReward) ReadRoundResult() *reward.CompletedRound {
 	return &reward.CompletedRound{
-		Total:            common.Big0,
+		Total:            big.NewInt(0),
 		BeaconchainAward: []reward.Payout{},
 		ShardChainAward:  []reward.Payout{},
 	}

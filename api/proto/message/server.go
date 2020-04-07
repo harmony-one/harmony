@@ -1,15 +1,11 @@
 package message
 
-// This client service will replace the other client service.
-// This client service will use unified Message.
-// TODO(minhdoan): Refactor and clean up the other client service.
 import (
 	"context"
 	"log"
 	"math/big"
 	"net"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"google.golang.org/grpc"
@@ -31,50 +27,6 @@ type Server struct {
 
 // Process processes the Message and returns Response
 func (s *Server) Process(ctx context.Context, message *Message) (*Response, error) {
-	if message.GetType() != MessageType_LOTTERY_REQUEST {
-		return &Response{}, ErrWrongMessage
-	}
-	lotteryRequest := message.GetLotteryRequest()
-	if lotteryRequest.GetType() == LotteryRequest_ENTER {
-		if s.CreateTransactionForEnterMethod == nil {
-			return nil, ErrEnterProcessorNotReady
-		}
-		amount := lotteryRequest.Amount
-		priKey := lotteryRequest.PrivateKey
-
-		key, err := crypto.HexToECDSA(priKey)
-		if err != nil {
-			utils.Logger().Error().Msg("Error when HexToECDSA")
-		}
-		address := crypto.PubkeyToAddress(key.PublicKey)
-
-		utils.Logger().Info().Int64("amount", amount).Hex("address", address[:]).Msg("Enter")
-		if err := s.CreateTransactionForEnterMethod(amount, priKey); err != nil {
-			return nil, ErrEnterMethod
-		}
-		return &Response{}, nil
-	} else if lotteryRequest.GetType() == LotteryRequest_RESULT {
-		players, balances := s.GetResult(lotteryRequest.PrivateKey)
-		stringBalances := []string{}
-		for _, balance := range balances {
-			stringBalances = append(stringBalances, balance.String())
-		}
-		utils.Logger().Info().Strs("players", players).Strs("balances", stringBalances).Msg("getPlayers")
-		ret := &Response{
-			Response: &Response_LotteryResponse{
-				LotteryResponse: &LotteryResponse{
-					Players:  players,
-					Balances: stringBalances,
-				},
-			},
-		}
-		return ret, nil
-	} else if lotteryRequest.GetType() == LotteryRequest_PICK_WINNER {
-		if s.CreateTransactionForPickWinner() != nil {
-			return nil, ErrWhenPickingWinner
-		}
-		return &Response{}, nil
-	}
 	return &Response{}, nil
 }
 
@@ -85,8 +37,7 @@ func (s *Server) Start() (*grpc.Server, error) {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	var opts []grpc.ServerOption
-	s.server = grpc.NewServer(opts...)
+	s.server = grpc.NewServer()
 	RegisterClientServiceServer(s.server, s)
 	go func() {
 		if err := s.server.Serve(lis); err != nil {
