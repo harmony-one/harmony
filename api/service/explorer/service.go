@@ -160,9 +160,7 @@ func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 }
 
 // NotifyService notify service.
-func (s *Service) NotifyService(params map[string]interface{}) {
-	return
-}
+func (s *Service) NotifyService(params map[string]interface{}) {}
 
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {

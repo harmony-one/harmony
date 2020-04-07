@@ -224,11 +224,6 @@ func (s *Service) findPeers(ctx context.Context) {
 	}
 	for peer := range s.peerInfo {
 		if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
-			// utils.Logger().Info().
-			// 	Interface("peer", peer.ID).
-			// 	Interface("addr", peer.Addrs).
-			// 	Interface("my ID", s.Host.GetP2PHost().ID()).
-			// 	Msg("Found Peer")
 			if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
 				utils.Logger().Warn().Err(err).Interface("peer", peer).Msg("can't connect to peer node")
 				// break if the node can't connect to peers, waiting for another peer

@@ -1,8 +1,5 @@
 package message
 
-// This client service will replace the other client service.
-// This client service will use unified Message.
-// TODO(minhdoan): Refactor and clean up the other client service.
 import (
 	"context"
 	"log"
@@ -85,8 +82,7 @@ func (s *Server) Start() (*grpc.Server, error) {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	var opts []grpc.ServerOption
-	s.server = grpc.NewServer(opts...)
+	s.server = grpc.NewServer()
 	RegisterClientServiceServer(s.server, s)
 	go func() {
 		if err := s.server.Serve(lis); err != nil {
