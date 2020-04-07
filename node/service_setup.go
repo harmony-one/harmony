@@ -18,7 +18,7 @@ import (
 func (node *Node) setupForValidator() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
 
-	// Register peer discovery service. No need to do staking for beacon chain node.
+	// Register peer discovery service
 	node.serviceManager.RegisterService(
 		service.PeerDiscovery,
 		discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer),

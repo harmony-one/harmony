@@ -21,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/ctxerror"
@@ -109,7 +108,6 @@ type Node struct {
 	BlockChannel          chan *types.Block    // The channel to send newly proposed blocks
 	ConfirmedBlockChannel chan *types.Block    // The channel to send confirmed blocks
 	BeaconBlockChannel    chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
-	DRand                 *drand.DRand         // The instance for distributed randomness protocol
 
 	pendingCXReceipts map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex    sync.Mutex
@@ -578,8 +576,9 @@ func New(
 	return &node
 }
 
-// InitConsensusWithValidators initialize shard state from latest epoch and update committee pub
-// keys for consensus and drand
+// InitConsensusWithValidators initialize shard state
+// from latest epoch and update committee pub
+// keys for consensus
 func (node *Node) InitConsensusWithValidators() (err error) {
 	if node.Consensus == nil {
 		utils.Logger().Error().
@@ -635,9 +634,6 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			return nil
 		}
 	}
-	// TODO: Disable drand. Currently drand isn't
-	// functioning but we want to compeletely turn it off for full protection.
-	// node.DRand.UpdatePublicKeys(pubKeys)
 	return nil
 }
 

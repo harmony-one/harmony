@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/pki"
-	"github.com/harmony-one/harmony/drand"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
@@ -193,7 +192,6 @@ func TestAddPeers(t *testing.T) {
 	blsKey := bls2.RandPrivateKey()
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
@@ -208,10 +206,8 @@ func TestAddPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
 	node := New(host, consensus, testDBFactory, nil, false)
-	node.DRand = dRand
 	r1 := node.AddPeers(peers1)
 	e1 := 2
 	if r1 != e1 {
@@ -245,7 +241,6 @@ func TestAddBeaconPeer(t *testing.T) {
 	blsKey := bls2.RandPrivateKey()
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
-	validator := p2p.Peer{IP: "127.0.0.1", Port: "8985"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2pimpl.NewHost(&leader, priKey)
 	if err != nil {
@@ -260,10 +255,8 @@ func TestAddBeaconPeer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	dRand := drand.New(host, 0, []p2p.Peer{leader, validator}, leader, nil, nil)
 
 	node := New(host, consensus, testDBFactory, nil, false)
-	node.DRand = dRand
 	for _, p := range peers1 {
 		ret := node.AddBeaconPeer(p)
 		if ret {
