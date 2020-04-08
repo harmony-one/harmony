@@ -43,7 +43,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 	"github.com/pkg/errors"
-	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Version string variables
@@ -55,7 +54,10 @@ var (
 )
 
 // Host
-var myHost p2p.Host
+var (
+	myHost          p2p.Host
+	initialAccounts = []*genesis.DeployAccount{}
+)
 
 func printVersion() {
 	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
@@ -104,9 +106,6 @@ var (
 	// logConn logs incoming/outgoing connections
 	logConn     = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
-	// Use a separate log file to log libp2p traces
-	logP2P          = flag.Bool("log_p2p", false, "log libp2p debug info")
-	initialAccounts = []*genesis.DeployAccount{}
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 	// dbDir is the database directory.
@@ -614,7 +613,6 @@ func setupViperConfig() {
 	viperconfig.ResetConfInt(devnetHarmonySize, envViper, configFileViper, "", "dn_hmy_size")
 	viperconfig.ResetConfBool(logConn, envViper, configFileViper, "", "log_conn")
 	viperconfig.ResetConfString(keystoreDir, envViper, configFileViper, "", "keystore")
-	viperconfig.ResetConfBool(logP2P, envViper, configFileViper, "", "log_p2p")
 	viperconfig.ResetConfInt(verbosity, envViper, configFileViper, "", "verbosity")
 	viperconfig.ResetConfString(dbDir, envViper, configFileViper, "", "db_dir")
 	viperconfig.ResetConfBool(publicRPC, envViper, configFileViper, "", "public_rpc")
@@ -695,7 +693,7 @@ func main() {
 			err = setupLegacyNodeAccount()
 		}
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "cannot set up node account: %s\n", err)
+			fmt.Fprintf(os.Stderr, "cannot set up node account: %s\n", err)
 			os.Exit(1)
 		}
 	}
@@ -717,7 +715,7 @@ func main() {
 
 	nodeConfig, err := createGlobalConfig()
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
+		fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
 		os.Exit(1)
 	}
 	currentNode := setupConsensusAndNode(nodeConfig)
@@ -726,15 +724,12 @@ func main() {
 	osSignal := make(chan os.Signal)
 	signal.Notify(osSignal, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		for {
-			select {
-			case sig := <-osSignal:
-				if sig == syscall.SIGTERM || sig == os.Interrupt {
-					msg := "Got %s signal. Gracefully shutting down...\n"
-					utils.Logger().Printf(msg, sig)
-					fmt.Printf(msg, sig)
-					currentNode.ShutDown()
-				}
+		for sig := range osSignal {
+			if sig == syscall.SIGTERM || sig == os.Interrupt {
+				const msg = "Got %s signal. Gracefully shutting down...\n"
+				utils.Logger().Printf(msg, sig)
+				fmt.Printf(msg, sig)
+				currentNode.ShutDown()
 			}
 		}
 	}()
@@ -782,20 +777,6 @@ func main() {
 			fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, myHost.GetID().Pretty()),
 		).
 		Msg(startMsg)
-
-	if *logP2P {
-		f, err := os.OpenFile(
-			path.Join(*logFolder, "libp2p.log"),
-			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644,
-		)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to open libp2p.log. %v\n", err)
-		} else {
-			defer f.Close()
-			backend1 := gologging.NewLogBackend(f, "", 0)
-			gologging.SetBackend(backend1)
-		}
-	}
 
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
