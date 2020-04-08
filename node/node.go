@@ -21,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -34,6 +33,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
+	"github.com/pkg/errors"
 )
 
 // State is a state of a node.
@@ -140,10 +140,6 @@ type Node struct {
 
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
-
-	// syncing frequency parameters
-	syncFreq       int
-	beaconSyncFreq int
 
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
@@ -418,9 +414,6 @@ func New(
 		failedStakingTxns *ring.Ring
 		failedTxns        *ring.Ring
 	}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)}
-	node.syncFreq = SyncFrequency
-	node.beaconSyncFreq = SyncFrequency
-
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -572,7 +565,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	if node.Consensus == nil {
 		utils.Logger().Error().
 			Msg("[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID")
-		return ctxerror.New(
+		return errors.New(
 			"[InitConsensusWithValidators] consenus is nil; Cannot figure out shardID",
 		)
 	}
@@ -606,10 +599,10 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			Uint32("shardID", shardID).
 			Uint64("blockNum", blockNum).
 			Msg("[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys")
-		return ctxerror.New(
+		return errors.Wrapf(
+			err,
 			"[InitConsensusWithValidators] PublicKeys is Empty, Cannot update public keys",
-			"shardID", shardID,
-			"blockNum", blockNum)
+		)
 	}
 
 	for _, key := range pubKeys {

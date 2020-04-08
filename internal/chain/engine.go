@@ -6,10 +6,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/harmony-one/harmony/staking/availability"
-
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
@@ -18,11 +15,11 @@ import (
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -124,15 +121,21 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 }
 
 // ReadPublicKeysFromLastBlock finds the public keys of last block's committee
-func ReadPublicKeysFromLastBlock(bc engine.ChainReader, header *block.Header) ([]*bls.PublicKey, error) {
+func ReadPublicKeysFromLastBlock(
+	bc engine.ChainReader, header *block.Header,
+) ([]*bls.PublicKey, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	return GetPublicKeys(bc, parentHeader, false)
 }
 
 // VerifyShardState implements Engine, checking the shardstate is valid at epoch transition
-func (e *engineImpl) VerifyShardState(bc engine.ChainReader, beacon engine.ChainReader, header *block.Header) error {
+func (e *engineImpl) VerifyShardState(
+	bc engine.ChainReader, beacon engine.ChainReader, header *block.Header,
+) error {
 	if bc.ShardID() != header.ShardID() {
-		return ctxerror.New("[VerifyShardState] shardID not match", "bc.ShardID", bc.ShardID(), "header.ShardID", header.ShardID())
+		return errors.Errorf(
+			"[VerifyShardState] shardID not match %d %d", bc.ShardID(), header.ShardID(),
+		)
 	}
 	headerShardStateBytes := header.ShardState()
 	// TODO: figure out leader withhold shardState
@@ -141,7 +144,7 @@ func (e *engineImpl) VerifyShardState(bc engine.ChainReader, beacon engine.Chain
 	}
 	shardState, err := bc.SuperCommitteeForNextEpoch(beacon, header, true)
 	if err != nil {
-		return ctxerror.New("[VerifyShardState] SuperCommitteeForNexEpoch calculation had error", "shardState", shardState).WithCause(err)
+		return err
 	}
 
 	isStaking := false
@@ -150,23 +153,13 @@ func (e *engineImpl) VerifyShardState(bc engine.ChainReader, beacon engine.Chain
 	}
 	shardStateBytes, err := shard.EncodeWrapper(*shardState, isStaking)
 	if err != nil {
-		return ctxerror.New("[VerifyShardState] ShardState Encoding had error", "shardStateBytes", shardStateBytes).WithCause(err)
+		return errors.Wrapf(
+			err, "[VerifyShardState] ShardState Encoding had error",
+		)
 	}
 
 	if !bytes.Equal(shardStateBytes, headerShardStateBytes) {
-		headerSS, err := header.GetShardState()
-		if err != nil {
-			headerSS = shard.State{}
-		}
-		utils.Logger().Error().
-			Str("shard-state", hexutil.Encode(shardStateBytes)).
-			Str("header-shard-state", hexutil.Encode(headerShardStateBytes)).
-			Msg("Shard states did not match, use rlpdump to inspect")
-		return ctxerror.New(
-			"[VerifyShardState] ShardState is Invalid", "shardStateEpoch", shardState.Epoch, "headerEpoch",
-			header.Epoch(), "headerShardStateEpoch", headerSS.Epoch, "beaconEpoch",
-			beacon.CurrentHeader().Epoch(),
-		)
+		return errors.New("shard state header did not match as expected")
 	}
 
 	return nil
@@ -182,16 +175,16 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	publicKeys, err := ReadPublicKeysFromLastBlock(chain, header)
 
 	if err != nil {
-		return ctxerror.New("[VerifySeal] Cannot retrieve publickeys from last block").WithCause(err)
+		return errors.New("[VerifySeal] Cannot retrieve publickeys from last block")
 	}
 	sig := header.LastCommitSignature()
 	payload := append(sig[:], header.LastCommitBitmap()...)
 	aggSig, mask, err := ReadSignatureBitmapByPublicKeys(payload, publicKeys)
 	if err != nil {
-		return ctxerror.New(
+		return errors.New(
 			"[VerifySeal] Unable to deserialize the LastCommitSignature" +
 				" and LastCommitBitmap in Block Header",
-		).WithCause(err)
+		)
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
@@ -216,7 +209,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 			return err
 		}
 		if !d.IsQuorumAchievedByMask(mask) {
-			return ctxerror.New(
+			return errors.New(
 				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
 			)
 		}
@@ -227,9 +220,9 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 				"cannot calculate quorum for block %s", header.Number())
 		}
 		if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
-			return ctxerror.New(
-				"[VerifySeal] Not enough signature in LastCommitSignature from Block Header",
-				"need", parentQuorum, "got", count,
+			return errors.Errorf(
+				"[VerifySeal] need %d signature in LastCommitSignature have %d",
+				parentQuorum, count,
 			)
 		}
 	}
@@ -238,12 +231,9 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	blockNumHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumHash, header.Number().Uint64()-1)
 	lastCommitPayload := append(blockNumHash, parentHash[:]...)
-
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
 		const msg = "[VerifySeal] Unable to verify aggregated signature from last block"
-		return ctxerror.New(
-			msg, "lastBlockNum", header.Number().Uint64()-1, "lastBlockHash", parentHash,
-		)
+		return errors.New(msg)
 	}
 	return nil
 }
@@ -298,7 +288,7 @@ func (e *engineImpl) Finalize(
 		chain, state, header, e.Beaconchain(),
 	)
 	if err != nil {
-		return nil, nil, ctxerror.New("cannot pay block reward").WithCause(err)
+		return nil, nil, errors.New("cannot pay block reward")
 	}
 
 	// Apply slashes
@@ -328,15 +318,15 @@ func payoutUndelegations(
 	countTrack := map[common.Address]int{}
 	if err != nil {
 		const msg = "[Finalize] failed to read all validators"
-		return ctxerror.New(msg).WithCause(err)
+		return errors.New(msg)
 	}
 	// Payout undelegated/unlocked tokens
 	for _, validator := range validators {
 		wrapper, err := state.ValidatorWrapper(validator)
 		if err != nil {
-			return ctxerror.New(
+			return errors.New(
 				"[Finalize] failed to get validator from state to finalize",
-			).WithCause(err)
+			)
 		}
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
@@ -350,7 +340,7 @@ func payoutUndelegations(
 			validator, wrapper,
 		); err != nil {
 			const msg = "[Finalize] failed update validator info"
-			return ctxerror.New(msg).WithCause(err)
+			return errors.New(msg)
 		}
 	}
 
@@ -367,21 +357,21 @@ func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
 	newShardState, err := header.GetShardState()
 	if err != nil {
 		const msg = "[Finalize] failed to read shard state"
-		return ctxerror.New(msg).WithCause(err)
+		return errors.New(msg)
 	}
 	for _, addr := range newShardState.StakedValidators().Addrs {
 		wrapper, err := state.ValidatorWrapper(addr)
 		if err != nil {
-			return ctxerror.New(
+			return errors.New(
 				"[Finalize] failed to get validator from state to finalize",
-			).WithCause(err)
+			)
 		}
 		wrapper.LastEpochInCommittee = newShardState.Epoch
 		if err := state.UpdateValidatorWrapper(
 			addr, wrapper,
 		); err != nil {
 			const msg = "[Finalize] failed update validator info"
-			return ctxerror.New(msg).WithCause(err)
+			return errors.New(msg)
 		}
 	}
 	return nil
@@ -470,7 +460,7 @@ func applySlashes(
 			records,
 			rate,
 		); err != nil {
-			return ctxerror.New("[Finalize] could not apply slash").WithCause(err)
+			return errors.New("[Finalize] could not apply slash")
 		}
 
 		utils.Logger().Info().
@@ -492,8 +482,9 @@ func QuorumForBlock(
 	} else {
 		ss, err = chain.ReadShardState(h.Epoch())
 		if err != nil {
-			return 0, ctxerror.New("failed to read shard state of epoch",
-				"epoch", h.Epoch().Uint64()).WithCause(err)
+			return 0, errors.Wrapf(
+				err, "failed to read shard state of epoch %d", h.Epoch().Uint64(),
+			)
 		}
 	}
 
@@ -515,13 +506,16 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 	}
 	publicKeys, err := GetPublicKeys(chain, header, reCalculate)
 	if err != nil {
-		return ctxerror.New("[VerifyHeaderWithSignature] Cannot get publickeys for block header").WithCause(err)
+		return errors.New("[VerifyHeaderWithSignature] Cannot get publickeys for block header")
 	}
 
 	payload := append(commitSig[:], commitBitmap[:]...)
 	aggSig, mask, err := ReadSignatureBitmapByPublicKeys(payload, publicKeys)
 	if err != nil {
-		return ctxerror.New("[VerifyHeaderWithSignature] Unable to deserialize the commitSignature and commitBitmap in Block Header").WithCause(err)
+		return errors.Wrapf(
+			err,
+			"[VerifyHeaderWithSignature] Unable to deserialize signatures",
+		)
 	}
 	hash := header.Hash()
 
@@ -545,7 +539,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			return err
 		}
 		if !d.IsQuorumAchievedByMask(mask) {
-			return ctxerror.New(
+			return errors.New(
 				"[VerifySeal] Not enough voting power in commitSignature from Block Header",
 			)
 		}
@@ -556,8 +550,9 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 				"cannot calculate quorum for block %s", header.Number())
 		}
 		if count := utils.CountOneBits(mask.Bitmap); count < int64(quorumCount) {
-			return ctxerror.New("[VerifyHeaderWithSignature] Not enough signature in commitSignature from Block Header",
-				"need", quorumCount, "got", count)
+			return errors.New(
+				"[VerifyHeaderWithSignature] Not enough signature in commitSignature from Block Header",
+			)
 		}
 	}
 	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
@@ -566,7 +561,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 	commitPayload := append(blockNumHash, hash[:]...)
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-		return ctxerror.New("[VerifySeal] Unable to verify aggregated signature for block", "blockNum", header.Number().Uint64()-1, "blockHash", hash)
+		return errors.New("[VerifySeal] Unable to verify aggregated signature for block")
 	}
 	return nil
 }
@@ -582,16 +577,19 @@ func GetPublicKeys(
 	} else {
 		shardState, err = chain.ReadShardState(header.Epoch())
 		if err != nil {
-			return nil, ctxerror.New("failed to read shard state of epoch",
-				"epoch", header.Epoch().Uint64()).WithCause(err)
+			return nil, errors.Wrapf(
+				err, "failed to read shard state of epoch %d", header.Epoch().Uint64(),
+			)
 		}
 	}
 
 	subCommittee, err := shardState.FindCommitteeByID(header.ShardID())
 	if err != nil {
-		return nil, ctxerror.New("cannot find shard in the shard state",
-			"blockNumber", header.Number(),
-			"shardID", header.ShardID(),
+		return nil, errors.Wrapf(
+			err,
+			"cannot find shard in the shard state at block %d shard %d",
+			header.Number(),
+			header.ShardID(),
 		)
 	}
 	return subCommittee.BLSPublicKeys()

@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -278,64 +277,11 @@ func TestValidatorSanityCheck(t *testing.T) {
 	}
 }
 
-func TestValidatorWrapperSanityCheck(t *testing.T) {
-	// no delegation must fail
-	wrapper := createNewValidatorWrapper(createNewValidator())
-	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
-		t.Error("expected", ErrInvalidSelfDelegation, "got", err)
-	}
-
-	// valid self delegation must not fail
-	wrapper.Validator.MaxTotalDelegation = tenK
-	valDel := NewDelegation(validatorAddr, tenK)
-	wrapper.Delegations = []Delegation{valDel}
-	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err != nil {
-		t.Errorf("validator wrapper SanityCheck failed: %s", err)
-	}
-
-	// invalid self delegation must fail
-	valDel = NewDelegation(validatorAddr, big.NewInt(1e18))
-	wrapper.Delegations = []Delegation{valDel}
-	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
-		t.Error("expected", ErrInvalidSelfDelegation, "got", err)
-	}
-
-	// invalid self delegation of less than 10K ONE must fail
-	valDel = NewDelegation(validatorAddr, big.NewInt(1e18))
-	if err := wrapper.SanityCheck(DoNotEnforceMaxBLS); err == nil {
-		t.Error("expected", ErrInvalidSelfDelegation, "got", err)
-	}
-}
-
-func testEnsureLength(t *testing.T) {
-	// test name length > MaxNameLength
-	if _, err := longNameDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longNameDesc.Name), "maxNameLen", MaxNameLength), "got", err)
-	}
-	// test identity length > MaxIdentityLength
-	if _, err := longIdentityDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longIdentityDesc.Identity), "maxIdentityLen", MaxIdentityLength), "got", err)
-	}
-	// test website length > MaxWebsiteLength
-	if _, err := longWebsiteDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longWebsiteDesc.Website), "maxWebsiteLen", MaxWebsiteLength), "got", err)
-	}
-	// test security contact length > MaxSecurityContactLength
-	if _, err := longSecurityContactDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longSecurityContactDesc.SecurityContact), "maxSecurityContactLen", MaxSecurityContactLength), "got", err)
-	}
-	// test details length > MaxDetailsLength
-	if _, err := longDetailsDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longDetailsDesc.Details), "maxDetailsLen", MaxDetailsLength), "got", err)
-	}
-}
-
 func TestEnsureLength(t *testing.T) {
 	_, err := validator.Description.EnsureLength()
 	if err != nil {
 		t.Error("expected", "nil", "got", err)
 	}
-	testEnsureLength(t)
 }
 
 func TestUpdateDescription(t *testing.T) {

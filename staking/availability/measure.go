@@ -7,7 +7,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -27,23 +26,15 @@ func BlockSigners(
 	bitmap []byte, parentCommittee *shard.Committee,
 ) (shard.SlotList, shard.SlotList, error) {
 	committerKeys, err := parentCommittee.BLSPublicKeys()
-
 	if err != nil {
-		return nil, nil, ctxerror.New(
-			"cannot convert a BLS public key",
-		).WithCause(err)
+		return nil, nil, err
 	}
-
 	mask, err := bls2.NewMask(committerKeys, nil)
 	if err != nil {
-		return nil, nil, ctxerror.New(
-			"cannot create group sig mask",
-		).WithCause(err)
+		return nil, nil, err
 	}
 	if err := mask.SetMask(bitmap); err != nil {
-		return nil, nil, ctxerror.New(
-			"cannot set group sig mask bits",
-		).WithCause(err)
+		return nil, nil, err
 	}
 
 	payable, missing := shard.SlotList{}, shard.SlotList{}
@@ -51,9 +42,7 @@ func BlockSigners(
 	for idx, member := range parentCommittee.Slots {
 		switch signed, err := mask.IndexEnabled(idx); true {
 		case err != nil:
-			return nil, nil, ctxerror.New("cannot check for committer bit",
-				"committerIndex", idx,
-			).WithCause(err)
+			return nil, nil, err
 		case signed:
 			payable = append(payable, member)
 		default:
@@ -71,10 +60,10 @@ func BallotResult(
 	parentCommittee, err := parentShardState.FindCommitteeByID(shardID)
 
 	if err != nil {
-		return nil, nil, nil, ctxerror.New(
-			"cannot find shard in the shard state",
-			"parentBlockNumber", parentHeader.Number(),
-			"shardID", parentHeader.ShardID(),
+		return nil, nil, nil, errors.Errorf(
+			"cannot find shard in the shard state %d %d",
+			parentHeader.Number(),
+			parentHeader.ShardID(),
 		)
 	}
 
@@ -235,14 +224,14 @@ func ComputeAndMutateEPOSStatus(
 			Str("threshold", measure.String()).
 			Msg("validator failed availability threshold, set to inactive")
 	default:
-		// Default is no-op so validator who wants to leave the committee can actually leave.
+		// Default is no-op so validator who wants
+		// to leave the committee can actually leave.
 	}
 
 	if err := state.UpdateValidatorWrapper(
 		addr, wrapper,
 	); err != nil {
-		const msg = "[ComputeAndMutateEPOSStatus] failed update validator info"
-		return ctxerror.New(msg).WithCause(err)
+		return err
 	}
 
 	return nil

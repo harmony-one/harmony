@@ -17,7 +17,6 @@
 package core
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -29,12 +28,12 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -124,16 +123,16 @@ func (p *StateProcessor) Process(
 			p.config, statedb, header, cx,
 		); err != nil {
 			return nil, nil,
-				nil, 0, nil, ctxerror.New("[Process] Cannot apply incoming receipts").WithCause(err)
+				nil, 0, nil, errors.New("[Process] Cannot apply incoming receipts")
 		}
 	}
 
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, 0, nil, ctxerror.New(
+			return nil, nil, nil, 0, nil, errors.New(
 				"[Process] Cannot finalize block",
-			).WithCause(err)
+			)
 		}
 	}
 
@@ -143,7 +142,7 @@ func (p *StateProcessor) Process(
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes,
 	)
 	if err != nil {
-		return nil, nil, nil, 0, nil, ctxerror.New("[Process] Cannot finalize block").WithCause(err)
+		return nil, nil, nil, 0, nil, errors.New("[Process] Cannot finalize block")
 	}
 
 	return receipts, outcxs, allLogs, *usedGas, payout, nil
@@ -175,13 +174,14 @@ func getTransactionType(
 func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
 	txType := getTransactionType(config, header, tx)
 	if txType == types.InvalidTx {
-		return nil, nil, 0, fmt.Errorf("Invalid Transaction Type")
+		return nil, nil, 0, errors.New("Invalid Transaction Type")
 	}
 
 	if txType != types.SameShardTx && !config.AcceptsCrossTx(header.Epoch()) {
-		return nil, nil, 0, fmt.Errorf(
+		return nil, nil, 0, errors.Errorf(
 			"cannot handle cross-shard transaction until after epoch %v (now %v)",
-			config.CrossTxEpoch, header.Epoch())
+			config.CrossTxEpoch, header.Epoch(),
+		)
 	}
 
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Epoch()))
@@ -286,16 +286,22 @@ func ApplyStakingTransaction(
 }
 
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt
-func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *block.Header, cxp *types.CXReceiptsProof) error {
+func ApplyIncomingReceipt(
+	config *params.ChainConfig, db *state.DB,
+	header *block.Header, cxp *types.CXReceiptsProof,
+) error {
 	if cxp == nil {
 		return nil
 	}
 
 	for _, cx := range cxp.Receipts {
 		if cx == nil || cx.To == nil { // should not happend
-			return ctxerror.New("ApplyIncomingReceipts: Invalid incomingReceipt!", "receipt", cx)
+			return errors.Errorf(
+				"ApplyIncomingReceipts: Invalid incomingReceipt! %v", cx,
+			)
 		}
-		utils.Logger().Info().Interface("receipt", cx).Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
+		utils.Logger().Info().Interface("receipt", cx).
+			Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
 
 		if !db.Exist(*cx.To) {
 			db.CreateAccount(*cx.To)
@@ -309,7 +315,9 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 // StakingToMessage returns the staking transaction as a core.Message.
 // requires a signer to derive the sender.
 // put it here to avoid cyclic import
-func StakingToMessage(tx *staking.StakingTransaction, blockNum *big.Int) (types.Message, error) {
+func StakingToMessage(
+	tx *staking.StakingTransaction, blockNum *big.Int,
+) (types.Message, error) {
 	payload, err := tx.RLPEncodeStakeMsg()
 	if err != nil {
 		return types.Message{}, err

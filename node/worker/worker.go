@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -251,7 +250,7 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 		if err := core.ApplyIncomingReceipt(
 			w.config, w.current.state, w.current.header, cx,
 		); err != nil {
-			return ctxerror.New("Failed applying cross-shard receipts").WithCause(err)
+			return errors.Wrapf(err, "Failed applying cross-shard receipts")
 		}
 	}
 	w.current.incxs = append(w.current.incxs, receiptsList...)
@@ -471,7 +470,7 @@ func (w *Worker) FinalizeNewBlock(
 		w.current.slashes,
 	)
 	if err != nil {
-		return nil, ctxerror.New("cannot finalize block").WithCause(err)
+		return nil, errors.Wrapf(err, "cannot finalize block")
 	}
 
 	return block, nil

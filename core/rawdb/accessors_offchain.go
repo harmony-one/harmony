@@ -6,10 +6,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // ReadShardState retrieves shard state of a specific epoch.
@@ -18,27 +18,27 @@ func ReadShardState(
 ) (*shard.State, error) {
 	data, err := db.Get(shardStateKey(epoch))
 	if err != nil {
-		return nil, ctxerror.New(MsgNoShardStateFromDB,
-			"epoch", epoch,
-		).WithCause(err)
+		return nil, errors.New(MsgNoShardStateFromDB)
 	}
 	ss, err2 := shard.DecodeWrapper(data)
 	if err2 != nil {
-		return nil, ctxerror.New("cannot decode sharding state",
-			"epoch", epoch,
-		).WithCause(err2)
+		return nil, errors.Wrapf(
+			err2, "cannot decode sharding state",
+		)
 	}
 	return ss, nil
 }
 
 // WriteShardStateBytes stores sharding state into database.
-func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) (err error) {
-	if err = db.Put(shardStateKey(epoch), data); err != nil {
-		return ctxerror.New("cannot write sharding state",
-			"epoch", epoch,
-		).WithCause(err)
+func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) error {
+	if err := db.Put(shardStateKey(epoch), data); err != nil {
+		return errors.Wrapf(
+			err, "cannot write sharding state",
+		)
 	}
-	utils.Logger().Info().Str("epoch", epoch.String()).Int("size", len(data)).Msg("wrote sharding state")
+	utils.Logger().Info().
+		Str("epoch", epoch.String()).
+		Int("size", len(data)).Msg("wrote sharding state")
 	return nil
 }
 
@@ -47,7 +47,7 @@ func ReadLastCommits(db DatabaseReader) ([]byte, error) {
 	var data []byte
 	data, err := db.Get(lastCommitsKey)
 	if err != nil {
-		return nil, ctxerror.New("cannot read last commits from rawdb").WithCause(err)
+		return nil, errors.New("cannot read last commits from rawdb")
 	}
 	return data, nil
 }
@@ -57,7 +57,7 @@ func WriteLastCommits(
 	db DatabaseWriter, data []byte,
 ) (err error) {
 	if err = db.Put(lastCommitsKey, data); err != nil {
-		return ctxerror.New("cannot write last commits").WithCause(err)
+		return errors.New("cannot write last commits")
 	}
 	utils.Logger().Info().
 		Int("size", len(data)).
@@ -66,7 +66,9 @@ func WriteLastCommits(
 }
 
 // ReadCrossLinkShardBlock retrieves the blockHash given shardID and blockNum
-func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64) ([]byte, error) {
+func ReadCrossLinkShardBlock(
+	db DatabaseReader, shardID uint32, blockNum uint64,
+) ([]byte, error) {
 	return db.Get(crosslinkKey(shardID, blockNum))
 }
 
@@ -147,7 +149,7 @@ func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash comm
 func ReadCXReceiptsProofSpent(db DatabaseReader, shardID uint32, number uint64) (byte, error) {
 	data, err := db.Get(cxReceiptSpentKey(shardID, number))
 	if err != nil || len(data) == 0 {
-		return NAByte, ctxerror.New("[ReadCXReceiptsProofSpent] Cannot find the key", "shardID", shardID, "number", number).WithCause(err)
+		return NAByte, errors.New("[ReadCXReceiptsProofSpent] Cannot find the key")
 	}
 	return data[0], nil
 }

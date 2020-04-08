@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"math/big"
 	"sort"
 	"time"
@@ -14,8 +13,8 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/sync/singleflight"
 )
@@ -332,9 +331,9 @@ func FromLibBLSPublicKeyUnsafe(key *bls.PublicKey) *BLSPublicKey {
 func (pk *BLSPublicKey) FromLibBLSPublicKey(key *bls.PublicKey) error {
 	bytes := key.Serialize()
 	if len(bytes) != len(pk) {
-		return ctxerror.New("BLS public key size mismatch",
-			"expected", len(pk),
-			"actual", len(bytes))
+		return errors.Errorf(
+			"key size (BLS) size mismatch, expected %d have %d", len(pk), len(bytes),
+		)
 	}
 	copy(pk[:], bytes)
 	return nil

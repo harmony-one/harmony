@@ -3,10 +3,9 @@ package shardingconfig
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/numeric"
-
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
+	"github.com/harmony-one/harmony/numeric"
+	"github.com/pkg/errors"
 )
 
 // NetworkID is the network type of the blockchain.
@@ -44,27 +43,33 @@ func NewInstance(
 	reshardingEpoch []*big.Int, blocksE uint64,
 ) (Instance, error) {
 	if numShards < 1 {
-		return nil, ctxerror.New("sharding config must have at least one shard",
-			"numShards", numShards)
+		return nil, errors.Errorf(
+			"sharding config must have at least one shard have %d", numShards,
+		)
 	}
 	if numNodesPerShard < 1 {
-		return nil, ctxerror.New("each shard must have at least one node",
-			"numNodesPerShard", numNodesPerShard)
+		return nil, errors.Errorf(
+			"each shard must have at least one node %d", numNodesPerShard,
+		)
 	}
 	if numHarmonyOperatedNodesPerShard < 0 {
-		return nil, ctxerror.New("Harmony-operated nodes cannot be negative",
-			"numHarmonyOperatedNodesPerShard", numHarmonyOperatedNodesPerShard)
+		return nil, errors.Errorf(
+			"Harmony-operated nodes cannot be negative %d", numHarmonyOperatedNodesPerShard,
+		)
 	}
 	if numHarmonyOperatedNodesPerShard > numNodesPerShard {
-		return nil, ctxerror.New(""+
+		return nil, errors.Errorf(""+
 			"number of Harmony-operated nodes cannot exceed "+
-			"overall number of nodes per shard",
-			"numHarmonyOperatedNodesPerShard", numHarmonyOperatedNodesPerShard,
-			"numNodesPerShard", numNodesPerShard)
+			"overall number of nodes per shard %d %d",
+			numHarmonyOperatedNodesPerShard,
+			numNodesPerShard,
+		)
 	}
-	if harmonyVotePercent.LT(numeric.ZeroDec()) || harmonyVotePercent.GT(numeric.OneDec()) {
-		return nil, ctxerror.New("" +
-			"total voting power of harmony nodes should be within [0, 1]")
+	if harmonyVotePercent.LT(numeric.ZeroDec()) ||
+		harmonyVotePercent.GT(numeric.OneDec()) {
+		return nil, errors.Errorf("" +
+			"total voting power of harmony nodes should be within [0, 1]",
+		)
 	}
 
 	return instance{
@@ -84,7 +89,9 @@ func NewInstance(
 // given parameters.  It panics if parameter validation fails.
 // It is intended to be used for static initialization.
 func MustNewInstance(
-	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int, harmonyVotePercent numeric.Dec,
+	numShards uint32,
+	numNodesPerShard, numHarmonyOperatedNodesPerShard int,
+	harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	reshardingEpoch []*big.Int, blocksPerEpoch uint64,

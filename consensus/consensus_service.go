@@ -15,7 +15,6 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
@@ -367,50 +366,46 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 }
 
 // retrieve corresponding blsPublicKey from Coinbase Address
-func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*bls.PublicKey, error) {
+func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
+	header *block.Header,
+) (*bls.PublicKey, error) {
 	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch())
 	if err != nil {
-		return nil, ctxerror.New("cannot read shard state",
-			"epoch", header.Epoch(),
-			"coinbaseAddr", header.Coinbase(),
-		).WithCause(err)
+		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
+			header.Epoch(),
+			header.Coinbase().Hash().Hex(),
+		)
 	}
 
 	committee, err := shardState.FindCommitteeByID(header.ShardID())
 	if err != nil {
-		return nil, ctxerror.New("cannot find shard in the shard state",
-			"blockNum", header.Number(),
-			"shardID", header.ShardID(),
-			"coinbaseAddr", header.Coinbase(),
-		)
+		return nil, err
 	}
+
 	committerKey := new(bls.PublicKey)
 	isStaking := consensus.ChainReader.Config().IsStaking(header.Epoch())
 	for _, member := range committee.Slots {
 		if isStaking {
 			// After staking the coinbase address will be the address of bls public key
 			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == header.Coinbase() {
-				err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey)
-				if err != nil {
-					return nil, ctxerror.New("cannot convert BLS public key",
-						"blsPublicKey", member.BLSPublicKey,
-						"coinbaseAddr", header.Coinbase()).WithCause(err)
+				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
+					return nil, err
 				}
 				return committerKey, nil
 			}
 		} else {
 			if member.EcdsaAddress == header.Coinbase() {
-				err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey)
-				if err != nil {
-					return nil, ctxerror.New("cannot convert BLS public key",
-						"blsPublicKey", member.BLSPublicKey,
-						"coinbaseAddr", header.Coinbase()).WithCause(err)
+				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
+					return nil, err
 				}
 				return committerKey, nil
 			}
 		}
 	}
-	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase().Hex())
+	return nil, errors.Errorf(
+		"cannot find corresponding BLS Public Key coinbase %s",
+		header.Coinbase().Hex(),
+	)
 }
 
 // UpdateConsensusInformation will update shard information (epoch, publicKeys, blockNum, viewID)

@@ -12,10 +12,10 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
+	"github.com/pkg/errors"
 )
 
 // handlemessageupdate will update the consensus state according to received message
@@ -202,12 +202,16 @@ func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
 	lastCommits, err := consensus.ChainReader.ReadLastCommits()
 	if err != nil ||
 		len(lastCommits) < shard.BLSSignatureSizeInBytes {
-		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
+		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
+			msg_pb.MessageType_COMMITTED, consensus.blockNum-1,
+		)
 		if len(msgs) != 1 {
 			consensus.getLogger().Error().
 				Int("numCommittedMsg", len(msgs)).
 				Msg("GetLastCommitSig failed with wrong number of committed message")
-			return nil, nil, ctxerror.New("GetLastCommitSig failed with wrong number of committed message", "numCommittedMsg", len(msgs))
+			return nil, nil, errors.Errorf(
+				"GetLastCommitSig failed with wrong number of committed message %d", len(msgs),
+			)
 		}
 		lastCommits = msgs[0].Payload
 	}

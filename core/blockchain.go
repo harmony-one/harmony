@@ -35,7 +35,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -44,7 +43,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -437,29 +435,6 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	rawdb.WriteHeadFastBlockHash(bc.db, currentFastBlock.Hash())
 
 	return bc.loadLastState()
-}
-
-// FastSyncCommitHead sets the current head block to the one defined by the hash
-// irrelevant what the chain contents were prior.
-func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
-	// Make sure that both the block as well at its state trie exists
-	block := bc.GetBlockByHash(hash)
-	if block == nil {
-		return fmt.Errorf("non existent block [%x…]", hash[:4])
-	}
-	if _, err := trie.NewSecure(block.Root(), bc.stateCache.TrieDB(), 0); err != nil {
-		return err
-	}
-	// If all checks out, manually set the head block
-	bc.mu.Lock()
-	bc.currentBlock.Store(block)
-	bc.mu.Unlock()
-
-	utils.Logger().Info().
-		Str("number", block.Number().String()).
-		Str("hash", hash.Hex()).
-		Msg("Committed new head block")
-	return nil
 }
 
 // ShardID returns the shard Id of the blockchain.
@@ -1765,9 +1740,9 @@ func (bc *BlockChain) GetEpochBlockNumber(epoch *big.Int) (*big.Int, error) {
 	}
 	blockNum, err := rawdb.ReadEpochBlockNumber(bc.db, epoch)
 	if err != nil {
-		return nil, ctxerror.New("cannot read epoch block number from database",
-			"epoch", epoch,
-		).WithCause(err)
+		return nil, errors.Wrapf(
+			err, "cannot read epoch block number from database",
+		)
 	}
 	cachedValue := []byte(blockNum.Bytes())
 	bc.epochCache.Add(cacheKey, cachedValue)
@@ -1782,10 +1757,9 @@ func (bc *BlockChain) StoreEpochBlockNumber(
 	cachedValue := []byte(blockNum.Bytes())
 	bc.epochCache.Add(cacheKey, cachedValue)
 	if err := rawdb.WriteEpochBlockNumber(bc.db, epoch, blockNum); err != nil {
-		return ctxerror.New("cannot write epoch block number to database",
-			"epoch", epoch,
-			"epochBlockNum", blockNum,
-		).WithCause(err)
+		return errors.Wrapf(
+			err, "cannot write epoch block number to database",
+		)
 	}
 	return nil
 }
@@ -2702,18 +2676,15 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 
 	shardState, err := bc.ReadShardState(header.Epoch())
 	if err != nil {
-		return common.Address{}, ctxerror.New("cannot read shard state",
-			"epoch", header.Epoch(),
-			"coinbaseAddr", coinbase,
-		).WithCause(err)
+		return common.Address{}, errors.Wrapf(
+			err, "cannot read shard state",
+		)
 	}
 
 	committee, err := shardState.FindCommitteeByID(header.ShardID())
 	if err != nil {
-		return common.Address{}, ctxerror.New("cannot find shard in the shard state",
-			"blockNum", header.Number(),
-			"shardID", header.ShardID(),
-			"coinbaseAddr", coinbase,
+		return common.Address{}, errors.Wrapf(
+			err, "cannot find shard in the shard state",
 		)
 	}
 	for _, member := range committee.Slots {
@@ -2726,7 +2697,10 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 			return member.EcdsaAddress, nil
 		}
 	}
-	return common.Address{}, ctxerror.New("cannot find corresponding ECDSA Address", "coinbaseAddr", header.Coinbase())
+	return common.Address{}, errors.Errorf(
+		"cannot find corresponding ECDSA Address for coinbase %s",
+		header.Coinbase().Hash().Hex(),
+	)
 }
 
 // SuperCommitteeForNextEpoch ...
