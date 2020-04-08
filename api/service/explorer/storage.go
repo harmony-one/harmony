@@ -3,6 +3,7 @@ package explorer
 import (
 	"fmt"
 	"os"
+	"path"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -47,7 +48,8 @@ func GetStorageInstance(ip, port string, remove bool) *Storage {
 
 // Init initializes the block update.
 func (storage *Storage) Init(ip, port string, remove bool) {
-	dbFileName := nodeconfig.GetDefaultConfig().DBDir + "/explorer_storage_" + ip + "_" + port
+	dbFileName := path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
+	utils.Logger().Info().Msg("explorer storage folder: " + dbFileName)
 	var err error
 	if remove {
 		var err = os.RemoveAll(dbFileName)
