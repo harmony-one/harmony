@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -117,11 +116,6 @@ func (b *APIBackend) ChainConfig() *params.ChainConfig {
 // CurrentBlock ...
 func (b *APIBackend) CurrentBlock() *types.Block {
 	return types.NewBlockWithHeader(b.hmy.blockchain.CurrentHeader())
-}
-
-// AccountManager ...
-func (b *APIBackend) AccountManager() *accounts.Manager {
-	return b.hmy.accountManager
 }
 
 // GetReceipts ...

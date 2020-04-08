@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -34,7 +33,6 @@ type Backend interface {
 	ProtocolVersion() int
 	ChainDb() ethdb.Database
 	EventMux() *event.TypeMux
-	AccountManager() *accounts.Manager
 	RPCGasCap() *big.Int // global gas cap for hmy_call over rpc: DoS protection
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error)
 	BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)
@@ -115,12 +113,6 @@ func GetAPIs(b Backend) []rpc.API {
 		{
 			Namespace: "hmy",
 			Version:   "1.0",
-			Service:   apiv1.NewPublicAccountAPI(b.AccountManager()),
-			Public:    true,
-		},
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
 			Service:   apiv1.NewDebugAPI(b),
 			Public:    true, // FIXME: change to false once IPC implemented
 		},
@@ -140,12 +132,6 @@ func GetAPIs(b Backend) []rpc.API {
 			Namespace: "hmyv2",
 			Version:   "1.0",
 			Service:   apiv2.NewPublicTransactionPoolAPI(b, nonceLockV2),
-			Public:    true,
-		},
-		{
-			Namespace: "hmyv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicAccountAPI(b.AccountManager()),
 			Public:    true,
 		},
 		{

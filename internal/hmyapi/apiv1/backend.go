@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -28,19 +27,15 @@ import (
 //   * hmy/api_backend.go
 type Backend interface {
 	NetVersion() uint64
-
-	// Downloader() *downloader.Downloader
 	ProtocolVersion() int
-	// SuggestPrice(ctx context.Context) (*big.Int, error)
 	ChainDb() ethdb.Database
 	EventMux() *event.TypeMux
-	AccountManager() *accounts.Manager
-	// ExtRPCEnabled() bool
 	RPCGasCap() *big.Int // global gas cap for hmy_call over rpc: DoS protection
-
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error)
 	BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)
-	StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *block.Header, error)
+	StateAndHeaderByNumber(
+		ctx context.Context, blockNr rpc.BlockNumber,
+	) (*state.DB, *block.Header, error)
 	GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
 

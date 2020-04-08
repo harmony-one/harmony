@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -162,29 +161,21 @@ type Node struct {
 
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
-
 	// Global group Message Receiver, communicate with beacon chain, or cross-shard TX
 	globalGroupReceiver p2p.GroupReceiver
-
 	// Client Message Receiver to handle light client messages
 	// Beacon leader needs to use this receiver to talk to new node
 	clientReceiver p2p.GroupReceiver
-
 	// Duplicated Ping Message Received
 	duplicatedPing sync.Map
-
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
-
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
-
 	// Chain configuration.
 	chainConfig params.ChainConfig
-
 	// map of service type to its message channel.
 	serviceMessageChan map[service.Type]chan *msg_pb.Message
-	accountManager     *accounts.Manager
 	isFirstTime        bool // the node was started with a fresh database
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
@@ -700,11 +691,6 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		utils.Logger().Error().Err(err).Msg("Failed to create client receiver")
 	}
 	return nodeConfig, chanPeer
-}
-
-// AccountManager ...
-func (node *Node) AccountManager() *accounts.Manager {
-	return node.accountManager
 }
 
 // ServiceManager ...

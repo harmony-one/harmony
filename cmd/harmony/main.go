@@ -55,12 +55,10 @@ var (
 )
 
 // Host
-var (
-	myHost p2p.Host
-)
+var myHost p2p.Host
 
 func printVersion() {
-	_, _ = fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
+	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
 	os.Exit(0)
 }
 
@@ -227,9 +225,8 @@ func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys []*bls.Public
 func setupLegacyNodeAccount() error {
 	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	multiBLSPubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
-
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
-	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
+	if len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
 			findAccountsByPubKeys(config, multiBLSPubKey.PublicKey)
@@ -242,7 +239,11 @@ func setupLegacyNodeAccount() error {
 	}
 
 	if len(initialAccounts) == 0 {
-		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", multiBLSPubKey.SerializeToHexStr())
+		fmt.Fprintf(
+			os.Stderr,
+			"ERROR cannot find your BLS key in the genesis/FN tables: %s\n",
+			multiBLSPubKey.SerializeToHexStr(),
+		)
 		os.Exit(100)
 	}
 
@@ -258,7 +259,9 @@ func setupStakingNodeAccount() error {
 	if err != nil {
 		return errors.Wrap(err, "cannot determine shard to join")
 	}
-	if err := nodeconfig.GetDefaultConfig().ValidateConsensusKeysForSameShard(pubKey.PublicKey, shardID); err != nil {
+	if err := nodeconfig.GetDefaultConfig().ValidateConsensusKeysForSameShard(
+		pubKey.PublicKey, shardID,
+	); err != nil {
 		return err
 	}
 	for _, blsKey := range pubKey.PublicKey {

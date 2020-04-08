@@ -154,7 +154,8 @@ func (r *GroupReceiverImpl) Receive(ctx context.Context) (
 func (host *HostV2) GroupReceiver(group nodeconfig.GroupID) (
 	receiver p2p.GroupReceiver, err error,
 ) {
-	t, err := host.getTopic(string(group))
+	top := string(group)
+	t, err := host.getTopic(top)
 	if err != nil {
 		return nil, err
 	}
