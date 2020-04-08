@@ -98,7 +98,7 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 func (consensus *Consensus) finalizeCommits() {
 	consensus.getLogger().Info().
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
-		Msg("[Finalizing] Finalizing Block")
+		Msg("[finalizeCommits] Finalizing Block")
 	beforeCatchupNum := consensus.blockNum
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
@@ -149,12 +149,12 @@ func (consensus *Consensus) finalizeCommits() {
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
 		host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[Finalizing] Cannot send committed message")
+		consensus.getLogger().Warn().Err(err).Msg("[finalizeCommits] Cannot send committed message")
 	} else {
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
-			Msg("[Finalizing] Sent Committed Message")
+			Msg("[finalizeCommits] Sent Committed Message")
 	}
 
 	// Dump new block into level db
@@ -165,9 +165,9 @@ func (consensus *Consensus) finalizeCommits() {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Debug().Msg("[Finalizing] Start consensus timer; stop bootstrap timer only once")
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Start consensus timer; stop bootstrap timer only once")
 	} else {
-		consensus.getLogger().Debug().Msg("[Finalizing] Start consensus timer")
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
@@ -180,8 +180,17 @@ func (consensus *Consensus) finalizeCommits() {
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
-	// Send signal to Node so the new block can be added and new round of consensus can be triggered
+
+	if time.Now().Before(consensus.NextBlockDue) {
+		// Sleep to wait for the full block time
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
+		time.Sleep(consensus.NextBlockDue.Sub(time.Now()))
+	}
+	// Send signal to Node to propose the new block for consensus
 	consensus.ReadySignal <- struct{}{}
+
+	// Update time due for next block
+	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 }
 
 // LastCommitSig returns the byte array of aggregated
@@ -335,8 +344,8 @@ func (consensus *Consensus) Start(
 			Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
 
 		vdfInProgress := false
-		// Set up the very first block time interval.
-		blockTime := time.Now().Add(consensus.BlockPeriod)
+		// Set up next block due time.
+		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 		for {
 			select {
 			case <-ticker.C:
@@ -473,16 +482,10 @@ func (consensus *Consensus) Start(
 
 				// Only Leader execute this condition
 				func() {
-					if time.Now().Before(blockTime) {
-						// Sleep to wait for the full block time
-						consensus.getLogger().Debug().Msg("[CommitFinishChan] Waiting for Block Time")
-						time.Sleep(blockTime.Sub(time.Now()))
-					}
 					consensus.mutex.Lock()
 					defer consensus.mutex.Unlock()
 					if viewID == consensus.viewID {
 						consensus.finalizeCommits()
-						blockTime = time.Now().Add(consensus.BlockPeriod)
 					}
 				}()
 
