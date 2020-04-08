@@ -352,6 +352,12 @@ func (s *PublicBlockChainAPI) GetBalanceByBlockNumber(ctx context.Context, addre
 	return s.b.GetBalance(ctx, addr, rpc.BlockNumber(blockNr))
 }
 
+// GetAccountNonce returns the nonce value of the given address for the given block number
+func (s *PublicBlockChainAPI) GetAccountNonce(ctx context.Context, address string, blockNr rpc.BlockNumber) (uint64, error) {
+	addr := internal_common.ParseAddr(address)
+	return s.b.GetAccountNonce(ctx, addr, rpc.BlockNumber(blockNr))
+}
+
 // GetBalance returns the amount of Nano for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.

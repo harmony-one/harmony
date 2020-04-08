@@ -46,6 +46,8 @@ type NodeAPI interface {
 	GetNonceOfAddress(address common.Address) uint64
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	GetTransactionCount(address, txType string) (uint64, error)
+	GetStakingTransactionCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
 	ErroredStakingTransactionSink() []staking.RPCTransactionError
 	ErroredTransactionSink() []types.RPCTransactionError

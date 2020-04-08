@@ -220,6 +220,16 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	return txs, nil
 }
 
+// GetAccountNonce returns the nonce value of the given address for the given block number
+func (b *APIBackend) GetAccountNonce(
+	ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error) {
+	state, _, err := b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return 0, err
+	}
+	return state.GetNonce(address), state.Error()
+}
+
 // GetBalance returns balance of an given address.
 func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error) {
 	state, _, err := b.StateAndHeaderByNumber(ctx, blockNr)
@@ -239,6 +249,18 @@ func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]co
 func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
 	hashes, err := b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
 	return hashes, err
+}
+
+// GetTransactionCount returns the number of regular transactions of address.
+func (b *APIBackend) GetTransactionCount(address, txType string) (uint64, error) {
+	count, err := b.hmy.nodeAPI.GetTransactionCount(address, txType)
+	return count, err
+}
+
+// GetStakingTransactionCount returns the number of staking transactions of address.
+func (b *APIBackend) GetStakingTransactionCount(address, txType string) (uint64, error) {
+	count, err := b.hmy.nodeAPI.GetStakingTransactionCount(address, txType)
+	return count, err
 }
 
 // NetVersion returns net version
