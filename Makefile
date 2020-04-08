@@ -21,6 +21,9 @@ exe:
 race:
 	./scripts/go_executable_build.sh -r
 
+trace-pointer:
+	./scripts/go_executable_build.sh -t
+
 test:
 	./test/debug.sh
 

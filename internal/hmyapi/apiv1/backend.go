@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
@@ -84,4 +85,5 @@ type Backend interface {
 	GetCurrentBadBlocks() []core.BadBlock
 	GetLastCrossLinks() ([]*types.CrossLink, error)
 	GetLatestChainHeaders() *block.HeaderPair
+	GetNodeMetadata() commonRPC.NodeMetadata
 }

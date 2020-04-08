@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
+	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
@@ -23,12 +24,8 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// Backend interface provides the common API services (that are provided by
-// both full and light clients) with access to necessary functions.
-// implementations:
-//   * hmy/api_backend.go
+// Backend ..
 type Backend interface {
-	// NOTE(ricl): this is not in ETH Backend inteface. They put it directly in eth object.
 	NetVersion() uint64
 	ProtocolVersion() int
 	ChainDb() ethdb.Database
@@ -39,32 +36,23 @@ type Backend interface {
 	StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *block.Header, error)
 	GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
-	// GetTd(blockHash common.Hash) *big.Int
 	GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *block.Header) (*vm.EVM, func() error, error)
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
-	// GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
 	GetPoolTransactions() (types.PoolTransactions, error)
 	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
-	// Stats() (pending int, queued int)
-	// TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
-	// Get balance
 	GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error)
-	// Get validators for a particular epoch
 	GetValidators(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
-	// Get transactions history for an address
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
-	// Get staking transactions history for an address
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
-	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
@@ -85,6 +73,7 @@ type Backend interface {
 	GetCurrentBadBlocks() []core.BadBlock
 	GetLastCrossLinks() ([]*types.CrossLink, error)
 	GetLatestChainHeaders() *block.HeaderPair
+	GetNodeMetadata() commonRPC.NodeMetadata
 }
 
 // GetAPIs returns all the APIs.

@@ -14,6 +14,7 @@ GOOS=linux
 GOARCH=amd64
 FOLDER=${WHOAMI:-$USER}
 RACE=
+TRACEPTR=
 VERBOSE=
 GO_GCFLAGS="all=-c 2"
 DEBUG=false
@@ -59,6 +60,7 @@ OPTIONS:
    -b bucket      set the upload bucket name (default: $BUCKET)
    -f folder      set the upload folder name in the bucket (default: $FOLDER)
    -r             enable -race build option (default: $RACE)
+   -t             full analysis on {pointer} build option (default: $TRACEPTR)
    -v             verbose build process (default: $VERBOSE)
    -s             build static linux executable (default: $STATIC)
 
@@ -107,12 +109,12 @@ function build_only
          rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
          if [ "$DEBUG" == "true" ]; then
-            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
          else
             if [ "$STATIC" == "true" ]; then
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
             else
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
             fi
          fi
          if [ "$(uname -s)" == "Linux" ]; then
@@ -231,7 +233,7 @@ function release
 
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:rvsdN:" option; do
+while getopts "hp:a:o:b:f:rtvsdN:" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;
@@ -240,6 +242,7 @@ while getopts "hp:a:o:b:f:rvsdN:" option; do
       b) BUCKET=$OPTARG/ ;;
       f) FOLDER=$OPTARG ;;
       r) RACE=-race ;;
+      t) TRACEPTR='-gcflags=all=-d=checkptr' ;;
       v) VERBOSE='-v -x' ;;
       d) DEBUG=true ;;
       s) STATIC=true ;;

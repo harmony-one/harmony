@@ -50,6 +50,7 @@ type NodeAPI interface {
 	ErroredStakingTransactionSink() []staking.RPCTransactionError
 	ErroredTransactionSink() []types.RPCTransactionError
 	PendingCXReceipts() []*types.CXReceiptsProof
+	GetNodeBootTime() int64
 }
 
 // New creates a new Harmony object (including the
