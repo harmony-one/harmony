@@ -158,11 +158,11 @@ func (e *GenesisMismatchError) Error() string {
 //     db has genesis    |  from DB           |  genesis (if compatible)
 //
 // The stored chain configuration will be updated if it is compatible (i.e. does not
-// specify a fork block below the local head block). In case of a conflict, the
-// error is a *params.ConfigCompatError and the new, unwritten config is returned.
-//
+// specify a fork block below the local head block)
 // The returned chain configuration is never nil.
-func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
+func SetupGenesisBlock(
+	db ethdb.Database, genesis *Genesis,
+) (*params.ChainConfig, common.Hash, error) {
 	if genesis != nil && genesis.Config == nil {
 		return params.AllProtocolChanges, common.Hash{}, errGenesisNoConfig
 	}
@@ -196,23 +196,11 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 		rawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, stored, nil
 	}
-	// Special case: don't change the existing config of a non-mainnet chain if no new
-	// config is supplied. These chains would get AllProtocolChanges (and a compat error)
-	// if we just continued here.
-	// TODO: take use of genesis hash
-	//if genesis == nil && stored != params.MainnetGenesisHash {
-	//	return storedcfg, stored, nil
-	//}
-
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
 	height := rawdb.ReadHeaderNumber(db, rawdb.ReadHeadHeaderHash(db))
 	if height == nil {
 		return newcfg, stored, fmt.Errorf("missing block number for head header hash")
-	}
-	compatErr := storedcfg.CheckCompatible(newcfg, *height)
-	if compatErr != nil && *height != 0 && compatErr.RewindTo != 0 {
-		return newcfg, stored, compatErr
 	}
 	rawdb.WriteChainConfig(db, stored, newcfg)
 	return newcfg, stored, nil
@@ -222,11 +210,6 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 	switch {
 	case g != nil:
 		return g.Config
-	// TODO: take use of genesis hash
-	//case ghash == params.MainnetGenesisHash:
-	//	return params.MainnetChainConfig
-	//case ghash == params.TestnetGenesisHash:
-	//	return params.TestnetChainConfig
 	default:
 		return params.AllProtocolChanges
 	}

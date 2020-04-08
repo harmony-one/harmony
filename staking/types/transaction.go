@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	errStakingTransactionTypeCastErr = errors.New("Cannot type cast to matching staking type")
+	errStakingTransactionTypeCastErr = errors.New("cannot type cast to matching staking type")
 )
 
 type txdata struct {
