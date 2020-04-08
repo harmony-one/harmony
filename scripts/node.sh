@@ -91,6 +91,18 @@ function setup_env
    add_env /etc/pam.d/common-session "session required pam_limits.so"
 }
 
+function check_pkg_management
+{
+   if which yum > /dev/null; then
+      PKG_INSTALL='sudo yum install -y'
+      return
+   fi
+   if which apt-get > /dev/null; then
+      PKG_INSTALL='sudo apt-get install -y'
+      return
+   fi
+}
+
 ######## main #########
 print_usage() {
    cat <<- ENDEND
@@ -610,6 +622,7 @@ fi
 
 # find my public ip address
 myip
+check_pkg_management
 
 unset -v BN_MA bn
 for bn in "${bootnodes[@]}"
@@ -633,6 +646,10 @@ then
       rm -rf latest
    fi
 
+   # install unzip as dependency of rclone
+   if ! which unzip > /dev/null; then
+      $PKG_INSTALL unzip
+   fi
    # do rclone sync
    if ! which rclone > /dev/null; then
       msg "installing rclone to fast sync db"
