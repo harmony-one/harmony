@@ -150,18 +150,6 @@ func TestGasCost(t *testing.T) {
 	if err != nil || cost.Int64() != 21100 {
 		t.Errorf("staking transaction cost is incorrect %v\n", err)
 	}
-	dAddr, _ := common2.Bech32ToAddress(testAccount)
-	vAddr, _ := common2.Bech32ToAddress(testAccount)
-	delegateTx1, err := NewStakingTransaction(0, 21000, big.NewInt(1), func() (Directive, interface{}) {
-		return DirectiveCreateValidator, Delegate{
-			DelegatorAddress: dAddr,
-			ValidatorAddress: vAddr,
-			Amount:           big.NewInt(100),
-		}
-	})
-	if _, err = delegateTx1.Cost(); err == nil {
-		t.Error("expected", errStakingTransactionTypeCastErr, "got", nil)
-	}
 }
 
 func TestNonce(t *testing.T) {
@@ -183,7 +171,7 @@ func TestData(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not rlp encode staking tx %v\n", err)
 	}
-	if bytes.Compare(stakingTx.Data(), encoded) != 0 {
+	if !bytes.Equal(stakingTx.Data(), encoded) {
 		t.Error("RLPEncode and Data does not match \n")
 	}
 	if _, err = RLPDecodeStakeMsg(encoded, DirectiveCreateValidator); err != nil {

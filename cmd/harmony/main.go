@@ -43,7 +43,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 	"github.com/pkg/errors"
-	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Version string variables
@@ -56,33 +55,30 @@ var (
 
 // Host
 var (
-	myHost p2p.Host
+	myHost          p2p.Host
+	initialAccounts = []*genesis.DeployAccount{}
 )
 
 func printVersion() {
-	_, _ = fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
+	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
 	os.Exit(0)
 }
 
 var (
-	ip               = flag.String("ip", "127.0.0.1", "ip of the node")
-	port             = flag.String("port", "9000", "port of the node.")
-	logFolder        = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	logMaxSize       = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
-	freshDB          = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
-	profile          = flag.Bool("profile", false, "Turn on profiling (CPU, Memory).")
-	metricsReportURL = flag.String("metrics_report_url", "", "If set, reports metrics to this URL.")
-	pprof            = flag.String("pprof", "", "what address and port the pprof profiling server should listen on")
-	versionFlag      = flag.Bool("version", false, "Output version info")
-	onlyLogTps       = flag.Bool("only_log_tps", false, "Only log TPS if true")
-	dnsZone          = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
-	dnsFlag          = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
+	ip          = flag.String("ip", "127.0.0.1", "ip of the node")
+	port        = flag.String("port", "9000", "port of the node.")
+	logFolder   = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
+	logMaxSize  = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
+	freshDB     = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
+	pprof       = flag.String("pprof", "", "what address and port the pprof profiling server should listen on")
+	versionFlag = flag.Bool("version", false, "Output version info")
+	onlyLogTps  = flag.Bool("only_log_tps", false, "Only log TPS if true")
+	dnsZone     = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
+	dnsFlag     = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers = flag.Int("min_peers", 32, "Minimal number of Peers in shard")
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
-	// isGenesis indicates this node is a genesis node
-	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "false will enable cached state pruning")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
@@ -91,13 +87,8 @@ var (
 	nodeType = flag.String("node_type", "validator", "node type: validator, explorer")
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, pangaea, partner, stressnet, devnet, localnet")
-	// syncFreq indicates sync frequency
-	syncFreq = flag.Int("sync_freq", 60, "unit in seconds")
-	// beaconSyncFreq indicates beaconchain sync frequency
-	beaconSyncFreq = flag.Int("beacon_sync_freq", 60, "unit in seconds")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
-	blockPeriod    = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
-	leaderOverride = flag.Bool("leader_override", false, "true means override the default leader role and acts as validator")
+	blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	// staking indicates whether the node is operating in staking mode.
 	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
 	// shardID indicates the shard ID of this node
@@ -115,18 +106,11 @@ var (
 	// logConn logs incoming/outgoing connections
 	logConn     = flag.Bool("log_conn", false, "log incoming/outgoing connections")
 	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
-
-	// Use a separate log file to log libp2p traces
-	logP2P = flag.Bool("log_p2p", false, "log libp2p debug info")
-
-	initialAccounts = []*genesis.DeployAccount{}
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 	// dbDir is the database directory.
-	dbDir = flag.String("db_dir", "", "blockchain database directory")
-	// Disable view change.
-	disableViewChange = flag.Bool("disable_view_change", false, "Do not propose view change (testing only)")
-	publicRPC         = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+	dbDir     = flag.String("db_dir", "", "blockchain database directory")
+	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
 	// Bad block revert
 	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
@@ -227,9 +211,8 @@ func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys []*bls.Public
 func setupLegacyNodeAccount() error {
 	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	multiBLSPubKey := setupConsensusKey(nodeconfig.GetDefaultConfig())
-
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
-	if reshardingEpoch != nil && len(reshardingEpoch) > 0 {
+	if len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
 			findAccountsByPubKeys(config, multiBLSPubKey.PublicKey)
@@ -242,7 +225,11 @@ func setupLegacyNodeAccount() error {
 	}
 
 	if len(initialAccounts) == 0 {
-		fmt.Fprintf(os.Stderr, "ERROR cannot find your BLS key in the genesis/FN tables: %s\n", multiBLSPubKey.SerializeToHexStr())
+		fmt.Fprintf(
+			os.Stderr,
+			"ERROR cannot find your BLS key in the genesis/FN tables: %s\n",
+			multiBLSPubKey.SerializeToHexStr(),
+		)
 		os.Exit(100)
 	}
 
@@ -258,7 +245,9 @@ func setupStakingNodeAccount() error {
 	if err != nil {
 		return errors.Wrap(err, "cannot determine shard to join")
 	}
-	if err := nodeconfig.GetDefaultConfig().ValidateConsensusKeysForSameShard(pubKey.PublicKey, shardID); err != nil {
+	if err := nodeconfig.GetDefaultConfig().ValidateConsensusKeysForSameShard(
+		pubKey.PublicKey, shardID,
+	); err != nil {
 		return err
 	}
 	for _, blsKey := range pubKey.PublicKey {
@@ -480,10 +469,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.SetCommitDelay(commitDelay)
 	currentConsensus.MinPeers = *minPeers
 
-	if *disableViewChange {
-		currentConsensus.DisableViewChangeForTestingOnly()
-	}
-
 	blacklist, err := setupBlacklist()
 	if err != nil {
 		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
@@ -607,8 +592,6 @@ func setupViperConfig() {
 	viperconfig.ResetConfString(logFolder, envViper, configFileViper, "", "log_folder")
 	viperconfig.ResetConfInt(logMaxSize, envViper, configFileViper, "", "log_max_size")
 	viperconfig.ResetConfBool(freshDB, envViper, configFileViper, "", "fresh_db")
-	viperconfig.ResetConfBool(profile, envViper, configFileViper, "", "profile")
-	viperconfig.ResetConfString(metricsReportURL, envViper, configFileViper, "", "metrics_report_url")
 	viperconfig.ResetConfString(pprof, envViper, configFileViper, "", "pprof")
 	viperconfig.ResetConfBool(versionFlag, envViper, configFileViper, "", "version")
 	viperconfig.ResetConfBool(onlyLogTps, envViper, configFileViper, "", "only_log_tps")
@@ -616,15 +599,11 @@ func setupViperConfig() {
 	viperconfig.ResetConfBool(dnsFlag, envViper, configFileViper, "", "dns")
 	viperconfig.ResetConfInt(minPeers, envViper, configFileViper, "", "min_peers")
 	viperconfig.ResetConfString(keyFile, envViper, configFileViper, "", "key")
-	viperconfig.ResetConfBool(isGenesis, envViper, configFileViper, "", "is_genesis")
 	viperconfig.ResetConfBool(isArchival, envViper, configFileViper, "", "is_archival")
 	viperconfig.ResetConfString(delayCommit, envViper, configFileViper, "", "delay_commit")
 	viperconfig.ResetConfString(nodeType, envViper, configFileViper, "", "node_type")
 	viperconfig.ResetConfString(networkType, envViper, configFileViper, "", "network_type")
-	viperconfig.ResetConfInt(syncFreq, envViper, configFileViper, "", "sync_freq")
-	viperconfig.ResetConfInt(beaconSyncFreq, envViper, configFileViper, "", "beacon_sync_freq")
 	viperconfig.ResetConfInt(blockPeriod, envViper, configFileViper, "", "block_period")
-	viperconfig.ResetConfBool(leaderOverride, envViper, configFileViper, "", "leader_override")
 	viperconfig.ResetConfBool(stakingFlag, envViper, configFileViper, "", "staking")
 	viperconfig.ResetConfInt(shardID, envViper, configFileViper, "", "shard_id")
 	viperconfig.ResetConfString(blsKeyFile, envViper, configFileViper, "", "blskey_file")
@@ -635,10 +614,8 @@ func setupViperConfig() {
 	viperconfig.ResetConfInt(devnetHarmonySize, envViper, configFileViper, "", "dn_hmy_size")
 	viperconfig.ResetConfBool(logConn, envViper, configFileViper, "", "log_conn")
 	viperconfig.ResetConfString(keystoreDir, envViper, configFileViper, "", "keystore")
-	viperconfig.ResetConfBool(logP2P, envViper, configFileViper, "", "log_p2p")
 	viperconfig.ResetConfInt(verbosity, envViper, configFileViper, "", "verbosity")
 	viperconfig.ResetConfString(dbDir, envViper, configFileViper, "", "db_dir")
-	viperconfig.ResetConfBool(disableViewChange, envViper, configFileViper, "", "disable_view_change")
 	viperconfig.ResetConfBool(publicRPC, envViper, configFileViper, "", "public_rpc")
 	viperconfig.ResetConfInt(doRevertBefore, envViper, configFileViper, "", "do_revert_before")
 	viperconfig.ResetConfInt(revertTo, envViper, configFileViper, "", "revert_to")
@@ -717,7 +694,7 @@ func main() {
 			err = setupLegacyNodeAccount()
 		}
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "cannot set up node account: %s\n", err)
+			fmt.Fprintf(os.Stderr, "cannot set up node account: %s\n", err)
 			os.Exit(1)
 		}
 	}
@@ -739,7 +716,7 @@ func main() {
 
 	nodeConfig, err := createGlobalConfig()
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
+		fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
 		os.Exit(1)
 	}
 	currentNode := setupConsensusAndNode(nodeConfig)
@@ -749,22 +726,15 @@ func main() {
 	osSignal := make(chan os.Signal)
 	signal.Notify(osSignal, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		for {
-			select {
-			case sig := <-osSignal:
-				if sig == syscall.SIGTERM || sig == os.Interrupt {
-					msg := "Got %s signal. Gracefully shutting down...\n"
-					utils.Logger().Printf(msg, sig)
-					fmt.Printf(msg, sig)
-					currentNode.ShutDown()
-				}
+		for sig := range osSignal {
+			if sig == syscall.SIGTERM || sig == os.Interrupt {
+				const msg = "Got %s signal. Gracefully shutting down...\n"
+				utils.Logger().Printf(msg, sig)
+				fmt.Printf(msg, sig)
+				currentNode.ShutDown()
 			}
 		}
 	}()
-
-	//setup state syncing and beacon syncing frequency
-	currentNode.SetSyncFreq(*syncFreq)
-	currentNode.SetBeaconSyncFreq(*beaconSyncFreq)
 
 	if nodeConfig.ShardID != shard.BeaconChainShardID &&
 		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
@@ -809,20 +779,6 @@ func main() {
 			fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, myHost.GetID().Pretty()),
 		).
 		Msg(startMsg)
-
-	if *logP2P {
-		f, err := os.OpenFile(
-			path.Join(*logFolder, "libp2p.log"),
-			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644,
-		)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to open libp2p.log. %v\n", err)
-		} else {
-			defer f.Close()
-			backend1 := gologging.NewLogBackend(f, "", 0)
-			gologging.SetBackend(backend1)
-		}
-	}
 
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()

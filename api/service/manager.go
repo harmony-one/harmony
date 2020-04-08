@@ -169,7 +169,6 @@ func (m *Manager) SetupServiceMessageChan(
 	mapServiceTypeChan map[Type]chan *msg_pb.Message,
 ) {
 	for serviceType, service := range m.services {
-		// TODO(minhdoan): for performance, consider buffered channel.
 		mapServiceTypeChan[serviceType] = make(chan *msg_pb.Message)
 		service.SetMessageChan(mapServiceTypeChan[serviceType])
 	}

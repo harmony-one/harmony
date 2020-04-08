@@ -29,67 +29,46 @@ import (
 var (
 	// databaseVerisionKey tracks the current database version.
 	databaseVerisionKey = []byte("DatabaseVersion")
-
 	// headHeaderKey tracks the latest know header's hash.
 	headHeaderKey = []byte("LastHeader")
-
 	// headBlockKey tracks the latest know full block's hash.
 	headBlockKey = []byte("LastBlock")
-
 	// headFastBlockKey tracks the latest known incomplete block's hash duirng fast sync.
 	headFastBlockKey = []byte("LastFast")
-
 	// Data item prefixes (use single byte to avoid mixing data types, avoid `i`, used for indexes).
-	headerPrefix       = []byte("h") // headerPrefix + num (uint64 big endian) + hash -> header
-	headerTDSuffix     = []byte("t") // headerPrefix + num (uint64 big endian) + hash + headerTDSuffix -> td
-	headerHashSuffix   = []byte("n") // headerPrefix + num (uint64 big endian) + headerHashSuffix -> hash
-	headerNumberPrefix = []byte("H") // headerNumberPrefix + hash -> num (uint64 big endian)
-
-	blockBodyPrefix     = []byte("b") // blockBodyPrefix + num (uint64 big endian) + hash -> block body
-	blockReceiptsPrefix = []byte("r") // blockReceiptsPrefix + num (uint64 big endian) + hash -> block receipts
-
-	txLookupPrefix  = []byte("l")  // txLookupPrefix + hash -> transaction/receipt lookup metadata
-	cxLookupPrefix  = []byte("cx") // cxLookupPrefix + hash -> cxReceipt lookup metadata
-	bloomBitsPrefix = []byte("B")  // bloomBitsPrefix + bit (uint16 big endian) + section (uint64 big endian) + hash -> bloom bits
-
-	shardStatePrefix = []byte("ss") // shardStatePrefix + num (uint64 big endian) + hash -> shardState
-	lastCommitsKey   = []byte("LastCommits")
-
-	pendingCrosslinkKey = []byte("pendingCL")        // prefix for shard last pending crosslink
-	pendingSlashingKey  = []byte("pendingSC")        // prefix for shard last pending slashing record
-	preimagePrefix      = []byte("secure-key-")      // preimagePrefix + hash -> preimage
-	configPrefix        = []byte("ethereum-config-") // config prefix for the db
-
-	shardLastCrosslinkPrefix = []byte("lcl") // prefix for shard last crosslink
-	crosslinkPrefix          = []byte("cl")  // prefix for crosslink
-
-	delegatorValidatorListPrefix = []byte("dvl") // prefix for delegator's validator list
-
+	headerPrefix                 = []byte("h")  // headerPrefix + num (uint64 big endian) + hash -> header
+	headerTDSuffix               = []byte("t")  // headerPrefix + num (uint64 big endian) + hash + headerTDSuffix -> td
+	headerHashSuffix             = []byte("n")  // headerPrefix + num (uint64 big endian) + headerHashSuffix -> hash
+	headerNumberPrefix           = []byte("H")  // headerNumberPrefix + hash -> num (uint64 big endian)
+	blockBodyPrefix              = []byte("b")  // blockBodyPrefix + num (uint64 big endian) + hash -> block body
+	blockReceiptsPrefix          = []byte("r")  // blockReceiptsPrefix + num (uint64 big endian) + hash -> block receipts
+	txLookupPrefix               = []byte("l")  // txLookupPrefix + hash -> transaction/receipt lookup metadata
+	cxLookupPrefix               = []byte("cx") // cxLookupPrefix + hash -> cxReceipt lookup metadata
+	bloomBitsPrefix              = []byte("B")  // bloomBitsPrefix + bit (uint16 big endian) + section (uint64 big endian) + hash -> bloom bits
+	shardStatePrefix             = []byte("ss") // shardStatePrefix + num (uint64 big endian) + hash -> shardState
+	lastCommitsKey               = []byte("LastCommits")
+	pendingCrosslinkKey          = []byte("pendingCL")        // prefix for shard last pending crosslink
+	pendingSlashingKey           = []byte("pendingSC")        // prefix for shard last pending slashing record
+	preimagePrefix               = []byte("secure-key-")      // preimagePrefix + hash -> preimage
+	configPrefix                 = []byte("ethereum-config-") // config prefix for the db
+	crosslinkPrefix              = []byte("cl")               // prefix for crosslink
+	delegatorValidatorListPrefix = []byte("dvl")              // prefix for delegator's validator list
 	// TODO: shorten the key prefix so we don't waste db space
-	cxReceiptPrefix                  = []byte("cxReceipt")                  // prefix for cross shard transaction receipt
-	cxReceiptHashPrefix              = []byte("cxReceiptHash")              // prefix for cross shard transaction receipt hash
-	cxReceiptSpentPrefix             = []byte("cxReceiptSpent")             // prefix for indicator of unspent of cxReceiptsProof
-	cxReceiptUnspentCheckpointPrefix = []byte("cxReceiptUnspentCheckpoint") // prefix for cxReceiptsProof unspent checkpoint
-
-	validatorPrefix         = []byte("validator")              // prefix for staking validator information
+	cxReceiptPrefix         = []byte("cxReceipt")              // prefix for cross shard transaction receipt
+	cxReceiptSpentPrefix    = []byte("cxReceiptSpent")         // prefix for indicator of unspent of cxReceiptsProof
 	validatorSnapshotPrefix = []byte("validator-snapshot")     // prefix for staking validator's snapshot information
 	validatorStatsPrefix    = []byte("validator-stats")        // prefix for staking validator's stats information
 	validatorListKey        = []byte("validator-list")         // key for all validators list
 	electedValidatorListKey = []byte("elected-validator-list") // key for elected validators list
-
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
 	epochBlockNumberPrefix = []byte("harmony-epoch-block-number")
-
 	// epochVrfBlockNumbersPrefix  + epoch (big.Int.Bytes())
 	epochVrfBlockNumbersPrefix = []byte("epoch-vrf-block-numbers")
-
 	// epochVdfBlockNumberPrefix  + epoch (big.Int.Bytes())
 	epochVdfBlockNumberPrefix = []byte("epoch-vdf-block-number")
-
 	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
-	BloomBitsIndexPrefix = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
-
+	BloomBitsIndexPrefix        = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
 	preimageCounter             = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter          = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 	currentRewardGivenOutPrefix = []byte("blk-rwd-")

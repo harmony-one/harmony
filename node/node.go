@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/api/client"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -161,29 +160,21 @@ type Node struct {
 
 	// Shard group Message Receiver
 	shardGroupReceiver p2p.GroupReceiver
-
 	// Global group Message Receiver, communicate with beacon chain, or cross-shard TX
 	globalGroupReceiver p2p.GroupReceiver
-
 	// Client Message Receiver to handle light client messages
 	// Beacon leader needs to use this receiver to talk to new node
 	clientReceiver p2p.GroupReceiver
-
 	// Duplicated Ping Message Received
 	duplicatedPing sync.Map
-
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
-
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
-
 	// Chain configuration.
 	chainConfig params.ChainConfig
-
 	// map of service type to its message channel.
 	serviceMessageChan map[service.Type]chan *msg_pb.Message
-	accountManager     *accounts.Manager
 	isFirstTime        bool // the node was started with a fresh database
 
 	// Last 1024 staking transaction error, only in memory
@@ -700,24 +691,9 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	return nodeConfig, chanPeer
 }
 
-// AccountManager ...
-func (node *Node) AccountManager() *accounts.Manager {
-	return node.accountManager
-}
-
 // ServiceManager ...
 func (node *Node) ServiceManager() *service.Manager {
 	return node.serviceManager
-}
-
-// SetSyncFreq sets the syncing frequency in the loop
-func (node *Node) SetSyncFreq(syncFreq int) {
-	node.syncFreq = syncFreq
-}
-
-// SetBeaconSyncFreq sets the syncing frequency in the loop
-func (node *Node) SetBeaconSyncFreq(syncFreq int) {
-	node.beaconSyncFreq = syncFreq
 }
 
 // ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.

@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	errInsufficientBalance = errors.New("Insufficient balance to undelegate")
-	errInvalidAmount       = errors.New("Invalid amount, must be positive")
+	errInsufficientBalance = errors.New("insufficient balance to undelegate")
+	errInvalidAmount       = errors.New("invalid amount, must be positive")
 )
 
 const (

@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
@@ -18,14 +17,13 @@ import (
 // Harmony implements the Harmony full node service.
 type Harmony struct {
 	// Channel for shutting down the service
-	shutdownChan   chan bool                      // Channel for shutting down the Harmony
-	bloomRequests  chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	blockchain     *core.BlockChain
-	beaconchain    *core.BlockChain
-	txPool         *core.TxPool
-	cxPool         *core.CxPool
-	accountManager *accounts.Manager
-	eventMux       *event.TypeMux
+	shutdownChan  chan bool                      // Channel for shutting down the Harmony
+	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
+	blockchain    *core.BlockChain
+	beaconchain   *core.BlockChain
+	txPool        *core.TxPool
+	cxPool        *core.CxPool
+	eventMux      *event.TypeMux
 	// DB interfaces
 	chainDb      ethdb.Database     // Block chain database
 	bloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
@@ -44,7 +42,6 @@ type NodeAPI interface {
 	AddPendingTransaction(newTx *types.Transaction) error
 	Blockchain() *core.BlockChain
 	Beaconchain() *core.BlockChain
-	AccountManager() *accounts.Manager
 	GetBalanceOfAddress(address common.Address) (*big.Int, error)
 	GetNonceOfAddress(address common.Address) uint64
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
@@ -63,19 +60,18 @@ func New(
 ) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	hmy := &Harmony{
-		shutdownChan:   make(chan bool),
-		bloomRequests:  make(chan chan *bloombits.Retrieval),
-		blockchain:     nodeAPI.Blockchain(),
-		beaconchain:    nodeAPI.Beaconchain(),
-		txPool:         txPool,
-		cxPool:         cxPool,
-		accountManager: nodeAPI.AccountManager(),
-		eventMux:       eventMux,
-		chainDb:        chainDb,
-		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
-		nodeAPI:        nodeAPI,
-		networkID:      1, // TODO(ricl): this should be from config
-		shardID:        shardID,
+		shutdownChan:  make(chan bool),
+		bloomRequests: make(chan chan *bloombits.Retrieval),
+		blockchain:    nodeAPI.Blockchain(),
+		beaconchain:   nodeAPI.Beaconchain(),
+		txPool:        txPool,
+		cxPool:        cxPool,
+		eventMux:      eventMux,
+		chainDb:       chainDb,
+		bloomIndexer:  NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
+		nodeAPI:       nodeAPI,
+		networkID:     1, // TODO(ricl): this should be from config
+		shardID:       shardID,
 	}
 	hmy.APIBackend = &APIBackend{hmy: hmy,
 		TotalStakingCache: struct {

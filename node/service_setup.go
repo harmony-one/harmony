@@ -17,7 +17,6 @@ import (
 
 func (node *Node) setupForValidator() {
 	nodeConfig, chanPeer := node.initNodeConfiguration()
-
 	// Register peer discovery service
 	node.serviceManager.RegisterService(
 		service.PeerDiscovery,

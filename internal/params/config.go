@@ -252,91 +252,12 @@ func (c *ChainConfig) GasTable(epoch *big.Int) GasTable {
 	}
 }
 
-// CheckCompatible checks whether scheduled fork transitions have been imported
-// with a mismatching chain configuration.
-func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *ConfigCompatError {
-	bhead := new(big.Int).SetUint64(height)
-
-	// Iterate checkCompatible to find the lowest conflict.
-	var lasterr *ConfigCompatError
-	for {
-		err := c.checkCompatible(newcfg, bhead)
-		if err == nil || (lasterr != nil && err.RewindTo == lasterr.RewindTo) {
-			break
-		}
-		lasterr = err
-		bhead.SetUint64(err.RewindTo)
-	}
-	return lasterr
-}
-
-func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *ConfigCompatError {
-	// TODO: check compatibility and reversion based on epochs.
-	//if isForkIncompatible(c.EIP155Epoch, newcfg.EIP155Epoch, head) {
-	//	return newCompatError("EIP155 fork block", c.EIP155Epoch, newcfg.EIP155Epoch)
-	//}
-	//if isForkIncompatible(c.CrossLinkEpoch, newcfg.CrossLinkEpoch, head) {
-	//	return newCompatError("CrossLink fork block", c.CrossLinkEpoch, newcfg.CrossLinkEpoch)
-	//}
-	//if isForkIncompatible(c.S3Epoch, newcfg.S3Epoch, head) {
-	//	return newCompatError("S3 fork block", c.S3Epoch, newcfg.S3Epoch)
-	//}
-	return nil
-}
-
-// isForkIncompatible returns true if a fork scheduled at s1 cannot be rescheduled to
-// epoch s2 because head is already past the fork.
-func isForkIncompatible(s1, s2, epoch *big.Int) bool {
-	return (isForked(s1, epoch) || isForked(s2, epoch)) && !configNumEqual(s1, s2)
-}
-
 // isForked returns whether a fork scheduled at epoch s is active at the given head epoch.
 func isForked(s, epoch *big.Int) bool {
 	if s == nil || epoch == nil {
 		return false
 	}
 	return s.Cmp(epoch) <= 0
-}
-
-func configNumEqual(x, y *big.Int) bool {
-	if x == nil {
-		return y == nil
-	}
-	if y == nil {
-		return x == nil
-	}
-	return x.Cmp(y) == 0
-}
-
-// ConfigCompatError is raised if the locally-stored blockchain is initialised with a
-// ChainConfig that would alter the past.
-type ConfigCompatError struct {
-	What string
-	// block numbers of the stored and new configurations
-	StoredConfig, NewConfig *big.Int
-	// the block number to which the local chain must be rewound to correct the error
-	RewindTo uint64
-}
-
-func newCompatError(what string, storedblock, newblock *big.Int) *ConfigCompatError {
-	var rew *big.Int
-	switch {
-	case storedblock == nil:
-		rew = newblock
-	case newblock == nil || storedblock.Cmp(newblock) < 0:
-		rew = storedblock
-	default:
-		rew = newblock
-	}
-	err := &ConfigCompatError{what, storedblock, newblock, 0}
-	if rew != nil && rew.Sign() > 0 {
-		err.RewindTo = rew.Uint64() - 1
-	}
-	return err
-}
-
-func (err *ConfigCompatError) Error() string {
-	return fmt.Sprintf("mismatching %s in database (have %d, want %d, rewindto %d)", err.What, err.StoredConfig, err.NewConfig, err.RewindTo)
 }
 
 // Rules wraps ChainConfig and is merely syntactic sugar or can be used for functions

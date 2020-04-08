@@ -140,16 +140,6 @@ func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
 	consensus.delayCommit = delay
 }
 
-// DisableViewChangeForTestingOnly makes the receiver not propose view
-// changes when it should, e.g. leader timeout.
-//
-// As the name implies, this is intended for testing only,
-// and should not be used on production network.
-// This is also not part of the long-term consensus API and may go away later.
-func (consensus *Consensus) DisableViewChangeForTestingOnly() {
-	consensus.disableViewChange = true
-}
-
 // BlocksSynchronized lets the main loop know that block synchronization finished
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
