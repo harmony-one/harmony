@@ -98,7 +98,7 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 		return nil, common.Hash{}, 0, 0
 	}
 	tx := body.TransactionAt(int(txIndex))
-	if tx == nil || bytes.Compare(hash.Bytes(), tx.Hash().Bytes()) != 0 {
+	if tx == nil || !bytes.Equal(hash.Bytes(), tx.Hash().Bytes()) {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
@@ -128,7 +128,7 @@ func ReadStakingTransaction(db DatabaseReader, hash common.Hash) (*staking.Staki
 		return nil, common.Hash{}, 0, 0
 	}
 	tx := body.StakingTransactionAt(int(txIndex))
-	if tx == nil || bytes.Compare(hash.Bytes(), tx.Hash().Bytes()) != 0 {
+	if tx == nil || !bytes.Equal(hash.Bytes(), tx.Hash().Bytes()) {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
