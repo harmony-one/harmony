@@ -825,7 +825,6 @@ do
       -bootnodes "${BN_MA}"
       -ip "${PUB_IP}"
       -port "${NODE_PORT}"
-      -is_genesis
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
       -blacklist="${blacklist}"
