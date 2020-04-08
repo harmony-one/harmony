@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/api/client"
@@ -179,6 +180,7 @@ type Node struct {
 		failedStakingTxns *ring.Ring
 		failedTxns        *ring.Ring
 	}
+	unixTimeAtNodeStart int64
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -408,6 +410,7 @@ func New(
 	isArchival bool,
 ) *Node {
 	node := Node{}
+	node.unixTimeAtNodeStart = time.Now().Unix()
 	const sinkSize = 4096
 	node.errorSink = struct {
 		sync.Mutex

@@ -20,6 +20,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -596,4 +598,39 @@ func (b *APIBackend) GetLastCrossLinks() ([]*types.CrossLink, error) {
 	}
 
 	return crossLinks, nil
+}
+
+// GetNodeMetadata ..
+func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
+	cfg := nodeconfig.GetDefaultConfig()
+	header := b.CurrentBlock().Header()
+	var blockEpoch *uint64
+
+	if header.ShardID() == shard.BeaconChainShardID {
+		sched := shard.Schedule.InstanceForEpoch(header.Epoch())
+		b := sched.BlocksPerEpoch()
+		blockEpoch = &b
+	}
+
+	blsKeys := []string{}
+	if cfg.ConsensusPubKey != nil {
+		for _, key := range cfg.ConsensusPubKey.PublicKey {
+			blsKeys = append(blsKeys, key.SerializeToHexStr())
+		}
+	}
+
+	return commonRPC.NodeMetadata{
+		blsKeys,
+		nodeconfig.GetVersion(),
+		string(cfg.GetNetworkType()),
+		*b.ChainConfig(),
+		b.IsLeader(),
+		b.GetShardID(),
+		header.Epoch().Uint64(),
+		blockEpoch,
+		cfg.Role().String(),
+		cfg.DNSZone,
+		cfg.GetArchival(),
+		b.hmy.nodeAPI.GetNodeBootTime(),
+	}
 }

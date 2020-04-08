@@ -5,9 +5,8 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/api/proto"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // PublicHarmonyAPI provides an API to access Harmony related information.
@@ -60,35 +59,6 @@ type NodeMetadata struct {
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
-func (s *PublicHarmonyAPI) GetNodeMetadata() NodeMetadata {
-	cfg := nodeconfig.GetDefaultConfig()
-	header := s.b.CurrentBlock().Header()
-	var blockEpoch *uint64
-
-	if header.ShardID() == shard.BeaconChainShardID {
-		sched := shard.Schedule.InstanceForEpoch(header.Epoch())
-		b := sched.BlocksPerEpoch()
-		blockEpoch = &b
-	}
-
-	blsKeys := []string{}
-	if cfg.ConsensusPubKey != nil {
-		for _, key := range cfg.ConsensusPubKey.PublicKey {
-			blsKeys = append(blsKeys, key.SerializeToHexStr())
-		}
-	}
-
-	return NodeMetadata{
-		blsKeys,
-		nodeconfig.GetVersion(),
-		string(cfg.GetNetworkType()),
-		*s.b.ChainConfig(),
-		s.b.IsLeader(),
-		s.b.GetShardID(),
-		header.Epoch().Uint64(),
-		blockEpoch,
-		cfg.Role().String(),
-		cfg.DNSZone,
-		cfg.GetArchival(),
-	}
+func (s *PublicHarmonyAPI) GetNodeMetadata() commonRPC.NodeMetadata {
+	return s.b.GetNodeMetadata()
 }
