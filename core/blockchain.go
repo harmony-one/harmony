@@ -2336,24 +2336,21 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				return nil, err
 			}
 
-			aprComputed, err := apr.ComputeForValidator(
-				bc, block, wrapper,
-			)
-			if err == nil && aprComputed != nil {
-				a := *aprComputed
-				utils.Logger().Info().
-					Str("return-rate", a.String()).
-					Uint64("new-epoch", newEpochSuperCommittee.Epoch.Uint64()).
-					Msg("apr computed")
-				stats.APR = a
-			}
-
-			if err != nil {
-				utils.Logger().Debug().Err(err).Msg("issue with compute of apr")
-			}
-
-			if err != nil {
-				return nil, err
+			stats.APR = numeric.ZeroDec()
+			if wrapper.Delegations[0].Amount.Cmp(common.Big0) > 0 {
+				if aprComputed, err := apr.ComputeForValidator(
+					bc, block, wrapper,
+				); err != nil {
+					if errors.Cause(err) == apr.ErrInsufficientEpoch {
+						utils.Logger().Info().Err(err).Msg("apr could not be computed")
+					} else {
+						return nil, err
+					}
+				} else {
+					stats.APR = *aprComputed
+				}
+			} else {
+				utils.Logger().Info().Msg("zero total delegation, skipping apr computation")
 			}
 
 			if _, wasBooted := bootedFromSuperCommittee[wrapper.Address]; wasBooted {

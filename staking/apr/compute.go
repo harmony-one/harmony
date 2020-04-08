@@ -15,6 +15,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	// ErrInsufficientEpoch is returned when insufficient past epochs for apr computation
+	ErrInsufficientEpoch = errors.New("insufficient past epochs to compute apr")
+	// ErrCouldNotRetreiveHeaderByNumber is returned when fail to retrieve header by number
+	ErrCouldNotRetreiveHeaderByNumber = errors.New("could not retrieve header by number")
+)
+
 // Reader ..
 type Reader interface {
 	GetHeaderByNumber(number uint64) *block.Header
@@ -87,26 +94,30 @@ func ComputeForValidator(
 	)
 
 	if err != nil {
-		return &zero, err
+		return nil, errors.Wrapf(
+			ErrInsufficientEpoch,
+			"current epoch %d, one-epoch-ago %d",
+			block.Epoch().Uint64(),
+			oneEpochAgo.Uint64(),
+		)
 	}
 
 	blockNumAtOneEpochAgo := shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64())
-
 	headerOneEpochAgo := bc.GetHeaderByNumber(blockNumAtOneEpochAgo)
-	if block.Header() == nil || headerOneEpochAgo == nil {
+
+	if headerOneEpochAgo == nil {
 		utils.Logger().Debug().
 			Msgf("apr compute headers epochs ago %+v %+v %+v",
 				oneEpochAgo,
 				blockNumAtOneEpochAgo,
 				headerOneEpochAgo,
 			)
-		return &zero, errors.New("can't get headers for APR computation")
+		return nil, errors.Wrapf(
+			ErrCouldNotRetreiveHeaderByNumber,
+			"num header wanted %d",
+			blockNumAtOneEpochAgo,
+		)
 	}
-
-	utils.Logger().Debug().
-		RawJSON("current-epoch-header", []byte(bc.CurrentHeader().String())).
-		RawJSON("one-epoch-ago-header", []byte(headerOneEpochAgo.String())).
-		Msg("headers used for apr computation")
 
 	estimatedRewardPerYear, err := expectedRewardPerYear(
 		block.Header(), headerOneEpochAgo,
@@ -122,10 +133,6 @@ func ComputeForValidator(
 	}
 
 	total := numeric.NewDecFromBigInt(validatorNow.TotalDelegation())
-	if total.IsZero() {
-		return nil, errors.New("zero total delegation will cause div by zero")
-	}
-
 	result := numeric.NewDecFromBigInt(estimatedRewardPerYear).Quo(
 		total,
 	)
