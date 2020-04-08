@@ -1,6 +1,6 @@
 module github.com/harmony-one/harmony
 
-go 1.13
+go 1.14
 
 require (
 	github.com/Workiva/go-datastructures v1.0.50
@@ -15,13 +15,13 @@ require (
 	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/ethereum/go-ethereum v1.8.27
-	github.com/fatih/color v1.7.0
-	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
+	github.com/fatih/color v1.7.0 // indirect
+	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
 	github.com/golangci/golangci-lint v1.22.2
-	github.com/gorilla/handlers v1.4.0
+	github.com/gorilla/handlers v1.4.0 // indirect
 	github.com/gorilla/mux v1.7.2
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
@@ -52,14 +52,14 @@ require (
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v0.9.3
+	github.com/prometheus/client_golang v0.9.3 // indirect
 	github.com/prometheus/common v0.4.1 // indirect
 	github.com/prometheus/procfs v0.0.3 // indirect
 	github.com/rjeczalik/notify v0.9.2
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/rs/zerolog v1.18.0
-	github.com/shirou/gopsutil v2.18.12+incompatible
-	github.com/spf13/cobra v0.0.5
+	github.com/shirou/gopsutil v2.18.12+incompatible // indirect
+	github.com/spf13/cobra v0.0.5 // indirect
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.5.1
 	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965
@@ -71,10 +71,10 @@ require (
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/sys v0.0.0-20200331124033-c3d80250170d // indirect
-	golang.org/x/tools v0.0.0-20200402223321-bcf690261a44
+	golang.org/x/tools v0.0.0-20200408032209-46bd65c8538f
 	google.golang.org/grpc v1.22.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
-	gopkg.in/ini.v1 v1.51.0
+	gopkg.in/ini.v1 v1.51.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
