@@ -196,13 +196,13 @@ func (node *Node) DoBeaconSyncing() {
 			}
 		}
 		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true, nil)
-		time.Sleep(time.Duration(node.beaconSyncFreq) * time.Second)
+		time.Sleep(time.Duration(SyncFrequency) * time.Second)
 	}
 }
 
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
-	ticker := time.NewTicker(time.Duration(node.syncFreq) * time.Second)
+	ticker := time.NewTicker(time.Duration(SyncFrequency) * time.Second)
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		select {

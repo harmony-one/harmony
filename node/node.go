@@ -141,10 +141,6 @@ type Node struct {
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 
-	// syncing frequency parameters
-	syncFreq       int
-	beaconSyncFreq int
-
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 
@@ -418,9 +414,6 @@ func New(
 		failedStakingTxns *ring.Ring
 		failedTxns        *ring.Ring
 	}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)}
-	node.syncFreq = SyncFrequency
-	node.beaconSyncFreq = SyncFrequency
-
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
