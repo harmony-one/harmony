@@ -30,17 +30,13 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 	crossLinks := &types.CrossLinks{}
 	err := rlp.DecodeBytes(cxLinksData, crossLinks)
 	if err != nil {
-		return errors.Errorf("[CrossLinkVerification] failed to decode cross links",
-			"blockHash", block.Hash(),
-			"crossLinks", len(block.Header().CrossLinks()),
+		return errors.Wrapf(
+			err, "[CrossLinkVerification] failed to decode cross links",
 		)
 	}
 
 	if !crossLinks.IsSorted() {
-		return errors.Errorf("[CrossLinkVerification] cross links are not sorted",
-			"blockHash", block.Hash(),
-			"crossLinks", len(block.Header().CrossLinks()),
-		)
+		return errors.New("[CrossLinkVerification] cross links are not sorted")
 	}
 
 	for _, crossLink := range *crossLinks {
@@ -121,9 +117,8 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 
 	if !node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
 		return errors.Errorf(
-			"[VerifyCrossLink] CrossLink Epoch should >= cross link starting epoch",
-			"crossLinkEpoch", cl.Epoch(), "cross_link_starting_eoch",
-			node.Blockchain().Config().CrossLinkEpoch,
+			"[VerifyCrossLink] CrossLink Epoch should >= cross link starting epoch %v %v",
+			cl.Epoch(), node.Blockchain().Config().CrossLinkEpoch,
 		)
 	}
 

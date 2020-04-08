@@ -22,18 +22,18 @@ func ReadShardState(
 	}
 	ss, err2 := shard.DecodeWrapper(data)
 	if err2 != nil {
-		return nil, errors.Errorf(
-			"cannot decode sharding state", "epoch", epoch,
+		return nil, errors.Wrapf(
+			err2, "cannot decode sharding state",
 		)
 	}
 	return ss, nil
 }
 
 // WriteShardStateBytes stores sharding state into database.
-func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) (err error) {
-	if err = db.Put(shardStateKey(epoch), data); err != nil {
-		return errors.Errorf(
-			"cannot write sharding state", "epoch", epoch,
+func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) error {
+	if err := db.Put(shardStateKey(epoch), data); err != nil {
+		return errors.Wrapf(
+			err, "cannot write sharding state",
 		)
 	}
 	utils.Logger().Info().
@@ -149,10 +149,7 @@ func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash comm
 func ReadCXReceiptsProofSpent(db DatabaseReader, shardID uint32, number uint64) (byte, error) {
 	data, err := db.Get(cxReceiptSpentKey(shardID, number))
 	if err != nil || len(data) == 0 {
-		return NAByte, errors.Errorf(
-			"[ReadCXReceiptsProofSpent] Cannot find the key",
-			"shardID", shardID, "number", number,
-		)
+		return NAByte, errors.New("[ReadCXReceiptsProofSpent] Cannot find the key")
 	}
 	return data[0], nil
 }

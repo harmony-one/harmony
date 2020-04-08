@@ -211,14 +211,12 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 		return errors.New("[ValidateCXReceiptsProof] Didn't find matching toShardID (no receipts for my shard)")
 	}
 
-	sourceShardID := merkleProof.ShardID
-	sourceBlockNum := merkleProof.BlockNum
-
 	sha := types.DeriveSha(cxp.Receipts)
-
 	// (1) verify the CXReceipts trie root match
 	if sha != shardRoot {
-		return errors.Errorf("[ValidateCXReceiptsProof] Trie Root of ReadCXReceipts Not Match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", sha, "got", shardRoot)
+		return errors.New(
+			"[ValidateCXReceiptsProof] Trie Root of ReadCXReceipts Not Match",
+		)
 	}
 
 	// (2) verify the outgoingCXReceiptsHash match
@@ -227,12 +225,17 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 		outgoingHashFromSourceShard = types.EmptyRootHash
 	}
 	if outgoingHashFromSourceShard != merkleProof.CXReceiptHash {
-		return errors.Errorf("[ValidateCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
+		return errors.New(
+			"[ValidateCXReceiptsProof] IncomingReceiptRootHash from source shard not match",
+		)
 	}
 
 	// (3) verify the block hash matches
-	if cxp.Header.Hash() != merkleProof.BlockHash || cxp.Header.OutgoingReceiptHash() != merkleProof.CXReceiptHash {
-		return errors.Errorf("[ValidateCXReceiptsProof] BlockHash or OutgoingReceiptHash not match in block Header", "blockHash", cxp.Header.Hash(), "merkleProofBlockHash", merkleProof.BlockHash, "headerOutReceiptHash", cxp.Header.OutgoingReceiptHash(), "merkleOutReceiptHash", merkleProof.CXReceiptHash)
+	if cxp.Header.Hash() != merkleProof.BlockHash ||
+		cxp.Header.OutgoingReceiptHash() != merkleProof.CXReceiptHash {
+		return errors.New(
+			"[ValidateCXReceiptsProof] BlockHash or OutgoingReceiptHash not match in block Header",
+		)
 	}
 
 	// (4) verify blockHeader with seal

@@ -411,31 +411,27 @@ func UpdateDescription(d1, d2 Description) (Description, error) {
 func (d Description) EnsureLength() (Description, error) {
 	if len(d.Name) > MaxNameLength {
 		return d, errors.Errorf(
-			"exceed maximum length %d have %s", MaxNameLength, len(d.Name),
+			"exceed maximum name length %d %d", len(d.Name), MaxNameLength,
 		)
 	}
 	if len(d.Identity) > MaxIdentityLength {
 		return d, errors.Errorf(
-			"[EnsureLength] Exceed Maximum Length", "have",
-			len(d.Identity), "maxIdentityLen", MaxIdentityLength,
+			"exceed Maximum Length identity %d %d", len(d.Identity), MaxIdentityLength,
 		)
 	}
 	if len(d.Website) > MaxWebsiteLength {
 		return d, errors.Errorf(
-			"[EnsureLength] Exceed Maximum Length", "have", len(d.Website),
-			"maxWebsiteLen", MaxWebsiteLength,
+			"exceed Maximum Length website %d %d", len(d.Website), MaxWebsiteLength,
 		)
 	}
 	if len(d.SecurityContact) > MaxSecurityContactLength {
 		return d, errors.Errorf(
-			"[EnsureLength] Exceed Maximum Length", "have",
-			len(d.SecurityContact), "maxSecurityContactLen", MaxSecurityContactLength,
+			"exceed Maximum Length %d %d", len(d.SecurityContact), MaxSecurityContactLength,
 		)
 	}
 	if len(d.Details) > MaxDetailsLength {
 		return d, errors.Errorf(
-			"[EnsureLength] Exceed Maximum Length", "have", len(d.Details),
-			"maxDetailsLen", MaxDetailsLength,
+			"exceed Maximum Length for details %d %d", len(d.Details), MaxDetailsLength,
 		)
 	}
 

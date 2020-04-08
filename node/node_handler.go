@@ -339,10 +339,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Uint32("my shard ID", node.Blockchain().ShardID()).
 			Uint32("new block's shard ID", newBlock.ShardID()).
 			Msg("[VerifyNewBlock] Wrong shard ID of the new block")
-		return errors.Errorf("[VerifyNewBlock] Wrong shard ID of the new block",
-			"my shard ID", node.Blockchain().ShardID(),
-			"new block's shard ID", newBlock.ShardID(),
-		)
+		return errors.New("[VerifyNewBlock] Wrong shard ID of the new block")
 	}
 
 	if err := node.Blockchain().Engine().VerifyShardState(
@@ -352,9 +349,8 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot verify shard state for the new block")
-		return errors.Errorf(
-			"[VerifyNewBlock] Cannot verify shard state for the new block", "blockHash",
-			newBlock.Hash(),
+		return errors.New(
+			"[VerifyNewBlock] Cannot verify shard state for the new block",
 		)
 	}
 
@@ -376,9 +372,10 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Int("numStakingTx", len(newBlock.StakingTransactions())).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
-		return errors.Errorf("[VerifyNewBlock] Cannot Verify New Block!!!",
-			"blockHash", newBlock.Hash(),
-			"numTx", len(newBlock.Transactions()),
+		return errors.Errorf(
+			"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
+			newBlock.Hash().Hex(),
+			len(newBlock.Transactions()),
 		)
 	}
 
@@ -399,9 +396,8 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Int("numIncomingReceipts", len(newBlock.IncomingReceipts())).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot ValidateNewBlock")
-		return errors.Errorf(
-			"[VerifyNewBlock] Cannot ValidateNewBlock", "blockHash", newBlock.Hash(),
-			"numIncomingReceipts", len(newBlock.IncomingReceipts()),
+		return errors.Wrapf(
+			err, "[VerifyNewBlock] Cannot ValidateNewBlock",
 		)
 	}
 	return nil

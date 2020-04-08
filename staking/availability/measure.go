@@ -61,9 +61,9 @@ func BallotResult(
 
 	if err != nil {
 		return nil, nil, nil, errors.Errorf(
-			"cannot find shard in the shard state",
-			"parentBlockNumber", parentHeader.Number(),
-			"shardID", parentHeader.ShardID(),
+			"cannot find shard in the shard state %d %d",
+			parentHeader.Number(),
+			parentHeader.ShardID(),
 		)
 	}
 
