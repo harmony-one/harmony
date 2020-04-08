@@ -11,6 +11,10 @@ import (
 const MaxBlockNumDiff = 100
 
 func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
+	if msg.GetConsensus() == nil {
+		consensus.getLogger().Warn().Msg("[validatorSanityChecks] malformed message")
+		return false
+	}
 	consensus.getLogger().Debug().
 		Uint64("blockNum", msg.GetConsensus().BlockNum).
 		Uint64("viewID", msg.GetConsensus().ViewId).
@@ -47,6 +51,10 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 }
 
 func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
+	if msg.GetConsensus() == nil {
+		consensus.getLogger().Warn().Msg("[leaderSanityChecks] malformed message")
+		return false
+	}
 	consensus.getLogger().Debug().
 		Uint64("blockNum", msg.GetConsensus().BlockNum).
 		Uint64("viewID", msg.GetConsensus().ViewId).
@@ -180,6 +188,10 @@ func (consensus *Consensus) onPreparedSanityChecks(
 }
 
 func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
+	if msg.GetViewchange() == nil {
+		consensus.getLogger().Warn().Msg("[viewChangeSanityCheck] malformed message")
+		return false
+	}
 	consensus.getLogger().Debug().
 		Msg("[viewChangeSanityCheck] Checking new message")
 	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
