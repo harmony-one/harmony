@@ -52,9 +52,9 @@ func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
 	return numeric.NewDec(v.TwoThirdsSignersCount())
 }
 
-// RewardThreshold ..
-func (v *uniformVoteWeight) IsRewardThresholdAchieved() bool {
-	return v.SignersCount(Commit) >= (v.ParticipantsCount() * 9 / 10)
+// IsAllSigsCollected ..
+func (v *uniformVoteWeight) IsAllSigsCollected() bool {
+	return v.SignersCount(Commit) == v.ParticipantsCount()
 }
 
 func (v *uniformVoteWeight) SetVoters(

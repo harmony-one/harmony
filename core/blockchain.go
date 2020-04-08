@@ -1888,10 +1888,6 @@ func (bc *BlockChain) ReadCrossLink(shardID uint32, blockNum uint64) (*types.Cro
 // any previous block's crosslink is received up to this point
 // there is no missing hole between genesis to this crosslink of given shardID
 func (bc *BlockChain) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardID uint32) error {
-	if !bc.Config().IsCrossLink(bc.CurrentBlock().Epoch()) {
-		return errors.New("Trying to write last continuous cross link with epoch before cross link starting epoch")
-	}
-
 	oldLink, err := bc.ReadShardLastCrossLink(shardID)
 	if oldLink == nil || err != nil {
 		return err
@@ -1963,7 +1959,6 @@ func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 	} else {
 		bytes, err := rawdb.ReadPendingCrossLinks(bc.db)
 		if err != nil || len(bytes) == 0 {
-			utils.Logger().Info().Err(err).Int("dataLen", len(bytes)).Msg("ReadPendingCrossLinks")
 			return nil, err
 		}
 	}

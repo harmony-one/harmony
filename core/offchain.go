@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"sort"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -170,7 +172,8 @@ func (bc *BlockChain) CommitOffChainData(
 
 		// clean/update local database cache after crosslink inserted into blockchain
 		num, err := bc.DeleteFromPendingCrossLinks(*crossLinks)
-		if err != nil {
+		if err != nil && nodeconfig.GetDefaultConfig().ShardID == shard.BeaconChainShardID {
+			// Only beacon chain worries about this
 			const msg = "DeleteFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, problem: %+v"
 			utils.Logger().Debug().Msgf(msg, len(*crossLinks), num, err)
 		}
@@ -181,12 +184,15 @@ func (bc *BlockChain) CommitOffChainData(
 		utils.Logger().Debug().Msgf(msg, len(*crossLinks), num)
 	}
 
-	if isBeaconChain {
+	if isBeaconChain && bc.Config().IsCrossLink(bc.CurrentBlock().Epoch()) {
 		// Roll up latest crosslinks
 		for i, c := uint32(0), shard.Schedule.InstanceForEpoch(
 			epoch,
 		).NumShards(); i < c; i++ {
-			bc.LastContinuousCrossLink(batch, i)
+			if err := bc.LastContinuousCrossLink(batch, i); err != nil {
+				utils.Logger().Info().
+					Err(err).Msg("Could not roll up last continuous crosslink")
+			}
 		}
 	}
 

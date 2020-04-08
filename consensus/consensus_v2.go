@@ -98,7 +98,7 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 func (consensus *Consensus) finalizeCommits() {
 	consensus.getLogger().Info().
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
-		Msg("[Finalizing] Finalizing Block")
+		Msg("[finalizeCommits] Finalizing Block")
 	beforeCatchupNum := consensus.blockNum
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
@@ -149,12 +149,12 @@ func (consensus *Consensus) finalizeCommits() {
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
 		host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[Finalizing] Cannot send committed message")
+		consensus.getLogger().Warn().Err(err).Msg("[finalizeCommits] Cannot send committed message")
 	} else {
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
-			Msg("[Finalizing] Sent Committed Message")
+			Msg("[finalizeCommits] Sent Committed Message")
 	}
 
 	// Dump new block into level db
@@ -165,9 +165,9 @@ func (consensus *Consensus) finalizeCommits() {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Debug().Msg("[Finalizing] Start consensus timer; stop bootstrap timer only once")
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Start consensus timer; stop bootstrap timer only once")
 	} else {
-		consensus.getLogger().Debug().Msg("[Finalizing] Start consensus timer")
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
@@ -180,8 +180,17 @@ func (consensus *Consensus) finalizeCommits() {
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
-	// Send signal to Node so the new block can be added and new round of consensus can be triggered
+
+	if n := time.Now(); n.Before(consensus.NextBlockDue) {
+		// Sleep to wait for the full block time
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
+		time.Sleep(consensus.NextBlockDue.Sub(n))
+	}
+	// Send signal to Node to propose the new block for consensus
 	consensus.ReadySignal <- struct{}{}
+
+	// Update time due for next block
+	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 }
 
 // LastCommitSig returns the byte array of aggregated
@@ -335,6 +344,8 @@ func (consensus *Consensus) Start(
 			Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
 
 		vdfInProgress := false
+		// Set up next block due time.
+		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 		for {
 			select {
 			case <-ticker.C:
@@ -367,20 +378,15 @@ func (consensus *Consensus) Start(
 				consensus.SetViewID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
 				mode := consensus.UpdateConsensusInformation()
 				consensus.current.SetMode(mode)
-				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is in sync")
+				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 
 			case <-consensus.syncNotReadyChan:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] syncNotReadyChan")
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
 				consensus.current.SetMode(Syncing)
-				consensus.getLogger().Info().Msg("Node is out of sync")
+				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 
 			case newBlock := <-blockChannel:
-				// Debug code to trigger leader change.
-				//if consensus.ShardID == 0 && newBlock.NumberU64() == 2 && strings.Contains(consensus.PubKey.SerializeToHexStr(), "65f55eb") {
-				//	continue
-				//}
-
 				consensus.getLogger().Info().
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
@@ -473,6 +479,7 @@ func (consensus *Consensus) Start(
 
 			case viewID := <-consensus.commitFinishChan:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
+
 				// Only Leader execute this condition
 				func() {
 					consensus.mutex.Lock()

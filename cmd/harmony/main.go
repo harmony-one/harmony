@@ -548,9 +548,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
 
-	// Setup block period for currentNode.
-	currentNode.BlockPeriod = time.Duration(*blockPeriod) * time.Second
-
 	// This needs to be executed after consensus setup
 	if err := currentNode.InitConsensusWithValidators(); err != nil {
 		utils.Logger().Warn().
@@ -573,6 +570,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
+
+	// Setup block period and block due time.
+	currentConsensus.BlockPeriod = time.Duration(*blockPeriod) * time.Second
+	currentConsensus.NextBlockDue = time.Now()
 	return currentNode
 }
 
@@ -742,6 +743,7 @@ func main() {
 		os.Exit(1)
 	}
 	currentNode := setupConsensusAndNode(nodeConfig)
+	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 
 	// Prepare for graceful shutdown from os signals
 	osSignal := make(chan os.Signal)

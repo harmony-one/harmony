@@ -590,6 +590,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		Uint64("blockHeight", block.NumberU64()).
 		Uint64("blockEpoch", block.Epoch().Uint64()).
 		Str("blockHex", block.Hash().Hex()).
+		Uint32("ShardID", block.ShardID()).
 		Msg("[SYNC] UpdateBlockAndStatus: new block added to blockchain")
 	for i, tx := range block.StakingTransactions() {
 		utils.Logger().Info().
@@ -783,7 +784,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			return
 		}
 		utils.Logger().Debug().
-			Msgf("[SYNC] Node is Not in Sync (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 				isBeacon, bc.ShardID(), otherHeight, currentHeight)
 
 		startHash := bc.CurrentBlock().Hash()
