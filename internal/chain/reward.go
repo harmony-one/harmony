@@ -27,14 +27,14 @@ func ballotResultBeaconchain(
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	if parentHeader == nil {
 		return nil, nil, nil, errors.Errorf(
-			"cannot find parent block header in DB",
-			"parentHash", header.ParentHash(),
+			"cannot find parent block header in DB %s",
+			header.ParentHash().Hex(),
 		)
 	}
 	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
 	if err != nil {
 		return nil, nil, nil, errors.Errorf(
-			"cannot read shard state", "epoch", parentHeader.Epoch(),
+			"cannot read shard state %v", parentHeader.Epoch(),
 		)
 	}
 
@@ -323,14 +323,11 @@ func AccumulateRewardsAndCountSigs(
 	}
 
 	// Before staking
-	// TODO ek – retrieving by parent number (blockNum - 1) doesn't work,
-	//  while it is okay with hash.  Sounds like DB inconsistency.
-	//  Figure out why.
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	if parentHeader == nil {
 		return network.EmptyPayout, errors.Errorf(
-			"cannot find parent block header in DB",
-			"parentHash", header.ParentHash(),
+			"cannot find parent block header in DB at parent hash %s",
+			header.ParentHash().Hex(),
 		)
 	}
 	if parentHeader.Number().Cmp(common.Big0) == 0 {
@@ -340,11 +337,13 @@ func AccumulateRewardsAndCountSigs(
 	}
 	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
 	if err != nil {
-		return nil, errors.Errorf(
-			"cannot read shard state", "epoch", parentHeader.Epoch(),
+		return nil, errors.Wrapf(
+			err, "cannot read shard state at epoch %v", parentHeader.Epoch(),
 		)
 	}
-	_, signers, _, err := availability.BallotResult(parentHeader, header, parentShardState, header.ShardID())
+	_, signers, _, err := availability.BallotResult(
+		parentHeader, header, parentShardState, header.ShardID(),
+	)
 
 	if err != nil {
 		return network.EmptyPayout, err

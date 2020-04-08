@@ -53,17 +53,20 @@ func NewInstance(
 		)
 	}
 	if numHarmonyOperatedNodesPerShard < 0 {
-		return nil, errors.Errorf("Harmony-operated nodes cannot be negative",
-			"numHarmonyOperatedNodesPerShard", numHarmonyOperatedNodesPerShard)
+		return nil, errors.Errorf(
+			"Harmony-operated nodes cannot be negative %d", numHarmonyOperatedNodesPerShard,
+		)
 	}
 	if numHarmonyOperatedNodesPerShard > numNodesPerShard {
 		return nil, errors.Errorf(""+
 			"number of Harmony-operated nodes cannot exceed "+
-			"overall number of nodes per shard",
-			"numHarmonyOperatedNodesPerShard", numHarmonyOperatedNodesPerShard,
-			"numNodesPerShard", numNodesPerShard)
+			"overall number of nodes per shard %d %d",
+			numHarmonyOperatedNodesPerShard,
+			numNodesPerShard,
+		)
 	}
-	if harmonyVotePercent.LT(numeric.ZeroDec()) || harmonyVotePercent.GT(numeric.OneDec()) {
+	if harmonyVotePercent.LT(numeric.ZeroDec()) ||
+		harmonyVotePercent.GT(numeric.OneDec()) {
 		return nil, errors.Errorf("" +
 			"total voting power of harmony nodes should be within [0, 1]",
 		)
@@ -86,7 +89,9 @@ func NewInstance(
 // given parameters.  It panics if parameter validation fails.
 // It is intended to be used for static initialization.
 func MustNewInstance(
-	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int, harmonyVotePercent numeric.Dec,
+	numShards uint32,
+	numNodesPerShard, numHarmonyOperatedNodesPerShard int,
+	harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	reshardingEpoch []*big.Int, blocksPerEpoch uint64,

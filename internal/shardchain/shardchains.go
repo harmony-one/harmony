@@ -116,7 +116,7 @@ func (sc *CollectionImpl) CloseShardChain(shardID uint32) error {
 	defer sc.mtx.Unlock()
 	bc, ok := sc.pool[shardID]
 	if !ok {
-		return errors.Errorf("shard chain not found", "shardID", shardID)
+		return errors.Errorf("shard chain not found %d", shardID)
 	}
 	utils.Logger().Info().
 		Uint32("shardID", shardID).
