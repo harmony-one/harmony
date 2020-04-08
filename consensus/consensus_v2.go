@@ -181,10 +181,10 @@ func (consensus *Consensus) finalizeCommits() {
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
-	if time.Now().Before(consensus.NextBlockDue) {
+	if n := time.Now(); n.Before(consensus.NextBlockDue) {
 		// Sleep to wait for the full block time
 		consensus.getLogger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
-		time.Sleep(consensus.NextBlockDue.Sub(time.Now()))
+		time.Sleep(consensus.NextBlockDue.Sub(n))
 	}
 	// Send signal to Node to propose the new block for consensus
 	consensus.ReadySignal <- struct{}{}

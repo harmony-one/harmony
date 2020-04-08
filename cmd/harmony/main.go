@@ -571,8 +571,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
 
-	// Setup block period for currentConsensus.
+	// Setup block period and block due time.
 	currentConsensus.BlockPeriod = time.Duration(*blockPeriod) * time.Second
+	currentConsensus.NextBlockDue = time.Now()
 	return currentNode
 }
 
