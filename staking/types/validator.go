@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -411,31 +410,30 @@ func UpdateDescription(d1, d2 Description) (Description, error) {
 // EnsureLength ensures the length of a validator's description.
 func (d Description) EnsureLength() (Description, error) {
 	if len(d.Name) > MaxNameLength {
-		return d, ctxerror.New(
-			"[EnsureLength] Exceed Maximum Length", "have",
-			len(d.Name), "maxNameLen", MaxNameLength,
+		return d, errors.Errorf(
+			"exceed maximum length %d have %s", MaxNameLength, len(d.Name),
 		)
 	}
 	if len(d.Identity) > MaxIdentityLength {
-		return d, ctxerror.New(
+		return d, errors.Errorf(
 			"[EnsureLength] Exceed Maximum Length", "have",
 			len(d.Identity), "maxIdentityLen", MaxIdentityLength,
 		)
 	}
 	if len(d.Website) > MaxWebsiteLength {
-		return d, ctxerror.New(
+		return d, errors.Errorf(
 			"[EnsureLength] Exceed Maximum Length", "have", len(d.Website),
 			"maxWebsiteLen", MaxWebsiteLength,
 		)
 	}
 	if len(d.SecurityContact) > MaxSecurityContactLength {
-		return d, ctxerror.New(
+		return d, errors.Errorf(
 			"[EnsureLength] Exceed Maximum Length", "have",
 			len(d.SecurityContact), "maxSecurityContactLen", MaxSecurityContactLength,
 		)
 	}
 	if len(d.Details) > MaxDetailsLength {
-		return d, ctxerror.New(
+		return d, errors.Errorf(
 			"[EnsureLength] Exceed Maximum Length", "have", len(d.Details),
 			"maxDetailsLen", MaxDetailsLength,
 		)

@@ -26,12 +26,11 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/internal/ctxerror"
-
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/pkg/errors"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
@@ -183,12 +182,12 @@ func CalcGasLimit(parent *types.Block, gasFloor, gasCeil uint64) uint64 {
 // ValidateCXReceiptsProof checks whether the given CXReceiptsProof is consistency with itself
 func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) error {
 	if !v.config.AcceptsCrossTx(cxp.Header.Epoch()) {
-		return ctxerror.New("[ValidateCXReceiptsProof] cross shard receipt received before cx fork")
+		return errors.New("[ValidateCXReceiptsProof] cross shard receipt received before cx fork")
 	}
 
 	toShardID, err := cxp.GetToShardID()
 	if err != nil {
-		return ctxerror.New("[ValidateCXReceiptsProof] invalid shardID").WithCause(err)
+		return errors.Wrapf(err, "[ValidateCXReceiptsProof] invalid shardID")
 	}
 
 	merkleProof := cxp.MerkleProof
@@ -209,7 +208,7 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	}
 
 	if !foundMatchingShardID {
-		return ctxerror.New("[ValidateCXReceiptsProof] Didn't find matching toShardID (no receipts for my shard)")
+		return errors.New("[ValidateCXReceiptsProof] Didn't find matching toShardID (no receipts for my shard)")
 	}
 
 	sourceShardID := merkleProof.ShardID
@@ -219,7 +218,7 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 
 	// (1) verify the CXReceipts trie root match
 	if sha != shardRoot {
-		return ctxerror.New("[ValidateCXReceiptsProof] Trie Root of ReadCXReceipts Not Match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", sha, "got", shardRoot)
+		return errors.Errorf("[ValidateCXReceiptsProof] Trie Root of ReadCXReceipts Not Match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", sha, "got", shardRoot)
 	}
 
 	// (2) verify the outgoingCXReceiptsHash match
@@ -228,12 +227,12 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 		outgoingHashFromSourceShard = types.EmptyRootHash
 	}
 	if outgoingHashFromSourceShard != merkleProof.CXReceiptHash {
-		return ctxerror.New("[ValidateCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
+		return errors.Errorf("[ValidateCXReceiptsProof] IncomingReceiptRootHash from source shard not match", "sourceShardID", sourceShardID, "sourceBlockNum", sourceBlockNum, "calculated", outgoingHashFromSourceShard, "got", merkleProof.CXReceiptHash)
 	}
 
 	// (3) verify the block hash matches
 	if cxp.Header.Hash() != merkleProof.BlockHash || cxp.Header.OutgoingReceiptHash() != merkleProof.CXReceiptHash {
-		return ctxerror.New("[ValidateCXReceiptsProof] BlockHash or OutgoingReceiptHash not match in block Header", "blockHash", cxp.Header.Hash(), "merkleProofBlockHash", merkleProof.BlockHash, "headerOutReceiptHash", cxp.Header.OutgoingReceiptHash(), "merkleOutReceiptHash", merkleProof.CXReceiptHash)
+		return errors.Errorf("[ValidateCXReceiptsProof] BlockHash or OutgoingReceiptHash not match in block Header", "blockHash", cxp.Header.Hash(), "merkleProofBlockHash", merkleProof.BlockHash, "headerOutReceiptHash", cxp.Header.OutgoingReceiptHash(), "merkleOutReceiptHash", merkleProof.CXReceiptHash)
 	}
 
 	// (4) verify blockHeader with seal

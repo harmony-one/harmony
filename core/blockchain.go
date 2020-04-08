@@ -44,7 +44,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -1765,9 +1764,10 @@ func (bc *BlockChain) GetEpochBlockNumber(epoch *big.Int) (*big.Int, error) {
 	}
 	blockNum, err := rawdb.ReadEpochBlockNumber(bc.db, epoch)
 	if err != nil {
-		return nil, ctxerror.New("cannot read epoch block number from database",
+		return nil, errors.Errorf(
+			"cannot read epoch block number from database",
 			"epoch", epoch,
-		).WithCause(err)
+		)
 	}
 	cachedValue := []byte(blockNum.Bytes())
 	bc.epochCache.Add(cacheKey, cachedValue)
@@ -1782,10 +1782,11 @@ func (bc *BlockChain) StoreEpochBlockNumber(
 	cachedValue := []byte(blockNum.Bytes())
 	bc.epochCache.Add(cacheKey, cachedValue)
 	if err := rawdb.WriteEpochBlockNumber(bc.db, epoch, blockNum); err != nil {
-		return ctxerror.New("cannot write epoch block number to database",
+		return errors.Errorf(
+			"cannot write epoch block number to database",
 			"epoch", epoch,
 			"epochBlockNum", blockNum,
-		).WithCause(err)
+		)
 	}
 	return nil
 }
@@ -2702,15 +2703,15 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 
 	shardState, err := bc.ReadShardState(header.Epoch())
 	if err != nil {
-		return common.Address{}, ctxerror.New("cannot read shard state",
+		return common.Address{}, errors.Errorf("cannot read shard state",
 			"epoch", header.Epoch(),
 			"coinbaseAddr", coinbase,
-		).WithCause(err)
+		)
 	}
 
 	committee, err := shardState.FindCommitteeByID(header.ShardID())
 	if err != nil {
-		return common.Address{}, ctxerror.New("cannot find shard in the shard state",
+		return common.Address{}, errors.Errorf("cannot find shard in the shard state",
 			"blockNum", header.Number(),
 			"shardID", header.ShardID(),
 			"coinbaseAddr", coinbase,
@@ -2726,7 +2727,9 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 			return member.EcdsaAddress, nil
 		}
 	}
-	return common.Address{}, ctxerror.New("cannot find corresponding ECDSA Address", "coinbaseAddr", header.Coinbase())
+	return common.Address{}, errors.Errorf(
+		"cannot find corresponding ECDSA Address", "coinbaseAddr", header.Coinbase(),
+	)
 }
 
 // SuperCommitteeForNextEpoch ...

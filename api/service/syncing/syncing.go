@@ -10,20 +10,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus/engine"
-
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/pkg/errors"
 )
 
 // Constants for syncing.
@@ -232,7 +231,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		Msg("[SYNC] CreateSyncConfig: len of peers")
 
 	if len(peers) == 0 {
-		return ctxerror.New("[SYNC] no peers to connect to")
+		return errors.New("[SYNC] no peers to connect to")
 	}
 	if ss.syncConfig != nil {
 		ss.syncConfig.CloseConnections()

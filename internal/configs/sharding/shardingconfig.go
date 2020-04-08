@@ -11,8 +11,6 @@ import (
 	"github.com/harmony-one/harmony/internal/genesis"
 )
 
-//go:generate mockgen -source=shardingconfig.go -destination=mock/shardingconfig.go
-
 // Schedule returns the sharding configuration instance for the given
 // epoch.
 type Schedule interface {

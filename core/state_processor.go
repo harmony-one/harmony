@@ -29,12 +29,12 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -124,16 +124,16 @@ func (p *StateProcessor) Process(
 			p.config, statedb, header, cx,
 		); err != nil {
 			return nil, nil,
-				nil, 0, nil, ctxerror.New("[Process] Cannot apply incoming receipts").WithCause(err)
+				nil, 0, nil, errors.New("[Process] Cannot apply incoming receipts")
 		}
 	}
 
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, 0, nil, ctxerror.New(
+			return nil, nil, nil, 0, nil, errors.New(
 				"[Process] Cannot finalize block",
-			).WithCause(err)
+			)
 		}
 	}
 
@@ -143,7 +143,7 @@ func (p *StateProcessor) Process(
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes,
 	)
 	if err != nil {
-		return nil, nil, nil, 0, nil, ctxerror.New("[Process] Cannot finalize block").WithCause(err)
+		return nil, nil, nil, 0, nil, errors.New("[Process] Cannot finalize block")
 	}
 
 	return receipts, outcxs, allLogs, *usedGas, payout, nil
@@ -293,7 +293,7 @@ func ApplyIncomingReceipt(config *params.ChainConfig, db *state.DB, header *bloc
 
 	for _, cx := range cxp.Receipts {
 		if cx == nil || cx.To == nil { // should not happend
-			return ctxerror.New("ApplyIncomingReceipts: Invalid incomingReceipt!", "receipt", cx)
+			return errors.Errorf("ApplyIncomingReceipts: Invalid incomingReceipt!", "receipt", cx)
 		}
 		utils.Logger().Info().Interface("receipt", cx).Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)
 

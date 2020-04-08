@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -310,23 +309,23 @@ func TestValidatorWrapperSanityCheck(t *testing.T) {
 func testEnsureLength(t *testing.T) {
 	// test name length > MaxNameLength
 	if _, err := longNameDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longNameDesc.Name), "maxNameLen", MaxNameLength), "got", err)
+		t.Error("expected", errors.New("[EnsureLength] Exceed Maximum Length", "have", len(longNameDesc.Name), "maxNameLen", MaxNameLength), "got", err)
 	}
 	// test identity length > MaxIdentityLength
 	if _, err := longIdentityDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longIdentityDesc.Identity), "maxIdentityLen", MaxIdentityLength), "got", err)
+		t.Error("expected", errors.New("[EnsureLength] Exceed Maximum Length", "have", len(longIdentityDesc.Identity), "maxIdentityLen", MaxIdentityLength), "got", err)
 	}
 	// test website length > MaxWebsiteLength
 	if _, err := longWebsiteDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longWebsiteDesc.Website), "maxWebsiteLen", MaxWebsiteLength), "got", err)
+		t.Error("expected", errors.Errorf("[EnsureLength] Exceed Maximum Length", "have", len(longWebsiteDesc.Website), "maxWebsiteLen", MaxWebsiteLength), "got", err)
 	}
 	// test security contact length > MaxSecurityContactLength
 	if _, err := longSecurityContactDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longSecurityContactDesc.SecurityContact), "maxSecurityContactLen", MaxSecurityContactLength), "got", err)
+		t.Error("expected", errors.Errorf("[EnsureLength] Exceed Maximum Length", "have", len(longSecurityContactDesc.SecurityContact), "maxSecurityContactLen", MaxSecurityContactLength), "got", err)
 	}
 	// test details length > MaxDetailsLength
 	if _, err := longDetailsDesc.EnsureLength(); err == nil {
-		t.Error("expected", ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(longDetailsDesc.Details), "maxDetailsLen", MaxDetailsLength), "got", err)
+		t.Error("expected", errors.Errorf("[EnsureLength] Exceed Maximum Length", "have", len(longDetailsDesc.Details), "maxDetailsLen", MaxDetailsLength), "got", err)
 	}
 }
 

@@ -1,7 +1,5 @@
 package hostv2
 
-//go:generate mockgen -source=hostv2.go -package=hostv2 -destination=hostv2_mock_for_test.go
-
 import (
 	"context"
 	"fmt"

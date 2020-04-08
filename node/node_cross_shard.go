@@ -7,10 +7,10 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/pkg/errors"
 )
 
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
@@ -66,7 +66,13 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 		return
 	}
 
-	cxReceiptsProof := &types.CXReceiptsProof{Receipts: cxReceipts, MerkleProof: merkleProof, Header: block.Header(), CommitSig: commitSig, CommitBitmap: commitBitmap}
+	cxReceiptsProof := &types.CXReceiptsProof{
+		Receipts:     cxReceipts,
+		MerkleProof:  merkleProof,
+		Header:       block.Header(),
+		CommitSig:    commitSig,
+		CommitBitmap: commitBitmap,
+	}
 
 	groupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(toShardID))
 	utils.Logger().Info().Uint32("ToShardID", toShardID).Str("GroupID", string(groupID)).Interface("cxp", cxReceiptsProof).Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof ready. Sending CX receipts...")
@@ -102,29 +108,36 @@ func (node *Node) BroadcastMissingCXReceipts() {
 	}
 }
 
+var (
+	errDoubleSpent = errors.New("[verifyIncomingReceipts] Double Spent")
+)
+
 func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 	m := make(map[common.Hash]struct{})
 	cxps := block.IncomingReceipts()
 	for _, cxp := range cxps {
 		// double spent
 		if node.Blockchain().IsSpent(cxp) {
-			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
+			return errDoubleSpent
 		}
 		hash := cxp.MerkleProof.BlockHash
 		// duplicated receipts
 		if _, ok := m[hash]; ok {
-			return ctxerror.New("[verifyIncomingReceipts] Double Spent!")
+			return errDoubleSpent
 		}
 		m[hash] = struct{}{}
 
 		for _, item := range cxp.Receipts {
-			if item.ToShardID != node.Blockchain().ShardID() {
-				return ctxerror.New("[verifyIncomingReceipts] Invalid ToShardID", "myShardID", node.Blockchain().ShardID(), "expectShardID", item.ToShardID)
+			if s := node.Blockchain().ShardID(); item.ToShardID != s {
+				return errors.Errorf(
+					"[verifyIncomingReceipts] Invalid ToShardID %d expectShardID %d",
+					s, item.ToShardID,
+				)
 			}
 		}
 
 		if err := node.Blockchain().Validator().ValidateCXReceiptsProof(cxp); err != nil {
-			return ctxerror.New("[verifyIncomingReceipts] verification failed").WithCause(err)
+			return errors.Wrapf(err, "[verifyIncomingReceipts] verification failed")
 		}
 	}
 
@@ -133,7 +146,7 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 		incomingReceiptHash = types.DeriveSha(cxps)
 	}
 	if incomingReceiptHash != block.Header().IncomingReceiptHash() {
-		return ctxerror.New("[verifyIncomingReceipts] Invalid IncomingReceiptHash in block header")
+		return errors.New("[verifyIncomingReceipts] Invalid IncomingReceiptHash in block header")
 	}
 
 	return nil
@@ -143,10 +156,12 @@ func (node *Node) verifyIncomingReceipts(block *types.Block) error {
 func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	cxp := types.CXReceiptsProof{}
 	if err := rlp.DecodeBytes(msgPayload, &cxp); err != nil {
-		utils.Logger().Error().Err(err).Msg("[ProcessReceiptMessage] Unable to Decode message Payload")
+		utils.Logger().Error().Err(err).
+			Msg("[ProcessReceiptMessage] Unable to Decode message Payload")
 		return
 	}
-	utils.Logger().Debug().Interface("cxp", cxp).Msg("[ProcessReceiptMessage] Add CXReceiptsProof to pending Receipts")
+	utils.Logger().Debug().Interface("cxp", cxp).
+		Msg("[ProcessReceiptMessage] Add CXReceiptsProof to pending Receipts")
 	// TODO: integrate with txpool
 	node.AddPendingReceipts(&cxp)
 }

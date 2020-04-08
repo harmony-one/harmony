@@ -4,10 +4,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/verify"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -15,24 +15,29 @@ const (
 	crossLinkBatchSize      = 10
 )
 
+var (
+	errAlreadyExist = errors.New("crosslink already exist")
+)
+
 // VerifyBlockCrossLinks verifies the cross links of the block
 func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
-	if len(block.Header().CrossLinks()) == 0 {
+	cxLinksData := block.Header().CrossLinks()
+	if len(cxLinksData) == 0 {
 		utils.Logger().Debug().Msgf("[CrossLinkVerification] Zero CrossLinks in the header")
 		return nil
 	}
 
 	crossLinks := &types.CrossLinks{}
-	err := rlp.DecodeBytes(block.Header().CrossLinks(), crossLinks)
+	err := rlp.DecodeBytes(cxLinksData, crossLinks)
 	if err != nil {
-		return ctxerror.New("[CrossLinkVerification] failed to decode cross links",
+		return errors.Errorf("[CrossLinkVerification] failed to decode cross links",
 			"blockHash", block.Hash(),
 			"crossLinks", len(block.Header().CrossLinks()),
-		).WithCause(err)
+		)
 	}
 
 	if !crossLinks.IsSorted() {
-		return ctxerror.New("[CrossLinkVerification] cross links are not sorted",
+		return errors.Errorf("[CrossLinkVerification] cross links are not sorted",
 			"blockHash", block.Hash(),
 			"crossLinks", len(block.Header().CrossLinks()),
 		)
@@ -42,16 +47,11 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 		cl, err := node.Blockchain().ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
 		if err == nil && cl != nil {
 			// Add slash for exist same blocknum but different crosslink
-			return ctxerror.New("crosslink already exist!")
+			return errAlreadyExist
 		}
-		if err = node.VerifyCrossLink(crossLink); err != nil {
-			return ctxerror.New("cannot VerifyBlockCrossLinks",
-				"blockHash", block.Hash(),
-				"blockNum", block.Number(),
-				"crossLinkShard", crossLink.ShardID(),
-				"crossLinkBlock", crossLink.BlockNum(),
-				"numTx", len(block.Transactions()),
-			).WithCause(err)
+		if err := node.VerifyCrossLink(crossLink); err != nil {
+			return errors.Wrapf(err, "cannot VerifyBlockCrossLinks")
+
 		}
 	}
 	return nil
@@ -112,15 +112,15 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 // VerifyCrossLink verifies the header is valid
 func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-		return ctxerror.New("[VerifyCrossLink] Shard chains should not verify cross links")
+		return errors.New("[VerifyCrossLink] Shard chains should not verify cross links")
 	}
 
 	if cl.BlockNum() <= 1 {
-		return ctxerror.New("[VerifyCrossLink] CrossLink BlockNumber should greater than 1")
+		return errors.New("[VerifyCrossLink] CrossLink BlockNumber should greater than 1")
 	}
 
 	if !node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
-		return ctxerror.New(
+		return errors.Errorf(
 			"[VerifyCrossLink] CrossLink Epoch should >= cross link starting epoch",
 			"crossLinkEpoch", cl.Epoch(), "cross_link_starting_eoch",
 			node.Blockchain().Config().CrossLinkEpoch,
@@ -142,10 +142,11 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 
 	aggSig := &bls.Sign{}
 	sig := cl.Signature()
-	if err = aggSig.Deserialize(sig[:]); err != nil {
-		return ctxerror.New(
+	if err := aggSig.Deserialize(sig[:]); err != nil {
+		return errors.Wrapf(
+			err,
 			"[VerifyCrossLink] unable to deserialize multi-signature from payload",
-		).WithCause(err)
+		)
 	}
 
 	return verify.AggregateSigForCommittee(

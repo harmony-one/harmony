@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -112,19 +111,19 @@ func TestCV5(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// identity length: 200 characters
 	msg.Identity = "adsfwryuiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfhuewhfiuewhfefhshfrhfhifhwbfvberhbvihfwuoefhusioehfeuwiafhaiobcfwfhceirui"
-	identitylengthCtxError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Identity), "maxIdentityLen", staking.MaxIdentityLength)
+	identitylengthErrors := errors.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Identity), "maxIdentityLen", staking.MaxIdentityLength)
 	var err error
 	if _, err = VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Errorf("expected non null error")
 	}
-	ctxerr, ok := err.(ctxerror.CtxError)
+	ctxerr, ok := err.(errors.Errors)
 	if !ok {
 		t.Errorf("expected context aware error")
 	}
-	if ctxerr.Message() != identitylengthCtxError.Message() {
-		t.Error("expected", identitylengthCtxError, "got", err)
+	if ctxerr.Message() != identitylengthErrors.Message() {
+		t.Error("expected", identitylengthErrors, "got", err)
 	}
 }
 
@@ -135,19 +134,19 @@ func TestCV6(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// Website length: 200 characters
 	msg.Website = "https://www.iwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceirui.com"
-	websiteLengthCtxError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Website), "maxWebsiteLen", staking.MaxWebsiteLength)
+	websiteLengthErrors := errors.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Website), "maxWebsiteLen", staking.MaxWebsiteLength)
 	_, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	)
 	if err == nil {
 		t.Errorf("expected non null error")
 	}
-	ctxerr, ok := err.(ctxerror.CtxError)
+	ctxerr, ok := err.(errors.Errors)
 	if !ok {
 		t.Errorf("expected context aware error")
 	}
-	if ctxerr.Message() != websiteLengthCtxError.Message() {
-		t.Error("expected", websiteLengthCtxError, "got", err)
+	if ctxerr.Message() != websiteLengthErrors.Message() {
+		t.Error("expected", websiteLengthErrors, "got", err)
 	}
 }
 
@@ -158,12 +157,12 @@ func TestCV7(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// Security Contact length: 200 characters
 	msg.SecurityContact = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdf"
-	securityContactLengthError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.SecurityContact), "maxSecurityContactLen", staking.MaxSecurityContactLength)
+	securityContactLengthError := errors.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.SecurityContact), "maxSecurityContactLen", staking.MaxSecurityContactLength)
 	_, err := VerifyAndCreateValidatorFromMsg(statedb, postStakingEpoch, big.NewInt(0), msg)
 	if err == nil {
 		t.Errorf("expected non null error")
 	}
-	ctxerr, ok := err.(ctxerror.CtxError)
+	ctxerr, ok := err.(errors.Errors)
 	if !ok {
 		t.Errorf("expected context aware error")
 	}
@@ -179,19 +178,19 @@ func TestCV8(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// Details length: 300 characters
 	msg.Details = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwiewwerfhuwefiuewfwwwwwfiuewhfefhshfrheterhbvihfwuoefhusioehfeuwiafhaiobcfwfhceiruiHellodfdfdfjiusngognoherugbounviesrbgufhuoshcofwevusguahferhgvuervurehniwjvseivusehvsghjvorsugjvsiovjpsevsvvvvv"
-	detailsLenCtxError := ctxerror.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Details), "maxDetailsLen", staking.MaxDetailsLength)
+	detailsLenErrors := errors.New("[EnsureLength] Exceed Maximum Length", "have", len(msg.Details), "maxDetailsLen", staking.MaxDetailsLength)
 	_, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	)
 	if err == nil {
 		t.Errorf("Expected non null error")
 	}
-	ctxerr, ok := err.(ctxerror.CtxError)
+	ctxerr, ok := err.(errors.Errors)
 	if !ok {
 		t.Errorf("expected context aware error")
 	}
-	if ctxerr.Message() != detailsLenCtxError.Message() {
-		t.Error("expected", detailsLenCtxError, "got", err)
+	if ctxerr.Message() != detailsLenErrors.Message() {
+		t.Error("expected", detailsLenErrors, "got", err)
 	}
 }
 
