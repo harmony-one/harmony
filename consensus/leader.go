@@ -267,10 +267,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
 
-	if consensus.Decider.IsRewardThresholdAchieved() {
+	if consensus.Decider.IsAllSigsCollected() {
 		go func(viewID uint64) {
 			consensus.commitFinishChan <- viewID
-			logger.Info().Msg("[OnCommit] 90% Enough commits received")
+			logger.Info().Msg("[OnCommit] 100% Enough commits received")
 		}(consensus.viewID)
 	}
 }

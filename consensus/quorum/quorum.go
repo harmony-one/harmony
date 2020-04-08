@@ -118,7 +118,7 @@ type Decider interface {
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
 	QuorumThreshold() numeric.Dec
 	AmIMemberOfCommitee() bool
-	IsRewardThresholdAchieved() bool
+	IsAllSigsCollected() bool
 	ResetPrepareAndCommitVotes()
 	ResetViewChangeVotes()
 }

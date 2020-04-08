@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/accounts"
@@ -186,8 +185,7 @@ type Node struct {
 	serviceMessageChan map[service.Type]chan *msg_pb.Message
 	accountManager     *accounts.Manager
 	isFirstTime        bool // the node was started with a fresh database
-	// How long in second the leader needs to wait to propose a new block.
-	BlockPeriod time.Duration
+
 	// Last 1024 staking transaction error, only in memory
 	errorSink struct {
 		sync.Mutex

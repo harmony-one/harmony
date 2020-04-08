@@ -14,9 +14,8 @@ import (
 )
 
 var (
-	twoThird      = numeric.NewDec(2).Quo(numeric.NewDec(3))
-	ninetyPercent = numeric.MustNewDecFromStr("0.90")
-	totalShare    = numeric.MustNewDecFromStr("1.00")
+	twoThird   = numeric.NewDec(2).Quo(numeric.NewDec(3))
+	totalShare = numeric.MustNewDecFromStr("1.00")
 )
 
 // TallyResult is the result of when we calculate voting power,
@@ -137,16 +136,9 @@ func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 	return twoThird
 }
 
-// RewardThreshold ..
-func (v *stakedVoteWeight) IsRewardThresholdAchieved() bool {
-	reached, err := v.computeCurrentTotalPower(Commit)
-	if err != nil {
-		utils.Logger().Error().
-			AnErr("bls error", err).
-			Msg("Failure in attempt bls-key reading")
-		return false
-	}
-	return reached.GTE(ninetyPercent)
+// IsAllSigsCollected ..
+func (v *stakedVoteWeight) IsAllSigsCollected() bool {
+	return v.SignersCount(Commit) == v.ParticipantsCount()
 }
 
 var (

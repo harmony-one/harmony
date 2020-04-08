@@ -335,6 +335,8 @@ func (consensus *Consensus) Start(
 			Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
 
 		vdfInProgress := false
+		// Set up the very first block time interval.
+		blockTime := time.Now().Add(consensus.BlockPeriod)
 		for {
 			select {
 			case <-ticker.C:
@@ -376,11 +378,6 @@ func (consensus *Consensus) Start(
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 
 			case newBlock := <-blockChannel:
-				// Debug code to trigger leader change.
-				//if consensus.ShardID == 0 && newBlock.NumberU64() == 2 && strings.Contains(consensus.PubKey.SerializeToHexStr(), "65f55eb") {
-				//	continue
-				//}
-
 				consensus.getLogger().Info().
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
@@ -473,12 +470,19 @@ func (consensus *Consensus) Start(
 
 			case viewID := <-consensus.commitFinishChan:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
+
 				// Only Leader execute this condition
 				func() {
+					if time.Now().Before(blockTime) {
+						// Sleep to wait for the full block time
+						consensus.getLogger().Debug().Msg("[CommitFinishChan] Waiting for Block Time")
+						time.Sleep(blockTime.Sub(time.Now()))
+					}
 					consensus.mutex.Lock()
 					defer consensus.mutex.Unlock()
 					if viewID == consensus.viewID {
 						consensus.finalizeCommits()
+						blockTime = time.Now().Add(consensus.BlockPeriod)
 					}
 				}()
 

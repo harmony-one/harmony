@@ -33,8 +33,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 		// TODO: make local net start faster
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
-		// Set up the very first deadline.
-		deadline := time.Now().Add(node.BlockPeriod)
 		for {
 			// keep waiting for Consensus ready
 			select {
@@ -45,12 +43,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 			case <-readySignal:
 				for node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(SleepPeriod)
-					if time.Now().Before(deadline) {
-						continue
-					}
-
-					// Start counting for block time before block proposal.
-					tmpDeadline := time.Now().Add(node.BlockPeriod)
 
 					utils.Logger().Debug().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
@@ -68,9 +60,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 							Msg("=========Successfully Proposed New Block==========")
 
-						// Set deadline only if block proposal is successful, otherwise, we should
-						// immediately start retrying block proposal
-						deadline = tmpDeadline
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
 						break

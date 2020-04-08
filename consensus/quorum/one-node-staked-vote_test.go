@@ -161,9 +161,9 @@ func TestEvenNodes(t *testing.T) {
 			ViewChange, strconv.FormatBool(achieved))
 	}
 	// RewardThreshold
-	rewarded := stakedVote.IsRewardThresholdAchieved()
+	rewarded := stakedVote.IsAllSigsCollected()
 	if rewarded {
-		t.Errorf("[IsRewardThresholdAchieved] Got: %s, Expected: false (All Staker nodes = 32%%)",
+		t.Errorf("[IsAllSigsCollected] Got: %s, Expected: false (All Staker nodes = 32%%)",
 			strconv.FormatBool(rewarded))
 	}
 
@@ -189,9 +189,9 @@ func TestEvenNodes(t *testing.T) {
 			ViewChange, strconv.FormatBool(achieved))
 	}
 	// RewardThreshold
-	rewarded = stakedVote.IsRewardThresholdAchieved()
+	rewarded = stakedVote.IsAllSigsCollected()
 	if !rewarded {
-		t.Errorf("[IsRewardThresholdAchieved] Got: %s, Expected: true (All nodes = 100%%)",
+		t.Errorf("[IsAllSigsCollected] Got: %s, Expected: true (All nodes = 100%%)",
 			strconv.FormatBool(rewarded))
 	}
 }
@@ -228,9 +228,9 @@ func Test33HarmonyNodes(t *testing.T) {
 			ViewChange, strconv.FormatBool(achieved))
 	}
 	// RewardThreshold
-	rewarded := stakedVote.IsRewardThresholdAchieved()
+	rewarded := stakedVote.IsAllSigsCollected()
 	if rewarded {
-		t.Errorf("[IsRewardThresholdAchieved] Got: %s, Expected: false (All Harmony nodes = 68%%)",
+		t.Errorf("[IsAllSigsCollected] Got: %s, Expected: false (All Harmony nodes = 68%%)",
 			strconv.FormatBool(rewarded))
 	}
 }
