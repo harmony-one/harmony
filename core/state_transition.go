@@ -253,9 +253,12 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		}
 	}
 	st.refundGas()
-	// Burn Txn Fees
-	//txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
-	//st.state.AddBalance(st.evm.Coinbase, txFee)
+
+	// Burn Txn Fees after staking epoch
+	if !st.evm.ChainConfig().IsStaking(st.evm.EpochNumber) {
+		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
+		st.state.AddBalance(st.evm.Coinbase, txFee)
+	}
 
 	return ret, st.gasUsed(), vmerr != nil, err
 }
