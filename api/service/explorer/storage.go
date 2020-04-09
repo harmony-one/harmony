@@ -83,44 +83,40 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		return
 	}
 
-	batch := new(leveldb.Batch)
 	// Store txs
 	for _, tx := range block.Transactions() {
 		explorerTransaction := GetTransaction(tx, block)
-		storage.UpdateTxAddress(batch, explorerTransaction, tx)
+		storage.UpdateTxAddress(explorerTransaction, tx)
 	}
 	// Store staking txns
 	for _, tx := range block.StakingTransactions() {
 		explorerTransaction := GetStakingTransaction(tx, block)
-		storage.UpdateStakingTxAddress(batch, explorerTransaction, tx)
-	}
-	if err := storage.db.Write(batch, nil); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot write batch")
+		storage.UpdateStakingTxAddress(explorerTransaction, tx)
 	}
 }
 
 // UpdateTxAddress ...
-func (storage *Storage) UpdateTxAddress(batch *leveldb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
+func (storage *Storage) UpdateTxAddress(explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
 	if explorerTransaction.To != "" {
-		storage.UpdateTxAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+		storage.UpdateTxAddressStorage(explorerTransaction.To, explorerTransaction, tx)
 	}
 	explorerTransaction.Type = Sent
-	storage.UpdateTxAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
+	storage.UpdateTxAddressStorage(explorerTransaction.From, explorerTransaction, tx)
 }
 
 // UpdateStakingTxAddress ...
-func (storage *Storage) UpdateStakingTxAddress(batch *leveldb.Batch, explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
+func (storage *Storage) UpdateStakingTxAddress(explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
 	explorerTransaction.Type = Received
 	if explorerTransaction.To != "" {
-		storage.UpdateStakingTxAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+		storage.UpdateStakingTxAddressStorage(explorerTransaction.To, explorerTransaction, tx)
 	}
 	explorerTransaction.Type = Sent
-	storage.UpdateStakingTxAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
+	storage.UpdateStakingTxAddressStorage(explorerTransaction.From, explorerTransaction, tx)
 }
 
 // UpdateTxAddressStorage updates specific addr tx Address.
-func (storage *Storage) UpdateTxAddressStorage(batch *leveldb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
+func (storage *Storage) UpdateTxAddressStorage(addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	var address Address
 	key := GetAddressKey(addr)
 	if data, err := storage.db.Get([]byte(key), nil); err == nil {
@@ -132,14 +128,14 @@ func (storage *Storage) UpdateTxAddressStorage(batch *leveldb.Batch, addr string
 	address.TXs = append(address.TXs, explorerTransaction)
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
-		batch.Put([]byte(key), encoded)
+		storage.GetDB().Put([]byte(key), encoded, nil)
 	} else {
 		utils.Logger().Error().Err(err).Msg("cannot encode address")
 	}
 }
 
 // UpdateStakingTxAddressStorage updates specific addr staking tx Address.
-func (storage *Storage) UpdateStakingTxAddressStorage(batch *leveldb.Batch, addr string, explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
+func (storage *Storage) UpdateStakingTxAddressStorage(addr string, explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
 	var address Address
 	key := GetAddressKey(addr)
 	if data, err := storage.db.Get([]byte(key), nil); err == nil {
@@ -151,7 +147,7 @@ func (storage *Storage) UpdateStakingTxAddressStorage(batch *leveldb.Batch, addr
 	address.StakingTXs = append(address.StakingTXs, explorerTransaction)
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
-		batch.Put([]byte(key), encoded)
+		storage.GetDB().Put([]byte(key), encoded, nil)
 	} else {
 		utils.Logger().Error().Err(err).Msg("cannot encode address")
 	}
