@@ -5,6 +5,7 @@ import (
 	"context"
 	"math/big"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -16,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/msgq"
@@ -408,6 +410,25 @@ var BigMaxUint64 = new(big.Int).SetBytes([]byte{
 	255, 255, 255, 255, 255, 255, 255, 255,
 })
 
+func (node *Node) signaturesIncludedInBlock(block *types.Block) ([]string, error) {
+	included := []string{}
+	pubkeys := node.Consensus.Decider.Participants()
+	mask, err := internal_bls.NewMask(pubkeys, nil)
+	if err != nil {
+		return included, err
+	}
+	err = mask.SetMask(block.Header().LastCommitBitmap())
+	if err != nil {
+		return included, err
+	}
+	for _, key := range node.Consensus.PubKey.PublicKey {
+		if ok, err := mask.KeyEnabled(key); err == nil && ok {
+			included = append(included, key.SerializeToHexStr())
+		}
+	}
+	return included, nil
+}
+
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
@@ -443,6 +464,12 @@ func (node *Node) PostConsensusProcessing(
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
 		if node.Consensus.Mode() != consensus.Listening {
+			sigs := "none"
+			if sigsInBlock, err := node.signaturesIncludedInBlock(newBlock); err == nil {
+				if len(sigsInBlock) > 0 {
+					sigs = strings.Join(sigsInBlock, ",")
+				}
+			}
 			utils.Logger().Info().
 				Uint64("blockNum", newBlock.NumberU64()).
 				Uint64("epochNum", newBlock.Epoch().Uint64()).
@@ -450,7 +477,7 @@ func (node *Node) PostConsensusProcessing(
 				Str("blockHash", newBlock.Hash().String()).
 				Int("numTxns", len(newBlock.Transactions())).
 				Int("numStakingTxns", len(newBlock.StakingTransactions())).
-				Msg("BINGO !!! Reached Consensus")
+				Msgf("BINGO !!! Reached Consensus, signatures included: %s", sigs)
 			// 1% of the validator also need to do broadcasting
 			rand.Seed(time.Now().UTC().UnixNano())
 			rnd := rand.Intn(100)
