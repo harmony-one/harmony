@@ -5,7 +5,6 @@ import (
 	"context"
 	"math/big"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -410,23 +409,23 @@ var BigMaxUint64 = new(big.Int).SetBytes([]byte{
 	255, 255, 255, 255, 255, 255, 255, 255,
 })
 
-func (node *Node) signaturesIncludedInBlock(block *types.Block) ([]string, error) {
-	included := []string{}
+func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
+	count := uint32(0)
 	pubkeys := node.Consensus.Decider.Participants()
 	mask, err := internal_bls.NewMask(pubkeys, nil)
 	if err != nil {
-		return included, err
+		return count
 	}
 	err = mask.SetMask(block.Header().LastCommitBitmap())
 	if err != nil {
-		return included, err
+		return count
 	}
 	for _, key := range node.Consensus.PubKey.PublicKey {
 		if ok, err := mask.KeyEnabled(key); err == nil && ok {
-			included = append(included, key.SerializeToHexStr())
+			count++
 		}
 	}
-	return included, nil
+	return count
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
@@ -464,12 +463,6 @@ func (node *Node) PostConsensusProcessing(
 		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 	} else {
 		if node.Consensus.Mode() != consensus.Listening {
-			sigs := "none"
-			if sigsInBlock, err := node.signaturesIncludedInBlock(newBlock); err == nil {
-				if len(sigsInBlock) > 0 {
-					sigs = strings.Join(sigsInBlock, ",")
-				}
-			}
 			utils.Logger().Info().
 				Uint64("blockNum", newBlock.NumberU64()).
 				Uint64("epochNum", newBlock.Epoch().Uint64()).
@@ -477,7 +470,8 @@ func (node *Node) PostConsensusProcessing(
 				Str("blockHash", newBlock.Hash().String()).
 				Int("numTxns", len(newBlock.Transactions())).
 				Int("numStakingTxns", len(newBlock.StakingTransactions())).
-				Msgf("BINGO !!! Reached Consensus, signatures included: %s", sigs)
+				Uint32("numSignatures", node.numSignaturesIncludedInBlock(newBlock)).
+				Msg("BINGO !!! Reached Consensus")
 			// 1% of the validator also need to do broadcasting
 			rand.Seed(time.Now().UTC().UnixNano())
 			rnd := rand.Intn(100)
