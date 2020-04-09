@@ -11,7 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
