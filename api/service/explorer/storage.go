@@ -85,11 +85,10 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		return
 	}
 
-	batch := new(leveldb.Batch)
 	// Store txs
 	for _, tx := range block.Transactions() {
 		explorerTransaction := GetTransaction(tx, block)
-		storage.UpdateAddress(batch, explorerTransaction, tx)
+		storage.UpdateAddress(explorerTransaction, tx)
 	}
 	// Store cross shard txs
 	for _, proof := range block.IncomingReceipts() {
@@ -121,30 +120,27 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 				ToShard:   receipt.ToShardID,
 				Type:      Cross,
 			}
-			storage.UpdateAddress(batch, explorerTransaction, nil)
+			storage.UpdateAddress(explorerTransaction, nil)
 		}
-	}
-	if err := storage.db.Write(batch, nil); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot write batch")
 	}
 }
 
 // UpdateAddress ...
-func (storage *Storage) UpdateAddress(batch *leveldb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
+func (storage *Storage) UpdateAddress(explorerTransaction *Transaction, tx *types.Transaction) {
 	if explorerTransaction.Type != Cross {
 		explorerTransaction.Type = Received
 	}
 	if explorerTransaction.To != "" {
-		storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
+		storage.UpdateAddressStorage(explorerTransaction.To, explorerTransaction, tx)
 	}
 	if explorerTransaction.Type != Cross {
 		explorerTransaction.Type = Sent
 	}
-	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
+	storage.UpdateAddressStorage(explorerTransaction.From, explorerTransaction, tx)
 }
 
 // UpdateAddressStorage updates specific addr Address.
-func (storage *Storage) UpdateAddressStorage(batch *leveldb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
+func (storage *Storage) UpdateAddressStorage(addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	var address Address
 	key := GetAddressKey(addr)
 	if data, err := storage.db.Get([]byte(key), nil); err == nil {
@@ -156,7 +152,7 @@ func (storage *Storage) UpdateAddressStorage(batch *leveldb.Batch, addr string, 
 	address.TXs = append(address.TXs, explorerTransaction)
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
-		batch.Put([]byte(key), encoded)
+		storage.GetDB().Put([]byte(key), encoded, nil)
 	} else {
 		utils.Logger().Error().Err(err).Msg("cannot encode address")
 	}
