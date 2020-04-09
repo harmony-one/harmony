@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
@@ -34,7 +35,8 @@ var once sync.Once
 
 // Storage dump the block info into leveldb.
 type Storage struct {
-	db *leveldb.DB
+	db   *leveldb.DB
+	lock sync.Mutex
 }
 
 // GetStorageInstance returns attack model by using singleton pattern.
@@ -48,7 +50,8 @@ func GetStorageInstance(ip, port string, remove bool) *Storage {
 
 // Init initializes the block update.
 func (storage *Storage) Init(ip, port string, remove bool) {
-	dbFileName := "/tmp/explorer_storage_" + ip + "_" + port
+	dbFileName := path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
+	utils.Logger().Info().Msg("explorer storage folder: " + dbFileName)
 	var err error
 	if remove {
 		var err = os.RemoveAll(dbFileName)
@@ -76,6 +79,8 @@ func (storage *Storage) GetDB() *leveldb.DB {
 
 // Dump extracts information from block and index them into lvdb for explorer.
 func (storage *Storage) Dump(block *types.Block, height uint64) {
+	storage.lock.Lock()
+	defer storage.lock.Unlock()
 	if block == nil {
 		return
 	}

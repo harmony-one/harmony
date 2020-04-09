@@ -194,6 +194,14 @@ func (node *Node) processStakingMessage(msgPayload []byte) {
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
+	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
+		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
+		return
+	}
+	if len(msgPayload) < 1 {
+		utils.Logger().Debug().Msgf("Invalid transaction message size")
+		return
+	}
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
 	switch txMessageType {
@@ -211,6 +219,14 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
+	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
+		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
+		return
+	}
+	if len(msgPayload) < 1 {
+		utils.Logger().Debug().Msgf("Invalid transaction message size")
+		return
+	}
 	txs := staking.StakingTransactions{}
 	err := rlp.Decode(bytes.NewReader(msgPayload[:]), &txs)
 	if err != nil {

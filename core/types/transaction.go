@@ -34,6 +34,13 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 )
 
+const (
+	//MaxPoolTransactionDataSize is a 32KB heuristic data limit for DOS prevention
+	MaxPoolTransactionDataSize = 32 * 1024
+	//MaxEncodedPoolTransactionSize is a heuristic raw/encoded data size limit. It has an additional 10KB for metadata
+	MaxEncodedPoolTransactionSize = MaxPoolTransactionDataSize + (10 * 1024)
+)
+
 // RPCTransactionError ..
 type RPCTransactionError struct {
 	TxHashID             string `json:"tx-hash-id"`

@@ -152,12 +152,12 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 - Information disposal algorithm using erasure encoding (to be integrated)
 - Blockchain explorer with performance report and transaction lookup
 - Transaction generator for loadtesting
+- Consensus view-change protocol
+- Cross-shard transaction
 
 ### Features To Be Implemented
 
 - Secure VDF
-- Consensus view-change protocol
-- Cross-shard transaction
 
 ### Features Planned after Mainnet
 
