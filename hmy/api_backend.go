@@ -251,15 +251,15 @@ func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string
 	return hashes, err
 }
 
-// GetTransactionCount returns the number of regular transactions of address.
-func (b *APIBackend) GetTransactionCount(address, txType string) (uint64, error) {
-	count, err := b.hmy.nodeAPI.GetTransactionCount(address, txType)
+// GetTransactionsCount returns the number of regular transactions of address.
+func (b *APIBackend) GetTransactionsCount(address, txType string) (uint64, error) {
+	count, err := b.hmy.nodeAPI.GetTransactionsCount(address, txType)
 	return count, err
 }
 
-// GetStakingTransactionCount returns the number of staking transactions of address.
-func (b *APIBackend) GetStakingTransactionCount(address, txType string) (uint64, error) {
-	count, err := b.hmy.nodeAPI.GetStakingTransactionCount(address, txType)
+// GetStakingTransactionsCount returns the number of staking transactions of address.
+func (b *APIBackend) GetStakingTransactionsCount(address, txType string) (uint64, error) {
+	count, err := b.hmy.nodeAPI.GetStakingTransactionsCount(address, txType)
 	return count, err
 }
 

@@ -152,6 +152,56 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockHashAndIndex(ctx 
 	return nil
 }
 
+// GetTransactionCount returns the number of transactions the given address has sent for the given block number.
+// Legacy for apiv1. For apiv2, please use getAccountNonce/getPoolNonce/getTransactionsCount/getStakingTransactionsCount apis for
+// more granular transaction counts queries
+func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr string, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
+	address := internal_common.ParseAddr(addr)
+	// Ask transaction pool for the nonce which includes pending transactions
+	if blockNr == rpc.PendingBlockNumber {
+		nonce, err := s.b.GetPoolNonce(ctx, address)
+		if err != nil {
+			return nil, err
+		}
+		return (*hexutil.Uint64)(&nonce), nil
+	}
+	// Resolve block number and use its state to ask for the nonce
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	nonce := state.GetNonce(address)
+	return (*hexutil.Uint64)(&nonce), state.Error()
+}
+
+// GetTransactionsCount returns the number of regular transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
+func (s *PublicTransactionPoolAPI) GetTransactionsCount(ctx context.Context, address, txType string) (uint64, error) {
+	var err error
+	if !strings.HasPrefix(address, "one1") {
+		addr := internal_common.ParseAddr(address)
+		address, err = internal_common.AddressToBech32(addr)
+		if err != nil {
+			return 0, err
+		}
+	}
+	count, err := s.b.GetTransactionsCount(address, txType)
+	return count, err
+}
+
+// GetStakingTransactionsCount returns the number of staking transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
+func (s *PublicTransactionPoolAPI) GetStakingTransactionsCount(ctx context.Context, address, txType string) (uint64, error) {
+	var err error
+	if !strings.HasPrefix(address, "one1") {
+		addr := internal_common.ParseAddr(address)
+		address, err = internal_common.AddressToBech32(addr)
+		if err != nil {
+			return 0, err
+		}
+	}
+	count, err := s.b.GetStakingTransactionsCount(address, txType)
+	return count, err
+}
+
 // SendRawStakingTransaction will add the signed transaction to the transaction pool.
 // The sender is responsible for signing the transaction and using the correct nonce.
 func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(

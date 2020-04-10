@@ -547,8 +547,8 @@ function API_getStorageAt_test() {
 
 function API_getAccountNonce_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
-	echo "POST API_getAccountNonce test:"
-	response_test ${RESPONSES[API_getAccountNonce]}
+	echo "POST hmy_getAccountNonce test:"
+	response_test ${RESPONSES[hmy_getAccountNonce]}
 	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }

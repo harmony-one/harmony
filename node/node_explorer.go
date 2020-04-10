@@ -211,8 +211,8 @@ func (node *Node) GetStakingTransactionsHistory(address, txType, order string) (
 	return hashes, nil
 }
 
-// GetTransactionCount returns the number of regular transactions hashes of address for input type.
-func (node *Node) GetTransactionCount(address, txType string) (uint64, error) {
+// GetTransactionsCount returns the number of regular transactions hashes of address for input type.
+func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
@@ -234,8 +234,8 @@ func (node *Node) GetTransactionCount(address, txType string) (uint64, error) {
 	return count, nil
 }
 
-// GetStakingTransactionCount returns the number of staking transactions hashes of address for input type.
-func (node *Node) GetStakingTransactionCount(address, txType string) (uint64, error) {
+// GetStakingTransactionsCount returns the number of staking transactions hashes of address for input type.
+func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)

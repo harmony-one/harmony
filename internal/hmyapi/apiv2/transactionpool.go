@@ -200,8 +200,8 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Conte
 	return nil
 }
 
-// GetTransactionCount returns the number of regular transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
-func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address, txType string) (uint64, error) {
+// GetTransactionsCount returns the number of regular transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
+func (s *PublicTransactionPoolAPI) GetTransactionsCount(ctx context.Context, address, txType string) (uint64, error) {
 	var err error
 	if !strings.HasPrefix(address, "one1") {
 		addr := internal_common.ParseAddr(address)
@@ -210,12 +210,12 @@ func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr
 			return 0, err
 		}
 	}
-	count, err := s.b.GetTransactionCount(address, txType)
+	count, err := s.b.GetTransactionsCount(address, txType)
 	return count, err
 }
 
-// GetStakingTransactionCount returns the number of staking transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
-func (s *PublicTransactionPoolAPI) GetStakingTransactionCount(ctx context.Context, address, txType string) (uint64, error) {
+// GetStakingTransactionsCount returns the number of staking transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
+func (s *PublicTransactionPoolAPI) GetStakingTransactionsCount(ctx context.Context, address, txType string) (uint64, error) {
 	var err error
 	if !strings.HasPrefix(address, "one1") {
 		addr := internal_common.ParseAddr(address)
@@ -224,7 +224,7 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionCount(ctx context.Contex
 			return 0, err
 		}
 	}
-	count, err := s.b.GetStakingTransactionCount(address, txType)
+	count, err := s.b.GetStakingTransactionsCount(address, txType)
 	return count, err
 }
 

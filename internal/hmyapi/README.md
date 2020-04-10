@@ -44,8 +44,8 @@
 * [x] hmy_getTransactionByBlockNumberAndIndex - get transaction object of block by block number and index number
 * [ ] hmy_sign - sign message using node specific sign method.
 * [ ] hmy_pendingTransactions - returns the pending transactions list.
-* [ ] hmy_getTransactionCount - returns the number of confirmed (not pending) transactions count for the account
-* [ ] hmy_getStakingTransactionCount - returns the number of confirmed (not pending) staking transactions count for the account
+* [ ] hmy_getTransactionsCount - returns the number of confirmed (not pending) transactions count for the account
+* [ ] hmy_getStakingTransactionsCount - returns the number of confirmed (not pending) staking transactions count for the account
 
 
 ### Contract related
