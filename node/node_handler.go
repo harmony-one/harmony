@@ -494,7 +494,7 @@ func (node *Node) PostConsensusProcessing(
 	}
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
 		if h.Availability != nil {
-			for _, addr := range node.Consensus.SelfAddresses {
+			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
 					return
@@ -506,7 +506,8 @@ func (node *Node) PostConsensusProcessing(
 				computed := availability.ComputeCurrentSigning(
 					snapshot, wrapper,
 				)
-				beaconChainBlocks := uint64(node.Beaconchain().CurrentBlock().Header().Number().Int64()) % shard.Schedule.BlocksPerEpoch()
+				beaconChainBlocks := uint64(node.Beaconchain().CurrentBlock().Header().Number().Int64()) %
+					shard.Schedule.BlocksPerEpoch()
 				computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
 
 				if err != nil && computed.IsBelowThreshold {

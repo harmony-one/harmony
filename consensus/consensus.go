@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -79,8 +78,6 @@ type Consensus struct {
 	// private/public keys of current node
 	priKey *multibls.PrivateKey
 	PubKey *multibls.PublicKey
-	// TODO(audit): SelfAddresses doesn't have the ECDSA address for external validators. Don't use it that way.
-	SelfAddresses map[string]common.Address
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 	viewID       uint64
