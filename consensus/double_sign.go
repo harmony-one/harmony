@@ -70,6 +70,14 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 
 						now := big.NewInt(time.Now().UnixNano())
 
+						leaderShardKey := *shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey)
+						leaderAddr, err := subComm.AddressForBLSKey(leaderShardKey)
+						if err != nil {
+							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
+								Msg("could not find address for leader bls key")
+							return true
+						}
+
 						go func(reporter common.Address) {
 							evid := slash.Evidence{
 								ConflictingBallots: slash.ConflictingBallots{
@@ -93,7 +101,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 								Offender: *addr,
 							}
 							consensus.SlashChan <- proof
-						}(consensus.SelfAddresses[consensus.LeaderPubKey.SerializeToHexStr()])
+						}(*leaderAddr)
 						return true
 					}
 				}

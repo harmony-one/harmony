@@ -4,12 +4,14 @@ import (
 	"container/ring"
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/client"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -21,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/chain"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
@@ -181,6 +184,10 @@ type Node struct {
 		failedTxns        *ring.Ring
 	}
 	unixTimeAtNodeStart int64
+
+	// SelfAddresses holds the addresses of bls keys run by the node
+	SelfAddresses    map[string]common.Address
+	selfAddressEpoch *big.Int
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -700,4 +707,72 @@ func (node *Node) ShutDown() {
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
 	os.Exit(0)
+}
+
+func (node *Node) populateSelfAddresses(epoch *big.Int) {
+	// reset the self addresses
+	node.SelfAddresses = map[string]common.Address{}
+	node.selfAddressEpoch = epoch
+
+	shardID := node.Consensus.ShardID
+	shardState, err := node.Consensus.ChainReader.ReadShardState(epoch)
+	if err != nil {
+		utils.Logger().Error().Err(err).
+			Int64("epoch", epoch.Int64()).
+			Uint32("shard-id", shardID).
+			Msg("[PopulateSelfAddresses] failed to read shard")
+		return
+	}
+
+	committee, err := shardState.FindCommitteeByID(shardID)
+	if err != nil {
+		utils.Logger().Error().Err(err).
+			Int64("epoch", epoch.Int64()).
+			Uint32("shard-id", shardID).
+			Msg("[PopulateSelfAddresses] failed to find shard committee")
+		return
+	}
+
+	for _, blskey := range node.Consensus.PubKey.PublicKey {
+		shardkey := *shard.FromLibBLSPublicKeyUnsafe(blskey)
+		addr, err := committee.AddressForBLSKey(shardkey)
+		blsStr := blskey.SerializeToHexStr()
+		if err != nil {
+			utils.Logger().Error().Err(err).
+				Int64("epoch", epoch.Int64()).
+				Uint32("shard-id", shardID).
+				Str("blskey", blsStr).
+				Msg("[PopulateSelfAddresses] could not find address")
+			return
+		}
+		node.SelfAddresses[blsStr] = *addr
+		utils.Logger().Debug().
+			Int64("epoch", epoch.Int64()).
+			Uint32("shard-id", shardID).
+			Str("bls-key", blsStr).
+			Str("address", common2.MustAddressToBech32(*addr)).
+			Msg("[PopulateSelfAddresses]")
+	}
+}
+
+func (node *Node) GetAddressForBLSKey(blskey *bls.PublicKey, epoch *big.Int) common.Address {
+	// populate if first time setting or new epoch
+	if node.selfAddressEpoch == nil || epoch.Cmp(node.selfAddressEpoch) != 0 {
+		node.populateSelfAddresses(epoch)
+	}
+	blsStr := blskey.SerializeToHexStr()
+	if addr, ok := node.SelfAddresses[blsStr]; !ok {
+		return common.Address{}
+	} else {
+		return addr
+	}
+}
+
+func (node *Node) GetSelfAddresses(epoch *big.Int) map[string]common.Address {
+	// populate if first time setting or new epoch
+	if node.selfAddressEpoch == nil || epoch.Cmp(node.selfAddressEpoch) != 0 {
+		node.populateSelfAddresses(epoch)
+	}
+	// self addresses map can never be nil
+	return node.SelfAddresses
 }

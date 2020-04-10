@@ -80,15 +80,15 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	node.Worker.UpdateCurrent()
 
+	header := node.Worker.GetCurrentHeader()
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
 	var (
-		coinbase    = node.Consensus.SelfAddresses[node.Consensus.LeaderPubKey.SerializeToHexStr()]
+		coinbase    = node.GetAddressForBLSKey(node.Consensus.LeaderPubKey, header.Epoch())
 		beneficiary = coinbase
 		err         error
 	)
 
-	header := node.Worker.GetCurrentHeader()
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
 		blsPubKeyBytes := node.Consensus.LeaderPubKey.GetAddress()
