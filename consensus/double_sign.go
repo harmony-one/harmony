@@ -54,6 +54,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 							consensus.getLogger().Error().
 								Str("msg", recvMsg.String()).
 								Msg("could not get shard key from sender's key")
+							return true
 						}
 						subComm, err := committee.FindCommitteeByID(
 							consensus.ShardID,
@@ -79,6 +80,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 							consensus.getLogger().Error().
 								Str("msg", recvMsg.String()).
 								Msg("could not get shard key from leader's key")
+							return true
 						}
 						leaderAddr, err := subComm.AddressForBLSKey(*leaderShardKey)
 						if err != nil {

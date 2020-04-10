@@ -712,8 +712,6 @@ func (node *Node) ShutDown() {
 
 func (node *Node) populateSelfAddresses(epoch *big.Int) {
 	// reset the self addresses
-	node.keysToAddrsMutex.Lock()
-	defer node.keysToAddrsMutex.Unlock()
 	node.KeysToAddrs = map[string]common.Address{}
 	node.keysToAddrsEpoch = epoch
 
@@ -769,6 +767,8 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 // GetAddressForBLSKey retrieves the ECDSA address associated with bls key for epoch
 func (node *Node) GetAddressForBLSKey(blskey *bls.PublicKey, epoch *big.Int) common.Address {
 	// populate if first time setting or new epoch
+	node.keysToAddrsMutex.Lock()
+	defer node.keysToAddrsMutex.Unlock()
 	if node.keysToAddrsEpoch == nil || epoch.Cmp(node.keysToAddrsEpoch) != 0 {
 		node.populateSelfAddresses(epoch)
 	}
@@ -783,6 +783,8 @@ func (node *Node) GetAddressForBLSKey(blskey *bls.PublicKey, epoch *big.Int) com
 // GetAddresses retrieves all ECDSA addresses of the bls keys for epoch
 func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 	// populate if first time setting or new epoch
+	node.keysToAddrsMutex.Lock()
+	defer node.keysToAddrsMutex.Unlock()
 	if node.keysToAddrsEpoch == nil || epoch.Cmp(node.keysToAddrsEpoch) != 0 {
 		node.populateSelfAddresses(epoch)
 	}
