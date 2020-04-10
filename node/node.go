@@ -780,7 +780,7 @@ func (node *Node) GetAddressForBLSKey(blskey *bls.PublicKey, epoch *big.Int) com
 	return addr
 }
 
-// GetSelfAddresses retrieves all ECDSA addresses of the bls keys for epoch
+// GetAddresses retrieves all ECDSA addresses of the bls keys for epoch
 func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 	// populate if first time setting or new epoch
 	if node.keysToAddrsEpoch == nil || epoch.Cmp(node.keysToAddrsEpoch) != 0 {
