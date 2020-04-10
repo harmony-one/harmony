@@ -50,6 +50,8 @@ type Backend interface {
 	GetPoolTransactions() (types.PoolTransactions, error)
 	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
+	// Get account nonce
+	GetAccountNonce(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error)
 	// Stats() (pending int, queued int)
 	// TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
@@ -60,10 +62,10 @@ type Backend interface {
 	// Get validators for a particular epoch
 	GetValidators(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
-	// Get transactions history for an address
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
-	// Get staking transactions history for an address
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	GetTransactionsCount(address, txType string) (uint64, error)
+	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool

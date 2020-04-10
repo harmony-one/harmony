@@ -210,3 +210,49 @@ func (node *Node) GetStakingTransactionsHistory(address, txType, order string) (
 	}
 	return hashes, nil
 }
+
+// GetTransactionsCount returns the number of regular transactions hashes of address for input type.
+func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
+	addressData := &explorer.Address{}
+	key := explorer.GetAddressKey(address)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
+		return 0, nil
+	}
+	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
+		return 0, err
+	}
+
+	count := uint64(0)
+	for _, tx := range addressData.TXs {
+		if txType == "" || txType == "ALL" || txType == tx.Type {
+			count++
+		}
+	}
+	return count, nil
+}
+
+// GetStakingTransactionsCount returns the number of staking transactions hashes of address for input type.
+func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, error) {
+	addressData := &explorer.Address{}
+	key := explorer.GetAddressKey(address)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
+		return 0, nil
+	}
+	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
+		return 0, err
+	}
+
+	count := uint64(0)
+	for _, tx := range addressData.StakingTXs {
+		if txType == "" || txType == "ALL" || txType == tx.Type {
+			count++
+		}
+	}
+	return count, nil
+}

@@ -200,28 +200,30 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Conte
 	return nil
 }
 
-// GetTransactionCount returns the number of transactions the given address has sent from genesis to the input block number
-// NOTE: unlike other txn apis where staking vs. regular txns are separate,
-// the transaction count here includes the count of both regular and staking txns
-func (s *PublicTransactionPoolAPI) GetTransactionCount(
-	ctx context.Context, addr string, blockNr uint64,
-) (uint64, error) {
-	address := internal_common.ParseAddr(addr)
-	// Ask transaction pool for the nonce which includes pending transactions
-	if rpc.BlockNumber(blockNr) == rpc.PendingBlockNumber {
-		nonce, err := s.b.GetPoolNonce(ctx, address)
+// GetTransactionsCount returns the number of regular transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
+func (s *PublicTransactionPoolAPI) GetTransactionsCount(ctx context.Context, address, txType string) (uint64, error) {
+	var err error
+	if !strings.HasPrefix(address, "one1") {
+		addr := internal_common.ParseAddr(address)
+		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			return 0, err
 		}
-		return nonce, nil
 	}
-	// Resolve block number and use its state to ask for the nonce
-	state, _, err := s.b.StateAndHeaderByNumber(ctx, rpc.BlockNumber(blockNr))
-	if state == nil || err != nil {
-		return 0, err
+	return s.b.GetTransactionsCount(address, txType)
+}
+
+// GetStakingTransactionsCount returns the number of staking transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
+func (s *PublicTransactionPoolAPI) GetStakingTransactionsCount(ctx context.Context, address, txType string) (uint64, error) {
+	var err error
+	if !strings.HasPrefix(address, "one1") {
+		addr := internal_common.ParseAddr(address)
+		address, err = internal_common.AddressToBech32(addr)
+		if err != nil {
+			return 0, err
+		}
 	}
-	nonce := state.GetNonce(address)
-	return nonce, state.Error()
+	return s.b.GetStakingTransactionsCount(address, txType)
 }
 
 // SendRawStakingTransaction will add the signed transaction to the transaction pool.
