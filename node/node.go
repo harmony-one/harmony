@@ -755,19 +755,21 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 	}
 }
 
+// GetAddressForBLSKey retrieves the ECDSA address associated with bls key for epoch
 func (node *Node) GetAddressForBLSKey(blskey *bls.PublicKey, epoch *big.Int) common.Address {
 	// populate if first time setting or new epoch
 	if node.selfAddressEpoch == nil || epoch.Cmp(node.selfAddressEpoch) != 0 {
 		node.populateSelfAddresses(epoch)
 	}
 	blsStr := blskey.SerializeToHexStr()
-	if addr, ok := node.SelfAddresses[blsStr]; !ok {
+	addr, ok := node.SelfAddresses[blsStr]
+	if !ok {
 		return common.Address{}
-	} else {
-		return addr
 	}
+	return addr
 }
 
+// GetSelfAddresses retrieves all ECDSA addresses of the bls keys for epoch
 func (node *Node) GetSelfAddresses(epoch *big.Int) map[string]common.Address {
 	// populate if first time setting or new epoch
 	if node.selfAddressEpoch == nil || epoch.Cmp(node.selfAddressEpoch) != 0 {
