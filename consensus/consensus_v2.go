@@ -242,27 +242,40 @@ func (consensus *Consensus) tryCatchup() {
 				Int("numMsgs", len(msgs)).
 				Msg("[TryCatchup] DANGER!!! we should only get one committed message for a given blockNum")
 		}
-		consensus.getLogger().Info().Msg("[TryCatchup] committed message found")
 
-		block := consensus.FBFTLog.GetBlockByHash(msgs[0].BlockHash)
-		if block == nil {
-			blksRepr, msgsRepr, incomingMsg :=
-				consensus.FBFTLog.Blocks().String(),
-				consensus.FBFTLog.Messages().String(),
-				msgs[0].String()
-			consensus.getLogger().Debug().
-				Str("FBFT-log-blocks", blksRepr).
-				Str("FBFT-log-messages", msgsRepr).
-				Str("incoming-message", incomingMsg).
-				Msg("block was nil invariant in consensus violated")
+		var committedMsg *FBFTMessage
+		var block *types.Block
+		for i := range msgs {
+			tmpBlock := consensus.FBFTLog.GetBlockByHash(msgs[i].BlockHash)
+			if tmpBlock == nil {
+				blksRepr, msgsRepr, incomingMsg :=
+					consensus.FBFTLog.Blocks().String(),
+					consensus.FBFTLog.Messages().String(),
+					msgs[i].String()
+				consensus.getLogger().Debug().
+					Str("FBFT-log-blocks", blksRepr).
+					Str("FBFT-log-messages", msgsRepr).
+					Str("incoming-message", incomingMsg).
+					Uint64("blockNum", msgs[i].BlockNum).
+					Uint64("viewID", msgs[i].ViewID).
+					Str("blockHash", msgs[i].BlockHash.Hex()).
+					Msg("[TryCatchup] Failed finding a matching block for committed message")
+				continue
+			}
+
+			if consensus.BlockVerifier == nil {
+				// do nothing
+			} else if err := consensus.BlockVerifier(tmpBlock); err != nil {
+				consensus.getLogger().Info().Msg("[TryCatchup] block verification failed")
+				continue
+			}
+			committedMsg = msgs[i]
+			block = tmpBlock
 			break
 		}
-
-		if consensus.BlockVerifier == nil {
-			// do nothing
-		} else if err := consensus.BlockVerifier(block); err != nil {
-			consensus.getLogger().Info().Msg("[TryCatchup] block verification failed")
-			return
+		if block == nil || committedMsg == nil {
+			consensus.getLogger().Error().Msg("[TryCatchup] Failed finding a valid committed message.")
+			break
 		}
 
 		if block.ParentHash() != consensus.ChainReader.CurrentHeader().Hash() {
@@ -272,7 +285,7 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
 
 		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
-			msg_pb.MessageType_PREPARED, msgs[0].BlockNum, msgs[0].BlockHash,
+			msg_pb.MessageType_PREPARED, committedMsg.BlockNum, committedMsg.BlockHash,
 		)
 		msg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 		if msg == nil {
@@ -283,11 +296,11 @@ func (consensus *Consensus) tryCatchup() {
 		// TODO(Chao): Explain the reasoning for these code
 		consensus.blockHash = [32]byte{}
 		consensus.blockNum = consensus.blockNum + 1
-		consensus.viewID = msgs[0].ViewID + 1
-		consensus.LeaderPubKey = msgs[0].SenderPubkey
+		consensus.viewID = committedMsg.ViewID + 1
+		consensus.LeaderPubKey = committedMsg.SenderPubkey
 
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
-		consensus.OnConsensusDone(block, msgs[0].Payload)
+		consensus.OnConsensusDone(block, committedMsg.Payload)
 		consensus.ResetState()
 
 		select {
