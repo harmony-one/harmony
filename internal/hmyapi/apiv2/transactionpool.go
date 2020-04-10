@@ -210,8 +210,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionsCount(ctx context.Context, add
 			return 0, err
 		}
 	}
-	count, err := s.b.GetTransactionsCount(address, txType)
-	return count, err
+	return s.b.GetTransactionsCount(address, txType)
 }
 
 // GetStakingTransactionsCount returns the number of staking transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
@@ -224,8 +223,7 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionsCount(ctx context.Conte
 			return 0, err
 		}
 	}
-	count, err := s.b.GetStakingTransactionsCount(address, txType)
-	return count, err
+	return s.b.GetStakingTransactionsCount(address, txType)
 }
 
 // SendRawStakingTransaction will add the signed transaction to the transaction pool.

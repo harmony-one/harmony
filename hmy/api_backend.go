@@ -241,26 +241,22 @@ func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blo
 
 // GetTransactionsHistory returns list of transactions hashes of address.
 func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
-	return hashes, err
+	return b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
 }
 
 // GetStakingTransactionsHistory returns list of staking transactions hashes of address.
 func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
-	return hashes, err
+	return b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
 }
 
 // GetTransactionsCount returns the number of regular transactions of address.
 func (b *APIBackend) GetTransactionsCount(address, txType string) (uint64, error) {
-	count, err := b.hmy.nodeAPI.GetTransactionsCount(address, txType)
-	return count, err
+	return b.hmy.nodeAPI.GetTransactionsCount(address, txType)
 }
 
 // GetStakingTransactionsCount returns the number of staking transactions of address.
 func (b *APIBackend) GetStakingTransactionsCount(address, txType string) (uint64, error) {
-	count, err := b.hmy.nodeAPI.GetStakingTransactionsCount(address, txType)
-	return count, err
+	return b.hmy.nodeAPI.GetStakingTransactionsCount(address, txType)
 }
 
 // NetVersion returns net version
