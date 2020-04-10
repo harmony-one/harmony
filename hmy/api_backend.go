@@ -220,6 +220,16 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	return txs, nil
 }
 
+// GetAccountNonce returns the nonce value of the given address for the given block number
+func (b *APIBackend) GetAccountNonce(
+	ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error) {
+	state, _, err := b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return 0, err
+	}
+	return state.GetNonce(address), state.Error()
+}
+
 // GetBalance returns balance of an given address.
 func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error) {
 	state, _, err := b.StateAndHeaderByNumber(ctx, blockNr)
@@ -231,14 +241,22 @@ func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blo
 
 // GetTransactionsHistory returns list of transactions hashes of address.
 func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
-	return hashes, err
+	return b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
 }
 
 // GetStakingTransactionsHistory returns list of staking transactions hashes of address.
 func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
-	return hashes, err
+	return b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
+}
+
+// GetTransactionsCount returns the number of regular transactions of address.
+func (b *APIBackend) GetTransactionsCount(address, txType string) (uint64, error) {
+	return b.hmy.nodeAPI.GetTransactionsCount(address, txType)
+}
+
+// GetStakingTransactionsCount returns the number of staking transactions of address.
+func (b *APIBackend) GetStakingTransactionsCount(address, txType string) (uint64, error) {
+	return b.hmy.nodeAPI.GetStakingTransactionsCount(address, txType)
 }
 
 // NetVersion returns net version

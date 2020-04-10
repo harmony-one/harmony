@@ -22,7 +22,7 @@
 * [ ] hmy_getUncleByBlockNumberAndIndex - get uncle by block number and index number
 * [ ] hmy_getUncleCountByBlockHash - get uncle count by block hash
 * [ ] hmy_getUncleCountByBlockNumber - get uncle count by block number
-* [ ] hmy_syncing - Returns an object with data about the sync status 
+* [ ] hmy_syncing - Returns an object with data about the sync status
 * [ ] hmy_coinbase - return coinbase address
 * [ ] hmy_mining - return if mining client is mining
 * [ ] hmy_hashrate - return current hash rate for blockchain
@@ -30,7 +30,7 @@
 
 ### Account related
 * [x] hmy_getBalance - get balance for account address
-* [x] hmy_getTransactionCount - get nonce for account address
+* [x] hmy_getAccountNonce - get nonce for account address
 * [ ] hmy_accounts - return accounts that lives in node
 
 ### Transactions related
@@ -44,10 +44,13 @@
 * [x] hmy_getTransactionByBlockNumberAndIndex - get transaction object of block by block number and index number
 * [ ] hmy_sign - sign message using node specific sign method.
 * [ ] hmy_pendingTransactions - returns the pending transactions list.
+* [ ] hmy_getTransactionsCount - returns the number of confirmed (not pending) transactions count for the account
+* [ ] hmy_getStakingTransactionsCount - returns the number of confirmed (not pending) staking transactions count for the account
+
 
 ### Contract related
-* [ ] hmy_call - call contract method 
-* [x] hmy_getCode - get deployed contract's byte code 
+* [ ] hmy_call - call contract method
+* [x] hmy_getCode - get deployed contract's byte code
 * [x] hmy_getStorageAt - get storage position at a given address
 * ~~[ ] hmy_getCompilers~~ - DEPRECATED
 * ~~[ ] hmy_compileLLL~~ - DEPRECATED

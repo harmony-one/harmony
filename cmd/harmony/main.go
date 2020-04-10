@@ -451,12 +451,6 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		return currentConsensus.PubKey, nil
 	})
 
-	// staking validator doesn't have to specify ECDSA address
-	currentConsensus.SelfAddresses = map[string]ethCommon.Address{}
-	for _, initialAccount := range initialAccounts {
-		currentConsensus.SelfAddresses[initialAccount.BLSPublicKey] = common.ParseAddr(initialAccount.Address)
-	}
-
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
