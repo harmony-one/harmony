@@ -122,7 +122,7 @@ func WhatPercentStakedNow(
 ) (*big.Int, *numeric.Dec, error) {
 	stakedNow := numeric.ZeroDec()
 	// Only elected validators' stake is counted in stake ratio because only their stake is under slashing risk
-	active, err := beaconchain.ReadElectedValidatorList()
+	active, err := beaconchain.ReadShardState(beaconchain.CurrentBlock().Epoch())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -137,8 +137,8 @@ func WhatPercentStakedNow(
 
 	dole := numeric.NewDecFromBigInt(soFarDoledOut)
 
-	for i := range active {
-		wrapper, err := beaconchain.ReadValidatorInformation(active[i])
+	for _, electedValAdr := range active.StakedValidators().Addrs {
+		wrapper, err := beaconchain.ReadValidatorInformation(electedValAdr)
 		if err != nil {
 			return nil, nil, err
 		}
