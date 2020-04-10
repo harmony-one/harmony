@@ -45,21 +45,9 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 			// Add slash for exist same blocknum but different crosslink
 			return errAlreadyExist
 		}
-<<<<<<< HEAD
 		if err := node.VerifyCrossLink(crossLink); err != nil {
 			return errors.Wrapf(err, "cannot VerifyBlockCrossLinks")
 
-=======
-		if err = node.VerifyCrossLink(crossLink); err != nil {
-			return ctxerror.New("cannot VerifyBlockCrossLinks",
-				"blockHash", block.Hash(),
-				"blockNum", block.Number(),
-				"crossLinkShard", crossLink.ShardID(),
-				"crossLinkBlock", crossLink.BlockNum(),
-				"numTx", len(block.Transactions()),
-				"numStakingTx", len(block.StakingTransactions()),
-			).WithCause(err)
->>>>>>> Updating all sources of block.Transactions and do the corresponding work for block staking txns
 		}
 	}
 	return nil

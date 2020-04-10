@@ -890,21 +890,19 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 		return errors.New("transaction+stakingTransactions and receipt count mismatch")
 	}
 
-	for j := 0; j < len(transactions); j++ {
+	// The used gas can be calculated based on previous receipts
+	if len(receipts) > 0 && len(transactions) > 0 {
+		receipts[0].GasUsed = receipts[0].CumulativeGasUsed
+	}
+	for j := 1; j < len(transactions); j++ {
 		// The transaction hash can be retrieved from the transaction itself
 		receipts[j].TxHash = transactions[j].Hash()
-
+		receipts[j].GasUsed = receipts[j].CumulativeGasUsed - receipts[j-1].CumulativeGasUsed
 		// The contract address can be derived from the transaction itself
 		if transactions[j].To() == nil {
 			// Deriving the signer is expensive, only do if it's actually needed
 			from, _ := types.Sender(signer, transactions[j])
 			receipts[j].ContractAddress = crypto.CreateAddress(from, transactions[j].Nonce())
-		}
-		// The used gas can be calculated based on previous receipts
-		if j == 0 {
-			receipts[j].GasUsed = receipts[j].CumulativeGasUsed
-		} else {
-			receipts[j].GasUsed = receipts[j].CumulativeGasUsed - receipts[j-1].CumulativeGasUsed
 		}
 		// The derived log fields can simply be set from the block and transaction
 		for k := 0; k < len(receipts[j].Logs); k++ {
@@ -916,17 +914,16 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 			logIndex++
 		}
 	}
+
+	// The used gas can be calculated based on previous receipts
+	if len(receipts) > len(transactions) && len(stakingTransactions) > 0 {
+		receipts[len(transactions)].GasUsed = receipts[len(transactions)].CumulativeGasUsed
+	}
 	// in a block, txns are processed before staking txns
-	for j := len(transactions); j < len(transactions)+len(stakingTransactions); j++ {
+	for j := len(transactions) + 1; j < len(transactions)+len(stakingTransactions); j++ {
 		// The transaction hash can be retrieved from the staking transaction itself
 		receipts[j].TxHash = stakingTransactions[j].Hash()
-
-		// The used gas can be calculated based on previous receipts
-		if j == 0 {
-			receipts[j].GasUsed = receipts[j].CumulativeGasUsed
-		} else {
-			receipts[j].GasUsed = receipts[j].CumulativeGasUsed - receipts[j-1].CumulativeGasUsed
-		}
+		receipts[j].GasUsed = receipts[j].CumulativeGasUsed - receipts[j-1].CumulativeGasUsed
 		// The derived log fields can simply be set from the block and transaction
 		for k := 0; k < len(receipts[j].Logs); k++ {
 			receipts[j].Logs[k].BlockNumber = block.NumberU64()
