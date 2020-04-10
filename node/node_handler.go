@@ -494,7 +494,7 @@ func (node *Node) PostConsensusProcessing(
 	}
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
 		if h.Availability != nil {
-			for _, addr := range node.GetSelfAddresses(newBlock.Epoch()) {
+			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
 					return

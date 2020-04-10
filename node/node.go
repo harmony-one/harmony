@@ -185,9 +185,10 @@ type Node struct {
 	}
 	unixTimeAtNodeStart int64
 
-	// SelfAddresses holds the addresses of bls keys run by the node
-	SelfAddresses    map[string]common.Address
-	selfAddressEpoch *big.Int
+	// KeysToAddrs holds the addresses of bls keys run by the node
+	KeysToAddrs      map[string]common.Address
+	keysToAddrsEpoch *big.Int
+	keysToAddrsMutex sync.Mutex
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -711,8 +712,10 @@ func (node *Node) ShutDown() {
 
 func (node *Node) populateSelfAddresses(epoch *big.Int) {
 	// reset the self addresses
-	node.SelfAddresses = map[string]common.Address{}
-	node.selfAddressEpoch = epoch
+	node.keysToAddrsMutex.Lock()
+	defer node.keysToAddrsMutex.Unlock()
+	node.KeysToAddrs = map[string]common.Address{}
+	node.keysToAddrsEpoch = epoch
 
 	shardID := node.Consensus.ShardID
 	shardState, err := node.Consensus.ChainReader.ReadShardState(epoch)
@@ -734,9 +737,17 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 	}
 
 	for _, blskey := range node.Consensus.PubKey.PublicKey {
-		shardkey := *shard.FromLibBLSPublicKeyUnsafe(blskey)
-		addr, err := committee.AddressForBLSKey(shardkey)
 		blsStr := blskey.SerializeToHexStr()
+		shardkey := shard.FromLibBLSPublicKeyUnsafe(blskey)
+		if shardkey == nil {
+			utils.Logger().Error().
+				Int64("epoch", epoch.Int64()).
+				Uint32("shard-id", shardID).
+				Str("blskey", blsStr).
+				Msg("[PopulateSelfAddresses] failed to get shard key from bls key")
+			return
+		}
+		addr, err := committee.AddressForBLSKey(*shardkey)
 		if err != nil {
 			utils.Logger().Error().Err(err).
 				Int64("epoch", epoch.Int64()).
@@ -745,7 +756,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 				Msg("[PopulateSelfAddresses] could not find address")
 			return
 		}
-		node.SelfAddresses[blsStr] = *addr
+		node.KeysToAddrs[blsStr] = *addr
 		utils.Logger().Debug().
 			Int64("epoch", epoch.Int64()).
 			Uint32("shard-id", shardID).
@@ -758,11 +769,11 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 // GetAddressForBLSKey retrieves the ECDSA address associated with bls key for epoch
 func (node *Node) GetAddressForBLSKey(blskey *bls.PublicKey, epoch *big.Int) common.Address {
 	// populate if first time setting or new epoch
-	if node.selfAddressEpoch == nil || epoch.Cmp(node.selfAddressEpoch) != 0 {
+	if node.keysToAddrsEpoch == nil || epoch.Cmp(node.keysToAddrsEpoch) != 0 {
 		node.populateSelfAddresses(epoch)
 	}
 	blsStr := blskey.SerializeToHexStr()
-	addr, ok := node.SelfAddresses[blsStr]
+	addr, ok := node.KeysToAddrs[blsStr]
 	if !ok {
 		return common.Address{}
 	}
@@ -770,11 +781,11 @@ func (node *Node) GetAddressForBLSKey(blskey *bls.PublicKey, epoch *big.Int) com
 }
 
 // GetSelfAddresses retrieves all ECDSA addresses of the bls keys for epoch
-func (node *Node) GetSelfAddresses(epoch *big.Int) map[string]common.Address {
+func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 	// populate if first time setting or new epoch
-	if node.selfAddressEpoch == nil || epoch.Cmp(node.selfAddressEpoch) != 0 {
+	if node.keysToAddrsEpoch == nil || epoch.Cmp(node.keysToAddrsEpoch) != 0 {
 		node.populateSelfAddresses(epoch)
 	}
 	// self addresses map can never be nil
-	return node.SelfAddresses
+	return node.KeysToAddrs
 }

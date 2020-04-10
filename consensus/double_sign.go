@@ -49,7 +49,12 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 								Msg("could not read shard state")
 							return true
 						}
-						offender := *shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
+						offender := shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
+						if offender == nil {
+							consensus.getLogger().Error().
+								Str("msg", recvMsg.String()).
+								Msg("could not get shard key from sender's key")
+						}
 						subComm, err := committee.FindCommitteeByID(
 							consensus.ShardID,
 						)
@@ -60,8 +65,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 							return true
 						}
 
-						addr, err := subComm.AddressForBLSKey(offender)
-
+						addr, err := subComm.AddressForBLSKey(*offender)
 						if err != nil {
 							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not find address for bls key")
@@ -70,8 +74,13 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 
 						now := big.NewInt(time.Now().UnixNano())
 
-						leaderShardKey := *shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey)
-						leaderAddr, err := subComm.AddressForBLSKey(leaderShardKey)
+						leaderShardKey := shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey)
+						if leaderShardKey == nil {
+							consensus.getLogger().Error().
+								Str("msg", recvMsg.String()).
+								Msg("could not get shard key from leader's key")
+						}
+						leaderAddr, err := subComm.AddressForBLSKey(*leaderShardKey)
 						if err != nil {
 							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not find address for leader bls key")
@@ -83,7 +92,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 								ConflictingBallots: slash.ConflictingBallots{
 									AlreadyCastBallot: *alreadyCastBallot,
 									DoubleSignedBallot: votepower.Ballot{
-										SignerPubKey:    offender,
+										SignerPubKey:    *offender,
 										BlockHeaderHash: recvMsg.BlockHash,
 										Signature:       common.Hex2Bytes(doubleSign.SerializeToHexStr()),
 										Height:          recvMsg.BlockNum,
