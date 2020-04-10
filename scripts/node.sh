@@ -656,7 +656,10 @@ then
       msg "curl https://rclone.org/install.sh | sudo bash"
       curl https://rclone.org/install.sh | sudo bash
       mkdir -p ~/.config/rclone
-      cat<<-EOT>~/.config/rclone/rclone.conf
+   fi
+   if ! grep -q 'hmy' ~/.config/rclone/rclone.conf 2> /dev/null; then
+      msg "adding [hmy] profile to rclone.conf"
+      cat<<-EOT>>~/.config/rclone/rclone.conf
 [hmy]
 type = s3
 provider = AWS
