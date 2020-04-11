@@ -98,23 +98,15 @@ func (bc *BlockChain) CommitOffChainData(
 	// Shard State and Validator Update
 	if isNewEpoch {
 		// Write shard state for the new epoch
-		shardState, err := block.Header().GetShardState()
-		if err == nil && shardState.Epoch != nil && bc.chainConfig.IsStaking(shardState.Epoch) {
-			// After staking, the epoch will be decided by the epoch in the shard state.
-			newEpoch = new(big.Int).Set(shardState.Epoch)
-		}
-
 		newShardState, err := bc.WriteShardStateBytes(batch, newEpoch, header.ShardState())
 		if err != nil {
 			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
 			return NonStatTy, err
 		}
 
-		// Update elected validators
-		if err := bc.WriteElectedValidatorList(
-			batch, newShardState.StakedValidators().Addrs,
-		); err != nil {
-			return NonStatTy, err
+		if err == nil && newShardState.Epoch != nil && bc.chainConfig.IsStaking(newShardState.Epoch) {
+			// After staking, the epoch will be decided by the epoch in the shard state.
+			newEpoch = new(big.Int).Set(newShardState.Epoch)
 		}
 	}
 

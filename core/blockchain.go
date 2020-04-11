@@ -2386,7 +2386,7 @@ func (bc *BlockChain) ReadValidatorList() ([]common.Address, error) {
 		}
 		return m, nil
 	}
-	return rawdb.ReadValidatorList(bc.db, false)
+	return rawdb.ReadValidatorList(bc.db)
 }
 
 // WriteValidatorList writes the list of validator addresses to database
@@ -2394,41 +2394,12 @@ func (bc *BlockChain) ReadValidatorList() ([]common.Address, error) {
 func (bc *BlockChain) WriteValidatorList(
 	db rawdb.DatabaseWriter, addrs []common.Address,
 ) error {
-	if err := rawdb.WriteValidatorList(db, addrs, false); err != nil {
+	if err := rawdb.WriteValidatorList(db, addrs); err != nil {
 		return err
 	}
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err == nil {
 		bc.validatorListCache.Add("validatorList", bytes)
-	}
-	return nil
-}
-
-// ReadElectedValidatorList reads the addresses of elected validators
-func (bc *BlockChain) ReadElectedValidatorList() ([]common.Address, error) {
-	if cached, ok := bc.validatorListCache.Get("electedValidatorList"); ok {
-		by := cached.([]byte)
-		m := []common.Address{}
-		if err := rlp.DecodeBytes(by, &m); err != nil {
-			return nil, err
-		}
-		return m, nil
-	}
-	return rawdb.ReadValidatorList(bc.db, true)
-}
-
-// WriteElectedValidatorList writes the list of
-// elected validator addresses to database
-// Note: this should only be called within the blockchain insert process.
-func (bc *BlockChain) WriteElectedValidatorList(
-	batch rawdb.DatabaseWriter, addrs []common.Address,
-) error {
-	if err := rawdb.WriteValidatorList(batch, addrs, true); err != nil {
-		return err
-	}
-	bytes, err := rlp.EncodeToBytes(addrs)
-	if err == nil {
-		bc.validatorListCache.Add("electedValidatorList", bytes)
 	}
 	return nil
 }
@@ -2485,12 +2456,16 @@ func (bc *BlockChain) UpdateStakingMetaData(
 			return newValidators, err
 		}
 
+		valMap := map[common.Address]struct{}{}
+		for _, addr := range list {
+			valMap[addr] = struct{}{}
+		}
+
+		newAddrs := []common.Address{}
 		for _, addr := range newValidators {
-			newList, appended := utils.AppendIfMissing(list, addr)
-			if !appended {
-				return newValidators, errValidatorExist
+			if _, ok := valMap[addr]; !ok {
+				newAddrs = append(newAddrs, addr)
 			}
-			list = newList
 
 			// Update validator snapshot for the new validator
 			validator, err := state.ValidatorWrapper(addr)
@@ -2511,6 +2486,7 @@ func (bc *BlockChain) UpdateStakingMetaData(
 		}
 
 		// Update validator list
+		list = append(list, newAddrs...)
 		if err = bc.WriteValidatorList(batch, list); err != nil {
 			return newValidators, err
 		}

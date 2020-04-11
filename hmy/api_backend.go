@@ -345,8 +345,8 @@ func (b *APIBackend) SendStakingTx(
 
 // GetElectedValidatorAddresses returns the address of elected validators for current epoch
 func (b *APIBackend) GetElectedValidatorAddresses() []common.Address {
-	list, _ := b.hmy.BlockChain().ReadElectedValidatorList()
-	return list
+	list, _ := b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentBlock().Epoch())
+	return list.StakedValidators().Addrs
 }
 
 // GetAllValidatorAddresses returns the up to date validator candidates for next epoch

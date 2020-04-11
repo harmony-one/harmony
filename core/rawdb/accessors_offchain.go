@@ -246,13 +246,9 @@ func WriteValidatorStats(
 	return err
 }
 
-// ReadValidatorList retrieves staking validator by its address
-// Return only elected validators if electedOnly==true, otherwise, return all validators
-func ReadValidatorList(db DatabaseReader, electedOnly bool) ([]common.Address, error) {
+// ReadValidatorList retrieves all staking validators by its address
+func ReadValidatorList(db DatabaseReader) ([]common.Address, error) {
 	key := validatorListKey
-	if electedOnly {
-		key = electedValidatorListKey
-	}
 	data, err := db.Get(key)
 	if err != nil || len(data) == 0 {
 		return []common.Address{}, nil
@@ -265,16 +261,11 @@ func ReadValidatorList(db DatabaseReader, electedOnly bool) ([]common.Address, e
 	return addrs, nil
 }
 
-// WriteValidatorList stores staking validator's information by its address
-// Writes only for elected validators
-// if electedOnly==true, otherwise, writes for all validators
+// WriteValidatorList stores all staking validators by its address
 func WriteValidatorList(
-	db DatabaseWriter, addrs []common.Address, electedOnly bool,
+	db DatabaseWriter, addrs []common.Address,
 ) error {
 	key := validatorListKey
-	if electedOnly {
-		key = electedValidatorListKey
-	}
 
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err != nil {

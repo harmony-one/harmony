@@ -54,12 +54,11 @@ var (
 	crosslinkPrefix              = []byte("cl")               // prefix for crosslink
 	delegatorValidatorListPrefix = []byte("dvl")              // prefix for delegator's validator list
 	// TODO: shorten the key prefix so we don't waste db space
-	cxReceiptPrefix         = []byte("cxReceipt")              // prefix for cross shard transaction receipt
-	cxReceiptSpentPrefix    = []byte("cxReceiptSpent")         // prefix for indicator of unspent of cxReceiptsProof
-	validatorSnapshotPrefix = []byte("validator-snapshot")     // prefix for staking validator's snapshot information
-	validatorStatsPrefix    = []byte("validator-stats")        // prefix for staking validator's stats information
-	validatorListKey        = []byte("validator-list")         // key for all validators list
-	electedValidatorListKey = []byte("elected-validator-list") // key for elected validators list
+	cxReceiptPrefix         = []byte("cxReceipt")          // prefix for cross shard transaction receipt
+	cxReceiptSpentPrefix    = []byte("cxReceiptSpent")     // prefix for indicator of unspent of cxReceiptsProof
+	validatorSnapshotPrefix = []byte("validator-snapshot") // prefix for staking validator's snapshot information
+	validatorStatsPrefix    = []byte("validator-stats")    // prefix for staking validator's stats information
+	validatorListKey        = []byte("validator-list")     // key for all validators list
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
 	epochBlockNumberPrefix = []byte("harmony-epoch-block-number")
