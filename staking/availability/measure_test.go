@@ -3,11 +3,13 @@ package availability
 import (
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/shard"
 	"math/big"
 	"reflect"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/shard"
 )
 
 func TestBlockSigners(t *testing.T) {
@@ -25,7 +27,7 @@ func TestBlockSigners(t *testing.T) {
 		{8, []int{1, 3, 5, 7}, 4, 4},
 		{8, []int{0, 2, 4, 6}, 4, 4},
 		{8, []int{0, 1, 2, 3, 4, 5, 6, 7}, 8, 0},
-		{13, []int{0, 1, 4, 5, 6, 9, 12}, 7, 5},
+		{13, []int{0, 1, 4, 5, 6, 9, 12}, 7, 6},
 		// TODO: add a real data test case given numSlots of a committee and
 		//  number of payable of a certain block
 	}
@@ -34,14 +36,17 @@ func TestBlockSigners(t *testing.T) {
 		bm, err := indexesToBitMap(test.verified, test.numSlots)
 		if err != nil {
 			t.Errorf("test %d: %v", i, err)
+			continue
 		}
 		pSlots, mSlots, err := BlockSigners(bm, cmt)
 		if err != nil {
 			t.Errorf("test %d: %v", i, err)
+			continue
 		}
 		if len(pSlots) != test.numPayable || len(mSlots) != test.numMissing {
 			t.Errorf("test %d: unexpected result: # pSlots %d/%d, # mSlots %d/%d",
 				i, len(pSlots), test.numPayable, len(mSlots), test.numMissing)
+			continue
 		}
 		if err := checkPayableAndMissing(cmt, test.verified, pSlots, mSlots); err != nil {
 			t.Errorf("test %d: %v", i, err)
@@ -74,7 +79,7 @@ func checkPayableAndMissing(cmt *shard.Committee, idxs []int, pSlots, mSlots sha
 	return nil
 }
 
-func TestBlockSigners_OverflowBitmap(t *testing.T) {
+func TestBlockSigners_BitmapOverflow(t *testing.T) {
 	tests := []struct {
 		numSlots  int
 		numBitmap int
@@ -97,7 +102,7 @@ func TestBlockSigners_OverflowBitmap(t *testing.T) {
 
 func makeTestCommittee(n int, shardID uint32) *shard.Committee {
 	slots := make(shard.SlotList, 0, n)
-	for i := 0; i != n; n++ {
+	for i := 0; i != n; i++ {
 		slots = append(slots, makeTestSlot(i))
 	}
 	return &shard.Committee{
@@ -109,7 +114,7 @@ func makeTestCommittee(n int, shardID uint32) *shard.Committee {
 func makeTestSlot(seed int) shard.Slot {
 	addr := common.BigToAddress(new(big.Int).SetInt64(int64(seed)))
 	var blsKey shard.BLSPublicKey
-	copy(blsKey[:], []byte(fmt.Sprintf("random bls key %d", seed)))
+	copy(blsKey[:], bls.RandPrivateKey().GetPublicKey().Serialize())
 
 	return shard.Slot{
 		EcdsaAddress: addr,
