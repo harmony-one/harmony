@@ -275,20 +275,25 @@ func readMultiBlsKeys(consensusMultiBlsPriKey *nodeconfig.MultiBlsPrivateKey, co
 	}
 
 	for _, blsKeyFile := range blsKeyFiles {
-		if filepath.Ext(blsKeyFile.Name()) != ".key" || filepath.Ext(blsKeyFile.Name()) != ".bls" {
-			continue
-		}
-
 		var consensusPriKey *bls.SecretKey
 		var err error
+
 		blsKeyFilePath := path.Join(*multiBlsKeyDir, blsKeyFile.Name())
-		if filepath.Ext(blsKeyFile.Name()) == ".key" {
+		switch filepath.Ext(blsKeyFile.Name()) {
+		case ".key":
 			// uses the same bls passphrase for multiple bls keys
 			consensusPriKey, err = blsgen.LoadBlsKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
-		} else {
+		case ".bls":
 			consensusPriKey, err = blsgen.LoadAwsCMKEncryptedBLSKey(blsKeyFilePath, awsSettingString)
+		case ".pass":
+			utils.Logger().Info().
+				Str("file", blsKeyFile.Name()).
+				Msg("pass file found in blskey directory")
+		default:
+			utils.Logger().Warn().
+				Str("file", blsKeyFile.Name()).
+				Msg("irrelevant file found in blskey directory")
 		}
-
 		if err != nil {
 			return err
 		}
