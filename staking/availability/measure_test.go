@@ -35,13 +35,11 @@ func TestBlockSigners(t *testing.T) {
 		cmt := makeTestCommittee(test.numSlots, 0)
 		bm, err := indexesToBitMap(test.verified, test.numSlots)
 		if err != nil {
-			t.Errorf("test %d: %v", i, err)
-			continue
+			t.Fatalf("test %d: %v", i, err)
 		}
 		pSlots, mSlots, err := BlockSigners(bm, cmt)
 		if err != nil {
-			t.Errorf("test %d: %v", i, err)
-			continue
+			t.Fatalf("test %d: %v", i, err)
 		}
 		if len(pSlots) != test.numPayable || len(mSlots) != test.numMissing {
 			t.Errorf("test %d: unexpected result: # pSlots %d/%d, # mSlots %d/%d",
