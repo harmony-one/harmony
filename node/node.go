@@ -220,7 +220,7 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
 		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
+			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
 		} else {
 			break
@@ -238,7 +238,7 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
 		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
+			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
 		} else {
 			break

@@ -72,7 +72,7 @@ func (consensus *Consensus) prepare() {
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
 				groupID,
-				p2p.ConstructP2pMessage(byte(17), networkMessage.Bytes),
+				p2p.ConstructMessage(networkMessage.Bytes),
 			); err != nil {
 				consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
 			} else {
@@ -215,7 +215,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
 				groupID,
-				p2p.ConstructP2pMessage(byte(17), networkMessage.Bytes),
+				p2p.ConstructMessage(networkMessage.Bytes),
 			); err != nil {
 				consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
 			} else {

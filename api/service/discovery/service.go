@@ -80,10 +80,8 @@ func (s *Service) contactP2pPeers() {
 		return
 	}
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), s.config.IsClient)
-
-	msgBuf := p2p.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
+	msgBuf := p2p.ConstructMessage(pingMsg.ConstructPingMessage())
 	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
-
 	pingInterval := 5
 	initialFlatRetries := 20 // no expotential backoff for 20 times.
 	for {

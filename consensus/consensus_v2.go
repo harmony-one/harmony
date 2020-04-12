@@ -148,7 +148,7 @@ func (consensus *Consensus) finalizeCommits() {
 		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
-		p2p.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+		p2p.ConstructMessage(msgToSend)); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[finalizeCommits] Cannot send committed message")
 	} else {
 		consensus.getLogger().Info().

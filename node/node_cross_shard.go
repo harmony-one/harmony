@@ -83,7 +83,7 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 		Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof ready. Sending CX receipts...")
 	// TODO ek – limit concurrency
 	go node.host.SendMessageToGroups([]nodeconfig.GroupID{groupID},
-		p2p.ConstructP2pMessage(byte(0), proto_node.ConstructCXReceiptsProof(cxReceiptsProof)),
+		p2p.ConstructMessage(proto_node.ConstructCXReceiptsProof(cxReceiptsProof)),
 	)
 }
 

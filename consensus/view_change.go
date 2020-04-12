@@ -135,7 +135,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
-			p2p.ConstructP2pMessage(byte(17), msgToSend),
+			p2p.ConstructMessage(msgToSend),
 		)
 	}
 
@@ -389,7 +389,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			msg_pb.MessageType_NEWVIEW,
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
-			p2p.ConstructP2pMessage(byte(17), msgToSend),
+			p2p.ConstructMessage(msgToSend),
 		); err != nil {
 			consensus.getLogger().Err(err).
 				Msg("could not send out the NEWVIEW message")
@@ -539,7 +539,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			consensus.getLogger().Info().Msg("onNewView === commit")
 			consensus.host.SendMessageToGroups(
 				groupID,
-				p2p.ConstructP2pMessage(byte(17), msgToSend),
+				p2p.ConstructMessage(msgToSend),
 			)
 		}
 		consensus.getLogger().Debug().
