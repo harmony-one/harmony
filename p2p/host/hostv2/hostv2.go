@@ -20,17 +20,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const (
-	// BatchSizeInByte The batch size in byte (64MB) in which we return data
-	BatchSizeInByte = 1 << 16
-	// ProtocolID The ID of protocol used in stream handling.
-	ProtocolID = "/harmony/0.0.1"
-
-	// Constants for discovery service.
-	//numIncoming = 128
-	//numOutgoing = 16
-)
-
 // topicHandle is a pubsub topic handle.
 type topicHandle interface {
 	Publish(ctx context.Context, data []byte) error
@@ -73,10 +62,6 @@ type HostV2 struct {
 	self   p2p.Peer
 	priKey libp2p_crypto.PrivKey
 	lock   sync.Mutex
-
-	//incomingPeers []p2p.Peer // list of incoming Peers. TODO: fixed number incoming
-	//outgoingPeers []p2p.Peer // list of outgoing Peers. TODO: fixed number of outgoing
-
 	// logger
 	logger *zerolog.Logger
 }
@@ -186,22 +171,10 @@ func (host *HostV2) AddPeer(p *p2p.Peer) error {
 	}
 
 	p.Addrs = append(p.Addrs, targetAddr)
-
 	host.Peerstore().AddAddrs(p.PeerID, p.Addrs, libp2p_peerstore.PermanentAddrTTL)
 	host.logger.Info().Interface("peer", *p).Msg("AddPeer add to libp2p_peerstore")
-
 	return nil
 }
-
-//// AddIncomingPeer add peer to incoming peer list
-//func (host *HostV2) AddIncomingPeer(peer p2p.Peer) {
-//	host.incomingPeers = append(host.incomingPeers, peer)
-//}
-//
-//// AddOutgoingPeer add peer to outgoing peer list
-//func (host *HostV2) AddOutgoingPeer(peer p2p.Peer) {
-//	host.outgoingPeers = append(host.outgoingPeers, peer)
-//}
 
 // Peerstore returns the peer store
 func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
@@ -210,13 +183,11 @@ func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
 
 // New creates a host for p2p communication
 func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
-	// TODO: Convert to zerolog or internal logger interface
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
 	if err != nil {
 		return nil, errors.Wrapf(err,
 			"cannot create listen multiaddr from port %#v", self.Port)
 	}
-	// TODO – use WithCancel for orderly host teardown (which we don't have yet)
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey),
@@ -226,10 +197,7 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 	}
 	traceFile := os.Getenv("P2P_TRACEFILE")
 
-	// TODO first starting with some huge number to see update of libp2p
-	// and also to dump some values about the p2p message sizes
-	// 3MB
-	const MaxSize = 3_145_728
+	const MaxSize = 2_145_728
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithPeerOutboundQueueSize(64),
 		libp2p_pubsub.WithMaxMessageSize(MaxSize),
@@ -244,7 +212,6 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 	}
 
 	self.PeerID = p2pHost.ID()
-
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 	// has to save the private key for host
 	h := &HostV2{
