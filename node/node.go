@@ -115,23 +115,16 @@ type Node struct {
 
 	// Shard databases
 	shardChains shardchain.Collection
-
-	Client   *client.Client // The presence of a client object means this node will also act as a client
-	SelfPeer p2p.Peer
-	BCPeers  []p2p.Peer // list of Beacon Chain Peers.  This is needed by all nodes.
-
+	Client      *client.Client // The presence of a client object means this node will also act as a client
+	SelfPeer    p2p.Peer
 	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	State      State      // State of the Node
 	stateMutex sync.Mutex // mutex for change node state
-
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
-	BeaconNeighbors sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-
-	TxPool *core.TxPool
-
-	CxPool *core.CxPool // pool for missing cross shard receipts resend
-
+	BeaconNeighbors      sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+	TxPool               *core.TxPool
+	CxPool               *core.CxPool // pool for missing cross shard receipts resend
 	Worker, BeaconWorker *worker.Worker
 	downloaderServer     *downloader.Server
 
