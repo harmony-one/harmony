@@ -583,6 +583,10 @@ func (node *Node) bootstrapConsensus() {
 			node.startConsensus <- struct{}{}
 			return
 		}
+		utils.Logger().Info().
+			Int("numPeersNow", numPeersNow).
+			Int("targetNumPeers", node.Consensus.MinPeers).
+			Msg("do not have enough min peers yet in bootstrap of consensus")
 	}
 }
 
