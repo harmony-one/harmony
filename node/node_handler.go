@@ -21,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -242,7 +241,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 		Msgf(
 			"broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0],
 		)
-	msg := host.ConstructP2pMessage(byte(0),
+	msg := p2p.ConstructP2pMessage(byte(0),
 		proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}),
 	)
 	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
@@ -254,7 +253,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 func (node *Node) BroadcastSlash(witness *slash.Record) {
 	if err := node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-		host.ConstructP2pMessage(
+		p2p.ConstructP2pMessage(
 			byte(0),
 			proto_node.ConstructSlashMessage(slash.Records{*witness})),
 	); err != nil {
@@ -318,7 +317,7 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 	}
 	node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-		host.ConstructP2pMessage(
+		p2p.ConstructP2pMessage(
 			byte(0),
 			proto_node.ConstructCrossLinkMessage(node.Consensus.ChainReader, headers)),
 	)

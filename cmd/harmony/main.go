@@ -38,8 +38,6 @@ import (
 	"github.com/harmony-one/harmony/node"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
-	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 	"github.com/pkg/errors"
@@ -165,13 +163,13 @@ func initSetup() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	if len(p2putils.BootNodes) == 0 {
-		bootNodeAddrs, err := p2putils.StringsToAddrs(p2putils.DefaultBootNodeAddrStrings)
+	if len(p2p.BootNodes) == 0 {
+		bootNodeAddrs, err := p2p.StringsToAddrs(p2p.DefaultBootNodeAddrStrings)
 		if err != nil {
 			utils.FatalErrMsg(err, "cannot parse default bootnode list %#v",
-				p2putils.DefaultBootNodeAddrStrings)
+				p2p.DefaultBootNodeAddrStrings)
 		}
-		p2putils.BootNodes = bootNodeAddrs
+		p2p.BootNodes = bootNodeAddrs
 	}
 }
 
@@ -414,7 +412,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
 	}
 
-	myHost, err = p2pimpl.NewHost(&selfPeer, nodeConfig.P2PPriKey)
+	myHost, err = p2p.NewHost(&selfPeer, nodeConfig.P2PPriKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
 	}
@@ -624,7 +622,7 @@ func main() {
 	// build time.
 	os.Setenv("GODEBUG", "netdns=go")
 
-	flag.Var(&p2putils.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
+	flag.Var(&p2p.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
 	switch *nodeType {
