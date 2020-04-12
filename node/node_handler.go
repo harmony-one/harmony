@@ -526,11 +526,12 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) {
 			Msg("Can't get Ping Message")
 	}
 
-	peer := new(p2p.Peer)
-	peer.IP = ping.Node.IP
-	peer.Port = ping.Node.Port
-	peer.PeerID = ping.Node.PeerID
-	peer.ConsensusPubKey = nil
+	peer := p2p.Peer{
+		IP:              ping.Node.IP,
+		Port:            ping.Node.Port,
+		PeerID:          ping.Node.PeerID,
+		ConsensusPubKey: nil,
+	}
 
 	if ping.Node.PubKey != nil {
 		peer.ConsensusPubKey = &bls.PublicKey{}
@@ -543,7 +544,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) {
 
 	utils.Logger().Debug().
 		Str("Version", ping.NodeVer).
-		Str("BLSKey", peer.ConsensusPubKey.SerializeToHexStr()).
 		Str("IP", peer.IP).
 		Str("Port", peer.Port).
 		Interface("PeerID", peer.PeerID).
@@ -557,14 +557,14 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) {
 		}
 	}
 
-	if err := node.host.ConnectHostPeer(*peer); err != nil {
+	if err := node.host.ConnectHostPeer(peer); err != nil {
 		utils.Logger().Info().Err(err).
 			Str("peer", peer.String()).
 			Msg("could not direct connect to this peer")
 	}
 
 	if ping.Node.Role != proto_node.ClientRole {
-		node.AddPeers([]*p2p.Peer{peer})
+		node.AddPeers([]*p2p.Peer{&peer})
 		utils.Logger().Info().
 			Str("Peer", peer.String()).
 			Int("# Peers", node.host.GetPeerCount()).
