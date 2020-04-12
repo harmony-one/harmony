@@ -8,7 +8,6 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/crypto/pki"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
@@ -171,53 +170,6 @@ func TestLocalSyncingPeerProvider(t *testing.T) {
 
 func makeLocalSyncingPeerProvider() *LocalSyncingPeerProvider {
 	return NewLocalSyncingPeerProvider(6000, 6001, 2, 3)
-}
-
-func TestAddPeers(t *testing.T) {
-	pubKey1 := pki.GetBLSPrivateKeyFromInt(333).GetPublicKey()
-	pubKey2 := pki.GetBLSPrivateKeyFromInt(444).GetPublicKey()
-
-	peers1 := []*p2p.Peer{
-		{
-			IP:              "127.0.0.1",
-			Port:            "8888",
-			ConsensusPubKey: pubKey1,
-		},
-		{
-			IP:              "127.0.0.1",
-			Port:            "9999",
-			ConsensusPubKey: pubKey2,
-		},
-	}
-	blsKey := bls2.RandPrivateKey()
-	pubKey := blsKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
-	if err != nil {
-		t.Fatalf("newhost failure: %v", err)
-	}
-	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
-	)
-	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsKey), decider,
-	)
-	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
-	}
-
-	node := New(host, consensus, testDBFactory, nil, false)
-	r1 := node.AddPeers(peers1)
-	e1 := 2
-	if r1 != e1 {
-		t.Errorf("Add %v peers, expectd %v", r1, e1)
-	}
-	r2 := node.AddPeers(peers1)
-	e2 := 0
-	if r2 != e2 {
-		t.Errorf("Add %v peers, expectd %v", r2, e2)
-	}
 }
 
 func TestAddBeaconPeer(t *testing.T) {
