@@ -68,7 +68,9 @@ func (node *Node) receiveGroupMessage(
 // some messages have uninteresting fields in header, slash, receipt and crosslink are
 // such messages. This function assumes that input bytes are a slice which already
 // past those not relevant header bytes.
-func (node *Node) processSkippedMsgTypeByteValue(cat proto_node.BlockMessageType, content []byte) {
+func (node *Node) processSkippedMsgTypeByteValue(
+	cat proto_node.BlockMessageType, content []byte,
+) {
 	switch cat {
 	case proto_node.SlashCandidate:
 		node.processSlashCandidateMessage(content)
