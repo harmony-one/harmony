@@ -571,7 +571,7 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 		node.AddPeers([]*p2p.Peer{peer})
 		utils.Logger().Info().
 			Str("Peer", peer.String()).
-			Int("# Peers", node.numPeers).
+			Int("# Peers", node.host.GetPeerCount()).
 			Msg("Add Peer to Node")
 	}
 
@@ -582,23 +582,8 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 func (node *Node) bootstrapConsensus() {
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
-	lastPeerNum := node.numPeers
 	for range tick.C {
-		numPeersNow := node.numPeers
-		// no peers, wait for another tick
-		if numPeersNow == 0 {
-			utils.Logger().Info().
-				Int("numPeersNow", numPeersNow).
-				Msg("No peers, continue")
-			continue
-		} else if numPeersNow > lastPeerNum {
-			utils.Logger().Info().
-				Int("previousNumPeers", lastPeerNum).
-				Int("numPeersNow", numPeersNow).
-				Int("targetNumPeers", node.Consensus.MinPeers).
-				Msg("New peers increased")
-			lastPeerNum = numPeersNow
-		}
+		numPeersNow := node.host.GetPeerCount()
 		if numPeersNow >= node.Consensus.MinPeers {
 			utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 			node.startConsensus <- struct{}{}
