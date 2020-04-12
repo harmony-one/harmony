@@ -8,7 +8,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 func (consensus *Consensus) didReachPrepareQuorum() error {
@@ -66,7 +66,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		msg_pb.MessageType_PREPARED, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
-		host.ConstructP2pMessage(byte(17), msgToSend),
+		p2p.ConstructMessage(msgToSend),
 	); err != nil {
 		consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 	} else {

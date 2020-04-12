@@ -10,14 +10,13 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/shard"
 )
 
 func TestPopulateMessageFields(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(&leader, priKey)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
@@ -58,7 +57,7 @@ func TestPopulateMessageFields(t *testing.T) {
 func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(&leader, priKey)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
@@ -87,7 +86,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 func TestSetViewID(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(&leader, priKey)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}

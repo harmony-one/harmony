@@ -11,7 +11,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
@@ -72,7 +72,7 @@ func (consensus *Consensus) prepare() {
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
 				groupID,
-				host.ConstructP2pMessage(byte(17), networkMessage.Bytes),
+				p2p.ConstructMessage(networkMessage.Bytes),
 			); err != nil {
 				consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
 			} else {
@@ -196,12 +196,14 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	// Optimistically add blockhash field of prepare message
 	emptyHash := [32]byte{}
-	if bytes.Compare(consensus.blockHash[:], emptyHash[:]) == 0 {
+	if bytes.Equal(consensus.blockHash[:], emptyHash[:]) {
 		copy(consensus.blockHash[:], blockHash[:])
 	}
 	blockNumBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
-	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+	groupID := []nodeconfig.GroupID{
+		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+	}
 	for i, key := range consensus.PubKey.PublicKey {
 		networkMessage, _ := consensus.construct(
 			// TODO(audit): sign signature on hash+blockNum+viewID (add a hard fork)
@@ -213,7 +215,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
 				groupID,
-				host.ConstructP2pMessage(byte(17), networkMessage.Bytes),
+				p2p.ConstructMessage(networkMessage.Bytes),
 			); err != nil {
 				consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
 			} else {

@@ -20,7 +20,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )

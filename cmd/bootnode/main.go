@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	badger "github.com/ipfs/go-ds-badger"
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 )
@@ -56,13 +55,14 @@ func main() {
 	}
 
 	selfPeer := p2p.Peer{IP: *ip, Port: *port}
-
-	host, err := p2pimpl.NewHost(&selfPeer, privKey)
+	host, err := p2p.NewHost(&selfPeer, privKey)
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")
 	}
 
-	fmt.Printf("bootnode BN_MA=%s", fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()))
+	fmt.Printf("bootnode BN_MA=%s",
+		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()),
+	)
 
 	if *logConn {
 		host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))

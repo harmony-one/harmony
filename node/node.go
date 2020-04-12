@@ -31,7 +31,6 @@ import (
 	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
-	p2p_host "github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -118,12 +117,11 @@ type Node struct {
 	shardChains shardchain.Collection
 
 	Client   *client.Client // The presence of a client object means this node will also act as a client
-	SelfPeer p2p.Peer       // TODO(minhdoan): it could be duplicated with Self below whose is Alok work.
-	BCPeers  []p2p.Peer     // list of Beacon Chain Peers.  This is needed by all nodes.
+	SelfPeer p2p.Peer
+	BCPeers  []p2p.Peer // list of Beacon Chain Peers.  This is needed by all nodes.
 
 	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	numPeers   int        // Number of Peers
 	State      State      // State of the Node
 	stateMutex sync.Mutex // mutex for change node state
 
@@ -221,7 +219,8 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
-		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
+		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
+			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
 		} else {
 			break
@@ -238,7 +237,8 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcastStaking")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
-		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID}, p2p_host.ConstructP2pMessage(byte(0), msg)); err != nil && attempt < NumTryBroadCast {
+		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
+			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
 			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
 		} else {
 			break
@@ -632,20 +632,17 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 
 // AddPeers adds neighbors nodes
 func (node *Node) AddPeers(peers []*p2p.Peer) int {
-	count := 0
 	for _, p := range peers {
 		key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
 		_, ok := node.Neighbors.LoadOrStore(key, *p)
 		if !ok {
 			// !ok means new peer is stored
-			count++
 			node.host.AddPeer(p)
-			node.numPeers++
 			continue
 		}
 	}
 
-	return count
+	return node.host.GetPeerCount()
 }
 
 // AddBeaconPeer adds beacon chain neighbors nodes

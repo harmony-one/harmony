@@ -21,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -242,7 +241,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 		Msgf(
 			"broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0],
 		)
-	msg := host.ConstructP2pMessage(byte(0),
+	msg := p2p.ConstructMessage(
 		proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}),
 	)
 	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
@@ -254,8 +253,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 func (node *Node) BroadcastSlash(witness *slash.Record) {
 	if err := node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-		host.ConstructP2pMessage(
-			byte(0),
+		p2p.ConstructMessage(
 			proto_node.ConstructSlashMessage(slash.Records{*witness})),
 	); err != nil {
 		utils.Logger().Err(err).
@@ -318,8 +316,7 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 	}
 	node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-		host.ConstructP2pMessage(
-			byte(0),
+		p2p.ConstructMessage(
 			proto_node.ConstructCrossLinkMessage(node.Consensus.ChainReader, headers)),
 	)
 }
@@ -521,20 +518,20 @@ func (node *Node) PostConsensusProcessing(
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
+func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) {
 	ping, err := proto_discovery.GetPingMessage(msgPayload)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msg("Can't get Ping Message")
-		return -1
 	}
 
-	peer := new(p2p.Peer)
-	peer.IP = ping.Node.IP
-	peer.Port = ping.Node.Port
-	peer.PeerID = ping.Node.PeerID
-	peer.ConsensusPubKey = nil
+	peer := p2p.Peer{
+		IP:              ping.Node.IP,
+		Port:            ping.Node.Port,
+		PeerID:          ping.Node.PeerID,
+		ConsensusPubKey: nil,
+	}
 
 	if ping.Node.PubKey != nil {
 		peer.ConsensusPubKey = &bls.PublicKey{}
@@ -542,13 +539,11 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 			utils.Logger().Error().
 				Err(err).
 				Msg("UnmarshalBinary Failed")
-			return -1
 		}
 	}
 
 	utils.Logger().Debug().
 		Str("Version", ping.NodeVer).
-		Str("BLSKey", peer.ConsensusPubKey.SerializeToHexStr()).
 		Str("IP", peer.IP).
 		Str("Port", peer.Port).
 		Interface("PeerID", peer.PeerID).
@@ -559,51 +554,40 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
 		if ok {
 			// duplicated ping message return
-			return 0
 		}
 	}
 
-	// add to incoming peer list
-	//node.host.AddIncomingPeer(*peer)
-	node.host.ConnectHostPeer(*peer)
-
-	if ping.Node.Role != proto_node.ClientRole {
-		node.AddPeers([]*p2p.Peer{peer})
-		utils.Logger().Info().
-			Str("Peer", peer.String()).
-			Int("# Peers", node.numPeers).
-			Msg("Add Peer to Node")
+	if err := node.host.ConnectHostPeer(peer); err != nil {
+		utils.Logger().Info().Err(err).
+			Str("peer", peer.String()).
+			Msg("could not direct connect to this peer")
 	}
 
-	return 1
+	if ping.Node.Role != proto_node.ClientRole {
+		node.AddPeers([]*p2p.Peer{&peer})
+		utils.Logger().Info().
+			Str("Peer", peer.String()).
+			Int("# Peers", node.host.GetPeerCount()).
+			Msg("Add Peer to Node")
+	}
 }
 
 // bootstrapConsensus is the a goroutine to check number of peers and start the consensus
 func (node *Node) bootstrapConsensus() {
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
-	lastPeerNum := node.numPeers
 	for range tick.C {
-		numPeersNow := node.numPeers
-		// no peers, wait for another tick
-		if numPeersNow == 0 {
-			utils.Logger().Info().
-				Int("numPeersNow", numPeersNow).
-				Msg("No peers, continue")
-			continue
-		} else if numPeersNow > lastPeerNum {
-			utils.Logger().Info().
-				Int("previousNumPeers", lastPeerNum).
-				Int("numPeersNow", numPeersNow).
-				Int("targetNumPeers", node.Consensus.MinPeers).
-				Msg("New peers increased")
-			lastPeerNum = numPeersNow
-		}
+		numPeersNow := node.host.GetPeerCount()
 		if numPeersNow >= node.Consensus.MinPeers {
 			utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 			node.startConsensus <- struct{}{}
 			return
 		}
+		utils.Logger().Info().
+			Int("numPeersNow", numPeersNow).
+			Int("targetNumPeers", node.Consensus.MinPeers).
+			Int("next-peer-count-check-in-seconds", 5).
+			Msg("do not have enough min peers yet in bootstrap of consensus")
 	}
 }
 

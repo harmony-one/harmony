@@ -13,7 +13,7 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // MaxViewIDDiff limits the received view ID to only 100 further from the current view ID
@@ -135,7 +135,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
-			host.ConstructP2pMessage(byte(17), msgToSend),
+			p2p.ConstructMessage(msgToSend),
 		)
 	}
 
@@ -389,7 +389,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			msg_pb.MessageType_NEWVIEW,
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
-			host.ConstructP2pMessage(byte(17), msgToSend),
+			p2p.ConstructMessage(msgToSend),
 		); err != nil {
 			consensus.getLogger().Err(err).
 				Msg("could not send out the NEWVIEW message")
@@ -539,7 +539,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			consensus.getLogger().Info().Msg("onNewView === commit")
 			consensus.host.SendMessageToGroups(
 				groupID,
-				host.ConstructP2pMessage(byte(17), msgToSend),
+				p2p.ConstructMessage(msgToSend),
 			)
 		}
 		consensus.getLogger().Debug().

@@ -12,7 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
 	"github.com/pkg/errors"
@@ -148,7 +148,7 @@ func (consensus *Consensus) finalizeCommits() {
 		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
-		host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
+		p2p.ConstructMessage(msgToSend)); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[finalizeCommits] Cannot send committed message")
 	} else {
 		consensus.getLogger().Info().

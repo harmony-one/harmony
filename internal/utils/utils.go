@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,13 +12,11 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/pkg/errors"
-
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	p2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/pkg/errors"
 )
 
 var lock sync.Mutex
@@ -62,18 +59,6 @@ func Marshal(v interface{}) (io.Reader, error) {
 	return bytes.NewReader(b), nil
 }
 
-// ConvertFixedDataIntoByteArray converts an empty interface data to a byte array
-func ConvertFixedDataIntoByteArray(data interface{}) []byte {
-	buff := new(bytes.Buffer)
-	err := binary.Write(buff, binary.BigEndian, data)
-	if err != nil {
-		Logger().Error().
-			AnErr("err", err).
-			Msg("Failed to convert fixed data into byte array")
-	}
-	return buff.Bytes()
-}
-
 // GetUniqueIDFromIPPort --
 func GetUniqueIDFromIPPort(ip, port string) uint32 {
 	reg, _ := regexp.Compile("[^0-9]+")
@@ -103,6 +88,8 @@ func GetAddressFromBLSPubKeyBytes(pubKeyBytes []byte) common.Address {
 	return addr
 }
 
+// TODO Remove this from main code - it is only used in *_test.go
+
 // GenKeyP2P generates a pair of RSA keys used in libp2p host
 func GenKeyP2P(ip, port string) (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
 	r := mrand.New(mrand.NewSource(int64(GetUniqueIDFromIPPort(ip, port))))
@@ -112,25 +99,6 @@ func GenKeyP2P(ip, port string) (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
 // GenKeyP2PRand generates a pair of RSA keys used in libp2p host, using random seed
 func GenKeyP2PRand() (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
 	return p2p_crypto.GenerateKeyPair(p2p_crypto.RSA, 2048)
-}
-
-// AllocateShard uses the number of current nodes and number of shards
-// to return the shardNum a new node belongs to, it also tells whether the node is a leader
-func AllocateShard(numOfAddedNodes, numOfShards int) (int, bool) {
-	if numOfShards == 1 {
-		if numOfAddedNodes == 1 {
-			return 1, true
-		}
-		return 1, false
-	}
-	if numOfAddedNodes > numOfShards {
-		shardNum := numOfAddedNodes % numOfShards
-		if shardNum == 0 {
-			return numOfShards, false
-		}
-		return shardNum, false
-	}
-	return numOfAddedNodes, true
 }
 
 // Save saves a representation of v to the file at path.
@@ -247,15 +215,6 @@ func IsPrivateIP(ip net.IP) bool {
 	return false
 }
 
-// GetPortFromDiff returns the port from base and the diff.
-func GetPortFromDiff(port string, diff int) string {
-	if portNum, err := strconv.Atoi(port); err == nil {
-		return fmt.Sprintf("%d", portNum-diff)
-	}
-	GetLogInstance().Error("error on parsing port.")
-	return ""
-}
-
 // GetPendingCXKey creates pending CXReceiptsProof key given shardID and blockNum
 // it is to avoid adding duplicated CXReceiptsProof from the same source shard
 func GetPendingCXKey(shardID uint32, blockNum uint64) string {
@@ -284,12 +243,6 @@ func PrintError(err error) {
 func FatalError(err error) {
 	PrintError(err)
 	os.Exit(1)
-}
-
-// PrintErrMsg prints the given error wrapped with the given message in the
-// extended format (%+v) onto stderr.
-func PrintErrMsg(err error, format string, args ...interface{}) {
-	PrintError(errors.WithMessagef(err, format, args...))
 }
 
 // FatalErrMsg prints the given error wrapped with the given message in the
