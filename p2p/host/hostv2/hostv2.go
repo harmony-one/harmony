@@ -10,15 +10,12 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p "github.com/libp2p/go-libp2p"
-	libp2p_core "github.com/libp2p/go-libp2p-core"
-	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
-	libp2p_host "github.com/libp2p/go-libp2p-host"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
+	libp2p_host "github.com/libp2p/go-libp2p-core/host"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p-peerstore"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
-
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
@@ -61,15 +58,6 @@ type topicJoinerImpl struct {
 }
 
 func (tj topicJoinerImpl) JoinTopic(topic string) (topicHandle, error) {
-	if err := tj.pubsub.RegisterTopicValidator(topic,
-		func(ctx context.Context, pid libp2p_core.PeerID, msg *pubsub.Message) bool {
-			fmt.Println("topic validator called", pid, msg.String())
-			return true
-		},
-	); err != nil {
-		return nil, err
-	}
-
 	th, err := tj.pubsub.Join(topic)
 	if err != nil {
 		return nil, err
