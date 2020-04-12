@@ -12,13 +12,11 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/pkg/errors"
-
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	p2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/pkg/errors"
 )
 
 var lock sync.Mutex
@@ -91,6 +89,7 @@ func GetAddressFromBLSPubKeyBytes(pubKeyBytes []byte) common.Address {
 }
 
 // TODO Remove this from main code - it is only used in *_test.go
+
 // GenKeyP2P generates a pair of RSA keys used in libp2p host
 func GenKeyP2P(ip, port string) (p2p_crypto.PrivKey, p2p_crypto.PubKey, error) {
 	r := mrand.New(mrand.NewSource(int64(GetUniqueIDFromIPPort(ip, port))))

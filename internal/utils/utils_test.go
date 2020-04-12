@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	crypto "github.com/libp2p/go-libp2p-crypto"
+	crypto "github.com/libp2p/go-libp2p-core/crypto"
 )
 
 // Test for GenKeyP2P, noted the length of private key can be random
