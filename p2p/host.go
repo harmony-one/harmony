@@ -389,27 +389,12 @@ func StringsToAddrs(addrStrings []string) (maddrs []ma.Multiaddr, err error) {
 	return
 }
 
-// StringsToPeers converts a string to a list of Peers
-// addr is a string of format "ip:port,ip:port"
-func StringsToPeers(input string) []Peer {
-	addrs := strings.Split(input, ",")
-	peers := []Peer{}
-	for _, addr := range addrs {
-		data := strings.Split(addr, ":")
-		if len(data) >= 2 {
-			peer := Peer{}
-			peer.IP = data[0]
-			peer.Port = data[1]
-			peers = append(peers, peer)
-		}
-	}
-	return peers
-}
-
-// DefaultBootNodeAddrStrings is a list of Harmony bootnodes address. Used to find other peers in the network.
+// DefaultBootNodeAddrStrings is a list of Harmony
+// bootnodes address. Used to find other peers in the network.
 var DefaultBootNodeAddrStrings = []string{
 	"/ip4/127.0.0.1/tcp/19876/p2p/Qmc1V6W7BwX8Ugb42Ti8RnXF1rY5PF7nnZ6bKBryCgi6cv",
 }
 
-// BootNodes is a list of boot nodes. It is populated either from default or from user CLI input.
+// BootNodes is a list of boot nodes.
+// It is populated either from default or from user CLI input.
 var BootNodes AddrList
