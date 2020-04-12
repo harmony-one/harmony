@@ -27,7 +27,6 @@ import (
 // Host is the client + server in p2p network.
 type Host interface {
 	GetSelfPeer() Peer
-	Close() error
 	AddPeer(*Peer) error
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
@@ -40,6 +39,8 @@ type Host interface {
 	// If multiple receivers are created for the same group,
 	// a message sent to the group will be delivered to all of the receivers.
 	GroupReceiver(nodeconfig.GroupID) (receiver GroupReceiver, err error)
+	Topic(t string) *libp2p_pubsub.Topic
+	AllTopics() []*libp2p_pubsub.Topic
 }
 
 // Peer is the object for a p2p peer (node)
@@ -64,68 +65,81 @@ func (p Peer) String() string {
 
 // GroupReceiver is a multicast group message receiver interface.
 type GroupReceiver interface {
-	// Close closes this receiver.
 	io.Closer
-
 	// Receive a message.
 	Receive(ctx context.Context) (msg []byte, sender libp2p_peer.ID, err error)
 }
 
 // NewHost ..
 func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
-	h, err := New(self, key)
+	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
+	if err != nil {
+		return nil, errors.Wrapf(err,
+			"cannot create listen multiaddr from port %#v", self.Port)
+	}
+	ctx := context.Background()
+	p2pHost, err := libp2p.New(ctx,
+		libp2p.ListenAddrs(listenAddr), libp2p.Identity(key),
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
+	}
+	traceFile := os.Getenv("P2P_TRACEFILE")
+
+	const MaxSize = 2_145_728
+	options := []libp2p_pubsub.Option{
+		libp2p_pubsub.WithPeerOutboundQueueSize(64),
+		libp2p_pubsub.WithMaxMessageSize(MaxSize),
+	}
+	if len(traceFile) > 0 {
+		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
+		options = append(options, libp2p_pubsub.WithEventTracer(tracer))
+	}
+	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot initialize libp2p pubsub")
+	}
+
+	self.PeerID = p2pHost.ID()
+	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
+	// has to save the private key for host
+	h := &HostV2{
+		h:      p2pHost,
+		joiner: topicJoiner{pubsub},
+		joined: map[string]*libp2p_pubsub.Topic{},
+		self:   *self,
+		priKey: key,
+		logger: &subLogger,
+	}
+
 	if err != nil {
 		return nil, err
 	}
-
 	utils.Logger().Info().
 		Str("self", net.JoinHostPort(self.IP, self.Port)).
 		Interface("PeerID", self.PeerID).
 		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
-		Msg("NewHost")
-
+		Msg("libp2p host ready")
 	return h, nil
 }
 
-// topicHandle is a pubsub topic handle.
-type topicHandle interface {
-	Publish(ctx context.Context, data []byte) error
-	Subscribe() (subscription, error)
-}
-
-type topicHandleImpl struct {
-	t *libp2p_pubsub.Topic
-}
-
-func (th topicHandleImpl) Publish(ctx context.Context, data []byte) error {
-	return th.t.Publish(ctx, data)
-}
-
-func (th topicHandleImpl) Subscribe() (subscription, error) {
-	return th.t.Subscribe()
-}
-
-type topicJoiner interface {
-	JoinTopic(topic string) (topicHandle, error)
-}
-
-type topicJoinerImpl struct {
+type topicJoiner struct {
 	pubsub *libp2p_pubsub.PubSub
 }
 
-func (tj topicJoinerImpl) JoinTopic(topic string) (topicHandle, error) {
+func (tj topicJoiner) JoinTopic(topic string) (*libp2p_pubsub.Topic, error) {
 	th, err := tj.pubsub.Join(topic)
 	if err != nil {
 		return nil, err
 	}
-	return topicHandleImpl{th}, nil
+	return th, nil
 }
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
 	h      libp2p_host.Host
 	joiner topicJoiner
-	joined map[string]topicHandle
+	joined map[string]*libp2p_pubsub.Topic
 	self   Peer
 	priKey libp2p_crypto.PrivKey
 	lock   sync.Mutex
@@ -133,7 +147,7 @@ type HostV2 struct {
 	logger *zerolog.Logger
 }
 
-func (host *HostV2) getTopic(topic string) (topicHandle, error) {
+func (host *HostV2) getTopic(topic string) (*libp2p_pubsub.Topic, error) {
 	host.lock.Lock()
 	defer host.lock.Unlock()
 	if t, ok := host.joined[topic]; ok {
@@ -165,15 +179,9 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 	return err
 }
 
-// subscription captures the subscription interface we expect from libp2p.
-type subscription interface {
-	Next(ctx context.Context) (*libp2p_pubsub.Message, error)
-	Cancel()
-}
-
 // GroupReceiverImpl is a multicast group receiver implementation.
 type GroupReceiverImpl struct {
-	sub subscription
+	sub *libp2p_pubsub.Subscription
 }
 
 // Close closes this receiver.
@@ -248,58 +256,6 @@ func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
 	return host.h.Peerstore()
 }
 
-// New creates a host for p2p communication
-func New(self *Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
-	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
-	if err != nil {
-		return nil, errors.Wrapf(err,
-			"cannot create listen multiaddr from port %#v", self.Port)
-	}
-	ctx := context.Background()
-	p2pHost, err := libp2p.New(ctx,
-		libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey),
-	)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
-	}
-	traceFile := os.Getenv("P2P_TRACEFILE")
-
-	const MaxSize = 2_145_728
-	options := []libp2p_pubsub.Option{
-		libp2p_pubsub.WithPeerOutboundQueueSize(64),
-		libp2p_pubsub.WithMaxMessageSize(MaxSize),
-	}
-	if len(traceFile) > 0 {
-		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
-		options = append(options, libp2p_pubsub.WithEventTracer(tracer))
-	}
-	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot initialize libp2p pubsub")
-	}
-
-	self.PeerID = p2pHost.ID()
-	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
-	// has to save the private key for host
-	h := &HostV2{
-		h:      p2pHost,
-		joiner: topicJoinerImpl{pubsub},
-		joined: map[string]topicHandle{},
-		self:   *self,
-		priKey: priKey,
-		logger: &subLogger,
-	}
-
-	h.logger.Debug().
-		Str("port", self.Port).
-		Str("id", p2pHost.ID().Pretty()).
-		Str("addr", listenAddr.String()).
-		Str("PubKey", self.ConsensusPubKey.SerializeToHexStr()).
-		Msg("HostV2 is up!")
-
-	return h, nil
-}
-
 // GetID returns ID.Pretty
 func (host *HostV2) GetID() libp2p_peer.ID {
 	return host.h.ID()
@@ -308,11 +264,6 @@ func (host *HostV2) GetID() libp2p_peer.ID {
 // GetSelfPeer gets self peer
 func (host *HostV2) GetSelfPeer() Peer {
 	return host.self
-}
-
-// Close closes the host
-func (host *HostV2) Close() error {
-	return host.h.Close()
 }
 
 // GetP2PHost returns the p2p.Host
@@ -345,6 +296,20 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	}
 	host.logger.Info().Interface("node", *peerInfo).Msg("connected to peer host")
 	return nil
+}
+
+// Topic ..
+func (host *HostV2) Topic(t string) *libp2p_pubsub.Topic {
+	return host.joined[t]
+}
+
+// AllTopics ..
+func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
+	topics := []*libp2p_pubsub.Topic{}
+	for _, g := range host.joined {
+		topics = append(topics, g)
+	}
+	return topics
 }
 
 // ConstructMessage constructs the p2p message as [messageType, contentSize, content]
@@ -395,27 +360,12 @@ func StringsToAddrs(addrStrings []string) (maddrs []ma.Multiaddr, err error) {
 	return
 }
 
-// StringsToPeers converts a string to a list of Peers
-// addr is a string of format "ip:port,ip:port"
-func StringsToPeers(input string) []Peer {
-	addrs := strings.Split(input, ",")
-	peers := []Peer{}
-	for _, addr := range addrs {
-		data := strings.Split(addr, ":")
-		if len(data) >= 2 {
-			peer := Peer{}
-			peer.IP = data[0]
-			peer.Port = data[1]
-			peers = append(peers, peer)
-		}
-	}
-	return peers
-}
-
-// DefaultBootNodeAddrStrings is a list of Harmony bootnodes address. Used to find other peers in the network.
+// DefaultBootNodeAddrStrings is a list of Harmony
+// bootnodes address. Used to find other peers in the network.
 var DefaultBootNodeAddrStrings = []string{
 	"/ip4/127.0.0.1/tcp/19876/p2p/Qmc1V6W7BwX8Ugb42Ti8RnXF1rY5PF7nnZ6bKBryCgi6cv",
 }
 
-// BootNodes is a list of boot nodes. It is populated either from default or from user CLI input.
+// BootNodes is a list of boot nodes.
+// It is populated either from default or from user CLI input.
 var BootNodes AddrList
