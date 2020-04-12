@@ -27,7 +27,6 @@ import (
 // Host is the client + server in p2p network.
 type Host interface {
 	GetSelfPeer() Peer
-	Close() error
 	AddPeer(*Peer) error
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
@@ -308,11 +307,6 @@ func (host *HostV2) GetID() libp2p_peer.ID {
 // GetSelfPeer gets self peer
 func (host *HostV2) GetSelfPeer() Peer {
 	return host.self
-}
-
-// Close closes the host
-func (host *HostV2) Close() error {
-	return host.h.Close()
 }
 
 // GetP2PHost returns the p2p.Host
