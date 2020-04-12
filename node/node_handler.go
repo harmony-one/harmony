@@ -586,6 +586,7 @@ func (node *Node) bootstrapConsensus() {
 		utils.Logger().Info().
 			Int("numPeersNow", numPeersNow).
 			Int("targetNumPeers", node.Consensus.MinPeers).
+			Int("next-peer-count-check-in-seconds", 5).
 			Msg("do not have enough min peers yet in bootstrap of consensus")
 	}
 }
