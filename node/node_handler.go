@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"context"
-	"math/big"
 	"math/rand"
 	"time"
 
@@ -402,11 +401,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	}
 	return nil
 }
-
-// BigMaxUint64 is maximum possible uint64 value, that is, (1**64)-1.
-var BigMaxUint64 = new(big.Int).SetBytes([]byte{
-	255, 255, 255, 255, 255, 255, 255, 255,
-})
 
 func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
 	count := uint32(0)
