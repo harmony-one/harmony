@@ -39,6 +39,8 @@ type Host interface {
 	// If multiple receivers are created for the same group,
 	// a message sent to the group will be delivered to all of the receivers.
 	GroupReceiver(nodeconfig.GroupID) (receiver GroupReceiver, err error)
+	Topic(t string) *libp2p_pubsub.Topic
+	AllTopics() []*libp2p_pubsub.Topic
 }
 
 // Peer is the object for a p2p peer (node)
@@ -294,6 +296,20 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	}
 	host.logger.Info().Interface("node", *peerInfo).Msg("connected to peer host")
 	return nil
+}
+
+// Topic ..
+func (host *HostV2) Topic(t string) *libp2p_pubsub.Topic {
+	return host.joined[t]
+}
+
+// AllTopics ..
+func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
+	topics := []*libp2p_pubsub.Topic{}
+	for _, g := range host.joined {
+		topics = append(topics, g)
+	}
+	return topics
 }
 
 // ConstructMessage constructs the p2p message as [messageType, contentSize, content]
