@@ -7,7 +7,7 @@ import (
 	"net"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -28,7 +28,10 @@ func (p Peer) String() string {
 	if p.ConsensusPubKey != nil {
 		BLSPubKey = p.ConsensusPubKey.SerializeToHexStr()
 	}
-	return fmt.Sprintf("BLSPubKey:%s-%s/%s[%d]", BLSPubKey, net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs))
+	return fmt.Sprintf(
+		"BLSPubKey:%s-%s/%s[%d]", BLSPubKey,
+		net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs),
+	)
 }
 
 // GroupReceiver is a multicast group message receiver interface.

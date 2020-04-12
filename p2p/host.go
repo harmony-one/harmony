@@ -2,8 +2,8 @@ package p2p
 
 import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	libp2p_host "github.com/libp2p/go-libp2p-host"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_host "github.com/libp2p/go-libp2p-core/host"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 // Host is the client + server in p2p network.
