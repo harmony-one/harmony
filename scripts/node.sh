@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200407.0"
+version="v1 20200411.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -632,9 +632,9 @@ done
 
 if [[ "${start_clean}" == "true" && "${network_type}" != "mainnet" ]]
 then
-   msg "cleaning up old database/logs (-c)"
+   msg "cleaning up old database (-c)"
    # set a 2s timeout, and set its default return value to Y (true)
-   read -t 2 -rp "Remove old database/logs? (Y/n) " yesno
+   read -t 2 -rp "Remove old database? (Y/n) " yesno
    yesno=${yesno:-Y}
    echo
    if [[ "$yesno" == "y" || "$yesno" == "Y" ]]; then
@@ -642,8 +642,7 @@ then
       now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
       mkdir -p backups; rm -rf backups/*
       backup_dir=$(mktemp -d "backups/${now}.XXXXXX")
-      mv -f harmony_db_* latest .dht* "${backup_dir}/" 2>/dev/null || :
-      rm -rf latest
+      mv -f harmony_db_* .dht* "${backup_dir}/" 2>/dev/null || :
    fi
 
    # install unzip as dependency of rclone
