@@ -549,11 +549,10 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) {
 		Interface("PeerID", peer.PeerID).
 		Msg("[PING] PeerInfo")
 
-	senderStr := string(sender)
-	if senderStr != "" {
+	if senderStr := string(sender); senderStr != "" {
 		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
 		if ok {
-			// duplicated ping message return
+			return
 		}
 	}
 
