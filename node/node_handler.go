@@ -521,13 +521,12 @@ func (node *Node) PostConsensusProcessing(
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
+func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) {
 	ping, err := proto_discovery.GetPingMessage(msgPayload)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msg("Can't get Ping Message")
-		return -1
 	}
 
 	peer := new(p2p.Peer)
@@ -542,7 +541,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 			utils.Logger().Error().
 				Err(err).
 				Msg("UnmarshalBinary Failed")
-			return -1
 		}
 	}
 
@@ -559,13 +557,14 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
 		if ok {
 			// duplicated ping message return
-			return 0
 		}
 	}
 
-	// add to incoming peer list
-	//node.host.AddIncomingPeer(*peer)
-	node.host.ConnectHostPeer(*peer)
+	if err := node.host.ConnectHostPeer(*peer); err != nil {
+		utils.Logger().Info().Err(err).
+			Str("peer", peer.String()).
+			Msg("could not direct connect to this peer")
+	}
 
 	if ping.Node.Role != proto_node.ClientRole {
 		node.AddPeers([]*p2p.Peer{peer})
@@ -574,8 +573,6 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 			Int("# Peers", node.host.GetPeerCount()).
 			Msg("Add Peer to Node")
 	}
-
-	return 1
 }
 
 // bootstrapConsensus is the a goroutine to check number of peers and start the consensus

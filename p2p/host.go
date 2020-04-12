@@ -14,14 +14,9 @@ type Host interface {
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
 	GetPeerCount() int
-
-	//AddIncomingPeer(Peer)
-	//AddOutgoingPeer(Peer)
-	ConnectHostPeer(Peer)
-
+	ConnectHostPeer(Peer) error
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-
 	// GroupReceiver returns a receiver of messages sent to a multicast group.
 	// Each call creates a new receiver.
 	// If multiple receivers are created for the same group,

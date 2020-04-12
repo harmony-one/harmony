@@ -292,22 +292,23 @@ func (host *HostV2) GetPeerCount() int {
 }
 
 // ConnectHostPeer connects to peer host
-func (host *HostV2) ConnectHostPeer(peer p2p.Peer) {
+func (host *HostV2) ConnectHostPeer(peer p2p.Peer) error {
 	ctx := context.Background()
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", peer.IP, peer.Port, peer.PeerID.Pretty())
 	peerAddr, err := ma.NewMultiaddr(addr)
 	if err != nil {
 		host.logger.Error().Err(err).Interface("peer", peer).Msg("ConnectHostPeer")
-		return
+		return err
 	}
 	peerInfo, err := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
 	if err != nil {
 		host.logger.Error().Err(err).Interface("peer", peer).Msg("ConnectHostPeer")
-		return
+		return err
 	}
 	if err := host.h.Connect(ctx, *peerInfo); err != nil {
 		host.logger.Warn().Err(err).Interface("peer", peer).Msg("can't connect to peer")
-	} else {
-		host.logger.Info().Interface("node", *peerInfo).Msg("connected to peer host")
+		return err
 	}
+	host.logger.Info().Interface("node", *peerInfo).Msg("connected to peer host")
+	return nil
 }
