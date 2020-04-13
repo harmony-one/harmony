@@ -30,6 +30,7 @@ type Backend interface {
 	NetVersion() uint64
 	ProtocolVersion() int
 	ChainDb() ethdb.Database
+	EventMux() *event.TypeMux
 	RPCGasCap() *big.Int // global gas cap for hmy_call over rpc: DoS protection
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error)
 	BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)

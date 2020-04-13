@@ -22,11 +22,12 @@ type Harmony struct {
 	beaconchain   *core.BlockChain
 	txPool        *core.TxPool
 	cxPool        *core.CxPool
-	eventMux      *event.Feed
+	eventMux      *event.TypeMux
 	// DB interfaces
-	chainDb    ethdb.Database // Block chain database
-	APIBackend *APIBackend
-	nodeAPI    NodeAPI
+	chainDb      ethdb.Database     // Block chain database
+	bloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
+	APIBackend   *APIBackend
+	nodeAPI      NodeAPI
 	// aka network version, which is used to identify which network we are using
 	networkID uint64
 	// RPCGasCap is the global gas cap for eth-call variants.
@@ -57,7 +58,7 @@ type NodeAPI interface {
 // initialisation of the common Harmony object)
 func New(
 	nodeAPI NodeAPI, txPool *core.TxPool,
-	cxPool *core.CxPool, eventMux *event.Feed, shardID uint32,
+	cxPool *core.CxPool, eventMux *event.TypeMux, shardID uint32,
 ) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	hmy := &Harmony{
