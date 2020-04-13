@@ -2,8 +2,6 @@ package node
 
 import (
 	"bytes"
-	"context"
-	"math/big"
 	"math/rand"
 	"time"
 
@@ -19,7 +17,6 @@ import (
 	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
@@ -31,39 +28,6 @@ import (
 )
 
 const p2pMsgPrefixSize = 5
-
-// receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
-func (node *Node) receiveGroupMessage(
-	receiver p2p.GroupReceiver, rxQueue msgq.MessageAdder,
-) {
-	ctx := context.Background()
-	// TODO ek – infinite loop; add shutdown/cleanup logic
-	for {
-		msg, sender, err := receiver.Receive(ctx)
-		if err != nil {
-			utils.Logger().Warn().Err(err).
-				Msg("cannot receive from group")
-			continue
-		}
-		if sender == node.host.GetID() {
-			continue
-		}
-		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
-		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-		// TODO sanity check that message isn't too big, have access to core txn constants
-		if len(msg) < p2pMsgPrefixSize {
-			utils.Logger().Warn().Err(err).Int("msg size", len(msg)).
-				Msg("invalid p2p message size")
-			continue
-		}
-		// NOTE non-blocking dispatches the message as fast as possiblee
-		if err := rxQueue.AddMessage(msg[p2pMsgPrefixSize:], sender); err != nil {
-			utils.Logger().Warn().Err(err).
-				Str("sender", sender.Pretty()).
-				Msg("cannot enqueue incoming message for processing")
-		}
-	}
-}
 
 // some messages have uninteresting fields in header, slash, receipt and crosslink are
 // such messages. This function assumes that input bytes are a slice which already
@@ -159,7 +123,9 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 								utils.Logger().Info().
 									Uint64("block", blocks[0].NumberU64()).
 									Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
-								node.BeaconBlockChannel <- block
+								go func(blk *types.Block) {
+									node.BeaconBlockChannel <- blk
+								}(block)
 							}
 						}
 					}
@@ -402,11 +368,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	}
 	return nil
 }
-
-// BigMaxUint64 is maximum possible uint64 value, that is, (1**64)-1.
-var BigMaxUint64 = new(big.Int).SetBytes([]byte{
-	255, 255, 255, 255, 255, 255, 255, 255,
-})
 
 func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
 	count := uint32(0)

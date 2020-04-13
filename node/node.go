@@ -2,6 +2,7 @@ package node
 
 import (
 	"container/ring"
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -28,7 +29,6 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -36,7 +36,9 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/semaphore"
 )
 
 // State is a state of a node.
@@ -105,14 +107,12 @@ type syncConfig struct {
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus             *consensus.Consensus // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel          chan *types.Block    // The channel to send newly proposed blocks
-	ConfirmedBlockChannel chan *types.Block    // The channel to send confirmed blocks
-	BeaconBlockChannel    chan *types.Block    // The channel to send beacon blocks for non-beaconchain nodes
-
-	pendingCXReceipts map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
-	pendingCXMutex    sync.Mutex
-
+	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
+	BlockChannel          chan *types.Block                 // The channel to send newly proposed blocks
+	ConfirmedBlockChannel chan *types.Block                 // The channel to send confirmed blocks
+	BeaconBlockChannel    chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
+	pendingCXReceipts     map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
+	pendingCXMutex        sync.Mutex
 	// Shard databases
 	shardChains shardchain.Collection
 	Client      *client.Client // The presence of a client object means this node will also act as a client
@@ -127,35 +127,18 @@ type Node struct {
 	CxPool               *core.CxPool // pool for missing cross shard receipts resend
 	Worker, BeaconWorker *worker.Worker
 	downloaderServer     *downloader.Server
-
 	// Syncing component.
-	syncID [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-
-	stateSync, beaconSync *syncing.StateSync
-
+	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
+	stateSync, beaconSync  *syncing.StateSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
-
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
-
-	// Incoming messages to process.
-	clientRxQueue, shardRxQueue, globalRxQueue *msgq.Queue
-
 	// Service manager.
-	serviceManager *service.Manager
-
+	serviceManager               *service.Manager
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-
-	// Shard group Message Receiver
-	shardGroupReceiver p2p.GroupReceiver
-	// Global group Message Receiver, communicate with beacon chain, or cross-shard TX
-	globalGroupReceiver p2p.GroupReceiver
-	// Client Message Receiver to handle light client messages
-	// Beacon leader needs to use this receiver to talk to new node
-	clientReceiver p2p.GroupReceiver
 	// Duplicated Ping Message Received
 	duplicatedPing sync.Map
 	// Channel to notify consensus service to really start consensus
@@ -167,7 +150,6 @@ type Node struct {
 	// map of service type to its message channel.
 	serviceMessageChan map[service.Type]chan *msg_pb.Message
 	isFirstTime        bool // the node was started with a fresh database
-
 	// Last 1024 staking transaction error, only in memory
 	errorSink struct {
 		sync.Mutex
@@ -175,7 +157,6 @@ type Node struct {
 		failedTxns        *ring.Ring
 	}
 	unixTimeAtNodeStart int64
-
 	// KeysToAddrs holds the addresses of bls keys run by the node
 	KeysToAddrs      map[string]common.Address
 	keysToAddrsEpoch *big.Int
@@ -197,7 +178,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(0)
+	bc, err := node.shardChains.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
 	}
@@ -374,27 +355,66 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 		Msg("Got ONE more receipt message")
 }
 
-func (node *Node) startRxPipeline(
-	receiver p2p.GroupReceiver, queue *msgq.Queue, numWorkers int,
-) {
-	// consumers
-	for i := 0; i < numWorkers; i++ {
-		go queue.HandleMessages(node)
+// Start kicks off the node message handling
+func (node *Node) Start() error {
+	allTopics := node.host.AllTopics()
+	if len(allTopics) == 0 {
+		return errors.New("have no topics to listen to")
 	}
-	// provider
-	go node.receiveGroupMessage(receiver, queue)
-}
+	weighted := make([]*semaphore.Weighted, len(allTopics))
+	const maxMessageHandlers = 100
+	ctx := context.Background()
+	ownID := node.host.GetID()
+	errChan := make(chan error)
 
-// StartServer starts a server and process the requests by a handler.
-func (node *Node) StartServer() {
-	// client messages are for just spectators, like plain observers
-	node.startRxPipeline(node.clientReceiver, node.clientRxQueue, ClientRxWorkers)
-	// start the goroutine to receive in my subcommittee messages
-	node.startRxPipeline(node.shardGroupReceiver, node.shardRxQueue, ShardRxWorkers)
-	// start the goroutine to receive supercommittee level messages
-	// FIXME (leo): we use beacon client topic as the global topic for now
-	node.startRxPipeline(node.globalGroupReceiver, node.globalRxQueue, GlobalRxWorkers)
-	select {}
+	for i, topic := range allTopics {
+		sub, err := topic.Subscribe()
+		if err != nil {
+			return err
+		}
+		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
+		msgChan := make(chan *libp2p_pubsub.Message)
+
+		go func(msgChan chan *libp2p_pubsub.Message, sem *semaphore.Weighted) {
+			for msg := range msgChan {
+				payload := msg.GetData()
+				if len(payload) < p2pMsgPrefixSize {
+					continue
+				}
+				if sem.TryAcquire(1) {
+					go func() {
+						node.HandleMessage(
+							payload[p2pMsgPrefixSize:], msg.GetFrom(),
+						)
+						sem.Release(1)
+					}()
+				} else {
+					utils.Logger().Info().
+						Msg("could not acquire semaphore to process incoming message")
+				}
+			}
+		}(msgChan, weighted[i])
+
+		go func(msgChan chan *libp2p_pubsub.Message) {
+			for {
+				nextMsg, err := sub.Next(ctx)
+				if err != nil {
+					errChan <- err
+					continue
+				}
+				if nextMsg.GetFrom() == ownID {
+					continue
+				}
+				msgChan <- nextMsg
+			}
+		}(msgChan)
+	}
+
+	for err := range errChan {
+		utils.Logger().Info().Err(err).Msg("issue while handling incoming p2p message")
+	}
+	// NOTE never gets here
+	return nil
 }
 
 // GetSyncID returns the syncID of this node
@@ -517,11 +537,6 @@ func New(
 	utils.Logger().Info().
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
-
-	node.clientRxQueue = msgq.New(ClientRxQueueSize)
-	node.shardRxQueue = msgq.New(ShardRxQueueSize)
-	node.globalRxQueue = msgq.New(GlobalRxQueueSize)
-
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = map[string]*syncConfig{}
 	node.startConsensus = make(chan struct{})
@@ -647,15 +662,13 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 	return ok
 }
 
-// isBeacon = true if the node is beacon node
-func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
+func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {
 	chanPeer := make(chan p2p.Peer)
-
 	nodeConfig := service.NodeConfig{
 		IsClient:     node.NodeConfig.IsClient(),
 		Beacon:       nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 		ShardGroupID: node.NodeConfig.GetShardGroupID(),
-		Actions:      make(map[nodeconfig.GroupID]nodeconfig.ActionType),
+		Actions:      map[nodeconfig.GroupID]nodeconfig.ActionType{},
 	}
 
 	if nodeConfig.IsClient {
@@ -665,24 +678,18 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = nodeconfig.ActionStart
 	}
 
-	var err error
-	node.shardGroupReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetShardGroupID())
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to create shard receiver")
-	}
-
-	node.globalGroupReceiver, err = node.host.GroupReceiver(
+	groups := []nodeconfig.GroupID{
+		node.NodeConfig.GetShardGroupID(),
 		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
-	)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to create global receiver")
+		node.NodeConfig.GetClientGroupID(),
 	}
 
-	node.clientReceiver, err = node.host.GroupReceiver(node.NodeConfig.GetClientGroupID())
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to create client receiver")
+	// force the side effect of topic join
+	if err := node.host.SendMessageToGroups(groups, []byte{}); err != nil {
+		return nodeConfig, nil, err
 	}
-	return nodeConfig, chanPeer
+
+	return nodeConfig, chanPeer, nil
 }
 
 // ServiceManager ...
@@ -694,7 +701,7 @@ func (node *Node) ServiceManager() *service.Manager {
 func (node *Node) ShutDown() {
 	node.Blockchain().Stop()
 	node.Beaconchain().Stop()
-	msg := "Successfully shut down!\n"
+	const msg = "Successfully shut down!\n"
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
 	os.Exit(0)

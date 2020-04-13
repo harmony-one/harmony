@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/params"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -71,7 +70,6 @@ func New(
 		cxPool:        cxPool,
 		eventMux:      eventMux,
 		chainDb:       chainDb,
-		bloomIndexer:  NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		nodeAPI:       nodeAPI,
 		networkID:     1, // TODO(ricl): this should be from config
 		shardID:       shardID,

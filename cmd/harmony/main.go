@@ -31,7 +31,6 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	viperconfig "github.com/harmony-one/harmony/internal/configs/viper"
 	"github.com/harmony-one/harmony/internal/genesis"
-	hmykey "github.com/harmony-one/harmony/internal/keystore"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
@@ -101,9 +100,6 @@ var (
 	devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
 	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
 	devnetHarmonySize = flag.Int("dn_hmy_size", -1, "number of Harmony-operated nodes per shard for -network_type=devnet; negative (default) means equal to -dn_shard_size")
-	// logConn logs incoming/outgoing connections
-	logConn     = flag.Bool("log_conn", false, "log incoming/outgoing connections")
-	keystoreDir = flag.String("keystore", hmykey.DefaultKeyStoreDir, "The default keystore directory")
 	// logging verbosity
 	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 	// dbDir is the database directory.
@@ -156,9 +152,6 @@ func initSetup() {
 
 	// Set sharding schedule
 	nodeconfig.SetShardingSchedule(shard.Schedule)
-
-	// Set default keystore Dir
-	hmykey.DefaultKeyStoreDir = *keystoreDir
 
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
@@ -416,9 +409,6 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
 	}
-	if *logConn && nodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		myHost.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogger()))
-	}
 
 	nodeConfig.DBDir = *dbDir
 
@@ -544,10 +534,8 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	currentNode.State = node.NodeWaitToJoin
-
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
-
 	// Setup block period and block due time.
 	currentConsensus.BlockPeriod = time.Duration(*blockPeriod) * time.Second
 	currentConsensus.NextBlockDue = time.Now()
@@ -604,8 +592,6 @@ func setupViperConfig() {
 	viperconfig.ResetConfUInt(devnetNumShards, envViper, configFileViper, "", "dn_num_shards")
 	viperconfig.ResetConfInt(devnetShardSize, envViper, configFileViper, "", "dn_shard_size")
 	viperconfig.ResetConfInt(devnetHarmonySize, envViper, configFileViper, "", "dn_hmy_size")
-	viperconfig.ResetConfBool(logConn, envViper, configFileViper, "", "log_conn")
-	viperconfig.ResetConfString(keystoreDir, envViper, configFileViper, "", "keystore")
 	viperconfig.ResetConfInt(verbosity, envViper, configFileViper, "", "verbosity")
 	viperconfig.ResetConfString(dbDir, envViper, configFileViper, "", "db_dir")
 	viperconfig.ResetConfBool(publicRPC, envViper, configFileViper, "", "public_rpc")
@@ -782,5 +768,8 @@ func main() {
 			Msg("StartRPC failed")
 	}
 
-	currentNode.StartServer()
+	if err := currentNode.Start(); err != nil {
+		fmt.Println("could not begin network message handling for node", err.Error())
+		os.Exit(-1)
+	}
 }

@@ -13,8 +13,71 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	badger "github.com/ipfs/go-ds-badger"
+	net "github.com/libp2p/go-libp2p-core/network"
 	kaddht "github.com/libp2p/go-libp2p-kad-dht"
+	ma "github.com/multiformats/go-multiaddr"
 )
+
+// ConnLogger ..
+type ConnLogger struct {
+	l log.Logger
+}
+
+func netLogger(n net.Network, l log.Logger) log.Logger {
+	return l.New(
+		"netLocalPeer", n.LocalPeer(),
+		"netListenAddresses", n.ListenAddresses())
+}
+
+func connLogger(c net.Conn, l log.Logger) log.Logger {
+	return l.New(
+		"connLocalPeer", c.LocalPeer(),
+		"connLocalAddr", c.LocalMultiaddr(),
+		"connRemotePeer", c.RemotePeer(),
+		"connRemoteAddr", c.RemoteMultiaddr())
+}
+
+func streamLogger(s net.Stream, l log.Logger) log.Logger {
+	return connLogger(s.Conn(), l).New("streamProtocolID", s.Protocol())
+}
+
+// Listen logs a listener starting listening on an address.
+func (cl ConnLogger) Listen(n net.Network, ma ma.Multiaddr) {
+	utils.WithCaller(netLogger(n, cl.l)).
+		Debug("listener starting", "listenAddress", ma)
+}
+
+// ListenClose logs a listener stopping listening on an address.
+func (cl ConnLogger) ListenClose(n net.Network, ma ma.Multiaddr) {
+	utils.WithCaller(netLogger(n, cl.l)).
+		Debug("listener closing", "listenAddress", ma)
+}
+
+// Connected logs a connection getting opened.
+func (cl ConnLogger) Connected(n net.Network, c net.Conn) {
+	utils.WithCaller(connLogger(c, netLogger(n, cl.l))).Debug("connected")
+}
+
+// Disconnected logs a connection getting closed.
+func (cl ConnLogger) Disconnected(n net.Network, c net.Conn) {
+	utils.WithCaller(connLogger(c, netLogger(n, cl.l))).Debug("disconnected")
+}
+
+// OpenedStream logs a new stream getting opened.
+func (cl ConnLogger) OpenedStream(n net.Network, s net.Stream) {
+	utils.WithCaller(streamLogger(s, netLogger(n, cl.l))).Debug("stream opened")
+}
+
+// ClosedStream logs a stream getting closed.
+func (cl ConnLogger) ClosedStream(n net.Network, s net.Stream) {
+	utils.WithCaller(streamLogger(s, netLogger(n, cl.l))).Debug("stream closed")
+}
+
+// NewConnLogger returns a new connection logger that uses the given
+// Ethereum logger.  See ConnLogger for usage.
+func NewConnLogger(l log.Logger) *ConnLogger {
+	return &ConnLogger{l: l}
+}
 
 var (
 	version string
@@ -65,7 +128,7 @@ func main() {
 	)
 
 	if *logConn {
-		host.GetP2PHost().Network().Notify(utils.NewConnLogger(utils.GetLogInstance()))
+		host.GetP2PHost().Network().Notify(NewConnLogger(utils.GetLogInstance()))
 	}
 
 	// set the KValue to 50 for DHT

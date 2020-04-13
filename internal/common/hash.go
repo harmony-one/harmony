@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bytes"
 	"database/sql/driver"
 	"encoding/hex"
 	"fmt"
@@ -20,9 +19,8 @@ const (
 )
 
 var (
-	hashT     = reflect.TypeOf(Hash{})
-	addressT  = reflect.TypeOf(Address{})
-	emptyHash = Hash{}
+	hashT    = reflect.TypeOf(Hash{})
+	addressT = reflect.TypeOf(Address{})
 )
 
 // Hash represents the 32 byte Keccak256 hash of arbitrary data.
@@ -34,11 +32,6 @@ func BytesToHash(b []byte) Hash {
 	var h Hash
 	h.SetBytes(b)
 	return h
-}
-
-// IsEmpty gets whether the hash contains all 0 bytes
-func (h Hash) IsEmpty() bool {
-	return bytes.Compare(h[:], emptyHash[:]) == 0
 }
 
 // BigToHash sets byte representation of b to hash.

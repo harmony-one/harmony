@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"strings"
@@ -34,12 +33,6 @@ type Host interface {
 	ConnectHostPeer(Peer) error
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-	// GroupReceiver returns a receiver of messages sent to a multicast group.
-	// Each call creates a new receiver.
-	// If multiple receivers are created for the same group,
-	// a message sent to the group will be delivered to all of the receivers.
-	GroupReceiver(nodeconfig.GroupID) (receiver GroupReceiver, err error)
-	Topic(t string) *libp2p_pubsub.Topic
 	AllTopics() []*libp2p_pubsub.Topic
 }
 
@@ -61,13 +54,6 @@ func (p Peer) String() string {
 		"BLSPubKey:%s-%s/%s[%d]", BLSPubKey,
 		net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs),
 	)
-}
-
-// GroupReceiver is a multicast group message receiver interface.
-type GroupReceiver interface {
-	io.Closer
-	// Receive a message.
-	Receive(ctx context.Context) (msg []byte, sender libp2p_peer.ID, err error)
 }
 
 // NewHost ..
@@ -179,51 +165,6 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 	return err
 }
 
-// GroupReceiverImpl is a multicast group receiver implementation.
-type GroupReceiverImpl struct {
-	sub *libp2p_pubsub.Subscription
-}
-
-// Close closes this receiver.
-func (r *GroupReceiverImpl) Close() error {
-	r.sub.Cancel()
-	r.sub = nil
-	return nil
-}
-
-// Receive receives a message.
-func (r *GroupReceiverImpl) Receive(ctx context.Context) (
-	msg []byte, sender libp2p_peer.ID, err error,
-) {
-	if r.sub == nil {
-		return nil, libp2p_peer.ID(""), fmt.Errorf("GroupReceiver has been closed")
-	}
-	m, err := r.sub.Next(ctx)
-	if err == nil {
-		msg = m.Data
-		sender = libp2p_peer.ID(m.From)
-	}
-
-	return msg, sender, err
-}
-
-// GroupReceiver returns a receiver of messages sent to a multicast group.
-// See the GroupReceiver interface for details.
-func (host *HostV2) GroupReceiver(group nodeconfig.GroupID) (
-	receiver GroupReceiver, err error,
-) {
-	top := string(group)
-	t, err := host.getTopic(top)
-	if err != nil {
-		return nil, err
-	}
-	sub, err := t.Subscribe()
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot subscribe to topic %x", group)
-	}
-	return &GroupReceiverImpl{sub: sub}, nil
-}
-
 // AddPeer add p2p.Peer into Peerstore
 func (host *HostV2) AddPeer(p *Peer) error {
 	if p.PeerID != "" && len(p.Addrs) != 0 {
@@ -298,13 +239,10 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	return nil
 }
 
-// Topic ..
-func (host *HostV2) Topic(t string) *libp2p_pubsub.Topic {
-	return host.joined[t]
-}
-
 // AllTopics ..
 func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
+	host.lock.Lock()
+	defer host.lock.Unlock()
 	topics := []*libp2p_pubsub.Topic{}
 	for _, g := range host.joined {
 		topics = append(topics, g)
