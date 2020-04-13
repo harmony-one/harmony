@@ -14,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/internal/hmyapi"
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
-	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -90,7 +89,7 @@ func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
 	harmony, _ = hmy.New(
-		node, node.TxPool, node.CxPool, new(event.TypeMux), node.Consensus.ShardID,
+		node, node.TxPool, node.CxPool, new(event.Feed), node.Consensus.ShardID,
 	)
 
 	apis := node.APIs()
@@ -180,12 +179,6 @@ func (node *Node) APIs() []rpc.API {
 	apis := hmyapi.GetAPIs(harmony.APIBackend)
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
-		{
-			Namespace: "hmy",
-			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(harmony.APIBackend, false),
-			Public:    true,
-		},
 		{
 			Namespace: "net",
 			Version:   "1.0",
