@@ -2258,9 +2258,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		return nil, shard.ErrSuperCommitteeNil
 	}
 
-	rosters, bootedFromSuperCommittee :=
-		make([]*votepower.Roster, len(newEpochSuperCommittee.Shards)),
-		map[common.Address]struct{}{}
+	validatorStats := map[common.Address]*staking.ValidatorStats{}
 
 	existing, replacing :=
 		currentEpochSuperCommittee.StakedValidators(),
@@ -2269,19 +2267,38 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 	// TODO could also keep track of the BLS keys which
 	// lost a slot because just losing slots doesn't mean that the
 	// validator was booted, just that some of their keys lost slots
-
 	for currentValidator := range existing.LookupSet {
 		if _, keptSlot := replacing.LookupSet[currentValidator]; !keptSlot {
-			bootedFromSuperCommittee[currentValidator] = struct{}{}
 			// NOTE Think carefully about when time comes to delete offchain things
 			// TODO Someone: collect and then delete every 30 epochs
 			// rawdb.DeleteValidatorSnapshot(
 			// 	bc.db, currentValidator, currentEpochSuperCommittee.Epoch,
 			// )
 			// rawdb.DeleteValidatorStats(bc.db, currentValidator)
+			stats, err := rawdb.ReadValidatorStats(bc.db, currentValidator)
+			if err != nil {
+				stats = staking.NewEmptyStats()
+			}
+			// This means it's already in staking epoch
+			if currentEpochSuperCommittee.Epoch != nil {
+				wrapper, err := state.ValidatorWrapper(currentValidator)
+				if err != nil {
+					return nil, err
+				}
+
+				if slash.IsBanned(wrapper) {
+					stats.BootedStatus = effective.BannedForDoubleSigning
+				} else if wrapper.Status == effective.Inactive {
+					stats.BootedStatus = effective.TurnedInactiveOrInsufficientUptime
+				} else {
+					stats.BootedStatus = effective.LostEPoSAuction
+				}
+			}
+			validatorStats[currentValidator] = stats
 		}
 	}
 
+	rosters := make([]*votepower.Roster, len(newEpochSuperCommittee.Shards))
 	for i := range newEpochSuperCommittee.Shards {
 		subCommittee := &newEpochSuperCommittee.Shards[i]
 		if newEpochSuperCommittee.Epoch == nil {
@@ -2299,7 +2316,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		rosters[i] = roster
 	}
 
-	validatorStats := map[common.Address]*staking.ValidatorStats{}
 	networkWide := votepower.AggregateRosters(rosters)
 	for key, value := range networkWide {
 		stats, err := rawdb.ReadValidatorStats(bc.db, key)
@@ -2342,18 +2358,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				}
 			} else {
 				utils.Logger().Info().Msg("zero total delegation, skipping apr computation")
-			}
-
-			if _, wasBooted := bootedFromSuperCommittee[wrapper.Address]; wasBooted {
-				stats.BootedStatus = effective.LostEPoSAuction
-			}
-
-			if wrapper.Status == effective.Inactive {
-				stats.BootedStatus = effective.TurnedInactiveOrInsufficientUptime
-			}
-
-			if slash.IsBanned(wrapper) {
-				stats.BootedStatus = effective.BannedForDoubleSigning
 			}
 		}
 		validatorStats[key] = stats
