@@ -15,7 +15,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-	peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -84,7 +84,7 @@ type Info struct {
 	Port   string
 	PubKey []byte
 	Role   RoleType
-	PeerID peer.ID // Peerstore ID
+	PeerID libp2p_peer.ID // Peerstore ID
 }
 
 func (info Info) String() string {

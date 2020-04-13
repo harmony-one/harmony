@@ -397,8 +397,5 @@ func (so *Object) Value() *big.Int {
 // IsValidator checks whether it is a validator object
 func (so *Object) IsValidator(db Database) bool {
 	value := so.GetState(db, staking.IsValidatorKey)
-	if value == (common.Hash{}) {
-		return false
-	}
-	return true
+	return value != (common.Hash{})
 }

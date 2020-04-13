@@ -14,10 +14,10 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	badger "github.com/ipfs/go-ds-badger"
 	coredis "github.com/libp2p/go-libp2p-core/discovery"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2pdhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	manet "github.com/multiformats/go-multiaddr-net"
 	"github.com/pkg/errors"
 )
@@ -32,7 +32,7 @@ type Service struct {
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
 	peerChan    chan p2p.Peer
-	peerInfo    <-chan peerstore.PeerInfo
+	peerInfo    <-chan libp2p_peer.AddrInfo
 	discovery   *libp2pdis.RoutingDiscovery
 	messageChan chan *msg_pb.Message
 	started     bool
@@ -138,7 +138,7 @@ func (s *Service) Init() error {
 
 	connected := false
 	for _, peerAddr := range s.bootnodes {
-		peerinfo, _ := peerstore.InfoFromP2pAddr(peerAddr)
+		peerinfo, _ := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
