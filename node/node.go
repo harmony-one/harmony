@@ -178,7 +178,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(0)
+	bc, err := node.shardChains.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
 	}
@@ -358,21 +358,24 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 // Start kicks off the node message handling
 func (node *Node) Start() error {
 	allTopics := node.host.AllTopics()
-	const maxMessageHandlers = 300
-	sem := semaphore.NewWeighted(maxMessageHandlers)
+	if len(allTopics) == 0 {
+		return errors.New("have no topics to listen to")
+	}
+	weighted := make([]*semaphore.Weighted, len(allTopics))
+	const maxMessageHandlers = 100
 	ctx := context.Background()
 	ownID := node.host.GetID()
 	errChan := make(chan error)
 
-	for _, topic := range allTopics {
+	for i, topic := range allTopics {
 		sub, err := topic.Subscribe()
 		if err != nil {
 			return err
 		}
-
+		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
 		msgChan := make(chan *libp2p_pubsub.Message)
 
-		go func(msgChan chan *libp2p_pubsub.Message) {
+		go func(msgChan chan *libp2p_pubsub.Message, sem *semaphore.Weighted) {
 			for msg := range msgChan {
 				payload := msg.GetData()
 				if len(payload) < p2pMsgPrefixSize {
@@ -390,7 +393,7 @@ func (node *Node) Start() error {
 						Msg("could not acquire semaphore to process incoming message")
 				}
 			}
-		}(msgChan)
+		}(msgChan, weighted[i])
 
 		go func(msgChan chan *libp2p_pubsub.Message) {
 			for {
@@ -659,14 +662,13 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 	return ok
 }
 
-// isBeacon = true if the node is beacon node
-func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
+func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {
 	chanPeer := make(chan p2p.Peer)
 	nodeConfig := service.NodeConfig{
 		IsClient:     node.NodeConfig.IsClient(),
 		Beacon:       nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 		ShardGroupID: node.NodeConfig.GetShardGroupID(),
-		Actions:      make(map[nodeconfig.GroupID]nodeconfig.ActionType),
+		Actions:      map[nodeconfig.GroupID]nodeconfig.ActionType{},
 	}
 
 	if nodeConfig.IsClient {
@@ -675,7 +677,19 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer) {
 	} else {
 		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = nodeconfig.ActionStart
 	}
-	return nodeConfig, chanPeer
+
+	groups := []nodeconfig.GroupID{
+		node.NodeConfig.GetShardGroupID(),
+		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
+		node.NodeConfig.GetClientGroupID(),
+	}
+
+	// force the side effect of topic join
+	if err := node.host.SendMessageToGroups(groups, []byte{}); err != nil {
+		return nodeConfig, nil, err
+	}
+
+	return nodeConfig, chanPeer, nil
 }
 
 // ServiceManager ...

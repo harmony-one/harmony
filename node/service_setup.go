@@ -16,7 +16,7 @@ import (
 )
 
 func (node *Node) setupForValidator() {
-	nodeConfig, chanPeer := node.initNodeConfiguration()
+	nodeConfig, chanPeer, _ := node.initNodeConfiguration()
 	// Register peer discovery service
 	node.serviceManager.RegisterService(
 		service.PeerDiscovery,
@@ -52,7 +52,7 @@ func (node *Node) setupForValidator() {
 }
 
 func (node *Node) setupForExplorerNode() {
-	nodeConfig, chanPeer := node.initNodeConfiguration()
+	nodeConfig, chanPeer, _ := node.initNodeConfiguration()
 
 	// Register peer discovery service.
 	node.serviceManager.RegisterService(
