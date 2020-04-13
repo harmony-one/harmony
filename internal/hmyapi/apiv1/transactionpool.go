@@ -386,7 +386,9 @@ func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() []staking.RPCTra
 }
 
 // GetCXReceiptByHash returns the transaction for the given hash
-func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash common.Hash) *RPCCXReceipt {
+func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(
+	ctx context.Context, hash common.Hash,
+) *RPCCXReceipt {
 	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.b.ChainDb(), hash); cx != nil {
 		return newRPCCXReceipt(cx, blockHash, blockNumber)
 	}
