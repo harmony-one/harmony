@@ -165,15 +165,6 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 	return err
 }
 
-// const (
-// 	// UnknownPeerID ..
-// 	UnknownPeerID = libp2p_peer.ID("")
-// )
-
-// var (
-// 	errCouldNotPayCostToAcquire = errors.New("could not pay cost to acquire cost lock")
-// )
-
 // AddPeer add p2p.Peer into Peerstore
 func (host *HostV2) AddPeer(p *Peer) error {
 	if p.PeerID != "" && len(p.Addrs) != 0 {
