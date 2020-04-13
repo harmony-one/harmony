@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -27,18 +26,6 @@ type awsConfiguration struct {
 	AccessKey string `json:"aws-access-key-id"`
 	SecretKey string `json:"aws-secret-access-key"`
 	Region    string `json:"aws-region"`
-}
-
-func toISO8601(t time.Time) string {
-	var tz string
-	name, offset := t.Zone()
-	if name == "UTC" {
-		tz = "Z"
-	} else {
-		tz = fmt.Sprintf("%03d00", offset/3600)
-	}
-	return fmt.Sprintf("%04d-%02d-%02dT%02d-%02d-%02d.%09d%s",
-		t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), tz)
 }
 
 // GenBLSKeyWithPassPhrase generates bls key with passphrase and write into disk.
