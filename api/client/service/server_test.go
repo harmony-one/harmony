@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"math/big"
 	"testing"
 
@@ -39,12 +40,15 @@ func TestGetFreeToken(test *testing.T) {
 
 	testBankKey, _ := crypto.GenerateKey()
 	testBankAddress := crypto.PubkeyToAddress(testBankKey.PublicKey)
-	response, err := server.GetFreeToken(nil, &client.GetFreeTokenRequest{Address: testBankAddress.Bytes()})
+	response, err := server.GetFreeToken(
+		context.TODO(),
+		&client.GetFreeTokenRequest{Address: testBankAddress.Bytes()},
+	)
 
 	if err != nil {
 		test.Errorf("Failed to get free token")
 	}
-	if bytes.Compare(response.TxId, hash.Bytes()) != 0 {
+	if !bytes.Equal(response.TxId, hash.Bytes()) {
 		test.Errorf("Wrong transaction id is returned")
 	}
 }
@@ -72,13 +76,16 @@ func TestFetchAccountState(test *testing.T) {
 		return hash
 	})
 
-	response, err := server.FetchAccountState(nil, &client.FetchAccountStateRequest{Address: testBankAddress.Bytes()})
+	response, err := server.FetchAccountState(
+		context.TODO(),
+		&client.FetchAccountStateRequest{Address: testBankAddress.Bytes()},
+	)
 
 	if err != nil {
 		test.Errorf("Failed to get free token")
 	}
 
-	if bytes.Compare(response.Balance, testBankFunds.Bytes()) != 0 {
+	if !bytes.Equal(response.Balance, testBankFunds.Bytes()) {
 		test.Errorf("Wrong balance is returned")
 	}
 

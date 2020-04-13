@@ -129,11 +129,17 @@ func (b *APIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.R
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) EventMux() *event.TypeMux { return b.hmy.eventMux }
 
+const (
+	// BloomBitsBlocks is the number of blocks a single bloom bit section vector
+	// contains on the server side.
+	BloomBitsBlocks uint64 = 4096
+)
+
 // BloomStatus ...
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) BloomStatus() (uint64, uint64) {
 	sections, _, _ := b.hmy.bloomIndexer.Sections()
-	return params.BloomBitsBlocks, sections
+	return BloomBitsBlocks, sections
 }
 
 // ProtocolVersion ...
