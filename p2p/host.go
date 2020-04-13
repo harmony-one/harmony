@@ -22,6 +22,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/semaphore"
 )
 
 // Host is the client + server in p2p network.
@@ -181,7 +182,8 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 
 // GroupReceiverImpl is a multicast group receiver implementation.
 type GroupReceiverImpl struct {
-	sub *libp2p_pubsub.Subscription
+	sub      *libp2p_pubsub.Subscription
+	costLock *semaphore.Weighted
 }
 
 // Close closes this receiver.
@@ -191,20 +193,34 @@ func (r *GroupReceiverImpl) Close() error {
 	return nil
 }
 
+const (
+	// UnknownPeerID ..
+	UnknownPeerID = libp2p_peer.ID("")
+)
+
+var (
+	errClosedGroupReceiver      = errors.New("topic subscription in GroupReceiver is closed")
+	errCouldNotPayCostToAcquire = errors.New("could not pay cost to acquire cost lock")
+)
+
 // Receive receives a message.
 func (r *GroupReceiverImpl) Receive(ctx context.Context) (
-	msg []byte, sender libp2p_peer.ID, err error,
+	[]byte, libp2p_peer.ID, error,
 ) {
 	if r.sub == nil {
-		return nil, libp2p_peer.ID(""), fmt.Errorf("GroupReceiver has been closed")
-	}
-	m, err := r.sub.Next(ctx)
-	if err == nil {
-		msg = m.Data
-		sender = libp2p_peer.ID(m.From)
+		return nil, UnknownPeerID, errClosedGroupReceiver
 	}
 
-	return msg, sender, err
+	if err := r.costLock.Acquire(ctx, 1); err != nil {
+		return nil, UnknownPeerID, errCouldNotPayCostToAcquire
+	}
+	m, err := r.sub.Next(ctx)
+	r.costLock.Release(1)
+	if err != nil {
+		return nil, UnknownPeerID, err
+	}
+
+	return m.GetData(), m.GetFrom(), nil
 }
 
 // GroupReceiver returns a receiver of messages sent to a multicast group.
@@ -221,7 +237,11 @@ func (host *HostV2) GroupReceiver(group nodeconfig.GroupID) (
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot subscribe to topic %x", group)
 	}
-	return &GroupReceiverImpl{sub: sub}, nil
+	const maxConsumption = 100
+	return &GroupReceiverImpl{
+		sub:      sub,
+		costLock: semaphore.NewWeighted(maxConsumption),
+	}, nil
 }
 
 // AddPeer add p2p.Peer into Peerstore
