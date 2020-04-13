@@ -241,6 +241,8 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 
 // AllTopics ..
 func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
+	host.lock.Lock()
+	defer host.lock.Unlock()
 	topics := []*libp2p_pubsub.Topic{}
 	for _, g := range host.joined {
 		topics = append(topics, g)
