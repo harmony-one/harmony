@@ -6,7 +6,6 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/rs/zerolog"
@@ -381,17 +380,6 @@ func (h *Header) SetSlashes(newSlashes []byte) {
 	h.fields.Slashes = append(newSlashes[:0:0], newSlashes...)
 }
 
-// field type overrides for gencodec
-type headerMarshaling struct {
-	Difficulty *hexutil.Big
-	Number     *hexutil.Big
-	GasLimit   hexutil.Uint64
-	GasUsed    hexutil.Uint64
-	Time       *hexutil.Big
-	Extra      hexutil.Bytes
-	Hash       common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
-}
-
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
 // RLP encoding.
 func (h *Header) Hash() common.Hash {
@@ -402,7 +390,10 @@ func (h *Header) Hash() common.Hash {
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
 	// TODO: update with new fields
-	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra())+(h.Number().BitLen()+h.Time().BitLen())/8)
+	return common.StorageSize(unsafe.Sizeof(*h)) +
+		common.StorageSize(len(h.Extra())+(h.Number().BitLen()+
+			h.Time().BitLen())/8,
+		)
 }
 
 // Logger returns a sub-logger with block contexts added.

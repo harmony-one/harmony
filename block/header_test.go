@@ -372,7 +372,7 @@ func TestHeader_EncodeRLP(t *testing.T) {
 			if err != nil {
 				return
 			}
-			if got := w.Bytes(); bytes.Compare(got, tt.want) != 0 {
+			if got := w.Bytes(); !bytes.Equal(got, tt.want) {
 				t.Errorf("EncodeRLP() got  %x", got)
 				t.Errorf("EncodeRLP() want %x", tt.want)
 			}

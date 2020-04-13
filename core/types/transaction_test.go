@@ -17,7 +17,6 @@
 package types
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
@@ -25,51 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 )
-
-// The values in those tests are from the Transaction Tests
-// at github.com/ethereum/tests.
-var (
-	emptyTx = NewTransaction(
-		0,
-		common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
-		0,
-		big.NewInt(0), 0, big.NewInt(0),
-		nil,
-	)
-
-	rightvrsTx, _ = NewTransaction(
-		3,
-		common.HexToAddress("b94f5374fce5edbc8e2a8697c15331677e6ebf0b"),
-		0,
-		big.NewInt(10),
-		2000,
-		big.NewInt(1),
-		common.FromHex("5544"),
-	).WithSignature(
-		HomesteadSigner{},
-		common.Hex2Bytes("98ff921201554726367d2be8c804a7ff89ccf285ebc57dff8ae4c44b9c19ac4a8887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a301"),
-	)
-)
-
-// Enable this test before we introduce shardID in signing. Very difficult to find the input value for HexToHash.
-// func TestTransactionSigHash(t *testing.T) {
-// 	var homestead HomesteadSigner
-// 	if homestead.Hash(emptyTx) != common.HexToHash("c775b99e7ad12f50d819fcd602390467e28141316969f4b57f0626f74fe3b386") {
-// 		t.Errorf("empty transaction hash mismatch, got %x", emptyTx.Hash())
-// 	}
-// 	if homestead.Hash(rightvrsTx) != common.HexToHash("fe7a79529ed5f7c3375d06b26b186a8644e0e16c373d7a12be41c62d6042b77a") {
-// 		t.Errorf("RightVRS transaction hash mismatch, got %x", rightvrsTx.Hash())
-// 	}
-// }
-
-func decodeTx(data []byte) (*Transaction, error) {
-	var tx Transaction
-	t, err := &tx, rlp.Decode(bytes.NewReader(data), &tx)
-
-	return t, err
-}
 
 func defaultTestKey() (*ecdsa.PrivateKey, common.Address) {
 	key, _ := crypto.HexToECDSA("45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8")
