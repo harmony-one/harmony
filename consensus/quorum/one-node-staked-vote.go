@@ -10,12 +10,10 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/pkg/errors"
 )
 
 var (
-	twoThird   = numeric.NewDec(2).Quo(numeric.NewDec(3))
-	totalShare = numeric.MustNewDecFromStr("1.00")
+	twoThird = numeric.NewDec(2).Quo(numeric.NewDec(3))
 )
 
 // TallyResult is the result of when we calculate voting power,
@@ -140,13 +138,6 @@ func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 func (v *stakedVoteWeight) IsAllSigsCollected() bool {
 	return v.SignersCount(Commit) == v.ParticipantsCount()
 }
-
-var (
-	errSumOfVotingPowerNotOne   = errors.New("sum of total votes do not sum to 100 percent")
-	errSumOfOursAndTheirsNotOne = errors.New(
-		"sum of hmy nodes and stakers do not sum to 100 percent",
-	)
-)
 
 func (v *stakedVoteWeight) SetVoters(
 	subCommittee *shard.Committee, epoch *big.Int,

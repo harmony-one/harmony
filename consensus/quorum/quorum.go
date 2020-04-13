@@ -153,7 +153,6 @@ type cIdentities struct {
 }
 
 type depInject struct {
-	shardIDProvider   func() (uint32, error)
 	publicKeyProvider func() (*multibls.PublicKey, error)
 }
 
