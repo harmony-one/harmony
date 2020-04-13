@@ -18,7 +18,7 @@ require (
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/golang/mock v1.3.1
-	github.com/golang/protobuf v1.3.2
+	github.com/golang/protobuf v1.3.5
 	github.com/golangci/golangci-lint v1.22.2
 	github.com/gorilla/handlers v1.4.0 // indirect
 	github.com/gorilla/mux v1.7.2
@@ -29,23 +29,24 @@ require (
 	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
-	github.com/ipfs/go-ds-badger v0.2.1
+	github.com/ipfs/go-ds-badger v0.2.4
 	github.com/jackpal/gateway v1.0.6 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/karalabe/hid v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/libp2p/go-libp2p v0.7.3
-	github.com/libp2p/go-libp2p-core v0.5.0
+	github.com/libp2p/go-libp2p v0.7.4
+	github.com/libp2p/go-libp2p-core v0.5.1
 	github.com/libp2p/go-libp2p-crypto v0.1.0
-	github.com/libp2p/go-libp2p-discovery v0.2.0
+	github.com/libp2p/go-libp2p-discovery v0.3.0
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-kad-dht v0.5.0
 	github.com/libp2p/go-libp2p-net v0.1.0
 	github.com/libp2p/go-libp2p-peer v0.2.0
-	github.com/libp2p/go-libp2p-peerstore v0.2.2
+	github.com/libp2p/go-libp2p-peerstore v0.2.3
 	github.com/libp2p/go-libp2p-pubsub v0.2.7-0.20200325112436-d3d43e32bef3
 	github.com/libp2p/go-nat v0.0.5 // indirect
 	github.com/libp2p/go-reuseport-transport v0.0.3 // indirect
+	github.com/libp2p/go-addr-util v0.0.2 // indirect
 	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/multiformats/go-multiaddr-net v0.1.4
 	github.com/natefinch/lumberjack v2.0.0+incompatible
@@ -59,17 +60,17 @@ require (
 	github.com/shirou/gopsutil v2.18.12+incompatible // indirect
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.5.1
-	github.com/syndtr/goleveldb v1.0.1-0.20190318030020-c3a204f8e965
+	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/uber/jaeger-client-go v2.20.1+incompatible // indirect
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	go.uber.org/zap v1.14.1 // indirect
-	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys v0.0.0-20200331124033-c3d80250170d // indirect
+	golang.org/x/crypto v0.0.0-20200406173513-056763e48d71
+	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
+	golang.org/x/sys v0.0.0-20200413165638-669c56c373c4 // indirect
 	golang.org/x/tools v0.0.0-20200408032209-46bd65c8538f
-	google.golang.org/grpc v1.22.0
+	google.golang.org/grpc v1.28.1
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect

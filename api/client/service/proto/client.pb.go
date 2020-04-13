@@ -204,7 +204,9 @@ func init() {
 	proto.RegisterType((*GetFreeTokenResponse)(nil), "client.GetFreeTokenResponse")
 }
 
-func init() { proto.RegisterFile("client.proto", fileDescriptor_014de31d7ac8c57c) }
+func init() {
+	proto.RegisterFile("client.proto", fileDescriptor_014de31d7ac8c57c)
+}
 
 var fileDescriptor_014de31d7ac8c57c = []byte{
 	// 229 bytes of a gzipped FileDescriptorProto
@@ -227,11 +229,11 @@ var fileDescriptor_014de31d7ac8c57c = []byte{
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
-var _ grpc.ClientConn
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion4
+const _ = grpc.SupportPackageIsVersion6
 
 // ClientServiceClient is the client API for ClientService service.
 //
@@ -242,10 +244,10 @@ type ClientServiceClient interface {
 }
 
 type clientServiceClient struct {
-	cc *grpc.ClientConn
+	cc grpc.ClientConnInterface
 }
 
-func NewClientServiceClient(cc *grpc.ClientConn) ClientServiceClient {
+func NewClientServiceClient(cc grpc.ClientConnInterface) ClientServiceClient {
 	return &clientServiceClient{cc}
 }
 
