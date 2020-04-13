@@ -357,7 +357,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			binary.LittleEndian.PutUint64(blockNumBytes[:], consensus.blockNum)
 			commitPayload := append(blockNumBytes[:], consensus.blockHash[:]...)
 			if _, err := consensus.Decider.SubmitVote(
-				quorum.ViewChange,
+				quorum.Commit,
 				newLeaderKey,
 				newLeaderPriKey.SignHash(commitPayload),
 				common.BytesToHash(consensus.blockHash[:]),
