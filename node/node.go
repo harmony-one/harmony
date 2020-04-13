@@ -358,7 +358,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 // Start kicks off the node message handling
 func (node *Node) Start() error {
 	allTopics := node.host.AllTopics()
-	const maxMessageHandlers = 100
+	const maxMessageHandlers = 300
 	sem := semaphore.NewWeighted(maxMessageHandlers)
 	ctx := context.Background()
 	ownID := node.host.GetID()
