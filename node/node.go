@@ -385,6 +385,9 @@ func (node *Node) Start() error {
 						)
 						sem.Release(1)
 					}()
+				} else {
+					utils.Logger().Info().
+						Msg("could not acquire semaphore to process incoming message")
 				}
 			}
 		}(msgChan)
