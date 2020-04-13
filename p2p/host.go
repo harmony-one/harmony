@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"strings"
@@ -22,7 +21,6 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"golang.org/x/sync/semaphore"
 )
 
 // Host is the client + server in p2p network.
@@ -35,12 +33,6 @@ type Host interface {
 	ConnectHostPeer(Peer) error
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-	// GroupReceiver returns a receiver of messages sent to a multicast group.
-	// Each call creates a new receiver.
-	// If multiple receivers are created for the same group,
-	// a message sent to the group will be delivered to all of the receivers.
-	GroupReceiver(nodeconfig.GroupID) (receiver GroupReceiver, err error)
-	Topic(t string) *libp2p_pubsub.Topic
 	AllTopics() []*libp2p_pubsub.Topic
 }
 
@@ -62,13 +54,6 @@ func (p Peer) String() string {
 		"BLSPubKey:%s-%s/%s[%d]", BLSPubKey,
 		net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs),
 	)
-}
-
-// GroupReceiver is a multicast group message receiver interface.
-type GroupReceiver interface {
-	io.Closer
-	// Receive a message.
-	Receive(ctx context.Context) (msg []byte, sender libp2p_peer.ID, err error)
 }
 
 // NewHost ..
@@ -180,69 +165,14 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 	return err
 }
 
-// GroupReceiverImpl is a multicast group receiver implementation.
-type GroupReceiverImpl struct {
-	sub      *libp2p_pubsub.Subscription
-	costLock *semaphore.Weighted
-}
+// const (
+// 	// UnknownPeerID ..
+// 	UnknownPeerID = libp2p_peer.ID("")
+// )
 
-// Close closes this receiver.
-func (r *GroupReceiverImpl) Close() error {
-	r.sub.Cancel()
-	r.sub = nil
-	return nil
-}
-
-const (
-	// UnknownPeerID ..
-	UnknownPeerID = libp2p_peer.ID("")
-)
-
-var (
-	errClosedGroupReceiver      = errors.New("topic subscription in GroupReceiver is closed")
-	errCouldNotPayCostToAcquire = errors.New("could not pay cost to acquire cost lock")
-)
-
-// Receive receives a message.
-func (r *GroupReceiverImpl) Receive(ctx context.Context) (
-	[]byte, libp2p_peer.ID, error,
-) {
-	if r.sub == nil {
-		return nil, UnknownPeerID, errClosedGroupReceiver
-	}
-
-	if err := r.costLock.Acquire(ctx, 1); err != nil {
-		return nil, UnknownPeerID, errCouldNotPayCostToAcquire
-	}
-	m, err := r.sub.Next(ctx)
-	r.costLock.Release(1)
-	if err != nil {
-		return nil, UnknownPeerID, err
-	}
-
-	return m.GetData(), m.GetFrom(), nil
-}
-
-// GroupReceiver returns a receiver of messages sent to a multicast group.
-// See the GroupReceiver interface for details.
-func (host *HostV2) GroupReceiver(group nodeconfig.GroupID) (
-	receiver GroupReceiver, err error,
-) {
-	top := string(group)
-	t, err := host.getTopic(top)
-	if err != nil {
-		return nil, err
-	}
-	sub, err := t.Subscribe()
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot subscribe to topic %x", group)
-	}
-	const maxConsumption = 100
-	return &GroupReceiverImpl{
-		sub:      sub,
-		costLock: semaphore.NewWeighted(maxConsumption),
-	}, nil
-}
+// var (
+// 	errCouldNotPayCostToAcquire = errors.New("could not pay cost to acquire cost lock")
+// )
 
 // AddPeer add p2p.Peer into Peerstore
 func (host *HostV2) AddPeer(p *Peer) error {

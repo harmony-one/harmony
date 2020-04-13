@@ -782,5 +782,5 @@ func main() {
 			Msg("StartRPC failed")
 	}
 
-	currentNode.StartServer()
+	currentNode.Start()
 }
