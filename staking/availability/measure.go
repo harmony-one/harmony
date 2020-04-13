@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -52,10 +51,17 @@ func BlockSigners(
 	return payable, missing, nil
 }
 
+// Header is the interface of block.Header for calculating the BallotResult.
+type Header interface {
+	Number() *big.Int
+	ShardID() uint32
+	LastCommitBitmap() []byte
+}
+
 // BallotResult returns
 // (parentCommittee.Slots, payable, missing, err)
 func BallotResult(
-	parentHeader, header *block.Header, parentShardState *shard.State, shardID uint32,
+	parentHeader, header Header, parentShardState *shard.State, shardID uint32,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
 	parentCommittee, err := parentShardState.FindCommitteeByID(shardID)
 

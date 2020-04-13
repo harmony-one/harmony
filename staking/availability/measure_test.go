@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -98,10 +99,87 @@ func TestBlockSigners_BitmapOverflow(t *testing.T) {
 	}
 }
 
+func TestBallotResult(t *testing.T) {
+	tests := []struct {
+		numStateShards, numShardSlots int
+		parVerified, chdVerified      int
+		parShardID, chdShardID        uint32
+		parBN, chdBN                  int64
+		expNumPayable, expNumMissing  int
+	}{
+		{1, 1, 1, 1, 0, 0, 10, 11, 1, 0},
+		{5, 16, 10, 12, 3, 4, 100, 101, 12, 4},
+	}
+	for i, test := range tests {
+		state := makeTestShardState(test.numStateShards, test.numShardSlots)
+		parHeader := newTestHeader(test.parBN, test.parShardID, test.numShardSlots, test.parVerified)
+		chdHeader := newTestHeader(test.chdBN, test.chdShardID, test.numShardSlots, test.chdVerified)
+
+		slots, payable, missing, err := BallotResult(parHeader, chdHeader, state, chdHeader.ShardID())
+		if err != nil {
+			t.Error(err)
+		}
+
+		expCmt, _ := state.FindCommitteeByID(test.chdShardID)
+		if !reflect.DeepEqual(slots, expCmt.Slots) {
+			t.Errorf("Test %v: Ballot result slots not expected", i)
+		}
+		if len(payable) != test.expNumPayable {
+			t.Errorf("Test %v: payable size not expected: %v / %v", i, len(payable), test.expNumPayable)
+		}
+		if len(missing) != test.expNumMissing {
+			t.Errorf("Test %v: missing size not expected: %v / %v", i, len(missing), test.expNumMissing)
+		}
+	}
+}
+
+type testHeader struct {
+	number           *big.Int
+	shardID          uint32
+	lastCommitBitmap []byte
+}
+
+func newTestHeader(number int64, shardID uint32, numSlots, numVerified int) *testHeader {
+	indexes := make([]int, 0, numVerified)
+	for i := 0; i != numVerified; i++ {
+		indexes = append(indexes, i)
+	}
+	bitmap, _ := indexesToBitMap(indexes, numSlots)
+	return &testHeader{
+		number:           new(big.Int).SetInt64(number),
+		shardID:          shardID,
+		lastCommitBitmap: bitmap,
+	}
+}
+
+func (th *testHeader) Number() *big.Int {
+	return th.number
+}
+
+func (th *testHeader) ShardID() uint32 {
+	return th.shardID
+}
+
+func (th *testHeader) LastCommitBitmap() []byte {
+	return th.lastCommitBitmap
+}
+
+func makeTestShardState(numShards, numSlots int) *shard.State {
+	state := &shard.State{
+		Epoch:  new(big.Int).SetInt64(0),
+		Shards: make([]shard.Committee, 0, numShards),
+	}
+	for shardID := uint32(0); shardID != uint32(numShards); shardID++ {
+		cmt := makeTestCommittee(numSlots, shardID)
+		state.Shards = append(state.Shards, *cmt)
+	}
+	return state
+}
+
 func makeTestCommittee(n int, shardID uint32) *shard.Committee {
 	slots := make(shard.SlotList, 0, n)
 	for i := 0; i != n; i++ {
-		slots = append(slots, makeTestSlot(i))
+		slots = append(slots, makeHmySlot(i, shardID))
 	}
 	return &shard.Committee{
 		ShardID: shardID,
@@ -109,8 +187,8 @@ func makeTestCommittee(n int, shardID uint32) *shard.Committee {
 	}
 }
 
-func makeTestSlot(seed int) shard.Slot {
-	addr := common.BigToAddress(new(big.Int).SetInt64(int64(seed)))
+func makeHmySlot(seed int, shardID uint32) shard.Slot {
+	addr := common.BigToAddress(new(big.Int).SetInt64(int64(seed) + int64(shardID*1000000)))
 	var blsKey shard.BLSPublicKey
 	copy(blsKey[:], bls.RandPrivateKey().GetPublicKey().Serialize())
 
@@ -118,6 +196,30 @@ func makeTestSlot(seed int) shard.Slot {
 		EcdsaAddress: addr,
 		BLSPublicKey: blsKey,
 	}
+}
+
+const testStake = int64(100000000000)
+
+// makeTestMixedCommittee makes a committee with both harmony nodes and user nodes
+func makeTestMixedCommittee(numHmyNode, numUserNode int, shardID uint32) *shard.Committee {
+	slots := make(shard.SlotList, 0, numHmyNode+numUserNode)
+	for i := 0; i != numHmyNode; i++ {
+		slots = append(slots, makeHmySlot(i, shardID))
+	}
+	for i := numHmyNode; i != numHmyNode+numUserNode; i++ {
+		slots = append(slots, makeUserSlot(i, shardID))
+	}
+	return &shard.Committee{
+		ShardID: shardID,
+		Slots:   slots,
+	}
+}
+
+func makeUserSlot(seed int, shardID uint32) shard.Slot {
+	slot := makeHmySlot(seed, shardID)
+	stake := numeric.NewDec(testStake)
+	slot.EffectiveStake = &stake
+	return slot
 }
 
 // indexesToBitMap convert the indexes to bitmap. The conversion follows the little-
