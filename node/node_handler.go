@@ -123,7 +123,9 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 								utils.Logger().Info().
 									Uint64("block", blocks[0].NumberU64()).
 									Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
-								node.BeaconBlockChannel <- block
+								go func(blk *types.Block) {
+									node.BeaconBlockChannel <- blk
+								}(block)
 							}
 						}
 					}
