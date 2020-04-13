@@ -248,11 +248,6 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	return nil
 }
 
-// Topic ..
-func (host *HostV2) Topic(t string) *libp2p_pubsub.Topic {
-	return host.joined[t]
-}
-
 // AllTopics ..
 func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
 	topics := []*libp2p_pubsub.Topic{}

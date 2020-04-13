@@ -782,5 +782,8 @@ func main() {
 			Msg("StartRPC failed")
 	}
 
-	currentNode.Start()
+	if err := currentNode.Start(); err != nil {
+		fmt.Println("could not begin network message handling for node", err.Error())
+		os.Exit(-1)
+	}
 }

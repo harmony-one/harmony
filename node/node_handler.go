@@ -29,39 +29,6 @@ import (
 
 const p2pMsgPrefixSize = 5
 
-// // receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
-// func (node *Node) receiveGroupMessage(
-// 	receiver p2p.GroupReceiver, rxQueue msgq.MessageAdder,
-// ) {
-// 	ctx := context.Background()
-// 	// TODO ek – infinite loop; add shutdown/cleanup logic
-// 	for {
-// 		msg, sender, err := receiver.Receive(ctx)
-// 		if err != nil {
-// 			utils.Logger().Warn().Err(err).
-// 				Msg("cannot receive from group")
-// 			continue
-// 		}
-// 		if sender == node.host.GetID() {
-// 			continue
-// 		}
-// 		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
-// 		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-// 		// TODO sanity check that message isn't too big, have access to core txn constants
-// 		if len(msg) < p2pMsgPrefixSize {
-// 			utils.Logger().Warn().Err(err).Int("msg size", len(msg)).
-// 				Msg("invalid p2p message size")
-// 			continue
-// 		}
-// 		// NOTE non-blocking dispatches the message as fast as possiblee
-// 		if err := rxQueue.AddMessage(msg[p2pMsgPrefixSize:], sender); err != nil {
-// 			utils.Logger().Warn().Err(err).
-// 				Str("sender", sender.Pretty()).
-// 				Msg("cannot enqueue incoming message for processing")
-// 		}
-// 	}
-// }
-
 // some messages have uninteresting fields in header, slash, receipt and crosslink are
 // such messages. This function assumes that input bytes are a slice which already
 // past those not relevant header bytes.
@@ -91,20 +58,20 @@ func (node *Node) processSkippedMsgTypeByteValue(
 }
 
 // HandleMessage parses the message and dispatch the actions.
-func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) error {
+func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msg("HandleMessage get message category failed")
-		return err
+		return
 	}
 	msgType, err := proto.GetMessageType(content)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msg("HandleMessage get message type failed")
-		return err
+		return
 	}
 
 	msgPayload, err := proto.GetMessagePayload(content)
@@ -112,7 +79,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) error {
 		utils.Logger().Error().
 			Err(err).
 			Msg("HandleMessage get message payload failed")
-		return err
+		return
 	}
 
 	switch msgCategory {
@@ -136,7 +103,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) error {
 			utils.Logger().Debug().Msg("NET: received message: Node/Block")
 			if len(msgPayload) < 1 {
 				utils.Logger().Debug().Msgf("Invalid block message size")
-				return errors.New("invalid block message size")
+				return
 			}
 
 			switch blockMsgType := proto_node.BlockMessageType(msgPayload[0]); blockMsgType {
@@ -147,27 +114,24 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) error {
 					utils.Logger().Error().
 						Err(err).
 						Msg("block sync")
-					return err
-				}
-				// for non-beaconchain node, subscribe to beacon block broadcast
-				if node.Blockchain().ShardID() != shard.BeaconChainShardID &&
-					node.NodeConfig.Role() != nodeconfig.ExplorerNode {
-					for _, block := range blocks {
-						if block.ShardID() == shard.BeaconChainShardID {
-							utils.Logger().Info().
-								Uint64("block", blocks[0].NumberU64()).
-								Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
-							go func() {
+				} else {
+					// for non-beaconchain node, subscribe to beacon block broadcast
+					if node.Blockchain().ShardID() != shard.BeaconChainShardID &&
+						node.NodeConfig.Role() != nodeconfig.ExplorerNode {
+						for _, block := range blocks {
+							if block.ShardID() == 0 {
+								utils.Logger().Info().
+									Uint64("block", blocks[0].NumberU64()).
+									Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
 								node.BeaconBlockChannel <- block
-							}()
+							}
 						}
 					}
+					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
+						utils.Logger().Info().Msg("Block being handled by client")
+						node.Client.UpdateBlocks(blocks)
+					}
 				}
-				if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
-					utils.Logger().Info().Msg("Block being handled by client")
-					node.Client.UpdateBlocks(blocks)
-				}
-
 			case
 				proto_node.SlashCandidate,
 				proto_node.Receipt,
@@ -181,9 +145,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) error {
 	default:
 		utils.Logger().Error().
 			Str("Unknown MsgCateogry", string(msgCategory))
-		return errors.New("unknown msg category")
 	}
-	return nil
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {

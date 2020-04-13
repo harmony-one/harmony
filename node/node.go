@@ -36,8 +36,8 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -356,56 +356,59 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 }
 
 // Start kicks off the node message handling
-func (node *Node) Start() {
-	var g errgroup.Group
+func (node *Node) Start() error {
 	allTopics := node.host.AllTopics()
 	const maxMessageHandlers = 100
 	sem := semaphore.NewWeighted(maxMessageHandlers)
 	ctx := context.Background()
+	ownID := node.host.GetID()
+	errChan := make(chan error)
 
 	for _, topic := range allTopics {
-		// need the local for the closure
 		sub, err := topic.Subscribe()
 		if err != nil {
-			fmt.Println("should not happen here, reason", err.Error())
+			return err
 		}
-		// if any of my topics fail, say it all fails
-		g.Go(func() error {
-			var topicG errgroup.Group
 
-			for nextMsg, err := sub.Next(ctx); ; {
-				if err != nil {
-					utils.Logger().Info().
-						Err(err).Msg("could not grab next message from subscription")
+		msgChan := make(chan *libp2p_pubsub.Message)
+
+		go func(msgChan chan *libp2p_pubsub.Message) {
+			for msg := range msgChan {
+				payload := msg.GetData()
+				if len(payload) < p2pMsgPrefixSize {
 					continue
 				}
-				go func() {
-					if err := sem.Acquire(ctx, 1); err != nil {
-						utils.Logger().Info().
-							Err(err).Msg("could not pay cost to handle message")
-					}
-					if err := node.HandleMessage(
-						nextMsg.GetData(), nextMsg.GetFrom(),
-					); err != nil {
-						utils.Logger().Info().
-							Err(err).Msg("issue in handling message from topic")
-					}
-				}()
+				if sem.TryAcquire(1) {
+					go func() {
+						node.HandleMessage(
+							payload[p2pMsgPrefixSize:], msg.GetFrom(),
+						)
+						sem.Release(1)
+					}()
+				}
 			}
+		}(msgChan)
 
-			if err := topicG.Wait(); err != nil {
-				return err
+		go func(msgChan chan *libp2p_pubsub.Message) {
+			for {
+				nextMsg, err := sub.Next(ctx)
+				if err != nil {
+					errChan <- err
+					continue
+				}
+				if nextMsg.GetFrom() == ownID {
+					continue
+				}
+				msgChan <- nextMsg
 			}
-			return nil
-		})
+		}(msgChan)
 	}
 
-	if err := g.Wait(); err != nil {
-		fmt.Println("should never happen, why died", err.Error())
-	} else if err := ctx.Err(); err != nil {
-		fmt.Println("why did context die?", err.Error())
+	for err := range errChan {
+		utils.Logger().Info().Err(err).Msg("issue while handling incoming p2p message")
 	}
-	// not possible
+	// NOTE never gets here
+	return nil
 }
 
 // GetSyncID returns the syncID of this node
