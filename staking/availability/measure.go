@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/core/state"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -51,15 +50,8 @@ func BlockSigners(
 	return payable, missing, nil
 }
 
-// Header is the interface of block.Header for calculating the BallotResult.
-type Header interface {
-	Number() *big.Int
-	ShardID() uint32
-	LastCommitBitmap() []byte
-}
-
 // BallotResult returns
-// (parentCommittee.Slots, payable, missing, err)
+// (parentCommittee.Slots, payable, missings, err)
 func BallotResult(
 	parentHeader, header Header, parentShardState *shard.State, shardID uint32,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
@@ -86,7 +78,7 @@ type signerKind struct {
 
 func bumpCount(
 	bc Reader,
-	state *state.DB,
+	state StateDB,
 	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
@@ -130,20 +122,13 @@ func bumpCount(
 func IncrementValidatorSigningCounts(
 	bc Reader,
 	staked *shard.StakedSlots,
-	state *state.DB,
+	state StateDB,
 	signers, missing shard.SlotList,
 ) error {
 	return bumpCount(
 		bc, state, []signerKind{{false, missing}, {true, signers}},
 		staked.LookupSet,
 	)
-}
-
-// Reader ..
-type Reader interface {
-	ReadValidatorSnapshot(
-		addr common.Address,
-	) (*staking.ValidatorWrapper, error)
 }
 
 // ComputeCurrentSigning returns (signed, toSign, quotient, error)
@@ -197,7 +182,7 @@ func IsBelowSigningThreshold(quotient numeric.Dec) bool {
 // signing threshold is 66%
 func ComputeAndMutateEPOSStatus(
 	bc Reader,
-	state *state.DB,
+	state StateDB,
 	addr common.Address,
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")

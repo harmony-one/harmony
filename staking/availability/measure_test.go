@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 func TestBlockSigners(t *testing.T) {
@@ -55,15 +57,15 @@ func TestBlockSigners(t *testing.T) {
 
 func checkPayableAndMissing(cmt *shard.Committee, idxs []int, pSlots, mSlots shard.SlotList) error {
 	if len(pSlots)+len(mSlots) != len(cmt.Slots) {
-		return fmt.Errorf("slots number not expected: %d(payable) + %d(missing) != %d(committee)",
+		return fmt.Errorf("slots number not expected: %d(payable) + %d(missings) != %d(committee)",
 			len(pSlots), len(mSlots), len(cmt.Slots))
 	}
 	pIndex, mIndex, iIndex := 0, 0, 0
 	for i, slot := range cmt.Slots {
 		if iIndex >= len(idxs) || i != idxs[iIndex] {
-			// the slot should be missing and we shall check mSlots[mIndex] == slot
+			// the slot should be missings and we shall check mSlots[mIndex] == slot
 			if mIndex >= len(mSlots) || !reflect.DeepEqual(slot, mSlots[mIndex]) {
-				return fmt.Errorf("addr %v missed from missing slots", slot.EcdsaAddress.String())
+				return fmt.Errorf("addr %v missed from missings slots", slot.EcdsaAddress.String())
 			}
 			mIndex += 1
 		} else {
@@ -111,16 +113,16 @@ func TestBallotResult(t *testing.T) {
 		{5, 16, 10, 12, 3, 4, 100, 101, 12, 4},
 	}
 	for i, test := range tests {
-		state := makeTestShardState(test.numStateShards, test.numShardSlots)
+		sstate := makeTestShardState(test.numStateShards, test.numShardSlots)
 		parHeader := newTestHeader(test.parBN, test.parShardID, test.numShardSlots, test.parVerified)
 		chdHeader := newTestHeader(test.chdBN, test.chdShardID, test.numShardSlots, test.chdVerified)
 
-		slots, payable, missing, err := BallotResult(parHeader, chdHeader, state, chdHeader.ShardID())
+		slots, payable, missing, err := BallotResult(parHeader, chdHeader, sstate, chdHeader.ShardID())
 		if err != nil {
 			t.Error(err)
 		}
 
-		expCmt, _ := state.FindCommitteeByID(test.chdShardID)
+		expCmt, _ := sstate.FindCommitteeByID(test.chdShardID)
 		if !reflect.DeepEqual(slots, expCmt.Slots) {
 			t.Errorf("Test %v: Ballot result slots not expected", i)
 		}
@@ -128,9 +130,193 @@ func TestBallotResult(t *testing.T) {
 			t.Errorf("Test %v: payable size not expected: %v / %v", i, len(payable), test.expNumPayable)
 		}
 		if len(missing) != test.expNumMissing {
-			t.Errorf("Test %v: missing size not expected: %v / %v", i, len(missing), test.expNumMissing)
+			t.Errorf("Test %v: missings size not expected: %v / %v", i, len(missing), test.expNumMissing)
 		}
 	}
+}
+
+func TestIncrementValidatorSigningCounts(t *testing.T) {
+	tests := []struct {
+		numHmySlots, numUserSlots int
+		verified                  []int
+	}{
+		{1, 0, []int{0}},
+		{0, 1, []int{0}},
+		{10, 6, []int{0, 2, 3, 4, 6, 8, 10, 12, 14}},
+		{10, 6, []int{1, 3, 5, 7, 9, 11, 13, 15}},
+	}
+	for _, test := range tests {
+		ctx, err := MakeIncStateTestCtx(test.numHmySlots, test.numUserSlots, test.verified)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := IncrementValidatorSigningCounts(nil, ctx.staked, ctx.state, ctx.signers,
+			ctx.missings); err != nil {
+
+			t.Fatal(err)
+		}
+		if err := ctx.CheckResult(); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+const (
+	typeIncSigned = iota
+	typeIncMissing
+	typeIncHmyNode
+)
+
+// incStateTestCtx is the helper structure for test case TestIncrementValidatorSigningCounts
+type incStateTestCtx struct {
+	// Initialized fields
+	prevState, state  testStateDB
+	cmt               *shard.Committee
+	staked            *shard.StakedSlots
+	signers, missings shard.SlotList
+
+	// computedSlotMap is parsed map for result checking, which maps from Ecdsa address
+	// to the expected behaviour of the address.
+	//  typeIncSigned - 0: increase both toSign and signed
+	//  typeIncMissing - 1: increase to sign
+	//  typeIncHmyNode - 2: keep the code field un changed
+	computedSlotMap map[common.Address]int
+}
+
+// MakeIncStateTestCtx create and initialize the test context for TestIncrementValidatorSigningCounts
+func MakeIncStateTestCtx(numHmySlots, numUserSlots int, verified []int) (*incStateTestCtx, error) {
+	cmt := makeTestMixedCommittee(numHmySlots, numUserSlots, 0)
+	staked := cmt.StakedValidators()
+	bitmap, _ := indexesToBitMap(verified, numUserSlots+numHmySlots)
+	signers, missing, err := BlockSigners(bitmap, cmt)
+	if err != nil {
+		return nil, err
+	}
+	state := newTestStateDBFromCommittee(cmt)
+	prevState := state.snapshot()
+
+	return &incStateTestCtx{
+		prevState: prevState,
+		state:     state,
+		cmt:       cmt,
+		staked:    staked,
+		signers:   signers,
+		missings:  missing,
+	}, nil
+}
+
+// CheckResult checks the state change result for incStateTestCtx
+func (ctx *incStateTestCtx) CheckResult() error {
+	ctx.computeSlotMaps()
+
+	for addr, typeInc := range ctx.computedSlotMap {
+		if err := ctx.checkAddrIncStateByType(addr, typeInc); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// computeSlotMaps compute for computedSlotMap for incStateTestCtx
+func (ctx *incStateTestCtx) computeSlotMaps() {
+	ctx.computedSlotMap = make(map[common.Address]int)
+
+	for _, signer := range ctx.signers {
+		ctx.computedSlotMap[signer.EcdsaAddress] = typeIncSigned
+	}
+	for _, missing := range ctx.missings {
+		ctx.computedSlotMap[missing.EcdsaAddress] = typeIncMissing
+	}
+	for _, slot := range ctx.cmt.Slots {
+		if slot.EffectiveStake == nil {
+			ctx.computedSlotMap[slot.EcdsaAddress] = typeIncHmyNode
+		}
+	}
+}
+
+// checkAddrIncStateByType checks whether the state behaviour of a given address follows
+// the expected state change rule given typeInc
+func (ctx *incStateTestCtx) checkAddrIncStateByType(addr common.Address, typeInc int) error {
+	var err error
+	switch typeInc {
+	case typeIncSigned:
+		if err = ctx.checkWrapperChangeByAddr(addr, checkIncWrapperVerified); err != nil {
+			err = fmt.Errorf("verified address %s: %v", addr, err)
+		}
+	case typeIncMissing:
+		if err = ctx.checkWrapperChangeByAddr(addr, checkIncWrapperMissing); err != nil {
+			err = fmt.Errorf("missing address %s: %v", addr, err)
+		}
+	case typeIncHmyNode:
+		if err = ctx.checkHmyNodeStateChangeByAddr(addr); err != nil {
+			err = fmt.Errorf("harmony node address %s: %v", addr, err)
+		}
+	default:
+		err = errors.New("unknown typeInc")
+	}
+	return err
+}
+
+// checkHmyNodeStateChangeByAddr checks the state change for hmy nodes. Since hmy nodes does not
+// have wrapper, it is supposed to be unchanged in code field
+func (ctx *incStateTestCtx) checkHmyNodeStateChangeByAddr(addr common.Address) error {
+	prevCode := ctx.prevState.GetCode(addr)
+	curCode := ctx.state.GetCode(addr)
+	if !reflect.DeepEqual(prevCode, curCode) {
+		return errors.New("code not expected")
+	}
+	return nil
+}
+
+// checkWrapperChangeByAddr checks whether the wrapper in state of a given address
+// before and after the state change is expected defined by compare function f.
+func (ctx *incStateTestCtx) checkWrapperChangeByAddr(addr common.Address,
+	f func(w1, w2 *staking.ValidatorWrapper) bool) error {
+
+	prevWrapper, err := ctx.prevState.ValidatorWrapper(addr)
+	if err != nil {
+		return err
+	}
+	curWrapper, err := ctx.state.ValidatorWrapper(addr)
+	if err != nil {
+		return err
+	}
+	if isExpected := f(prevWrapper, curWrapper); !isExpected {
+		return errors.New("validatorWrapper not expected")
+	}
+	return nil
+}
+
+// checkIncWrapperVerified is the compare function to check whether validator wrapper
+// is expected for nodes who has verified a block.
+func checkIncWrapperVerified(prevWrapper, curWrapper *staking.ValidatorWrapper) bool {
+	prevSigned := prevWrapper.Counters.NumBlocksSigned
+	curSigned := curWrapper.Counters.NumBlocksSigned
+	if curSigned.Cmp(new(big.Int).Add(prevSigned, common.Big1)) != 0 {
+		return false
+	}
+	prevToSign := prevWrapper.Counters.NumBlocksToSign
+	curToSign := curWrapper.Counters.NumBlocksToSign
+	if curToSign.Cmp(new(big.Int).Add(prevToSign, common.Big1)) != 0 {
+		return false
+	}
+	return true
+}
+
+// checkIncWrapperMissing is the compare function to check whether validator wrapper
+// is expected for nodes who has missed a block.
+func checkIncWrapperMissing(prevWrapper, curWrapper *staking.ValidatorWrapper) bool {
+	prevSigned := prevWrapper.Counters.NumBlocksSigned
+	curSigned := curWrapper.Counters.NumBlocksSigned
+	if curSigned.Cmp(prevSigned) != 0 {
+		return false
+	}
+	prevToSign := prevWrapper.Counters.NumBlocksToSign
+	curToSign := curWrapper.Counters.NumBlocksToSign
+	if curToSign.Cmp(new(big.Int).Add(prevToSign, common.Big1)) != 0 {
+		return false
+	}
+	return true
 }
 
 type testHeader struct {
@@ -201,12 +387,12 @@ func makeHmySlot(seed int, shardID uint32) shard.Slot {
 const testStake = int64(100000000000)
 
 // makeTestMixedCommittee makes a committee with both harmony nodes and user nodes
-func makeTestMixedCommittee(numHmyNode, numUserNode int, shardID uint32) *shard.Committee {
-	slots := make(shard.SlotList, 0, numHmyNode+numUserNode)
-	for i := 0; i != numHmyNode; i++ {
+func makeTestMixedCommittee(numHmySlots, numUserSlots int, shardID uint32) *shard.Committee {
+	slots := make(shard.SlotList, 0, numHmySlots+numUserSlots)
+	for i := 0; i != numHmySlots; i++ {
 		slots = append(slots, makeHmySlot(i, shardID))
 	}
-	for i := numHmyNode; i != numHmyNode+numUserNode; i++ {
+	for i := numHmySlots; i != numHmySlots+numUserSlots; i++ {
 		slots = append(slots, makeUserSlot(i, shardID))
 	}
 	return &shard.Committee{
@@ -236,4 +422,63 @@ func indexesToBitMap(idxs []int, n int) ([]byte, error) {
 		res[byt] ^= msk
 	}
 	return res, nil
+}
+
+type testStateDB map[common.Address]staking.ValidatorWrapper
+
+func newTestStateDBFromCommittee(cmt *shard.Committee) testStateDB {
+	state := make(testStateDB)
+	for _, slot := range cmt.Slots {
+		if slot.EffectiveStake == nil {
+			continue
+		}
+		var wrapper staking.ValidatorWrapper
+		wrapper.Address = slot.EcdsaAddress
+		wrapper.SlotPubKeys = []shard.BLSPublicKey{slot.BLSPublicKey}
+		wrapper.Counters.NumBlocksSigned = new(big.Int).SetInt64(1)
+		wrapper.Counters.NumBlocksToSign = new(big.Int).SetInt64(1)
+
+		state[slot.EcdsaAddress] = wrapper
+	}
+	return state
+}
+
+// snapshot returns a deep copy of the current test state
+func (state testStateDB) snapshot() testStateDB {
+	res := make(map[common.Address]staking.ValidatorWrapper)
+	for addr, wrapper := range state {
+		wrapperCpy := staking.ValidatorWrapper{
+			Validator: staking.Validator{
+				Address:     addr,
+				SlotPubKeys: make([]shard.BLSPublicKey, 1),
+			},
+		}
+		copy(wrapperCpy.SlotPubKeys, wrapper.SlotPubKeys)
+		wrapperCpy.Counters.NumBlocksToSign = new(big.Int).Set(wrapper.Counters.NumBlocksToSign)
+		wrapperCpy.Counters.NumBlocksSigned = new(big.Int).Set(wrapper.Counters.NumBlocksSigned)
+		res[addr] = wrapperCpy
+	}
+	return res
+}
+
+func (state testStateDB) ValidatorWrapper(addr common.Address) (*staking.ValidatorWrapper, error) {
+	wrapper, ok := state[addr]
+	if !ok {
+		return nil, fmt.Errorf("addr not exist in validator wrapper: %v", addr.String())
+	}
+	return &wrapper, nil
+}
+
+func (state testStateDB) UpdateValidatorWrapper(addr common.Address, wrapper *staking.ValidatorWrapper) error {
+	state[addr] = *wrapper
+	return nil
+}
+
+func (state testStateDB) GetCode(addr common.Address) []byte {
+	wrapper, ok := state[addr]
+	if !ok {
+		return nil
+	}
+	b, _ := rlp.EncodeToBytes(wrapper)
+	return b
 }
