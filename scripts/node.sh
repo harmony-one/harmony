@@ -773,13 +773,14 @@ read_bls_pass() {
    if ${prompt_save} ; then
       while true
       do
-         read -p "Do you wish to delete the saved passphrase files after successful start of node? (y|n):" yn
+         read -t 3 -rp "Do you wish to delete the saved passphrase files after successful start of node? (y|n):" yn
+         yn=${yn:-Y}
          case $yn in
             [Yy]*) save_pass_file=false
             break;;
             [Nn]*) save_pass_file=true
             break;;
-            *) echo "Please answer yes (y|Y) or no (n|N)";;
+            *) sleep 1 && echo "Please answer yes (y|Y) or no (n|N)";;
          esac
       done
       prompt_save=false
