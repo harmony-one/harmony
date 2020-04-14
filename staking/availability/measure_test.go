@@ -179,7 +179,7 @@ type incStateTestCtx struct {
 	// to the expected behaviour of the address.
 	//  typeIncSigned - 0: increase both toSign and signed
 	//  typeIncMissing - 1: increase to sign
-	//  typeIncHmyNode - 2: keep the code field un changed
+	//  typeIncHmyNode - 2: keep the code field unchanged
 	computedSlotMap map[common.Address]int
 }
 
@@ -268,7 +268,7 @@ func (ctx *incStateTestCtx) checkHmyNodeStateChangeByAddr(addr common.Address) e
 	return nil
 }
 
-// checkWrapperChangeByAddr checks whether the wrapper in state of a given address
+// checkWrapperChangeByAddr checks whether the wrapper of a given address
 // before and after the state change is expected defined by compare function f.
 func (ctx *incStateTestCtx) checkWrapperChangeByAddr(addr common.Address,
 	f func(w1, w2 *staking.ValidatorWrapper) bool) error {
@@ -319,6 +319,46 @@ func checkIncWrapperMissing(prevWrapper, curWrapper *staking.ValidatorWrapper) b
 	return true
 }
 
+func TestComputeCurrentSigning(t *testing.T) {
+	tests := []struct {
+		prevSigned, curSigned, diffSigned int64
+		prevToSign, curToSign, diffToSign int64
+		pctNum, pctDiv                    int64
+		isBelowThreshold                  bool
+	}{
+		{0, 1, 1, 0, 1, 1, 1, 1, false},
+		{0, 2, 2, 0, 3, 3, 2, 3, true},
+		{0, 1, 1, 0, 3, 3, 1, 3, true},
+		{100, 225, 125, 200, 350, 150, 5, 6, false},
+		{100, 200, 100, 200, 350, 150, 2, 3, true},
+		{100, 200, 100, 200, 400, 200, 1, 2, true},
+	}
+	for i, test := range tests {
+		prevWrapper := makeTestWrapper(common.Address{}, test.prevSigned, test.prevToSign)
+		curWrapper := makeTestWrapper(common.Address{}, test.curSigned, test.curToSign)
+
+		computed := ComputeCurrentSigning(&prevWrapper, &curWrapper)
+
+		if computed.Signed.Cmp(new(big.Int).SetInt64(test.diffSigned)) != 0 {
+			t.Errorf("test %v: computed signed not expected: %v / %v",
+				i, computed.Signed, test.diffSigned)
+		}
+		if computed.ToSign.Cmp(new(big.Int).SetInt64(test.diffToSign)) != 0 {
+			t.Errorf("test %v: computed to sign not expected: %v / %v",
+				i, computed.ToSign, test.diffToSign)
+		}
+		expPct := numeric.NewDec(test.pctNum).Quo(numeric.NewDec(test.pctDiv))
+		if !computed.Percentage.Equal(expPct) {
+			t.Errorf("test %v: computed percentage not expected: %v / %v",
+				i, computed.Percentage, expPct)
+		}
+		if computed.IsBelowThreshold != test.isBelowThreshold {
+			t.Errorf("test %v: computed is below threshold not expected: %v / %v",
+				i, computed.IsBelowThreshold, test.isBelowThreshold)
+		}
+	}
+}
+
 type testHeader struct {
 	number           *big.Int
 	shardID          uint32
@@ -348,6 +388,65 @@ func (th *testHeader) ShardID() uint32 {
 
 func (th *testHeader) LastCommitBitmap() []byte {
 	return th.lastCommitBitmap
+}
+
+type testStateDB map[common.Address]staking.ValidatorWrapper
+
+func newTestStateDBFromCommittee(cmt *shard.Committee) testStateDB {
+	state := make(testStateDB)
+	for _, slot := range cmt.Slots {
+		if slot.EffectiveStake == nil {
+			continue
+		}
+		var wrapper staking.ValidatorWrapper
+		wrapper.Address = slot.EcdsaAddress
+		wrapper.SlotPubKeys = []shard.BLSPublicKey{slot.BLSPublicKey}
+		wrapper.Counters.NumBlocksSigned = new(big.Int).SetInt64(1)
+		wrapper.Counters.NumBlocksToSign = new(big.Int).SetInt64(1)
+
+		state[slot.EcdsaAddress] = wrapper
+	}
+	return state
+}
+
+// snapshot returns a deep copy of the current test state
+func (state testStateDB) snapshot() testStateDB {
+	res := make(map[common.Address]staking.ValidatorWrapper)
+	for addr, wrapper := range state {
+		wrapperCpy := staking.ValidatorWrapper{
+			Validator: staking.Validator{
+				Address:     addr,
+				SlotPubKeys: make([]shard.BLSPublicKey, 1),
+			},
+		}
+		copy(wrapperCpy.SlotPubKeys, wrapper.SlotPubKeys)
+		wrapperCpy.Counters.NumBlocksToSign = new(big.Int).Set(wrapper.Counters.NumBlocksToSign)
+		wrapperCpy.Counters.NumBlocksSigned = new(big.Int).Set(wrapper.Counters.NumBlocksSigned)
+		res[addr] = wrapperCpy
+	}
+	return res
+}
+
+func (state testStateDB) ValidatorWrapper(addr common.Address) (*staking.ValidatorWrapper, error) {
+	wrapper, ok := state[addr]
+	if !ok {
+		return nil, fmt.Errorf("addr not exist in validator wrapper: %v", addr.String())
+	}
+	return &wrapper, nil
+}
+
+func (state testStateDB) UpdateValidatorWrapper(addr common.Address, wrapper *staking.ValidatorWrapper) error {
+	state[addr] = *wrapper
+	return nil
+}
+
+func (state testStateDB) GetCode(addr common.Address) []byte {
+	wrapper, ok := state[addr]
+	if !ok {
+		return nil
+	}
+	b, _ := rlp.EncodeToBytes(wrapper)
+	return b
 }
 
 func makeTestShardState(numShards, numSlots int) *shard.State {
@@ -424,61 +523,10 @@ func indexesToBitMap(idxs []int, n int) ([]byte, error) {
 	return res, nil
 }
 
-type testStateDB map[common.Address]staking.ValidatorWrapper
-
-func newTestStateDBFromCommittee(cmt *shard.Committee) testStateDB {
-	state := make(testStateDB)
-	for _, slot := range cmt.Slots {
-		if slot.EffectiveStake == nil {
-			continue
-		}
-		var wrapper staking.ValidatorWrapper
-		wrapper.Address = slot.EcdsaAddress
-		wrapper.SlotPubKeys = []shard.BLSPublicKey{slot.BLSPublicKey}
-		wrapper.Counters.NumBlocksSigned = new(big.Int).SetInt64(1)
-		wrapper.Counters.NumBlocksToSign = new(big.Int).SetInt64(1)
-
-		state[slot.EcdsaAddress] = wrapper
-	}
-	return state
-}
-
-// snapshot returns a deep copy of the current test state
-func (state testStateDB) snapshot() testStateDB {
-	res := make(map[common.Address]staking.ValidatorWrapper)
-	for addr, wrapper := range state {
-		wrapperCpy := staking.ValidatorWrapper{
-			Validator: staking.Validator{
-				Address:     addr,
-				SlotPubKeys: make([]shard.BLSPublicKey, 1),
-			},
-		}
-		copy(wrapperCpy.SlotPubKeys, wrapper.SlotPubKeys)
-		wrapperCpy.Counters.NumBlocksToSign = new(big.Int).Set(wrapper.Counters.NumBlocksToSign)
-		wrapperCpy.Counters.NumBlocksSigned = new(big.Int).Set(wrapper.Counters.NumBlocksSigned)
-		res[addr] = wrapperCpy
-	}
-	return res
-}
-
-func (state testStateDB) ValidatorWrapper(addr common.Address) (*staking.ValidatorWrapper, error) {
-	wrapper, ok := state[addr]
-	if !ok {
-		return nil, fmt.Errorf("addr not exist in validator wrapper: %v", addr.String())
-	}
-	return &wrapper, nil
-}
-
-func (state testStateDB) UpdateValidatorWrapper(addr common.Address, wrapper *staking.ValidatorWrapper) error {
-	state[addr] = *wrapper
-	return nil
-}
-
-func (state testStateDB) GetCode(addr common.Address) []byte {
-	wrapper, ok := state[addr]
-	if !ok {
-		return nil
-	}
-	b, _ := rlp.EncodeToBytes(wrapper)
-	return b
+func makeTestWrapper(addr common.Address, numSigned, numToSign int64) staking.ValidatorWrapper {
+	var vm staking.ValidatorWrapper
+	vm.Address = addr
+	vm.Counters.NumBlocksToSign = new(big.Int).SetInt64(numToSign)
+	vm.Counters.NumBlocksSigned = new(big.Int).SetInt64(numSigned)
+	return vm
 }
