@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"github.com/harmony-one/harmony/staking/availability"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
@@ -16,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -325,11 +324,13 @@ func eposStakedCommittee(
 	for i := range completedEPoSRound.AuctionWinners {
 		purchasedSlot := completedEPoSRound.AuctionWinners[i]
 		shardID := int(new(big.Int).Mod(purchasedSlot.Key.Big(), shardBig).Int64())
-		shardState.Shards[shardID].Slots = append(shardState.Shards[shardID].Slots, shard.Slot{
-			purchasedSlot.Addr,
-			purchasedSlot.Key,
-			&purchasedSlot.Stake,
-		})
+		shardState.Shards[shardID].Slots = append(
+			shardState.Shards[shardID].Slots, shard.Slot{
+				purchasedSlot.Addr,
+				purchasedSlot.Key,
+				&purchasedSlot.EPoSStake,
+			},
+		)
 	}
 
 	return shardState, nil

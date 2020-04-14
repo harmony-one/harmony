@@ -28,21 +28,24 @@ func effectiveStake(median, actual numeric.Dec) numeric.Dec {
 
 // SlotPurchase ..
 type SlotPurchase struct {
-	Addr  common.Address     `json:"slot-owner"`
-	Key   shard.BLSPublicKey `json:"bls-public-key"`
-	Stake numeric.Dec        `json:"eposed-stake"`
+	Addr      common.Address
+	Key       shard.BLSPublicKey
+	RawStake  numeric.Dec
+	EPoSStake numeric.Dec
 }
 
 // MarshalJSON ..
 func (p SlotPurchase) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Addr  string      `json:"slot-owner"`
-		Key   string      `json:"bls-public-key"`
-		Stake numeric.Dec `json:"eposed-stake"`
+		Addr      string      `json:"slot-owner"`
+		Key       string      `json:"bls-public-key"`
+		RawStake  numeric.Dec `json:"raw-stake"`
+		EPoSStake numeric.Dec `json:"eposed-stake"`
 	}{
 		common2.MustAddressToBech32(p.Addr),
 		p.Key.Hex(),
-		p.Stake,
+		p.RawStake,
+		p.EPoSStake,
 	})
 }
 
@@ -62,7 +65,7 @@ func Median(stakes []SlotPurchase) numeric.Dec {
 	sort.SliceStable(
 		stakes,
 		func(i, j int) bool {
-			return stakes[i].Stake.GT(stakes[j].Stake)
+			return stakes[i].RawStake.GT(stakes[j].RawStake)
 		},
 	)
 	const isEven = 0
@@ -70,9 +73,9 @@ func Median(stakes []SlotPurchase) numeric.Dec {
 	case isEven:
 		left := (l / 2) - 1
 		right := l / 2
-		return stakes[left].Stake.Add(stakes[right].Stake).Quo(two)
+		return stakes[left].RawStake.Add(stakes[right].RawStake).Quo(two)
 	default:
-		return stakes[l/2].Stake
+		return stakes[l/2].RawStake
 	}
 }
 
@@ -111,9 +114,11 @@ func Compute(
 			QuoInt64(int64(slotsCount))
 		for i := 0; i < slotsCount; i++ {
 			eposedSlots = append(eposedSlots, SlotPurchase{
-				staker.addr,
-				staker.slot.SpreadAmong[i],
-				spread,
+				Addr: staker.addr,
+				Key:  staker.slot.SpreadAmong[i],
+				// NOTE these are same because later the .EPoSStake mutated
+				RawStake:  spread,
+				EPoSStake: spread,
 			})
 		}
 	}
@@ -121,7 +126,7 @@ func Compute(
 	sort.SliceStable(
 		eposedSlots,
 		func(i, j int) bool {
-			return eposedSlots[i].Stake.GT(eposedSlots[j].Stake)
+			return eposedSlots[i].RawStake.GT(eposedSlots[j].RawStake)
 		},
 	)
 
@@ -144,7 +149,7 @@ func Apply(shortHand map[common.Address]*SlotOrder, pull int) (
 ) {
 	median, picks := Compute(shortHand, pull)
 	for i := range picks {
-		picks[i].Stake = effectiveStake(median, picks[i].Stake)
+		picks[i].EPoSStake = effectiveStake(median, picks[i].RawStake)
 	}
 
 	return median, picks
