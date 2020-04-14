@@ -2426,8 +2426,9 @@ func (bc *BlockChain) ReadDelegationsByDelegator(
 			return nil, err
 		}
 	}
+	blockNum := bc.CurrentBlock().Number()
 	for _, index := range rawResult {
-		if index.BlockNum.Cmp(bc.CurrentBlock().Number()) <= 0 {
+		if index.BlockNum.Cmp(blockNum) <= 0 {
 			m = append(m, index)
 		} else {
 			// Filter out index that's created beyond current height of chain.
@@ -2533,6 +2534,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 	err error,
 ) {
 	newDelegations = map[common.Address]staking.DelegationIndexes{}
+	blockNum := block.Number()
 	for _, txn := range block.StakingTransactions() {
 		payload, err := txn.RLPEncodeStakeMsg()
 		if err != nil {
@@ -2558,7 +2560,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 			selfIndex := staking.DelegationIndex{
 				createValidator.ValidatorAddress,
 				uint64(0),
-				block.Number(),
+				blockNum,
 			}
 			delegations, ok := newDelegations[createValidator.ValidatorAddress]
 			if ok {
@@ -2580,7 +2582,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 				}
 			}
 			if delegations, err = bc.addDelegationIndex(
-				delegations, delegate.DelegatorAddress, delegate.ValidatorAddress, state, block.Number(),
+				delegations, delegate.DelegatorAddress, delegate.ValidatorAddress, state, blockNum,
 			); err != nil {
 				return nil, nil, err
 			}
