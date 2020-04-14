@@ -96,7 +96,7 @@ type ValidatorWrapper struct {
 type Computed struct {
 	Signed            *big.Int    `json:"current-epoch-signed"`
 	ToSign            *big.Int    `json:"current-epoch-to-sign"`
-	BlocksLeftInEpoch uint64      `json:"num-beacon-blocks-until-next-epoch"`
+	BlocksLeftInEpoch uint64      `json:"-"`
 	Percentage        numeric.Dec `json:"current-epoch-signing-percentage"`
 	IsBelowThreshold  bool        `json:"-"`
 }
