@@ -104,6 +104,7 @@ type DelegationIndexes []DelegationIndex
 type DelegationIndex struct {
 	ValidatorAddress common.Address
 	Index            uint64
+	BlockNum         *big.Int
 }
 
 // NewDelegation creates a new delegation object

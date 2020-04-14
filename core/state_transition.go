@@ -362,7 +362,8 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.DelegatorAddress {
 			return 0, errInvalidSigner
 		}
-		collectedRewards, err := st.verifyAndApplyCollectRewards(stkMsg)
+		collectedRewards, tempErr := st.verifyAndApplyCollectRewards(stkMsg)
+		err = tempErr
 		if err == nil {
 			st.state.AddLog(&types.Log{
 				Address:     stkMsg.DelegatorAddress,
@@ -438,7 +439,6 @@ func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.
 	if st.bc == nil {
 		return network.NoReward, errors.New("[CollectRewards] No chain context provided")
 	}
-	// TODO(audit): make sure the delegation index is always consistent with onchain data
 	delegations, err := st.bc.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
 	if err != nil {
 		return network.NoReward, err
