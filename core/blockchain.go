@@ -2414,16 +2414,29 @@ func (bc *BlockChain) WriteValidatorList(
 // ReadDelegationsByDelegator reads the addresses of validators delegated by a delegator
 func (bc *BlockChain) ReadDelegationsByDelegator(
 	delegator common.Address,
-) (staking.DelegationIndexes, error) {
+) (m staking.DelegationIndexes, err error) {
+	rawResult := staking.DelegationIndexes{}
 	if cached, ok := bc.validatorListByDelegatorCache.Get(string(delegator.Bytes())); ok {
 		by := cached.([]byte)
-		m := []staking.DelegationIndex{}
-		if err := rlp.DecodeBytes(by, &m); err != nil {
+		if err := rlp.DecodeBytes(by, &rawResult); err != nil {
 			return nil, err
 		}
-		return m, nil
+	} else {
+		if rawResult, err = rawdb.ReadDelegationsByDelegator(bc.db, delegator); err != nil {
+			return nil, err
+		}
 	}
-	return rawdb.ReadDelegationsByDelegator(bc.db, delegator)
+	blockNum := bc.CurrentBlock().Number()
+	for _, index := range rawResult {
+		if index.BlockNum.Cmp(blockNum) <= 0 {
+			m = append(m, index)
+		} else {
+			// Filter out index that's created beyond current height of chain.
+			// This only happens when there is a chain rollback.
+			utils.Logger().Warn().Msgf("Future delegation index encountered. Skip: %+v", index)
+		}
+	}
+	return m, nil
 }
 
 // writeDelegationsByDelegator writes the list of validator addresses to database
@@ -2448,10 +2461,10 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 // including the full validator list and delegation indexes.
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateStakingMetaData(
-	batch rawdb.DatabaseWriter, txns staking.StakingTransactions,
+	batch rawdb.DatabaseWriter, block *types.Block,
 	state *state.DB, epoch, newEpoch *big.Int,
 ) (newValidators []common.Address, err error) {
-	newValidators, newDelegations, err := bc.prepareStakingMetaData(txns, state)
+	newValidators, newDelegations, err := bc.prepareStakingMetaData(block, state)
 	if err != nil {
 		utils.Logger().Warn().Msgf("oops, prepareStakingMetaData failed, err: %+v", err)
 		return newValidators, err
@@ -2515,13 +2528,14 @@ func (bc *BlockChain) UpdateStakingMetaData(
 // newValidators - the addresses of the newly created validators
 // newDelegations - the map of delegator address and their updated delegation indexes
 func (bc *BlockChain) prepareStakingMetaData(
-	txns staking.StakingTransactions, state *state.DB,
+	block *types.Block, state *state.DB,
 ) (newValidators []common.Address,
 	newDelegations map[common.Address]staking.DelegationIndexes,
 	err error,
 ) {
 	newDelegations = map[common.Address]staking.DelegationIndexes{}
-	for _, txn := range txns {
+	blockNum := block.Number()
+	for _, txn := range block.StakingTransactions() {
 		payload, err := txn.RLPEncodeStakeMsg()
 		if err != nil {
 			return nil, nil, err
@@ -2546,6 +2560,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 			selfIndex := staking.DelegationIndex{
 				createValidator.ValidatorAddress,
 				uint64(0),
+				blockNum,
 			}
 			delegations, ok := newDelegations[createValidator.ValidatorAddress]
 			if ok {
@@ -2567,7 +2582,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 				}
 			}
 			if delegations, err = bc.addDelegationIndex(
-				delegations, delegate.DelegatorAddress, delegate.ValidatorAddress, state,
+				delegations, delegate.DelegatorAddress, delegate.ValidatorAddress, state, blockNum,
 			); err != nil {
 				return nil, nil, err
 			}
@@ -2623,7 +2638,7 @@ func (bc *BlockChain) UpdateBlockRewardAccumulator(
 // Note this should read from the state of current block in concern (root == newBlock.root)
 func (bc *BlockChain) addDelegationIndex(
 	delegations staking.DelegationIndexes,
-	delegatorAddress, validatorAddress common.Address, state *state.DB,
+	delegatorAddress, validatorAddress common.Address, state *state.DB, blockNum *big.Int,
 ) (staking.DelegationIndexes, error) {
 	// If there is an existing delegation, just return
 	validatorAddressBytes := validatorAddress.Bytes()
@@ -2647,6 +2662,7 @@ func (bc *BlockChain) addDelegationIndex(
 			delegations = append(delegations, staking.DelegationIndex{
 				validatorAddress,
 				uint64(i),
+				blockNum,
 			})
 		}
 	}
