@@ -3,6 +3,7 @@ package availability
 import (
 	"errors"
 	"fmt"
+	"github.com/harmony-one/harmony/staking/effective"
 	"math/big"
 	"reflect"
 	"testing"
@@ -170,7 +171,7 @@ const (
 // incStateTestCtx is the helper structure for test case TestIncrementValidatorSigningCounts
 type incStateTestCtx struct {
 	// Initialized fields
-	prevState, state  testStateDB
+	snapState, state  testStateDB
 	cmt               *shard.Committee
 	staked            *shard.StakedSlots
 	signers, missings shard.SlotList
@@ -193,10 +194,10 @@ func MakeIncStateTestCtx(numHmySlots, numUserSlots int, verified []int) (*incSta
 		return nil, err
 	}
 	state := newTestStateDBFromCommittee(cmt)
-	prevState := state.snapshot()
+	snapState := state.snapshot()
 
 	return &incStateTestCtx{
-		prevState: prevState,
+		snapState: snapState,
 		state:     state,
 		cmt:       cmt,
 		staked:    staked,
@@ -260,9 +261,9 @@ func (ctx *incStateTestCtx) checkAddrIncStateByType(addr common.Address, typeInc
 // checkHmyNodeStateChangeByAddr checks the state change for hmy nodes. Since hmy nodes does not
 // have wrapper, it is supposed to be unchanged in code field
 func (ctx *incStateTestCtx) checkHmyNodeStateChangeByAddr(addr common.Address) error {
-	prevCode := ctx.prevState.GetCode(addr)
+	snapCode := ctx.snapState.GetCode(addr)
 	curCode := ctx.state.GetCode(addr)
-	if !reflect.DeepEqual(prevCode, curCode) {
+	if !reflect.DeepEqual(snapCode, curCode) {
 		return errors.New("code not expected")
 	}
 	return nil
@@ -273,7 +274,7 @@ func (ctx *incStateTestCtx) checkHmyNodeStateChangeByAddr(addr common.Address) e
 func (ctx *incStateTestCtx) checkWrapperChangeByAddr(addr common.Address,
 	f func(w1, w2 *staking.ValidatorWrapper) bool) error {
 
-	prevWrapper, err := ctx.prevState.ValidatorWrapper(addr)
+	snapWrapper, err := ctx.snapState.ValidatorWrapper(addr)
 	if err != nil {
 		return err
 	}
@@ -281,7 +282,7 @@ func (ctx *incStateTestCtx) checkWrapperChangeByAddr(addr common.Address,
 	if err != nil {
 		return err
 	}
-	if isExpected := f(prevWrapper, curWrapper); !isExpected {
+	if isExpected := f(snapWrapper, curWrapper); !isExpected {
 		return errors.New("validatorWrapper not expected")
 	}
 	return nil
@@ -289,15 +290,15 @@ func (ctx *incStateTestCtx) checkWrapperChangeByAddr(addr common.Address,
 
 // checkIncWrapperVerified is the compare function to check whether validator wrapper
 // is expected for nodes who has verified a block.
-func checkIncWrapperVerified(prevWrapper, curWrapper *staking.ValidatorWrapper) bool {
-	prevSigned := prevWrapper.Counters.NumBlocksSigned
+func checkIncWrapperVerified(snapWrapper, curWrapper *staking.ValidatorWrapper) bool {
+	snapSigned := snapWrapper.Counters.NumBlocksSigned
 	curSigned := curWrapper.Counters.NumBlocksSigned
-	if curSigned.Cmp(new(big.Int).Add(prevSigned, common.Big1)) != 0 {
+	if curSigned.Cmp(new(big.Int).Add(snapSigned, common.Big1)) != 0 {
 		return false
 	}
-	prevToSign := prevWrapper.Counters.NumBlocksToSign
+	snapToSign := snapWrapper.Counters.NumBlocksToSign
 	curToSign := curWrapper.Counters.NumBlocksToSign
-	if curToSign.Cmp(new(big.Int).Add(prevToSign, common.Big1)) != 0 {
+	if curToSign.Cmp(new(big.Int).Add(snapToSign, common.Big1)) != 0 {
 		return false
 	}
 	return true
@@ -305,15 +306,15 @@ func checkIncWrapperVerified(prevWrapper, curWrapper *staking.ValidatorWrapper) 
 
 // checkIncWrapperMissing is the compare function to check whether validator wrapper
 // is expected for nodes who has missed a block.
-func checkIncWrapperMissing(prevWrapper, curWrapper *staking.ValidatorWrapper) bool {
-	prevSigned := prevWrapper.Counters.NumBlocksSigned
+func checkIncWrapperMissing(snapWrapper, curWrapper *staking.ValidatorWrapper) bool {
+	snapSigned := snapWrapper.Counters.NumBlocksSigned
 	curSigned := curWrapper.Counters.NumBlocksSigned
-	if curSigned.Cmp(prevSigned) != 0 {
+	if curSigned.Cmp(snapSigned) != 0 {
 		return false
 	}
-	prevToSign := prevWrapper.Counters.NumBlocksToSign
+	snapToSign := snapWrapper.Counters.NumBlocksToSign
 	curToSign := curWrapper.Counters.NumBlocksToSign
-	if curToSign.Cmp(new(big.Int).Add(prevToSign, common.Big1)) != 0 {
+	if curToSign.Cmp(new(big.Int).Add(snapToSign, common.Big1)) != 0 {
 		return false
 	}
 	return true
@@ -321,11 +322,12 @@ func checkIncWrapperMissing(prevWrapper, curWrapper *staking.ValidatorWrapper) b
 
 func TestComputeCurrentSigning(t *testing.T) {
 	tests := []struct {
-		prevSigned, curSigned, diffSigned int64
-		prevToSign, curToSign, diffToSign int64
+		snapSigned, curSigned, diffSigned int64
+		snapToSign, curToSign, diffToSign int64
 		pctNum, pctDiv                    int64
 		isBelowThreshold                  bool
 	}{
+		{0, 0, 0, 0, 0, 0, 0, 1, true},
 		{0, 1, 1, 0, 1, 1, 1, 1, false},
 		{0, 2, 2, 0, 3, 3, 2, 3, true},
 		{0, 1, 1, 0, 3, 3, 1, 3, true},
@@ -334,10 +336,10 @@ func TestComputeCurrentSigning(t *testing.T) {
 		{100, 200, 100, 200, 400, 200, 1, 2, true},
 	}
 	for i, test := range tests {
-		prevWrapper := makeTestWrapper(common.Address{}, test.prevSigned, test.prevToSign)
+		snapWrapper := makeTestWrapper(common.Address{}, test.snapSigned, test.snapToSign)
 		curWrapper := makeTestWrapper(common.Address{}, test.curSigned, test.curToSign)
 
-		computed := ComputeCurrentSigning(&prevWrapper, &curWrapper)
+		computed := ComputeCurrentSigning(&snapWrapper, &curWrapper)
 
 		if computed.Signed.Cmp(new(big.Int).SetInt64(test.diffSigned)) != 0 {
 			t.Errorf("test %v: computed signed not expected: %v / %v",
@@ -359,6 +361,172 @@ func TestComputeCurrentSigning(t *testing.T) {
 	}
 }
 
+func TestComputeAndMutateEPOSStatus(t *testing.T) {
+	tests := []struct {
+		ctx       *computeEPOSTestCtx
+		expErr    error
+		expStatus effective.Eligibility
+	}{
+		// active node
+		{
+			ctx: &computeEPOSTestCtx{
+				addr:       common.Address{20, 20},
+				snapSigned: 100,
+				snapToSign: 100,
+				snapEli:    effective.Active,
+				curSigned:  200,
+				curToSign:  200,
+				curEli:     effective.Active,
+			},
+			expStatus: effective.Active,
+		},
+		// active -> inactive
+		{
+			ctx: &computeEPOSTestCtx{
+				addr:       common.Address{20, 20},
+				snapSigned: 100,
+				snapToSign: 100,
+				snapEli:    effective.Active,
+				curSigned:  200,
+				curToSign:  250,
+				curEli:     effective.Active,
+			},
+			expStatus: effective.Inactive,
+		},
+		// active -> inactive
+		{
+			ctx: &computeEPOSTestCtx{
+				addr:       common.Address{20, 20},
+				snapSigned: 100,
+				snapToSign: 100,
+				snapEli:    effective.Active,
+				curSigned:  100,
+				curToSign:  200,
+				curEli:     effective.Active,
+			},
+			expStatus: effective.Inactive,
+		},
+		// status unchanged: inactive -> inactive
+		{
+			ctx: &computeEPOSTestCtx{
+				addr:       common.Address{20, 20},
+				snapSigned: 100,
+				snapToSign: 100,
+				snapEli:    effective.Inactive,
+				curSigned:  200,
+				curToSign:  200,
+				curEli:     effective.Inactive,
+			},
+			expStatus: effective.Inactive,
+		},
+		// status unchanged: inactive
+		{
+			ctx: &computeEPOSTestCtx{
+				addr:       common.Address{20, 20},
+				snapSigned: 100,
+				snapToSign: 100,
+				snapEli:    effective.Inactive,
+				curSigned:  200,
+				curToSign:  200,
+				curEli:     effective.Active,
+			},
+			expStatus: effective.Active,
+		},
+		// nil validator wrapper in state
+		{
+			ctx: &computeEPOSTestCtx{
+				addr:       common.Address{20, 20},
+				snapSigned: 100,
+				snapToSign: 100,
+				snapEli:    effective.Active,
+				curEli:     effective.Nil,
+			},
+			expErr: errors.New("nil validator wrapper in state"),
+		},
+		// nil validator wrapper in snapshot
+		{
+			ctx: &computeEPOSTestCtx{
+				addr:      common.Address{20, 20},
+				snapEli:   effective.Nil,
+				curSigned: 200,
+				curToSign: 200,
+				curEli:    effective.Active,
+			},
+			expErr: errors.New("nil validator wrapper in snapshot"),
+		},
+		// banned node
+		{
+			ctx: &computeEPOSTestCtx{
+				addr:       common.Address{20, 20},
+				snapSigned: 100,
+				snapToSign: 200,
+				snapEli:    effective.Active,
+				curSigned:  100,
+				curToSign:  200,
+				curEli:     effective.Banned,
+			},
+			expStatus: effective.Banned,
+		},
+	}
+	for i, test := range tests {
+		ctx := test.ctx
+		ctx.makeStateAndReader()
+
+		err := ComputeAndMutateEPOSStatus(ctx.reader, ctx.state, ctx.addr)
+		if err != nil {
+			if test.expErr == nil {
+				t.Errorf("Test %v: unexpected error: %v", i, err)
+			}
+			continue
+		}
+
+		if err := ctx.checkWrapperStatus(test.expStatus); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
+type computeEPOSTestCtx struct {
+	// input arguments
+	addr                   common.Address
+	snapSigned, snapToSign int64
+	snapEli                effective.Eligibility
+	curSigned, curToSign   int64
+	curEli                 effective.Eligibility
+
+	// computed fields
+	state  testStateDB
+	reader testReader
+}
+
+// makeStateAndReader compute for state and reader given the input arguments
+func (ctx *computeEPOSTestCtx) makeStateAndReader() {
+	ctx.reader = newTestReader()
+	if ctx.snapEli != effective.Nil {
+		wrapper := makeTestWrapper(ctx.addr, ctx.snapSigned, ctx.snapToSign)
+		wrapper.Status = ctx.snapEli
+		ctx.reader.updateValidatorWrapper(ctx.addr, &wrapper)
+	}
+	ctx.state = newTestStateDB()
+	if ctx.curEli != effective.Nil {
+		wrapper := makeTestWrapper(ctx.addr, ctx.curSigned, ctx.curToSign)
+		wrapper.Status = ctx.curEli
+		ctx.state.UpdateValidatorWrapper(ctx.addr, &wrapper)
+	}
+}
+
+func (ctx *computeEPOSTestCtx) checkWrapperStatus(expStatus effective.Eligibility) error {
+	wrapper, err := ctx.state.ValidatorWrapper(ctx.addr)
+	if err != nil {
+		return err
+	}
+	if wrapper.Status != expStatus {
+		return fmt.Errorf("wrapper status unexpected: %v / %v", wrapper.Status, expStatus)
+	}
+	return nil
+}
+
+// testHeader is the fake Header for testing
 type testHeader struct {
 	number           *big.Int
 	shardID          uint32
@@ -390,8 +558,17 @@ func (th *testHeader) LastCommitBitmap() []byte {
 	return th.lastCommitBitmap
 }
 
+// testStateDB is the fake state db for testing
 type testStateDB map[common.Address]staking.ValidatorWrapper
 
+// newTestStateDB return an empty testStateDB
+func newTestStateDB() testStateDB {
+	state := make(testStateDB)
+	return state
+}
+
+// newTestStateDBFromCommittee creates a testStateDB given a shard committee.
+// The validator wrappers are only set for user nodes.
 func newTestStateDBFromCommittee(cmt *shard.Committee) testStateDB {
 	state := make(testStateDB)
 	for _, slot := range cmt.Slots {
@@ -447,6 +624,27 @@ func (state testStateDB) GetCode(addr common.Address) []byte {
 	}
 	b, _ := rlp.EncodeToBytes(wrapper)
 	return b
+}
+
+// testReader is the fake Reader for testing
+type testReader map[common.Address]staking.ValidatorWrapper
+
+// newTestReader creates an empty test reader
+func newTestReader() testReader {
+	reader := make(testReader)
+	return reader
+}
+
+func (reader testReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
+	wrapper, ok := reader[addr]
+	if !ok {
+		return nil, errors.New("not a valid validator address")
+	}
+	return &wrapper, nil
+}
+
+func (reader testReader) updateValidatorWrapper(addr common.Address, wrapper *staking.ValidatorWrapper) {
+	reader[addr] = *wrapper
 }
 
 func makeTestShardState(numShards, numSlots int) *shard.State {
