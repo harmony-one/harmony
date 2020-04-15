@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -90,11 +91,21 @@ func printVersion(me string) {
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
-	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	logMaxSize := flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
-	keyFile := flag.String("key", "./.bnkey", "the private key file of the bootnode")
+	logFolder := flag.String(
+		"log_folder", "latest", "the folder collecting the logs of this execution",
+	)
+	logMaxSize := flag.Int(
+		"log_max_size", 100, "the max size in megabytes of the log file before it gets rotated",
+	)
+	keyFile := flag.String(
+		"key", "./.bnkey", "the private key file of the bootnode",
+	)
 	versionFlag := flag.Bool("version", false, "Output version info")
-	verbosity := flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
+	verbosity := flag.Int(
+		"verbosity",
+		5,
+		"Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)",
+	)
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
 
 	flag.Parse()
@@ -132,11 +143,14 @@ func main() {
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize DHT cache at %s", dataStorePath)
 	}
-	dht := kaddht.NewDHT(context.Background(), host.GetP2PHost(), dataStore)
-
-	if err := dht.Bootstrap(context.Background()); err != nil {
+	ctx := context.Background()
+	dht := kaddht.NewDHT(ctx, host.GetP2PHost(), dataStore)
+	if err := dht.Bootstrap(ctx); err != nil {
 		utils.FatalErrMsg(err, "cannot bootstrap DHT")
 	}
 
-	select {}
+	for range time.NewTicker(time.Second * 30).C {
+		err := <-dht.RefreshRoutingTable()
+		utils.FatalErrMsg(err, "cannot bootstrap DHT")
+	}
 }
