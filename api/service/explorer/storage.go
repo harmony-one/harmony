@@ -94,7 +94,6 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		if err != nil {
 			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
 				Msg("Failed to get explorer StakingTransaction mapping")
-			continue
 		}
 		storage.UpdateStakingTxAddress(explorerTransaction, tx)
 	}
