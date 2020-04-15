@@ -108,10 +108,13 @@ func TestBallotResult(t *testing.T) {
 		parVerified, chdVerified      int
 		parShardID, chdShardID        uint32
 		parBN, chdBN                  int64
-		expNumPayable, expNumMissing  int
+
+		expNumPayable, expNumMissing int
+		expErr                       error
 	}{
-		{1, 1, 1, 1, 0, 0, 10, 11, 1, 0},
-		{5, 16, 10, 12, 3, 4, 100, 101, 12, 4},
+		{1, 1, 1, 1, 0, 0, 10, 11, 1, 0, nil},
+		{5, 16, 10, 12, 3, 4, 100, 101, 12, 4, nil},
+		{5, 16, 10, 12, 5, 6, 100, 101, 12, 4, errors.New("cannot find shard")},
 	}
 	for i, test := range tests {
 		sstate := makeTestShardState(test.numStateShards, test.numShardSlots)
@@ -120,7 +123,10 @@ func TestBallotResult(t *testing.T) {
 
 		slots, payable, missing, err := BallotResult(parHeader, chdHeader, sstate, chdHeader.ShardID())
 		if err != nil {
-			t.Error(err)
+			if test.expErr == nil {
+				t.Errorf("Test %v: unexpected error: %v", i, err)
+			}
+			continue
 		}
 
 		expCmt, _ := sstate.FindCommitteeByID(test.chdShardID)
