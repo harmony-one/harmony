@@ -3,7 +3,6 @@ package availability
 import (
 	"errors"
 	"fmt"
-	"github.com/harmony-one/harmony/staking/effective"
 	"math/big"
 	"reflect"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
