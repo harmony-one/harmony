@@ -1,3 +1,12 @@
+-------------------
+name: stake heist submission
+about: Submit work for Stake Heist Hackathon
+title: "[submission]"
+labels: stake-heist
+assignees: ' '
+
+-------------------
+
 # Linked bounty (please link the related bounty posting for your work)
 
 # Description of the bug, vulnerability, security threat OR the product/tool
