@@ -377,13 +377,13 @@ func exampleSlashRecords() Records {
 }
 
 type mockOutSnapshotReader struct {
-	snapshot staking.ValidatorWrapper
+	snapshot staking.ValidatorSnapshot
 }
 
 func (m mockOutSnapshotReader) ReadValidatorSnapshotAtEpoch(
 	epoch *big.Int,
 	addr common.Address,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	return &m.snapshot, nil
 }
 

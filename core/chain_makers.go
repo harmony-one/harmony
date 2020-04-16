@@ -275,12 +275,12 @@ func (cr *fakeChainReader) ReadValidatorInformation(
 }
 func (cr *fakeChainReader) ReadValidatorSnapshot(
 	addr common.Address,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	return nil, nil
 }
 func (cr *fakeChainReader) ReadValidatorSnapshotAtEpoch(
 	epoch *big.Int, addr common.Address,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	return nil, nil
 }
 

@@ -406,7 +406,7 @@ func (b *APIBackend) GetValidatorInformation(
 	}
 
 	computed := availability.ComputeCurrentSigning(
-		snapshot, wrapper,
+		snapshot.Validator, wrapper,
 	)
 	beaconChainBlocks := uint64(
 		b.hmy.BeaconChain().CurrentBlock().Header().Number().Int64(),
@@ -470,7 +470,7 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 		snapshot, _ := b.hmy.BlockChain().ReadValidatorSnapshot(candidates[i])
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
 		if !committee.IsEligibleForEPoSAuction(
-			snapshot, validator, b.hmy.BlockChain().CurrentBlock().Epoch(),
+			snapshot, validator,
 		) {
 			continue
 		}

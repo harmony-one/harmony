@@ -137,7 +137,7 @@ func IncrementValidatorSigningCounts(
 type Reader interface {
 	ReadValidatorSnapshot(
 		addr common.Address,
-	) (*staking.ValidatorWrapper, error)
+	) (*staking.ValidatorSnapshot, error)
 }
 
 // ComputeCurrentSigning returns (signed, toSign, quotient, error)
@@ -210,7 +210,7 @@ func ComputeAndMutateEPOSStatus(
 		return err
 	}
 
-	computed := ComputeCurrentSigning(snapshot, wrapper)
+	computed := ComputeCurrentSigning(snapshot.Validator, wrapper)
 
 	utils.Logger().
 		Info().Msg("check if signing percent is meeting required threshold")

@@ -69,7 +69,7 @@ type ValidatorSnapshotReader interface {
 	ReadValidatorSnapshotAtEpoch(
 		epoch *big.Int,
 		addr common.Address,
-	) (*ValidatorWrapper, error)
+	) (*ValidatorSnapshot, error)
 }
 
 type counters struct {
@@ -89,6 +89,12 @@ type ValidatorWrapper struct {
 	Counters counters `json:"-"`
 	// All the rewarded accumulated so far
 	BlockReward *big.Int `json:"-"`
+}
+
+// ValidatorSnapshot contains validator snapshot and the corresponding epoch
+type ValidatorSnapshot struct {
+	Validator *ValidatorWrapper
+	Epoch     *big.Int
 }
 
 // Computed represents current epoch
