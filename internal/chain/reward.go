@@ -104,7 +104,7 @@ func lookupDelegatorShares(
 
 			// For new calc, remove old data from 3 epochs ago
 			deleteEpoch := big.NewInt(0).Sub(epoch, big.NewInt(3))
-			deleteKey := fmt.Sprintf("%s-%d", deleteEpoch.String(), validatorSnapshot.Address.Hex())
+			deleteKey := fmt.Sprintf("%s-%s", deleteEpoch.String(), validatorSnapshot.Address.Hex())
 			votingPowerCache.Forget(deleteKey)
 
 			return result, nil
