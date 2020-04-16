@@ -90,7 +90,11 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	}
 	// Store staking txns
 	for _, tx := range block.StakingTransactions() {
-		explorerTransaction := GetStakingTransaction(tx, block)
+		explorerTransaction, err := GetStakingTransaction(tx, block)
+		if err != nil {
+			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
+				Msg("Failed to get explorer StakingTransaction mapping")
+		}
 		storage.UpdateStakingTxAddress(explorerTransaction, tx)
 	}
 }
