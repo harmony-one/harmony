@@ -2187,14 +2187,14 @@ func (bc *BlockChain) ReadValidatorInformation(
 func (bc *BlockChain) ReadValidatorSnapshotAtEpoch(
 	epoch *big.Int,
 	addr common.Address,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
 }
 
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
 func (bc *BlockChain) ReadValidatorSnapshot(
 	addr common.Address,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	epoch := bc.CurrentBlock().Epoch()
 	if cached, ok := bc.validatorCache.Get("validator-snapshot-" + string(addr.Bytes()) + epoch.String()); ok {
 		by := cached.([]byte)
@@ -2202,7 +2202,8 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 		if err := rlp.DecodeBytes(by, &v); err != nil {
 			return nil, err
 		}
-		return &v, nil
+		s := staking.ValidatorSnapshot{&v, epoch}
+		return &s, nil
 	}
 	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
 }

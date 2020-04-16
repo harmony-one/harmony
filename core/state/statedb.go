@@ -753,7 +753,7 @@ var (
 )
 
 // AddReward distributes the reward to all the delegators based on stake percentage.
-func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
+func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int, shareLookup map[common.Address]numeric.Dec) error {
 	if reward.Cmp(common.Big0) == 0 {
 		utils.Logger().Info().RawJSON("validator", []byte(snapshot.String())).
 			Msg("0 given as reward")
@@ -783,19 +783,17 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 		)
 		rewardPool.Sub(rewardPool, commissionInt)
 	}
-	totalRewardForDelegators := big.NewInt(0).Set(rewardPool)
+
 	// Payout each delegator's reward pro-rata
-	totalDelegationDec := numeric.NewDecFromBigInt(snapshot.TotalDelegation())
+	totalRewardForDelegators := big.NewInt(0).Set(rewardPool)
 	for i := range snapshot.Delegations {
 		delegation := snapshot.Delegations[i]
-		// NOTE percentage = <this_delegator_amount>/<total_delegation>
-		if totalDelegationDec.Equal(zero) {
-			utils.Logger().Info().
-				RawJSON("validator-snapshot", []byte(snapshot.String())).
-				Msg("zero total delegation during AddReward delegation payout")
-			return nil
+		percentage, ok := shareLookup[delegation.DelegatorAddress]
+
+		if !ok {
+			continue
 		}
-		percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec)
+
 		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
 		curDelegation := curValidator.Delegations[i]
 		curDelegation.Reward.Add(curDelegation.Reward, rewardInt)

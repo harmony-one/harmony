@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -27,7 +29,6 @@ var (
 )
 
 func init() {
-
 	bls.Init(bls.BLS12_381)
 }
 
@@ -62,12 +63,12 @@ func createValidator() *staking.CreateValidator {
 		MaxRate:       maxRate,
 		MaxChangeRate: maxChangeRate,
 	}
-	minSelfDel := big.NewInt(1e18)
-	maxTotalDel := big.NewInt(9e18)
+	minSelfDel := new(big.Int).Mul(big.NewInt(5e18), big.NewInt(2000))
+	maxTotalDel := new(big.Int).Mul(big.NewInt(5e18), big.NewInt(100000))
 	pubKey, pubSig := generateBLSKeySigPair()
 	slotPubKeys := []shard.BLSPublicKey{pubKey}
 	slotKeySigs := []shard.BLSSignature{pubSig}
-	amount := big.NewInt(5e18)
+	amount := new(big.Int).Mul(big.NewInt(5e18), big.NewInt(2000))
 	v := staking.CreateValidator{
 		ValidatorAddress:   validatorAddress,
 		Description:        desc,
@@ -84,10 +85,13 @@ func createValidator() *staking.CreateValidator {
 func main() {
 	statedb, _ := state.New(common2.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
-	statedb.AddBalance(msg.ValidatorAddress, big.NewInt(5e18))
-	validator, _ := core.VerifyAndCreateValidatorFromMsg(
+	statedb.AddBalance(msg.ValidatorAddress, new(big.Int).Mul(big.NewInt(5e18), big.NewInt(2000)))
+	validator, err := core.VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	)
+	if err != nil {
+		fmt.Print(err)
+	}
 	for i := 0; i < 100000; i++ {
 		validator.Delegations = append(validator.Delegations, staking.Delegation{
 			common2.Address{},
@@ -101,9 +105,36 @@ func main() {
 
 	startTime := time.Now()
 	validator, _ = statedb.ValidatorWrapper(msg.ValidatorAddress)
-
-	fmt.Printf("Total num delegations: %d\n", len(validator.Delegations))
-	statedb.AddReward(validator, big.NewInt(1000))
 	endTime := time.Now()
+	fmt.Printf("Time required to read validator: %f seconds\n", endTime.Sub(startTime).Seconds())
+
+	startTime = time.Now()
+	shares, _ := lookupDelegatorShares(validator)
+	endTime = time.Now()
+	fmt.Printf("Time required to calc percentage %d delegations: %f seconds\n", len(validator.Delegations), endTime.Sub(startTime).Seconds())
+
+	startTime = time.Now()
+	statedb.AddReward(validator, big.NewInt(1000), shares)
+	endTime = time.Now()
 	fmt.Printf("Time required to reward a validator with %d delegations: %f seconds\n", len(validator.Delegations), endTime.Sub(startTime).Seconds())
+}
+
+func lookupDelegatorShares(
+	snapshot *staking.ValidatorWrapper,
+) (result map[common2.Address]numeric.Dec, err error) {
+	result = map[common2.Address]numeric.Dec{}
+	totalDelegationDec := numeric.NewDecFromBigInt(snapshot.TotalDelegation())
+	for i := range snapshot.Delegations {
+		delegation := snapshot.Delegations[i]
+		// NOTE percentage = <this_delegator_amount>/<total_delegation>
+		if totalDelegationDec.IsZero() {
+			utils.Logger().Info().
+				RawJSON("validator-snapshot", []byte(snapshot.String())).
+				Msg("zero total delegation during AddReward delegation payout")
+			return nil, nil
+		}
+		percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec)
+		result[delegation.DelegatorAddress] = percentage
+	}
+	return result, nil
 }

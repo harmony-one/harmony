@@ -171,7 +171,7 @@ func DeleteCXReceiptsProofSpent(db DatabaseDeleter, shardID uint32, number uint6
 // ReadValidatorSnapshot retrieves validator's snapshot by its address
 func ReadValidatorSnapshot(
 	db DatabaseReader, addr common.Address, epoch *big.Int,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	data, err := db.Get(validatorSnapshotKey(addr, epoch))
 	if err != nil || len(data) == 0 {
 		utils.Logger().Info().Err(err).Msg("ReadValidatorSnapshot")
@@ -184,7 +184,8 @@ func ReadValidatorSnapshot(
 			Msg("Unable to decode validator snapshot from database")
 		return nil, err
 	}
-	return &v, nil
+	s := staking.ValidatorSnapshot{&v, epoch}
+	return &s, nil
 }
 
 // WriteValidatorSnapshot stores validator's snapshot by its address

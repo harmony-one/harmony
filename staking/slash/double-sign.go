@@ -460,7 +460,7 @@ func Apply(
 		// stake, rest are external delegations.
 		// Bottom line: everyone will be slashed under the same rule.
 		if err := delegatorSlashApply(
-			snapshot, current, rate, state,
+			snapshot.Validator, current, rate, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,
 		); err != nil {
 			return nil, err
@@ -474,7 +474,7 @@ func Apply(
 			Msg("about to update staking info for a validator after a slash")
 
 		if err := state.UpdateValidatorWrapper(
-			snapshot.Address, current,
+			snapshot.Validator.Address, current,
 		); err != nil {
 			return nil, err
 		}

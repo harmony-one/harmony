@@ -19,6 +19,8 @@ package vm
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -45,7 +47,7 @@ type StateDB interface {
 	SetValidatorFlag(common.Address)
 	UnsetValidatorFlag(common.Address)
 	IsValidator(common.Address) bool
-	AddReward(*staking.ValidatorWrapper, *big.Int) error
+	AddReward(*staking.ValidatorWrapper, *big.Int, map[common.Address]numeric.Dec) error
 
 	AddRefund(uint64)
 	SubRefund(uint64)

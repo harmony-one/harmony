@@ -5,6 +5,9 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/harmony-one/harmony/numeric"
+	types2 "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
@@ -42,11 +45,12 @@ func ballotResultBeaconchain(
 }
 
 var (
-	votingPowerCache singleflight.Group
+	votingPowerCache   singleflight.Group
+	delegateShareCache singleflight.Group
 )
 
 func lookupVotingPower(
-	epoch, beaconCurrentEpoch *big.Int, subComm *shard.Committee,
+	epoch *big.Int, subComm *shard.Committee,
 ) (*votepower.Roster, error) {
 	key := fmt.Sprintf("%s-%d", epoch.String(), subComm.ShardID)
 	results, err, _ := votingPowerCache.Do(
@@ -55,6 +59,12 @@ func lookupVotingPower(
 			if err != nil {
 				return nil, err
 			}
+
+			// For new calc, remove old data from 3 epochs ago
+			deleteEpoch := big.NewInt(0).Sub(epoch, big.NewInt(3))
+			deleteKey := fmt.Sprintf("%s-%d", deleteEpoch.String(), subComm.ShardID)
+			votingPowerCache.Forget(deleteKey)
+
 			return votingPower, nil
 		},
 	)
@@ -62,14 +72,49 @@ func lookupVotingPower(
 		return nil, err
 	}
 
-	// TODO consider if this is the best way to clear the cache
-	if new(big.Int).Sub(beaconCurrentEpoch, epoch).Cmp(common.Big3) == 1 {
-		go func() {
-			votingPowerCache.Forget(key)
-		}()
+	return results.(*votepower.Roster), nil
+}
+
+// Lookup or compute the shares of stake for all delegators in a validator
+func lookupDelegatorShares(
+	snapshot *types2.ValidatorSnapshot,
+) (map[common.Address]numeric.Dec, error) {
+	epoch := snapshot.Epoch
+	validatorSnapshot := snapshot.Validator
+	key := fmt.Sprintf("%s-%s", epoch.String(), validatorSnapshot.Address.Hex())
+
+	shares, err, _ := delegateShareCache.Do(
+		key, func() (interface{}, error) {
+			result := map[common.Address]numeric.Dec{}
+
+			totalDelegationDec := numeric.NewDecFromBigInt(validatorSnapshot.TotalDelegation())
+			if totalDelegationDec.IsZero() {
+				utils.Logger().Info().
+					RawJSON("validator-snapshot", []byte(validatorSnapshot.String())).
+					Msg("zero total delegation during AddReward delegation payout")
+				return result, nil
+			}
+
+			for i := range validatorSnapshot.Delegations {
+				delegation := validatorSnapshot.Delegations[i]
+				// NOTE percentage = <this_delegator_amount>/<total_delegation>
+				percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec)
+				result[delegation.DelegatorAddress] = percentage
+			}
+
+			// For new calc, remove old data from 3 epochs ago
+			deleteEpoch := big.NewInt(0).Sub(epoch, big.NewInt(3))
+			deleteKey := fmt.Sprintf("%s-%s", deleteEpoch.String(), validatorSnapshot.Address.Hex())
+			votingPowerCache.Forget(deleteKey)
+
+			return result, nil
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	return results.(*votepower.Roster), nil
+	return shares.(map[common.Address]numeric.Dec), nil
 }
 
 // AccumulateRewardsAndCountSigs credits the coinbase of the given block with the mining
@@ -91,6 +136,7 @@ func AccumulateRewardsAndCountSigs(
 	if bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() != shard.BeaconChainShardID {
 		return network.EmptyPayout, nil
+
 	}
 
 	// After staking
@@ -142,9 +188,8 @@ func AccumulateRewardsAndCountSigs(
 		); err != nil {
 			return network.EmptyPayout, err
 		}
-		beaconCurrentEpoch := beaconChain.CurrentHeader().Epoch()
 		votingPower, err := lookupVotingPower(
-			headerE, beaconCurrentEpoch, &subComm,
+			headerE, &subComm,
 		)
 		if err != nil {
 			return network.EmptyPayout, err
@@ -167,7 +212,12 @@ func AccumulateRewardsAndCountSigs(
 					voter.OverallPercent.Quo(beaconExternalShare),
 				).RoundInt()
 				newRewards.Add(newRewards, due)
-				if err := state.AddReward(snapshot, due); err != nil {
+
+				shares, err := lookupDelegatorShares(snapshot)
+				if err != nil {
+					return network.EmptyPayout, err
+				}
+				if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
 					return network.EmptyPayout, err
 				}
 				beaconP = append(beaconP, reward.Payout{
@@ -237,7 +287,7 @@ func AccumulateRewardsAndCountSigs(
 				}
 
 				votingPower, err := lookupVotingPower(
-					epoch, beaconCurrentEpoch, subComm,
+					epoch, subComm,
 				)
 
 				if err != nil {
@@ -303,7 +353,12 @@ func AccumulateRewardsAndCountSigs(
 					}
 					due := resultsHandle[bucket][payThem].payout
 					newRewards.Add(newRewards, due)
-					if err := state.AddReward(snapshot, due); err != nil {
+
+					shares, err := lookupDelegatorShares(snapshot)
+					if err != nil {
+						return network.EmptyPayout, err
+					}
+					if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
 						return network.EmptyPayout, err
 					}
 					shardP = append(shardP, reward.Payout{
