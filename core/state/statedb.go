@@ -67,8 +67,9 @@ type DB struct {
 	trie Trie
 
 	// This map holds 'live' objects, which will get modified while processing a state transition.
-	stateObjects      map[common.Address]*Object
-	stateObjectsDirty map[common.Address]struct{}
+	stateObjects         map[common.Address]*Object
+	stateObjectsDirty    map[common.Address]struct{}
+	stateValidatorsCache map[common.Address]*stk.ValidatorWrapper
 
 	// DB error.
 	// State objects are used by the consensus core and VM which are
@@ -101,13 +102,14 @@ func New(root common.Hash, db Database) (*DB, error) {
 		return nil, err
 	}
 	return &DB{
-		db:                db,
-		trie:              tr,
-		stateObjects:      make(map[common.Address]*Object),
-		stateObjectsDirty: make(map[common.Address]struct{}),
-		logs:              make(map[common.Hash][]*types.Log),
-		preimages:         make(map[common.Hash][]byte),
-		journal:           newJournal(),
+		db:                   db,
+		trie:                 tr,
+		stateObjects:         make(map[common.Address]*Object),
+		stateObjectsDirty:    make(map[common.Address]struct{}),
+		stateValidatorsCache: make(map[common.Address]*stk.ValidatorWrapper),
+		logs:                 make(map[common.Hash][]*types.Log),
+		preimages:            make(map[common.Hash][]byte),
+		journal:              newJournal(),
 	}, nil
 }
 
@@ -132,6 +134,7 @@ func (db *DB) Reset(root common.Hash) error {
 	db.trie = tr
 	db.stateObjects = make(map[common.Address]*Object)
 	db.stateObjectsDirty = make(map[common.Address]struct{})
+	db.stateValidatorsCache = make(map[common.Address]*stk.ValidatorWrapper)
 	db.thash = common.Hash{}
 	db.bhash = common.Hash{}
 	db.txIndex = 0
@@ -516,15 +519,16 @@ func (db *DB) ForEachStorage(addr common.Address, cb func(key, value common.Hash
 func (db *DB) Copy() *DB {
 	// Copy all the basic fields, initialize the memory ones
 	state := &DB{
-		db:                db.db,
-		trie:              db.db.CopyTrie(db.trie),
-		stateObjects:      make(map[common.Address]*Object, len(db.journal.dirties)),
-		stateObjectsDirty: make(map[common.Address]struct{}, len(db.journal.dirties)),
-		refund:            db.refund,
-		logs:              make(map[common.Hash][]*types.Log, len(db.logs)),
-		logSize:           db.logSize,
-		preimages:         make(map[common.Hash][]byte),
-		journal:           newJournal(),
+		db:                   db.db,
+		trie:                 db.db.CopyTrie(db.trie),
+		stateObjects:         make(map[common.Address]*Object, len(db.journal.dirties)),
+		stateObjectsDirty:    make(map[common.Address]struct{}, len(db.journal.dirties)),
+		stateValidatorsCache: make(map[common.Address]*stk.ValidatorWrapper),
+		refund:               db.refund,
+		logs:                 make(map[common.Hash][]*types.Log, len(db.logs)),
+		logSize:              db.logSize,
+		preimages:            make(map[common.Hash][]byte),
+		journal:              newJournal(),
 	}
 	// Copy the dirty states, logs, and preimages
 	for addr := range db.journal.dirties {
@@ -546,6 +550,7 @@ func (db *DB) Copy() *DB {
 			state.stateObjectsDirty[addr] = struct{}{}
 		}
 	}
+
 	for hash, logs := range db.logs {
 		cpy := make([]*types.Log, len(logs))
 		for i, l := range logs {
@@ -695,6 +700,12 @@ var (
 func (db *DB) ValidatorWrapper(
 	addr common.Address,
 ) (*stk.ValidatorWrapper, error) {
+	// Read cache first
+	cached, ok := db.stateValidatorsCache[addr]
+	if ok {
+		return cached, nil
+	}
+
 	by := db.GetCode(addr)
 	if len(by) == 0 {
 		return nil, errAddressNotPresent
@@ -726,6 +737,9 @@ func (db *DB) UpdateValidatorWrapper(
 		return err
 	}
 	db.SetCode(addr, by)
+
+	// Update cache
+	db.stateValidatorsCache[addr] = val
 	return nil
 }
 
