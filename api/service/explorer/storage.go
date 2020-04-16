@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"path"
 	"sync"
@@ -19,13 +20,19 @@ import (
 
 // Constants for storage.
 const (
-	AddressPrefix = "ad"
-	PrefixLen     = 3
+	AddressPrefix    = "ad"
+	CheckpointPrefix = "dc"
+	PrefixLen        = 3
 )
 
 // GetAddressKey ...
 func GetAddressKey(address string) string {
 	return fmt.Sprintf("%s_%s", AddressPrefix, address)
+}
+
+// GetCheckpointKey ...
+func GetCheckpointKey(blockNum *big.Int) string {
+	return fmt.Sprintf("%s_%x", CheckpointPrefix, blockNum)
 }
 
 var storage *Storage
@@ -83,6 +90,12 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		return
 	}
 
+	// Skip dump for redundant blocks with lower block number than the checkpoint block number
+	blockCheckpoint := GetCheckpointKey(block.Header().Number())
+	if _, err := storage.GetDB().Get([]byte(blockCheckpoint), nil); err == nil {
+		return
+	}
+
 	// Store txs
 	for _, tx := range block.Transactions() {
 		explorerTransaction := GetTransaction(tx, block)
@@ -97,6 +110,9 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		}
 		storage.UpdateStakingTxAddress(explorerTransaction, tx)
 	}
+
+	// save checkpoint of block dumped
+	storage.GetDB().Put([]byte(blockCheckpoint), []byte{}, nil)
 }
 
 // UpdateTxAddress ...
@@ -123,7 +139,7 @@ func (storage *Storage) UpdateStakingTxAddress(explorerTransaction *StakingTrans
 func (storage *Storage) UpdateTxAddressStorage(addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	var address Address
 	key := GetAddressKey(addr)
-	if data, err := storage.db.Get([]byte(key), nil); err == nil {
+	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
 		if err = rlp.DecodeBytes(data, &address); err != nil {
 			utils.Logger().Error().Err(err).Msg("Failed due to error")
 		}
@@ -142,7 +158,7 @@ func (storage *Storage) UpdateTxAddressStorage(addr string, explorerTransaction 
 func (storage *Storage) UpdateStakingTxAddressStorage(addr string, explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
 	var address Address
 	key := GetAddressKey(addr)
-	if data, err := storage.db.Get([]byte(key), nil); err == nil {
+	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
 		if err = rlp.DecodeBytes(data, &address); err != nil {
 			utils.Logger().Error().Err(err).Msg("Failed due to error")
 		}
