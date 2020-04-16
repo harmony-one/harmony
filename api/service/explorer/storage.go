@@ -20,14 +20,19 @@ import (
 
 // Constants for storage.
 const (
-	AddressPrefix     = "ad"
-	DumpCheckpointKey = "dump_checkpoint"
-	PrefixLen         = 3
+	AddressPrefix    = "ad"
+	CheckpointPrefix = "dc"
+	PrefixLen        = 3
 )
 
 // GetAddressKey ...
 func GetAddressKey(address string) string {
 	return fmt.Sprintf("%s_%s", AddressPrefix, address)
+}
+
+// GetCheckpointKey ...
+func GetCheckpointKey(blockNum *big.Int) string {
+	return fmt.Sprintf("%s_%x", CheckpointPrefix, blockNum)
 }
 
 var storage *Storage
@@ -86,12 +91,9 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	}
 
 	// Skip dump for redundant blocks with lower block number than the checkpoint block number
-	blockNum := block.Header().Number()
-	if data, err := storage.GetDB().Get([]byte(DumpCheckpointKey), nil); err == nil {
-		checkpoint := new(big.Int).SetBytes(data)
-		if checkpoint.Cmp(blockNum) >= 0 {
-			return
-		}
+	blockCheckpoint := GetCheckpointKey(block.Header().Number())
+	if _, err := storage.GetDB().Get([]byte(blockCheckpoint), nil); err == nil {
+		return
 	}
 
 	// Store txs
@@ -110,7 +112,7 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 	}
 
 	// save checkpoint of block dumped
-	storage.GetDB().Put([]byte(DumpCheckpointKey), blockNum.Bytes(), nil)
+	storage.GetDB().Put([]byte(blockCheckpoint), []byte{}, nil)
 }
 
 // UpdateTxAddress ...
