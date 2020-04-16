@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"path"
 	"sync"
@@ -19,8 +20,9 @@ import (
 
 // Constants for storage.
 const (
-	AddressPrefix = "ad"
-	PrefixLen     = 3
+	AddressPrefix     = "ad"
+	DumpCheckpointKey = "dump_checkpoint"
+	PrefixLen         = 3
 )
 
 // GetAddressKey ...
@@ -83,6 +85,15 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		return
 	}
 
+	// Skip dump for redundant blocks with lower block number than the checkpoint block number
+	blockNum := block.Header().Number()
+	if data, err := storage.GetDB().Get([]byte(DumpCheckpointKey), nil); err == nil {
+		checkpoint := new(big.Int).SetBytes(data)
+		if checkpoint.Cmp(blockNum) >= 0 {
+			return
+		}
+	}
+
 	// Store txs
 	for _, tx := range block.Transactions() {
 		explorerTransaction := GetTransaction(tx, block)
@@ -97,6 +108,9 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		}
 		storage.UpdateStakingTxAddress(explorerTransaction, tx)
 	}
+
+	// save checkpoint of block dumped
+	storage.GetDB().Put([]byte(DumpCheckpointKey), blockNum.Bytes(), nil)
 }
 
 // UpdateTxAddress ...
@@ -123,7 +137,7 @@ func (storage *Storage) UpdateStakingTxAddress(explorerTransaction *StakingTrans
 func (storage *Storage) UpdateTxAddressStorage(addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	var address Address
 	key := GetAddressKey(addr)
-	if data, err := storage.db.Get([]byte(key), nil); err == nil {
+	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
 		if err = rlp.DecodeBytes(data, &address); err != nil {
 			utils.Logger().Error().Err(err).Msg("Failed due to error")
 		}
@@ -142,7 +156,7 @@ func (storage *Storage) UpdateTxAddressStorage(addr string, explorerTransaction 
 func (storage *Storage) UpdateStakingTxAddressStorage(addr string, explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
 	var address Address
 	key := GetAddressKey(addr)
-	if data, err := storage.db.Get([]byte(key), nil); err == nil {
+	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
 		if err = rlp.DecodeBytes(data, &address); err != nil {
 			utils.Logger().Error().Err(err).Msg("Failed due to error")
 		}
