@@ -19,7 +19,6 @@ FOLDER=${WHOAMI:-$USER}
 RACE=
 VERBOSE=
 DEBUG=false
-NETWORK=main
 STATIC=false
 
 unset -v progdir
@@ -179,6 +178,11 @@ function release
    fi
 
    OS=$(uname -s)
+   REL=$FOLDER
+   if [ "$REL" = "mainnet" ]; then
+      echo "DO NOT release mainnet binary"
+      exit 1
+   fi
 
    case "$OS" in
       "Linux")
@@ -250,7 +254,7 @@ function upload_wallet
 }
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:rvsN:" option; do
+while getopts "hp:a:o:b:f:rtvsd" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;
@@ -262,7 +266,6 @@ while getopts "hp:a:o:b:f:rvsN:" option; do
       v) VERBOSE='-v -x' ;;
       d) DEBUG=true ;;
       s) STATIC=true ;;
-      N) NETWORK=$OPTARG ;;
    esac
 done
 
@@ -271,22 +274,6 @@ mkdir -p $BINDIR
 shift $(($OPTIND-1))
 
 ACTION=${1:-build}
-
-case "${NETWORK}" in
-main)
-  REL=mainnet
-  ;;
-beta)
-  REL=testnet
-  ;;
-pangaea)
-  REL=pangaea
-  ;;
-*)
-  echo "${NETWORK}: invalid network"
-  exit
-  ;;
-esac
 
 case "$ACTION" in
    "build") build_only ;;
