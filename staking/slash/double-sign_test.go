@@ -448,7 +448,7 @@ func testScenario(
 	// state looks like as of this point
 
 	slashResult, err := Apply(
-		mockOutSnapshotReader{*s.snapshot},
+		mockOutSnapshotReader{staking.ValidatorSnapshot{s.snapshot, big.NewInt(0)}},
 		stateHandle,
 		slashes,
 		numeric.MustNewDecFromStr(
