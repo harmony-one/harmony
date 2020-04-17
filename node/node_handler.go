@@ -142,7 +142,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 				node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 			}
 		case proto_node.PING:
-			node.pingMessageHandler(msgPayload, sender)
 		}
 	default:
 		utils.Logger().Error().

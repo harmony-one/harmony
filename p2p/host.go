@@ -4,23 +4,16 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"net"
-	"os"
 	"strings"
-	"sync"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
-	libp2p "github.com/libp2p/go-libp2p"
-	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
-	libp2p_host "github.com/libp2p/go-libp2p-core/host"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
-	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/harmony-one/harmony/p2p/ipfsutil"
+	"github.com/ipfs/go-datastore"
+	sync_ds "github.com/ipfs/go-datastore/sync"
+	ipfs_cfg "github.com/ipfs/go-ipfs-config"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 )
 
 // Host is the client + server in p2p network.
@@ -36,24 +29,15 @@ type Host interface {
 	AllTopics() []*libp2p_pubsub.Topic
 }
 
-// Peer is the object for a p2p peer (node)
-type Peer struct {
-	IP              string         // IP address of the peer
-	Port            string         // Port number of the peer
-	ConsensusPubKey *bls.PublicKey // Public key of the peer, used for consensus signing
-	Addrs           []ma.Multiaddr // MultiAddress of the peer
-	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
-}
+var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
 
-func (p Peer) String() string {
-	BLSPubKey := "nil"
-	if p.ConsensusPubKey != nil {
-		BLSPubKey = p.ConsensusPubKey.SerializeToHexStr()
-	}
-	return fmt.Sprintf(
-		"BLSPubKey:%s-%s/%s[%d]", BLSPubKey,
-		net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs),
-	)
+type Opts struct {
+	Bootstrap             []string
+	RendezVousServerMAddr string
+	GroupInvitation       string
+	Port                  uint
+	RootDS                datastore.Batching
+	Logger                *zap.Logger
 }
 
 // NewHost ..
@@ -86,16 +70,12 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p pubsub")
 	}
 
-	self.PeerID = p2pHost.ID()
-	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
-	// has to save the private key for host
-	h := &HostV2{
-		h:      p2pHost,
-		joiner: topicJoiner{pubsub},
-		joined: map[string]*libp2p_pubsub.Topic{},
-		self:   *self,
-		priKey: key,
-		logger: &subLogger,
+	opts := Opts{
+		Bootstrap:             DefaultBootstrap,
+		RendezVousServerMAddr: DevRendezVousPoint,
+		Port:                  0,
+		RootDS:                baseDS,
+		Logger:                log,
 	}
 
 	if err != nil {
@@ -156,98 +136,64 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 			err = e
 			continue
 		}
-		e = t.Publish(context.Background(), msg)
-		if e != nil {
-			err = e
-			continue
+	} else {
+		swarmAddresses = []string{
+			"/ip4/0.0.0.0/tcp/0",
+			"/ip6/0.0.0.0/tcp/0",
+			"/ip4/0.0.0.0/udp/0/quic",
+			"/ip6/0.0.0.0/udp/0/quic",
 		}
 	}
-	return err
-}
 
-// AddPeer add p2p.Peer into Peerstore
-func (host *HostV2) AddPeer(p *Peer) error {
-	if p.PeerID != "" && len(p.Addrs) != 0 {
-		host.Peerstore().AddAddrs(p.PeerID, p.Addrs, libp2p_peerstore.PermanentAddrTTL)
-		return nil
-	}
-
-	if p.PeerID == "" {
-		host.logger.Error().Msg("AddPeer PeerID is EMPTY")
-		return fmt.Errorf("AddPeer error: peerID is empty")
-	}
-
-	// reconstruct the multiaddress based on ip/port
-	// PeerID has to be known for the ip/port
-	addr := fmt.Sprintf("/ip4/%s/tcp/%s", p.IP, p.Port)
-	targetAddr, err := ma.NewMultiaddr(addr)
+	mardv, err := multiaddr.NewMultiaddr(opts.RendezVousServerMAddr)
 	if err != nil {
-		host.logger.Error().Err(err).Msg("AddPeer NewMultiaddr error")
-		return err
+		return nil, nil, err
+
 	}
 
-	p.Addrs = append(p.Addrs, targetAddr)
-	host.Peerstore().AddAddrs(p.PeerID, p.Addrs, libp2p_peerstore.PermanentAddrTTL)
-	host.logger.Info().Interface("peer", *p).Msg("AddPeer add to libp2p_peerstore")
-	return nil
-}
+	rdvpeer, err := peer.AddrInfoFromP2pAddr(mardv)
+	if err != nil {
+		return nil, nil, err
 
-// Peerstore returns the peer store
-func (host *HostV2) Peerstore() libp2p_peerstore.Peerstore {
-	return host.h.Peerstore()
-}
+	}
 
-// GetID returns ID.Pretty
-func (host *HostV2) GetID() libp2p_peer.ID {
-	return host.h.ID()
-}
-
-// GetSelfPeer gets self peer
-func (host *HostV2) GetSelfPeer() Peer {
-	return host.self
-}
-
-// GetP2PHost returns the p2p.Host
-func (host *HostV2) GetP2PHost() libp2p_host.Host {
-	return host.h
-}
-
-// GetPeerCount ...
-func (host *HostV2) GetPeerCount() int {
-	return host.h.Peerstore().Peers().Len()
-}
-
-// ConnectHostPeer connects to peer host
-func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	ctx := context.Background()
-	addr := fmt.Sprintf("/ip4/%s/tcp/%s/ipfs/%s", peer.IP, peer.Port, peer.PeerID.Pretty())
-	peerAddr, err := ma.NewMultiaddr(addr)
+	rootDS := sync_ds.MutexWrap(opts.RootDS)
+	ipfsDS := ipfsutil.NewNamespacedDatastore(rootDS, datastore.NewKey("ipfs"))
+	cfg, err := ipfsutil.CreateBuildConfigWithDatastore(&ipfsutil.BuildOpts{
+		SwarmAddresses: swarmAddresses,
+	}, ipfsDS)
 	if err != nil {
-		host.logger.Error().Err(err).Interface("peer", peer).Msg("ConnectHostPeer")
-		return err
+		return nil, nil, err
 	}
-	peerInfo, err := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
-	if err != nil {
-		host.logger.Error().Err(err).Interface("peer", peer).Msg("ConnectHostPeer")
-		return err
-	}
-	if err := host.h.Connect(ctx, *peerInfo); err != nil {
-		host.logger.Warn().Err(err).Interface("peer", peer).Msg("can't connect to peer")
-		return err
-	}
-	host.logger.Info().Interface("node", *peerInfo).Msg("connected to peer host")
-	return nil
-}
 
-// AllTopics ..
-func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
-	host.lock.Lock()
-	defer host.lock.Unlock()
-	topics := []*libp2p_pubsub.Topic{}
-	for _, g := range host.joined {
-		topics = append(topics, g)
+	routingOpt, crouting := ipfsutil.NewTinderRouting(
+		opts.Logger, rdvpeer.ID, false,
+	)
+	cfg.Routing = routingOpt
+
+	ipfsConfig, err := cfg.Repo.Config()
+	if err != nil {
+		return nil, nil, err
 	}
-	return topics
+
+	ipfsConfig.Bootstrap = append(opts.Bootstrap, opts.RendezVousServerMAddr)
+	if err := cfg.Repo.SetConfig(ipfsConfig); err != nil {
+		return nil, nil, err
+	}
+
+	api, node, err := ipfsutil.NewConfigurableCoreAPI(
+		ctx,
+		cfg,
+		ipfsutil.OptionMDNSDiscovery,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	// wait to get routing
+	routing := <-crouting
+	routing.RoutingTable().Print()
+	return api, node, nil
 }
 
 // ConstructMessage constructs the p2p message as [messageType, contentSize, content]

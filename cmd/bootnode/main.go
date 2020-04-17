@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -11,10 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
-	badger "github.com/ipfs/go-ds-badger"
 	net "github.com/libp2p/go-libp2p-core/network"
-	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
