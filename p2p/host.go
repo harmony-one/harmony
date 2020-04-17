@@ -72,10 +72,10 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	}
 	traceFile := os.Getenv("P2P_TRACEFILE")
 
-	const MaxSize = 2_145_728
+	// const MaxSize = 2_145_728
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithPeerOutboundQueueSize(64),
-		libp2p_pubsub.WithMaxMessageSize(MaxSize),
+		// libp2p_pubsub.WithMaxMessageSize(MaxSize),
 	}
 	if len(traceFile) > 0 {
 		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)

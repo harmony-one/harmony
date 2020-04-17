@@ -131,9 +131,6 @@ func main() {
 		host.GetP2PHost().Network().Notify(NewConnLogger(utils.GetLogInstance()))
 	}
 
-	// set the KValue to 50 for DHT
-	// 50 is the size of every bucket in the DHT
-	kaddht.KValue = 50
 	dataStorePath := fmt.Sprintf(".dht-%s-%s", *ip, *port)
 	dataStore, err := badger.NewDatastore(dataStorePath, nil)
 	if err != nil {
