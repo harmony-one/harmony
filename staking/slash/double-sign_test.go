@@ -427,7 +427,7 @@ func TestVerify(t *testing.T) {
 func testScenario(
 	t *testing.T, stateHandle *state.DB, slashes Records, s *scenario,
 ) {
-	if err := stateHandle.updateValidatorWrapper(
+	if err := stateHandle.UpdateValidatorWrapper(
 		offenderAddr, s.snapshot,
 	); err != nil {
 		t.Fatalf("creation of validator failed %s", err.Error())
@@ -436,7 +436,7 @@ func testScenario(
 	stateHandle.IntermediateRoot(false)
 	stateHandle.Commit(false)
 
-	if err := stateHandle.updateValidatorWrapper(
+	if err := stateHandle.UpdateValidatorWrapper(
 		offenderAddr, s.current,
 	); err != nil {
 		t.Fatalf("update of validator failed %s", err.Error())

@@ -651,7 +651,7 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	// Commit validator changes
 	for addr, val := range db.stateValidators {
 		if bytes.Compare(addr.Bytes(), val.Address.Bytes()) == 0 {
-			db.updateValidatorWrapper(addr, val)
+			db.UpdateValidatorWrapper(addr, val)
 		} // else it's dummy new validator which we shouldn't commit
 	}
 
@@ -704,7 +704,8 @@ var (
 	errAddressNotPresent = errors.New("address not present in state")
 )
 
-// ValidatorWrapper  ..
+// ValidatorWrapper retrieves the existing validator from state.
+// The return value is a reference to the actual validator object in state.
 func (db *DB) ValidatorWrapper(
 	addr common.Address,
 ) (*stk.ValidatorWrapper, error) {
@@ -732,7 +733,8 @@ func (db *DB) ValidatorWrapper(
 	return &val, nil
 }
 
-// ValidatorWrapper  ..
+// NewValidatorWrapper creates a new validator in state.
+// The return value is a reference to the actual validator object in state.
 func (db *DB) NewValidatorWrapper(
 	addr common.Address,
 ) (*stk.ValidatorWrapper, error) {
@@ -749,9 +751,9 @@ func (db *DB) NewValidatorWrapper(
 
 const doNotEnforceMaxBLS = -1
 
-// updateValidatorWrapper updates staking information of
+// UpdateValidatorWrapper updates staking information of
 // a given validator (including delegation info)
-func (db *DB) updateValidatorWrapper(
+func (db *DB) UpdateValidatorWrapper(
 	addr common.Address, val *stk.ValidatorWrapper,
 ) error {
 	if err := val.SanityCheck(doNotEnforceMaxBLS); err != nil {

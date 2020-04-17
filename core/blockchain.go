@@ -2366,8 +2366,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 			return err
 		}
 
-		copy := *validator
-		snapshot := &staking.ValidatorSnapshot{&copy, epoch}
+		snapshot := &staking.ValidatorSnapshot{validator, epoch}
 		if err := bc.writeValidatorSnapshot(batch, snapshot); err != nil {
 			return err
 		}
