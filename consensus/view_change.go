@@ -209,8 +209,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 	// TODO: remove NIL type message
 	// add self m1 or m2 type message signature and bitmap
-	_, ok1 := consensus.nilSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()]
-	_, ok2 := consensus.bhpSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()]
+	_, ok1 := consensus.nilSigs[recvMsg.ViewID][newLeaderKey.SerializeToHexStr()]
+	_, ok2 := consensus.bhpSigs[recvMsg.ViewID][newLeaderKey.SerializeToHexStr()]
 	if !(ok1 || ok2) {
 		// add own signature for newview message
 		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
@@ -219,22 +219,31 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 		if preparedMsg == nil {
 			utils.Logger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
-			consensus.nilSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()] = newLeaderPriKey.SignHash(NIL)
-			consensus.nilBitmap[recvMsg.ViewID].SetKey(newLeaderKey, true)
+			for i, key := range consensus.PubKey.PublicKey {
+				priKey := consensus.priKey.PrivateKey[i]
+				consensus.nilSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(NIL)
+				consensus.nilBitmap[recvMsg.ViewID].SetKey(key, true)
+			}
 		} else {
 			utils.Logger().Debug().Msg("[onViewChange] add my M1 type messaage")
 			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
-			consensus.bhpSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()] = newLeaderPriKey.SignHash(msgToSign)
-			consensus.bhpBitmap[recvMsg.ViewID].SetKey(newLeaderKey, true)
+			for i, key := range consensus.PubKey.PublicKey {
+				priKey := consensus.priKey.PrivateKey[i]
+				consensus.bhpSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(msgToSign)
+				consensus.bhpBitmap[recvMsg.ViewID].SetKey(key, true)
+			}
 		}
 	}
 	// add self m3 type message signature and bitmap
-	_, ok3 := consensus.viewIDSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()]
+	_, ok3 := consensus.viewIDSigs[recvMsg.ViewID][newLeaderKey.SerializeToHexStr()]
 	if !ok3 {
 		viewIDBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
-		consensus.viewIDSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()] = newLeaderPriKey.SignHash(viewIDBytes)
-		consensus.viewIDBitmap[recvMsg.ViewID].SetKey(newLeaderKey, true)
+		for i, key := range consensus.PubKey.PublicKey {
+			priKey := consensus.priKey.PrivateKey[i]
+			consensus.viewIDSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(viewIDBytes)
+			consensus.viewIDBitmap[recvMsg.ViewID].SetKey(key, true)
+		}
 	}
 
 	// m2 type message
@@ -386,14 +395,17 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			blockNumBytes := make([]byte, 8)
 			binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
 			commitPayload := append(blockNumBytes, consensus.blockHash[:]...)
-			consensus.Decider.AddSignature(
-				quorum.Commit, newLeaderKey, newLeaderPriKey.SignHash(commitPayload),
-			)
+			for i, key := range consensus.PubKey.PublicKey {
+				priKey := consensus.priKey.PrivateKey[i]
+				consensus.Decider.AddSignature(
+					quorum.Commit, key, priKey.SignHash(commitPayload),
+				)
 
-			if err = consensus.commitBitmap.SetKey(newLeaderKey, true); err != nil {
-				utils.Logger().Debug().
-					Msg("[OnViewChange] New Leader commit bitmap set failed")
-				return
+				if err = consensus.commitBitmap.SetKey(key, true); err != nil {
+					utils.Logger().Error().Err(err).
+						Msg("[OnViewChange] New Leader commit bitmap set failed")
+					return
+				}
 			}
 		}
 
@@ -416,7 +428,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Uint64("recvMsg.ViewID", recvMsg.ViewID).
 			Msg("[onViewChange] New Leader Start Consensus Timer and Stop View Change Timer")
 		utils.Logger().Debug().
-			Str("myKey", consensus.PubKey.SerializeToHexStr()).
+			Str("myKey", newLeaderKey.SerializeToHexStr()).
 			Uint64("viewID", consensus.viewID).
 			Uint64("block", consensus.blockNum).
 			Msg("[onViewChange] I am the New Leader")
