@@ -473,9 +473,7 @@ func Apply(
 			RawJSON("slash", []byte(slash.String())).
 			Msg("about to update staking info for a validator after a slash")
 
-		if err := state.UpdateValidatorWrapper(
-			snapshot.Validator.Address, current,
-		); err != nil {
+		if err := current.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {
 			return nil, err
 		}
 	}

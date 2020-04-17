@@ -2358,17 +2358,16 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 
 	allValidators = append(allValidators, newValidators...)
 
-	// Read all validator's current data
-	validators := []*staking.ValidatorWrapper{}
+	// Read all validator's current data and snapshot them
 	for i := range allValidators {
 		// The snapshot will be captured in the state after the last epoch block is finalized
 		validator, err := state.ValidatorWrapper(allValidators[i])
 		if err != nil {
 			return err
 		}
-		validators = append(validators, validator)
 
-		snapshot := &staking.ValidatorSnapshot{validator, epoch}
+		copy := *validator
+		snapshot := &staking.ValidatorSnapshot{&copy, epoch}
 		if err := bc.writeValidatorSnapshot(batch, snapshot); err != nil {
 			return err
 		}

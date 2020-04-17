@@ -387,52 +387,40 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 	createValidator *staking.CreateValidator, blockNum *big.Int,
 ) error {
-
-	wrapper, err := VerifyAndCreateValidatorFromMsg(
+	err := VerifyAndCreateValidatorFromMsg(
 		st.state, st.evm.EpochNumber, blockNum, createValidator,
 	)
 	if err != nil {
 		return err
 	}
-	if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
-		return err
-	}
-	st.state.SetValidatorFlag(wrapper.Address)
-	st.state.SubBalance(wrapper.Address, createValidator.Amount)
+	st.state.SetValidatorFlag(createValidator.ValidatorAddress)
+	st.state.SubBalance(createValidator.ValidatorAddress, createValidator.Amount)
 	return nil
 }
 
 func (st *StateTransition) verifyAndApplyEditValidatorTx(
 	editValidator *staking.EditValidator, blockNum *big.Int,
 ) error {
-	wrapper, err := VerifyAndEditValidatorFromMsg(
+	return VerifyAndEditValidatorFromMsg(
 		st.state, st.bc, st.evm.EpochNumber, blockNum, editValidator,
 	)
-	if err != nil {
-		return err
-	}
-	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
 }
 
 func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) error {
-	wrapper, balanceToBeDeducted, err := VerifyAndDelegateFromMsg(st.state, delegate)
+	balanceToBeDeducted, err := VerifyAndDelegateFromMsg(st.state, delegate)
 	if err != nil {
 		return err
 	}
 
 	st.state.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
 
-	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
+	return nil
 }
 
 func (st *StateTransition) verifyAndApplyUndelegateTx(
 	undelegate *staking.Undelegate,
 ) error {
-	wrapper, err := VerifyAndUndelegateFromMsg(st.state, st.evm.EpochNumber, undelegate)
-	if err != nil {
-		return err
-	}
-	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
+	return VerifyAndUndelegateFromMsg(st.state, st.evm.EpochNumber, undelegate)
 }
 
 func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.CollectRewards) (*big.Int, error) {
@@ -443,16 +431,11 @@ func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.
 	if err != nil {
 		return network.NoReward, err
 	}
-	updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
+	totalRewards, err := VerifyAndCollectRewardsFromDelegation(
 		st.state, delegations,
 	)
 	if err != nil {
 		return network.NoReward, err
-	}
-	for _, wrapper := range updatedValidatorWrappers {
-		if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
-			return network.NoReward, err
-		}
 	}
 	st.state.AddBalance(collectRewards.DelegatorAddress, totalRewards)
 	return totalRewards, nil

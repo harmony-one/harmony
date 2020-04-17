@@ -18,6 +18,7 @@
 package state
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"sort"
@@ -67,9 +68,9 @@ type DB struct {
 	trie Trie
 
 	// This map holds 'live' objects, which will get modified while processing a state transition.
-	stateObjects         map[common.Address]*Object
-	stateObjectsDirty    map[common.Address]struct{}
-	stateValidatorsCache map[common.Address]*stk.ValidatorWrapper
+	stateObjects      map[common.Address]*Object
+	stateObjectsDirty map[common.Address]struct{}
+	stateValidators   map[common.Address]*stk.ValidatorWrapper
 
 	// DB error.
 	// State objects are used by the consensus core and VM which are
@@ -102,14 +103,14 @@ func New(root common.Hash, db Database) (*DB, error) {
 		return nil, err
 	}
 	return &DB{
-		db:                   db,
-		trie:                 tr,
-		stateObjects:         make(map[common.Address]*Object),
-		stateObjectsDirty:    make(map[common.Address]struct{}),
-		stateValidatorsCache: make(map[common.Address]*stk.ValidatorWrapper),
-		logs:                 make(map[common.Hash][]*types.Log),
-		preimages:            make(map[common.Hash][]byte),
-		journal:              newJournal(),
+		db:                db,
+		trie:              tr,
+		stateObjects:      make(map[common.Address]*Object),
+		stateObjectsDirty: make(map[common.Address]struct{}),
+		stateValidators:   make(map[common.Address]*stk.ValidatorWrapper),
+		logs:              make(map[common.Hash][]*types.Log),
+		preimages:         make(map[common.Hash][]byte),
+		journal:           newJournal(),
 	}, nil
 }
 
@@ -134,7 +135,7 @@ func (db *DB) Reset(root common.Hash) error {
 	db.trie = tr
 	db.stateObjects = make(map[common.Address]*Object)
 	db.stateObjectsDirty = make(map[common.Address]struct{})
-	db.stateValidatorsCache = make(map[common.Address]*stk.ValidatorWrapper)
+	db.stateValidators = make(map[common.Address]*stk.ValidatorWrapper)
 	db.thash = common.Hash{}
 	db.bhash = common.Hash{}
 	db.txIndex = 0
@@ -519,16 +520,16 @@ func (db *DB) ForEachStorage(addr common.Address, cb func(key, value common.Hash
 func (db *DB) Copy() *DB {
 	// Copy all the basic fields, initialize the memory ones
 	state := &DB{
-		db:                   db.db,
-		trie:                 db.db.CopyTrie(db.trie),
-		stateObjects:         make(map[common.Address]*Object, len(db.journal.dirties)),
-		stateObjectsDirty:    make(map[common.Address]struct{}, len(db.journal.dirties)),
-		stateValidatorsCache: make(map[common.Address]*stk.ValidatorWrapper),
-		refund:               db.refund,
-		logs:                 make(map[common.Hash][]*types.Log, len(db.logs)),
-		logSize:              db.logSize,
-		preimages:            make(map[common.Hash][]byte),
-		journal:              newJournal(),
+		db:                db.db,
+		trie:              db.db.CopyTrie(db.trie),
+		stateObjects:      make(map[common.Address]*Object, len(db.journal.dirties)),
+		stateObjectsDirty: make(map[common.Address]struct{}, len(db.journal.dirties)),
+		stateValidators:   make(map[common.Address]*stk.ValidatorWrapper),
+		refund:            db.refund,
+		logs:              make(map[common.Hash][]*types.Log, len(db.logs)),
+		logSize:           db.logSize,
+		preimages:         make(map[common.Hash][]byte),
+		journal:           newJournal(),
 	}
 	// Copy the dirty states, logs, and preimages
 	for addr := range db.journal.dirties {
@@ -647,6 +648,13 @@ func (db *DB) clearJournalAndRefund() {
 func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	defer db.clearJournalAndRefund()
 
+	// Commit validator changes
+	for addr, val := range db.stateValidators {
+		if bytes.Compare(addr.Bytes(), val.Address.Bytes()) == 0 {
+			db.updateValidatorWrapper(addr, val)
+		} // else it's dummy new validator which we shouldn't commit
+	}
+
 	for addr := range db.journal.dirties {
 		db.stateObjectsDirty[addr] = struct{}{}
 	}
@@ -700,8 +708,8 @@ var (
 func (db *DB) ValidatorWrapper(
 	addr common.Address,
 ) (*stk.ValidatorWrapper, error) {
-	// Read cache first
-	cached, ok := db.stateValidatorsCache[addr]
+	// Read memory first
+	cached, ok := db.stateValidators[addr]
 	if ok {
 		return cached, nil
 	}
@@ -718,14 +726,32 @@ func (db *DB) ValidatorWrapper(
 			common2.MustAddressToBech32(addr),
 		)
 	}
+	// Put in map
+	db.stateValidators[addr] = &val
+
+	return &val, nil
+}
+
+// ValidatorWrapper  ..
+func (db *DB) NewValidatorWrapper(
+	addr common.Address,
+) (*stk.ValidatorWrapper, error) {
+	if db.IsValidator(addr) {
+		return nil, errors.New("Failed creating new validator: validator already exists")
+	}
+
+	val := stk.ValidatorWrapper{}
+	// add in memory
+	db.stateValidators[addr] = &val
+
 	return &val, nil
 }
 
 const doNotEnforceMaxBLS = -1
 
-// UpdateValidatorWrapper updates staking information of
+// updateValidatorWrapper updates staking information of
 // a given validator (including delegation info)
-func (db *DB) UpdateValidatorWrapper(
+func (db *DB) updateValidatorWrapper(
 	addr common.Address, val *stk.ValidatorWrapper,
 ) error {
 	if err := val.SanityCheck(doNotEnforceMaxBLS); err != nil {
@@ -737,9 +763,6 @@ func (db *DB) UpdateValidatorWrapper(
 		return err
 	}
 	db.SetCode(addr, by)
-
-	// Update cache
-	db.stateValidatorsCache[addr] = val
 	return nil
 }
 
@@ -820,5 +843,5 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int, shareLo
 		curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, rewardPool)
 	}
 
-	return db.UpdateValidatorWrapper(curValidator.Address, curValidator)
+	return curValidator.SanityCheck(doNotEnforceMaxBLS)
 }
