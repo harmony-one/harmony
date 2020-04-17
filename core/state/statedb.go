@@ -18,7 +18,6 @@
 package state
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"sort"
@@ -649,10 +648,9 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	defer db.clearJournalAndRefund()
 
 	// Commit validator changes
+	// Need to happen before stateObject commitment
 	for addr, val := range db.stateValidators {
-		if bytes.Compare(addr.Bytes(), val.Address.Bytes()) == 0 {
-			db.UpdateValidatorWrapper(addr, val)
-		} // else it's dummy new validator which we shouldn't commit
+		db.UpdateValidatorWrapper(addr, val)
 	}
 
 	for addr := range db.journal.dirties {
@@ -711,12 +709,14 @@ var (
 func (db *DB) ValidatorWrapper(
 	addr common.Address, copy bool,
 ) (*stk.ValidatorWrapper, error) {
+	populateCache := false
 	if !copy {
-		// Read memory first
+		// Read cache first
 		cached, ok := db.stateValidators[addr]
 		if ok {
 			return cached, nil
 		}
+		populateCache = true
 	}
 
 	by := db.GetCode(addr)
@@ -731,8 +731,11 @@ func (db *DB) ValidatorWrapper(
 			common2.MustAddressToBech32(addr),
 		)
 	}
-	// Put in map
-	db.stateValidators[addr] = &val
+
+	// populate cache if the validator is not in it
+	if populateCache {
+		db.stateValidators[addr] = &val
+	}
 
 	return &val, nil
 }

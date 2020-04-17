@@ -2168,7 +2168,7 @@ func (bc *BlockChain) ReadValidatorInformationAt(
 	if err != nil || state == nil {
 		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
-	wrapper, err := state.ValidatorWrapper(addr, true)
+	wrapper, err := state.ValidatorWrapper(addr, false)
 	if err != nil {
 		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
