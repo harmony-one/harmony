@@ -706,13 +706,17 @@ var (
 
 // ValidatorWrapper retrieves the existing validator from state.
 // The return value is a reference to the actual validator object in state.
+// Whether to get a copy of the validator wrapper. If retrieved as copy,
+// remember to commit your change with UpdateValidatorWrapper.
 func (db *DB) ValidatorWrapper(
-	addr common.Address,
+	addr common.Address, copy bool,
 ) (*stk.ValidatorWrapper, error) {
-	// Read memory first
-	cached, ok := db.stateValidators[addr]
-	if ok {
-		return cached, nil
+	if !copy {
+		// Read memory first
+		cached, ok := db.stateValidators[addr]
+		if ok {
+			return cached, nil
+		}
 	}
 
 	by := db.GetCode(addr)
@@ -728,22 +732,6 @@ func (db *DB) ValidatorWrapper(
 		)
 	}
 	// Put in map
-	db.stateValidators[addr] = &val
-
-	return &val, nil
-}
-
-// NewValidatorWrapper creates a new validator in state.
-// The return value is a reference to the actual validator object in state.
-func (db *DB) NewValidatorWrapper(
-	addr common.Address,
-) (*stk.ValidatorWrapper, error) {
-	if db.IsValidator(addr) {
-		return nil, errors.New("Failed creating new validator: validator already exists")
-	}
-
-	val := stk.ValidatorWrapper{}
-	// add in memory
 	db.stateValidators[addr] = &val
 
 	return &val, nil
@@ -799,7 +787,7 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int, shareLo
 		return nil
 	}
 
-	curValidator, err := db.ValidatorWrapper(snapshot.Address)
+	curValidator, err := db.ValidatorWrapper(snapshot.Address, false)
 	if err != nil {
 		return errors.Wrapf(err, "failed to distribute rewards: validator does not exist")
 	}

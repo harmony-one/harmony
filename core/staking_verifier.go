@@ -32,36 +32,33 @@ var (
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndCreateValidatorFromMsg(
 	stateDB vm.StateDB, epoch *big.Int, blockNum *big.Int, msg *staking.CreateValidator,
-) error {
+) (*staking.ValidatorWrapper, error) {
 
 	if stateDB == nil {
-		return errStateDBIsMissing
+		return nil, errStateDBIsMissing
 	}
 	if epoch == nil {
-		return errEpochMissing
+		return nil, errEpochMissing
 	}
 	if blockNum == nil {
-		return errBlockNumMissing
+		return nil, errBlockNumMissing
 	}
 	if msg.Amount.Sign() == -1 {
-		return errNegativeAmount
+		return nil, errNegativeAmount
 	}
 	if stateDB.IsValidator(msg.ValidatorAddress) {
-		return errors.Wrapf(
+		return nil, errors.Wrapf(
 			errValidatorExist, common2.MustAddressToBech32(msg.ValidatorAddress),
 		)
 	}
 	if !CanTransfer(stateDB, msg.ValidatorAddress, msg.Amount) {
-		return errInsufficientBalanceForStake
+		return nil, errInsufficientBalanceForStake
 	}
 	v, err := staking.CreateValidatorFromNewMsg(msg, blockNum, epoch)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	wrapper, err := stateDB.NewValidatorWrapper(msg.ValidatorAddress)
-	if err != nil {
-		return err
-	}
+	wrapper := &staking.ValidatorWrapper{}
 	wrapper.Validator = *v
 	wrapper.Delegations = []staking.Delegation{
 		staking.NewDelegation(v.Address, msg.Amount),
@@ -72,9 +69,9 @@ func VerifyAndCreateValidatorFromMsg(
 	wrapper.BlockReward = big.NewInt(0)
 	maxBLSKeyAllowed := shard.ExternalSlotsAvailableForEpoch(epoch) / 3
 	if err := wrapper.SanityCheck(maxBLSKeyAllowed); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return wrapper, nil
 }
 
 // VerifyAndEditValidatorFromMsg verifies the edit validator message using
@@ -84,35 +81,35 @@ func VerifyAndCreateValidatorFromMsg(
 func VerifyAndEditValidatorFromMsg(
 	stateDB vm.StateDB, chainContext ChainContext,
 	epoch, blockNum *big.Int, msg *staking.EditValidator,
-) error {
+) (*staking.ValidatorWrapper, error) {
 
 	if stateDB == nil {
-		return errStateDBIsMissing
+		return nil, errStateDBIsMissing
 	}
 	if chainContext == nil {
-		return errChainContextMissing
+		return nil, errChainContextMissing
 	}
 	if blockNum == nil {
-		return errBlockNumMissing
+		return nil, errBlockNumMissing
 	}
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
-		return errValidatorNotExist
+		return nil, errValidatorNotExist
 	}
-	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress)
+	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress, true)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := staking.UpdateValidatorFromEditMsg(&wrapper.Validator, msg, epoch); err != nil {
-		return err
+		return nil, err
 	}
 	newRate := wrapper.Validator.Rate
 	if newRate.GT(wrapper.Validator.MaxRate) {
-		return errCommissionRateChangeTooHigh
+		return nil, errCommissionRateChangeTooHigh
 	}
 
 	snapshotValidator, err := chainContext.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
-		return errors.WithMessage(err, "Validator snapshot not found.")
+		return nil, errors.WithMessage(err, "Validator snapshot not found.")
 	}
 	rateAtBeginningOfEpoch := snapshotValidator.Validator.Rate
 
@@ -124,13 +121,13 @@ func VerifyAndEditValidatorFromMsg(
 	if newRate.Sub(rateAtBeginningOfEpoch).Abs().GT(
 		wrapper.Validator.MaxChangeRate,
 	) {
-		return errCommissionRateChangeTooFast
+		return nil, errCommissionRateChangeTooFast
 	}
 	maxBLSKeyAllowed := shard.ExternalSlotsAvailableForEpoch(epoch) / 3
 	if err := wrapper.SanityCheck(maxBLSKeyAllowed); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return wrapper, nil
 }
 
 const oneThousand = 1000
@@ -148,22 +145,22 @@ var (
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndDelegateFromMsg(
 	stateDB vm.StateDB, msg *staking.Delegate,
-) (*big.Int, error) {
+) (*staking.ValidatorWrapper, *big.Int, error) {
 	if stateDB == nil {
-		return nil, errStateDBIsMissing
+		return nil, nil, errStateDBIsMissing
 	}
 	if msg.Amount.Sign() == -1 {
-		return nil, errNegativeAmount
+		return nil, nil, errNegativeAmount
 	}
 	if msg.Amount.Cmp(minimumDelegation) < 0 {
-		return nil, errDelegationTooSmall
+		return nil, nil, errDelegationTooSmall
 	}
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
-		return nil, errValidatorNotExist
+		return nil, nil, errValidatorNotExist
 	}
-	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress)
+	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// Check for redelegation
 	for i := range wrapper.Delegations {
@@ -193,20 +190,20 @@ func VerifyAndDelegateFromMsg(
 				if err := wrapper.SanityCheck(
 					staking.DoNotEnforceMaxBLS,
 				); err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				if delegateBalance.Cmp(big.NewInt(0)) < 0 {
-					return nil, errNegativeAmount // shouldn't really happen
+					return nil, nil, errNegativeAmount // shouldn't really happen
 				}
 				// Return remaining balance to be deducted for delegation
 				if !CanTransfer(stateDB, msg.DelegatorAddress, delegateBalance) {
-					return nil, errors.Wrapf(
+					return nil, nil, errors.Wrapf(
 						errInsufficientBalanceForStake, "had %v, tried to stake %v",
 						stateDB.GetBalance(msg.DelegatorAddress), delegateBalance)
 				}
-				return delegateBalance, nil
+				return wrapper, delegateBalance, nil
 			}
-			return nil, errors.Wrapf(
+			return nil, nil, errors.Wrapf(
 				errInsufficientBalanceForStake,
 				"total-delegated %s own-current-balance %s amount-to-delegate %s",
 				totalInUndelegation.String(),
@@ -217,7 +214,7 @@ func VerifyAndDelegateFromMsg(
 	}
 	// If no redelegation, create new delegation
 	if !CanTransfer(stateDB, msg.DelegatorAddress, msg.Amount) {
-		return nil, errors.Wrapf(
+		return nil, nil, errors.Wrapf(
 			errInsufficientBalanceForStake, "had %v, tried to stake %v",
 			stateDB.GetBalance(msg.DelegatorAddress), msg.Amount)
 	}
@@ -227,9 +224,9 @@ func VerifyAndDelegateFromMsg(
 		),
 	)
 	if err := wrapper.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return msg.Amount, nil
+	return wrapper, msg.Amount, nil
 }
 
 // VerifyAndUndelegateFromMsg verifies the undelegate validator message
@@ -239,32 +236,32 @@ func VerifyAndDelegateFromMsg(
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndUndelegateFromMsg(
 	stateDB vm.StateDB, epoch *big.Int, msg *staking.Undelegate,
-) error {
+) (*staking.ValidatorWrapper, error) {
 	if stateDB == nil {
-		return errStateDBIsMissing
+		return nil, errStateDBIsMissing
 	}
 	if epoch == nil {
-		return errEpochMissing
+		return nil, errEpochMissing
 	}
 
 	if msg.Amount.Sign() == -1 {
-		return errNegativeAmount
+		return nil, errNegativeAmount
 	}
 
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
-		return errValidatorNotExist
+		return nil, errValidatorNotExist
 	}
 
-	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress)
+	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress, true)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for i := range wrapper.Delegations {
 		delegation := &wrapper.Delegations[i]
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
 			if err := delegation.Undelegate(epoch, msg.Amount); err != nil {
-				return err
+				return nil, err
 			}
 			if err := wrapper.SanityCheck(
 				staking.DoNotEnforceMaxBLS,
@@ -274,13 +271,13 @@ func VerifyAndUndelegateFromMsg(
 				if errors.Cause(err) == staking.ErrInvalidSelfDelegation {
 					wrapper.Status = effective.Inactive
 				} else {
-					return err
+					return nil, err
 				}
 			}
-			return nil
+			return wrapper, nil
 		}
 	}
-	return errNoDelegationToUndelegate
+	return nil, errNoDelegationToUndelegate
 }
 
 // VerifyAndCollectRewardsFromDelegation verifies and collects rewards
@@ -290,16 +287,17 @@ func VerifyAndUndelegateFromMsg(
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndCollectRewardsFromDelegation(
 	stateDB vm.StateDB, delegations []staking.DelegationIndex,
-) (*big.Int, error) {
+) ([]*staking.ValidatorWrapper, *big.Int, error) {
 	if stateDB == nil {
-		return nil, errStateDBIsMissing
+		return nil, nil, errStateDBIsMissing
 	}
+	updatedValidatorWrappers := []*staking.ValidatorWrapper{}
 	totalRewards := big.NewInt(0)
 	for i := range delegations {
 		delegation := &delegations[i]
-		wrapper, err := stateDB.ValidatorWrapper(delegation.ValidatorAddress)
+		wrapper, err := stateDB.ValidatorWrapper(delegation.ValidatorAddress, true)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if uint64(len(wrapper.Delegations)) > delegation.Index {
 			delegation := &wrapper.Delegations[delegation.Index]
@@ -313,11 +311,12 @@ func VerifyAndCollectRewardsFromDelegation(
 				Uint64("delegation index", delegation.Index).
 				Int("delegations length", len(wrapper.Delegations)).
 				Msg("Delegation index out of bound")
-			return nil, errors.New("Delegation index out of bound")
+			return nil, nil, errors.New("Delegation index out of bound")
 		}
+		updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)
 	}
 	if totalRewards.Int64() == 0 {
-		return nil, errNoRewardsToCollect
+		return nil, nil, errNoRewardsToCollect
 	}
-	return totalRewards, nil
+	return updatedValidatorWrappers, totalRewards, nil
 }

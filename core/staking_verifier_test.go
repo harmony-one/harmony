@@ -78,7 +78,7 @@ func TestCV1(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -90,14 +90,14 @@ func TestCV3(t *testing.T) {
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
 	}
 	statedb.SetValidatorFlag(msg.ValidatorAddress)
 
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); !strings.Contains(err.Error(), errValidatorExist.Error()) {
 		t.Error("expected", errValidatorExist, "got", err)
@@ -111,7 +111,7 @@ func TestCV9(t *testing.T) {
 	// name length: 140 characters
 	msg.Name = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -125,7 +125,7 @@ func TestCV10(t *testing.T) {
 	// identity length: 140 characters
 	msg.Identity = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -139,7 +139,7 @@ func TestCV11(t *testing.T) {
 	// website length: 140 characters
 	msg.Website = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -153,7 +153,7 @@ func TestCV12(t *testing.T) {
 	// security contact length: 140 characters
 	msg.SecurityContact = "Helloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -167,7 +167,7 @@ func TestCV13(t *testing.T) {
 	// details length: 280 characters
 	msg.Details = "HelloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuebfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjoweHlloiwfhwifbwfbcerghveugbviuscbhwiefbcusidbcifwefhgciwefherhbfiwuehfciwiuedbfcuyiewfhwieufwiweifhcwefhwefhwidsffevjnononwondqmeofniowfndjowe"
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -182,7 +182,7 @@ func TestCV14(t *testing.T) {
 	// commission rate == max rate &&  max change rate == max rate
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("0.5")
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("0.5")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -196,7 +196,7 @@ func TestCV15(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate: 0.6 > max rate: 0.5
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("0.6")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "commission rate and change rate can not be larger than max commission rate", "got", nil)
@@ -210,7 +210,7 @@ func TestCV16(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max change rate: 0.6 > max rate: 0.5
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("0.6")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "commission rate and change rate can not be larger than max commission rate", "got", nil)
@@ -224,7 +224,7 @@ func TestCV17(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max rate == 1
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("1")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -240,7 +240,7 @@ func TestCV18(t *testing.T) {
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("1")
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("1")
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("1")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -254,7 +254,7 @@ func TestCV19(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate == 0
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("0")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -268,7 +268,7 @@ func TestCV20(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate == 0
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("0")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -284,7 +284,7 @@ func TestCV21(t *testing.T) {
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("0")
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("0")
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("0")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -299,7 +299,7 @@ func TestCV22(t *testing.T) {
 	// max change rate == 1 & max rate == 1
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("1")
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("1")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -313,7 +313,7 @@ func TestCV23(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate < 0
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("-0.1")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "rate:-0.100000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
@@ -327,7 +327,7 @@ func TestCV24(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max rate < 0
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("-0.001")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "rate:-0.001000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
@@ -341,7 +341,7 @@ func TestCV25(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max rate < 0
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("-0.001")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "rate:-0.001000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
@@ -355,7 +355,7 @@ func TestCV26(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// commission rate > 1
 	msg.CommissionRates.Rate, _ = numeric.NewDecFromStr("1.01")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "rate:1.01000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
@@ -369,7 +369,7 @@ func TestCV27(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max rate > 1
 	msg.CommissionRates.MaxRate, _ = numeric.NewDecFromStr("1.01")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "rate:1.01000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
@@ -383,7 +383,7 @@ func TestCV28(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// max change rate > 1
 	msg.CommissionRates.MaxChangeRate, _ = numeric.NewDecFromStr("1.01")
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "rate:1.01000000000000000: commission rate, change rate and max rate should be within 0-100 percent", "got", nil)
@@ -398,7 +398,7 @@ func TestCV29(t *testing.T) {
 	// amount > MinSelfDelegation
 	msg.Amount = twelveK
 	msg.MinSelfDelegation = tenK
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -413,7 +413,7 @@ func TestCV30(t *testing.T) {
 	// amount > MinSelfDelegation
 	msg.Amount = tenK
 	msg.MinSelfDelegation = tenK
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -428,7 +428,7 @@ func TestCV31(t *testing.T) {
 	// amount > MinSelfDelegation
 	msg.Amount = twelveK
 	msg.MinSelfDelegation = tenK
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "min_self_delegation 5000000000000000000, after delegation amount 4000000000000000000: self delegation can not be less than min_self_delegation", "got", nil)
@@ -443,7 +443,7 @@ func TestCV32(t *testing.T) {
 	// MaxTotalDelegation < MinSelfDelegation
 	msg.MaxTotalDelegation = tenK
 	msg.MinSelfDelegation = twelveK
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "max_total_delegation can not be less than min_self_delegation", "got", nil)
@@ -457,7 +457,7 @@ func TestCV33(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// MinSelfDelegation < 10,000 ONE
 	msg.MinSelfDelegation = big.NewInt(1e18)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "delegation-given 1000000000000000000: min_self_delegation has to be greater than 10,000 ONE", "got", nil)
@@ -471,7 +471,7 @@ func TestCV34(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// MinSelfDelegation not specified
 	msg.MinSelfDelegation = nil
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "MinSelfDelegation can not be nil", "got", nil)
@@ -485,7 +485,7 @@ func TestCV35(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// MinSelfDelegation < 0
 	msg.MinSelfDelegation = big.NewInt(-1)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "delegation-given -1: min_self_delegation has to be greater than 1 ONE", "got", nil)
@@ -500,7 +500,7 @@ func TestCV36(t *testing.T) {
 	// amount > MaxTotalDelegation
 	msg.Amount = big.NewInt(4e18)
 	msg.MaxTotalDelegation = big.NewInt(3e18)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "total delegation can not be bigger than max_total_delegation", "got", nil)
@@ -514,7 +514,7 @@ func TestCV39(t *testing.T) {
 	statedb.AddBalance(msg.ValidatorAddress, tenK)
 	// MaxTotalDelegation < 0
 	msg.MaxTotalDelegation = big.NewInt(-1)
-	if err := VerifyAndCreateValidatorFromMsg(
+	if _, err := VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	); err == nil {
 		t.Error("expected", "max_total_delegation can not be less than min_self_delegation", "got", nil)

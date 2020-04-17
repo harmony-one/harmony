@@ -2168,7 +2168,7 @@ func (bc *BlockChain) ReadValidatorInformationAt(
 	if err != nil || state == nil {
 		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
-	wrapper, err := state.ValidatorWrapper(addr)
+	wrapper, err := state.ValidatorWrapper(addr, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
@@ -2259,7 +2259,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			}
 			// This means it's already in staking epoch
 			if currentEpochSuperCommittee.Epoch != nil {
-				wrapper, err := state.ValidatorWrapper(currentValidator)
+				wrapper, err := state.ValidatorWrapper(currentValidator, false)
 				if err != nil {
 					return nil, err
 				}
@@ -2316,7 +2316,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 
 		// This means it's already in staking epoch
 		if currentEpochSuperCommittee.Epoch != nil {
-			wrapper, err := state.ValidatorWrapper(key)
+			wrapper, err := state.ValidatorWrapper(key, false)
 			if err != nil {
 				return nil, err
 			}
@@ -2361,7 +2361,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 	// Read all validator's current data and snapshot them
 	for i := range allValidators {
 		// The snapshot will be captured in the state after the last epoch block is finalized
-		validator, err := state.ValidatorWrapper(allValidators[i])
+		validator, err := state.ValidatorWrapper(allValidators[i], false)
 		if err != nil {
 			return err
 		}
@@ -2480,7 +2480,7 @@ func (bc *BlockChain) UpdateStakingMetaData(
 			}
 
 			// Update validator snapshot for the new validator
-			validator, err := state.ValidatorWrapper(addr)
+			validator, err := state.ValidatorWrapper(addr, false)
 			if err != nil {
 				return newValidators, err
 			}
@@ -2642,7 +2642,7 @@ func (bc *BlockChain) addDelegationIndex(
 
 	// Found the delegation from state and add the delegation index
 	// Note this should read from the state of current block in concern
-	wrapper, err := state.ValidatorWrapper(validatorAddress)
+	wrapper, err := state.ValidatorWrapper(validatorAddress, false)
 	if err != nil {
 		return delegations, err
 	}

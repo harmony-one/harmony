@@ -762,12 +762,9 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if shard.Schedule.IsLastBlock(currentBlockNumber.Uint64()) {
 			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
 		}
-		// Need a play ground state as staking txn actual modifies the state.
-		playGround, err := pool.chain.StateAt(pool.chain.CurrentBlock().Root())
-		if err != nil {
-			return err
-		}
-		return VerifyAndCreateValidatorFromMsg(playGround, pendingEpoch, pendingBlockNumber, stkMsg)
+
+		_, err = VerifyAndCreateValidatorFromMsg(pool.currentState, pendingEpoch, pendingBlockNumber, stkMsg)
+		return err
 	case staking.DirectiveEditValidator:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveEditValidator)
 		if err != nil {
@@ -785,16 +782,13 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			chainContext = nil // might use testing blockchain, set to nil for verifier to handle.
 		}
 		pendingBlockNumber := new(big.Int).Add(pool.chain.CurrentBlock().Number(), big.NewInt(1))
-		// Need a play ground state as staking txn actual modifies the state.
-		playGround, err := pool.chain.StateAt(pool.chain.CurrentBlock().Root())
-		if err != nil {
-			return err
-		}
-		return VerifyAndEditValidatorFromMsg(
-			playGround, chainContext,
+
+		_, err = VerifyAndEditValidatorFromMsg(
+			pool.currentState, chainContext,
 			pool.chain.CurrentBlock().Epoch(),
 			pendingBlockNumber, stkMsg,
 		)
+		return err
 	case staking.DirectiveDelegate:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
 		if err != nil {
@@ -807,12 +801,8 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.DelegatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
-		// Need a play ground state as staking txn actual modifies the state.
-		playGround, err := pool.chain.StateAt(pool.chain.CurrentBlock().Root())
-		if err != nil {
-			return err
-		}
-		_, err = VerifyAndDelegateFromMsg(playGround, stkMsg)
+
+		_, _, err = VerifyAndDelegateFromMsg(pool.currentState, stkMsg)
 		return err
 	case staking.DirectiveUndelegate:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
@@ -830,12 +820,9 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if shard.Schedule.IsLastBlock(pool.chain.CurrentBlock().Number().Uint64()) {
 			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
 		}
-		// Need a play ground state as staking txn actual modifies the state.
-		playGround, err := pool.chain.StateAt(pool.chain.CurrentBlock().Root())
-		if err != nil {
-			return err
-		}
-		return VerifyAndUndelegateFromMsg(playGround, pendingEpoch, stkMsg)
+
+		_, err = VerifyAndUndelegateFromMsg(pool.currentState, pendingEpoch, stkMsg)
+		return err
 	case staking.DirectiveCollectRewards:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCollectRewards)
 		if err != nil {
@@ -856,12 +843,8 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if err != nil {
 			return err
 		}
-		// Need a play ground state as staking txn actual modifies the state.
-		playGround, err := pool.chain.StateAt(pool.chain.CurrentBlock().Root())
-		if err != nil {
-			return err
-		}
-		_, err = VerifyAndCollectRewardsFromDelegation(playGround, delegations)
+
+		_, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations)
 		return err
 	default:
 		return staking.ErrInvalidStakingKind

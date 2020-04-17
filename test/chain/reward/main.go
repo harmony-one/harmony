@@ -86,10 +86,9 @@ func main() {
 	statedb, _ := state.New(common2.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	msg := createValidator()
 	statedb.AddBalance(msg.ValidatorAddress, new(big.Int).Mul(big.NewInt(5e18), big.NewInt(2000)))
-	err := core.VerifyAndCreateValidatorFromMsg(
+	validator, err := core.VerifyAndCreateValidatorFromMsg(
 		statedb, postStakingEpoch, big.NewInt(0), msg,
 	)
-	validator, err := statedb.ValidatorWrapper(msg.ValidatorAddress)
 	if err != nil {
 		fmt.Print(err)
 	}
@@ -103,7 +102,7 @@ func main() {
 	}
 
 	startTime := time.Now()
-	validator, _ = statedb.ValidatorWrapper(msg.ValidatorAddress)
+	validator, _ = statedb.ValidatorWrapper(msg.ValidatorAddress, false)
 	endTime := time.Now()
 	fmt.Printf("Time required to read validator: %f seconds\n", endTime.Sub(startTime).Seconds())
 
