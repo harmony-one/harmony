@@ -334,7 +334,8 @@ func delegatorSlashApply(
 		slashDebt := applySlashRate(delegationSnapshot.Amount, rate)
 		slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 		snapshotAddr := delegationSnapshot.DelegatorAddress
-		for _, delegationNow := range current.Delegations {
+		for i := range current.Delegations {
+			delegationNow := current.Delegations[i]
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
 				utils.Logger().Info().
 					RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).

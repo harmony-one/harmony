@@ -2203,8 +2203,8 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
 }
 
-// writeValidatorSnapshot writes the snapshot of provided validator
-func (bc *BlockChain) writeValidatorSnapshot(
+// WriteValidatorSnapshot writes the snapshot of provided validator
+func (bc *BlockChain) WriteValidatorSnapshot(
 	batch rawdb.DatabaseWriter, snapshot *staking.ValidatorSnapshot,
 ) error {
 	// Batch write the current data as snapshot
@@ -2367,7 +2367,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 		}
 
 		snapshot := &staking.ValidatorSnapshot{validator, epoch}
-		if err := bc.writeValidatorSnapshot(batch, snapshot); err != nil {
+		if err := bc.WriteValidatorSnapshot(batch, snapshot); err != nil {
 			return err
 		}
 	}
@@ -2485,13 +2485,13 @@ func (bc *BlockChain) UpdateStakingMetaData(
 				return newValidators, err
 			}
 
-			if err := rawdb.WriteValidatorSnapshot(batch, validator, epoch); err != nil {
+			if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, epoch}); err != nil {
 				return newValidators, err
 			}
 			// For validator created at exactly the last block of an epoch, we should create the snapshot
 			// for next epoch too.
 			if newEpoch.Cmp(epoch) > 0 {
-				if err := rawdb.WriteValidatorSnapshot(batch, validator, newEpoch); err != nil {
+				if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, newEpoch}); err != nil {
 					return newValidators, err
 				}
 			}

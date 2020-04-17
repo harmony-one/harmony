@@ -145,6 +145,7 @@ func (w *Worker) CommitTransactions(
 			// Start executing the transaction
 			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
 			// THESE CODE ARE DUPLICATED AS ABOVE>>
+			// TODO(audit): add staking txn revert functionality
 			if _, err := w.commitStakingTransaction(tx, coinbase); err != nil {
 				txID := tx.Hash().Hex()
 				utils.Logger().Error().Err(err).

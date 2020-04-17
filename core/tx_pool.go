@@ -17,7 +17,6 @@
 package core
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"math/big"
@@ -965,14 +964,6 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		Interface("to", tx.To()).
 		Msg("Pooled new future transaction")
 	return replace, nil
-}
-
-// Add adds a transaction to the pool if valid and passes it to the tx relay
-// backend
-func (pool *TxPool) Add(ctx context.Context, tx *types.PoolTransaction) error {
-	// TODO(ricl): placeholder
-	// TODO(minhdoan): follow with richard why we need this. As of now TxPool is not used now.
-	return nil
 }
 
 // enqueueTx inserts a new transaction into the non-executable transaction queue.

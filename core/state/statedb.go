@@ -830,7 +830,7 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int, shareLo
 		percentage, ok := shareLookup[delegation.DelegatorAddress]
 
 		if !ok {
-			continue
+			return errors.Wrapf(err, "missing delegation shares for reward distribution")
 		}
 
 		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
@@ -845,5 +845,5 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int, shareLo
 		curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, rewardPool)
 	}
 
-	return curValidator.SanityCheck(doNotEnforceMaxBLS)
+	return nil
 }
