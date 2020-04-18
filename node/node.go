@@ -36,7 +36,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
-	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 )
@@ -355,7 +355,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 // Start kicks off the node message handling
 func (node *Node) Start() error {
-	allTopics := node.host.AllTopics()
+	allTopics := node.host.AllSubscriptions()
 	if len(allTopics) == 0 {
 		return errors.New("have no topics to listen to")
 	}
@@ -365,26 +365,24 @@ func (node *Node) Start() error {
 	ownID := node.host.GetSelfPeer().PeerID
 	errChan := make(chan error)
 
-	for i, topic := range allTopics {
-		sub, err := topic.Subscribe()
-		if err != nil {
-			return err
-		}
+	for i, sub := range allTopics {
 		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
-		msgChan := make(chan *libp2p_pubsub.Message)
+		msgChan := make(chan ipfs_interface.PubSubMessage)
 
-		go func(msgChan chan *libp2p_pubsub.Message, sem *semaphore.Weighted) {
+		go func(msgChan chan ipfs_interface.PubSubMessage, sem *semaphore.Weighted) {
 			for msg := range msgChan {
-				payload := msg.GetData()
-				if len(payload) < p2pMsgPrefixSize {
-					continue
-				}
+				// for the closure
+				m := msg
 				if sem.TryAcquire(1) {
 					go func() {
+						defer sem.Release(1)
+						payload := m.Data()
+						if len(payload) < p2pMsgPrefixSize {
+							utils.Logger().Info().Msg("p2p message above expected size, possible attack")
+						}
 						node.HandleMessage(
-							payload[p2pMsgPrefixSize:], msg.GetFrom(),
+							payload[p2pMsgPrefixSize:], m.From(),
 						)
-						sem.Release(1)
 					}()
 				} else {
 					utils.Logger().Info().
@@ -393,16 +391,17 @@ func (node *Node) Start() error {
 			}
 		}(msgChan, weighted[i])
 
-		go func(msgChan chan *libp2p_pubsub.Message) {
+		go func(msgChan chan ipfs_interface.PubSubMessage) {
 			for {
 				nextMsg, err := sub.Next(ctx)
 				if err != nil {
 					errChan <- err
 					continue
 				}
-				if nextMsg.GetFrom() == ownID {
+				if nextMsg.From() == ownID {
 					continue
 				}
+
 				msgChan <- nextMsg
 			}
 		}(msgChan)

@@ -18,7 +18,6 @@ import (
 	"github.com/juju/fslock"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -37,14 +36,14 @@ type Peer struct {
 // Host is the client + server in p2p network.
 type Host interface {
 	GetSelfPeer() *Peer
+	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 
 	AddPeer(*Peer) error
 	GetP2PHost() libp2p_host.Host
 	GetPeerCount() int
 	ConnectHostPeer(Peer) error
-	// SendMessageToGroups sends a message to one or more multicast groups.
-	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-	AllTopics() []*libp2p_pubsub.Topic
+
+	AllSubscriptions() []ipfs_interface.PubSubSubscription
 }
 
 var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
@@ -127,6 +126,10 @@ func (h *hmyHost) getTopic(topic string) (ipfs_interface.PubSubSubscription, err
 
 	h.joined[topic] = sub
 	return sub, nil
+}
+
+func (h *hmyHost) AllSubscriptions() []ipfs_interface.PubSubSubscription {
+	return nil
 }
 
 // NewHost ..
