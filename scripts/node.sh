@@ -122,7 +122,6 @@ function setup_env
    sysctl -w net.ipv4.udp_wmem_min=16384
    # Increase the tcp-time-wait buckets pool size to prevent simple DOS attacks
    sysctl -w net.ipv4.tcp_max_tw_buckets=1440000
-   sysctl -w net.ipv4.tcp_tw_recycle=1
    sysctl -w net.ipv4.tcp_tw_reuse=1
    
    add_env /etc/security/limits.conf "* soft     nproc          65535"
