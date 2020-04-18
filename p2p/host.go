@@ -1,18 +1,24 @@
 package p2p
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/p2p/ipfsutil"
 	"github.com/ipfs/go-datastore"
+	sync_ds "github.com/ipfs/go-datastore/sync"
 	ipfs_cfg "github.com/ipfs/go-ipfs-config"
 	"github.com/juju/fslock"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 )
@@ -70,13 +76,136 @@ func panicUnlockFS(err error, l *fslock.Lock) {
 	panic(err)
 }
 
+func fatal(err error) {
+	fmt.Println("died, why", err.Error())
+	panic("end")
+}
+
 // NewHost ..
 func NewHost(opts *Opts) (Host, error) {
-	// log := utils.NetworkLogger()
-	// var (
-	// 	swarmAddresses []string
-	// 	lock           *fslock.Lock
-	// )
+	var swarmAddresses []string
+
+	if opts.Port != 0 {
+		swarmAddresses = []string{
+			fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", opts.Port),
+			fmt.Sprintf("/ip6/0.0.0.0/tcp/%d", opts.Port),
+			fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", opts.Port+1),
+			fmt.Sprintf("/ip6/0.0.0.0/udp/%d/quic", opts.Port+1),
+		}
+	} else {
+		swarmAddresses = []string{
+			"/ip4/0.0.0.0/tcp/0",
+			"/ip6/0.0.0.0/tcp/0",
+			"/ip4/0.0.0.0/udp/0/quic",
+			"/ip6/0.0.0.0/udp/0/quic",
+		}
+	}
+
+	mardv, err := multiaddr.NewMultiaddr(opts.RendezVousServerMAddr)
+	if err != nil {
+		fatal(err)
+	}
+
+	rdvpeer, err := peer.AddrInfoFromP2pAddr(mardv)
+	if err != nil {
+		fatal(err)
+	}
+
+	ctx := context.Background()
+	rootDS := sync_ds.MutexWrap(opts.RootDS)
+	ipfsDS := ipfsutil.NewNamespacedDatastore(rootDS, datastore.NewKey("ipfs"))
+	cfg, err := ipfsutil.CreateBuildConfigWithDatastore(&ipfsutil.BuildOpts{
+		SwarmAddresses: swarmAddresses,
+	}, ipfsDS)
+	if err != nil {
+		fatal(err)
+	}
+
+	routingOpt, crouting := ipfsutil.NewTinderRouting(
+		opts.Logger, rdvpeer.ID, false,
+	)
+	cfg.Routing = routingOpt
+
+	ipfsConfig, err := cfg.Repo.Config()
+	if err != nil {
+		fatal(err)
+	}
+
+	ipfsConfig.Bootstrap = append(opts.Bootstrap, opts.RendezVousServerMAddr)
+	if err := cfg.Repo.SetConfig(ipfsConfig); err != nil {
+		fatal(err)
+	}
+
+	api, node, err := ipfsutil.NewConfigurableCoreAPI(
+		ctx,
+		cfg,
+		ipfsutil.OptionMDNSDiscovery,
+	)
+	if err != nil {
+		fatal(err)
+	}
+	// wait to get routing
+	routing := <-crouting
+	routing.RoutingTable().Print()
+
+	fmt.Println("node->",
+		node.Identity,
+		node.PeerHost.Addrs(),
+	)
+
+	for {
+
+		if err := node.PeerHost.Connect(ctx, *rdvpeer); err != nil {
+			fmt.Println("something busted, why", err.Error())
+			opts.Logger.Error().Err(err).Msg("cannot dial rendezvous point")
+		} else {
+			fmt.Println(
+				"was able to connect to the rendevous peer",
+				rdvpeer.Loggable(),
+				rdvpeer.String(),
+			)
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	const topic = "hello-world"
+
+	sub, err := api.PubSub().Subscribe(ctx, topic)
+
+	if err != nil {
+		fatal(err)
+	}
+
+	go func() {
+		for range time.NewTicker(time.Second * 5).C {
+			fmt.Println("I am publishing now", node.PeerHost.ID())
+			if err := api.PubSub().Publish(
+				ctx, topic, []byte("some junk data, what"),
+			); err != nil {
+				fmt.Println("why couldnt publish the message?")
+			}
+		}
+	}()
+
+	for range time.NewTicker(time.Second * 1).C {
+		msg, err := sub.Next(ctx)
+		if err != nil {
+			fmt.Println("nothing")
+		}
+		sender := msg.From()
+		if sender != node.PeerHost.ID() {
+			fmt.Println(
+				"got real data", string(msg.Data()), msg.From(), msg.Topics(),
+			)
+			fmt.Println(
+				"who am i connected to",
+				node.PubSub.ListPeers(topic),
+				"my peer ID =>", node.PeerHost.ID(),
+			)
+		}
+	}
 
 	return &hmyHost{
 		l: nil,

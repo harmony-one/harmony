@@ -42,6 +42,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	sync_ds "github.com/ipfs/go-datastore/sync"
 	badger "github.com/ipfs/go-ds-badger"
+	ipfs_cfg "github.com/ipfs/go-ipfs-config"
 	"github.com/juju/fslock"
 	"github.com/pkg/errors"
 )
@@ -466,11 +467,17 @@ func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 		Port:            *port,
 		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
 	}
+	baseDS := datastore.NewMapDatastore()
+
+	const DevRendezVousPoint = "/ip4/167.99.223.55/tcp/4040/p2p/QmTo3RS6Uc8aCS5Cxx8EBHkNCe4C7vKRanbMEboxkA92Cn"
+
+	var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
+
 	myHost, err := p2p.NewHost(&p2p.Opts{
-		Bootstrap:             []string{},
-		RendezVousServerMAddr: "",
-		Port:                  80,
-		RootDS:                nil,
+		Bootstrap:             DefaultBootstrap,
+		RendezVousServerMAddr: DevRendezVousPoint,
+		Port:                  0,
+		RootDS:                baseDS,
 		Logger:                utils.NetworkLogger(),
 	})
 	if err != nil {
