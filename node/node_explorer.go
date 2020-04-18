@@ -172,7 +172,7 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 	hashes := make([]common.Hash, 0)
 	for _, tx := range addressData.TXs {
 		if txType == "" || txType == "ALL" || txType == tx.Type {
-			hash := common.HexToHash(tx.ID)
+			hash := common.HexToHash(tx.Hash)
 			hashes = append(hashes, hash)
 		}
 	}
@@ -204,7 +204,7 @@ func (node *Node) GetStakingTransactionsHistory(address, txType, order string) (
 	hashes := make([]common.Hash, 0)
 	for _, tx := range addressData.StakingTXs {
 		if txType == "" || txType == "ALL" || txType == tx.Type {
-			hash := common.HexToHash(tx.ID)
+			hash := common.HexToHash(tx.Hash)
 			hashes = append(hashes, hash)
 		}
 	}

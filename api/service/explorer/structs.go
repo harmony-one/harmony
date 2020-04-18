@@ -25,6 +25,13 @@ const (
 	Sent     = "SENT"
 )
 
+// TxRecord ...
+type TxRecord struct {
+	Hash      string
+	Type      string
+	Timestamp string
+}
+
 // Data ...
 type Data struct {
 	Addresses []string `json:"Addresses"`
@@ -32,10 +39,10 @@ type Data struct {
 
 // Address ...
 type Address struct {
-	ID         string                `json:"id"`
-	Balance    *big.Int              `json:"balance"`
-	TXs        []*Transaction        `json:"txs"`
-	StakingTXs []*StakingTransaction `json:"staking_txs"`
+	ID         string      `json:"id"`
+	Balance    *big.Int    `json:"balance"`
+	TXs        []*TxRecord `json:"txs"`
+	StakingTXs []*TxRecord `json:"staking_txs"`
 }
 
 // Transaction ...

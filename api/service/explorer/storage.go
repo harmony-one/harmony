@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -20,9 +19,10 @@ import (
 
 // Constants for storage.
 const (
-	AddressPrefix    = "ad"
-	CheckpointPrefix = "dc"
-	PrefixLen        = 3
+	AddressPrefix        = "ad"
+	CheckpointPrefix     = "dc"
+	PrefixLen            = 3
+	AdddressTxnsInitSize = 10
 )
 
 // GetAddressKey ...
@@ -96,86 +96,41 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 		return
 	}
 
-	// Store txs
-	for _, tx := range block.Transactions() {
-		explorerTransaction, err := GetTransaction(tx, block)
-		if err != nil {
-			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
-				Msg("[Explorer Storage] Failed to get GetTransaction mapping")
-			continue
-		}
-		storage.UpdateTxAddress(explorerTransaction, tx)
+	acntsTxns, acntsStakingTxns := computeAccountsTransactionsMapForBlock(block)
+
+	for address, txRecords := range acntsTxns {
+		storage.UpdateTxAddressStorage(address, txRecords, false /* isStaking */)
 	}
-	// Store staking txns
-	for _, tx := range block.StakingTransactions() {
-		explorerTransaction, err := GetStakingTransaction(tx, block)
-		if err != nil {
-			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
-				Msg("[Explorer Storage] Failed to get StakingTransaction mapping")
-			continue
-		}
-		storage.UpdateStakingTxAddress(explorerTransaction, tx)
+	for address, txRecords := range acntsStakingTxns {
+		storage.UpdateTxAddressStorage(address, txRecords, true /* isStaking */)
 	}
 
 	// save checkpoint of block dumped
 	storage.GetDB().Put([]byte(blockCheckpoint), []byte{}, nil)
 }
 
-// UpdateTxAddress ...
-func (storage *Storage) UpdateTxAddress(explorerTransaction *Transaction, tx *types.Transaction) {
-	explorerTransaction.Type = Received
-	if explorerTransaction.To != "" {
-		storage.UpdateTxAddressStorage(explorerTransaction.To, explorerTransaction, tx)
-	}
-	explorerTransaction.Type = Sent
-	storage.UpdateTxAddressStorage(explorerTransaction.From, explorerTransaction, tx)
-}
-
-// UpdateStakingTxAddress ...
-func (storage *Storage) UpdateStakingTxAddress(explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
-	explorerTransaction.Type = Received
-	if explorerTransaction.To != "" {
-		storage.UpdateStakingTxAddressStorage(explorerTransaction.To, explorerTransaction, tx)
-	}
-	explorerTransaction.Type = Sent
-	storage.UpdateStakingTxAddressStorage(explorerTransaction.From, explorerTransaction, tx)
-}
-
 // UpdateTxAddressStorage updates specific addr tx Address.
-func (storage *Storage) UpdateTxAddressStorage(addr string, explorerTransaction *Transaction, tx *types.Transaction) {
+func (storage *Storage) UpdateTxAddressStorage(addr string, txRecords []*TxRecord, isStaking bool) {
 	var address Address
 	key := GetAddressKey(addr)
 	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
 		if err = rlp.DecodeBytes(data, &address); err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed due to error")
+			utils.Logger().Error().
+				Bool("isStaking", isStaking).Err(err).Msg("Failed due to error")
 		}
 	}
 	address.ID = addr
-	address.TXs = append(address.TXs, explorerTransaction)
+	if isStaking {
+		address.StakingTXs = append(address.StakingTXs, txRecords...)
+	} else {
+		address.TXs = append(address.TXs, txRecords...)
+	}
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
 		storage.GetDB().Put([]byte(key), encoded, nil)
 	} else {
-		utils.Logger().Error().Err(err).Msg("cannot encode address")
-	}
-}
-
-// UpdateStakingTxAddressStorage updates specific addr staking tx Address.
-func (storage *Storage) UpdateStakingTxAddressStorage(addr string, explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
-	var address Address
-	key := GetAddressKey(addr)
-	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
-		if err = rlp.DecodeBytes(data, &address); err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed due to error")
-		}
-	}
-	address.ID = addr
-	address.StakingTXs = append(address.StakingTXs, explorerTransaction)
-	encoded, err := rlp.EncodeToBytes(address)
-	if err == nil {
-		storage.GetDB().Put([]byte(key), encoded, nil)
-	} else {
-		utils.Logger().Error().Err(err).Msg("cannot encode address")
+		utils.Logger().Error().
+			Bool("isStaking", isStaking).Err(err).Msg("cannot encode address")
 	}
 }
 
@@ -201,4 +156,83 @@ func (storage *Storage) GetAddresses(size int, prefix string) ([]string, error) 
 		return nil, err
 	}
 	return addresses, nil
+}
+
+func computeAccountsTransactionsMapForBlock(
+	block *types.Block,
+) (map[string][]*TxRecord, map[string][]*TxRecord) {
+	// mapping from account address to TxRecords for txns in the block
+	var acntsTxns map[string][]*TxRecord
+	// mapping from account address to TxRecords for staking txns in the block
+	var acntsStakingTxns map[string][]*TxRecord
+
+	// Store txs
+	for _, tx := range block.Transactions() {
+		explorerTransaction, err := GetTransaction(tx, block)
+		if err != nil {
+			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
+				Msg("[Explorer Storage] Failed to get GetTransaction mapping")
+			continue
+		}
+
+		// store as sent transaction with from address
+		txRecord := &TxRecord{
+			Hash:      explorerTransaction.ID,
+			Type:      Sent,
+			Timestamp: explorerTransaction.Timestamp,
+		}
+		acntTxns, ok := acntsTxns[explorerTransaction.From]
+		if !ok {
+			acntTxns = make([]*TxRecord, AdddressTxnsInitSize)
+		}
+		acntTxns = append(acntTxns, txRecord)
+
+		// store as received transaction with to address
+		txRecord = &TxRecord{
+			Hash:      explorerTransaction.ID,
+			Type:      Received,
+			Timestamp: explorerTransaction.Timestamp,
+		}
+		acntTxns, ok = acntsTxns[explorerTransaction.To]
+		if !ok {
+			acntTxns = make([]*TxRecord, AdddressTxnsInitSize)
+		}
+		acntTxns = append(acntTxns, txRecord)
+	}
+
+	// Store staking txns
+	for _, tx := range block.StakingTransactions() {
+		explorerTransaction, err := GetStakingTransaction(tx, block)
+		if err != nil {
+			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
+				Msg("[Explorer Storage] Failed to get StakingTransaction mapping")
+			continue
+		}
+
+		// store as sent staking transaction with from address
+		txRecord := &TxRecord{
+			Hash:      explorerTransaction.ID,
+			Type:      Sent,
+			Timestamp: explorerTransaction.Timestamp,
+		}
+		acntStakingTxns, ok := acntsStakingTxns[explorerTransaction.From]
+		if !ok {
+			acntStakingTxns = make([]*TxRecord, AdddressTxnsInitSize)
+		}
+		acntStakingTxns = append(acntStakingTxns, txRecord)
+
+		// For delegate/undelegate, also store as received staking transaction with to address
+		txRecord = &TxRecord{
+			Hash:      explorerTransaction.ID,
+			Type:      Received,
+			Timestamp: explorerTransaction.Timestamp,
+		}
+		acntStakingTxns, ok = acntsStakingTxns[explorerTransaction.To]
+		if !ok {
+			acntStakingTxns = make([]*TxRecord, AdddressTxnsInitSize)
+		}
+		acntStakingTxns = append(acntStakingTxns, txRecord)
+	}
+
+	return acntsTxns, acntsStakingTxns
 }
