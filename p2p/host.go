@@ -5,11 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/ipfsutil"
 	"github.com/ipfs/go-datastore"
 	sync_ds "github.com/ipfs/go-datastore/sync"
@@ -158,7 +156,6 @@ func NewHost(opts *Opts) (Host, error) {
 	)
 
 	for {
-
 		if err := node.PeerHost.Connect(ctx, *rdvpeer); err != nil {
 			fmt.Println("something busted, why", err.Error())
 			opts.Logger.Error().Err(err).Msg("cannot dial rendezvous point")
@@ -170,51 +167,49 @@ func NewHost(opts *Opts) (Host, error) {
 			)
 			break
 		}
-
-		time.Sleep(time.Second)
 	}
 
-	const topic = "hello-world"
+	// const topic = "hello-world"
 
-	sub, err := api.PubSub().Subscribe(ctx, topic)
+	// sub, err := api.PubSub().Subscribe(ctx, topic)
 
-	if err != nil {
-		fatal(err)
-	}
+	// if err != nil {
+	// 	fatal(err)
+	// }
 
-	go func() {
-		for range time.NewTicker(time.Second * 5).C {
-			fmt.Println("I am publishing now", node.PeerHost.ID())
-			if err := api.PubSub().Publish(
-				ctx, topic, []byte("some junk data, what"),
-			); err != nil {
-				fmt.Println("why couldnt publish the message?")
-			}
-		}
-	}()
+	// go func() {
+	// 	for range time.NewTicker(time.Second * 5).C {
+	// 		fmt.Println("I am publishing now", node.PeerHost.ID())
+	// 		if err := api.PubSub().Publish(
+	// 			ctx, topic, []byte("some junk data, what"),
+	// 		); err != nil {
+	// 			fmt.Println("why couldnt publish the message?")
+	// 		}
+	// 	}
+	// }()
 
-	for range time.NewTicker(time.Second * 1).C {
-		msg, err := sub.Next(ctx)
-		if err != nil {
-			fmt.Println("nothing")
-		}
-		sender := msg.From()
-		if sender != node.PeerHost.ID() {
-			fmt.Println(
-				"got real data", string(msg.Data()), msg.From(), msg.Topics(),
-			)
-			fmt.Println(
-				"who am i connected to",
-				node.PubSub.ListPeers(topic),
-				"my peer ID =>", node.PeerHost.ID(),
-			)
-		}
-	}
+	// for range time.NewTicker(time.Second * 1).C {
+	// 	msg, err := sub.Next(ctx)
+	// 	if err != nil {
+	// 		fmt.Println("nothing")
+	// 	}
+	// 	sender := msg.From()
+	// 	if sender != node.PeerHost.ID() {
+	// 		fmt.Println(
+	// 			"got real data", string(msg.Data()), msg.From(), msg.Topics(),
+	// 		)
+	// 		fmt.Println(
+	// 			"who am i connected to",
+	// 			node.PubSub.ListPeers(topic),
+	// 			"my peer ID =>", node.PeerHost.ID(),
+	// 		)
+	// 	}
+	// }
 
 	return &hmyHost{
 		coreAPI: api,
 		node:    node,
-		log:     utils.NetworkLogger(),
+		log:     opts.Logger,
 	}, nil
 }
 
