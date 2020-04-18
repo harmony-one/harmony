@@ -70,7 +70,6 @@ var (
 	freshDB     = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	pprof       = flag.String("pprof", "", "what address and port the pprof profiling server should listen on")
 	versionFlag = flag.Bool("version", false, "Output version info")
-	onlyLogTps  = flag.Bool("only_log_tps", false, "Only log TPS if true")
 	dnsZone     = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
 	dnsFlag     = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
 	//Leader needs to have a minimal number of peers to start consensus
@@ -184,11 +183,6 @@ func initSetup() {
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
 	utils.AddLogFile(fmt.Sprintf("%v/validator-%v-%v.log", *logFolder, *ip, *port), *logMaxSize)
 
-	if *onlyLogTps {
-		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
-		utils.GetLogInstance().SetHandler(matchFilterHandler)
-	}
-
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(runtime.NumCPU() * 4)
 
@@ -202,14 +196,6 @@ func initSetup() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	if len(p2p.BootNodes) == 0 {
-		bootNodeAddrs, err := p2p.StringsToAddrs(p2p.DefaultBootNodeAddrStrings)
-		if err != nil {
-			utils.FatalErrMsg(err, "cannot parse default bootnode list %#v",
-				p2p.DefaultBootNodeAddrStrings)
-		}
-		p2p.BootNodes = bootNodeAddrs
-	}
 }
 
 func passphraseForBLS() {
@@ -633,7 +619,6 @@ func setupViperConfig() {
 	viperconfig.ResetConfBool(freshDB, envViper, configFileViper, "", "fresh_db")
 	viperconfig.ResetConfString(pprof, envViper, configFileViper, "", "pprof")
 	viperconfig.ResetConfBool(versionFlag, envViper, configFileViper, "", "version")
-	viperconfig.ResetConfBool(onlyLogTps, envViper, configFileViper, "", "only_log_tps")
 	viperconfig.ResetConfString(dnsZone, envViper, configFileViper, "", "dns_zone")
 	viperconfig.ResetConfBool(dnsFlag, envViper, configFileViper, "", "dns")
 	viperconfig.ResetConfInt(minPeers, envViper, configFileViper, "", "min_peers")
@@ -666,8 +651,6 @@ func main() {
 	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
 	// build time.
 	os.Setenv("GODEBUG", "netdns=go")
-
-	flag.Var(&p2p.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
 	switch *nodeType {
@@ -765,6 +748,10 @@ func main() {
 		os.Exit(1)
 	}
 	myHost, err := setupHost(nodeConfig)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "issue with setup host: %#v\n", err.Error())
+		os.Exit(2)
+	}
 	currentNode := setupConsensusAndNode(nodeConfig, myHost)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 

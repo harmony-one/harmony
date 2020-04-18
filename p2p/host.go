@@ -247,25 +247,3 @@ func (al *AddrList) Set(value string) error {
 	}
 	return nil
 }
-
-// StringsToAddrs convert a list of strings to a list of multiaddresses
-func StringsToAddrs(addrStrings []string) (maddrs []ma.Multiaddr, err error) {
-	for _, addrString := range addrStrings {
-		addr, err := ma.NewMultiaddr(addrString)
-		if err != nil {
-			return maddrs, err
-		}
-		maddrs = append(maddrs, addr)
-	}
-	return
-}
-
-// DefaultBootNodeAddrStrings is a list of Harmony
-// bootnodes address. Used to find other peers in the network.
-var DefaultBootNodeAddrStrings = []string{
-	"/ip4/127.0.0.1/tcp/19876/p2p/Qmc1V6W7BwX8Ugb42Ti8RnXF1rY5PF7nnZ6bKBryCgi6cv",
-}
-
-// BootNodes is a list of boot nodes.
-// It is populated either from default or from user CLI input.
-var BootNodes AddrList
