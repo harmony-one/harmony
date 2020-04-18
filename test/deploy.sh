@@ -137,11 +137,6 @@ log_folder="tmp_log/log-$t"
 mkdir -p $log_folder
 LOG_FILE=$log_folder/r.log
 
-echo "launching boot node ..."
-$DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
-sleep 1
-BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
-echo "bootnode launched." + " $BN_MA"
 
 unset -v base_args
 declare -a base_args args
