@@ -7,6 +7,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ipfs/go-datastore"
 	ipfs_cfg "github.com/ipfs/go-ipfs-config"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
@@ -49,9 +50,17 @@ type Opts struct {
 	Logger                *zerolog.Logger
 }
 
+type hmyHost struct {
+	Host
+	l *zerolog.Logger
+}
+
 // NewHost ..
 func NewHost() (Host, error) {
-	return nil, nil
+	log := utils.NetworkLogger()
+	return &hmyHost{
+		l: log,
+	}, nil
 }
 
 // ConstructMessage constructs the p2p message as [messageType, contentSize, content]

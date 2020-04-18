@@ -1,8 +1,6 @@
 package node
 
 import (
-	"fmt"
-
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
@@ -86,12 +84,4 @@ func (node *Node) StopServices() {
 		return
 	}
 	node.serviceManager.StopServicesByRole([]service.Type{})
-}
-
-func (node *Node) networkInfoDHTPath() string {
-	return fmt.Sprintf(".dht-%s-%s-c%s",
-		node.SelfPeer.IP,
-		node.SelfPeer.Port,
-		node.chainConfig.ChainID,
-	)
 }

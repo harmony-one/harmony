@@ -39,6 +39,10 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
+	"github.com/ipfs/go-datastore"
+	sync_ds "github.com/ipfs/go-datastore/sync"
+	badger "github.com/ipfs/go-ds-badger"
+	"github.com/juju/fslock"
 	"github.com/pkg/errors"
 )
 
@@ -113,6 +117,51 @@ var (
 	// aws credentials
 	awsSettingString = ""
 )
+
+const inMemoryDirectory = ":memory:"
+
+// func (node *Node) networkInfoDHTPath() string {
+// 	return fmt.Sprintf(".dht-%s-%s-c%s",
+// 		node.SelfPeer.IP,
+// 		node.SelfPeer.Port,
+// 		node.chainConfig.ChainID,
+// 	)
+// }
+
+func getRootDatastore(optPath *string) (datastore.Batching, *fslock.Lock, error) {
+	var (
+		baseDS datastore.Batching = datastore.NewMapDatastore()
+		lock   *fslock.Lock
+	)
+
+	if optPath != nil && *optPath != inMemoryDirectory {
+		basePath := path.Join(*optPath, ".dht")
+		_, err := os.Stat(basePath)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return nil, nil, err
+			}
+			if err := os.MkdirAll(basePath, 0700); err != nil {
+				panic(err)
+			}
+		}
+
+		lock = fslock.New(path.Join(*optPath, "lock"))
+		err = lock.TryLock()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		baseDS, err = badger.NewDatastore(basePath, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		baseDS = sync_ds.MutexWrap(baseDS)
+	}
+
+	return baseDS, lock, nil
+}
 
 func initSetup() {
 
