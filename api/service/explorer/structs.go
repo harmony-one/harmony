@@ -54,22 +54,23 @@ type Transaction struct {
 }
 
 // GetTransaction ...
-func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transaction {
+func GetTransaction(tx *types.Transaction, addressBlock *types.Block) (*Transaction, error) {
 	msg, err := tx.AsMessage(types.NewEIP155Signer(tx.ChainID()))
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
+		return nil, err
 	}
 	gasFee := big.NewInt(0)
 	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas()))
 	to := ""
 	if msg.To() != nil {
 		if to, err = common2.AddressToBech32(*msg.To()); err != nil {
-			return nil
+			return nil, err
 		}
 	}
 	from := ""
 	if from, err = common2.AddressToBech32(msg.From()); err != nil {
-		return nil
+		return nil, err
 	}
 	return &Transaction{
 		ID:        tx.Hash().Hex(),
@@ -83,7 +84,7 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) *Transacti
 		FromShard: tx.ShardID(),
 		ToShard:   tx.ToShardID(),
 		Type:      "",
-	}
+	}, nil
 }
 
 // StakingTransaction ...
@@ -96,6 +97,7 @@ func GetStakingTransaction(tx *staking.StakingTransaction, addressBlock *types.B
 	msg, err := core2.StakingToMessage(tx, addressBlock.Header().Number())
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
+		return nil, err
 	}
 
 	gasFee := big.NewInt(0)
