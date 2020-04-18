@@ -417,9 +417,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 	return *consensusMultiPubKey
 }
 
-func createGlobalConfig() (*nodeconfig.ConfigType, p2p.Host, error) {
-	var err error
-
+func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	if len(initialAccounts) == 0 {
 		initialAccounts = append(initialAccounts, &genesis.DeployAccount{ShardID: uint32(*shardID)})
 	}
@@ -439,40 +437,40 @@ func createGlobalConfig() (*nodeconfig.ConfigType, p2p.Host, error) {
 	nodeConfig.SetArchival(*isArchival)
 
 	// P2P private key is used for secure message transfer between p2p nodes.
-	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
+	key, _, err := utils.LoadKeyFromFile(*keyFile)
+
 	if err != nil {
-		return nil, nil, errors.Wrapf(
+		return nil, errors.Wrapf(
 			err, "cannot load or create P2P key at %#v", *keyFile,
 		)
 	}
 
-	_ = p2p.Peer{
-		IP:              *ip,
-		Port:            *port,
-		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
-	}
-
-	// myHost, err = p2p.NewHost(&selfPeer, nodeConfig.P2PPriKey)
-	myHost, err := p2p.NewHost()
-
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "cannot create P2P network host")
-	}
-
+	nodeConfig.P2PPriKey = key
 	nodeConfig.DBDir = *dbDir
 
 	if p := *webHookYamlPath; p != "" {
 		config, err := webhooks.NewWebHooksFromPath(p)
 		if err != nil {
-			fmt.Fprintf(
-				os.Stderr, "yaml path is bad: %s", p,
-			)
-			os.Exit(1)
+			return nil, err
 		}
 		nodeConfig.WebHooks.Hooks = config
 	}
 
-	return nodeConfig, myHost, nil
+	return nodeConfig, nil
+}
+
+func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
+	// myHost, err = p2p.NewHost(&selfPeer, nodeConfig.P2PPriKey)
+	_ = p2p.Peer{
+		IP:              *ip,
+		Port:            *port,
+		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
+	}
+	myHost, err := p2p.NewHost()
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create P2P network host")
+	}
+	return myHost, nil
 }
 
 func setupConsensusAndNode(
@@ -748,11 +746,12 @@ func main() {
 		}
 	}
 
-	nodeConfig, myHost, err := createGlobalConfig()
+	nodeConfig, err := createGlobalConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
 		os.Exit(1)
 	}
+	myHost, err := setupHost(nodeConfig)
 	currentNode := setupConsensusAndNode(nodeConfig, myHost)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 
