@@ -50,7 +50,9 @@ func (node *Node) DoSyncWithoutConsensus() {
 // IsSameHeight tells whether node is at same bc height as a peer
 func (node *Node) IsSameHeight() (uint64, bool) {
 	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+		node.stateSync = syncing.CreateStateSync(
+			node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID,
+		)
 	}
 	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
 }
@@ -177,7 +179,7 @@ func (node *Node) DoBeaconSyncing() {
 	for {
 		if node.beaconSync == nil {
 			utils.Logger().Info().Msg("initializing beacon sync")
-			node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+			node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID)
 		}
 		if node.beaconSync.GetActivePeerNumber() == 0 {
 			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
@@ -216,7 +218,9 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+		node.stateSync = syncing.CreateStateSync(
+			node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID,
+		)
 		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 	}
 	if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
@@ -319,7 +323,7 @@ func (node *Node) SendNewBlockToUnsync() {
 				delete(node.peerRegistrationRecord, peerID)
 				continue
 			}
-			response, err := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
+			response, err := config.client.PushNewBlock(node.SyncID, blockHash, false)
 			// close the connection if cannot push new block to unsync node
 			if err != nil {
 				node.peerRegistrationRecord[peerID].client.Close()

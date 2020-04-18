@@ -116,7 +116,7 @@ type Node struct {
 	// Shard databases
 	shardChains shardchain.Collection
 	Client      *client.Client // The presence of a client object means this node will also act as a client
-	SelfPeer    p2p.Peer
+	SelfPeer    *p2p.Peer
 	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	State      State      // State of the Node
@@ -128,7 +128,7 @@ type Node struct {
 	Worker, BeaconWorker *worker.Worker
 	downloaderServer     *downloader.Server
 	// Syncing component.
-	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
+	SyncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	stateSync, beaconSync  *syncing.StateSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
@@ -415,10 +415,7 @@ func (node *Node) Start() error {
 	return nil
 }
 
-// GetSyncID returns the syncID of this node
-func (node *Node) GetSyncID() [SyncIDLength]byte {
-	return node.syncID
-}
+const sinkSize = 4096
 
 // New creates a new node.
 func New(
@@ -428,14 +425,17 @@ func New(
 	blacklist map[common.Address]struct{},
 	isArchival bool,
 ) *Node {
-	node := Node{}
-	node.unixTimeAtNodeStart = time.Now().Unix()
-	const sinkSize = 4096
-	node.errorSink = struct {
-		sync.Mutex
-		failedStakingTxns *ring.Ring
-		failedTxns        *ring.Ring
-	}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)}
+	node := Node{
+		host:                host,
+		SelfPeer:            host.GetSelfPeer(),
+		unixTimeAtNodeStart: time.Now().Unix(),
+		errorSink: struct {
+			sync.Mutex
+			failedStakingTxns *ring.Ring
+			failedTxns        *ring.Ring
+		}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)},
+	}
+
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -443,11 +443,7 @@ func New(
 		node.NodeConfig = nodeconfig.GetDefaultConfig()
 	}
 
-	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
-	if host != nil {
-		node.host = host
-		node.SelfPeer = host.GetSelfPeer()
-	}
+	copy(node.SyncID[:], GenerateRandomString(SyncIDLength))
 
 	networkType := node.NodeConfig.GetNetworkType()
 	chainConfig := networkType.ChainConfig()

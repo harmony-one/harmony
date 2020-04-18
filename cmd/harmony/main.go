@@ -448,15 +448,9 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 
 func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 	// myHost, err = p2p.NewHost(&selfPeer, nodeConfig.P2PPriKey)
-	_ = p2p.Peer{
-		IP:              *ip,
-		Port:            *port,
-		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
-	}
 	baseDS := datastore.NewMapDatastore()
 
 	const DevRendezVousPoint = "/ip4/167.99.223.55/tcp/4040/p2p/QmTo3RS6Uc8aCS5Cxx8EBHkNCe4C7vKRanbMEboxkA92Cn"
-
 	var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
 
 	myHost, err := p2p.NewHost(&p2p.Opts{
@@ -465,7 +459,14 @@ func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 		Port:                  0,
 		RootDS:                baseDS,
 		Logger:                utils.NetworkLogger(),
-	})
+	}, &p2p.Peer{
+		IP:              *ip,
+		Port:            *port,
+		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
+		Addrs:           nil,
+		PeerID:          "",
+	},
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
 	}

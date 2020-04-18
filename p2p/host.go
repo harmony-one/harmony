@@ -24,7 +24,8 @@ import (
 
 // Peer is the object for a p2p peer (node)
 type Peer struct {
-	IP              string                // IP address of the peer
+	IP string // IP address of the peer
+	// TODO this should not be string
 	Port            string                // Port number of the peer
 	ConsensusPubKey *bls.PublicKey        // Public key of the peer, used for consensus signing
 	Addrs           []multiaddr.Multiaddr // MultiAddress of the peer
@@ -33,7 +34,8 @@ type Peer struct {
 
 // Host is the client + server in p2p network.
 type Host interface {
-	GetSelfPeer() Peer
+	GetSelfPeer() *Peer
+
 	AddPeer(*Peer) error
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
@@ -60,6 +62,7 @@ type hmyHost struct {
 	coreAPI ipfs_interface.CoreAPI
 	node    *ipfs_core.IpfsNode
 	log     *zerolog.Logger
+	ownPeer *Peer
 }
 
 func unlockFS(l *fslock.Lock) {
@@ -83,8 +86,12 @@ func fatal(err error) {
 	panic("end")
 }
 
+func (h *hmyHost) GetSelfPeer() *Peer {
+	return h.ownPeer
+}
+
 // NewHost ..
-func NewHost(opts *Opts) (Host, error) {
+func NewHost(opts *Opts, own *Peer) (Host, error) {
 	var swarmAddresses []string
 
 	if opts.Port != 0 {
@@ -210,6 +217,7 @@ func NewHost(opts *Opts) (Host, error) {
 		coreAPI: api,
 		node:    node,
 		log:     opts.Logger,
+		ownPeer: own,
 	}, nil
 }
 
