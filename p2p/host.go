@@ -123,7 +123,13 @@ func (h *hmyHost) getTopic(topic string) (ipfs_interface.PubSubSubscription, err
 }
 
 func (h *hmyHost) AllSubscriptions() []ipfs_interface.PubSubSubscription {
-	return nil
+	subs := []ipfs_interface.PubSubSubscription{}
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	for _, g := range h.joined {
+		subs = append(subs, g)
+	}
+	return subs
 }
 
 // NewHost ..
