@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/pkg/errors"
@@ -96,11 +95,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	return consensus.Decider.ParticipantsCount()
 }
 
-// NewFaker returns a faker consensus.
-func NewFaker() *Consensus {
-	return &Consensus{}
-}
-
 // Sign on the hash of the message
 func (consensus *Consensus) signMessage(message []byte, priKey *bls.SecretKey) []byte {
 	hash := hash.Keccak256(message)
@@ -121,21 +115,6 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
 	signature := consensus.signMessage(marshaledMessage, priKey)
 	message.Signature = signature
 	return nil
-}
-
-// GetValidatorPeers returns list of validator peers.
-func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
-	validatorPeers := []p2p.Peer{}
-
-	consensus.validators.Range(func(k, v interface{}) bool {
-		if peer, ok := v.(p2p.Peer); ok {
-			validatorPeers = append(validatorPeers, peer)
-			return true
-		}
-		return false
-	})
-
-	return validatorPeers
 }
 
 // GetViewIDSigsArray returns the signatures for viewID in viewchange
