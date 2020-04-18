@@ -113,9 +113,6 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 
 // startViewChange send a  new view change
 func (consensus *Consensus) startViewChange(viewID uint64) {
-	if consensus.disableViewChange {
-		return
-	}
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)

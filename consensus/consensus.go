@@ -121,8 +121,6 @@ type Consensus struct {
 	syncReadyChan chan struct{}
 	// Used to convey to the consensus main loop that node is out of sync
 	syncNotReadyChan chan struct{}
-	// If true, this consensus will not propose view change.
-	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
 	SlashChan chan slash.Record
 	// How long in second the leader needs to wait to propose a new block.

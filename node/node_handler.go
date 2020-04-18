@@ -2,7 +2,6 @@ package node
 
 import (
 	"bytes"
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -485,7 +484,6 @@ func (node *Node) bootstrapConsensus() {
 	defer tick.Stop()
 	for range tick.C {
 		numPeersNow := node.host.GetPeerCount()
-		fmt.Println("how many peers i have", numPeersNow)
 		if numPeersNow >= node.Consensus.MinPeers {
 			utils.Logger().Info().Msg("[bootstrap] StartConsensus")
 			node.startConsensus <- struct{}{}
