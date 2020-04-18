@@ -9,27 +9,28 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p/ipfsutil"
 	"github.com/ipfs/go-datastore"
 	sync_ds "github.com/ipfs/go-datastore/sync"
 	ipfs_cfg "github.com/ipfs/go-ipfs-config"
+	ipfs_core "github.com/ipfs/go-ipfs/core"
+	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/juju/fslock"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
-	ma "github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 )
 
 // Peer is the object for a p2p peer (node)
 type Peer struct {
-	IP              string         // IP address of the peer
-	Port            string         // Port number of the peer
-	ConsensusPubKey *bls.PublicKey // Public key of the peer, used for consensus signing
-	Addrs           []ma.Multiaddr // MultiAddress of the peer
-	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
+	IP              string                // IP address of the peer
+	Port            string                // Port number of the peer
+	ConsensusPubKey *bls.PublicKey        // Public key of the peer, used for consensus signing
+	Addrs           []multiaddr.Multiaddr // MultiAddress of the peer
+	PeerID          libp2p_peer.ID        // PeerID, the pubkey for communication
 }
 
 // Host is the client + server in p2p network.
@@ -56,8 +57,11 @@ type Opts struct {
 }
 
 type hmyHost struct {
+	// Temp hack to satisfy all methods
 	Host
-	l *zerolog.Logger
+	coreAPI ipfs_interface.CoreAPI
+	node    *ipfs_core.IpfsNode
+	log     *zerolog.Logger
 }
 
 func unlockFS(l *fslock.Lock) {
@@ -106,7 +110,7 @@ func NewHost(opts *Opts) (Host, error) {
 		fatal(err)
 	}
 
-	rdvpeer, err := peer.AddrInfoFromP2pAddr(mardv)
+	rdvpeer, err := libp2p_peer.AddrInfoFromP2pAddr(mardv)
 	if err != nil {
 		fatal(err)
 	}
@@ -208,7 +212,9 @@ func NewHost(opts *Opts) (Host, error) {
 	}
 
 	return &hmyHost{
-		l: nil,
+		coreAPI: api,
+		node:    node,
+		log:     utils.NetworkLogger(),
 	}, nil
 }
 
@@ -222,7 +228,7 @@ func ConstructMessage(content []byte) []byte {
 }
 
 // AddrList is a list of multiaddress
-type AddrList []ma.Multiaddr
+type AddrList []multiaddr.Multiaddr
 
 // String is a function to print a string representation of the AddrList
 func (al *AddrList) String() string {
@@ -239,7 +245,7 @@ func (al *AddrList) Set(value string) error {
 		return fmt.Errorf("AddrList is already set")
 	}
 	for _, a := range strings.Split(value, ",") {
-		addr, err := ma.NewMultiaddr(a)
+		addr, err := multiaddr.NewMultiaddr(a)
 		if err != nil {
 			return err
 		}
