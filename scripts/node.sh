@@ -110,6 +110,7 @@ function setup_env
    sysctl -w net.core.netdev_max_backlog=65536
    # Increase the maximum amount of option memory buffers
    sysctl -w net.core.optmem_max=25165824
+   sysctl -w net.ipv4.tcp_max_syn_backlog=8192
    # Increase the maximum total buffer-space allocatable
    # This is measured in units of pages (4096 bytes)
    sysctl -w net.ipv4.tcp_mem='786432 1048576 26777216'
@@ -124,6 +125,7 @@ function setup_env
    sysctl -w net.ipv4.tcp_max_tw_buckets=1440000
    sysctl -w net.ipv4.tcp_tw_reuse=1
    sysctl -w net.ipv4.tcp_fastopen=3
+   sysctl -w net.ipv4.tcp_window_scaling=1
    
    add_env /etc/security/limits.conf "* soft     nproc          65535"
    add_env /etc/security/limits.conf "* hard     nproc          65535"
