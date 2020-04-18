@@ -27,8 +27,6 @@ const (
 	SupportExplorer
 	Consensus
 	BlockProposal
-	NetworkInfo
-	PeerDiscovery
 )
 
 func (t Type) String() string {
@@ -41,10 +39,6 @@ func (t Type) String() string {
 		return "Consensus"
 	case BlockProposal:
 		return "BlockProposal"
-	case NetworkInfo:
-		return "NetworkInfo"
-	case PeerDiscovery:
-		return "PeerDiscovery"
 	default:
 		return "Unknown"
 	}

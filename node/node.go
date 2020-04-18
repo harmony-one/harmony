@@ -139,8 +139,6 @@ type Node struct {
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-	// Duplicated Ping Message Received
-	duplicatedPing sync.Map
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
 	// node configuration, including group ID, shard ID, etc
@@ -660,36 +658,6 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
 	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
 	return ok
-}
-
-func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		IsClient:     node.NodeConfig.IsClient(),
-		Beacon:       nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
-		ShardGroupID: node.NodeConfig.GetShardGroupID(),
-		Actions:      map[nodeconfig.GroupID]nodeconfig.ActionType{},
-	}
-
-	if nodeConfig.IsClient {
-		nodeConfig.Actions[nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID)] =
-			nodeconfig.ActionStart
-	} else {
-		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = nodeconfig.ActionStart
-	}
-
-	groups := []nodeconfig.GroupID{
-		node.NodeConfig.GetShardGroupID(),
-		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
-		node.NodeConfig.GetClientGroupID(),
-	}
-
-	// force the side effect of topic join
-	if err := node.host.SendMessageToGroups(groups, []byte{}); err != nil {
-		return nodeConfig, nil, err
-	}
-
-	return nodeConfig, chanPeer, nil
 }
 
 // ServiceManager ...

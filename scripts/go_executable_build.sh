@@ -4,7 +4,6 @@ export GO111MODULE=on
 
 declare -A SRC
 SRC[harmony]=cmd/harmony/main.go
-SRC[bootnode]=cmd/bootnode/main.go
 
 BINDIR=bin
 BUCKET=unique-bucket-bin

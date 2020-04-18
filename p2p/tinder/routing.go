@@ -5,7 +5,7 @@ import (
 
 	p2p_routing "github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 type Routing interface {
@@ -26,7 +26,7 @@ func (r *routing) Bootstrap(ctx context.Context) error {
 }
 
 func NewRouting(
-	logger *zap.Logger,
+	logger *zerolog.Logger,
 	name string,
 	r p2p_routing.Routing,
 	drivers ...Driver,

@@ -14,7 +14,6 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	record "github.com/libp2p/go-libp2p-record"
-	"go.uber.org/zap"
 )
 
 type RoutingOut struct {
@@ -23,7 +22,6 @@ type RoutingOut struct {
 }
 
 func NewTinderRouting(
-	logger *zap.Logger,
 	rdvpeer peer.ID,
 	dhtclient bool,
 ) (ipfs_p2p.RoutingOption, <-chan *RoutingOut) {

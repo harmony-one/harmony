@@ -13,13 +13,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/discovery"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"go.uber.org/zap"
-
 	p2p_rp "github.com/libp2p/go-libp2p-rendezvous"
+	"github.com/rs/zerolog"
 )
 
 type rendezvousDiscovery struct {
-	logger       *zap.Logger
+	logger       *zerolog.Logger
 	rp           p2p_rp.RendezvousPoint
 	peerCache    map[string]*rpCache
 	peerCacheMux sync.RWMutex
@@ -39,7 +38,7 @@ type rpRecord struct {
 }
 
 func NewRendezvousDiscovery(
-	logger *zap.Logger,
+	logger *zerolog.Logger,
 	host host.Host, rdvPeer peer.ID, rng *mrand.Rand,
 ) Driver {
 	rp := p2p_rp.NewRendezvousPoint(host, rdvPeer)
@@ -51,7 +50,9 @@ func NewRendezvousDiscovery(
 	}
 }
 
-func (c *rendezvousDiscovery) Advertise(ctx context.Context, ns string, opts ...discovery.Option) (time.Duration, error) {
+func (c *rendezvousDiscovery) Advertise(
+	ctx context.Context, ns string, opts ...discovery.Option,
+) (time.Duration, error) {
 	// Get options
 	var options discovery.Options
 	err := options.Apply(opts...)
@@ -143,7 +144,7 @@ func (c *rendezvousDiscovery) FindPeers(ctx context.Context, ns string, opts ...
 		count = limit
 	}
 
-	c.logger.Debug("found peers", zap.String("key", ns), zap.Int("count", count))
+	// c.logger.Debug("found peers", zap.String("key", ns), zap.Int("count", count))
 
 	// fmt.Printf("rdvp findpeers found [%s]: %d peers found\n", ns, count)
 	chPeer := make(chan peer.AddrInfo, count)

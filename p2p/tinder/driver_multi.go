@@ -9,19 +9,19 @@ import (
 	p2p_discovery "github.com/libp2p/go-libp2p-core/discovery"
 	p2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	disc "github.com/libp2p/go-libp2p-discovery"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 )
 
 // MultiDriver is a simple driver manager, that forward request across multiple driver
 type MultiDriver struct {
-	logger  *zap.Logger
+	logger  *zerolog.Logger
 	drivers []Driver
 
 	mapc map[string]context.CancelFunc
 	muc  sync.Mutex
 }
 
-func NewMultiDriver(logger *zap.Logger, drivers ...Driver) Driver {
+func NewMultiDriver(logger *zerolog.Logger, drivers ...Driver) Driver {
 	return &MultiDriver{
 		logger:  logger.Named("tinder/multi"),
 		drivers: drivers,
@@ -59,8 +59,8 @@ func (md *MultiDriver) advertise(ctx context.Context, d Driver, ns string, opts 
 		for {
 			ttl, err := d.Advertise(ctx, ns, opts...)
 			if err != nil {
-				md.logger.Warn("failed to advertise",
-					zap.String("driver", d.Name()), zap.String("key", ns), zap.Error(err))
+				// md.logger.Warn("failed to advertise",
+				// 	zap.String("driver", d.Name()), zap.String("key", ns), zap.Error(err))
 				if ctx.Err() != nil {
 					return
 				}
@@ -73,7 +73,7 @@ func (md *MultiDriver) advertise(ctx context.Context, d Driver, ns string, opts 
 				}
 			}
 
-			md.logger.Info("advertise", zap.String("driver", d.Name()), zap.String("key", ns))
+			// md.logger.Info("advertise", zap.String("driver", d.Name()), zap.String("key", ns))
 			wait := 7 * ttl / 8
 			select {
 			case <-time.After(wait):
@@ -86,8 +86,11 @@ func (md *MultiDriver) advertise(ctx context.Context, d Driver, ns string, opts 
 
 // FindPeers for MultiDriver doesn't care about duplicate peers, his only
 // job here is to dispatch FindPeers request across all the drivers.
-func (md *MultiDriver) FindPeers(ctx context.Context, ns string, opts ...p2p_discovery.Option) (<-chan p2p_peer.AddrInfo, error) {
-	md.logger.Debug("looking for peers", zap.String("key", ns))
+func (md *MultiDriver) FindPeers(
+	ctx context.Context,
+	ns string, opts ...p2p_discovery.Option,
+) (<-chan p2p_peer.AddrInfo, error) {
+	// md.logger.Debug("looking for peers", zap.String("key", ns))
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -103,10 +106,10 @@ func (md *MultiDriver) FindPeers(ctx context.Context, ns string, opts ...p2p_dis
 	for _, driver := range md.drivers {
 		ch, err := driver.FindPeers(ctx, ns, opts...)
 		if err != nil { // @TODO(gfanton): log this
-			md.logger.Warn("failed to run find peers",
-				zap.String("driver", driver.Name()),
-				zap.String("key", ns),
-				zap.Error(err))
+			// md.logger.Warn("failed to run find peers",
+			// 	zap.String("driver", driver.Name()),
+			// 	zap.String("key", ns),
+			// 	zap.Error(err))
 
 			continue
 		}
@@ -147,8 +150,8 @@ func (md *MultiDriver) FindPeers(ctx context.Context, ns string, opts ...p2p_dis
 			peer := value.Interface().(p2p_peer.AddrInfo)
 			// fmt.Printf("[multi] found a peers: %v for %s\n", peer, ns)
 
-			md.logger.Debug("found a peer",
-				zap.String("driver", driverRefs[idx]), zap.String("key", ns), zap.String("peer", peer.ID.String()))
+			// md.logger.Debug("found a peer",
+			// 	zap.String("driver", driverRefs[idx]), zap.String("key", ns), zap.String("peer", peer.ID.String()))
 
 			// forward the peer
 			select {
