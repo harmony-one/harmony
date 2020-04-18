@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -19,6 +20,7 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -62,6 +64,8 @@ type hmyHost struct {
 	node    *ipfs_core.IpfsNode
 	log     *zerolog.Logger
 	ownPeer *Peer
+	lock    sync.Mutex
+	joined  map[string]ipfs_interface.PubSubSubscription
 }
 
 func unlockFS(l *fslock.Lock) {
@@ -87,6 +91,42 @@ func fatal(err error) {
 
 func (h *hmyHost) GetSelfPeer() *Peer {
 	return h.ownPeer
+}
+
+func (h *hmyHost) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) (e error) {
+	ctx := context.Background()
+
+	for _, group := range groups {
+		top := string(group)
+		_, err := h.getTopic(top)
+		if err != nil {
+			e = err
+			continue
+		}
+		if err := h.coreAPI.PubSub().Publish(ctx, top, msg); err != nil {
+			e = err
+			continue
+		}
+	}
+
+	return e
+}
+
+func (h *hmyHost) getTopic(topic string) (ipfs_interface.PubSubSubscription, error) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	if t, ok := h.joined[topic]; ok {
+		return t, nil
+	}
+
+	sub, err := h.coreAPI.PubSub().Subscribe(context.Background(), topic)
+
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot join pubsub topic %x", topic)
+	}
+
+	h.joined[topic] = sub
+	return sub, nil
 }
 
 // NewHost ..
@@ -217,6 +257,8 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 		node:    node,
 		log:     opts.Logger,
 		ownPeer: own,
+		lock:    sync.Mutex{},
+		joined:  map[string]ipfs_interface.PubSubSubscription{},
 	}, nil
 }
 
