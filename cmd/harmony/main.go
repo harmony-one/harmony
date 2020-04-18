@@ -344,7 +344,9 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 		multibls.AppendPriKey(consensusMultiPriKey, consensusPriKey)
 		multibls.AppendPubKey(consensusMultiPubKey, consensusPriKey.GetPublicKey())
 	} else if *cmkEncryptedBLSKey != "" {
-		consensusPriKey, err := blsgen.LoadAwsCMKEncryptedBLSKey(*cmkEncryptedBLSKey, awsSettingString)
+		consensusPriKey, err := blsgen.LoadAwsCMKEncryptedBLSKey(
+			*cmkEncryptedBLSKey, awsSettingString,
+		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR when loading aws CMK encrypted bls key, err :%v\n", err)
 			os.Exit(100)
@@ -363,7 +365,6 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 	// Consensus keys are the BLS12-381 keys used to sign consensus messages
 	nodeConfig.ConsensusPriKey = consensusMultiPriKey
 	nodeConfig.ConsensusPubKey = consensusMultiPubKey
-
 	return *consensusMultiPubKey
 }
 
@@ -646,15 +647,23 @@ func main() {
 		}
 		// TODO (leo): use a passing list of accounts here
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
+			uint32(*devnetNumShards),
+			*devnetShardSize,
+			*devnetHarmonySize,
+			numeric.OneDec(),
+			genesis.HarmonyAccounts,
+			genesis.FoundationalNodeAccounts,
+			nil,
+			shardingconfig.VLBPE,
+		)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
+			fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
 			os.Exit(1)
 		}
 		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
+		fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
 		os.Exit(2)
 	}
 
