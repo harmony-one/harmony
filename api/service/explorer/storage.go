@@ -98,17 +98,25 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 
 	// Store txs
 	for _, tx := range block.Transactions() {
-		explorerTransaction := GetTransaction(tx, block)
-		storage.UpdateTxAddress(explorerTransaction, tx)
+		explorerTransaction, err := GetTransaction(tx, block)
+		if err != nil {
+			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
+				Msg("[Explorer Storage] Failed to get GetTransaction mapping")
+		}
+		if explorerTransaction != nil {
+			storage.UpdateTxAddress(explorerTransaction, tx)
+		}
 	}
 	// Store staking txns
 	for _, tx := range block.StakingTransactions() {
 		explorerTransaction, err := GetStakingTransaction(tx, block)
 		if err != nil {
 			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
-				Msg("Failed to get explorer StakingTransaction mapping")
+				Msg("[Explorer Storage] Failed to get StakingTransaction mapping")
 		}
-		storage.UpdateStakingTxAddress(explorerTransaction, tx)
+		if explorerTransaction != nil {
+			storage.UpdateStakingTxAddress(explorerTransaction, tx)
+		}
 	}
 
 	// save checkpoint of block dumped
