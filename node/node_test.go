@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/shardchain"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -22,8 +21,7 @@ func TestNewNode(t *testing.T) {
 	blsKey := bls2.RandPrivateKey()
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(&p2p.Opts{}, &leader)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
@@ -169,55 +167,4 @@ func TestLocalSyncingPeerProvider(t *testing.T) {
 
 func makeLocalSyncingPeerProvider() *LocalSyncingPeerProvider {
 	return NewLocalSyncingPeerProvider(6000, 6001, 2, 3)
-}
-
-func TestAddBeaconPeer(t *testing.T) {
-	pubKey1 := bls2.RandPrivateKey().GetPublicKey()
-	pubKey2 := bls2.RandPrivateKey().GetPublicKey()
-
-	peers1 := []*p2p.Peer{
-		{
-			IP:              "127.0.0.1",
-			Port:            "8888",
-			ConsensusPubKey: pubKey1,
-			PeerID:          "1234",
-		},
-		{
-			IP:              "127.0.0.1",
-			Port:            "9999",
-			ConsensusPubKey: pubKey2,
-			PeerID:          "4567",
-		},
-	}
-	blsKey := bls2.RandPrivateKey()
-	pubKey := blsKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
-	if err != nil {
-		t.Fatalf("newhost failure: %v", err)
-	}
-	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
-	)
-	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsKey), decider,
-	)
-	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
-	}
-
-	node := New(host, consensus, testDBFactory, nil, false)
-	for _, p := range peers1 {
-		ret := node.AddBeaconPeer(p)
-		if ret {
-			t.Errorf("AddBeaconPeer Failed, expecting false, got %v, peer %v", ret, p)
-		}
-	}
-	for _, p := range peers1 {
-		ret := node.AddBeaconPeer(p)
-		if !ret {
-			t.Errorf("AddBeaconPeer Failed, expecting true, got %v, peer %v", ret, p)
-		}
-	}
 }

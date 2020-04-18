@@ -16,7 +16,6 @@ import (
 	ipfs_core "github.com/ipfs/go-ipfs/core"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/juju/fslock"
-	libp2p_host "github.com/libp2p/go-libp2p-core/host"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -37,12 +36,7 @@ type Peer struct {
 type Host interface {
 	GetSelfPeer() *Peer
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-
-	AddPeer(*Peer) error
-	GetP2PHost() libp2p_host.Host
 	GetPeerCount() int
-	ConnectHostPeer(Peer) error
-
 	AllSubscriptions() []ipfs_interface.PubSubSubscription
 }
 

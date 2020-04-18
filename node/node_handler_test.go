@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -20,8 +19,7 @@ func TestAddNewBlock(t *testing.T) {
 	blsKey := bls.RandPrivateKey()
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9882", ConsensusPubKey: pubKey}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(&p2p.Opts{}, &leader)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
@@ -60,8 +58,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	blsKey := bls.RandPrivateKey()
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(&p2p.Opts{}, &leader)
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
