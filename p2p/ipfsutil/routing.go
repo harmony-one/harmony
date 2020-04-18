@@ -14,6 +14,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	record "github.com/libp2p/go-libp2p-record"
+	"github.com/rs/zerolog"
 )
 
 type RoutingOut struct {
@@ -22,6 +23,7 @@ type RoutingOut struct {
 }
 
 func NewTinderRouting(
+	log *zerolog.Logger,
 	rdvpeer peer.ID,
 	dhtclient bool,
 ) (ipfs_p2p.RoutingOption, <-chan *RoutingOut) {
@@ -51,12 +53,12 @@ func NewTinderRouting(
 		if string(rdvpeer) != "" {
 			// @FIXME(gfanton): use rand as argument
 			rdvClient := tinder.NewRendezvousDiscovery(
-				logger, h, rdvpeer, rand.New(rand.NewSource(rand.Int63())),
+				log, h, rdvpeer, rand.New(rand.NewSource(rand.Int63())),
 			)
 			drivers = append(drivers, rdvClient)
 		}
 
-		tinderRouting := tinder.NewRouting(logger, "dht", dht, drivers...)
+		tinderRouting := tinder.NewRouting(log, "dht", dht, drivers...)
 		crout <- &RoutingOut{dht, tinderRouting}
 
 		return tinderRouting, nil

@@ -43,7 +43,7 @@ func NewRendezvousDiscovery(
 ) Driver {
 	rp := p2p_rp.NewRendezvousPoint(host, rdvPeer)
 	return &rendezvousDiscovery{
-		logger:    logger.Named("tinder/rdvp"),
+		logger:    logger,
 		rp:        rp,
 		rng:       rng,
 		peerCache: make(map[string]*rpCache),

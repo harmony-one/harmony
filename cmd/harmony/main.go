@@ -466,7 +466,13 @@ func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 		Port:            *port,
 		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
 	}
-	myHost, err := p2p.NewHost()
+	myHost, err := p2p.NewHost(&p2p.Opts{
+		Bootstrap:             []string{},
+		RendezVousServerMAddr: "",
+		Port:                  80,
+		RootDS:                nil,
+		Logger:                utils.NetworkLogger(),
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
 	}

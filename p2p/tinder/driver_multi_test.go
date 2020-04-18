@@ -5,18 +5,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
 	p2p_discovery "github.com/libp2p/go-libp2p-core/discovery"
 	p2p_host "github.com/libp2p/go-libp2p-core/host"
 	p2p_disc "github.com/libp2p/go-libp2p-discovery"
 	p2p_mock "github.com/libp2p/go-libp2p/p2p/net/mock"
-	"go.uber.org/zap"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	logger, _ = zap.NewProduction()
+	logger = utils.Logger()
 )
 
 func TestMultiDriver_Advertise(t *testing.T) {

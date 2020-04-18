@@ -7,9 +7,9 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ipfs/go-datastore"
 	ipfs_cfg "github.com/ipfs/go-ipfs-config"
+	"github.com/juju/fslock"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -44,7 +44,6 @@ var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
 type Opts struct {
 	Bootstrap             []string
 	RendezVousServerMAddr string
-	GroupInvitation       string
 	Port                  uint
 	RootDS                datastore.Batching
 	Logger                *zerolog.Logger
@@ -55,11 +54,32 @@ type hmyHost struct {
 	l *zerolog.Logger
 }
 
+func unlockFS(l *fslock.Lock) {
+	if l == nil {
+		return
+	}
+
+	err := l.Unlock()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func panicUnlockFS(err error, l *fslock.Lock) {
+	unlockFS(l)
+	panic(err)
+}
+
 // NewHost ..
-func NewHost() (Host, error) {
-	log := utils.NetworkLogger()
+func NewHost(opts *Opts) (Host, error) {
+	// log := utils.NetworkLogger()
+	// var (
+	// 	swarmAddresses []string
+	// 	lock           *fslock.Lock
+	// )
+
 	return &hmyHost{
-		l: log,
+		l: nil,
 	}, nil
 }
 

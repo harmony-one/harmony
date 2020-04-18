@@ -23,7 +23,7 @@ type MultiDriver struct {
 
 func NewMultiDriver(logger *zerolog.Logger, drivers ...Driver) Driver {
 	return &MultiDriver{
-		logger:  logger.Named("tinder/multi"),
+		logger:  logger,
 		drivers: drivers,
 		mapc:    make(map[string]context.CancelFunc),
 	}
@@ -123,7 +123,7 @@ func (md *MultiDriver) FindPeers(
 
 	ndrivers := len(selCases) - 1 // we dont want to wait for the context
 	if ndrivers == 0 {
-		md.logger.Error("no drivers available to find peers")
+		md.logger.Error().Msg("no drivers available to find peers")
 	}
 
 	cpeers := make(chan p2p_peer.AddrInfo, ndrivers)
