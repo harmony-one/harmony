@@ -123,6 +123,7 @@ function setup_env
    # Increase the tcp-time-wait buckets pool size to prevent simple DOS attacks
    sysctl -w net.ipv4.tcp_max_tw_buckets=1440000
    sysctl -w net.ipv4.tcp_tw_reuse=1
+   sysctl -w net.ipv4.tcp_fastopen=3
    
    add_env /etc/security/limits.conf "* soft     nproc          65535"
    add_env /etc/security/limits.conf "* hard     nproc          65535"
