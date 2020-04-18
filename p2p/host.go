@@ -132,6 +132,11 @@ func (h *hmyHost) AllSubscriptions() []ipfs_interface.PubSubSubscription {
 	return subs
 }
 
+func (h *hmyHost) GetPeerCount() int {
+	conns, _ := h.coreAPI.Swarm().Peers(context.Background())
+	return len(conns)
+}
+
 // NewHost ..
 func NewHost(opts *Opts, own *Peer) (Host, error) {
 	var swarmAddresses []string
@@ -140,15 +145,16 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 		swarmAddresses = []string{
 			fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", opts.Port),
 			fmt.Sprintf("/ip6/0.0.0.0/tcp/%d", opts.Port),
-			fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", opts.Port+1),
-			fmt.Sprintf("/ip6/0.0.0.0/udp/%d/quic", opts.Port+1),
+			// TODO Hold up, need httpu
+			// fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", opts.Port+1),
+			// fmt.Sprintf("/ip6/0.0.0.0/udp/%d/quic", opts.Port+1),
 		}
 	} else {
 		swarmAddresses = []string{
 			"/ip4/0.0.0.0/tcp/0",
 			"/ip6/0.0.0.0/tcp/0",
-			"/ip4/0.0.0.0/udp/0/quic",
-			"/ip6/0.0.0.0/udp/0/quic",
+			// "/ip4/0.0.0.0/udp/0/quic",
+			// "/ip6/0.0.0.0/udp/0/quic",
 		}
 	}
 
@@ -217,43 +223,6 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 			break
 		}
 	}
-
-	// const topic = "hello-world"
-
-	// sub, err := api.PubSub().Subscribe(ctx, topic)
-
-	// if err != nil {
-	// 	fatal(err)
-	// }
-
-	// go func() {
-	// 	for range time.NewTicker(time.Second * 5).C {
-	// 		fmt.Println("I am publishing now", node.PeerHost.ID())
-	// 		if err := api.PubSub().Publish(
-	// 			ctx, topic, []byte("some junk data, what"),
-	// 		); err != nil {
-	// 			fmt.Println("why couldnt publish the message?")
-	// 		}
-	// 	}
-	// }()
-
-	// for range time.NewTicker(time.Second * 1).C {
-	// 	msg, err := sub.Next(ctx)
-	// 	if err != nil {
-	// 		fmt.Println("nothing")
-	// 	}
-	// 	sender := msg.From()
-	// 	if sender != node.PeerHost.ID() {
-	// 		fmt.Println(
-	// 			"got real data", string(msg.Data()), msg.From(), msg.Topics(),
-	// 		)
-	// 		fmt.Println(
-	// 			"who am i connected to",
-	// 			node.PubSub.ListPeers(topic),
-	// 			"my peer ID =>", node.PeerHost.ID(),
-	// 		)
-	// 	}
-	// }
 
 	return &hmyHost{
 		coreAPI: api,

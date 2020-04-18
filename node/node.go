@@ -33,9 +33,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/harmony-one/harmony/webhooks"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
@@ -379,6 +377,7 @@ func (node *Node) Start() error {
 						payload := m.Data()
 						if len(payload) < p2pMsgPrefixSize {
 							utils.Logger().Info().Msg("p2p message above expected size, possible attack")
+							return
 						}
 						node.HandleMessage(
 							payload[p2pMsgPrefixSize:], m.From(),
@@ -425,9 +424,16 @@ func New(
 	isArchival bool,
 ) *Node {
 	node := Node{
-		host:                host,
-		SelfPeer:            host.GetSelfPeer(),
-		unixTimeAtNodeStart: time.Now().Unix(),
+		host:                   host,
+		SelfPeer:               host.GetSelfPeer(),
+		unixTimeAtNodeStart:    time.Now().Unix(),
+		CxPool:                 core.NewCxPool(core.CxPoolSize),
+		startConsensus:         make(chan struct{}),
+		pendingCXReceipts:      map[string]*types.CXReceiptsProof{},
+		peerRegistrationRecord: map[string]*syncConfig{},
+		BlockChannel:           make(chan *types.Block),
+		ConfirmedBlockChannel:  make(chan *types.Block),
+		BeaconBlockChannel:     make(chan *types.Block),
 		errorSink: struct {
 			sync.Mutex
 			failedStakingTxns *ring.Ring
@@ -456,7 +462,7 @@ func New(
 	}
 	node.shardChains = collection
 
-	if host != nil && consensusObj != nil {
+	if consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensusObj
 
@@ -477,9 +483,6 @@ func New(
 			os.Exit(-1)
 		}
 
-		node.BlockChannel = make(chan *types.Block)
-		node.ConfirmedBlockChannel = make(chan *types.Block)
-		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 		txPoolConfig.Blacklist = blacklist
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain,
@@ -502,7 +505,6 @@ func New(
 				node.errorSink.Unlock()
 			},
 		)
-		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
 		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
@@ -511,7 +513,6 @@ func New(
 			)
 		}
 
-		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetBeaconchain(beaconChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
@@ -530,41 +531,10 @@ func New(
 	utils.Logger().Info().
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
-	// Setup initial state of syncing.
-	node.peerRegistrationRecord = map[string]*syncConfig{}
-	node.startConsensus = make(chan struct{})
 	go node.bootstrapConsensus()
 	// Broadcast double-signers reported by consensus
 	if node.Consensus != nil {
-		go func() {
-			for doubleSign := range node.Consensus.SlashChan {
-				utils.Logger().Info().
-					RawJSON("double-sign-candidate", []byte(doubleSign.String())).
-					Msg("double sign notified by consensus leader")
-				// no point to broadcast the slash if we aren't even in the right epoch yet
-				if !node.Blockchain().Config().IsStaking(
-					node.Blockchain().CurrentHeader().Epoch(),
-				) {
-					return
-				}
-				if hooks := node.NodeConfig.WebHooks.Hooks; hooks != nil {
-					if s := hooks.Slashing; s != nil {
-						url := s.OnNoticeDoubleSign
-						go func() { webhooks.DoPost(url, &doubleSign) }()
-					}
-				}
-				if node.NodeConfig.ShardID != shard.BeaconChainShardID {
-					go node.BroadcastSlash(&doubleSign)
-				} else {
-					records := slash.Records{doubleSign}
-					if err := node.Blockchain().AddPendingSlashingCandidates(
-						records,
-					); err != nil {
-						utils.Logger().Err(err).Msg("could not add new slash to ending slashes")
-					}
-				}
-			}
-		}()
+		go node.handleSlashChan()
 	}
 
 	return &node

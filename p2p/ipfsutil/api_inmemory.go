@@ -25,7 +25,9 @@ type IpfsOpts struct {
 }
 
 // NewInMemoryCoreAPI returns an IPFS CoreAPI based on an opininated ipfs_node.BuildCfg
-func NewInMemoryCoreAPI(ctx context.Context, opts *IpfsOpts) (ipfs_interface.CoreAPI, *ipfs_core.IpfsNode, error) {
+func NewInMemoryCoreAPI(
+	ctx context.Context, opts *IpfsOpts,
+) (ipfs_interface.CoreAPI, *ipfs_core.IpfsNode, error) {
 	cfg, err := createBuildConfig(opts)
 	if err != nil {
 		return nil, nil, err
@@ -55,7 +57,8 @@ func createBuildConfig(opts *IpfsOpts) (*ipfs_node.BuildCfg, error) {
 		Host:                        hostopts,
 		Repo:                        repo,
 		ExtraOpts: map[string]bool{
-			"pubsub": true,
+			"pubsub":    true,
+			"gossipsub": true,
 		},
 	}, nil
 }

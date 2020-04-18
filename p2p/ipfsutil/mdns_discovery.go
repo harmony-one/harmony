@@ -2,7 +2,6 @@ package ipfsutil
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	ipfs_core "github.com/ipfs/go-ipfs/core"
@@ -16,9 +15,6 @@ type DiscoveryNotifee struct {
 }
 
 func (n *DiscoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
-
-	fmt.Println("hello handle peer", pi.String())
-
 	if err := n.api.Swarm().Connect(context.Background(), pi); err != nil {
 		_ = err
 		// TODO: log

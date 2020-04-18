@@ -15,5 +15,9 @@ func (n *namespacedDatastore) Close() error {
 }
 
 func NewNamespacedDatastore(child ds.Datastore, prefix ds.Key) ds.Batching {
-	return &namespacedDatastore{Batching: keytransform.Wrap(child, keytransform.PrefixTransform{Prefix: prefix})}
+	return &namespacedDatastore{
+		Batching: keytransform.Wrap(
+			child, keytransform.PrefixTransform{Prefix: prefix},
+		),
+	}
 }
