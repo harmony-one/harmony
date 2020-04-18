@@ -23,7 +23,7 @@ func TestGetTransaction(t *testing.T) {
 
 	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, types.Receipts{&types.Receipt{}, &types.Receipt{}, &types.Receipt{}}, nil, nil, nil)
 
-	tx := GetTransaction(tx1, block)
+	tx, _ := GetTransaction(tx1, block)
 	assert.Equal(t, tx.ID, tx1.Hash().Hex(), "should be equal tx1.Hash()")
 	assert.Equal(t, tx.To, common2.MustAddressToBech32(common.HexToAddress(tx1.To().Hex())), "should be equal tx1.To()")
 	assert.Equal(t, tx.Bytes, strconv.Itoa(int(tx1.Size())), "should be equal tx1.Size()")

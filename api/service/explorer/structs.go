@@ -58,7 +58,6 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) (*Transact
 	msg, err := tx.AsMessage(types.NewEIP155Signer(tx.ChainID()))
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
-		return nil, err
 	}
 	gasFee := big.NewInt(0)
 	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas()))
