@@ -597,6 +597,11 @@ func (db *DB) GetRefund() uint64 {
 // Finalise finalises the state by removing the db destructed objects
 // and clears the journal as well as the refunds.
 func (db *DB) Finalise(deleteEmptyObjects bool) {
+	// Commit validator changes in cache to stateObjects
+	for addr, val := range db.stateValidators {
+		db.UpdateValidatorWrapper(addr, val)
+	}
+
 	for addr := range db.journal.dirties {
 		stateObject, exist := db.stateObjects[addr]
 		if !exist {
@@ -646,12 +651,6 @@ func (db *DB) clearJournalAndRefund() {
 // Commit writes the state to the underlying in-memory trie database.
 func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 	defer db.clearJournalAndRefund()
-
-	// Commit validator changes
-	// Need to happen before stateObject commitment
-	for addr, val := range db.stateValidators {
-		db.UpdateValidatorWrapper(addr, val)
-	}
 
 	for addr := range db.journal.dirties {
 		db.stateObjectsDirty[addr] = struct{}{}
