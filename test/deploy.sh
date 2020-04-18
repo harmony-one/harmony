@@ -140,7 +140,11 @@ LOG_FILE=$log_folder/r.log
 
 unset -v base_args
 declare -a base_args args
-base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -network_type="$NETWORK" -blspass file:.hmy/blspass.txt -dns=false)
+base_args=(-log_folder "${log_folder}" \
+		       -min_peers "${MIN}" \
+		       -network_type="$NETWORK" \
+		       -blspass file:.hmy/blspass.txt \
+		       -dns=false)
 sleep 2
 
 # Start nodes
