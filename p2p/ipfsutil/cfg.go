@@ -88,7 +88,7 @@ func CreateRepo(
 
 	fmt.Printf("IPFS listening on %s\n", strings.Join(c.Addresses.Swarm, ", "))
 
-	c.Experimental.QUIC = true
+	// c.Experimental.QUIC = true
 
 	c.Identity.PeerID = pid.Pretty()
 	c.Identity.PrivKey = base64.StdEncoding.EncodeToString(privkeyb)
