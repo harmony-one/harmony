@@ -76,12 +76,3 @@ func (node *Node) RunServices() {
 	}
 	node.serviceManager.RunServices()
 }
-
-// StopServices runs registered services.
-func (node *Node) StopServices() {
-	if node.serviceManager == nil {
-		utils.Logger().Info().Msg("Service manager is not set up yet.")
-		return
-	}
-	node.serviceManager.StopServicesByRole([]service.Type{})
-}
