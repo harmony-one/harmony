@@ -362,7 +362,7 @@ func (node *Node) Start() error {
 	weighted := make([]*semaphore.Weighted, len(allTopics))
 	const maxMessageHandlers = 200
 	ctx := context.Background()
-	ownID := node.host.GetID()
+	ownID := node.host.GetSelfPeer().PeerID
 	errChan := make(chan error)
 
 	for i, topic := range allTopics {
