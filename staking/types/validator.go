@@ -100,11 +100,10 @@ type ValidatorSnapshot struct {
 // Computed represents current epoch
 // availability measures, mostly for RPC
 type Computed struct {
-	Signed            *big.Int    `json:"current-epoch-signed"`
-	ToSign            *big.Int    `json:"current-epoch-to-sign"`
-	BlocksLeftInEpoch uint64      `json:"-"`
-	Percentage        numeric.Dec `json:"current-epoch-signing-percentage"`
-	IsBelowThreshold  bool        `json:"-"`
+	Signed           *big.Int    `json:"current-epoch-signed"`
+	ToSign           *big.Int    `json:"current-epoch-to-sign"`
+	Percentage       numeric.Dec `json:"current-epoch-signing-percentage"`
+	IsBelowThreshold bool        `json:"-"`
 }
 
 func (c Computed) String() string {
@@ -115,10 +114,9 @@ func (c Computed) String() string {
 // NewComputed ..
 func NewComputed(
 	signed, toSign *big.Int,
-	blocksLeft uint64,
 	percent numeric.Dec,
 	isBelowNow bool) *Computed {
-	return &Computed{signed, toSign, blocksLeft, percent, isBelowNow}
+	return &Computed{signed, toSign, percent, isBelowNow}
 }
 
 // NewEmptyStats ..

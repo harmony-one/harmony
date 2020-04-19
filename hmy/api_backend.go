@@ -408,10 +408,6 @@ func (b *APIBackend) GetValidatorInformation(
 	computed := availability.ComputeCurrentSigning(
 		snapshot.Validator, wrapper,
 	)
-	beaconChainBlocks := uint64(
-		b.hmy.BeaconChain().CurrentBlock().Header().Number().Int64(),
-	) % shard.Schedule.BlocksPerEpoch()
-	computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
 
 	stats, err := bc.ReadValidatorStats(addr)
 	if err != nil {

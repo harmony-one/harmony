@@ -154,7 +154,7 @@ func ComputeCurrentSigning(
 		new(big.Int).Sub(statsNow.NumBlocksToSign, snapToSign)
 
 	computed := staking.NewComputed(
-		signed, toSign, 0, numeric.ZeroDec(), true,
+		signed, toSign, numeric.ZeroDec(), true,
 	)
 
 	if toSign.Cmp(common.Big0) == 0 {
