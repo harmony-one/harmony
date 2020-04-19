@@ -467,7 +467,6 @@ func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 		// TODO Unify these
 		Port:            *port,
 		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
-		Addrs:           nil,
 		PeerID:          "",
 	},
 	)

@@ -26,10 +26,9 @@ import (
 type Peer struct {
 	IP string // IP address of the peer
 	// TODO this should not be string
-	Port            string                // Port number of the peer
-	ConsensusPubKey *bls.PublicKey        // Public key of the peer, used for consensus signing
-	Addrs           []multiaddr.Multiaddr // MultiAddress of the peer
-	PeerID          libp2p_peer.ID        // PeerID, the pubkey for communication
+	Port            string         // Port number of the peer
+	ConsensusPubKey *bls.PublicKey // Public key of the peer, used for consensus signing
+	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
 }
 
 // Host is the client + server in p2p network.
@@ -223,6 +222,8 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 			break
 		}
 	}
+
+	own.PeerID = node.PeerHost.ID()
 
 	return &hmyHost{
 		coreAPI: api,
