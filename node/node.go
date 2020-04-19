@@ -481,7 +481,6 @@ func New(
 			)
 		}
 
-		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
 		chain.Engine.SetBeaconchain(beaconChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block

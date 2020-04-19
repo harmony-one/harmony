@@ -533,7 +533,8 @@ func setupConsensusAndNode(
 				Msg("cannot convert self port string into port number")
 		}
 		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
-			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
+			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()),
+		)
 	case *dnsZone != "":
 		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*port))
 	case *dnsFlag:

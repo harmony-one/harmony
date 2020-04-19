@@ -170,21 +170,39 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, erro
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey *multibls.PrivateKey,
+	host p2p.Host,
+	shard uint32,
+	leader p2p.Peer,
+	multiBLSPriKey *multibls.PrivateKey,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
-	consensus := Consensus{}
-	consensus.Decider = Decider
-	consensus.host = host
-	consensus.msgSender = NewMessageSender(host)
-	consensus.BlockNumLowChan = make(chan struct{})
-	// FBFT related
-	consensus.FBFTLog = NewFBFTLog()
-	consensus.phase = FBFTAnnounce
-	// TODO Refactor consensus.block* into State?
-	consensus.current = State{mode: Normal}
-	// FBFT timeout
-	consensus.consensusTimeout = createTimeout()
+
+	consensus := Consensus{
+		VerifiedNewBlock: make(chan *types.Block),
+		Decider:          Decider,
+		host:             host,
+		msgSender:        NewMessageSender(host),
+		BlockNumLowChan:  make(chan struct{}),
+		// FBFT related
+		FBFTLog: NewFBFTLog(),
+		phase:   FBFTAnnounce,
+		// TODO Refactor consensus.block* into State?
+		current:          State{mode: Normal},
+		consensusTimeout: createTimeout(),
+		// viewID has to be initialized as the height of
+		// the blockchain during initialization as it was
+		// displayed on explorer as Height right now
+		viewID:           0,
+		ShardID:          shard,
+		MsgChan:          make(chan []byte),
+		syncReadyChan:    make(chan struct{}),
+		syncNotReadyChan: make(chan struct{}),
+		SlashChan:        make(chan slash.Record),
+		commitFinishChan: make(chan uint64),
+		ReadySignal:      make(chan struct{}),
+		RndChannel:       make(chan [vdfAndSeedSize]byte),
+	}
+
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if multiBLSPriKey != nil {
@@ -197,18 +215,5 @@ func New(
 		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
-	// viewID has to be initialized as the height of
-	// the blockchain during initialization as it was
-	// displayed on explorer as Height right now
-	consensus.viewID = 0
-	consensus.ShardID = shard
-	consensus.MsgChan = make(chan []byte)
-	consensus.syncReadyChan = make(chan struct{})
-	consensus.syncNotReadyChan = make(chan struct{})
-	consensus.SlashChan = make(chan slash.Record)
-	consensus.commitFinishChan = make(chan uint64)
-	consensus.ReadySignal = make(chan struct{})
-	// channel for receiving newly generated VDF
-	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	return &consensus, nil
 }
