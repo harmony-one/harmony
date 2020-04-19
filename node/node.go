@@ -422,7 +422,7 @@ func New(
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
 	isArchival bool,
-) *Node {
+) (*Node, error) {
 	node := Node{
 		host:                   host,
 		SelfPeer:               host.GetSelfPeer(),
@@ -465,22 +465,18 @@ func New(
 	if consensusObj != nil {
 		// Consensus and associated channel to communicate blocks
 		node.Consensus = consensusObj
-
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
 		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
-
 			shardID := node.NodeConfig.ShardID
 			// HACK get the real error reason
-			_, err := node.shardChains.ShardChain(shardID)
-
-			fmt.Fprintf(
-				os.Stderr,
-				"reason:%s beaconchain-is-nil:%t shardchain-is-nil:%t",
-				err.Error(), b1, b2,
-			)
-			os.Exit(-1)
+			if _, err := node.shardChains.ShardChain(shardID); err != nil {
+				return nil, errors.Wrapf(err,
+					"beaconchain-is-nil:%t shardchain-is-nil:%t",
+					b1, b2,
+				)
+			}
 		}
 
 		txPoolConfig := core.DefaultTxPoolConfig
@@ -537,7 +533,7 @@ func New(
 		go node.handleSlashChan()
 	}
 
-	return &node
+	return &node, nil
 }
 
 // InitConsensusWithValidators initialize shard state

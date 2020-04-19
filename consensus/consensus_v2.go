@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -404,6 +405,7 @@ func (consensus *Consensus) Start(
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 
 			case newBlock := <-blockChannel:
+				fmt.Println("Found new block=>", newBlock)
 				consensus.getLogger().Info().
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
@@ -437,7 +439,8 @@ func (consensus *Consensus) Start(
 							//generate a new VRF for the current block
 							vrfBlockNumbers := consensus.GenerateVrfAndProof(newBlock, vrfBlockNumbers)
 
-							//generate a new VDF for the current epoch if there are enough VRFs in the current epoch
+							//generate a new VDF for the current
+							// epoch if there are enough VRFs in the current epoch
 							//note that  >= instead of == is used, because it is possible the current leader
 							//can commit this block, go offline without finishing VDF
 							if (!vdfInProgress) && len(vrfBlockNumbers) >= consensus.VdfSeedSize() {
@@ -493,6 +496,7 @@ func (consensus *Consensus) Start(
 				consensus.announce(newBlock)
 
 			case msg := <-consensus.MsgChan:
+				// fmt.Println("did I get my msg", msg)
 				consensus.handleMessageUpdate(msg)
 
 			case viewID := <-consensus.commitFinishChan:
@@ -517,7 +521,9 @@ func (consensus *Consensus) Start(
 }
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
-func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockNumbers []uint64) []uint64 {
+func (consensus *Consensus) GenerateVrfAndProof(
+	newBlock *types.Block, vrfBlockNumbers []uint64,
+) []uint64 {
 	key, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
 		consensus.getLogger().Error().

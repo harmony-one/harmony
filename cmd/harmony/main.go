@@ -473,6 +473,11 @@ func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 	return myHost, nil
 }
 
+func fatal(err error) {
+	fmt.Fprintf(os.Stderr, "cannot recover from failure: %s \n", err.Error())
+	os.Exit(1)
+}
+
 func setupConsensusAndNode(
 	nodeConfig *nodeconfig.ConfigType,
 	myHost p2p.Host,
@@ -486,14 +491,18 @@ func setupConsensusAndNode(
 	})
 
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
-		os.Exit(1)
+		fatal(err)
 	}
 	commitDelay, err := time.ParseDuration(*delayCommit)
-	if err != nil || commitDelay < 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", *delayCommit)
-		os.Exit(1)
+
+	if err != nil {
+		fatal(err)
 	}
+
+	if commitDelay < 0 {
+		fatal(errors.New("ERROR invalid commit delay % " + *delayCommit))
+	}
+
 	currentConsensus.SetCommitDelay(commitDelay)
 	currentConsensus.MinPeers = *minPeers
 
@@ -505,7 +514,10 @@ func setupConsensusAndNode(
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
+	currentNode, err := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
+	if err != nil {
+		fatal(err)
+	}
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
@@ -647,6 +659,24 @@ func setupViperConfig() {
 	viperconfig.ResetConfString(webHookYamlPath, envViper, configFileViper, "", "webhook_yaml")
 }
 
+func setAllCLIFlagsIntoConfig() error {
+	nodeconfig.SetPublicRPC(*publicRPC)
+	nodeconfig.SetVersion(
+		fmt.Sprintf("Harmony (C) 2020. %v, version %v-%v (%v %v)",
+			path.Base(os.Args[0]), version, commit, builtBy, builtAt),
+	)
+
+	if n := *nodeType; n != "validator" && n != "explorer" {
+		return errors.New("Unknown node type: " + n)
+	}
+
+	if *versionFlag {
+		printVersion()
+	}
+
+	return nil
+}
+
 func main() {
 	// HACK Force usage of go implementation rather than the C based one. Do the right way, see the
 	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
@@ -654,22 +684,8 @@ func main() {
 	os.Setenv("GODEBUG", "netdns=go")
 	flag.Parse()
 
-	switch *nodeType {
-	case "validator":
-	case "explorer":
-		break
-	default:
-		_, _ = fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
-		os.Exit(1)
-	}
-
-	nodeconfig.SetPublicRPC(*publicRPC)
-	nodeconfig.SetVersion(
-		fmt.Sprintf("Harmony (C) 2020. %v, version %v-%v (%v %v)",
-			path.Base(os.Args[0]), version, commit, builtBy, builtAt),
-	)
-	if *versionFlag {
-		printVersion()
+	if err := setAllCLIFlagsIntoConfig(); err != nil {
+		fatal(err)
 	}
 
 	switch *networkType {
@@ -701,18 +717,14 @@ func main() {
 			shardingconfig.VLBPE,
 		)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
-				err)
-			os.Exit(1)
+			fatal(errors.Wrapf(err, "invalid devnet sharding config"))
 		}
 		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
 	default:
-		fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
-		os.Exit(2)
+		fatal(errors.New("invalid network type: " + *networkType))
 	}
 
 	setupViperConfig()
-
 	initSetup()
 
 	if *nodeType == "validator" {
