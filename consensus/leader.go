@@ -37,7 +37,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 		consensus.getLogger().Warn().Err(err).Msg("[Announce] Node not a leader")
 		return
 	}
-	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, key.GetPublicKey(), key)
+	networkMessage, err := consensus.construct(
+		msg_pb.MessageType_ANNOUNCE, nil, key.GetPublicKey(), key,
+	)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_ANNOUNCE.String()).

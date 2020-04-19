@@ -414,7 +414,9 @@ func (consensus *Consensus) Start(
 				if consensus.NeedsRandomNumberGeneration(newBlock.Header().Epoch()) {
 					// generate VRF if the current block has a new leader
 					if !consensus.ChainReader.IsSameLeaderAsPreviousBlock(newBlock) {
-						vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(newBlock.Header().Epoch())
+						vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(
+							newBlock.Header().Epoch(),
+						)
 						if err != nil {
 							consensus.getLogger().Info().
 								Uint64("MsgBlockNum", newBlock.NumberU64()).

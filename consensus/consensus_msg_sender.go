@@ -59,9 +59,21 @@ func (sender *MessageSender) Reset(blockNum uint64) {
 }
 
 // SendWithRetry sends message with retry logic.
-func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.MessageType, groups []nodeconfig.GroupID, p2pMsg []byte) error {
+func (sender *MessageSender) SendWithRetry(
+	blockNum uint64,
+	msgType msg_pb.MessageType,
+	groups []nodeconfig.GroupID,
+	p2pMsg []byte,
+) error {
 	willRetry := sender.retryTimes != 0
-	msgRetry := MessageRetry{blockNum: blockNum, groups: groups, p2pMsg: p2pMsg, msgType: msgType, retryCount: 0, isActive: willRetry}
+	msgRetry := MessageRetry{
+		blockNum:   blockNum,
+		groups:     groups,
+		p2pMsg:     p2pMsg,
+		msgType:    msgType,
+		retryCount: 0,
+		isActive:   willRetry,
+	}
 	if willRetry {
 		sender.messagesToRetry.Store(msgType, &msgRetry)
 		go func() {
