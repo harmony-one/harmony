@@ -107,7 +107,9 @@ func (node *Node) StartRPC(nodePort string) error {
 	}
 	httpEndpoint = fmt.Sprintf("%v:%v", ip, port+rpcHTTPPortOffset)
 
-	if err := node.startHTTP(httpEndpoint, apis, httpModules, httpOrigins, httpVirtualHosts, httpTimeouts); err != nil {
+	if err := node.startHTTP(
+		httpEndpoint, apis, httpModules, httpOrigins, httpVirtualHosts, httpTimeouts,
+	); err != nil {
 		return err
 	}
 	wsEndpoint = fmt.Sprintf("%v:%v", ip, port+rpcWSPortOffset)

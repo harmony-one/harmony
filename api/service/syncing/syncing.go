@@ -297,16 +297,6 @@ func (sc *SyncConfig) getHowManyMaxConsensus() (int, int) {
 	return maxFirstID, maxCount
 }
 
-// InitForTesting used for testing.
-func (sc *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]byte) {
-	sc.mtx.RLock()
-	defer sc.mtx.RUnlock()
-	for i := range sc.peers {
-		sc.peers[i].blockHashes = blockHashes
-		sc.peers[i].client = client
-	}
-}
-
 // cleanUpPeers cleans up all peers whose blockHashes are not equal to
 // consensus block hashes.  Caller shall ensure mtx is locked for RW.
 func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {

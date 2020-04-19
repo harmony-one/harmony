@@ -828,9 +828,9 @@ func main() {
 		).
 		Msg(startMsg)
 
-	currentNode.StartBlockStateSync()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
+	currentNode.StartBlockStateSync()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
 		utils.Logger().Warn().
