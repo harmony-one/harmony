@@ -207,7 +207,7 @@ The script starts 2 shards and 7 nodes in each shard.
 Make sure you use the following command and make sure everything passed before submitting your code.
 
 ```bash
-./test/test_before_submit.sh
+./scripts/travis_checker.sh
 ```
 
 ## License

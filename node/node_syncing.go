@@ -50,11 +50,6 @@ func (node *Node) DoSyncWithoutConsensus() {
 
 // IsSameHeight tells whether node is at same bc height as a peer
 func (node *Node) IsSameHeight() (uint64, bool) {
-	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(
-			node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID,
-		)
-	}
 	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
 }
 

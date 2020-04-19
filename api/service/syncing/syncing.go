@@ -90,6 +90,7 @@ func (sc *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
 func CreateStateSync(ip string, port string, peerHash [20]byte) *StateSync {
+	// TODO named fields please
 	stateSync := &StateSync{}
 	stateSync.selfip = ip
 	stateSync.selfport = port
