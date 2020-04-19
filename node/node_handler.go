@@ -2,7 +2,6 @@ package node
 
 import (
 	"bytes"
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -80,8 +79,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			Msg("HandleMessage get message payload failed")
 		return
 	}
-
-	fmt.Println("handle what message?", msgCategory, msgType)
 
 	switch msgCategory {
 	case proto.Consensus:
@@ -499,6 +496,5 @@ func (node *Node) bootstrapConsensus() {
 
 // ConsensusMessageHandler passes received message in node_handler to consensus
 func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
-	fmt.Println("some consensus message?", msgPayload)
 	node.Consensus.MsgChan <- msgPayload
 }

@@ -766,7 +766,12 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
+func (ss *StateSync) SyncLoop(
+	bc *core.BlockChain,
+	worker *worker.Worker,
+	isBeacon bool,
+	consensus *consensus.Consensus,
+) {
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}

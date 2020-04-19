@@ -450,15 +450,21 @@ func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 	baseDS := datastore.NewMapDatastore()
 	const DevRendezVousPoint = "/ip4/167.99.223.55/tcp/4040/p2p/QmTo3RS6Uc8aCS5Cxx8EBHkNCe4C7vKRanbMEboxkA92Cn"
 	var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
+	p, err := strconv.Atoi(*port)
+
+	if err != nil {
+		return nil, err
+	}
 
 	myHost, err := p2p.NewHost(&p2p.Opts{
 		Bootstrap:             DefaultBootstrap,
 		RendezVousServerMAddr: DevRendezVousPoint,
-		Port:                  0,
+		Port:                  uint(p),
 		RootDS:                baseDS,
 		Logger:                utils.NetworkLogger(),
 	}, &p2p.Peer{
-		IP:              *ip,
+		IP: *ip,
+		// TODO Unify these
 		Port:            *port,
 		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
 		Addrs:           nil,
