@@ -270,16 +270,8 @@ func (node *Node) SupportBeaconSyncing() {
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
 func (node *Node) SupportSyncing() {
-	node.InitSyncingServer()
 	node.StartSyncingServer()
-
-	joinConsensus := false
-	// Check if the current node is explorer node.
-	switch node.NodeConfig.Role() {
-	case nodeconfig.Validator:
-		joinConsensus = true
-	}
-
+	joinConsensus := node.NodeConfig.Role() == nodeconfig.Validator
 	// Send new block to unsync node if the current node is not explorer node.
 	// TODO: leo this pushing logic has to be removed
 	if joinConsensus {
@@ -287,13 +279,6 @@ func (node *Node) SupportSyncing() {
 	}
 
 	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
-}
-
-// InitSyncingServer starts downloader server.
-func (node *Node) InitSyncingServer() {
-	if node.downloaderServer == nil {
-		node.downloaderServer = downloader.NewServer(node)
-	}
 }
 
 // StartSyncingServer starts syncing server.

@@ -34,7 +34,7 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, testDBFactory, nil, false)
+	node, _ := New(host, consensus, testDBFactory, nil, false)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}

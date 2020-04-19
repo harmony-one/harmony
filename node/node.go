@@ -423,7 +423,7 @@ func New(
 	blacklist map[common.Address]struct{},
 	isArchival bool,
 ) (*Node, error) {
-	node := Node{
+	node := &Node{
 		host:                   host,
 		SelfPeer:               host.GetSelfPeer(),
 		unixTimeAtNodeStart:    time.Now().Unix(),
@@ -434,6 +434,7 @@ func New(
 		BlockChannel:           make(chan *types.Block),
 		ConfirmedBlockChannel:  make(chan *types.Block),
 		BeaconBlockChannel:     make(chan *types.Block),
+		State:                  NodeWaitToJoin,
 		errorSink: struct {
 			sync.Mutex
 			failedStakingTxns *ring.Ring
@@ -455,7 +456,7 @@ func New(
 	node.chainConfig = chainConfig
 
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig,
+		chainDBFactory, &genesisInitializer{node}, chain.Engine, &chainConfig,
 	)
 	if isArchival {
 		collection.DisableCache()
@@ -524,6 +525,8 @@ func New(
 		}
 	}
 
+	node.downloaderServer = downloader.NewServer(node)
+
 	utils.Logger().Info().
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
@@ -533,7 +536,7 @@ func New(
 		go node.handleSlashChan()
 	}
 
-	return &node, nil
+	return node, nil
 }
 
 // InitConsensusWithValidators initialize shard state

@@ -563,11 +563,19 @@ func setupConsensusAndNode(
 		nodeconfig.SetDefaultRole(nodeconfig.Validator)
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 		if nodeConfig.ShardID == shard.BeaconChainShardID {
-			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID))
-			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
+			currentNode.NodeConfig.SetShardGroupID(
+				nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
+			)
+			currentNode.NodeConfig.SetClientGroupID(
+				nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
+			)
 		} else {
-			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
-			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
+			currentNode.NodeConfig.SetShardGroupID(
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)),
+			)
+			currentNode.NodeConfig.SetClientGroupID(
+				nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)),
+			)
 		}
 	}
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
@@ -591,7 +599,6 @@ func setupConsensusAndNode(
 	// Assign closure functions to the consensus object
 	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
-	currentNode.State = node.NodeWaitToJoin
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
 	// Setup block period and block due time.
@@ -660,6 +667,7 @@ func setupViperConfig() {
 }
 
 func setAllCLIFlagsIntoConfig() error {
+	flag.Parse()
 	nodeconfig.SetPublicRPC(*publicRPC)
 	nodeconfig.SetVersion(
 		fmt.Sprintf("Harmony (C) 2020. %v, version %v-%v (%v %v)",
@@ -682,7 +690,6 @@ func main() {
 	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
 	// build time.
 	os.Setenv("GODEBUG", "netdns=go")
-	flag.Parse()
 
 	if err := setAllCLIFlagsIntoConfig(); err != nil {
 		fatal(err)
@@ -826,7 +833,7 @@ func main() {
 		).
 		Msg(startMsg)
 
-	go currentNode.SupportSyncing()
+	currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 	// RPC for SDK not supported for mainnet.
