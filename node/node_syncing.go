@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
@@ -263,14 +264,17 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 	node.stateMutex.Unlock()
 }
 
-// SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node
-func (node *Node) SupportBeaconSyncing() {
-	go node.DoBeaconSyncing()
-}
+// StartBlockStateSync ..
+func (node *Node) StartBlockStateSync() {
+	if node.downloaderServer.GrpcServer == nil {
+		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
+	}
 
-// SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
-func (node *Node) SupportSyncing() {
-	node.StartSyncingServer()
+	if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
+		node.NodeConfig.Role() != nodeconfig.ExplorerNode {
+		go node.DoBeaconSyncing()
+	}
+
 	joinConsensus := node.NodeConfig.Role() == nodeconfig.Validator
 	// Send new block to unsync node if the current node is not explorer node.
 	// TODO: leo this pushing logic has to be removed
@@ -279,14 +283,7 @@ func (node *Node) SupportSyncing() {
 	}
 
 	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
-}
 
-// StartSyncingServer starts syncing server.
-func (node *Node) StartSyncingServer() {
-	utils.Logger().Info().Msg("[SYNC] support_syncing: StartSyncingServer")
-	if node.downloaderServer.GrpcServer == nil {
-		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
-	}
 }
 
 // SendNewBlockToUnsync send latest verified block to unsync, registered nodes

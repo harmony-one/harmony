@@ -423,6 +423,7 @@ func New(
 	blacklist map[common.Address]struct{},
 	isArchival bool,
 ) (*Node, error) {
+
 	node := &Node{
 		host:                   host,
 		SelfPeer:               host.GetSelfPeer(),
@@ -434,6 +435,8 @@ func New(
 		BlockChannel:           make(chan *types.Block),
 		ConfirmedBlockChannel:  make(chan *types.Block),
 		BeaconBlockChannel:     make(chan *types.Block),
+		serviceManager:         service.NewManager(),
+		serviceMessageChan:     make(map[service.Type]chan *msg_pb.Message),
 		State:                  NodeWaitToJoin,
 		errorSink: struct {
 			sync.Mutex

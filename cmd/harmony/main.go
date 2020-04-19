@@ -447,9 +447,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 }
 
 func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
-	// myHost, err = p2p.NewHost(&selfPeer, nodeConfig.P2PPriKey)
 	baseDS := datastore.NewMapDatastore()
-
 	const DevRendezVousPoint = "/ip4/167.99.223.55/tcp/4040/p2p/QmTo3RS6Uc8aCS5Cxx8EBHkNCe4C7vKRanbMEboxkA92Cn"
 	var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
 
@@ -742,15 +740,15 @@ func main() {
 			err = setupLegacyNodeAccount()
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "cannot set up node account: %s\n", err)
-			os.Exit(1)
+			fatal(errors.Wrapf(err, "cannot set up node account"))
 		}
 	}
 	if *nodeType == "validator" {
 		fmt.Printf("%s mode; node key %s -> shard %d\n",
 			map[bool]string{false: "Legacy", true: "Staking"}[*stakingFlag],
 			nodeconfig.GetDefaultConfig().ConsensusPubKey.SerializeToHexStr(),
-			initialAccounts[0].ShardID)
+			initialAccounts[0].ShardID,
+		)
 	}
 	if *nodeType != "validator" && *shardID >= 0 {
 		for _, initialAccount := range initialAccounts {
@@ -764,17 +762,16 @@ func main() {
 
 	nodeConfig, err := createGlobalConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
-		os.Exit(1)
+		fatal(errors.Wrapf(err, "cannot configure node"))
 	}
+
 	myHost, err := setupHost(nodeConfig)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "issue with setup host: %#v\n", err.Error())
-		os.Exit(2)
+		fatal(errors.Wrapf(err, "issue with setup host"))
 	}
+
 	currentNode := setupConsensusAndNode(nodeConfig, myHost)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
-
 	// Prepare for graceful shutdown from os signals
 	osSignal := make(chan os.Signal)
 	signal.Notify(osSignal, os.Interrupt, syscall.SIGTERM)
@@ -788,14 +785,6 @@ func main() {
 			}
 		}
 	}()
-
-	if nodeConfig.ShardID != shard.BeaconChainShardID &&
-		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
-		utils.Logger().Info().
-			Uint32("shardID", currentNode.Blockchain().ShardID()).
-			Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
-		currentNode.SupportBeaconSyncing()
-	}
 
 	if uint64(*doRevertBefore) != 0 && uint64(*revertTo) != 0 {
 		chain := currentNode.Blockchain()
@@ -833,7 +822,7 @@ func main() {
 		).
 		Msg(startMsg)
 
-	currentNode.SupportSyncing()
+	currentNode.StartBlockStateSync()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 	// RPC for SDK not supported for mainnet.

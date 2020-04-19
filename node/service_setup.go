@@ -1,7 +1,6 @@
 package node
 
 import (
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
 	"github.com/harmony-one/harmony/api/service/clientsupport"
@@ -44,9 +43,6 @@ func (node *Node) setupForExplorerNode() {
 
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() error {
-	node.serviceManager = &service.Manager{}
-	node.serviceMessageChan = make(map[service.Type]chan *msg_pb.Message)
-
 	groups := []nodeconfig.GroupID{
 		node.NodeConfig.GetShardGroupID(),
 		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
