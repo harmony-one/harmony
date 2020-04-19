@@ -40,43 +40,23 @@ import (
 )
 
 // State is a state of a node.
-type State byte
+type State = string
 
 // All constants except the NodeLeader below are for validators only.
 const (
-	NodeInit              State = iota // Node just started, before contacting BeaconChain
-	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
-	NodeNotInSync                      // Node out of sync, might be just joined Shard or offline for a period of time
-	NodeOffline                        // Node is offline
-	NodeReadyForConsensus              // Node is ready for doing consensus
-	NodeDoingConsensus                 // Node is already doing consensus
-	NodeLeader                         // Node is the leader of some shard.
+	NodeInit              State = "node-init"           // Node just started, before contacting BeaconChain
+	NodeWaitToJoin        State = "wait-to-join"        // Node contacted BeaconChain, wait to join Shard
+	NodeNotInSync         State = "not-in-sync"         // Node out of sync, might be just joined Shard or offline for a period of time
+	NodeOffline           State = "offline"             // Node is offline
+	NodeReadyForConsensus State = "ready-for-consensus" // Node is ready for doing consensus
+	NodeDoingConsensus    State = "doing-consensus"     // Node is already doing consensus
+	NodeLeader            State = "leader"              // Node is the leader of some shard.
 )
 
 const (
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
 )
-
-func (state State) String() string {
-	switch state {
-	case NodeInit:
-		return "NodeInit"
-	case NodeWaitToJoin:
-		return "NodeWaitToJoin"
-	case NodeNotInSync:
-		return "NodeNotInSync"
-	case NodeOffline:
-		return "NodeOffline"
-	case NodeReadyForConsensus:
-		return "NodeReadyForConsensus"
-	case NodeDoingConsensus:
-		return "NodeDoingConsensus"
-	case NodeLeader:
-		return "NodeLeader"
-	}
-	return "Unknown"
-}
 
 const (
 	maxBroadcastNodes       = 10              // broadcast at most maxBroadcastNodes peers that need in sync

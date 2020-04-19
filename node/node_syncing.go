@@ -1,6 +1,7 @@
 package node
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
@@ -292,6 +293,11 @@ func (node *Node) SendNewBlockToUnsync() {
 		}
 
 		node.stateMutex.Lock()
+		s, _ := json.Marshal(node.peerRegistrationRecord)
+
+		fmt.Println(
+			"verified a new block but what about my peer registration group?->", s,
+		)
 		for peerID, config := range node.peerRegistrationRecord {
 			elapseTime := time.Now().UnixNano() - config.timestamp
 			if elapseTime > broadcastTimeout {
@@ -393,7 +399,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
 		if node.State != NodeNotInSync {
 			utils.Logger().Debug().
-				Str("state", node.State.String()).
+				Str("state", node.State).
 				Msg("[SYNC] new block received, but state is")
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
