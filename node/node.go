@@ -501,6 +501,9 @@ func New(
 	node.stateSync = syncing.CreateStateSync(
 		node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID,
 	)
+	node.beaconSync = syncing.CreateStateSync(
+		node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID,
+	)
 
 	utils.Logger().Info().
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).

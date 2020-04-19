@@ -174,10 +174,6 @@ func (node *Node) DoBeaconSyncing() {
 
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
-		if node.beaconSync == nil {
-			utils.Logger().Info().Msg("initializing beacon sync")
-			node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID)
-		}
 		if node.beaconSync.GetActivePeerNumber() == 0 {
 			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
 			// 0 means shardID=0 here
@@ -199,8 +195,13 @@ func (node *Node) DoBeaconSyncing() {
 }
 
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
-func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
+func (node *Node) DoSyncing(
+	bc *core.BlockChain,
+	worker *worker.Worker,
+	willJoinConsensus bool,
+) {
 	ticker := time.NewTicker(time.Duration(SyncFrequency) * time.Second)
+	defer ticker.Stop()
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		select {
@@ -214,12 +215,6 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
-	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(
-			node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID,
-		)
-		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
-	}
 	if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
 		shardID := bc.ShardID()
 		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
