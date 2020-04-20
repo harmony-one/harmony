@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env /usr/local/bin/bash
 
 export GO111MODULE=on
 
@@ -37,7 +37,7 @@ if [ "$(uname -s)" == "Darwin" ]; then
    LIB[libmcl.dylib]=${MCL_DIR}/lib/libmcl.dylib
    LIB[libgmp.10.dylib]=/usr/local/opt/gmp/lib/libgmp.10.dylib
    LIB[libgmpxx.4.dylib]=/usr/local/opt/gmp/lib/libgmpxx.4.dylib
-   LIB[libcrypto.1.0.0.dylib]=/usr/local/opt/openssl/lib/libcrypto.1.0.0.dylib
+   LIB[libcrypto.1.1.dylib]=/usr/local/opt/openssl/lib/libcrypto.1.1.dylib
 else
    MD5=md5sum
    LIB[libbls384_256.so]=${BLS_DIR}/lib/libbls384_256.so
@@ -129,13 +129,15 @@ function build_only
    if [ "$STATIC" == "true" ]; then
       $MD5 "${!SRC[@]}" > md5sum.txt
    else
+      $MD5 "${!SRC[@]}" > md5sum.txt
       for lib in "${!LIB[@]}"; do
          if [ -e ${LIB[$lib]} ]; then
-            cp -pf ${LIB[$lib]} .
+            cp -pf ${LIB[$lib]} ./lib/
+            $MD5 lib/$lib >> md5sum.txt
          fi
-      done
 
-      $MD5 "${!SRC[@]}" "${!LIB[@]}" > md5sum.txt
+      done
+      
       # hardcode the prebuilt libcrypto to md5sum.txt
       if [ "$(uname -s)" == "Linux" ]; then
          echo '771150db04267126823190c873a96e48  libcrypto.so.10' >> md5sum.txt
@@ -171,6 +173,7 @@ function upload
       for lib in "${!LIB[@]}"; do
          if [ -e ${LIB[$lib]} ]; then
             $AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}/$FOLDER/$lib --acl public-read
+            echo "copy 1"
          else
             echo "!! MISSING ${LIB[$lib]} !!"
          fi
@@ -180,7 +183,8 @@ function upload
    fi
 
    for bin in "${!SRC[@]}"; do
-      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}/$FOLDER/$bin --acl public-read
+      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}/$FOLDER/$bin/$lib --acl public-read
+      echo "copy 2"
    done
 
 
@@ -253,7 +257,7 @@ while getopts "hp:a:o:b:f:rtvsd" option; do
    esac
 done
 
-mkdir -p $BINDIR
+mkdir -p $BINDIR/lib
 
 shift $(($OPTIND-1))
 
