@@ -59,6 +59,13 @@ func (node *Node) processSkippedMsgTypeByteValue(
 
 // HandleMessage parses the message and dispatch the actions.
 func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
+	// log in-coming metrics
+	node.host.LogRecvMessage(content)
+	utils.Logger().Info().
+		Int64("TotalIn", node.host.GetBandwidthTotals().TotalIn).
+		Float64("RateIn", node.host.GetBandwidthTotals().RateIn).
+		Msg("Record Receiving Metrics!")
+
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
@@ -447,6 +454,10 @@ func (node *Node) PostConsensusProcessing(
 
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
+
+	// Clear metrics after one consensus cycle
+	node.host.ResetMetrics()
+	utils.Logger().Info().Msg("Metrics cleared after one consensus cycle")	
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
