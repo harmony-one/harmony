@@ -728,9 +728,9 @@ func indexesToBitMap(idxs []int, n int) ([]byte, error) {
 }
 
 func makeTestWrapper(addr common.Address, numSigned, numToSign int64) staking.ValidatorWrapper {
-	var vm staking.ValidatorWrapper
-	vm.Address = addr
-	vm.Counters.NumBlocksToSign = new(big.Int).SetInt64(numToSign)
-	vm.Counters.NumBlocksSigned = new(big.Int).SetInt64(numSigned)
-	return vm
+	var val staking.ValidatorWrapper
+	val.Address = addr
+	val.Counters.NumBlocksToSign = new(big.Int).SetInt64(numToSign)
+	val.Counters.NumBlocksSigned = new(big.Int).SetInt64(numSigned)
+	return val
 }
