@@ -642,15 +642,15 @@ func newTestReader() testReader {
 }
 
 func (reader testReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
-	wrapper, ok := reader[addr]
+	val, ok := reader[addr]
 	if !ok {
 		return nil, errors.New("not a valid validator address")
 	}
-	return &wrapper, nil
+	return &val, nil
 }
 
-func (reader testReader) updateValidatorWrapper(addr common.Address, wrapper *staking.ValidatorWrapper) {
-	reader[addr] = *wrapper
+func (reader testReader) updateValidatorWrapper(addr common.Address, val *staking.ValidatorWrapper) {
+	reader[addr] = *val
 }
 
 func makeTestShardState(numShards, numSlots int) *shard.State {

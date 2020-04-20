@@ -53,7 +53,7 @@ func BlockSigners(
 // BallotResult returns
 // (parentCommittee.Slots, payable, missings, err)
 func BallotResult(
-	parentHeader, header Header, parentShardState *shard.State, shardID uint32,
+	parentHeader, header RoundHeader, parentShardState *shard.State, shardID uint32,
 ) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
 	parentCommittee, err := parentShardState.FindCommitteeByID(shardID)
 
@@ -78,7 +78,7 @@ type signerKind struct {
 
 func bumpCount(
 	bc Reader,
-	state StateDB,
+	state ValidatorState,
 	signers []signerKind,
 	stakedAddrSet map[common.Address]struct{},
 ) error {
@@ -122,7 +122,7 @@ func bumpCount(
 func IncrementValidatorSigningCounts(
 	bc Reader,
 	staked *shard.StakedSlots,
-	state StateDB,
+	state ValidatorState,
 	signers, missing shard.SlotList,
 ) error {
 	return bumpCount(
@@ -182,7 +182,7 @@ func IsBelowSigningThreshold(quotient numeric.Dec) bool {
 // signing threshold is 66%
 func ComputeAndMutateEPOSStatus(
 	bc Reader,
-	state StateDB,
+	state ValidatorState,
 	addr common.Address,
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")
