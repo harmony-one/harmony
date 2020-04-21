@@ -175,12 +175,12 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 			continue
 		}
 		// log out-going metrics
-		host.metrics.LogSentMessage(int64(len(msg))) 
+		host.metrics.LogSentMessage(int64(len(msg)))
 	}
 	host.logger.Info().
- 		Int64("TotalOut", host.GetBandwidthTotals().TotalOut).
-                Float64("RateOut", host.GetBandwidthTotals().RateOut).
-                Msg("Record Sending Metrics!")
+		Int64("TotalOut", host.GetBandwidthTotals().TotalOut).
+		Float64("RateOut", host.GetBandwidthTotals().RateOut).
+		Msg("Record Sending Metrics!")
 
 	return err
 }
