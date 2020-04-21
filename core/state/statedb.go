@@ -714,13 +714,14 @@ func (db *DB) ValidatorWrapper(
 		return cached, nil
 	}
 
-	if copy, err := db.ValidatorWrapperCopy(addr); err != nil {
+	val, err := db.ValidatorWrapperCopy(addr)
+	if err != nil {
 		return nil, err
-	} else {
-		// populate cache if the validator is not in it
-		db.stateValidators[addr] = copy
-		return copy, nil
 	}
+	// populate cache if the validator is not in it
+	db.stateValidators[addr] = val
+	return val, nil
+
 }
 
 // ValidatorWrapperCopy retrieves the existing validator as a copy from state object.
@@ -760,6 +761,8 @@ func (db *DB) UpdateValidatorWrapper(
 		return err
 	}
 	db.SetCode(addr, by)
+	// update cache
+	db.stateValidators[addr] = val
 	return nil
 }
 
