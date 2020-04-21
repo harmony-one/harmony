@@ -13,7 +13,7 @@ import (
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // MaxViewIDDiff limits the received view ID to only 100 further from the current view ID
@@ -135,7 +135,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
-			host.ConstructP2pMessage(byte(17), msgToSend),
+			p2p.ConstructMessage(msgToSend),
 		)
 	}
 
@@ -182,8 +182,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 	// TODO: remove NIL type message
 	// add self m1 or m2 type message signature and bitmap
-	_, ok1 := consensus.nilSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()]
-	_, ok2 := consensus.bhpSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()]
+	_, ok1 := consensus.nilSigs[recvMsg.ViewID][newLeaderKey.SerializeToHexStr()]
+	_, ok2 := consensus.bhpSigs[recvMsg.ViewID][newLeaderKey.SerializeToHexStr()]
 	if !(ok1 || ok2) {
 		// add own signature for newview message
 		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
@@ -192,22 +192,31 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 		if preparedMsg == nil {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
-			consensus.nilSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()] = newLeaderPriKey.SignHash(NIL)
-			consensus.nilBitmap[recvMsg.ViewID].SetKey(newLeaderKey, true)
+			for i, key := range consensus.PubKey.PublicKey {
+				priKey := consensus.priKey.PrivateKey[i]
+				consensus.nilSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(NIL)
+				consensus.nilBitmap[recvMsg.ViewID].SetKey(key, true)
+			}
 		} else {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M1 type messaage")
 			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
-			consensus.bhpSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()] = newLeaderPriKey.SignHash(msgToSign)
-			consensus.bhpBitmap[recvMsg.ViewID].SetKey(newLeaderKey, true)
+			for i, key := range consensus.PubKey.PublicKey {
+				priKey := consensus.priKey.PrivateKey[i]
+				consensus.bhpSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(msgToSign)
+				consensus.bhpBitmap[recvMsg.ViewID].SetKey(key, true)
+			}
 		}
 	}
 	// add self m3 type message signature and bitmap
-	_, ok3 := consensus.viewIDSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()]
+	_, ok3 := consensus.viewIDSigs[recvMsg.ViewID][newLeaderKey.SerializeToHexStr()]
 	if !ok3 {
 		viewIDBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
-		consensus.viewIDSigs[recvMsg.ViewID][consensus.PubKey.SerializeToHexStr()] = newLeaderPriKey.SignHash(viewIDBytes)
-		consensus.viewIDBitmap[recvMsg.ViewID].SetKey(newLeaderKey, true)
+		for i, key := range consensus.PubKey.PublicKey {
+			priKey := consensus.priKey.PrivateKey[i]
+			consensus.viewIDSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(viewIDBytes)
+			consensus.viewIDBitmap[recvMsg.ViewID].SetKey(key, true)
+		}
 	}
 
 	// m2 type message
@@ -356,22 +365,25 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			blockNumBytes := [8]byte{}
 			binary.LittleEndian.PutUint64(blockNumBytes[:], consensus.blockNum)
 			commitPayload := append(blockNumBytes[:], consensus.blockHash[:]...)
-			if _, err := consensus.Decider.SubmitVote(
-				quorum.ViewChange,
-				newLeaderKey,
-				newLeaderPriKey.SignHash(commitPayload),
-				common.BytesToHash(consensus.blockHash[:]),
-				consensus.blockNum,
-				recvMsg.ViewID,
-			); err != nil {
-				consensus.getLogger().Debug().Msg("submit vote on viewchange commit failed")
-				return
-			}
+			for i, key := range consensus.PubKey.PublicKey {
+				priKey := consensus.priKey.PrivateKey[i]
+				if _, err := consensus.Decider.SubmitVote(
+					quorum.Commit,
+					key,
+					priKey.SignHash(commitPayload),
+					common.BytesToHash(consensus.blockHash[:]),
+					consensus.blockNum,
+					recvMsg.ViewID,
+				); err != nil {
+					consensus.getLogger().Debug().Msg("submit vote on viewchange commit failed")
+					return
+				}
 
-			if err := consensus.commitBitmap.SetKey(newLeaderKey, true); err != nil {
-				consensus.getLogger().Debug().
-					Msg("[OnViewChange] New Leader commit bitmap set failed")
-				return
+				if err := consensus.commitBitmap.SetKey(key, true); err != nil {
+					consensus.getLogger().Debug().
+						Msg("[OnViewChange] New Leader commit bitmap set failed")
+					return
+				}
 			}
 		}
 
@@ -389,7 +401,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			msg_pb.MessageType_NEWVIEW,
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
-			host.ConstructP2pMessage(byte(17), msgToSend),
+			p2p.ConstructMessage(msgToSend),
 		); err != nil {
 			consensus.getLogger().Err(err).
 				Msg("could not send out the NEWVIEW message")
@@ -403,7 +415,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Uint64("viewChangingID", consensus.current.ViewID()).
 			Msg("[onViewChange] New Leader Start Consensus Timer and Stop View Change Timer")
 		consensus.getLogger().Debug().
-			Str("myKey", consensus.PubKey.SerializeToHexStr()).
+			Str("myKey", newLeaderKey.SerializeToHexStr()).
 			Uint64("viewID", consensus.viewID).
 			Uint64("block", consensus.blockNum).
 			Msg("[onViewChange] I am the New Leader")
@@ -539,7 +551,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			consensus.getLogger().Info().Msg("onNewView === commit")
 			consensus.host.SendMessageToGroups(
 				groupID,
-				host.ConstructP2pMessage(byte(17), msgToSend),
+				p2p.ConstructMessage(msgToSend),
 			)
 		}
 		consensus.getLogger().Debug().

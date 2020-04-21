@@ -10,7 +10,6 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
 )
 
 // Service is the struct for discovery service.
@@ -81,10 +80,8 @@ func (s *Service) contactP2pPeers() {
 		return
 	}
 	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), s.config.IsClient)
-
-	msgBuf := host.ConstructP2pMessage(byte(0), pingMsg.ConstructPingMessage())
+	msgBuf := p2p.ConstructMessage(pingMsg.ConstructPingMessage())
 	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
-
 	pingInterval := 5
 	initialFlatRetries := 20 // no expotential backoff for 20 times.
 	for {

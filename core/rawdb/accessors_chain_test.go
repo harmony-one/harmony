@@ -27,6 +27,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -136,7 +137,8 @@ func TestBlockStorage(t *testing.T) {
 	}
 	if entry := ReadBody(db, block.Hash(), block.NumberU64()); entry == nil {
 		t.Fatalf("Stored body not found")
-	} else if types.DeriveSha(types.Transactions(entry.Transactions())) != types.DeriveSha(block.Transactions()) || types.CalcUncleHash(entry.Uncles()) != types.CalcUncleHash(block.Uncles()) {
+	} else if types.DeriveSha(types.Transactions(entry.Transactions())) != types.DeriveSha(block.Transactions()) ||
+		types.DeriveSha(staking.StakingTransactions(entry.StakingTransactions())) != types.DeriveSha(block.StakingTransactions()) {
 		t.Fatalf("Retrieved body mismatch: have %v, want %v", entry, block.Body())
 	}
 	//if actual, err := ReadEpochBlockNumber(db, big.NewInt(0)); err != nil {

@@ -334,7 +334,8 @@ func delegatorSlashApply(
 		slashDebt := applySlashRate(delegationSnapshot.Amount, rate)
 		slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 		snapshotAddr := delegationSnapshot.DelegatorAddress
-		for _, delegationNow := range current.Delegations {
+		for i := range current.Delegations {
+			delegationNow := current.Delegations[i]
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
 				utils.Logger().Info().
 					RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
@@ -460,7 +461,7 @@ func Apply(
 		// stake, rest are external delegations.
 		// Bottom line: everyone will be slashed under the same rule.
 		if err := delegatorSlashApply(
-			snapshot, current, rate, state,
+			snapshot.Validator, current, rate, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,
 		); err != nil {
 			return nil, err
@@ -473,9 +474,7 @@ func Apply(
 			RawJSON("slash", []byte(slash.String())).
 			Msg("about to update staking info for a validator after a slash")
 
-		if err := state.UpdateValidatorWrapper(
-			snapshot.Address, current,
-		); err != nil {
+		if err := current.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {
 			return nil, err
 		}
 	}

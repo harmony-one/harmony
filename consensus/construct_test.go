@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
@@ -18,7 +17,7 @@ import (
 func TestConstructAnnounceMessage(test *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(&leader, priKey)
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}
@@ -46,7 +45,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	validatorPriKey := bls.RandPrivateKey()
 	validatorPubKey := leaderPriKey.GetPublicKey()
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2pimpl.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(&leader, priKey)
 	if err != nil {
 		test.Fatalf("newhost failure: %v", err)
 	}

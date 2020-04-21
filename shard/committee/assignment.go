@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"github.com/harmony-one/harmony/staking/availability"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
@@ -16,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -38,7 +37,7 @@ type Reader interface {
 type StakingCandidatesReader interface {
 	CurrentBlock() *types.Block
 	ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error)
-	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
+	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error)
 	ValidatorCandidates() []common.Address
 }
 
@@ -143,7 +142,7 @@ func prepareOrders(
 		if err != nil {
 			return nil, err
 		}
-		if !IsEligibleForEPoSAuction(snapshot, validator, stakedReader.CurrentBlock().Epoch()) {
+		if !IsEligibleForEPoSAuction(snapshot, validator) {
 			continue
 		}
 
@@ -185,18 +184,18 @@ func prepareOrders(
 }
 
 // IsEligibleForEPoSAuction ..
-func IsEligibleForEPoSAuction(snapshot, validator *staking.ValidatorWrapper, curEpoch *big.Int) bool {
+func IsEligibleForEPoSAuction(snapshot *staking.ValidatorSnapshot, validator *staking.ValidatorWrapper) bool {
 	// This original condition to check whether a validator is in last committee is not stable
 	// because cross-links may arrive after the epoch ends and it still got counted into the
 	// NumBlocksToSign, making this condition to be true when the validator is actually not in committee
 	//if snapshot.Counters.NumBlocksToSign.Cmp(validator.Counters.NumBlocksToSign) != 0 {
 
 	// Check whether the validator is in current committee
-	if validator.LastEpochInCommittee.Cmp(curEpoch) == 0 {
+	if validator.LastEpochInCommittee.Cmp(snapshot.Epoch) == 0 {
 		// validator was in last epoch's committee
 		// validator with below-threshold signing activity won't be considered for next epoch
 		// and their status will be turned to inactive in FinalizeNewBlock
-		computed := availability.ComputeCurrentSigning(snapshot, validator)
+		computed := availability.ComputeCurrentSigning(snapshot.Validator, validator)
 		if computed.IsBelowThreshold {
 			return false
 		}
@@ -325,11 +324,13 @@ func eposStakedCommittee(
 	for i := range completedEPoSRound.AuctionWinners {
 		purchasedSlot := completedEPoSRound.AuctionWinners[i]
 		shardID := int(new(big.Int).Mod(purchasedSlot.Key.Big(), shardBig).Int64())
-		shardState.Shards[shardID].Slots = append(shardState.Shards[shardID].Slots, shard.Slot{
-			purchasedSlot.Addr,
-			purchasedSlot.Key,
-			&purchasedSlot.Stake,
-		})
+		shardState.Shards[shardID].Slots = append(
+			shardState.Shards[shardID].Slots, shard.Slot{
+				purchasedSlot.Addr,
+				purchasedSlot.Key,
+				&purchasedSlot.EPoSStake,
+			},
+		)
 	}
 
 	return shardState, nil

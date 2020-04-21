@@ -68,7 +68,6 @@ func (b *BodyV0) SetTransactions(newTransactions []*Transaction) {
 // list. (not supported by Body V0)
 func (b *BodyV0) SetStakingTransactions(newTransactions []*staking.StakingTransaction) {
 	// not supported
-	return
 }
 
 // Uncles returns a deep copy of the list of uncle headers of this block.

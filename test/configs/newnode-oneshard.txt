@@ -1,7 +1,0 @@
-127.0.0.1 9000 leader 0
-127.0.0.1 9001 validator 0
-127.0.0.1 9002 validator 0
-127.0.0.1 9003 validator 0
-127.0.0.1 9004 validator 0
-127.0.0.1 9009 newnode 0
-127.0.0.1 19999 client 0

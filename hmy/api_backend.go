@@ -129,11 +129,17 @@ func (b *APIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.R
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) EventMux() *event.TypeMux { return b.hmy.eventMux }
 
+const (
+	// BloomBitsBlocks is the number of blocks a single bloom bit section vector
+	// contains on the server side.
+	BloomBitsBlocks uint64 = 4096
+)
+
 // BloomStatus ...
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) BloomStatus() (uint64, uint64) {
 	sections, _, _ := b.hmy.bloomIndexer.Sections()
-	return params.BloomBitsBlocks, sections
+	return BloomBitsBlocks, sections
 }
 
 // ProtocolVersion ...
@@ -220,6 +226,16 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	return txs, nil
 }
 
+// GetAccountNonce returns the nonce value of the given address for the given block number
+func (b *APIBackend) GetAccountNonce(
+	ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error) {
+	state, _, err := b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return 0, err
+	}
+	return state.GetNonce(address), state.Error()
+}
+
 // GetBalance returns balance of an given address.
 func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error) {
 	state, _, err := b.StateAndHeaderByNumber(ctx, blockNr)
@@ -231,14 +247,22 @@ func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blo
 
 // GetTransactionsHistory returns list of transactions hashes of address.
 func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
-	return hashes, err
+	return b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
 }
 
 // GetStakingTransactionsHistory returns list of staking transactions hashes of address.
 func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	hashes, err := b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
-	return hashes, err
+	return b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
+}
+
+// GetTransactionsCount returns the number of regular transactions of address.
+func (b *APIBackend) GetTransactionsCount(address, txType string) (uint64, error) {
+	return b.hmy.nodeAPI.GetTransactionsCount(address, txType)
+}
+
+// GetStakingTransactionsCount returns the number of staking transactions of address.
+func (b *APIBackend) GetStakingTransactionsCount(address, txType string) (uint64, error) {
+	return b.hmy.nodeAPI.GetStakingTransactionsCount(address, txType)
 }
 
 // NetVersion returns net version
@@ -327,8 +351,8 @@ func (b *APIBackend) SendStakingTx(
 
 // GetElectedValidatorAddresses returns the address of elected validators for current epoch
 func (b *APIBackend) GetElectedValidatorAddresses() []common.Address {
-	list, _ := b.hmy.BlockChain().ReadElectedValidatorList()
-	return list
+	list, _ := b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentBlock().Epoch())
+	return list.StakedValidators().Addrs
 }
 
 // GetAllValidatorAddresses returns the up to date validator candidates for next epoch
@@ -382,7 +406,7 @@ func (b *APIBackend) GetValidatorInformation(
 	}
 
 	computed := availability.ComputeCurrentSigning(
-		snapshot, wrapper,
+		snapshot.Validator, wrapper,
 	)
 	beaconChainBlocks := uint64(
 		b.hmy.BeaconChain().CurrentBlock().Header().Number().Int64(),
@@ -446,7 +470,7 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 		snapshot, _ := b.hmy.BlockChain().ReadValidatorSnapshot(candidates[i])
 		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
 		if !committee.IsEligibleForEPoSAuction(
-			snapshot, validator, b.hmy.BlockChain().CurrentBlock().Epoch(),
+			snapshot, validator,
 		) {
 			continue
 		}

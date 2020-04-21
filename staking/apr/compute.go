@@ -33,7 +33,7 @@ type Reader interface {
 	ReadValidatorSnapshotAtEpoch(
 		epoch *big.Int,
 		addr common.Address,
-	) (*staking.ValidatorWrapper, error)
+	) (*staking.ValidatorSnapshot, error)
 }
 
 const (
@@ -121,7 +121,7 @@ func ComputeForValidator(
 
 	estimatedRewardPerYear, err := expectedRewardPerYear(
 		block.Header(), headerOneEpochAgo,
-		validatorNow, oneSnapshotAgo,
+		validatorNow, oneSnapshotAgo.Validator,
 	)
 
 	if err != nil {

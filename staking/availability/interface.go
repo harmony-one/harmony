@@ -11,7 +11,7 @@ import (
 type Reader interface {
 	ReadValidatorSnapshot(
 		addr common.Address,
-	) (*staking.ValidatorWrapper, error)
+	) (*staking.ValidatorSnapshot, error)
 }
 
 // RoundHeader is the interface of block.Header for calculating the BallotResult.

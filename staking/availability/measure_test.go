@@ -565,7 +565,7 @@ func (th *testHeader) LastCommitBitmap() []byte {
 }
 
 // testStateDB is the fake state db for testing
-type testStateDB map[common.Address]staking.ValidatorWrapper
+type testStateDB map[common.Address]*staking.ValidatorWrapper
 
 // newTestStateDB return an empty testStateDB
 func newTestStateDB() testStateDB {
@@ -587,14 +587,14 @@ func newTestStateDBFromCommittee(cmt *shard.Committee) testStateDB {
 		wrapper.Counters.NumBlocksSigned = new(big.Int).SetInt64(1)
 		wrapper.Counters.NumBlocksToSign = new(big.Int).SetInt64(1)
 
-		state[slot.EcdsaAddress] = wrapper
+		state[slot.EcdsaAddress] = &wrapper
 	}
 	return state
 }
 
 // snapshot returns a deep copy of the current test state
 func (state testStateDB) snapshot() testStateDB {
-	res := make(map[common.Address]staking.ValidatorWrapper)
+	res := make(map[common.Address]*staking.ValidatorWrapper)
 	for addr, wrapper := range state {
 		wrapperCpy := staking.ValidatorWrapper{
 			Validator: staking.Validator{
@@ -605,7 +605,7 @@ func (state testStateDB) snapshot() testStateDB {
 		copy(wrapperCpy.SlotPubKeys, wrapper.SlotPubKeys)
 		wrapperCpy.Counters.NumBlocksToSign = new(big.Int).Set(wrapper.Counters.NumBlocksToSign)
 		wrapperCpy.Counters.NumBlocksSigned = new(big.Int).Set(wrapper.Counters.NumBlocksSigned)
-		res[addr] = wrapperCpy
+		res[addr] = &wrapperCpy
 	}
 	return res
 }
@@ -615,11 +615,11 @@ func (state testStateDB) ValidatorWrapper(addr common.Address) (*staking.Validat
 	if !ok {
 		return nil, fmt.Errorf("addr not exist in validator wrapper: %v", addr.String())
 	}
-	return &wrapper, nil
+	return wrapper, nil
 }
 
 func (state testStateDB) UpdateValidatorWrapper(addr common.Address, wrapper *staking.ValidatorWrapper) error {
-	state[addr] = *wrapper
+	state[addr] = wrapper
 	return nil
 }
 
@@ -641,12 +641,14 @@ func newTestReader() testReader {
 	return reader
 }
 
-func (reader testReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error) {
-	val, ok := reader[addr]
+func (reader testReader) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error) {
+	wrapper, ok := reader[addr]
 	if !ok {
 		return nil, errors.New("not a valid validator address")
 	}
-	return &val, nil
+	return &staking.ValidatorSnapshot{
+		Validator: &wrapper,
+	}, nil
 }
 
 func (reader testReader) updateValidatorWrapper(addr common.Address, val *staking.ValidatorWrapper) {

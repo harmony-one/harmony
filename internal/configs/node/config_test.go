@@ -48,14 +48,6 @@ func TestNodeConfigMultiple(t *testing.T) {
 	}
 }
 
-func blsPubKeyFromHex(hex string) *bls.PublicKey {
-	var k bls.PublicKey
-	if err := k.DeserializeHexStr(hex); err != nil {
-		panic(err)
-	}
-	return &k
-}
-
 func TestValidateConsensusKeysForSameShard(t *testing.T) {
 	// set localnet config
 	networkType := "localnet"

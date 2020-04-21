@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/params"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -46,6 +45,8 @@ type NodeAPI interface {
 	GetNonceOfAddress(address common.Address) uint64
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	GetTransactionsCount(address, txType string) (uint64, error)
+	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
 	ErroredStakingTransactionSink() []staking.RPCTransactionError
 	ErroredTransactionSink() []types.RPCTransactionError
@@ -69,7 +70,6 @@ func New(
 		cxPool:        cxPool,
 		eventMux:      eventMux,
 		chainDb:       chainDb,
-		bloomIndexer:  NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		nodeAPI:       nodeAPI,
 		networkID:     1, // TODO(ricl): this should be from config
 		shardID:       shardID,

@@ -145,6 +145,7 @@ func (w *Worker) CommitTransactions(
 			// Start executing the transaction
 			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
 			// THESE CODE ARE DUPLICATED AS ABOVE>>
+			// TODO(audit): add staking txn revert functionality
 			if _, err := w.commitStakingTransaction(tx, coinbase); err != nil {
 				txID := tx.Hash().Hex()
 				utils.Logger().Error().Err(err).
@@ -460,10 +461,8 @@ func (w *Worker) FinalizeNewBlock(
 			return nil, err
 		}
 	}
-
 	state := w.current.state.Copy()
 	copyHeader := types.CopyHeader(w.current.header)
-	// TODO: feed coinbase into here so the proposer gets extra rewards.
 	block, _, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,

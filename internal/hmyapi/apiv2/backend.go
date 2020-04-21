@@ -50,6 +50,7 @@ type Backend interface {
 	GetPoolTransactions() (types.PoolTransactions, error)
 	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
+	GetAccountNonce(ctx context.Context, addr common.Address, blockNr rpc.BlockNumber) (uint64, error)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
@@ -59,6 +60,8 @@ type Backend interface {
 	GetShardID() uint32
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	GetTransactionsCount(address, txType string) (uint64, error)
+	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
 	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error

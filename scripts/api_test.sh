@@ -26,7 +26,7 @@ function response_test() {
 }
 
 function isHashTest() {
-	if [ "$TRANSACTION" != "null" ]; then	
+	if [ "$TRANSACTION" != "null" ]; then
 		if [[ "$TRANSACTION_HASH" =~ ^0x[0-9a-f]{64}$ ]]; then
 			echo ${green}TRANSACTION HASH VALID${reset}
 			echo
@@ -38,7 +38,7 @@ function isHashTest() {
 }
 
 function isHexTest() {
-	if [ "$1" != "null" ]; then	
+	if [ "$1" != "null" ]; then
 		if [[ "$1" =~ ^0x[0-9a-f]+$ ]]; then
 			echo ${green}VALID HEX RECIEVED${reset}
 			echo
@@ -60,7 +60,7 @@ while getopts "lbvp" OPTION; do
 			  --data "{\"jsonrpc\":\"2.0\",\"method\":\"hmy_getBlockByNumber\",\"params\":[\"0x1\", true],\"id\":1}" | jq -r '.result.hash')
 		echo "BLOCK0HASH:"
 		echo "$BLOCK_0_HASH"
-		
+
 		SIGNED_RAW_TRANSACTION=$(node ../dapp-examples/nodejs/apiTestSign.js)
 		echo "RAWTX"
 		echo "$SIGNED_RAW_TRANSACTION"
@@ -80,7 +80,7 @@ while getopts "lbvp" OPTION; do
 		TRANSACTION_BLOCK_HASH=$(echo $TRANSACTION | jq -r '.result.blockHash')
 		TRANSACTION_BLOCK_NUMBER=$(echo $TRANSACTION | jq -r '.result.blockNumber')
 		TRANSACTION_INDEX=$(echo $TRANSACTION | jq -r '.result.transactionIndex')  #Needs to be get transaction Index
-		
+
 
 		TRANSACTION_BLOCK_ID=$(( $TRANSACTION_BLOCK_NUMBER ))
 		echo TRANSACTION_BLOCK_ID
@@ -104,7 +104,7 @@ while getopts "lbvp" OPTION; do
 
 		echo "BLOCK0HASH:"
 		echo "$BLOCK_0_HASH"
-		
+
 		SIGNED_RAW_TRANSACTION=$(node ../dapp-examples/nodejs/apiTestSign.js localnet)
 		echo "RAWTX"
 		echo "$SIGNED_RAW_TRANSACTION"
@@ -123,7 +123,7 @@ while getopts "lbvp" OPTION; do
 
 		TRANSACTION_BLOCK_HASH=$(echo $TRANSACTION | jq -r '.result.blockHash')
 		TRANSACTION_BLOCK_NUMBER=$(echo $TRANSACTION | jq -r '.result.blockNumber')
-		TRANSACTION_INDEX=$(echo $TRANSACTION | jq -r '.result.transactionIndex')  
+		TRANSACTION_INDEX=$(echo $TRANSACTION | jq -r '.result.transactionIndex')
 
 		TRANSACTION_BLOCK_ID=$(( $TRANSACTION_BLOCK_NUMBER ))
 		echo TRANSACTION_BLOCK_ID
@@ -165,7 +165,7 @@ if [ "$NETWORK" == "localnet" ]; then
 	POSTDATA[net_peerCount]="net_peerCount\",\"params\":[]"
 	POSTDATA[hmy_getBalance]="hmy_getBalance\",\"params\":[\"one18t4yj4fuutj83uwqckkvxp9gfa0568uc48ggj7\", \"latest\"]"
 	POSTDATA[hmy_getStorageAt]="hmy_getStorageAt\",\"params\":[\"0xD7Ff41CA29306122185A07d04293DdB35F24Cf2d\", \"0\", \"latest\"]"
-	POSTDATA[hmy_getTransactionCount]="hmy_getTransactionCount\",\"params\":[\"0x806171f95C5a74371a19e8a312c9e5Cb4E1D24f6\", \"latest\"]" # what is this
+	POSTDATA[hmy_getAccountNonce]="hmy_getAccountNonce\",\"params\":[\"0x806171f95C5a74371a19e8a312c9e5Cb4E1D24f6\", \"latest\"]"
 	POSTDATA[hmy_sendRawTransaction]="hmy_sendRawTransaction\",\"params\":[\"$SIGNED_RAW_TRANSACTION\"]"
 	POSTDATA[hmy_getLogs]="hmy_getLogs\", \"params\":[{\"BlockHash\": \"$TRANSACTION_BLOCK_HASH\"}]"
 	POSTDATA[hmy_getFilterChanges]="hmy_getFilterChanges\", \"params\":[\"0x58010795a282878ed0d61da72a14b8b0\"]"
@@ -193,7 +193,7 @@ if [ "$NETWORK" == "betanet" ]; then
 	POSTDATA[net_peerCount]="net_peerCount\",\"params\":[]"
 	POSTDATA[hmy_getBalance]="hmy_getBalance\",\"params\":[\"one18t4yj4fuutj83uwqckkvxp9gfa0568uc48ggj7\", \"latest\"]"
 	POSTDATA[hmy_getStorageAt]="hmy_getStorageAt\",\"params\":[\"0xD7Ff41CA29306122185A07d04293DdB35F24Cf2d\", \"0\", \"latest\"]"
-	POSTDATA[hmy_getTransactionCount]="hmy_getTransactionCount\",\"params\":[\"0x806171f95C5a74371a19e8a312c9e5Cb4E1D24f6\", \"latest\"]" # what is this
+	POSTDATA[hmy_getAccountNonce]="hmy_getAccountNonce\",\"params\":[\"0x806171f95C5a74371a19e8a312c9e5Cb4E1D24f6\", \"latest\"]"
 	POSTDATA[hmy_sendRawTransaction]="hmy_sendRawTransaction\",\"params\":[\"$SIGNED_RAW_TRANSACTION\"]"
 	POSTDATA[hmy_getLogs]="hmy_getLogs\", \"params\":[{\"BlockHash\": \"$TRANSACTION_BLOCK_HASH\"}]"
 	POSTDATA[hmy_getFilterChanges]="hmy_getFilterChanges\", \"params\":[\"0x58010795a282878ed0d61da72a14b8b0\"]"
@@ -228,7 +228,7 @@ RESPONSES[hmy_syncing]=""
 RESPONSES[net_peerCount]=""
 RESPONSES[hmy_getBalance]=""
 RESPONSES[hmy_getStorageAt]=""
-RESPONSES[hmy_getTransactionCount]=""
+RESPONSES[hmy_getAccountNonce]=""
 RESPONSES[hmy_sendRawTransaction]=""
 RESPONSES[hmy_getLogs]=""
 RESPONSES[hmy_getFilterChanges]=""
@@ -243,7 +243,7 @@ RESPONSES[hmy_protocolVersion]=""
 
 ### Processes GET requests and stores reponses in RESPONSES ###
 function GET_requests() {
-	for K in "${!GETDATA[@]}"; 
+	for K in "${!GETDATA[@]}";
 	do
 		RESPONSES[$K]=$(curl -s --location --request GET "${PORT[GET]}${GETDATA[$K]}" \
 	  		--header "Content-Type: application/json" \
@@ -253,8 +253,8 @@ function GET_requests() {
 
 ### Processes POST requests and stores reponses in RESPONSES ###
 function POST_requests() {
-	for K in "${!POSTDATA[@]}"; 
-	do	
+	for K in "${!POSTDATA[@]}";
+	do
 		RESPONSES[$K]="$(curl -s --location --request POST "${PORT[POST]}" \
 	  		--header "Content-Type: application/json" \
 			--data "{\"jsonrpc\":\"2.0\",\"method\":\"${POSTDATA[$K]},\"id\":1}")"
@@ -262,7 +262,7 @@ function POST_requests() {
 }
 
 function log_API_responses() {
-	for K in "${!GETDATA[@]}"; 
+	for K in "${!GETDATA[@]}";
 	do
 		echo "${yellow}$K"
 		echo "${blue}REQUEST:"
@@ -272,8 +272,8 @@ function log_API_responses() {
 		echo
 		echo
 	done
-	for K in "${!POSTDATA[@]}"; 
-	do 
+	for K in "${!POSTDATA[@]}";
+	do
 		echo "${yellow}$K"
 		echo "${blue}REQUEST:"
 		echo "${white}${POSTDATA[$K]}"
@@ -291,10 +291,10 @@ POST_requests
 function Explorer_getBlock_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "GET blocks(explorer) test:"
-	response_test ${RESPONSES[GET_blocks]}	
-	if [ "$?"  == "1" ]; then 
+	response_test ${RESPONSES[GET_blocks]}
+	if [ "$?"  == "1" ]; then
 		BLOCKBYIDHASH=$(echo ${RESPONSES[GET_blocks]} | jq -r .[0].id)
-		if [ "$BLOCKBYIDHASH" != "null" ]; then		
+		if [ "$BLOCKBYIDHASH" != "null" ]; then
 			if [ "$BLOCKBYIDHASH" == "$TRANSACTION_BLOCK_HASH" ]; then
 				TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 				echo ${green}BLOCK HASH MATCHES TX${reset}
@@ -312,9 +312,9 @@ function Explorer_getTx_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "GET tx(explorer) test:"
 	response_test ${RESPONSES[GET_tx]}
-	if [ "$?" == "1" ]; then 
+	if [ "$?" == "1" ]; then
 		TX_HASH=$(echo ${RESPONSES[GET_tx]} | jq -r .id) # fix agrs to jq
-		if [ "$TX_HASH" != "null" ]; then		
+		if [ "$TX_HASH" != "null" ]; then
 			if [ "$TX_HASH" == "$TX_HASH" ]; then
 				TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 				echo ${green}BLOCK HASH MATCHES TX${reset}
@@ -331,7 +331,7 @@ function Explorer_getExplorerNodeAdress_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "GET address(explorer) test:"
 	response_test ${RESPONSES[GET_address]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -352,15 +352,15 @@ function Explorer_getShard_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "GET shard(explorer) test:"
 	response_test ${RESPONSES[GET_shard]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
-function Explorer_getCommitte_test() {	
+function Explorer_getCommitte_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "GET committe(explorer) test:"
 	response_test ${RESPONSES[GET_committee]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -371,8 +371,8 @@ function API_getBlockByNumber_test() {
 	echo "POST hmy_getBlockByNumber test:"
 	response_test ${RESPONSES[hmy_getBlockByNumber]}
 	BLOCKBYNUMBERHASH=$(echo ${RESPONSES[hmy_getBlockByNumber]} | jq -r '.result.hash')
-	
-	if [ "$BLOCKBLOCKBYNUMBERHASH" != "null" ]; then		
+
+	if [ "$BLOCKBLOCKBYNUMBERHASH" != "null" ]; then
 		if [ "$BLOCKBYNUMBERHASH" == "$TRANSACTION_BLOCK_HASH" ]; then
 			TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 			echo ${green}BLOCK HASH MATCHES TX${reset}
@@ -389,8 +389,8 @@ function API_getBlockByHash_test() {
 	echo "POST hmy_getBlockByHash test:"
 	response_test ${RESPONSES[hmy_getBlockByHash]}
 	BLOCKBYHASHHASH=$(echo ${RESPONSES[hmy_getBlockByHash]} | jq -r '.result.hash')
-	if [ "$BLOCKBYHASHBYHASH" != "null" ]; then	
-		if [ "$BLOCKBYHASHHASH" == "$TRANSACTION_BLOCK_HASH" ]; then	
+	if [ "$BLOCKBYHASHBYHASH" != "null" ]; then
+		if [ "$BLOCKBYHASHHASH" == "$TRANSACTION_BLOCK_HASH" ]; then
 			TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 			echo ${green}BLOCK HASH MATCHES TX${reset}
 			echo
@@ -407,8 +407,8 @@ function API_getBlockTransactionCountByHash_test() {
 	response_test ${RESPONSES[hmy_getBlockTransactionCountByHash]}
 	TRANSACTIONCOUNTBYHASH=$(echo ${RESPONSES[hmy_getBlockTransactionCountByHash]} | jq -r '.result')
 	TRANSACTIONCOUNTBYHASH=$(( TRANSACTIONCOUNTBYHASH ))
-	if [ "$TRANSACTIONCOUNTBYHASH" != "null" ]; then	
-		if [ $TRANSACTIONCOUNTBYHASH -gt 0 ]; then	
+	if [ "$TRANSACTIONCOUNTBYHASH" != "null" ]; then
+		if [ $TRANSACTIONCOUNTBYHASH -gt 0 ]; then
 			TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 			echo ${green}NON ZERO TRANSACTION COUNT IN BLOCK${reset}
 			echo
@@ -419,13 +419,13 @@ function API_getBlockTransactionCountByHash_test() {
 	echo
 }
 
-function API_getBlockTransactionCountByNumber_test() {	
+function API_getBlockTransactionCountByNumber_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_getBlockTransactionCountByNumber test:"
 	response_test ${RESPONSES[hmy_getBlockTransactionCountByNumber]}
 	TRANSACTIONCOUNTBYNUMBER=$(echo ${RESPONSES[hmy_getBlockTransactionCountByNumber]} | jq -r '.result')
 	TRANSACTIONCOUNTBYNUMBER=$(( TRANSACTIONCOUNTBYNUMBER ))
-	if [ "$BLOCKBYHASH" != "null" ]; then		
+	if [ "$BLOCKBYHASH" != "null" ]; then
 		if [ $TRANSACTIONCOUNTBYNUMBER -gt 0 ]; then
 			TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 			echo ${green}NON ZERO TRANSACTION COUNT IN BLOCK${reset}
@@ -441,7 +441,7 @@ function API_getCode_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_getCode test:"
 	response_test ${RESPONSES[hmy_getCode]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -450,8 +450,8 @@ function API_getTransactionByBlockHashAndIndex_test() {
 	echo "POST hmy_getTransactionByBlockHashAndIndex test:"
 	response_test ${RESPONSES[hmy_getTransactionByBlockHashAndIndex]}
 	TRANSACTIONHASHBYHASHANDINDEX=$(echo ${RESPONSES[hmy_getTransactionByBlockHashAndIndex]} | jq -r '.result.hash')
-	if [ "$TRANSACTIONHASHBYHASHANDINDEX" != "null" ]; then	
-		if [ "$TRANSACTIONHASHBYHASHANDINDEX" == "$TRANSACTION_HASH" ]; then	
+	if [ "$TRANSACTIONHASHBYHASHANDINDEX" != "null" ]; then
+		if [ "$TRANSACTIONHASHBYHASHANDINDEX" == "$TRANSACTION_HASH" ]; then
 			TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 			echo ${green}TRANSACTION FROM BLOCKHASH AND INDEX MATCH${reset}
 			echo
@@ -467,7 +467,7 @@ function API_getTransactionByBlockNumberAndIndex_test() {
 	echo "POST hmy_getTransactionByBlockNumberAndIndex test:"
 	response_test ${RESPONSES[hmy_getTransactionByBlockNumberAndIndex]}
 	TRANSACTIONHASHBYNUMBERANDINDEX=$(echo ${RESPONSES[hmy_getTransactionByBlockNumberAndIndex]} | jq -r '.result.hash')
-	if [ "$TRANSACTIONHASHBYNUMBERANDINDEX" != "null" ]; then	
+	if [ "$TRANSACTIONHASHBYNUMBERANDINDEX" != "null" ]; then
 		if [ "$TRANSACTIONHASHBYNUMBERANDINDEX" == "$TRANSACTION_HASH" ]; then
 			TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 			echo ${green}TRANSACTION FROM BLOCKNUMBER AND INDEX MATCH${reset}
@@ -479,12 +479,12 @@ function API_getTransactionByBlockNumberAndIndex_test() {
 	echo
 }
 
-function API_getTransactionByHash_test() {	
-	TESTS_RAN=$(( TESTS_RAN + 1 ))	
+function API_getTransactionByHash_test() {
+	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_getTransactionByHash test:"
 	TX_HASH=$(echo ${RESPONSES[hmy_getTransactionByHash]} | jq -r '.result.hash')
-	response_test ${RESPONSES[hmy_getTransactionByHash]} 
-	if [ "$TX_HASH" != "null" ]; then	
+	response_test ${RESPONSES[hmy_getTransactionByHash]}
+	if [ "$TX_HASH" != "null" ]; then
 		if [ "$TX_HASH" == "$TRANSACTION_HASH" ]; then
 			TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 			echo ${green}TRANSACTION HASH MATCH${reset}
@@ -497,11 +497,11 @@ function API_getTransactionByHash_test() {
 }
 
 function API_getTransactionReceipt_test() {
-	TESTS_RAN=$(( TESTS_RAN + 1 ))	
+	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_getTransactionReceipt test:"
 	TX_HASH=$(echo ${RESPONSES[hmy_getTransactionReceipt]} | jq -r '.result.transactionHash')
-	response_test ${RESPONSES[hmy_getTransactionReceipt]} 
-	if [ "$TX_HASH" != "null" ]; then	
+	response_test ${RESPONSES[hmy_getTransactionReceipt]}
+	if [ "$TX_HASH" != "null" ]; then
 		if [ "$TX_HASH" == "$TRANSACTION_HASH" ]; then
 			TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 			echo ${green}TRANSACTION HASH MATCH${reset}
@@ -517,15 +517,15 @@ function API_syncing_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_syncing test:"
 	response_test ${RESPONSES[hmy_syncing]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
 function API_netPeerCount_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST net_peerCount test:"
-	response_test ${RESPONSES[net_peerCount]}	
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	response_test ${RESPONSES[net_peerCount]}
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -533,7 +533,7 @@ function API_getBalance_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_getBalance test:"
 	response_test ${RESPONSES[hmy_getBalance]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -541,15 +541,15 @@ function API_getStorageAt_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_getStorageAt test:"
 	response_test ${RESPONSES[hmy_getStorageAt]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
-function API_getTransactionCount_test() {
+function API_getAccountNonce_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
-	echo "POST hmy_getTransactionCount test:"
-	response_test ${RESPONSES[hmy_getTransactionCount]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	echo "POST hmy_getAccountNonce test:"
+	response_test ${RESPONSES[hmy_getAccountNonce]}
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -557,7 +557,7 @@ function API_sendRawTransaction_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_sendRawTransaction test:"
 	response_test ${RESPONSES[hmy_sendRawTransaction]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -565,15 +565,15 @@ function API_getLogs_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_getLogs test:"
 	response_test ${RESPONSES[hmy_getLogs]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
 function API_getFilterChanges_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_getFilterChanges test:"
-	response_test ${RESPONSES[hmy_getFilterChanges]}	
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	response_test ${RESPONSES[hmy_getFilterChanges]}
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -581,7 +581,7 @@ function API_newPendingTransactionFilter_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_sendRawTransaction test:"
 	response_test ${RESPONSES[hmy_newPendingTransactionFilter]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -589,7 +589,7 @@ function API_newBlockFilter_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_newBlockFilter test:"
 	response_test ${RESPONSES[hmy_newBlockFilter]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -597,7 +597,7 @@ function API_newFilter_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_newFilter test:"
 	response_test ${RESPONSES[hmy_newFilter]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -605,7 +605,7 @@ function API_call_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_call test:"
 	response_test ${RESPONSES[hmy_call]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -616,7 +616,7 @@ function API_gasPrice_test() {
 	if [ "$?" == "1" ]; then
 		RESULT=$(echo ${RESPONSES[hmy_gasPrice]} | jq -r '.result')
 		isHexTest $RESULT
-		[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+		[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	fi
 }
 
@@ -627,7 +627,7 @@ function API_blockNumber_test() {
 	if [ "$?" == "1" ]; then
 		RESULT=$(echo ${RESPONSES[hmy_blockNumber]} | jq -r '.result')
 		isHexTest $RESULT
-		[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+		[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	fi
 }
 
@@ -635,7 +635,7 @@ function API_net_version_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST net_version test:"
 	response_test ${RESPONSES[net_version]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -643,7 +643,7 @@ function API_protocolVersion_test() {
 	TESTS_RAN=$(( TESTS_RAN + 1 ))
 	echo "POST hmy_protocolVersion test:"
 	response_test ${RESPONSES[hmy_protocolVersion]}
-	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 )) 
+	[ "$?" == "1" ] && TESTS_PASSED=$(( TESTS_PASSED + 1 ))
 	echo
 }
 
@@ -670,7 +670,7 @@ function run_tests() {
 	API_netPeerCount_test
 	API_getBalance_test
 	API_getStorageAt_test
-	API_getTransactionCount_test
+	API_getAccountNonce_test
 	API_sendRawTransaction_test
 	API_getLogs_test
 	API_getFilterChanges_test

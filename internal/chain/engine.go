@@ -336,12 +336,6 @@ func payoutUndelegations(
 			state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 		}
 		countTrack[validator] = len(wrapper.Delegations)
-		if err := state.UpdateValidatorWrapper(
-			validator, wrapper,
-		); err != nil {
-			const msg = "[Finalize] failed update validator info"
-			return errors.New(msg)
-		}
 	}
 
 	utils.Logger().Info().
@@ -367,12 +361,6 @@ func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
 			)
 		}
 		wrapper.LastEpochInCommittee = newShardState.Epoch
-		if err := state.UpdateValidatorWrapper(
-			addr, wrapper,
-		); err != nil {
-			const msg = "[Finalize] failed update validator info"
-			return errors.New(msg)
-		}
 	}
 	return nil
 }
@@ -444,7 +432,7 @@ func applySlashes(
 		// Apply the slashes, invariant: assume been verified as legit slash by this point
 		var slashApplied *slash.Application
 		votingPower, err := lookupVotingPower(
-			header.Epoch(), new(big.Int).SetUint64(key.epoch), subComm,
+			big.NewInt(int64(key.epoch)), subComm,
 		)
 		if err != nil {
 			return errors.Wrapf(err, "could not lookup cached voting power in slash application")

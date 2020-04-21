@@ -7,34 +7,32 @@ import (
 	"sync"
 	"time"
 
-	manet "github.com/multiformats/go-multiaddr-net"
-	"github.com/pkg/errors"
-
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	badger "github.com/ipfs/go-ds-badger"
 	coredis "github.com/libp2p/go-libp2p-core/discovery"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2pdhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	manet "github.com/multiformats/go-multiaddr-net"
+	"github.com/pkg/errors"
 )
 
 // Service is the network info service.
 type Service struct {
 	Host        p2p.Host
 	Rendezvous  nodeconfig.GroupID
-	bootnodes   p2putils.AddrList
+	bootnodes   p2p.AddrList
 	dht         *libp2pdht.IpfsDHT
 	cancel      context.CancelFunc
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
 	peerChan    chan p2p.Peer
-	peerInfo    <-chan peerstore.PeerInfo
+	peerInfo    <-chan libp2p_peer.AddrInfo
 	discovery   *libp2pdis.RoutingDiscovery
 	messageChan chan *msg_pb.Message
 	started     bool
@@ -61,7 +59,7 @@ const (
 // points to a persistent database directory to use.
 func New(
 	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
-	bootnodes p2putils.AddrList, dataStorePath string,
+	bootnodes p2p.AddrList, dataStorePath string,
 ) (*Service, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var dhtOpts []libp2pdhtopts.Option
@@ -99,7 +97,7 @@ func New(
 // MustNew is a panic-on-error version of New.
 func MustNew(
 	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
-	bootnodes p2putils.AddrList, dataStorePath string,
+	bootnodes p2p.AddrList, dataStorePath string,
 ) *Service {
 	service, err := New(h, rendezvous, peerChan, bootnodes, dataStorePath)
 	if err != nil {
@@ -135,12 +133,12 @@ func (s *Service) Init() error {
 	var wg sync.WaitGroup
 	if s.bootnodes == nil {
 		// TODO: should've passed in bootnodes through constructor.
-		s.bootnodes = p2putils.BootNodes
+		s.bootnodes = p2p.BootNodes
 	}
 
 	connected := false
 	for _, peerAddr := range s.bootnodes {
-		peerinfo, _ := peerstore.InfoFromP2pAddr(peerAddr)
+		peerinfo, _ := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200407.0"
+version="v1 20200411.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -71,15 +71,62 @@ function add_env
 function setup_env
 {
    check_root
-
-# setup environment variables, may not be nessary
-   sysctl -w net.core.somaxconn=1024
+   ### KERNEL TUNING ###
+   # Increase size of file handles and inode cache
+   sysctl -w fs.file-max=2097152
+   # Do less swapping
+   sysctl -w vm.swappiness=10
+   sysctl -w vm.dirty_ratio=60
+   sysctl -w vm.dirty_background_ratio=2
+   # Sets the time before the kernel considers migrating a proccess to another core
+   sysctl -w kernel.sched_migration_cost_ns=5000000
+   ### GENERAL NETWORK SECURITY OPTIONS ###
+   # Number of times SYNACKs for passive TCP connection.
+   sysctl -w net.ipv4.tcp_synack_retries=2
+   # Allowed local port range
+   sysctl -w net.ipv4.ip_local_port_range='2000 65535'
+   # Protect Against TCP Time-Wait
+   sysctl -w net.ipv4.tcp_rfc1337=1
+   # Control Syncookies
+   sysctl -w net.ipv4.tcp_syncookies=1
+   # Decrease the time default value for tcp_fin_timeout connection
+   sysctl -w net.ipv4.tcp_fin_timeout=15
+   # Decrease the time default value for connections to keep alive
+   sysctl -w net.ipv4.tcp_keepalive_time=300
+   sysctl -w net.ipv4.tcp_keepalive_probes=5
+   sysctl -w net.ipv4.tcp_keepalive_intvl=15
+   ### TUNING NETWORK PERFORMANCE ###
+   # Default Socket Receive Buffer
+   sysctl -w net.core.rmem_default=31457280
+   # Maximum Socket Receive Buffer
+   sysctl -w net.core.rmem_max=33554432
+   # Default Socket Send Buffer
+   sysctl -w net.core.wmem_default=31457280
+   # Maximum Socket Send Buffer
+   sysctl -w net.core.wmem_max=33554432
+   # Increase number of incoming connections
+   sysctl -w net.core.somaxconn=8096
+   # Increase number of incoming connections backlog
    sysctl -w net.core.netdev_max_backlog=65536
+   # Increase the maximum amount of option memory buffers
+   sysctl -w net.core.optmem_max=25165824
+   sysctl -w net.ipv4.tcp_max_syn_backlog=8192
+   # Increase the maximum total buffer-space allocatable
+   # This is measured in units of pages (4096 bytes)
+   sysctl -w net.ipv4.tcp_mem='786432 1048576 26777216'
+   sysctl -w net.ipv4.udp_mem='65536 131072 262144'
+   # Increase the read-buffer space allocatable
+   sysctl -w net.ipv4.tcp_rmem='8192 87380 33554432'
+   sysctl -w net.ipv4.udp_rmem_min=16384
+   # Increase the write-buffer-space allocatable
+   sysctl -w net.ipv4.tcp_wmem='8192 65536 33554432'
+   sysctl -w net.ipv4.udp_wmem_min=16384
+   # Increase the tcp-time-wait buckets pool size to prevent simple DOS attacks
+   sysctl -w net.ipv4.tcp_max_tw_buckets=1440000
    sysctl -w net.ipv4.tcp_tw_reuse=1
-   sysctl -w net.ipv4.tcp_rmem='4096 65536 16777216'
-   sysctl -w net.ipv4.tcp_wmem='4096 65536 16777216'
-   sysctl -w net.ipv4.tcp_mem='65536 131072 262144'
-
+   sysctl -w net.ipv4.tcp_fastopen=3
+   sysctl -w net.ipv4.tcp_window_scaling=1
+   
    add_env /etc/security/limits.conf "* soft     nproc          65535"
    add_env /etc/security/limits.conf "* hard     nproc          65535"
    add_env /etc/security/limits.conf "* soft     nofile         65535"
@@ -632,9 +679,9 @@ done
 
 if [[ "${start_clean}" == "true" && "${network_type}" != "mainnet" ]]
 then
-   msg "cleaning up old database/logs (-c)"
+   msg "cleaning up old database (-c)"
    # set a 2s timeout, and set its default return value to Y (true)
-   read -t 2 -rp "Remove old database/logs? (Y/n) " yesno
+   read -t 2 -rp "Remove old database? (Y/n) " yesno
    yesno=${yesno:-Y}
    echo
    if [[ "$yesno" == "y" || "$yesno" == "Y" ]]; then
@@ -642,8 +689,7 @@ then
       now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
       mkdir -p backups; rm -rf backups/*
       backup_dir=$(mktemp -d "backups/${now}.XXXXXX")
-      mv -f harmony_db_* latest .dht* "${backup_dir}/" 2>/dev/null || :
-      rm -rf latest
+      mv -f harmony_db_* .dht* "${backup_dir}/" 2>/dev/null || :
    fi
 
    # install unzip as dependency of rclone
@@ -656,7 +702,10 @@ then
       msg "curl https://rclone.org/install.sh | sudo bash"
       curl https://rclone.org/install.sh | sudo bash
       mkdir -p ~/.config/rclone
-      cat<<-EOT>~/.config/rclone/rclone.conf
+   fi
+   if ! grep -q 'hmy' ~/.config/rclone/rclone.conf 2> /dev/null; then
+      msg "adding [hmy] profile to rclone.conf"
+      cat<<-EOT>>~/.config/rclone/rclone.conf
 [hmy]
 type = s3
 provider = AWS
@@ -771,13 +820,14 @@ read_bls_pass() {
    if ${prompt_save} ; then
       while true
       do
-         read -p "Do you wish to delete the saved passphrase files after successful start of node? (y|n):" yn
+         read -t 3 -rp "Do you wish to delete the saved passphrase files after successful start of node? (y|n):" yn
+         yn=${yn:-Y}
          case $yn in
             [Yy]*) save_pass_file=false
             break;;
             [Nn]*) save_pass_file=true
             break;;
-            *) echo "Please answer yes (y|Y) or no (n|N)";;
+            *) sleep 1 && echo "Please answer yes (y|Y) or no (n|N)";;
          esac
       done
       prompt_save=false

@@ -5,11 +5,9 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
-
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
 func TestService(t *testing.T) {
@@ -23,8 +21,7 @@ func TestService(t *testing.T) {
 		t.Fatal("generate key error")
 	}
 	selfPeer := p2p.Peer{IP: "127.0.0.1", Port: "12345", ConsensusPubKey: peerPubKey}
-
-	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
+	host, err := p2p.NewHost(&selfPeer, nodePriKey)
 	if err != nil {
 		t.Fatal("unable to new host in harmony")
 	}
@@ -35,8 +32,6 @@ func TestService(t *testing.T) {
 	}
 
 	s.StartService()
-
 	time.Sleep(2 * time.Second)
-
 	s.StopService()
 }

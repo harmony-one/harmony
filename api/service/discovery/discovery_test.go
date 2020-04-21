@@ -4,12 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/p2pimpl"
 )
 
 var dService *Service
@@ -26,13 +24,12 @@ func TestDiscoveryService(t *testing.T) {
 	}
 	selfPeer := p2p.Peer{IP: "127.0.0.1", Port: "12345", ConsensusPubKey: peerPubKey}
 
-	host, err := p2pimpl.NewHost(&selfPeer, nodePriKey)
+	host, err := p2p.NewHost(&selfPeer, nodePriKey)
 	if err != nil {
 		t.Fatalf("unable to new host in harmony: %v", err)
 	}
 
 	config := service.NodeConfig{}
-
 	dService = New(host, config, nil, nil)
 
 	if dService == nil {
@@ -40,8 +37,6 @@ func TestDiscoveryService(t *testing.T) {
 	}
 
 	dService.StartService()
-
 	time.Sleep(3 * time.Second)
-
 	dService.StopService()
 }

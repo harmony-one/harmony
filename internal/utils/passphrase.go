@@ -15,7 +15,7 @@ import (
 
 // AskForPassphrase return passphrase using password input
 func AskForPassphrase(prompt string) string {
-	fmt.Printf(prompt)
+	fmt.Println(prompt)
 	bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		panic("read password error")
