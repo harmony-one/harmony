@@ -99,12 +99,12 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 
 	// has to save the private key for host
 	h := &HostV2{
-		h:      p2pHost,
-		joiner: topicJoiner{pubsub},
-		joined: map[string]*libp2p_pubsub.Topic{},
-		self:   *self,
-		priKey: key,
-		logger: &subLogger,
+		h:       p2pHost,
+		joiner:  topicJoiner{pubsub},
+		joined:  map[string]*libp2p_pubsub.Topic{},
+		self:    *self,
+		priKey:  key,
+		logger:  &subLogger,
 		metrics: newMetrics,
 	}
 
