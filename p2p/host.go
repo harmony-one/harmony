@@ -237,15 +237,17 @@ func (host *HostV2) GetPeerCount() int {
 	return host.h.Peerstore().Peers().Len()
 }
 
-// host.metrics.GetBandwidthTotals()
+// GetBandwidthTotals returns total bandwidth of a node
 func (host *HostV2) GetBandwidthTotals() libp2p_metrics.Stats {
 	return host.metrics.GetBandwidthTotals()
 }
 
+// LogRecvMessage logs received message on node
 func (host *HostV2) LogRecvMessage( msg []byte ) {
 	host.metrics.LogRecvMessage(int64(len(msg)))
 }
 
+// ResetMetrics resets metrics counters
 func (host *HostV2) ResetMetrics() {
 	host.metrics.Reset()
 }
