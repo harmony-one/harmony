@@ -15,10 +15,10 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
+	libp2p_metrics "github.com/libp2p/go-libp2p-core/metrics"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
-	libp2p_metrics  "github.com/libp2p/go-libp2p-core/metrics"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -38,7 +38,7 @@ type Host interface {
 
 	// libp2p.metrics related
 	GetBandwidthTotals() libp2p_metrics.Stats
-	LogRecvMessage( msg []byte )
+	LogRecvMessage(msg []byte)
 	ResetMetrics()
 }
 
@@ -243,7 +243,7 @@ func (host *HostV2) GetBandwidthTotals() libp2p_metrics.Stats {
 }
 
 // LogRecvMessage logs received message on node
-func (host *HostV2) LogRecvMessage( msg []byte ) {
+func (host *HostV2) LogRecvMessage(msg []byte) {
 	host.metrics.LogRecvMessage(int64(len(msg)))
 }
 
