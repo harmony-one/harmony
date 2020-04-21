@@ -457,7 +457,7 @@ func (node *Node) PostConsensusProcessing(
 
 	// Clear metrics after one consensus cycle
 	node.host.ResetMetrics()
-	utils.Logger().Info().Msg("Metrics cleared after one consensus cycle")	
+	utils.Logger().Info().Msg("Metrics cleared after one consensus cycle")
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
