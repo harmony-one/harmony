@@ -701,23 +701,34 @@ var (
 	errAddressNotPresent = errors.New("address not present in state")
 )
 
-// ValidatorWrapper retrieves the existing validator from state.
+// ValidatorWrapper retrieves the existing validator in the cache.
 // The return value is a reference to the actual validator object in state.
-// Whether to get a copy of the validator wrapper. If retrieved as copy,
-// remember to commit your change with UpdateValidatorWrapper.
+// The modification on it will be committed to the state object when Finalize()
+// is called.
 func (db *DB) ValidatorWrapper(
-	addr common.Address, copy bool,
+	addr common.Address,
 ) (*stk.ValidatorWrapper, error) {
-	populateCache := false
-	if !copy {
-		// Read cache first
-		cached, ok := db.stateValidators[addr]
-		if ok {
-			return cached, nil
-		}
-		populateCache = true
+	// Read cache first
+	cached, ok := db.stateValidators[addr]
+	if ok {
+		return cached, nil
 	}
 
+	if copy, err := db.ValidatorWrapperCopy(addr); err != nil {
+		return nil, err
+	} else {
+		// populate cache if the validator is not in it
+		db.stateValidators[addr] = copy
+		return copy, nil
+	}
+}
+
+// ValidatorWrapperCopy retrieves the existing validator as a copy from state object.
+// Changes on the copy has to be explicitly commited with UpdateValidatorWrapper()
+// to take effect.
+func (db *DB) ValidatorWrapperCopy(
+	addr common.Address,
+) (*stk.ValidatorWrapper, error) {
 	by := db.GetCode(addr)
 	if len(by) == 0 {
 		return nil, errAddressNotPresent
@@ -730,12 +741,6 @@ func (db *DB) ValidatorWrapper(
 			common2.MustAddressToBech32(addr),
 		)
 	}
-
-	// populate cache if the validator is not in it
-	if populateCache {
-		db.stateValidators[addr] = &val
-	}
-
 	return &val, nil
 }
 
@@ -789,7 +794,7 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int, shareLo
 		return nil
 	}
 
-	curValidator, err := db.ValidatorWrapper(snapshot.Address, false)
+	curValidator, err := db.ValidatorWrapper(snapshot.Address)
 	if err != nil {
 		return errors.Wrapf(err, "failed to distribute rewards: validator does not exist")
 	}

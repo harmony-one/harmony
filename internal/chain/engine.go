@@ -322,7 +322,7 @@ func payoutUndelegations(
 	}
 	// Payout undelegated/unlocked tokens
 	for _, validator := range validators {
-		wrapper, err := state.ValidatorWrapper(validator, false)
+		wrapper, err := state.ValidatorWrapper(validator)
 		if err != nil {
 			return errors.New(
 				"[Finalize] failed to get validator from state to finalize",
@@ -354,7 +354,7 @@ func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
 		return errors.New(msg)
 	}
 	for _, addr := range newShardState.StakedValidators().Addrs {
-		wrapper, err := state.ValidatorWrapper(addr, false)
+		wrapper, err := state.ValidatorWrapper(addr)
 		if err != nil {
 			return errors.New(
 				"[Finalize] failed to get validator from state to finalize",

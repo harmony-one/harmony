@@ -102,7 +102,7 @@ func main() {
 	}
 
 	startTime := time.Now()
-	validator, _ = statedb.ValidatorWrapper(msg.ValidatorAddress, false)
+	validator, _ = statedb.ValidatorWrapper(msg.ValidatorAddress)
 	endTime := time.Now()
 	fmt.Printf("Time required to read validator: %f seconds\n", endTime.Sub(startTime).Seconds())
 

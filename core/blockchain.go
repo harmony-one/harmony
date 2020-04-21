@@ -2168,7 +2168,7 @@ func (bc *BlockChain) ReadValidatorInformationAt(
 	if err != nil || state == nil {
 		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
-	wrapper, err := state.ValidatorWrapper(addr, false)
+	wrapper, err := state.ValidatorWrapper(addr)
 	if err != nil {
 		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
@@ -2259,7 +2259,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			}
 			// This means it's already in staking epoch
 			if currentEpochSuperCommittee.Epoch != nil {
-				wrapper, err := state.ValidatorWrapper(currentValidator, false)
+				wrapper, err := state.ValidatorWrapper(currentValidator)
 				if err != nil {
 					return nil, err
 				}
@@ -2316,7 +2316,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 
 		// This means it's already in staking epoch
 		if currentEpochSuperCommittee.Epoch != nil {
-			wrapper, err := state.ValidatorWrapper(key, false)
+			wrapper, err := state.ValidatorWrapper(key)
 			if err != nil {
 				return nil, err
 			}
@@ -2361,7 +2361,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 	// Read all validator's current data and snapshot them
 	for i := range allValidators {
 		// The snapshot will be captured in the state after the last epoch block is finalized
-		validator, err := state.ValidatorWrapper(allValidators[i], false)
+		validator, err := state.ValidatorWrapper(allValidators[i])
 		if err != nil {
 			return err
 		}
@@ -2480,7 +2480,7 @@ func (bc *BlockChain) UpdateStakingMetaData(
 			}
 
 			// Update validator snapshot for the new validator
-			validator, err := state.ValidatorWrapper(addr, false)
+			validator, err := state.ValidatorWrapper(addr)
 			if err != nil {
 				return newValidators, err
 			}

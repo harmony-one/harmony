@@ -94,7 +94,7 @@ func bumpCount(
 				continue
 			}
 
-			wrapper, err := state.ValidatorWrapper(addr, false)
+			wrapper, err := state.ValidatorWrapper(addr)
 			if err != nil {
 				return err
 			}
@@ -190,7 +190,7 @@ func ComputeAndMutateEPOSStatus(
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")
 
-	wrapper, err := state.ValidatorWrapper(addr, false)
+	wrapper, err := state.ValidatorWrapper(addr)
 	if err != nil {
 		return err
 	}

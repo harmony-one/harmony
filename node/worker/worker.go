@@ -461,9 +461,10 @@ func (w *Worker) FinalizeNewBlock(
 			return nil, err
 		}
 	}
-
+	state := w.current.state.Copy()
+	copyHeader := types.CopyHeader(w.current.header)
 	block, _, err := w.engine.Finalize(
-		w.chain, w.current.header, w.current.state, w.current.txs, w.current.receipts,
+		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
 		w.current.slashes,
 	)
