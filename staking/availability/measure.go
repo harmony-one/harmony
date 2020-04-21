@@ -108,12 +108,6 @@ func bumpCount(
 					wrapper.Counters.NumBlocksSigned, common.Big1,
 				)
 			}
-
-			if err := state.UpdateValidatorWrapper(
-				addr, wrapper,
-			); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -226,12 +220,6 @@ func ComputeAndMutateEPOSStatus(
 	default:
 		// Default is no-op so validator who wants
 		// to leave the committee can actually leave.
-	}
-
-	if err := state.UpdateValidatorWrapper(
-		addr, wrapper,
-	); err != nil {
-		return err
 	}
 
 	return nil

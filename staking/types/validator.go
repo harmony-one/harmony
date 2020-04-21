@@ -26,7 +26,7 @@ const (
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
 	BLSVerificationStr       = "harmony-one"
-	TenThousand              = 10000
+	TenThousand              = 10
 )
 
 var (

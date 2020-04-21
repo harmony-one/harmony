@@ -101,8 +101,6 @@ func main() {
 		})
 	}
 
-	statedb.UpdateValidatorWrapper(validator.Address, validator)
-
 	startTime := time.Now()
 	validator, _ = statedb.ValidatorWrapper(msg.ValidatorAddress)
 	endTime := time.Now()

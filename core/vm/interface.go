@@ -42,7 +42,7 @@ type StateDB interface {
 	SetCode(common.Address, []byte)
 	GetCodeSize(common.Address) int
 
-	ValidatorWrapper(common.Address) (*staking.ValidatorWrapper, error)
+	ValidatorWrapperCopy(common.Address) (*staking.ValidatorWrapper, error)
 	UpdateValidatorWrapper(common.Address, *staking.ValidatorWrapper) error
 	SetValidatorFlag(common.Address)
 	UnsetValidatorFlag(common.Address)

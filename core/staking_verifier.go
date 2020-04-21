@@ -95,7 +95,7 @@ func VerifyAndEditValidatorFromMsg(
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
 		return nil, errValidatorNotExist
 	}
-	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress)
+	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func VerifyAndDelegateFromMsg(
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
 		return nil, nil, errValidatorNotExist
 	}
-	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress)
+	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -252,7 +252,7 @@ func VerifyAndUndelegateFromMsg(
 		return nil, errValidatorNotExist
 	}
 
-	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress)
+	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +295,7 @@ func VerifyAndCollectRewardsFromDelegation(
 	totalRewards := big.NewInt(0)
 	for i := range delegations {
 		delegation := &delegations[i]
-		wrapper, err := stateDB.ValidatorWrapper(delegation.ValidatorAddress)
+		wrapper, err := stateDB.ValidatorWrapperCopy(delegation.ValidatorAddress)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -312,11 +312,6 @@ func VerifyAndCollectRewardsFromDelegation(
 				Int("delegations length", len(wrapper.Delegations)).
 				Msg("Delegation index out of bound")
 			return nil, nil, errors.New("Delegation index out of bound")
-		}
-		if err := wrapper.SanityCheck(
-			staking.DoNotEnforceMaxBLS,
-		); err != nil {
-			return nil, nil, err
 		}
 		updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)
 	}
