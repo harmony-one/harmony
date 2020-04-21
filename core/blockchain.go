@@ -2642,7 +2642,7 @@ func (bc *BlockChain) addDelegationIndex(
 
 	// Found the delegation from state and add the delegation index
 	// Note this should read from the state of current block in concern
-	wrapper, err := state.ValidatorWrapper(validatorAddress, false)
+	wrapper, err := state.ValidatorWrapper(validatorAddress)
 	if err != nil {
 		return delegations, err
 	}
