@@ -141,13 +141,13 @@ func (tx *RegularTx) To() *common.Address {
 	return &to
 }
 
-// ShardId ...
-func (tx *RegularTx) ShardId() uint32 {
+// FromShard returns the message from shard id
+func (tx *RegularTx) FromShard() uint32 {
 	return tx.ShardID
 }
 
-// ToShardId ...
-func (tx *RegularTx) ToShardId() uint32 {
+// ToShard returns the message to shard id
+func (tx *RegularTx) ToShard() uint32 {
 	return tx.ToShardID
 }
 
@@ -156,23 +156,23 @@ func (tx *RegularTx) Value() *big.Int {
 	return new(big.Int).Set(tx.Amount)
 }
 
-// Data ...
-func (d *RegularTx) Data() []byte {
-	return d.Payload
+// Data returns the message payload
+func (tx *RegularTx) Data() []byte {
+	return tx.Payload
 }
 
-// Copy ...
-func (d *RegularTx) Copy() staking.TxMessage {
+// Copy deep copy of the interface
+func (tx *RegularTx) Copy() staking.TxMessage {
 	return &RegularTx{
-		d.ShardID,
-		d.ToShardID,
-		copyAddr(d.Recipient),
-		new(big.Int).Set(d.Amount),
-		append(d.Payload[:0:0], d.Payload...),
+		tx.ShardID,
+		tx.ToShardID,
+		copyAddr(tx.Recipient),
+		new(big.Int).Set(tx.Amount),
+		append(tx.Payload[:0:0], tx.Payload...),
 	}
 }
 
-// Cost ...
+// Cost returns the message cost
 func (tx *RegularTx) Cost() *big.Int {
 	return tx.Amount
 }
@@ -293,6 +293,7 @@ func newTransaction(
 // TxMsgFulfiller is signature of callback intended to produce the Message
 type TxMsgFulfiller func() (TransactionType, interface{})
 
+// NewStakingTransaction returns staking transaction.
 func NewStakingTransaction(nonce, gasLimit uint64, gasPrice *big.Int, f TxMsgFulfiller) *Transaction {
 	txType, message := f()
 	d := txdata{
@@ -323,7 +324,7 @@ func (tx *Transaction) ShardID() (uint32, error) {
 	if err != nil {
 		return 0, ErrInvalidMsgKind
 	}
-	return msg.ShardId(), nil
+	return msg.FromShard(), nil
 }
 
 // ToShardID returns the destination shard id this transaction is going to
@@ -332,7 +333,7 @@ func (tx *Transaction) ToShardID() (uint32, error) {
 	if err != nil {
 		return 0, ErrInvalidMsgKind
 	}
-	return msg.ToShardId(), nil
+	return msg.ToShard(), nil
 }
 
 // Protected returns whether the transaction is protected from replay protection.
@@ -364,7 +365,6 @@ func (tx *Transaction) DecodeRLP(s *rlp.Stream) error {
 	return err
 }
 
-// TODO(gu): not used? remove it
 // MarshalJSON encodes the web3 RPC transaction format.
 func (tx *Transaction) MarshalJSON() ([]byte, error) {
 	hash := tx.Hash()
@@ -417,6 +417,7 @@ func (tx *Transaction) GasPrice() *big.Int {
 	return new(big.Int).Set(tx.data.Price)
 }
 
+// Value returns transaction amount
 func (tx *Transaction) Value() (*big.Int, error) {
 	msg, err := tx.data.GetMessage()
 	if err != nil {
@@ -435,6 +436,7 @@ func (tx *Transaction) CheckNonce() bool {
 	return true
 }
 
+// To returns transaction to address
 func (tx *Transaction) To() (*common.Address, error) {
 	msg, err := tx.data.GetMessage()
 	if err != nil {
@@ -535,10 +537,12 @@ func (tx *Transaction) Copy() *Transaction {
 	return &tx2
 }
 
+// Type returns transaction type
 func (tx *Transaction) Type() TransactionType {
 	return tx.data.TxType
 }
 
+// IsStaking return true if staking transaction
 func (tx *Transaction) IsStaking() bool {
 	switch tx.Type() {
 	case CreateValidator, EditValidator, Delegate, Undelegate, CollectRewards:
@@ -547,6 +551,7 @@ func (tx *Transaction) IsStaking() bool {
 	return false
 }
 
+// Message returns the transaction message
 func (tx *Transaction) Message() (staking.TxMessage, error) {
 	msg, err := tx.data.GetMessage()
 	if err != nil {
@@ -555,10 +560,12 @@ func (tx *Transaction) Message() (staking.TxMessage, error) {
 	return msg, nil
 }
 
+// BlockNum returns the block number
 func (tx *Transaction) BlockNum() *big.Int {
 	return tx.blockNum
 }
 
+// SetBlockNum sets the block number for transaction
 func (tx *Transaction) SetBlockNum(blockNum *big.Int) {
 	tx.blockNum = blockNum
 }
@@ -588,8 +595,12 @@ func (s Transactions) GetRlp(i int) []byte {
 }
 
 // ToShardID returns the destination shardID of given transaction
-func (s Transactions) ToShardID(i int) uint32 {
-	return s[i].data.Message.(staking.TxMessage).ToShardId()
+func (s Transactions) ToShardID(i int) (uint32, error) {
+	msg, err := s[i].data.GetMessage()
+	if err != nil {
+		return 0, ErrInvalidMsgKind
+	}
+	return msg.ToShard(), nil
 }
 
 // MaxToShardID returns 0, arbitrary value, NOT use
@@ -807,6 +818,7 @@ func (m Message) BlockNum() *big.Int {
 	return m.blockNum
 }
 
+// Msg returns the transaction message part
 func (m Message) Msg() staking.TxMessage {
 	return m.msg
 }
@@ -838,6 +850,7 @@ func (btc BlockTxsCounts) String() string {
 	return ret
 }
 
+// RedecodeMsg encodes and again decodes the message interface
 func (tx *Transaction) RedecodeMsg() error {
 	msgBytes, err := tx.RLPEncodeMsg()
 	if err != nil {
@@ -851,35 +864,36 @@ func (tx *Transaction) RedecodeMsg() error {
 	return nil
 }
 
-func (tx *txdata) GetMessage() (staking.TxMessage, error) {
-	switch tx.TxType {
+// GetMessage returns transaction message for valid types
+func (d *txdata) GetMessage() (staking.TxMessage, error) {
+	switch d.TxType {
 	case SameShardTx, SubtractionOnly, Contract:
-		msg, ok := tx.Message.(*RegularTx)
+		msg, ok := d.Message.(*RegularTx)
 		if ok {
 			return msg, nil
 		}
 	case CreateValidator:
-		msg, ok := tx.Message.(*staking.CreateValidator)
+		msg, ok := d.Message.(*staking.CreateValidator)
 		if ok {
 			return msg, nil
 		}
 	case EditValidator:
-		msg, ok := tx.Message.(*staking.EditValidator)
+		msg, ok := d.Message.(*staking.EditValidator)
 		if ok {
 			return msg, nil
 		}
 	case Delegate:
-		msg, ok := tx.Message.(*staking.Delegate)
+		msg, ok := d.Message.(*staking.Delegate)
 		if ok {
 			return msg, nil
 		}
 	case Undelegate:
-		msg, ok := tx.Message.(*staking.Undelegate)
+		msg, ok := d.Message.(*staking.Undelegate)
 		if ok {
 			return msg, nil
 		}
 	case CollectRewards:
-		msg, ok := tx.Message.(*staking.CollectRewards)
+		msg, ok := d.Message.(*staking.CollectRewards)
 		if ok {
 			return msg, nil
 		}
@@ -887,12 +901,12 @@ func (tx *txdata) GetMessage() (staking.TxMessage, error) {
 	return nil, ErrInvalidMsgKind
 }
 
-// RLPEncodeStakeMsg ..
+// RLPEncodeMsg ..
 func (tx *Transaction) RLPEncodeMsg() (by []byte, err error) {
 	return rlp.EncodeToBytes(tx.data.Message)
 }
 
-// RLPDecodeStakeMsg ..
+// RLPDecodeMsg ..
 func RLPDecodeMsg(payload []byte, txType TransactionType) (interface{}, error) {
 	var oops error
 	var ds interface{}
@@ -923,8 +937,9 @@ func RLPDecodeMsg(payload []byte, txType TransactionType) (interface{}, error) {
 	return ds, nil
 }
 
-func (tx *txdata) TypeToMsg() (staking.TxMessage, error) {
-	switch tx.TxType {
+// TypeToMsg returns message literal for valid transaction type
+func (d *txdata) TypeToMsg() (staking.TxMessage, error) {
+	switch d.TxType {
 	case SameShardTx, SubtractionOnly, Contract:
 		return &RegularTx{}, nil
 	case CreateValidator:

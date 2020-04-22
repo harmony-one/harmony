@@ -53,112 +53,138 @@ type CollectRewards struct {
 	DelegatorAddress common.Address `json:"delegator_address"`
 }
 
+// TxMessage defines contract for valid transaction messages
 type TxMessage interface {
 	To() *common.Address
-	ShardId() uint32
-	ToShardId() uint32
+	FromShard() uint32
+	ToShard() uint32
 	Value() *big.Int
 	Data() []byte
 	Copy() TxMessage
 	Cost() *big.Int
 }
 
+// To returns the message to address
 func (v CreateValidator) To() *common.Address {
 	return nil
 }
 
+// To returns the message to address
 func (v EditValidator) To() *common.Address {
 	return nil
 }
 
+// To returns the message to address
 func (v Delegate) To() *common.Address {
 	return &v.ValidatorAddress
 }
 
+// To returns the message to address
 func (v Undelegate) To() *common.Address {
 	return &v.ValidatorAddress
 }
 
+// To returns the message to address
 func (v CollectRewards) To() *common.Address {
 	return nil
 }
 
-func (v CreateValidator) ShardId() uint32 {
+// FromShard returns the message from shard id
+func (v CreateValidator) FromShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
-func (v EditValidator) ShardId() uint32 {
+// FromShard returns the message from shard id
+func (v EditValidator) FromShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
-func (v Delegate) ShardId() uint32 {
+// FromShard returns the message from shard id
+func (v Delegate) FromShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
-func (v Undelegate) ShardId() uint32 {
+// FromShard returns the message from shard id
+func (v Undelegate) FromShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
-func (v CollectRewards) ShardId() uint32 {
+// FromShard returns the message from shard id
+func (v CollectRewards) FromShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
-func (v CreateValidator) ToShardId() uint32 {
+// ToShard returns the message to shard id
+func (v CreateValidator) ToShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
-func (v EditValidator) ToShardId() uint32 {
+// ToShard returns the message to shard id
+func (v EditValidator) ToShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
-func (v Delegate) ToShardId() uint32 {
+// ToShard returns the message to shard id
+func (v Delegate) ToShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
-func (v Undelegate) ToShardId() uint32 {
+// ToShard returns the message to shard id
+func (v Undelegate) ToShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
-func (v CollectRewards) ToShardId() uint32 {
+// ToShard returns the message to shard id
+func (v CollectRewards) ToShard() uint32 {
 	return shard.BeaconChainShardID
 }
 
+// Value returns the message amount
 func (v CreateValidator) Value() *big.Int {
 	return new(big.Int).SetInt64(0)
 }
 
+// Value returns the message amount
 func (v EditValidator) Value() *big.Int {
 	return new(big.Int).SetInt64(0)
 }
 
+// Value returns the message amount
 func (v Delegate) Value() *big.Int {
 	return new(big.Int).SetInt64(0)
 }
 
+// Value returns the message amount
 func (v Undelegate) Value() *big.Int {
 	return new(big.Int).SetInt64(0)
 }
 
+// Value returns the message amount
 func (v CollectRewards) Value() *big.Int {
 	return new(big.Int).SetInt64(0)
 }
 
+// Data returns the message payload
 func (v CreateValidator) Data() []byte {
 	return []byte{}
 }
 
+// Data returns the message payload
 func (v EditValidator) Data() []byte {
 	return []byte{}
 }
 
+// Data returns the message payload
 func (v Delegate) Data() []byte {
 	return []byte{}
 }
 
+// Data returns the message payload
 func (v Undelegate) Data() []byte {
 	return []byte{}
 }
 
+// Data returns the message payload
 func (v CollectRewards) Data() []byte {
 	return []byte{}
 }
@@ -195,27 +221,27 @@ func (v CollectRewards) Copy() TxMessage {
 	return &v1
 }
 
-// Cost ..
-func (tx *CreateValidator) Cost() *big.Int {
-	return tx.Amount
+// Cost returns the message cost
+func (v *CreateValidator) Cost() *big.Int {
+	return v.Amount
 }
 
-// Cost ..
-func (tx *EditValidator) Cost() *big.Int {
+// Cost returns the message cost
+func (v *EditValidator) Cost() *big.Int {
 	return common.Big0
 }
 
-// Cost ..
-func (tx *Delegate) Cost() *big.Int {
-	return tx.Amount
+// Cost returns the message cost
+func (v *Delegate) Cost() *big.Int {
+	return v.Amount
 }
 
-// Cost ..
-func (tx *Undelegate) Cost() *big.Int {
+// Cost returns the message cost
+func (v *Undelegate) Cost() *big.Int {
 	return common.Big0
 }
 
-// Cost ..
-func (tx *CollectRewards) Cost() *big.Int {
+// Cost returns the message cost
+func (v *CollectRewards) Cost() *big.Int {
 	return common.Big0
 }
