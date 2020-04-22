@@ -20,11 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/harmony/common"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/rlp"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/trie"
 )
 
 // DumpAccount ...

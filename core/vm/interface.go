@@ -21,7 +21,7 @@ import (
 
 	"github.com/harmony-one/harmony/numeric"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core/types"
 	staking "github.com/harmony-one/harmony/staking/types"
 )

@@ -24,9 +24,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/ethdb"
+	"github.com/harmony-one/harmony/event"
 	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/block"

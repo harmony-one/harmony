@@ -6,8 +6,8 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/shard"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"

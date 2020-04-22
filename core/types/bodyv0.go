@@ -3,7 +3,7 @@ package types
 import (
 	"io"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/rlp"
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/internal/utils"

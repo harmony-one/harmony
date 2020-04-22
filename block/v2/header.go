@@ -5,13 +5,13 @@ import (
 	"math/big"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
 	blockif "github.com/harmony-one/harmony/block/interface"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/hexutil"
 	"github.com/harmony-one/harmony/crypto/hash"
+	ethtypes "github.com/harmony-one/harmony/ethcore/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/rlp"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/rs/zerolog"
 )

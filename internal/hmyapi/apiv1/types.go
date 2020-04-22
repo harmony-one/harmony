@@ -8,11 +8,11 @@ import (
 
 	types2 "github.com/harmony-one/harmony/staking/types"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/hexutil"
 	"github.com/harmony-one/harmony/core/types"
+	ethtypes "github.com/harmony-one/harmony/ethcore/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
 )

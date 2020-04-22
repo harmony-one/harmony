@@ -22,10 +22,10 @@ import (
 	"io"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/hexutil"
+	ethtypes "github.com/harmony-one/harmony/ethcore/types"
+	"github.com/harmony-one/harmony/rlp"
 )
 
 // no go:generate gencodec -type Receipt -field-override receiptMarshaling -out gen_receipt_json.go

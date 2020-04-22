@@ -25,11 +25,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/prque"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/prque"
+	"github.com/harmony-one/harmony/event"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/metrics"
 	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/block"

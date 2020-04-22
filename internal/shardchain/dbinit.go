@@ -1,6 +1,6 @@
 package shardchain
 
-import "github.com/ethereum/go-ethereum/ethdb"
+import "github.com/harmony-one/harmony/ethdb"
 
 // DBInitializer initializes a newly created chain database.
 type DBInitializer interface {

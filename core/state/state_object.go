@@ -22,9 +22,9 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/rlp"
 
 	"github.com/harmony-one/harmony/staking"
 )

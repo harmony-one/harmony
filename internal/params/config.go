@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/common"
 )
 
 // Well-known chain IDs.

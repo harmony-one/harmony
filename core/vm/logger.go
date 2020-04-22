@@ -23,10 +23,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/hexutil"
+	"github.com/harmony-one/harmony/common/math"
+	types "github.com/harmony-one/harmony/ethcore/types"
 )
 
 // Storage represents a contract's storage.

@@ -22,18 +22,18 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/log"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/rlp"
 	"github.com/harmony-one/harmony/staking"
 	"github.com/harmony-one/harmony/staking/effective"
 	stk "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/trie"
 	"github.com/pkg/errors"
 )
 

@@ -3,9 +3,9 @@ package service
 import (
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/rpc"
 )
 
 // ActionType is the input for Service Manager to operate.

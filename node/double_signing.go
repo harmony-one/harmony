@@ -1,8 +1,8 @@
 package node
 
 import (
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/rlp"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 )

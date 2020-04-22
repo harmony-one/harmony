@@ -21,8 +21,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/core/types"

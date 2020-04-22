@@ -23,9 +23,9 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/accounts/abi"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/crypto"
 )
 
 // makeTopics converts a filter query argument list into a filter topic set.

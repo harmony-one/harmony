@@ -5,8 +5,8 @@ import (
 	"log"
 	"net"
 
-	"github.com/ethereum/go-ethereum/common"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/internal/utils"
 

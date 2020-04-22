@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	ethCommon "github.com/ethereum/go-ethereum/common"
+	ethCommon "github.com/harmony-one/harmony/common"
 )
 
 func TestIsBech32Address(t *testing.T) {

@@ -22,8 +22,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/math"
 )
 
 // JSONLogger ...

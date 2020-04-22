@@ -19,8 +19,8 @@ package types
 import (
 	"math/big"
 
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/crypto"
+	ethtypes "github.com/harmony-one/harmony/ethcore/types"
 )
 
 type bytesBacked interface {

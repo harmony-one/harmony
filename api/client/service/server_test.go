@@ -9,13 +9,13 @@ import (
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/internal/chain"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 	client "github.com/harmony-one/harmony/api/client/service/proto"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/ethdb"
 	"github.com/harmony-one/harmony/internal/params"
 )
 

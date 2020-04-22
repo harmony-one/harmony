@@ -33,11 +33,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto"
+	"github.com/harmony-one/harmony/event"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 

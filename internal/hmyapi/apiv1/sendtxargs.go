@@ -1,8 +1,8 @@
 package apiv1
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/hexutil"
 )
 
 // SendTxArgs represents the arguments to sumbit a new transaction into the transaction pool.

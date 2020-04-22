@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	proto "github.com/harmony-one/harmony/api/client/service/proto"
+	"github.com/harmony-one/harmony/common"
 
 	"google.golang.org/grpc"
 )

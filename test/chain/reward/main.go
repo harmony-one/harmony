@@ -8,12 +8,12 @@ import (
 
 	"github.com/harmony-one/harmony/internal/utils"
 
-	common2 "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	common2 "github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/ethdb"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"

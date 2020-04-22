@@ -4,8 +4,8 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/common/hexutil"
 	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
 )
 

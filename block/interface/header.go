@@ -3,8 +3,8 @@ package blockif
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/harmony-one/harmony/common"
+	types "github.com/harmony-one/harmony/ethcore/types"
 	"github.com/rs/zerolog"
 
 	"github.com/harmony-one/harmony/shard"

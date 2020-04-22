@@ -3,8 +3,8 @@ package engine
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"

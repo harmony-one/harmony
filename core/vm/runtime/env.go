@@ -17,7 +17,7 @@
 package runtime
 
 import (
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/vm"
 )

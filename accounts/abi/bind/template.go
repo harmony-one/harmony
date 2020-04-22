@@ -68,12 +68,12 @@ import (
 	"math/big"
 	"strings"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	ethereum "github.com/harmony-one/harmony"
 	"github.com/harmony-one/harmony/accounts/abi"
 	"github.com/harmony-one/harmony/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/event"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

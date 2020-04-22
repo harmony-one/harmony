@@ -21,8 +21,8 @@ import (
 	"errors"
 	"math/big"
 
-	ethereum "github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
+	ethereum "github.com/harmony-one/harmony"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core/types"
 )
 

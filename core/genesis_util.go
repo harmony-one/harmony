@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/rlp"
 )
 
 // GenesisItem represents one genesis block transaction

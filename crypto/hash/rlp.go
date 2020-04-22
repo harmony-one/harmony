@@ -1,8 +1,8 @@
 package hash
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/rlp"
 	"golang.org/x/crypto/sha3"
 )
 

@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	ethereum "github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/rpc"
+	ethereum "github.com/harmony-one/harmony"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/ethdb"
+	"github.com/harmony-one/harmony/event"
+	"github.com/harmony-one/harmony/rpc"
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"

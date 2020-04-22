@@ -3,13 +3,13 @@ package discovery
 import (
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/rpc"
 )
 
 // Service is the struct for discovery service.

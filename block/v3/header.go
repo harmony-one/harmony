@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/common"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/common"
+	ethtypes "github.com/harmony-one/harmony/ethcore/types"
+	"github.com/harmony-one/harmony/rlp"
 	"github.com/rs/zerolog"
 
 	blockif "github.com/harmony-one/harmony/block/interface"

@@ -4,7 +4,7 @@ import (
 	"path"
 	"runtime"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/log"
 )
 
 // WithCallerSkip logs the caller info in three context items "funcFile",

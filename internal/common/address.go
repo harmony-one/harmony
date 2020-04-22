@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"math/big"
 
-	ethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethCommon "github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/hexutil"
 	"github.com/harmony-one/harmony/internal/bech32"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"

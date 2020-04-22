@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	common "github.com/ethereum/go-ethereum/common"
+	common "github.com/harmony-one/harmony/common"
 	common2 "github.com/harmony-one/harmony/internal/common"
 )
 

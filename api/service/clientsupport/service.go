@@ -3,11 +3,11 @@ package clientsupport
 import (
 	"strconv"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	clientService "github.com/harmony-one/harmony/api/client/service"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/rpc"
 	"google.golang.org/grpc"
 )
 

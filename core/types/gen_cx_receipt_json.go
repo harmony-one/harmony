@@ -5,8 +5,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/common"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 )
 

@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/rpc"
 	badger "github.com/ipfs/go-ds-badger"
 	coredis "github.com/libp2p/go-libp2p-core/discovery"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"

@@ -19,9 +19,9 @@ package rawdb
 import (
 	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/rlp"
 
 	"github.com/harmony-one/harmony/internal/utils"
 )

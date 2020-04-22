@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcutil/bech32"
-	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	ethCommon "github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/internal/common"
 )
 

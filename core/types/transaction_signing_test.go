@@ -20,8 +20,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/crypto"
 )
 
 func TestEIP155Signing(t *testing.T) {

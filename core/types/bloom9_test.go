@@ -20,7 +20,7 @@ import (
 	"math/big"
 	"testing"
 
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/harmony-one/harmony/ethcore/types"
 )
 
 func TestBloom(t *testing.T) {

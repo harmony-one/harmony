@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/taggedrlp"
+	"github.com/harmony-one/harmony/rlp"
+	"github.com/harmony-one/harmony/taggedrlp"
 
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"

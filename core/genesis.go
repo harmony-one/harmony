@@ -25,13 +25,13 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/rlp"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/hexutil"
+	"github.com/harmony-one/harmony/common/math"
+	"github.com/harmony-one/harmony/ethdb"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/rlp"
 	"github.com/harmony-one/harmony/staking/slash"
 
 	"github.com/harmony-one/harmony/core/rawdb"

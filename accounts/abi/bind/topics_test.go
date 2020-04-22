@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/accounts/abi"
+	"github.com/harmony-one/harmony/common"
 )
 
 func TestMakeTopics(t *testing.T) {

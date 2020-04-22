@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/crypto"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 

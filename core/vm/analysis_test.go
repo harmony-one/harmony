@@ -19,7 +19,7 @@ package vm
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/crypto"
 )
 
 func TestJumpDestAnalysis(t *testing.T) {

@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
+	"github.com/harmony-one/harmony/rpc"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/reward"

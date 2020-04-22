@@ -19,10 +19,10 @@ package keystore
 import (
 	"math/big"
 
-	ethereum "github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/crypto"
+	ethereum "github.com/harmony-one/harmony"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original

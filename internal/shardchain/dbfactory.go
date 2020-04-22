@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/ethdb"
 )
 
 // DBFactory is a blockchain database factory.

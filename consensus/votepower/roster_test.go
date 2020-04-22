@@ -7,8 +7,8 @@ import (
 
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )

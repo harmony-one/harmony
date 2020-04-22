@@ -6,15 +6,15 @@ import (
 	"math/big"
 	"reflect"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
 	v2 "github.com/harmony-one/harmony/block/v2"
 	v3 "github.com/harmony-one/harmony/block/v3"
+	ethcommon "github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/taggedrlp"
+	"github.com/harmony-one/harmony/rlp"
+	"github.com/harmony-one/harmony/taggedrlp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )

@@ -4,12 +4,12 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/bloombits"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	bloombits "github.com/harmony-one/harmony/ethcore/bloombits"
+	"github.com/harmony-one/harmony/ethdb"
+	"github.com/harmony-one/harmony/event"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 

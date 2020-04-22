@@ -1,7 +1,7 @@
 package staking
 
 import (
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/crypto"
 )
 
 const (

@@ -21,12 +21,12 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/bloombits"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/common"
+	bloombits "github.com/harmony-one/harmony/ethcore/bloombits"
+	"github.com/harmony-one/harmony/ethdb"
+	ethtypes "github.com/harmony-one/harmony/ethcore/types"
+	"github.com/harmony-one/harmony/event"
+	"github.com/harmony-one/harmony/rpc"
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"

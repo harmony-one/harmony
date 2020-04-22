@@ -1,10 +1,10 @@
 package node
 
 import (
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/rlp"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/verify"
 	"github.com/pkg/errors"

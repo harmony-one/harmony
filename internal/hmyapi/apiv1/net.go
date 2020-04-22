@@ -3,7 +3,7 @@ package apiv1
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/harmony-one/harmony/common/hexutil"
 	"github.com/harmony-one/harmony/p2p"
 )
 

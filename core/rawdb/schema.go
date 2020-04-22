@@ -21,8 +21,8 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/metrics"
 )
 
 // The fields below define the low level database schema prefixing.

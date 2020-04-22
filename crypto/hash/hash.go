@@ -1,7 +1,7 @@
 package hash
 
 import (
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/common"
 	"golang.org/x/crypto/sha3"
 )
 

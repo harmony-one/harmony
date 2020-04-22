@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/common"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	numeric "github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"math/big"
 
-	ethereum "github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
+	ethereum "github.com/harmony-one/harmony"
+	"github.com/harmony-one/harmony/common"
+	"github.com/harmony-one/harmony/common/hexutil"
+	"github.com/harmony-one/harmony/rpc"
 )
 
 // FilterCriteria represents a request to create a new filter.

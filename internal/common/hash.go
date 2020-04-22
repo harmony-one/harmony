@@ -8,7 +8,7 @@ import (
 	"math/rand"
 	"reflect"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/harmony-one/harmony/common/hexutil"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 

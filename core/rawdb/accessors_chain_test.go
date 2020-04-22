@@ -21,12 +21,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
+	"github.com/harmony-one/harmony/common"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/ethdb"
+	"github.com/harmony-one/harmony/rlp"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"golang.org/x/crypto/sha3"
 )

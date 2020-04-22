@@ -19,7 +19,7 @@ package apiv2
 import (
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/common"
 )
 
 // AddrLocker ...
