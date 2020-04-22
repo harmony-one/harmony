@@ -180,7 +180,7 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 	host.logger.Info().
 		Int64("TotalOut", host.GetBandwidthTotals().TotalOut).
 		Float64("RateOut", host.GetBandwidthTotals().RateOut).
-		Msg("Record Sending Metrics!")
+		Msg("[metrics][p2p] traffic out in bytes")
 
 	return err
 }
