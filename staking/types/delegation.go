@@ -113,6 +113,7 @@ func NewDelegation(delegatorAddr common.Address,
 	return Delegation{
 		DelegatorAddress: delegatorAddr,
 		Amount:           amount,
+		Reward:           big.NewInt(0),
 	}
 }
 

@@ -387,7 +387,6 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 	createValidator *staking.CreateValidator, blockNum *big.Int,
 ) error {
-
 	wrapper, err := VerifyAndCreateValidatorFromMsg(
 		st.state, st.evm.EpochNumber, blockNum, createValidator,
 	)
@@ -397,8 +396,8 @@ func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 	if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
 		return err
 	}
-	st.state.SetValidatorFlag(wrapper.Address)
-	st.state.SubBalance(wrapper.Address, createValidator.Amount)
+	st.state.SetValidatorFlag(createValidator.ValidatorAddress)
+	st.state.SubBalance(createValidator.ValidatorAddress, createValidator.Amount)
 	return nil
 }
 

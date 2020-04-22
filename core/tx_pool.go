@@ -17,7 +17,6 @@
 package core
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"math/big"
@@ -763,6 +762,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if shard.Schedule.IsLastBlock(currentBlockNumber.Uint64()) {
 			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
 		}
+
 		_, err = VerifyAndCreateValidatorFromMsg(pool.currentState, pendingEpoch, pendingBlockNumber, stkMsg)
 		return err
 	case staking.DirectiveEditValidator:
@@ -782,6 +782,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			chainContext = nil // might use testing blockchain, set to nil for verifier to handle.
 		}
 		pendingBlockNumber := new(big.Int).Add(pool.chain.CurrentBlock().Number(), big.NewInt(1))
+
 		_, err = VerifyAndEditValidatorFromMsg(
 			pool.currentState, chainContext,
 			pool.chain.CurrentBlock().Epoch(),
@@ -800,6 +801,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.DelegatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
+
 		_, _, err = VerifyAndDelegateFromMsg(pool.currentState, stkMsg)
 		return err
 	case staking.DirectiveUndelegate:
@@ -818,6 +820,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if shard.Schedule.IsLastBlock(pool.chain.CurrentBlock().Number().Uint64()) {
 			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
 		}
+
 		_, err = VerifyAndUndelegateFromMsg(pool.currentState, pendingEpoch, stkMsg)
 		return err
 	case staking.DirectiveCollectRewards:
@@ -840,6 +843,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if err != nil {
 			return err
 		}
+
 		_, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations)
 		return err
 	default:
@@ -943,14 +947,6 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		Interface("to", tx.To()).
 		Msg("Pooled new future transaction")
 	return replace, nil
-}
-
-// Add adds a transaction to the pool if valid and passes it to the tx relay
-// backend
-func (pool *TxPool) Add(ctx context.Context, tx *types.PoolTransaction) error {
-	// TODO(ricl): placeholder
-	// TODO(minhdoan): follow with richard why we need this. As of now TxPool is not used now.
-	return nil
 }
 
 // enqueueTx inserts a new transaction into the non-executable transaction queue.
