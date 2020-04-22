@@ -24,7 +24,6 @@ import (
 	"github.com/harmony-one/harmony/staking/network"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
@@ -91,6 +90,7 @@ type Message interface {
 	Data() []byte
 	Type() types.TransactionType
 	BlockNum() *big.Int
+	Msg() staking.TxMessage
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
@@ -149,13 +149,8 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) ([]byte, uint64, bool, error) {
-	return NewStateTransition(evm, msg, gp, nil).TransitionDb()
-}
-
-// ApplyStakingMessage computes the new state for staking message
-func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) (uint64, error) {
-	return NewStateTransition(evm, msg, gp, bc).StakingTransitionDb()
+func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) ([]byte, uint64, bool, error) {
+	return NewStateTransition(evm, msg, gp, bc).TransitionDb()
 }
 
 // to returns the recipient of the message.
@@ -217,10 +212,10 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
-	contractCreation := msg.To() == nil
+	contractCreation := msg.Type() == types.Contract
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, contractCreation, homestead, false)
+	gas, err := IntrinsicGas(st.data, contractCreation, homestead, msg.Type() == types.CreateValidator)
 	if err != nil {
 		return nil, 0, false, err
 	}
@@ -235,13 +230,66 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		// error.
 		vmerr error
 	)
-	if contractCreation {
-		ret, _, st.gas, vmerr = evm.Create(sender, st.data, st.gas, st.value)
-	} else {
-		// Increment the nonce for the next transaction
+
+	// Increment the nonce for the next transaction
+	if !contractCreation {
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gas, vmerr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
+	switch msg.Type() {
+	case types.SameShardTx, types.SubtractionOnly:
+		ret, st.gas, vmerr = evm.Call(sender, st.to(), msg.Data(), st.gas, msg.Value())
+	case types.Contract:
+		ret, _, st.gas, vmerr = evm.Create(sender, msg.Data(), st.gas, msg.Value())
+	case types.CreateValidator:
+		stkMsg := msg.Msg().(*staking.CreateValidator)
+		utils.Logger().Info().
+			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		if msg.From() != stkMsg.ValidatorAddress {
+			return nil, 0, false, errInvalidSigner
+		}
+		err = st.verifyAndApplyCreateValidatorTx(stkMsg, msg.BlockNum())
+	case types.EditValidator:
+		stkMsg := msg.Msg().(*staking.EditValidator)
+		utils.Logger().Info().
+			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		if msg.From() != stkMsg.ValidatorAddress {
+			return nil, 0, false, errInvalidSigner
+		}
+		err = st.verifyAndApplyEditValidatorTx(stkMsg, msg.BlockNum())
+	case types.Delegate:
+		stkMsg := msg.Msg().(*staking.Delegate)
+		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		if msg.From() != stkMsg.DelegatorAddress {
+			return nil, 0, false, errInvalidSigner
+		}
+		err = st.verifyAndApplyDelegateTx(stkMsg)
+	case types.Undelegate:
+		stkMsg := msg.Msg().(*staking.Undelegate)
+		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		if msg.From() != stkMsg.DelegatorAddress {
+			return nil, 0, false, errInvalidSigner
+		}
+		err = st.verifyAndApplyUndelegateTx(stkMsg)
+	case types.CollectRewards:
+		stkMsg := msg.Msg().(*staking.CollectRewards)
+		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
+		if msg.From() != stkMsg.DelegatorAddress {
+			return nil, 0, false, errInvalidSigner
+		}
+		collectedRewards, tempErr := st.verifyAndApplyCollectRewards(stkMsg)
+		err = tempErr
+		if err == nil {
+			st.state.AddLog(&types.Log{
+				Address:     stkMsg.DelegatorAddress,
+				Topics:      []common.Hash{staking2.CollectRewardsTopic},
+				Data:        collectedRewards.Bytes(),
+				BlockNumber: st.evm.BlockNumber.Uint64(),
+			})
+		}
+	default:
+		return nil, 0, false, types.ErrInvalidMsgKind
+	}
+
 	if vmerr != nil {
 		utils.Logger().Debug().Err(vmerr).Msg("VM returned with error")
 		// The only possible consensus-error would be if there wasn't
@@ -254,6 +302,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	}
 	st.refundGas()
 
+	// TODO(gu): needed?
 	// Burn Txn Fees after staking epoch
 	if !st.evm.ChainConfig().IsStaking(st.evm.EpochNumber) {
 		txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
@@ -283,105 +332,6 @@ func (st *StateTransition) refundGas() {
 // gasUsed returns the amount of gas used up by the state transition.
 func (st *StateTransition) gasUsed() uint64 {
 	return st.initialGas - st.gas
-}
-
-// StakingTransitionDb will transition the state by applying the staking message and
-// returning the result including the used gas. It returns an error if failed.
-// It is used for staking transaction only
-func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
-	if err = st.preCheck(); err != nil {
-		return 0, err
-	}
-	msg := st.msg
-
-	sender := vm.AccountRef(msg.From())
-	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
-
-	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, false, homestead, msg.Type() == types.StakeCreateVal)
-
-	if err != nil {
-		return 0, err
-	}
-	if err = st.useGas(gas); err != nil {
-		return 0, err
-	}
-
-	// Increment the nonce for the next transaction
-	st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-
-	switch msg.Type() {
-	case types.StakeCreateVal:
-		stkMsg := &staking.CreateValidator{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().
-			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.ValidatorAddress {
-			return 0, errInvalidSigner
-		}
-		err = st.verifyAndApplyCreateValidatorTx(stkMsg, msg.BlockNum())
-	case types.StakeEditVal:
-		stkMsg := &staking.EditValidator{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().
-			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.ValidatorAddress {
-			return 0, errInvalidSigner
-		}
-		err = st.verifyAndApplyEditValidatorTx(stkMsg, msg.BlockNum())
-	case types.Delegate:
-		stkMsg := &staking.Delegate{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
-		}
-		err = st.verifyAndApplyDelegateTx(stkMsg)
-	case types.Undelegate:
-		stkMsg := &staking.Undelegate{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
-		}
-		err = st.verifyAndApplyUndelegateTx(stkMsg)
-	case types.CollectRewards:
-		stkMsg := &staking.CollectRewards{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
-		}
-		collectedRewards, tempErr := st.verifyAndApplyCollectRewards(stkMsg)
-		err = tempErr
-		if err == nil {
-			st.state.AddLog(&types.Log{
-				Address:     stkMsg.DelegatorAddress,
-				Topics:      []common.Hash{staking2.CollectRewardsTopic},
-				Data:        collectedRewards.Bytes(),
-				BlockNumber: st.evm.BlockNumber.Uint64(),
-			})
-		}
-	default:
-		return 0, staking.ErrInvalidStakingKind
-	}
-	st.refundGas()
-
-	// Burn Txn Fees
-	//txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
-	//st.state.AddBalance(st.evm.Coinbase, txFee)
-
-	return st.gasUsed(), err
 }
 
 func (st *StateTransition) verifyAndApplyCreateValidatorTx(

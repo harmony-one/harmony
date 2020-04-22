@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // Constants of proposing a new block
@@ -56,7 +55,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 							Uint64("epoch", newBlock.Epoch().Uint64()).
 							Uint64("viewID", newBlock.Header().ViewID().Uint64()).
 							Int("numTxs", newBlock.Transactions().Len()).
-							Int("numStakingTxs", newBlock.StakingTransactions().Len()).
 							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 							Msg("=========Successfully Proposed New Block==========")
 
@@ -120,22 +118,16 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 	pendingPlainTxs := map[common.Address]types.Transactions{}
-	pendingStakingTxs := staking.StakingTransactions{}
 	for addr, poolTxs := range pendingPoolTxs {
 		plainTxsPerAcc := types.Transactions{}
 		for _, tx := range poolTxs {
-			if plainTx, ok := tx.(*types.Transaction); ok {
-				plainTxsPerAcc = append(plainTxsPerAcc, plainTx)
-			} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
-				// Only process staking transactions after pre-staking epoch happened.
-				if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
-					pendingStakingTxs = append(pendingStakingTxs, stakingTx)
+			if tx.IsStaking() {
+				// skip staking txs before prestaking epoch
+				if !node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
+					continue
 				}
-			} else {
-				utils.Logger().Err(types.ErrUnknownPoolTxType).
-					Msg("Failed to parse pending transactions")
-				return nil, types.ErrUnknownPoolTxType
 			}
+			plainTxsPerAcc = append(plainTxsPerAcc, tx)
 		}
 		if plainTxsPerAcc.Len() > 0 {
 			pendingPlainTxs[addr] = plainTxsPerAcc
@@ -146,7 +138,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Try commit normal and staking transactions based on the current state
 	// The successfully committed transactions will be put in the proposed block
 	if err := node.Worker.CommitTransactions(
-		pendingPlainTxs, pendingStakingTxs, beneficiary,
+		pendingPlainTxs, beneficiary,
 	); err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 		return nil, err

@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
@@ -156,7 +155,7 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionsHistory(ctx context.Con
 // GetBlockStakingTransactionCountByNumber returns the number of staking transactions in the block with the given block number.
 func (s *PublicTransactionPoolAPI) GetBlockStakingTransactionCountByNumber(ctx context.Context, blockNr uint64) int {
 	if block, _ := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
-		return len(block.StakingTransactions())
+		return len(block.Transactions()) // TODO filter staking
 	}
 	return 0
 }
@@ -164,7 +163,7 @@ func (s *PublicTransactionPoolAPI) GetBlockStakingTransactionCountByNumber(ctx c
 // GetBlockStakingTransactionCountByHash returns the number of staking transactions in the block with the given hash.
 func (s *PublicTransactionPoolAPI) GetBlockStakingTransactionCountByHash(ctx context.Context, blockHash common.Hash) int {
 	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
-		return len(block.StakingTransactions())
+		return len(block.Transactions()) // TODO filter staking
 	}
 	return 0
 }
@@ -188,7 +187,7 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockHashAndIndex(ctx 
 // GetStakingTransactionByHash returns the staking transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Context, hash common.Hash) *RPCStakingTransaction {
 	// Try to return an already finalized transaction
-	stx, blockHash, blockNumber, index := rawdb.ReadStakingTransaction(s.b.ChainDb(), hash)
+	stx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash)
 	block, _ := s.b.GetBlock(ctx, blockHash)
 	if block == nil {
 		return nil
@@ -231,21 +230,7 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionsCount(ctx context.Conte
 func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	ctx context.Context, encodedTx hexutil.Bytes,
 ) (common.Hash, error) {
-	if len(encodedTx) >= types.MaxEncodedPoolTransactionSize {
-		err := errors.Wrapf(core.ErrOversizedData, "encoded tx size: %d", len(encodedTx))
-		return common.Hash{}, err
-	}
-	tx := new(staking.StakingTransaction)
-	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
-		return common.Hash{}, err
-	}
-	c := s.b.ChainConfig().ChainID
-	if id := tx.ChainID(); id.Cmp(c) != 0 {
-		return common.Hash{}, errors.Wrapf(
-			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
-		)
-	}
-	return SubmitStakingTransaction(ctx, s.b, tx)
+	return s.SendRawTransaction(ctx, encodedTx)
 }
 
 // SendRawTransaction will add the signed transaction to the transaction pool.
@@ -270,7 +255,11 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 
 func (s *PublicTransactionPoolAPI) fillTransactionFields(tx *types.Transaction, fields map[string]interface{}) error {
 	var err error
-	fields["shardID"] = tx.ShardID()
+	shardID, err := tx.ShardID()
+	if err != nil {
+		return err
+	}
+	fields["shardID"] = shardID
 	var signer types.Signer = types.FrontierSigner{}
 	if tx.Protected() {
 		signer = types.NewEIP155Signer(tx.ChainID())
@@ -278,8 +267,12 @@ func (s *PublicTransactionPoolAPI) fillTransactionFields(tx *types.Transaction, 
 	from, _ := types.Sender(signer, tx)
 	fields["from"] = from
 	fields["to"] = ""
-	if tx.To() != nil {
-		fields["to"], err = internal_common.AddressToBech32(*tx.To())
+	to, err := tx.To()
+	if err != nil {
+		return err
+	}
+	if to != nil {
+		fields["to"], err = internal_common.AddressToBech32(*to)
 		if err != nil {
 			return err
 		}
@@ -288,34 +281,18 @@ func (s *PublicTransactionPoolAPI) fillTransactionFields(tx *types.Transaction, 
 			return err
 		}
 	}
-	return nil
-}
-
-func (s *PublicTransactionPoolAPI) fillStakingTransactionFields(stx *staking.StakingTransaction, fields map[string]interface{}) error {
-	from, err := stx.SenderAddress()
-	if err != nil {
-		return err
-	}
-	fields["sender"], err = internal_common.AddressToBech32(from)
-	if err != nil {
-		return err
-	}
-	fields["type"] = stx.StakingType()
+	fields["type"] = tx.Type()
 	return nil
 }
 
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
 func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
 	var tx *types.Transaction
-	var stx *staking.StakingTransaction
 	var blockHash common.Hash
 	var blockNumber, index uint64
 	tx, blockHash, blockNumber, index = rawdb.ReadTransaction(s.b.ChainDb(), hash)
 	if tx == nil {
-		stx, blockHash, blockNumber, index = rawdb.ReadStakingTransaction(s.b.ChainDb(), hash)
-		if stx == nil {
-			return nil, nil
-		}
+		return nil, nil
 	}
 	receipts, err := s.b.GetReceipts(ctx, blockHash)
 	if err != nil {
@@ -338,10 +315,6 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	}
 	if tx != nil {
 		if err = s.fillTransactionFields(tx, fields); err != nil {
-			return nil, err
-		}
-	} else { // stx not nil
-		if err = s.fillStakingTransactionFields(stx, fields); err != nil {
 			return nil, err
 		}
 	}
@@ -377,13 +350,7 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 		}
 		from, _ := types.PoolTransactionSender(signer, tx)
 		if _, exists := managedAccounts[from]; exists {
-			if plainTx, ok := tx.(*types.Transaction); ok {
-				transactions = append(transactions, newRPCPendingTransaction(plainTx))
-			} else if _, ok := tx.(*staking.StakingTransaction); ok {
-				continue // Do not return staking transactions here
-			} else {
-				return nil, types.ErrUnknownPoolTxType
-			}
+			transactions = append(transactions, newRPCPendingTransaction(tx))
 		}
 	}
 	return transactions, nil
@@ -405,13 +372,7 @@ func (s *PublicTransactionPoolAPI) PendingStakingTransactions() ([]*RPCStakingTr
 		}
 		from, _ := types.PoolTransactionSender(signer, tx)
 		if _, exists := managedAccounts[from]; exists {
-			if _, ok := tx.(*types.Transaction); ok {
-				continue // Do not return plain transactions here
-			} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
-				transactions = append(transactions, newRPCPendingStakingTransaction(stakingTx))
-			} else {
-				return nil, types.ErrUnknownPoolTxType
-			}
+			transactions = append(transactions, newRPCPendingStakingTransaction(tx))
 		}
 	}
 	return transactions, nil
@@ -423,7 +384,7 @@ func (s *PublicTransactionPoolAPI) GetCurrentTransactionErrorSink() []types.RPCT
 }
 
 // GetCurrentStakingErrorSink ..
-func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
+func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() []types.RPCTransactionError {
 	return s.b.GetCurrentStakingErrorSink()
 }
 

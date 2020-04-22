@@ -888,8 +888,8 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) error {
 	signer := types.MakeSigner(config, block.Epoch())
 
-	transactions, stakingTransactions, logIndex := block.Transactions(), block.StakingTransactions(), uint(0)
-	if len(transactions)+len(stakingTransactions) != len(receipts) {
+	transactions, logIndex := block.Transactions(), uint(0)
+	if len(transactions) != len(receipts) {
 		return errors.New("transaction+stakingTransactions and receipt count mismatch")
 	}
 
@@ -902,7 +902,7 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 		receipts[j].TxHash = transactions[j].Hash()
 		receipts[j].GasUsed = receipts[j].CumulativeGasUsed - receipts[j-1].CumulativeGasUsed
 		// The contract address can be derived from the transaction itself
-		if transactions[j].To() == nil {
+		if transactions[j].Type() == types.Contract {
 			// Deriving the signer is expensive, only do if it's actually needed
 			from, _ := types.Sender(signer, transactions[j])
 			receipts[j].ContractAddress = crypto.CreateAddress(from, transactions[j].Nonce())
@@ -919,23 +919,8 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 	}
 
 	// The used gas can be calculated based on previous receipts
-	if len(receipts) > len(transactions) && len(stakingTransactions) > 0 {
+	if len(receipts) > len(transactions) {
 		receipts[len(transactions)].GasUsed = receipts[len(transactions)].CumulativeGasUsed
-	}
-	// in a block, txns are processed before staking txns
-	for j := len(transactions) + 1; j < len(transactions)+len(stakingTransactions); j++ {
-		// The transaction hash can be retrieved from the staking transaction itself
-		receipts[j].TxHash = stakingTransactions[j].Hash()
-		receipts[j].GasUsed = receipts[j].CumulativeGasUsed - receipts[j-1].CumulativeGasUsed
-		// The derived log fields can simply be set from the block and transaction
-		for k := 0; k < len(receipts[j].Logs); k++ {
-			receipts[j].Logs[k].BlockNumber = block.NumberU64()
-			receipts[j].Logs[k].BlockHash = block.Hash()
-			receipts[j].Logs[k].TxHash = receipts[j].TxHash
-			receipts[j].Logs[k].TxIndex = uint(j) + uint(len(transactions))
-			receipts[j].Logs[k].Index = logIndex
-			logIndex++
-		}
 	}
 	return nil
 }
@@ -1355,7 +1340,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 			Str("hash", block.Hash().Hex()).
 			Int("uncles", len(block.Uncles())).
 			Int("txs", len(block.Transactions())).
-			Int("stakingTxs", len(block.StakingTransactions())).
 			Uint64("gas", block.GasUsed()).
 			Str("elapsed", common.PrettyDuration(time.Since(bstart)).String()).
 			Logger()
@@ -1532,7 +1516,6 @@ Chain config: %v
 Number: %v
 Epoch: %v
 NumTxn: %v
-NumStkTxn: %v
 Hash: 0x%x
 %v
 
@@ -1542,14 +1525,17 @@ Error: %v
 		block.Number(),
 		block.Epoch(),
 		len(block.Transactions()),
-		len(block.StakingTransactions()),
 		block.Hash(),
 		receiptString,
 		err,
 	)
-	for i, tx := range block.StakingTransactions() {
-		utils.Logger().Error().
-			Msgf("StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage())
+	for i, tx := range block.Transactions() {
+		if tx.IsStaking() {
+			if msg, err := tx.Message(); err == nil {
+				utils.Logger().Error().
+					Msgf("StakingTxn %d: %s, %v", i, tx.Type().String(), msg)
+			}
+		}
 	}
 }
 
@@ -2527,18 +2513,13 @@ func (bc *BlockChain) prepareStakingMetaData(
 ) {
 	newDelegations = map[common.Address]staking.DelegationIndexes{}
 	blockNum := block.Number()
-	for _, txn := range block.StakingTransactions() {
-		payload, err := txn.RLPEncodeStakeMsg()
+	for _, txn := range block.Transactions() {
+		decodePayload, err := txn.Message()
 		if err != nil {
 			return nil, nil, err
 		}
-		decodePayload, err := staking.RLPDecodeStakeMsg(payload, txn.StakingType())
-		if err != nil {
-			return nil, nil, err
-		}
-
-		switch txn.StakingType() {
-		case staking.DirectiveCreateValidator:
+		switch txn.Type() {
+		case types.CreateValidator:
 			createValidator := decodePayload.(*staking.CreateValidator)
 			newList, appended := utils.AppendIfMissing(
 				newValidators, createValidator.ValidatorAddress,
@@ -2561,8 +2542,8 @@ func (bc *BlockChain) prepareStakingMetaData(
 				delegations = staking.DelegationIndexes{selfIndex}
 			}
 			newDelegations[createValidator.ValidatorAddress] = delegations
-		case staking.DirectiveEditValidator:
-		case staking.DirectiveDelegate:
+		case types.EditValidator:
+		case types.Delegate:
 			delegate := decodePayload.(*staking.Delegate)
 
 			delegations, ok := newDelegations[delegate.DelegatorAddress]
@@ -2579,8 +2560,8 @@ func (bc *BlockChain) prepareStakingMetaData(
 				return nil, nil, err
 			}
 			newDelegations[delegate.DelegatorAddress] = delegations
-		case staking.DirectiveUndelegate:
-		case staking.DirectiveCollectRewards:
+		case types.Undelegate:
+		case types.CollectRewards:
 		default:
 		}
 	}

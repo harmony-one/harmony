@@ -21,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
 )
@@ -244,7 +243,7 @@ func (e *engineImpl) Finalize(
 	chain engine.ChainReader, header *block.Header,
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
-	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
+	incxs []*types.CXReceiptsProof,
 	doubleSigners slash.Records,
 ) (*types.Block, reward.Reader, error) {
 
@@ -302,7 +301,7 @@ func (e *engineImpl) Finalize(
 
 	// Finalize the state root
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
-	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
+	return types.NewBlock(header, txs, receipts, outcxs, incxs), payout, nil
 }
 
 // Withdraw unlocked tokens to the delegators' accounts

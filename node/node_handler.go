@@ -21,7 +21,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
@@ -98,7 +97,7 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			node.transactionMessageHandler(msgPayload)
 		case proto_node.Staking:
 			utils.Logger().Debug().Msg("NET: received message: Node/Staking")
-			node.stakingMessageHandler(msgPayload)
+			node.transactionMessageHandler(msgPayload)
 		case proto_node.Block:
 			utils.Logger().Debug().Msg("NET: received message: Node/Block")
 			if len(msgPayload) < 1 {
@@ -172,31 +171,6 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			return
 		}
 		node.addPendingTransactions(txs)
-	}
-}
-
-func (node *Node) stakingMessageHandler(msgPayload []byte) {
-	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
-		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
-		return
-	}
-	if len(msgPayload) < 1 {
-		utils.Logger().Debug().Msgf("Invalid staking transaction message size")
-		return
-	}
-	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
-
-	switch txMessageType {
-	case proto_node.Send:
-		txs := staking.StakingTransactions{}
-		err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send messge type
-		if err != nil {
-			utils.Logger().Error().
-				Err(err).
-				Msg("Failed to deserialize staking transaction list")
-			return
-		}
-		node.addPendingStakingTransactions(txs)
 	}
 }
 
@@ -335,7 +309,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
 			Int("numTx", len(newBlock.Transactions())).
-			Int("numStakingTx", len(newBlock.StakingTransactions())).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
 		return errors.Errorf(
@@ -429,7 +402,6 @@ func (node *Node) PostConsensusProcessing(
 				Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
 				Str("blockHash", newBlock.Hash().String()).
 				Int("numTxns", len(newBlock.Transactions())).
-				Int("numStakingTxns", len(newBlock.StakingTransactions())).
 				Uint32("numSignatures", node.numSignaturesIncludedInBlock(newBlock)).
 				Msg("BINGO !!! Reached Consensus")
 			// 1% of the validator also need to do broadcasting

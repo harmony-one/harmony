@@ -54,7 +54,7 @@ func (b *APIBackend) GetBlock(ctx context.Context, hash common.Hash) (*types.Blo
 }
 
 // GetPoolTransaction ...
-func (b *APIBackend) GetPoolTransaction(hash common.Hash) types.PoolTransaction {
+func (b *APIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
 	return b.hmy.txPool.Get(hash)
 }
 
@@ -214,12 +214,12 @@ func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscripti
 
 // GetPoolTransactions returns pool transactions.
 // TODO: this is not implemented or verified yet for harmony.
-func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
+func (b *APIBackend) GetPoolTransactions() (types.Transactions, error) {
 	pending, err := b.hmy.txPool.Pending()
 	if err != nil {
 		return nil, err
 	}
-	var txs types.PoolTransactions
+	var txs types.Transactions
 	for _, batch := range pending {
 		txs = append(txs, batch...)
 	}
@@ -327,11 +327,19 @@ func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bo
 	}
 	tx := txs[int(index)]
 
-	// check whether it is a valid cross shard tx
-	if tx.ShardID() == tx.ToShardID() || blk.Header().ShardID() != tx.ShardID() {
+	shardID, err := tx.ShardID()
+	if err != nil {
 		return 0, false
 	}
-	entry := core.CxEntry{blockHash, tx.ToShardID()}
+	toShardID, err := tx.ToShardID()
+	if err != nil {
+		return 0, false
+	}
+	// check whether it is a valid cross shard tx
+	if shardID == toShardID || blk.Header().ShardID() != shardID {
+		return 0, false
+	}
+	entry := core.CxEntry{blockHash, toShardID}
 	success := b.hmy.CxPool().Add(entry)
 	return blockNum, success
 }
@@ -339,14 +347,6 @@ func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bo
 // IsLeader exposes if node is currently leader
 func (b *APIBackend) IsLeader() bool {
 	return b.hmy.nodeAPI.IsCurrentlyLeader()
-}
-
-// SendStakingTx adds a staking transaction
-func (b *APIBackend) SendStakingTx(
-	ctx context.Context,
-	newStakingTx *staking.StakingTransaction) error {
-	b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
-	return nil
 }
 
 // GetElectedValidatorAddresses returns the address of elected validators for current epoch
@@ -542,7 +542,7 @@ func (b *APIBackend) GetShardState() (*shard.State, error) {
 }
 
 // GetCurrentStakingErrorSink ..
-func (b *APIBackend) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
+func (b *APIBackend) GetCurrentStakingErrorSink() []types.RPCTransactionError {
 	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
 }
 

@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -56,13 +55,13 @@ func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
 }
 
 // ErroredStakingTransactionSink is the inmemory failed staking transactions this node has
-func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError {
+func (node *Node) ErroredStakingTransactionSink() []types.RPCTransactionError {
 	node.errorSink.Lock()
 	defer node.errorSink.Unlock()
-	result := []staking.RPCTransactionError{}
+	result := []types.RPCTransactionError{}
 	node.errorSink.failedStakingTxns.Do(func(d interface{}) {
 		if d != nil {
-			result = append(result, d.(staking.RPCTransactionError))
+			result = append(result, d.(types.RPCTransactionError))
 		}
 	})
 	return result

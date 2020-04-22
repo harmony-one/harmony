@@ -178,7 +178,6 @@ func (consensus *Consensus) finalizeCommits() {
 		Str("blockHash", block.Hash().String()).
 		Int("index", consensus.Decider.IndexOf(consensus.LeaderPubKey)).
 		Int("numTxns", len(block.Transactions())).
-		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
 	if n := time.Now(); n.Before(consensus.NextBlockDue) {
@@ -486,7 +485,6 @@ func (consensus *Consensus) Start(
 
 				consensus.getLogger().Debug().
 					Int("numTxs", len(newBlock.Transactions())).
-					Int("numStakingTxs", len(newBlock.StakingTransactions())).
 					Time("startTime", startTime).
 					Int64("publicKeys", consensus.Decider.ParticipantsCount()).
 					Msg("[ConsensusMainLoop] STARTING CONSENSUS")

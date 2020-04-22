@@ -2,7 +2,6 @@ package worker
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 	"sort"
 	"time"
@@ -21,22 +20,20 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
-	signer     types.Signer
-	state      *state.DB     // apply state changes here
-	gasPool    *core.GasPool // available gas used to pack transactions
-	header     *block.Header
-	txs        []*types.Transaction
-	stakingTxs []*staking.StakingTransaction
-	receipts   []*types.Receipt
-	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
-	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
-	slashes    slash.Records
+	signer   types.Signer
+	state    *state.DB     // apply state changes here
+	gasPool  *core.GasPool // available gas used to pack transactions
+	header   *block.Header
+	txs      []*types.Transaction
+	receipts []*types.Receipt
+	outcxs   []*types.CXReceipt       // cross shard transaction receipts (source shard)
+	incxs    []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
+	slashes  slash.Records
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -53,8 +50,7 @@ type Worker struct {
 
 // CommitTransactions commits transactions for new block.
 func (w *Worker) CommitTransactions(
-	pendingNormal map[common.Address]types.Transactions,
-	pendingStaking staking.StakingTransactions, coinbase common.Address,
+	pendingNormal map[common.Address]types.Transactions, coinbase common.Address,
 ) error {
 
 	if w.current.gasPool == nil {
@@ -74,6 +70,9 @@ func (w *Worker) CommitTransactions(
 		if tx == nil {
 			break
 		}
+		if tx.IsStaking() && w.chain.ShardID() != shard.BeaconChainShardID {
+			continue
+		}
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
 		// We use the eip155 signer regardless of the current hf.
@@ -88,12 +87,18 @@ func (w *Worker) CommitTransactions(
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
 
-		if tx.ShardID() != w.chain.ShardID() {
+		shardID, err := tx.ShardID()
+		if err != nil {
+			// TODO(gu): confirm ok to ignore the transaction and proceed?
+			txs.Pop()
+			continue
+		}
+		if shardID != w.chain.ShardID() {
 			txs.Shift()
 			continue
 		}
 
-		_, err := w.commitTransaction(tx, coinbase)
+		_, err = w.commitTransaction(tx, coinbase)
 
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
@@ -124,72 +129,12 @@ func (w *Worker) CommitTransactions(
 		}
 	}
 
-	// STAKING - only beaconchain process staking transaction
-	if w.chain.ShardID() == shard.BeaconChainShardID {
-		for _, tx := range pendingStaking {
-			// TODO: merge staking transaction processing with normal transaction processing.
-			// <<THESE CODE ARE DUPLICATED AS ABOVE
-			// If we don't have enough gas for any further transactions then we're done
-			if w.current.gasPool.Gas() < params.TxGas {
-				utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("Not enough gas for further transactions")
-				break
-			}
-			// Check whether the tx is replay protected. If we're not in the EIP155 hf
-			// phase, start ignoring the sender until we do.
-			if tx.Protected() && !w.config.IsEIP155(w.current.header.Number()) {
-				utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
-				txs.Pop()
-				continue
-			}
-
-			// Start executing the transaction
-			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
-			// THESE CODE ARE DUPLICATED AS ABOVE>>
-			// TODO(audit): add staking txn revert functionality
-			if _, err := w.commitStakingTransaction(tx, coinbase); err != nil {
-				txID := tx.Hash().Hex()
-				utils.Logger().Error().Err(err).
-					Str("stakingTxID", txID).
-					Interface("stakingTx", tx).
-					Msg("Failed committing staking transaction")
-			} else {
-				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).
-					Uint64("txGasLimit", tx.Gas()).
-					Msg("Successfully committed staking transaction")
-			}
-		}
-	}
-
 	utils.Logger().Info().
 		Int("newTxns", len(w.current.txs)).
-		Int("newStakingTxns", len(w.current.stakingTxs)).
 		Uint64("blockGasLimit", w.current.header.GasLimit()).
 		Uint64("blockGasUsed", w.current.header.GasUsed()).
 		Msg("Block gas limit and usage info")
 	return nil
-}
-
-func (w *Worker) commitStakingTransaction(
-	tx *staking.StakingTransaction, coinbase common.Address,
-) ([]*types.Log, error) {
-	snap := w.current.state.Snapshot()
-	gasUsed := w.current.header.GasUsed()
-	receipt, _, err := core.ApplyStakingTransaction(
-		w.config, w.chain, &coinbase, w.current.gasPool,
-		w.current.state, w.current.header, tx, &gasUsed, vm.Config{},
-	)
-	w.current.header.SetGasUsed(gasUsed)
-	if err != nil {
-		w.current.state.RevertToSnapshot(snap)
-		return nil, err
-	}
-	if receipt == nil {
-		return nil, fmt.Errorf("nil staking receipt")
-	}
-
-	w.current.stakingTxs = append(w.current.stakingTxs, tx)
-	w.current.receipts = append(w.current.receipts, receipt)
-	return receipt.Logs, nil
 }
 
 var (
@@ -465,8 +410,7 @@ func (w *Worker) FinalizeNewBlock(
 	copyHeader := types.CopyHeader(w.current.header)
 	block, _, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
-		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
-		w.current.slashes,
+		w.current.outcxs, w.current.incxs, w.current.slashes,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot finalize block")

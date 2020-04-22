@@ -161,11 +161,8 @@ func (s EIP155Signer) Hash(tx *Transaction) common.Hash {
 		tx.data.AccountNonce,
 		tx.data.Price,
 		tx.data.GasLimit,
-		tx.data.ShardID,
-		tx.data.ToShardID,
-		tx.data.Recipient,
-		tx.data.Amount,
-		tx.data.Payload,
+		tx.data.TxType,
+		tx.data.Message,
 		s.chainID, uint(0), uint(0),
 	})
 }
@@ -219,11 +216,8 @@ func (fs FrontierSigner) Hash(tx *Transaction) common.Hash {
 		tx.data.AccountNonce,
 		tx.data.Price,
 		tx.data.GasLimit,
-		tx.data.ShardID,
-		tx.data.ToShardID,
-		tx.data.Recipient,
-		tx.data.Amount,
-		tx.data.Payload,
+		tx.data.TxType,
+		tx.data.Message,
 	})
 }
 

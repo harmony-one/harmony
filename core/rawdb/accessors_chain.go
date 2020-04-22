@@ -211,7 +211,7 @@ func ReadBody(db DatabaseReader, hash common.Hash, number uint64) *types.Body {
 	body := new(types.Body)
 	if err := rlp.Decode(bytes.NewReader(data), body); err != nil {
 		utils.Logger().Error().Err(err).Str("hash", hash.Hex()).Msg("Invalid block body RLP")
-		return nil
+		return new(types.Body)
 	}
 	return body
 }
@@ -323,7 +323,7 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 	if body == nil {
 		return nil
 	}
-	return types.NewBlockWithHeader(header).WithBody(body.Transactions(), body.StakingTransactions(), body.Uncles(), body.IncomingReceipts())
+	return types.NewBlockWithHeader(header).WithBody(body.Transactions(), body.Uncles(), body.IncomingReceipts())
 }
 
 // WriteBlock serializes a block into the database, header and body separately.

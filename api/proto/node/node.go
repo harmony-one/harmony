@@ -14,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/staking/slash"
-	staking "github.com/harmony-one/harmony/staking/types"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -147,20 +146,6 @@ func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
 func ConstructTransactionListMessageAccount(transactions types.Transactions) []byte {
 	byteBuffer := bytes.NewBuffer(transactionListH)
-	txs, err := rlp.EncodeToBytes(transactions)
-	if err != nil {
-		log.Fatal(err)
-		return []byte{} // TODO(RJ): better handle of the error
-	}
-	byteBuffer.Write(txs)
-	return byteBuffer.Bytes()
-}
-
-// ConstructStakingTransactionListMessageAccount constructs serialized staking transactions in account model
-func ConstructStakingTransactionListMessageAccount(
-	transactions staking.StakingTransactions,
-) []byte {
-	byteBuffer := bytes.NewBuffer(stakingTxnListH)
 	txs, err := rlp.EncodeToBytes(transactions)
 	if err != nil {
 		log.Fatal(err)

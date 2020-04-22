@@ -14,7 +14,7 @@ func TestIsEpochBlock(t *testing.T) {
 	blockNumbered := func(n int64) *types.Block {
 		return types.NewBlock(
 			blockfactory.NewTestHeader().With().Number(big.NewInt(n)).Header(),
-			nil, nil, nil, nil, nil,
+			nil, nil, nil, nil,
 		)
 	}
 	tests := []struct {

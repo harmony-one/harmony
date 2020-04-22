@@ -122,7 +122,7 @@ type Engine interface {
 		chain ChainReader, header *block.Header,
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
-		incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
+		incxs []*types.CXReceiptsProof,
 		doubleSigners slash.Records,
 	) (*types.Block, reward.Reader, error)
 

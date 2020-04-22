@@ -165,15 +165,31 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	from, _ := types.Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
 
+	shardID, err := tx.ShardID()
+	if err != nil {
+		return nil
+	}
+	toShardID, err := tx.ToShardID()
+	if err != nil {
+		return nil
+	}
+	data, err := tx.Data()
+	if err != nil {
+		return nil
+	}
+	value, err := tx.Value()
+	if err != nil {
+		return nil
+	}
 	result := &RPCTransaction{
 		Gas:       tx.Gas(),
 		GasPrice:  tx.GasPrice(),
 		Hash:      tx.Hash(),
-		Input:     hexutil.Bytes(tx.Data()),
+		Input:     hexutil.Bytes(data),
 		Nonce:     tx.Nonce(),
-		Value:     tx.Value(),
-		ShardID:   tx.ShardID(),
-		ToShardID: tx.ToShardID(),
+		Value:     value,
+		ShardID:   shardID,
+		ToShardID: toShardID,
 		Timestamp: timestamp,
 		V:         (*hexutil.Big)(v),
 		R:         (*hexutil.Big)(r),
@@ -191,8 +207,12 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 	}
 	toAddr := ""
 
-	if tx.To() != nil {
-		if toAddr, err = internal_common.AddressToBech32(*tx.To()); err != nil {
+	to, err := tx.To()
+	if err != nil {
+		return nil
+	}
+	if to != nil {
+		if toAddr, err = internal_common.AddressToBech32(*to); err != nil {
 			return nil
 		}
 		result.From = fromAddr
@@ -206,20 +226,24 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 
 // newRPCStakingTransaction returns a staking transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, index uint64) *RPCStakingTransaction {
-	from, err := tx.SenderAddress()
+func newRPCStakingTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, index uint64) *RPCStakingTransaction {
+	var signer types.Signer = types.FrontierSigner{}
+	if tx.Protected() {
+		signer = types.NewEIP155Signer(tx.ChainID())
+	}
+	from, _ := types.Sender(signer, tx)
+	v, r, s := tx.RawSignatureValues()
+
+	stakingTxType := tx.Type()
+	message, err := tx.Message()
 	if err != nil {
 		return nil
 	}
-	v, r, s := tx.RawSignatureValues()
-
-	stakingTxType := tx.StakingType()
-	message := tx.StakingMessage()
-	fields := make(map[string]interface{}, 0)
+	fields := map[string]interface{}{}
 
 	switch stakingTxType {
-	case types2.DirectiveCreateValidator:
-		msg, ok := message.(types2.CreateValidator)
+	case types.CreateValidator:
+		msg, ok := message.(*types2.CreateValidator)
 		if !ok {
 			return nil
 		}
@@ -242,8 +266,8 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 			"details":            msg.Description.Details,
 			"slotPubKeys":        msg.SlotPubKeys,
 		}
-	case types2.DirectiveEditValidator:
-		msg, ok := message.(types2.EditValidator)
+	case types.EditValidator:
+		msg, ok := message.(*types2.EditValidator)
 		if !ok {
 			return nil
 		}
@@ -269,8 +293,8 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 			"slotPubKeyToAdd":    msg.SlotKeyToAdd,
 			"slotPubKeyToRemove": msg.SlotKeyToRemove,
 		}
-	case types2.DirectiveCollectRewards:
-		msg, ok := message.(types2.CollectRewards)
+	case types.CollectRewards:
+		msg, ok := message.(*types2.CollectRewards)
 		if !ok {
 			return nil
 		}
@@ -281,8 +305,8 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 		fields = map[string]interface{}{
 			"delegatorAddress": delegatorAddress,
 		}
-	case types2.DirectiveDelegate:
-		msg, ok := message.(types2.Delegate)
+	case types.Delegate:
+		msg, ok := message.(*types2.Delegate)
 		if !ok {
 			return nil
 		}
@@ -299,8 +323,8 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 			"validatorAddress": validatorAddress,
 			"amount":           msg.Amount,
 		}
-	case types2.DirectiveUndelegate:
-		msg, ok := message.(types2.Undelegate)
+	case types.Undelegate:
+		msg, ok := message.(*types2.Undelegate)
 		if !ok {
 			return nil
 		}
@@ -352,7 +376,7 @@ func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
 }
 
 // newRPCPendingStakingTransaction returns a pending transaction that will serialize to the RPC representation
-func newRPCPendingStakingTransaction(tx *types2.StakingTransaction) *RPCStakingTransaction {
+func newRPCPendingStakingTransaction(tx *types.Transaction) *RPCStakingTransaction {
 	return newRPCStakingTransaction(tx, common.Hash{}, 0, 0, 0)
 }
 
@@ -418,6 +442,9 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 		transactions := make([]interface{}, len(txs))
 		var err error
 		for i, tx := range txs {
+			if tx.IsStaking() {
+				continue
+			}
 			if transactions[i], err = formatTx(tx); err != nil {
 				return nil, err
 			}
@@ -425,17 +452,20 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 		fields["transactions"] = transactions
 
 		if blockArgs.InclStaking {
-			formatStakingTx := func(tx *types2.StakingTransaction) (interface{}, error) {
+			formatStakingTx := func(tx *types.Transaction) (interface{}, error) {
 				return tx.Hash(), nil
 			}
 			if blockArgs.FullTx {
-				formatStakingTx = func(tx *types2.StakingTransaction) (interface{}, error) {
+				formatStakingTx = func(tx *types.Transaction) (interface{}, error) {
 					return newRPCStakingTransactionFromBlockHash(b, tx.Hash()), nil
 				}
 			}
-			stakingTxs := b.StakingTransactions()
+			stakingTxs := b.Transactions()
 			stakingTransactions := make([]interface{}, len(stakingTxs))
 			for i, tx := range stakingTxs {
+				if !tx.IsStaking() {
+					continue
+				}
 				if stakingTransactions[i], err = formatStakingTx(tx); err != nil {
 					return nil, err
 				}
@@ -477,7 +507,7 @@ func newRPCTransactionFromBlockIndex(b *types.Block, index uint64) *RPCTransacti
 
 // newRPCStakingTransactionFromBlockHash returns a staking transaction that will serialize to the RPC representation.
 func newRPCStakingTransactionFromBlockHash(b *types.Block, hash common.Hash) *RPCStakingTransaction {
-	for idx, tx := range b.StakingTransactions() {
+	for idx, tx := range b.Transactions() {
 		if tx.Hash() == hash {
 			return newRPCStakingTransactionFromBlockIndex(b, uint64(idx))
 		}
@@ -487,7 +517,7 @@ func newRPCStakingTransactionFromBlockHash(b *types.Block, hash common.Hash) *RP
 
 // newRPCStakingTransactionFromBlockIndex returns a staking transaction that will serialize to the RPC representation.
 func newRPCStakingTransactionFromBlockIndex(b *types.Block, index uint64) *RPCStakingTransaction {
-	txs := b.StakingTransactions()
+	txs := b.Transactions()
 	if index >= uint64(len(txs)) {
 		return nil
 	}

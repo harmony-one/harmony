@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/harmony/block"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // BodyV2 is the V2 block body
@@ -15,10 +14,9 @@ type BodyV2 struct {
 }
 
 type bodyFieldsV2 struct {
-	Transactions        []*Transaction
-	StakingTransactions []*staking.StakingTransaction
-	Uncles              []*block.Header
-	IncomingReceipts    CXReceiptsProofs
+	Transactions     []*Transaction
+	Uncles           []*block.Header
+	IncomingReceipts CXReceiptsProofs
 }
 
 // Transactions returns the list of transactions.
@@ -32,16 +30,6 @@ func (b *BodyV2) Transactions() (txs []*Transaction) {
 	return txs
 }
 
-// StakingTransactions returns the list of staking transactions.
-// The returned list is a deep copy; the caller may do anything with it without
-// affecting the original.
-func (b *BodyV2) StakingTransactions() (txs []*staking.StakingTransaction) {
-	for _, tx := range b.f.StakingTransactions {
-		txs = append(txs, tx.Copy())
-	}
-	return txs
-}
-
 // TransactionAt returns the transaction at the given index in this block.
 // It returns nil if index is out of bounds.
 func (b *BodyV2) TransactionAt(index int) *Transaction {
@@ -49,15 +37,6 @@ func (b *BodyV2) TransactionAt(index int) *Transaction {
 		return nil
 	}
 	return b.f.Transactions[index].Copy()
-}
-
-// StakingTransactionAt returns the staking transaction at the given index in this block.
-// It returns nil if index is out of bounds.
-func (b *BodyV2) StakingTransactionAt(index int) *staking.StakingTransaction {
-	if index < 0 || index >= len(b.f.StakingTransactions) {
-		return nil
-	}
-	return b.f.StakingTransactions[index].Copy()
 }
 
 // CXReceiptAt returns the CXReceipt at given index in this block
@@ -84,16 +63,6 @@ func (b *BodyV2) SetTransactions(newTransactions []*Transaction) {
 		txs = append(txs, tx.Copy())
 	}
 	b.f.Transactions = txs
-}
-
-// SetStakingTransactions sets the list of staking transactions with a deep copy of the given
-// list.
-func (b *BodyV2) SetStakingTransactions(newStakingTransactions []*staking.StakingTransaction) {
-	var txs []*staking.StakingTransaction
-	for _, tx := range newStakingTransactions {
-		txs = append(txs, tx.Copy())
-	}
-	b.f.StakingTransactions = txs
 }
 
 // Uncles returns a deep copy of the list of uncle headers of this block.

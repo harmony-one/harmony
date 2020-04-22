@@ -1,56 +1,13 @@
 package types
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
-	"github.com/pkg/errors"
 )
-
-// Directive says what kind of payload follows
-type Directive byte
-
-// StakeMsg defines the interface of Stake Message
-type StakeMsg interface {
-	Type() Directive
-	Copy() StakeMsg
-}
-
-const (
-	// DirectiveCreateValidator ...
-	DirectiveCreateValidator Directive = iota
-	// DirectiveEditValidator ...
-	DirectiveEditValidator
-	// DirectiveDelegate ...
-	DirectiveDelegate
-	// DirectiveUndelegate ...
-	DirectiveUndelegate
-	// DirectiveCollectRewards ...
-	DirectiveCollectRewards
-)
-
-var (
-	directiveNames = map[Directive]string{
-		DirectiveCreateValidator: "CreateValidator",
-		DirectiveEditValidator:   "EditValidator",
-		DirectiveDelegate:        "Delegate",
-		DirectiveUndelegate:      "Undelegate",
-		DirectiveCollectRewards:  "CollectRewards",
-	}
-	// ErrInvalidStakingKind given when caller gives bad staking message kind
-	ErrInvalidStakingKind = errors.New("bad staking kind")
-)
-
-func (d Directive) String() string {
-	if name, ok := directiveNames[d]; ok {
-		return name
-	}
-	return fmt.Sprintf("Directive %+v", byte(d))
-}
 
 // CreateValidator - type for creating a new validator
 type CreateValidator struct {
@@ -96,59 +53,169 @@ type CollectRewards struct {
 	DelegatorAddress common.Address `json:"delegator_address"`
 }
 
-// Type of CreateValidator
-func (v CreateValidator) Type() Directive {
-	return DirectiveCreateValidator
+type TxMessage interface {
+	To() *common.Address
+	ShardId() uint32
+	ToShardId() uint32
+	Value() *big.Int
+	Data() []byte
+	Copy() TxMessage
+	Cost() *big.Int
 }
 
-// Type of EditValidator
-func (v EditValidator) Type() Directive {
-	return DirectiveEditValidator
+func (v CreateValidator) To() *common.Address {
+	return nil
 }
 
-// Type of Delegate
-func (v Delegate) Type() Directive {
-	return DirectiveDelegate
+func (v EditValidator) To() *common.Address {
+	return nil
 }
 
-// Type of Undelegate
-func (v Undelegate) Type() Directive {
-	return DirectiveUndelegate
+func (v Delegate) To() *common.Address {
+	return &v.ValidatorAddress
 }
 
-// Type of CollectRewards
-func (v CollectRewards) Type() Directive {
-	return DirectiveCollectRewards
+func (v Undelegate) To() *common.Address {
+	return &v.ValidatorAddress
+}
+
+func (v CollectRewards) To() *common.Address {
+	return nil
+}
+
+func (v CreateValidator) ShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v EditValidator) ShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v Delegate) ShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v Undelegate) ShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v CollectRewards) ShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v CreateValidator) ToShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v EditValidator) ToShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v Delegate) ToShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v Undelegate) ToShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v CollectRewards) ToShardId() uint32 {
+	return shard.BeaconChainShardID
+}
+
+func (v CreateValidator) Value() *big.Int {
+	return new(big.Int).SetInt64(0)
+}
+
+func (v EditValidator) Value() *big.Int {
+	return new(big.Int).SetInt64(0)
+}
+
+func (v Delegate) Value() *big.Int {
+	return new(big.Int).SetInt64(0)
+}
+
+func (v Undelegate) Value() *big.Int {
+	return new(big.Int).SetInt64(0)
+}
+
+func (v CollectRewards) Value() *big.Int {
+	return new(big.Int).SetInt64(0)
+}
+
+func (v CreateValidator) Data() []byte {
+	return []byte{}
+}
+
+func (v EditValidator) Data() []byte {
+	return []byte{}
+}
+
+func (v Delegate) Data() []byte {
+	return []byte{}
+}
+
+func (v Undelegate) Data() []byte {
+	return []byte{}
+}
+
+func (v CollectRewards) Data() []byte {
+	return []byte{}
 }
 
 // Copy deep copy of the interface
-func (v CreateValidator) Copy() StakeMsg {
+func (v CreateValidator) Copy() TxMessage {
 	v1 := v
 	v1.Description = v.Description
-	return v1
+	return &v1
 }
 
 // Copy deep copy of the interface
-func (v EditValidator) Copy() StakeMsg {
+func (v EditValidator) Copy() TxMessage {
 	v1 := v
 	v1.Description = v.Description
-	return v1
+	return &v1
 }
 
 // Copy deep copy of the interface
-func (v Delegate) Copy() StakeMsg {
+func (v Delegate) Copy() TxMessage {
 	v1 := v
-	return v1
+	return &v1
 }
 
 // Copy deep copy of the interface
-func (v Undelegate) Copy() StakeMsg {
+func (v Undelegate) Copy() TxMessage {
 	v1 := v
-	return v1
+	return &v1
 }
 
 // Copy deep copy of the interface
-func (v CollectRewards) Copy() StakeMsg {
+func (v CollectRewards) Copy() TxMessage {
 	v1 := v
-	return v1
+	return &v1
+}
+
+// Cost ..
+func (tx *CreateValidator) Cost() *big.Int {
+	return tx.Amount
+}
+
+// Cost ..
+func (tx *EditValidator) Cost() *big.Int {
+	return common.Big0
+}
+
+// Cost ..
+func (tx *Delegate) Cost() *big.Int {
+	return tx.Amount
+}
+
+// Cost ..
+func (tx *Undelegate) Cost() *big.Int {
+	return common.Big0
+}
+
+// Cost ..
+func (tx *CollectRewards) Cost() *big.Int {
+	return common.Big0
 }

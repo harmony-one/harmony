@@ -78,7 +78,7 @@ func TestCommitTransactions(t *testing.T) {
 	txs := make(map[common.Address]types.Transactions)
 	txs[testBankAddress] = types.Transactions{tx}
 	err := worker.CommitTransactions(
-		txs, nil, testBankAddress,
+		txs, testBankAddress,
 	)
 	if err != nil {
 		t.Error(err)

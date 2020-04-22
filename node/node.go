@@ -34,7 +34,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/slash"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
@@ -188,8 +187,11 @@ func (node *Node) Beaconchain() *core.BlockChain {
 // TODO: make this batch more transactions
 func (node *Node) tryBroadcast(tx *types.Transaction) {
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
-
-	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(tx.ShardID()))
+	shardID, err := tx.ShardID()
+	if err != nil {
+		return
+	}
+	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(shardID))
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
 
 	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
@@ -202,27 +204,9 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 	}
 }
 
-func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
-	msg := proto_node.ConstructStakingTransactionListMessageAccount(staking.StakingTransactions{stakingTx})
-
-	shardGroupID := nodeconfig.NewGroupIDByShardID(
-		nodeconfig.ShardID(shard.BeaconChainShardID),
-	) // broadcast to beacon chain
-	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcastStaking")
-
-	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
-		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
-			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
-		} else {
-			break
-		}
-	}
-}
-
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
-	poolTxs := types.PoolTransactions{}
+	poolTxs := types.Transactions{}
 	for _, tx := range newTxs {
 		poolTxs = append(poolTxs, tx)
 	}
@@ -237,47 +221,14 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 	return errs
 }
 
-// Add new staking transactions to the pending staking transaction list.
-func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) []error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
-		node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
-		poolTxs := types.PoolTransactions{}
-		for _, tx := range newStakingTxs {
-			poolTxs = append(poolTxs, tx)
-		}
-		errs := node.TxPool.AddRemotes(poolTxs)
-		pendingCount, queueCount := node.TxPool.Stats()
-		utils.Logger().Info().
-			Int("length of newStakingTxs", len(poolTxs)).
-			Int("totalPending", pendingCount).
-			Int("totalQueued", queueCount).
-			Msg("Got more staking transactions")
-		return errs
-	}
-	return make([]error, len(newStakingTxs))
-}
-
-// AddPendingStakingTransaction staking transactions
-func (node *Node) AddPendingStakingTransaction(
-	newStakingTx *staking.StakingTransaction,
-) error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
-		for i := range errs {
-			if errs[i] != nil {
-				return errs[i]
-			}
-		}
-		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
-		node.tryBroadcastStaking(newStakingTx)
-	}
-	return nil
-}
-
 // AddPendingTransaction adds one new transaction to the pending transaction list.
 // This is only called from SDK.
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
-	if newTx.ShardID() == node.NodeConfig.ShardID {
+	shardID, err := newTx.ShardID()
+	if err != nil {
+		return err
+	}
+	if shardID == node.NodeConfig.ShardID {
 		errs := node.addPendingTransactions(types.Transactions{newTx})
 		for i := range errs {
 			if errs[i] != nil {
@@ -500,7 +451,7 @@ func New(
 					node.errorSink.Unlock()
 				}
 			},
-			func(payload []staking.RPCTransactionError) {
+			func(payload []types.RPCTransactionError) {
 				node.errorSink.Lock()
 				for i := range payload {
 					node.errorSink.failedStakingTxns.Value = payload[i]

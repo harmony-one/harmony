@@ -39,7 +39,6 @@ import (
 	v3 "github.com/harmony-one/harmony/block/v3"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/taggedrlp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -83,16 +82,9 @@ type BodyInterface interface {
 	// Transactions returns a deep copy the list of transactions in this block.
 	Transactions() []*Transaction
 
-	// StakingTransactions returns a deep copy of staking transactions
-	StakingTransactions() []*staking.StakingTransaction
-
 	// TransactionAt returns the transaction at the given index in this block.
 	// It returns nil if index is out of bounds.
 	TransactionAt(index int) *Transaction
-
-	// StakingTransactionAt returns the staking transaction at the given index in this block.
-	// It returns nil if index is out of bounds.
-	StakingTransactionAt(index int) *staking.StakingTransaction
 
 	// CXReceiptAt returns the CXReceipt given index (calculated from IncomingReceipts)
 	// It returns nil if index is out of bounds
@@ -101,10 +93,6 @@ type BodyInterface interface {
 	// SetTransactions sets the list of transactions with a deep copy of the
 	// given list.
 	SetTransactions(newTransactions []*Transaction)
-
-	// SetStakingTransactions sets the list of staking transactions with a deep copy of the
-	// given list.
-	SetStakingTransactions(newStakingTransactions []*staking.StakingTransaction)
 
 	// Uncles returns a deep copy of the list of uncle headers of this block.
 	Uncles() []*block.Header
@@ -198,11 +186,10 @@ func init() {
 
 // Block represents an entire block in the Harmony blockchain.
 type Block struct {
-	header              *block.Header
-	uncles              []*block.Header
-	transactions        Transactions
-	stakingTransactions staking.StakingTransactions
-	incomingReceipts    CXReceiptsProofs
+	header           *block.Header
+	uncles           []*block.Header
+	transactions     Transactions
+	incomingReceipts CXReceiptsProofs
 
 	// caches
 	hash atomic.Value
@@ -270,7 +257,6 @@ type extblockV1 struct {
 type extblockV2 struct {
 	Header           *block.Header
 	Txs              []*Transaction
-	Stks             []*staking.StakingTransaction
 	Uncles           []*block.Header
 	IncomingReceipts CXReceiptsProofs
 }
@@ -292,33 +278,27 @@ func init() {
 // and receipts.
 func NewBlock(
 	header *block.Header, txs []*Transaction,
-	receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof,
-	stks []*staking.StakingTransaction) *Block {
+	receipts []*Receipt, outcxs []*CXReceipt, incxs []*CXReceiptsProof) *Block {
 
 	b := &Block{header: CopyHeader(header)}
 
-	if len(receipts) != len(txs)+len(stks) {
+	if len(receipts) != len(txs) {
 		utils.Logger().Error().
 			Int("receiptsLen", len(receipts)).
 			Int("txnsLen", len(txs)).
-			Int("stakingTxnsLen", len(stks)).
 			Msg("Length of receipts doesn't match length of transactions")
 		return nil
 	}
 
 	// Put transactions into block
-	if len(txs) == 0 && len(stks) == 0 {
+	if len(txs) == 0 {
 		b.header.SetTxHash(EmptyRootHash)
 	} else {
 		b.transactions = make(Transactions, len(txs))
 		copy(b.transactions, txs)
 
-		b.stakingTransactions = make(staking.StakingTransactions, len(stks))
-		copy(b.stakingTransactions, stks)
-
 		b.header.SetTxHash(DeriveSha(
 			Transactions(txs),
-			staking.StakingTransactions(stks),
 		))
 	}
 
@@ -368,7 +348,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	}
 	switch eb := eb.(type) {
 	case *extblockV2:
-		b.header, b.uncles, b.transactions, b.incomingReceipts, b.stakingTransactions = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts, eb.Stks
+		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
 	case *extblockV1:
 		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
 	case *extblock:
@@ -385,7 +365,7 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
 	switch h := b.header.Header.(type) {
 	case *v3.Header:
-		eb = extblockV2{b.header, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
+		eb = extblockV2{b.header, b.transactions, b.uncles, b.incomingReceipts}
 	case *v2.Header, *v1.Header:
 		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
 	case *v0.Header:
@@ -408,11 +388,6 @@ func (b *Block) Uncles() []*block.Header {
 // Transactions returns transactions.
 func (b *Block) Transactions() Transactions {
 	return b.transactions
-}
-
-// StakingTransactions returns stakingTransactions.
-func (b *Block) StakingTransactions() staking.StakingTransactions {
-	return b.stakingTransactions
 }
 
 // IncomingReceipts returns verified outgoing receipts
@@ -490,7 +465,6 @@ func (b *Block) Body() *Body {
 	}
 	return body.With().
 		Transactions(b.transactions).
-		StakingTransactions(b.stakingTransactions).
 		Uncles(b.uncles).
 		IncomingReceipts(b.incomingReceipts).
 		Body()
@@ -539,16 +513,14 @@ func (b *Block) WithSeal(header *block.Header) *Block {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(transactions []*Transaction, stakingTxns []*staking.StakingTransaction, uncles []*block.Header, incomingReceipts CXReceiptsProofs) *Block {
+func (b *Block) WithBody(transactions []*Transaction, uncles []*block.Header, incomingReceipts CXReceiptsProofs) *Block {
 	block := &Block{
-		header:              CopyHeader(b.header),
-		transactions:        make([]*Transaction, len(transactions)),
-		stakingTransactions: make([]*staking.StakingTransaction, len(stakingTxns)),
-		uncles:              make([]*block.Header, len(uncles)),
-		incomingReceipts:    make([]*CXReceiptsProof, len(incomingReceipts)),
+		header:           CopyHeader(b.header),
+		transactions:     make([]*Transaction, len(transactions)),
+		uncles:           make([]*block.Header, len(uncles)),
+		incomingReceipts: make([]*CXReceiptsProof, len(incomingReceipts)),
 	}
 	copy(block.transactions, transactions)
-	copy(block.stakingTransactions, stakingTxns)
 	copy(block.incomingReceipts, incomingReceipts)
 	for i := range uncles {
 		block.uncles[i] = CopyHeader(uncles[i])

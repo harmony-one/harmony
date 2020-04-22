@@ -47,8 +47,8 @@ type Backend interface {
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
 	// GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
-	GetPoolTransactions() (types.PoolTransactions, error)
-	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
+	GetPoolTransactions() (types.Transactions, error)
+	GetPoolTransaction(txHash common.Hash) *types.Transaction
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	// Get account nonce
 	GetAccountNonce(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error)
@@ -69,7 +69,6 @@ type Backend interface {
 	// retrieve the blockHash using txID and add blockHash to CxPool for resending
 	ResendCx(ctx context.Context, txID common.Hash) (uint64, bool)
 	IsLeader() bool
-	SendStakingTx(ctx context.Context, newStakingTx *staking.StakingTransaction) error
 	GetElectedValidatorAddresses() []common.Address
 	GetAllValidatorAddresses() []common.Address
 	GetValidatorInformation(addr common.Address, block *types.Block) (*staking.ValidatorRPCEnchanced, error)
@@ -77,7 +76,7 @@ type Backend interface {
 	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)
 	GetValidatorSelfDelegation(addr common.Address) *big.Int
 	GetShardState() (*shard.State, error)
-	GetCurrentStakingErrorSink() []staking.RPCTransactionError
+	GetCurrentStakingErrorSink() []types.RPCTransactionError
 	GetCurrentTransactionErrorSink() []types.RPCTransactionError
 	GetMedianRawStakeSnapshot() (*committee.CompletedEPoSRound, error)
 	GetPendingCXReceipts() []*types.CXReceiptsProof

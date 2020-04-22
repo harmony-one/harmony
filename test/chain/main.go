@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/params"
 	pkgworker "github.com/harmony-one/harmony/node/worker"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -122,7 +121,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 	txmap[FaucetAddress] = txs
 
 	err := contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
+		txmap, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -164,7 +163,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	txmap[FaucetAddress] = types.Transactions{callfaucettx}
 
 	err = contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
+		txmap, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -199,14 +198,14 @@ func main() {
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine(), vm.Config{}, nil)
 
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain,
-		func([]types.RPCTransactionError) {}, func([]staking.RPCTransactionError) {})
+		func([]types.RPCTransactionError) {}, func([]types.RPCTransactionError) {})
 
 	backend := &testWorkerBackend{
 		db:     database,
 		chain:  chain,
 		txPool: txpool,
 	}
-	poolPendingTx := types.PoolTransactions{}
+	poolPendingTx := types.Transactions{}
 	for _, tx := range pendingTxs {
 		poolPendingTx = append(poolPendingTx, tx)
 	}

@@ -589,11 +589,14 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		Str("blockHex", block.Hash().Hex()).
 		Uint32("ShardID", block.ShardID()).
 		Msg("[SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
-	for i, tx := range block.StakingTransactions() {
-		utils.Logger().Info().
-			Msgf(
-				"StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage(),
-			)
+	for i, tx := range block.Transactions() {
+		if tx.IsStaking() {
+			if msg, err := tx.Message(); err == nil {
+				utils.Logger().Info().Msgf(
+					"StakingTxn %d: %s, %v", i, tx.Type().String(), msg,
+				)
+			}
+		}
 	}
 	return nil
 }

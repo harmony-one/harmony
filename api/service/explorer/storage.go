@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -98,23 +97,27 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 
 	// Store txs
 	for _, tx := range block.Transactions() {
-		explorerTransaction, err := GetTransaction(tx, block)
-		if err != nil {
-			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
-				Msg("[Explorer Storage] Failed to get GetTransaction mapping")
-			continue
+		if !tx.IsStaking() {
+			explorerTransaction, err := GetTransaction(tx, block)
+			if err != nil {
+				utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
+					Msg("[Explorer Storage] Failed to get transaction mapping")
+				continue
+			}
+			storage.UpdateTxAddress(explorerTransaction, tx)
 		}
-		storage.UpdateTxAddress(explorerTransaction, tx)
 	}
 	// Store staking txns
-	for _, tx := range block.StakingTransactions() {
-		explorerTransaction, err := GetStakingTransaction(tx, block)
-		if err != nil {
-			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
-				Msg("[Explorer Storage] Failed to get StakingTransaction mapping")
-			continue
+	for _, tx := range block.Transactions() {
+		if tx.IsStaking() {
+			explorerTransaction, err := GetTransaction(tx, block)
+			if err != nil {
+				utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
+					Msg("[Explorer Storage] Failed to get staking transaction mapping")
+				continue
+			}
+			storage.UpdateStakingTxAddress(explorerTransaction, tx)
 		}
-		storage.UpdateStakingTxAddress(explorerTransaction, tx)
 	}
 
 	// save checkpoint of block dumped
@@ -132,7 +135,7 @@ func (storage *Storage) UpdateTxAddress(explorerTransaction *Transaction, tx *ty
 }
 
 // UpdateStakingTxAddress ...
-func (storage *Storage) UpdateStakingTxAddress(explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
+func (storage *Storage) UpdateStakingTxAddress(explorerTransaction *Transaction, tx *types.Transaction) {
 	explorerTransaction.Type = Received
 	if explorerTransaction.To != "" {
 		storage.UpdateStakingTxAddressStorage(explorerTransaction.To, explorerTransaction, tx)
@@ -161,7 +164,7 @@ func (storage *Storage) UpdateTxAddressStorage(addr string, explorerTransaction 
 }
 
 // UpdateStakingTxAddressStorage updates specific addr staking tx Address.
-func (storage *Storage) UpdateStakingTxAddressStorage(addr string, explorerTransaction *StakingTransaction, tx *staking.StakingTransaction) {
+func (storage *Storage) UpdateStakingTxAddressStorage(addr string, explorerTransaction *Transaction, tx *types.Transaction) {
 	var address Address
 	key := GetAddressKey(addr)
 	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {

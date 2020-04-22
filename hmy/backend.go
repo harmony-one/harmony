@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // Harmony implements the Harmony full node service.
@@ -37,7 +36,6 @@ type Harmony struct {
 
 // NodeAPI is the list of functions from node used to call rpc apis.
 type NodeAPI interface {
-	AddPendingStakingTransaction(*staking.StakingTransaction) error
 	AddPendingTransaction(newTx *types.Transaction) error
 	Blockchain() *core.BlockChain
 	Beaconchain() *core.BlockChain
@@ -48,7 +46,7 @@ type NodeAPI interface {
 	GetTransactionsCount(address, txType string) (uint64, error)
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
-	ErroredStakingTransactionSink() []staking.RPCTransactionError
+	ErroredStakingTransactionSink() []types.RPCTransactionError
 	ErroredTransactionSink() []types.RPCTransactionError
 	PendingCXReceipts() []*types.CXReceiptsProof
 	GetNodeBootTime() int64
