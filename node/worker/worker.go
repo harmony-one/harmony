@@ -60,7 +60,7 @@ func (w *Worker) CommitTransactions(
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
 
-	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, poolTransactions)
+	txs := types.NewPoolTransactionsByPriceAndNonce(w.current.signer, poolTransactions)
 	dbIndex := 0
 	// NORMAL
 	for {

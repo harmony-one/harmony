@@ -109,7 +109,7 @@ func (p *StateProcessor) Process(
 		poolTransactions[from] = append(poolTransactions[from], tx)
 	}
 
-	txs := types.NewTransactionsByPriceAndNonce(signer, poolTransactions)
+	txs := types.NewPoolTransactionsByPriceAndNonce(signer, poolTransactions)
 	dbIndex := 0
 	// NORMAL
 	for {
