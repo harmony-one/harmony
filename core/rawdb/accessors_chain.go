@@ -330,6 +330,11 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 func WriteBlock(db DatabaseWriter, block *types.Block) {
 	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
 	WriteHeader(db, block.Header())
+
+	curSig := block.GetCurrentCommitSig()
+	if len(curSig) > 96 {
+		WriteBlockCommitSig(db, block.NumberU64(), curSig)
+	}
 }
 
 // DeleteBlock removes all block data associated with a hash.

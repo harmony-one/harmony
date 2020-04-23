@@ -548,7 +548,7 @@ func (bc *BlockChain) repair(head **types.Block) error {
 		// Repair last commit sigs
 		lastSig := (*head).Header().LastCommitSignature()
 		sigAndBitMap := append(lastSig[:], (*head).Header().LastCommitBitmap()...)
-		bc.WriteLastCommits(sigAndBitMap)
+		bc.WriteCommitSig((*head).NumberU64()-1, sigAndBitMap)
 
 		// Otherwise rewind one block and recheck state availability there
 		(*head) = bc.GetBlock((*head).ParentHash(), (*head).NumberU64()-1)
@@ -1708,26 +1708,26 @@ func (bc *BlockChain) WriteShardStateBytes(db rawdb.DatabaseWriter,
 	return decodeShardState, nil
 }
 
-// ReadLastCommits retrieves last commits.
-func (bc *BlockChain) ReadLastCommits() ([]byte, error) {
-	if cached, ok := bc.lastCommitsCache.Get("lastCommits"); ok {
+// ReadCommitSig retrieves the commit signature on a block.
+func (bc *BlockChain) ReadCommitSig(blockNum uint64) ([]byte, error) {
+	if cached, ok := bc.lastCommitsCache.Get("commitSig" + string(blockNum)); ok {
 		lastCommits := cached.([]byte)
 		return lastCommits, nil
 	}
-	lastCommits, err := rawdb.ReadLastCommits(bc.db)
+	lastCommits, err := rawdb.ReadBlockCommitSig(bc.db, blockNum)
 	if err != nil {
 		return nil, err
 	}
 	return lastCommits, nil
 }
 
-// WriteLastCommits saves the commits of last block.
-func (bc *BlockChain) WriteLastCommits(lastCommits []byte) error {
-	err := rawdb.WriteLastCommits(bc.db, lastCommits)
+// WriteCommitSig saves the commits signatures signed on a block.
+func (bc *BlockChain) WriteCommitSig(blockNum uint64, lastCommits []byte) error {
+	err := rawdb.WriteBlockCommitSig(bc.db, blockNum, lastCommits)
 	if err != nil {
 		return err
 	}
-	bc.lastCommitsCache.Add("lastCommits", lastCommits)
+	bc.lastCommitsCache.Add("commitSig"+string(blockNum), lastCommits)
 	return nil
 }
 

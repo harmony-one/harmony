@@ -136,12 +136,6 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 
-	if err := consensus.ChainReader.WriteLastCommits(FBFTMsg.Payload); err != nil {
-		consensus.getLogger().Err(err).
-			Msg("[FinalizeCommits] could not write last commits")
-		return
-	}
-
 	// if leader success finalize the block, send committed message to validators
 	if err := consensus.msgSender.SendWithRetry(
 		block.NumberU64(),
@@ -193,13 +187,13 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 }
 
-// LastCommitSig returns the byte array of aggregated
-// commit signature and bitmap of last block
-func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
+// BlockCommitSig returns the byte array of aggregated
+// commit signature and bitmap signed on the block
+func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, error) {
 	if consensus.blockNum <= 1 {
 		return nil, nil, nil
 	}
-	lastCommits, err := consensus.ChainReader.ReadLastCommits()
+	lastCommits, err := consensus.ChainReader.ReadCommitSig(blockNum)
 	if err != nil ||
 		len(lastCommits) < shard.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
@@ -300,7 +294,10 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.LeaderPubKey = committedMsg.SenderPubkey
 
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
-		consensus.OnConsensusDone(block, committedMsg.Payload)
+
+		// Fill in the commit signatures
+		block.SetCurrentCommitSig(committedMsg.Payload)
+		consensus.OnConsensusDone(block)
 		consensus.ResetState()
 
 		select {

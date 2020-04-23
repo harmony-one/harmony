@@ -15,18 +15,18 @@ import (
 
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
 // destination shards
-func (node *Node) BroadcastCXReceipts(newBlock *types.Block, lastCommits []byte) {
-
+func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
+	commitSigAndBitmap := newBlock.GetCurrentCommitSig()
 	//#### Read payload data from committed msg
-	if len(lastCommits) <= 96 {
-		utils.Logger().Debug().Int("lastCommitsLen", len(lastCommits)).Msg("[BroadcastCXReceipts] lastCommits Not Enough Length")
+	if len(commitSigAndBitmap) <= 96 {
+		utils.Logger().Debug().Int("commitSigAndBitmapLen", len(commitSigAndBitmap)).Msg("[BroadcastCXReceipts] commitSigAndBitmap Not Enough Length")
 	}
 	commitSig := make([]byte, 96)
-	commitBitmap := make([]byte, len(lastCommits)-96)
+	commitBitmap := make([]byte, len(commitSigAndBitmap)-96)
 	offset := 0
-	copy(commitSig[:], lastCommits[offset:offset+96])
+	copy(commitSig[:], commitSigAndBitmap[offset:offset+96])
 	offset += 96
-	copy(commitBitmap[:], lastCommits[offset:])
+	copy(commitBitmap[:], commitSigAndBitmap[offset:])
 	//#### END Read payload data from committed msg
 
 	epoch := newBlock.Header().Epoch()
