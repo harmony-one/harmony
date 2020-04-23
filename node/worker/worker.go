@@ -82,9 +82,9 @@ func (w *Worker) CommitTransactions(
 			txs.Pop()
 			continue
 		}
+
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, dbIndex)
-		dbIndex = dbIndex + 1
 
 		if tx.ShardID() != w.chain.ShardID() {
 			txs.Shift()
@@ -136,6 +136,7 @@ func (w *Worker) CommitTransactions(
 				Uint64("txGasLimit", tx.Gas()).
 				Msg("Successfully committed transaction")
 			txs.Shift()
+			dbIndex = dbIndex + 1
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
