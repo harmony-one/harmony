@@ -53,7 +53,7 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 		joiner := NewMocktopicJoiner(mc)
 		newMetrics := libp2p_metrics.NewBandwidthCounter()
 		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{},
-				metrics: newMetrics}
+			metrics: newMetrics}
 
 		gomock.InOrder(
 			// Make first join return an error
