@@ -44,7 +44,7 @@ func TestTransactionPriceNonceSort(t *testing.T) {
 
 	signer := HomesteadSigner{}
 	// Generate a batch of transactions with overlapping values, but shifted nonces
-	groups := map[common.Address]Transactions{}
+	groups := map[common.Address]PoolTransactions{}
 	for start, key := range keys {
 		addr := crypto.PubkeyToAddress(key.PublicKey)
 		for i := 0; i < 25; i++ {
@@ -57,7 +57,7 @@ func TestTransactionPriceNonceSort(t *testing.T) {
 
 	txs := Transactions{}
 	for tx := txset.Peek(); tx != nil; tx = txset.Peek() {
-		txs = append(txs, tx)
+		txs = append(txs, tx.(*Transaction))
 		txset.Shift()
 	}
 	if len(txs) != 25*25 {

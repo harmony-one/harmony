@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 func TestAddNewBlock(t *testing.T) {
@@ -37,10 +36,9 @@ func TestAddNewBlock(t *testing.T) {
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
 	node := New(host, consensus, testDBFactory, nil, false)
 
-	txs := make(map[common.Address]types.Transactions)
-	stks := staking.StakingTransactions{}
+	txs := make(map[common.Address]types.PoolTransactions)
 	node.Worker.CommitTransactions(
-		txs, stks, common.Address{},
+		txs, common.Address{},
 	)
 	block, _ := node.Worker.FinalizeNewBlock(
 		[]byte{}, []byte{}, 0, common.Address{}, nil, nil,
@@ -76,10 +74,9 @@ func TestVerifyNewBlock(t *testing.T) {
 	}
 	node := New(host, consensus, testDBFactory, nil, false)
 
-	txs := make(map[common.Address]types.Transactions)
-	stks := staking.StakingTransactions{}
+	txs := make(map[common.Address]types.PoolTransactions)
 	node.Worker.CommitTransactions(
-		txs, stks, common.Address{},
+		txs, common.Address{},
 	)
 	block, _ := node.Worker.FinalizeNewBlock(
 		[]byte{}, []byte{}, 0, common.Address{}, nil, nil,
