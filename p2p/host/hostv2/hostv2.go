@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	libp2p_metrics "github.com/libp2p/go-libp2p-core/metrics"
 	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-host"
 	libp2p_peer "github.com/libp2p/go-libp2p-peer"
@@ -83,6 +84,8 @@ type HostV2 struct {
 
 	// logger
 	logger *zerolog.Logger
+	// metrics
+	metrics *libp2p_metrics.BandwidthCounter
 }
 
 func (host *HostV2) getTopic(topic string) (topicHandle, error) {
@@ -113,7 +116,13 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 			err = e
 			continue
 		}
+		// log out-going metrics
+		host.metrics.LogSentMessage(int64(len(msg)))
 	}
+	host.logger.Info().
+		Int64("TotalOut", host.GetBandwidthTotals().TotalOut).
+		Float64("RateOut", host.GetBandwidthTotals().RateOut).
+		Msg("Record Sending Metrics!")
 	return err
 }
 
@@ -239,14 +248,16 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 	}
 	self.PeerID = p2pHost.ID()
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
+	newMetrics := libp2p_metrics.NewBandwidthCounter()
 	// has to save the private key for host
 	h := &HostV2{
-		h:      p2pHost,
-		joiner: topicJoinerImpl{pubsub},
-		joined: map[string]topicHandle{},
-		self:   *self,
-		priKey: priKey,
-		logger: &subLogger,
+		h:       p2pHost,
+		joiner:  topicJoinerImpl{pubsub},
+		joined:  map[string]topicHandle{},
+		self:    *self,
+		priKey:  priKey,
+		logger:  &subLogger,
+		metrics: newMetrics,
 	}
 
 	h.logger.Debug().
@@ -282,6 +293,21 @@ func (host *HostV2) GetP2PHost() libp2p_host.Host {
 // GetPeerCount ...
 func (host *HostV2) GetPeerCount() int {
 	return host.h.Peerstore().Peers().Len()
+}
+
+// GetBandwidthTotals returns total bandwidth of a node
+func (host *HostV2) GetBandwidthTotals() libp2p_metrics.Stats {
+	return host.metrics.GetBandwidthTotals()
+}
+
+// LogRecvMessage logs received message on node
+func (host *HostV2) LogRecvMessage(msg []byte) {
+	host.metrics.LogRecvMessage(int64(len(msg)))
+}
+
+// ResetMetrics resets metrics counters
+func (host *HostV2) ResetMetrics() {
+	host.metrics.Reset()
 }
 
 // ConnectHostPeer connects to peer host
