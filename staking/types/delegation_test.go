@@ -67,16 +67,74 @@ func TestDeleteEntry(t *testing.T) {
 	}
 }
 
-func TestRemoveUnlockUndelegations(t *testing.T) {
-	lastEpochInCommitte := big.NewInt(16)
+func TestUnlockedLastEpochInCommittee(t *testing.T) {
+	lastEpochInCommittee := big.NewInt(17)
 	curEpoch := big.NewInt(24)
 
 	epoch4 := big.NewInt(21)
 	amount4 := big.NewInt(4000)
 	delegation.Undelegate(epoch4, amount4)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommitte)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee)
 	if result.Cmp(big.NewInt(8000)) != 0 {
 		t.Errorf("removing an unlocked undelegation fails")
+	}
+}
+
+func TestUnlockedLastEpochInCommitteeFail(t *testing.T) {
+	delegation := NewDelegation(delegatorAddr, delegationAmt)
+	lastEpochInCommittee := big.NewInt(18)
+	curEpoch := big.NewInt(24)
+
+	epoch4 := big.NewInt(21)
+	amount4 := big.NewInt(4000)
+	delegation.Undelegate(epoch4, amount4)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee)
+	if result.Cmp(big.NewInt(0)) != 0 {
+		t.Errorf("premature delegation shouldn't be unlocked")
+	}
+}
+
+func TestUnlockedFullPeriod(t *testing.T) {
+	lastEpochInCommittee := big.NewInt(34)
+	curEpoch := big.NewInt(34)
+
+	epoch5 := big.NewInt(27)
+	amount5 := big.NewInt(4000)
+	delegation.Undelegate(epoch5, amount5)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee)
+	if result.Cmp(big.NewInt(4000)) != 0 {
+		t.Errorf("removing an unlocked undelegation fails")
+	}
+}
+
+func TestUnlockedFullPeriodFail(t *testing.T) {
+	delegation := NewDelegation(delegatorAddr, delegationAmt)
+	lastEpochInCommittee := big.NewInt(34)
+	curEpoch := big.NewInt(34)
+
+	epoch5 := big.NewInt(28)
+	amount5 := big.NewInt(4000)
+	delegation.Undelegate(epoch5, amount5)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee)
+	if result.Cmp(big.NewInt(0)) != 0 {
+		t.Errorf("premature delegation shouldn't be unlocked")
+	}
+}
+
+func TestUnlockedPremature(t *testing.T) {
+	lastEpochInCommittee := big.NewInt(44)
+	curEpoch := big.NewInt(44)
+
+	epoch6 := big.NewInt(42)
+	amount6 := big.NewInt(4000)
+	delegation.Undelegate(epoch6, amount6)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee)
+	if result.Cmp(big.NewInt(0)) != 0 {
+		t.Errorf("premature delegation shouldn't be unlocked")
 	}
 }
