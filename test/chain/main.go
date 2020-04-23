@@ -118,11 +118,13 @@ func fundFaucetContract(chain *core.BlockChain) {
 	tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(4), randomUserAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 	txs = append(txs, tx)
 
-	txmap := make(map[common.Address]types.Transactions)
-	txmap[FaucetAddress] = txs
+	txmap := make(map[common.Address]types.PoolTransactions)
+	for _, tx := range txs {
+		txmap[FaucetAddress] = append(txmap[FaucetAddress], tx)
+	}
 
 	err := contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
+		txmap, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -160,11 +162,11 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	callEnc = append(callEnc, paddedAddress...)
 	callfaucettx, _ := types.SignTx(types.NewTransaction(nonce+uint64(5), faucetContractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, FaucetPriKey)
 
-	txmap := make(map[common.Address]types.Transactions)
-	txmap[FaucetAddress] = types.Transactions{callfaucettx}
+	txmap := make(map[common.Address]types.PoolTransactions)
+	txmap[FaucetAddress] = types.PoolTransactions{callfaucettx}
 
 	err = contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
+		txmap, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)
