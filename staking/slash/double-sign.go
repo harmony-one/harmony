@@ -352,7 +352,8 @@ func delegatorSlashApply(
 				}
 
 				// NOTE Assume did as much as could above, now check the undelegations
-				for _, undelegate := range delegationNow.Undelegations {
+				for i := range delegationNow.Undelegations {
+					undelegate := delegationNow.Undelegations[i]
 					// the epoch matters, only those undelegation
 					// such that epoch>= doubleSignEpoch should be slashable
 					if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
@@ -371,7 +372,6 @@ func delegatorSlashApply(
 						}
 
 						if nowAmt.Cmp(common.Big0) == 0 {
-							// TODO(audit): need to remove the undelegate
 							utils.Logger().Info().
 								RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
 								RawJSON("delegation-current", []byte(delegationNow.String())).

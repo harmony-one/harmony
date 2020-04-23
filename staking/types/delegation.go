@@ -181,8 +181,8 @@ func (d *Delegation) RemoveUnlockedUndelegations(
 	totalWithdraw := big.NewInt(0)
 	count := 0
 	for j := range d.Undelegations {
-		if big.NewInt(0).Sub(curEpoch, d.Undelegations[j].Epoch).Int64() > LockPeriodInEpoch ||
-			big.NewInt(0).Sub(curEpoch, lastEpochInCommittee).Int64() > LockPeriodInEpoch {
+		if big.NewInt(0).Sub(curEpoch, d.Undelegations[j].Epoch).Int64() >= LockPeriodInEpoch ||
+			big.NewInt(0).Sub(curEpoch, lastEpochInCommittee).Int64() >= LockPeriodInEpoch {
 			// need to wait at least 7 epochs to withdraw; or the validator has been out of committee for 7 epochs
 			totalWithdraw.Add(totalWithdraw, d.Undelegations[j].Amount)
 			count++
