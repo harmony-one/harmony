@@ -1,0 +1,392 @@
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts/abi/bind
+PASS
+ok  	github.com/harmony-one/harmony/accounts/abi/bind	0.091s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts/abi
+PASS
+ok  	github.com/harmony-one/harmony/accounts/abi	0.086s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts/keystore/testdata/dupes
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts/keystore/testdata/keystore/foo
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts/keystore/testdata/keystore
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts/keystore/testdata/v1/cb61d5a9c4896fb9658090b597ef0e7be6f7b67e
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts/keystore/testdata/v1
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts/keystore/testdata
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts/keystore
+PASS
+ok  	github.com/harmony-one/harmony/accounts/keystore	15.989s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/accounts
+PASS
+ok  	github.com/harmony-one/harmony/accounts	0.089s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/client/service/proto
+?   	github.com/harmony-one/harmony/api/client/service/proto	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/client/service
+PASS
+ok  	github.com/harmony-one/harmony/api/client/service	0.087s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/client
+?   	github.com/harmony-one/harmony/api/client	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/proto/discovery
+PASS
+ok  	github.com/harmony-one/harmony/api/proto/discovery	0.086s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/proto/message
+PASS
+ok  	github.com/harmony-one/harmony/api/proto/message	1.033s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/proto/node
+PASS
+ok  	github.com/harmony-one/harmony/api/proto/node	0.084s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/proto
+?   	github.com/harmony-one/harmony/api/proto	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service/blockproposal
+?   	github.com/harmony-one/harmony/api/service/blockproposal	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service/clientsupport
+?   	github.com/harmony-one/harmony/api/service/clientsupport	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service/consensus
+?   	github.com/harmony-one/harmony/api/service/consensus	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service/discovery
+PASS
+ok  	github.com/harmony-one/harmony/api/service/discovery	3.103s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service/explorer
+PASS
+ok  	github.com/harmony-one/harmony/api/service/explorer	0.149s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service/networkinfo
+PASS
+ok  	github.com/harmony-one/harmony/api/service/networkinfo	2.104s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service/syncing/downloader/proto
+?   	github.com/harmony-one/harmony/api/service/syncing/downloader/proto	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service/syncing/downloader
+?   	github.com/harmony-one/harmony/api/service/syncing/downloader	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service/syncing
+PASS
+ok  	github.com/harmony-one/harmony/api/service/syncing	0.087s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api/service
+PASS
+ok  	github.com/harmony-one/harmony/api/service	0.081s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/api
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/bin/lib
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/bin
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/block/factory
+PASS
+ok  	github.com/harmony-one/harmony/block/factory	0.080s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/block/interface
+?   	github.com/harmony-one/harmony/block/interface	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/block/v0
+?   	github.com/harmony-one/harmony/block/v0	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/block/v1
+?   	github.com/harmony-one/harmony/block/v1	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/block/v2
+?   	github.com/harmony-one/harmony/block/v2	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/block/v3
+?   	github.com/harmony-one/harmony/block/v3	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/block
+PASS
+ok  	github.com/harmony-one/harmony/block	0.084s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/cmd/bootnode
+?   	github.com/harmony-one/harmony/cmd/bootnode	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/cmd/harmony
+?   	github.com/harmony-one/harmony/cmd/harmony	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/cmd
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/common/bitutil
+PASS
+ok  	github.com/harmony-one/harmony/common/bitutil	0.007s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/common/compiler
+PASS
+ok  	github.com/harmony-one/harmony/common/compiler	0.006s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/common/denominations
+?   	github.com/harmony-one/harmony/common/denominations	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/common/fdlimit
+PASS
+ok  	github.com/harmony-one/harmony/common/fdlimit	0.006s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/common/hexutil
+PASS
+ok  	github.com/harmony-one/harmony/common/hexutil	0.007s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/common/math
+PASS
+ok  	github.com/harmony-one/harmony/common/math	0.006s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/common/mclock
+?   	github.com/harmony-one/harmony/common/mclock	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/common/prque
+?   	github.com/harmony-one/harmony/common/prque	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/common
+OK: 3 passed
+PASS
+ok  	github.com/harmony-one/harmony/common	0.007s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/consensus/engine
+?   	github.com/harmony-one/harmony/consensus/engine	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/consensus/quorum
+PASS
+ok  	github.com/harmony-one/harmony/consensus/quorum	0.603s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/consensus/reward
+PASS
+ok  	github.com/harmony-one/harmony/consensus/reward	0.083s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/consensus/votepower
+PASS
+ok  	github.com/harmony-one/harmony/consensus/votepower	0.082s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/consensus
+PASS
+ok  	github.com/harmony-one/harmony/consensus	1.765s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/contracts
+?   	github.com/harmony-one/harmony/contracts	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/core/rawdb
+PASS
+ok  	github.com/harmony-one/harmony/core/rawdb	0.093s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/core/state
+PASS
+ok  	github.com/harmony-one/harmony/core/state	6.821s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/core/types
+PASS
+ok  	github.com/harmony-one/harmony/core/types	1.084s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/core/vm/runtime
+PASS
+ok  	github.com/harmony-one/harmony/core/vm/runtime	0.080s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/core/vm
+PASS
+ok  	github.com/harmony-one/harmony/core/vm	0.166s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/core
+PASS
+ok  	github.com/harmony-one/harmony/core	7.273s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/bls
+PASS
+ok  	github.com/harmony-one/harmony/crypto/bls	0.014s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/bn256/cloudflare
+PASS
+ok  	github.com/harmony-one/harmony/crypto/bn256/cloudflare	0.105s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/bn256/google
+PASS
+ok  	github.com/harmony-one/harmony/crypto/bn256/google	0.550s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/bn256
+?   	github.com/harmony-one/harmony/crypto/bn256	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/ecies
+flag provided but not defined: -test.timeout
+Usage of /var/folders/5j/j0xn64_54379n_2w3q589l480000gn/T/go-build025529692/b001/ecies.test:
+  -dump
+    	write encrypted test message to file
+exit status 2
+FAIL	github.com/harmony-one/harmony/crypto/ecies	0.058s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/hash
+?   	github.com/harmony-one/harmony/crypto/hash	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/pki
+PASS
+ok  	github.com/harmony-one/harmony/crypto/pki	0.008s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/build-aux/m4
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/build-aux
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/contrib
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/include
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/obj
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/sage
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/src/asm
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/src/java/org/bitcoin
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/src/java/org
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/src/java
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/src/modules/ecdh
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/src/modules/recovery
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/src/modules
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1/src
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1/libsecp256k1
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/secp256k1
+PASS
+ok  	github.com/harmony-one/harmony/crypto/secp256k1	4.728s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/vdf
+?   	github.com/harmony-one/harmony/crypto/vdf	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/vrf/bls
+PASS
+ok  	github.com/harmony-one/harmony/crypto/vrf/bls	0.415s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/vrf/p256
+PASS
+ok  	github.com/harmony-one/harmony/crypto/vrf/p256	6.237s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto/vrf
+?   	github.com/harmony-one/harmony/crypto/vrf	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/crypto
+PASS
+ok  	github.com/harmony-one/harmony/crypto	0.181s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethboombits
+PASS
+ok  	github.com/harmony-one/harmony/ethboombits	0.191s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethcore/bloombits
+PASS
+ok  	github.com/harmony-one/harmony/ethcore/bloombits	2.418s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethcore/types
+[119 177 155 170 77 230 126 69 167 178 110 74 34 11 204 219 182 115 24 133 170 153 39 6 78 35 156 162 50 2 50 21]
+{0 10 50000 [9 94 123 174 166 166 199 196 194 223 235 151 126 250 195 38 175 85 45 135] 10 [] 27 70522460370187956038204948924070039059720810735419926107150428544048091171151 62673035389445833073657395954200172251579639992696796677674670364000792703665 <nil>}
+[119 177 155 170 77 230 126 69 167 178 110 74 34 11 204 219 182 115 24 133 170 153 39 6 78 35 156 162 50 2 50 21]
+PASS
+ok  	github.com/harmony-one/harmony/ethcore/types	1.044s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethcore
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethdb
+PASS
+ok  	github.com/harmony-one/harmony/ethdb	0.086s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethnode
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/discover
+PASS
+ok  	github.com/harmony-one/harmony/ethp2p/discover	7.634s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/discv5
+--- FAIL: TestParseNode (0.00s)
+    node_test.go:156: test "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:foo":
+          got error `parse "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:foo": invalid port ":foo" after host`, expected `invalid port`
+    node_test.go:156: test "://foo":
+          got error `parse "://foo": missing protocol scheme`, expected `parse ://foo: missing protocol scheme`
+FAIL
+exit status 1
+FAIL	github.com/harmony-one/harmony/ethp2p/discv5	8.532s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/enode
+--- FAIL: TestParseNode (0.00s)
+    urlv4_test.go:139: test "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:foo":
+          got error `parse "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:foo": invalid port ":foo" after host`, expected `invalid port`
+    urlv4_test.go:139: test "://foo":
+          got error `parse "://foo": missing protocol scheme`, expected `parse ://foo: missing protocol scheme`
+FAIL
+exit status 1
+FAIL	github.com/harmony-one/harmony/ethp2p/enode	0.166s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/enr
+PASS
+ok  	github.com/harmony-one/harmony/ethp2p/enr	0.023s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/nat
+PASS
+ok  	github.com/harmony-one/harmony/ethp2p/nat	2.635s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/netutil
+PASS
+ok  	github.com/harmony-one/harmony/ethp2p/netutil	0.012s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/protocols
+FAIL	github.com/harmony-one/harmony/ethp2p/protocols [setup failed]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/simulations/adapters
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/simulations/examples
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/simulations/pipes
+?   	github.com/harmony-one/harmony/ethp2p/simulations/pipes	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/simulations
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p/testing
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/ethp2p
+--- FAIL: TestProtocolHandshakeErrors (0.00s)
+    rlpx_test.go:263: test 3: error mismatch: got "invalid message: (code 0) (size 4) rlp: expected input list for ethp2p.protoHandshake", want "invalid message: (code 0) (size 4) rlp: expected input list for p2p.protoHandshake"
+FAIL
+exit status 1
+FAIL	github.com/harmony-one/harmony/ethp2p	1.715s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/event
+PASS
+ok  	github.com/harmony-one/harmony/event	0.603s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/hmy
+?   	github.com/harmony-one/harmony/hmy	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/bech32
+PASS
+ok  	github.com/harmony-one/harmony/internal/bech32	0.006s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/blsgen
+PASS
+ok  	github.com/harmony-one/harmony/internal/blsgen	0.060s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/chain
+?   	github.com/harmony-one/harmony/internal/chain	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/common
+PASS
+ok  	github.com/harmony-one/harmony/internal/common	0.030s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/configs/node
+PASS
+ok  	github.com/harmony-one/harmony/internal/configs/node	0.085s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/configs/sharding
+PASS
+ok  	github.com/harmony-one/harmony/internal/configs/sharding	0.085s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/configs/viper
+?   	github.com/harmony-one/harmony/internal/configs/viper	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/configs
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/debug
+?   	github.com/harmony-one/harmony/internal/debug	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/genesis
+PASS
+ok  	github.com/harmony-one/harmony/internal/genesis	2.773s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/hmyapi/apiv1
+?   	github.com/harmony-one/harmony/internal/hmyapi/apiv1	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/hmyapi/apiv2
+?   	github.com/harmony-one/harmony/internal/hmyapi/apiv2	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/hmyapi/common
+?   	github.com/harmony-one/harmony/internal/hmyapi/common	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/hmyapi/filters
+?   	github.com/harmony-one/harmony/internal/hmyapi/filters	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/hmyapi
+?   	github.com/harmony-one/harmony/internal/hmyapi	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/params
+?   	github.com/harmony-one/harmony/internal/params	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/shardchain
+?   	github.com/harmony-one/harmony/internal/shardchain	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/utils/testing
+?   	github.com/harmony-one/harmony/internal/utils/testing	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal/utils
+PASS
+ok  	github.com/harmony-one/harmony/internal/utils	4.027s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/internal
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/log
+?   	github.com/harmony-one/harmony/log	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/metrics/exp
+?   	github.com/harmony-one/harmony/metrics/exp	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/metrics/influxdb
+?   	github.com/harmony-one/harmony/metrics/influxdb	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/metrics/librato
+?   	github.com/harmony-one/harmony/metrics/librato	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/metrics
+PASS
+ok  	github.com/harmony-one/harmony/metrics	5.555s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/multibls
+?   	github.com/harmony-one/harmony/multibls	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/node/worker
+PASS
+ok  	github.com/harmony-one/harmony/node/worker	0.092s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/node
+PASS
+ok  	github.com/harmony-one/harmony/node	1.952s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/numeric
+PASS
+ok  	github.com/harmony-one/harmony/numeric	0.027s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/p2p
+?   	github.com/harmony-one/harmony/p2p	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/params
+PASS
+ok  	github.com/harmony-one/harmony/params	0.008s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/rlp
+PASS
+ok  	github.com/harmony-one/harmony/rlp	0.010s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/rpc
+PASS
+ok  	github.com/harmony-one/harmony/rpc	6.356s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/scripts/docker
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/scripts
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/shard/committee
+?   	github.com/harmony-one/harmony/shard/committee	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/shard
+PASS
+ok  	github.com/harmony-one/harmony/shard	0.078s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/staking/apr
+?   	github.com/harmony-one/harmony/staking/apr	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/staking/availability
+PASS
+ok  	github.com/harmony-one/harmony/staking/availability	0.079s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/staking/effective
+PASS
+ok  	github.com/harmony-one/harmony/staking/effective	0.088s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/staking/network
+?   	github.com/harmony-one/harmony/staking/network	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/staking/slash
+PASS
+ok  	github.com/harmony-one/harmony/staking/slash	0.110s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/staking/types
+{"address":"0x0b585f8daefbc68a311fbd4cb20d9174ad174016","bls-public-keys":["ba41f49d70d40434110e32b269dc9b52879ca5fb2aee01c49311c45e008a4b6494c3bd9e6ef7954e39d25d023243b898"],"last-epoch-in-committee":20,"min-self-delegation":10000000000000000000000,"max-total-delegation":12000000000000000000000,"rate":"1.000000000000000000","max-rate":"1.000000000000000000","max-change-rate":"0.000000000000000000","update-height":300,"name":"john","identity":"john","website":"harmony.one.wen","security-contact":"wenSecurity","details":"wenDetails","creation-height":12306}
+PASS
+ok  	github.com/harmony-one/harmony/staking/types	0.091s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/staking/verify
+?   	github.com/harmony-one/harmony/staking/verify	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/staking
+?   	github.com/harmony-one/harmony/staking	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/swarm/spancontext
+?   	github.com/harmony-one/harmony/swarm/spancontext	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/swarm/tracing
+?   	github.com/harmony-one/harmony/swarm/tracing	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/swarm
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/taggedrlp/tools
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/taggedrlp
+PASS
+ok  	github.com/harmony-one/harmony/taggedrlp	0.006s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/test/chain/reward
+?   	github.com/harmony-one/harmony/test/chain/reward	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/test/chain
+?   	github.com/harmony-one/harmony/test/chain	[no test files]
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/test/configs
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/test
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/tools
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/trie
+PASS
+ok  	github.com/harmony-one/harmony/trie	2.797s
+/Users/songgeng/Projects/myharmony/src/github.com/harmony-one/harmony/webhooks
+?   	github.com/harmony-one/harmony/webhooks	[no test files]
+done

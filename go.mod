@@ -13,9 +13,9 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/davidlazar/go-crypto v0.0.0-20190912175916-7055855a373f // indirect
 	github.com/deckarep/golang-set v1.7.1
+	github.com/docker/docker v1.13.1
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
-	
-	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
+	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/go-stack/stack v1.8.0
 	github.com/golang/mock v1.3.1
@@ -27,16 +27,17 @@ require (
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
 	github.com/harmony-one/bls v0.0.6
-
 	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/huin/goupnp v1.0.0
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
+	github.com/influxdata/influxdb v1.8.0
 	github.com/ipfs/go-ds-badger v0.2.4
 	github.com/jackpal/gateway v1.0.6 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
-	github.com/karalabe/hid v1.0.0 // indirect
+	github.com/julienschmidt/httprouter v1.2.0
+	github.com/karalabe/hid v1.0.0
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/libp2p/go-addr-util v0.0.2 // indirect
 	github.com/libp2p/go-libp2p v0.7.4
@@ -51,12 +52,14 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.2.7-0.20200325112436-d3d43e32bef3
 	github.com/libp2p/go-nat v0.0.5 // indirect
 	github.com/libp2p/go-reuseport-transport v0.0.3 // indirect
+	github.com/mattn/go-colorable v0.1.4
+	github.com/mattn/go-isatty v0.0.8
 	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/multiformats/go-multiaddr-net v0.1.4
 	github.com/natefinch/lumberjack v2.0.0+incompatible
+	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/common v0.4.1 // indirect
 	github.com/prometheus/procfs v0.0.3 // indirect
 	github.com/rjeczalik/notify v0.9.2
 	github.com/rs/cors v1.7.0
@@ -65,7 +68,7 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.5.1
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
-	github.com/uber/jaeger-client-go v2.20.1+incompatible // indirect
+	github.com/uber/jaeger-client-go v2.20.1+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	go.uber.org/zap v1.14.1 // indirect
 	golang.org/x/crypto v0.0.0-20200406173513-056763e48d71
@@ -78,6 +81,6 @@ require (
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
-	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
+	gopkg.in/urfave/cli.v1 v1.20.0
 	gopkg.in/yaml.v2 v2.2.7
 )
