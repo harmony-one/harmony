@@ -126,7 +126,6 @@ func (p *StateProcessor) Process(
 			err       error
 			receipt   *types.Receipt
 			cxReceipt *types.CXReceipt
-			receipts  types.Receipts
 		)
 
 		if plainTx, ok := tx.(*types.Transaction); ok {

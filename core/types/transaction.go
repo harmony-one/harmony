@@ -432,11 +432,6 @@ func (tx *Transaction) Copy() *Transaction {
 	return &tx2
 }
 
-// Sender retrieves sender address using input signer
-func (tx *Transaction) Sender(signer Signer) (common.Address, error) {
-	return Sender(signer, tx)
-}
-
 // Transactions is a Transaction slice type for basic sorting.
 type Transactions []*Transaction
 
