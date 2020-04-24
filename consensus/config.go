@@ -8,22 +8,11 @@ const (
 	// timeout will be equal to viewChangeDuration; if view change failed and start v+2
 	// timeout will be 2*viewChangeDuration; timeout of view change v+n is n*viewChangeDuration
 	viewChangeDuration time.Duration = 60 * time.Second
-
 	// timeout duration for announce/prepare/commit
-	phaseDuration     time.Duration = 60 * time.Second
-	bootstrapDuration time.Duration = 600 * time.Second
-	maxLogSize        uint32        = 1000
+	phaseDuration time.Duration = 60 * time.Second
+	maxLogSize    uint32        = 1000
 	// threshold between received consensus message blockNum and my blockNum
 	consensusBlockNumBuffer uint64 = 2
-)
-
-// TimeoutType is the type of timeout in view change protocol
-type TimeoutType int
-
-const (
-	timeoutConsensus TimeoutType = iota
-	timeoutViewChange
-	timeoutBootstrap
 )
 
 var (

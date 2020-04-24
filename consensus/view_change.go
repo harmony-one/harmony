@@ -105,25 +105,14 @@ func (consensus *Consensus) ResetViewChangeState() {
 	consensus.Decider.ResetViewChangeVotes()
 }
 
-func createTimeout() map[TimeoutType]*utils.Timeout {
-	timeouts := make(map[TimeoutType]*utils.Timeout)
-	timeouts[timeoutConsensus] = utils.NewTimeout(phaseDuration)
-	timeouts[timeoutViewChange] = utils.NewTimeout(viewChangeDuration)
-	timeouts[timeoutBootstrap] = utils.NewTimeout(bootstrapDuration)
-	return timeouts
-}
-
 // startViewChange send a  new view change
 func (consensus *Consensus) startViewChange(viewID uint64) {
 	if consensus.disableViewChange {
 		return
 	}
-	consensus.consensusTimeout[timeoutConsensus].Stop()
-	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
 	consensus.current.SetViewID(viewID)
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
-
 	diff := int64(viewID - consensus.viewID)
 	duration := time.Duration(diff * diff * int64(viewChangeDuration))
 	utils.Logger().Info().
@@ -141,8 +130,8 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		)
 	}
 
-	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
-	consensus.consensusTimeout[timeoutViewChange].Start()
+	consensus.timeouts.viewChange.SetDuration(duration)
+	consensus.timeouts.viewChange.Start()
 	utils.Logger().Debug().
 		Uint64("ViewChangingID", consensus.current.ViewID()).
 		Msg("[startViewChange] start view change timer")
@@ -411,8 +400,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 		consensus.viewID = recvMsg.ViewID
 		consensus.ResetViewChangeState()
-		consensus.consensusTimeout[timeoutViewChange].Stop()
-		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensus.timeouts.consensus.Start()
 		utils.Logger().Debug().
 			Uint64("viewChangingID", consensus.current.ViewID()).
 			Msg("[onViewChange] New Leader Start Consensus Timer and Stop View Change Timer")
@@ -570,6 +558,5 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		Msg("new leader changed")
 	utils.Logger().Debug().
 		Msg("validator start consensus timer and stop view change timer")
-	consensus.consensusTimeout[timeoutConsensus].Start()
-	consensus.consensusTimeout[timeoutViewChange].Stop()
+	consensus.timeouts.consensus.Start()
 }

@@ -153,19 +153,7 @@ func (consensus *Consensus) finalizeCommits() {
 			Msg("[finalizeCommits] Sent Committed Message")
 	}
 
-	// Dump new block into level db
-	// In current code, we add signatures in block in tryCatchup, the block dump to explorer does not contains signatures
-	// but since explorer doesn't need signatures, it should be fine
-	// in future, we will move signatures to next block
-	//explorer.GetStorageInstance(consensus.leader.IP, consensus.leader.Port, true).Dump(block, beforeCatchupNum)
-
-	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
-		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		utils.Logger().Debug().Msg("[finalizeCommits] Start consensus timer; stop bootstrap timer only once")
-	} else {
-		utils.Logger().Debug().Msg("[finalizeCommits] Start consensus timer")
-	}
-	consensus.consensusTimeout[timeoutConsensus].Start()
+	consensus.timeouts.consensus.Start()
 
 	utils.Logger().Info().
 		Uint64("blockNum", block.NumberU64()).
@@ -324,7 +312,6 @@ func (consensus *Consensus) tryCatchup() {
 	if currentBlockNum < consensus.blockNum &&
 		consensus.current.Mode() == ViewChanging {
 		consensus.current.SetMode(Normal)
-		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
 	// clean up old log
 	consensus.FBFTLog.DeleteBlocksLessThan(consensus.blockNum - 1)
@@ -340,13 +327,17 @@ func (consensus *Consensus) Start(
 		toStart.Store(false)
 		isInitialLeader := consensus.IsLeader()
 		if isInitialLeader {
-			utils.Logger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Waiting for consensus start")
+			utils.Logger().Info().
+				Time("time", time.Now()).
+				Msg("[ConsensusMainLoop] Waiting for consensus start")
 			// send a signal to indicate it's ready to run consensus
 			// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
 			go func() {
 				<-startChannel
 				toStart.Store(true)
-				utils.Logger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
+				utils.Logger().Info().
+					Time("time", time.Now()).
+					Msg("[ConsensusMainLoop] Send ReadySignal")
 				consensus.ReadySignal <- struct{}{}
 			}()
 		}
@@ -354,7 +345,6 @@ func (consensus *Consensus) Start(
 		defer close(stoppedChan)
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
-		consensus.consensusTimeout[timeoutBootstrap].Start()
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
 			Uint64("blockNum", consensus.blockNum).
@@ -367,28 +357,21 @@ func (consensus *Consensus) Start(
 			select {
 			case <-ticker.C:
 				utils.Logger().Debug().Msg("[ConsensusMainLoop] Ticker")
-				if !toStart.Load().(bool) && isInitialLeader {
+				if !toStart.Load().(bool) || isInitialLeader {
 					continue
 				}
-				for k, v := range consensus.consensusTimeout {
-					if consensus.current.Mode() == Syncing ||
-						consensus.current.Mode() == Listening {
-						v.Stop()
-					}
-					if !v.CheckExpire() {
-						continue
-					}
-					if k != timeoutViewChange {
+				// TODO think about this some more
+				if m := consensus.current.Mode(); m == Syncing || m == Listening {
+					if !consensus.timeouts.consensus.WithinLimit() {
 						utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
 						consensus.startViewChange(consensus.viewID + 1)
-						break
-					} else {
+					} else if !consensus.timeouts.viewChange.WithinLimit() {
 						utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
 						viewID := consensus.current.ViewID()
 						consensus.startViewChange(viewID + 1)
-						break
 					}
 				}
+
 			case <-consensus.syncReadyChan:
 				utils.Logger().Debug().Msg("[ConsensusMainLoop] syncReadyChan")
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
@@ -412,7 +395,9 @@ func (consensus *Consensus) Start(
 				if consensus.NeedsRandomNumberGeneration(newBlock.Header().Epoch()) {
 					// generate VRF if the current block has a new leader
 					if !consensus.ChainReader.IsSameLeaderAsPreviousBlock(newBlock) {
-						vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(newBlock.Header().Epoch())
+						vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(
+							newBlock.Header().Epoch(),
+						)
 						if err != nil {
 							utils.Logger().Info().
 								Uint64("MsgBlockNum", newBlock.NumberU64()).

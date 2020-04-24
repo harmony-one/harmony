@@ -118,15 +118,6 @@ func fundFaucetContract(chain *core.BlockChain) {
 	tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(4), randomUserAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 	txs = append(txs, tx)
 
-	txmap := make(map[common.Address]types.Transactions)
-	txmap[FaucetAddress] = txs
-
-	err := contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
-	)
-	if err != nil {
-		fmt.Println(err)
-	}
 	block, _ := contractworker.
 		FinalizeNewBlock([]byte{}, []byte{}, 0, common.Address{}, nil, nil)
 	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
@@ -163,15 +154,6 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	txmap := make(map[common.Address]types.Transactions)
 	txmap[FaucetAddress] = types.Transactions{callfaucettx}
 
-	err = contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
-	)
-	if err != nil {
-		fmt.Println(err)
-	}
-	if err != nil {
-		fmt.Println(err)
-	}
 	block, _ := contractworker.FinalizeNewBlock(
 		[]byte{}, []byte{}, 0, common.Address{}, nil, nil,
 	)

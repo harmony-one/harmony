@@ -251,7 +251,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.current.SetViewID(msg.ViewID)
 		consensus.LeaderPubKey = msg.SenderPubkey
 		consensus.ignoreViewIDCheck = false
-		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensus.timeouts.consensus.Start()
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
 			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:20]).

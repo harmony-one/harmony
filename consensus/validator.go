@@ -277,14 +277,13 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.commitBitmap = mask
 
 	if recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
-		utils.Logger().Debug().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")
+		utils.Logger().Debug().
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Msg("[OnCommitted] OUT OF SYNC")
 		go func() {
 			select {
 			case consensus.BlockNumLowChan <- struct{}{}:
 				consensus.current.SetMode(Syncing)
-				for _, v := range consensus.consensusTimeout {
-					v.Stop()
-				}
 			case <-time.After(1 * time.Second):
 			}
 		}()
@@ -297,11 +296,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
-		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		utils.Logger().Debug().Msg("[OnCommitted] Start consensus timer; stop bootstrap timer only once")
-	} else {
-		utils.Logger().Debug().Msg("[OnCommitted] Start consensus timer")
-	}
-	consensus.consensusTimeout[timeoutConsensus].Start()
+	utils.Logger().Debug().Msg("[OnCommitted] Start consensus timer")
+	consensus.timeouts.consensus.Start()
 }

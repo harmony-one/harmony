@@ -25,6 +25,41 @@ const (
 
 var errLeaderPriKeyNotFound = errors.New("getting leader private key from consensus public keys failed")
 
+type comeDue struct {
+	duration  atomic.Value
+	startTime atomic.Value
+}
+
+func (d *comeDue) Start() {
+	d.startTime.Store(time.Now())
+}
+
+func (d *comeDue) SetDuration(dur time.Duration) {
+	d.duration.Store(dur)
+}
+
+func (d *comeDue) WithinLimit() bool {
+	return time.Since(
+		d.startTime.Load().(time.Time),
+	) > d.duration.Load().(time.Duration)
+}
+
+type roundTimeout struct {
+	consensus  comeDue
+	viewChange comeDue
+}
+
+func newRoundTimeoutWithDefaults() *roundTimeout {
+	var con, vc atomic.Value
+	con.Store(phaseDuration)
+	vc.Store(viewChangeDuration)
+	return &roundTimeout{
+		consensus:  comeDue{duration: con},
+		viewChange: comeDue{duration: vc},
+	}
+
+}
+
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	Decider quorum.Decider
@@ -45,8 +80,7 @@ type Consensus struct {
 	delayCommit time.Duration
 	// Consensus rounds whose commit phase finished
 	commitFinishChan chan uint64
-	// 2 types of timeouts: normal and viewchange
-	consensusTimeout map[TimeoutType]*utils.Timeout
+	timeouts         *roundTimeout
 	// Commits collected from validators.
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
@@ -185,15 +219,12 @@ func New(
 		msgSender:       NewMessageSender(host),
 		BlockNumLowChan: make(chan struct{}),
 		isLeader:        isLeader,
+		timeouts:        newRoundTimeoutWithDefaults(),
+		FBFTLog:         NewFBFTLog(),
+		phase:           FBFTAnnounce,
+		// TODO Refactor consensus.block* into State?
+		current: NewState(),
 	}
-
-	// FBFT related
-	consensus.FBFTLog = NewFBFTLog()
-	consensus.phase = FBFTAnnounce
-	// TODO Refactor consensus.block* into State?
-	consensus.current = NewState()
-	// FBFT timeout
-	consensus.consensusTimeout = createTimeout()
 
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey
