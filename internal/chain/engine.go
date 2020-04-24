@@ -2,7 +2,7 @@ package chain
 
 import (
 	"bytes"
-	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 	"sort"
 
@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -227,10 +228,13 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		}
 	}
 
-	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
-	blockNumHash := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumHash, header.Number().Uint64()-1)
-	lastCommitPayload := append(blockNumHash, parentHash[:]...)
+	lastCommitPayload := signature.ConstructCommitPayload(e.Beaconchain(),
+		parentHeader.Hash(), parentHeader.Epoch().Uint64(), parentHeader.Number().Uint64(), parentHeader.ViewID().Uint64())
+	utils.Logger().Debug(). // TODO: remove debug msg after STN testing
+				Uint64("epoch", parentHeader.Epoch().Uint64()).
+				Uint64("block-number", parentHeader.Number().Uint64()).
+				Uint64("view-id", parentHeader.ViewID().Uint64()).
+				Msgf("[COMMIT-PAYLOAD] VerifySeal %v", hex.EncodeToString(lastCommitPayload))
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
 		const msg = "[VerifySeal] Unable to verify aggregated signature from last block"
 		return errors.New(msg)
@@ -505,7 +509,6 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			"[VerifyHeaderWithSignature] Unable to deserialize signatures",
 		)
 	}
-	hash := header.Hash()
 
 	if e := header.Epoch(); chain.Config().IsStaking(e) {
 		slotList, err := chain.ReadShardState(e)
@@ -543,10 +546,13 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			)
 		}
 	}
-	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
-	blockNumHash := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumHash, header.Number().Uint64())
-	commitPayload := append(blockNumHash, hash[:]...)
+	commitPayload := signature.ConstructCommitPayload(e.Beaconchain(),
+		header.Hash(), header.Epoch().Uint64(), header.Number().Uint64(), header.ViewID().Uint64())
+	utils.Logger().Debug(). // TODO: remove debug msg after STN testing
+				Uint64("epoch", header.Epoch().Uint64()).
+				Uint64("block-number", header.Number().Uint64()).
+				Uint64("view-id", header.ViewID().Uint64()).
+				Msgf("[COMMIT-PAYLOAD] VerifyHeaderWithSignature %v", hex.EncodeToString(commitPayload))
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		return errors.New("[VerifySeal] Unable to verify aggregated signature for block")
