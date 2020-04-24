@@ -163,7 +163,7 @@ func VerifyAndDelegateFromMsg(
 		return nil, nil, err
 	}
 
-	// If no existing delegation, create new delegation
+	// Check if there is enough liquid token to delegate
 	if !CanTransfer(stateDB, msg.DelegatorAddress, msg.Amount) {
 		return nil, nil, errors.Wrapf(
 			errInsufficientBalanceForStake, "had %v, tried to stake %v",
@@ -183,6 +183,8 @@ func VerifyAndDelegateFromMsg(
 			return wrapper, msg.Amount, nil
 		}
 	}
+
+	// Add new delegation
 	wrapper.Delegations = append(
 		wrapper.Delegations, staking.NewDelegation(
 			msg.DelegatorAddress, msg.Amount,
