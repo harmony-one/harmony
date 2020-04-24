@@ -39,6 +39,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
+	"github.com/ipfs/go-datastore"
+	ipfs_cfg "github.com/ipfs/go-ipfs-config"
 	"github.com/pkg/errors"
 )
 
@@ -156,14 +158,6 @@ func initSetup() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	if len(p2p.BootNodes) == 0 {
-		bootNodeAddrs, err := p2p.StringsToAddrs(p2p.DefaultBootNodeAddrStrings)
-		if err != nil {
-			utils.FatalErrMsg(err, "cannot parse default bootnode list %#v",
-				p2p.DefaultBootNodeAddrStrings)
-		}
-		p2p.BootNodes = bootNodeAddrs
-	}
 }
 
 func passphraseForBLS() {
@@ -371,6 +365,36 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 	return *consensusMultiPubKey
 }
 
+func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
+	baseDS := datastore.NewMapDatastore()
+	const DevRendezVousPoint = "/ip4/167.99.223.55/tcp/4040/p2p/QmTo3RS6Uc8aCS5Cxx8EBHkNCe4C7vKRanbMEboxkA92Cn"
+	var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
+	p, err := strconv.Atoi(*port)
+
+	if err != nil {
+		return nil, err
+	}
+
+	myHost, err := p2p.NewHost(&p2p.Opts{
+		Bootstrap:             DefaultBootstrap,
+		RendezVousServerMAddr: DevRendezVousPoint,
+		Port:                  uint(p),
+		RootDS:                baseDS,
+		Logger:                utils.NetworkLogger(),
+	}, &p2p.Peer{
+		IP: *ip,
+		// TODO Unify these
+		Port:            *port,
+		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
+		PeerID:          "",
+	},
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create P2P network host")
+	}
+	return myHost, nil
+}
+
 func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	var err error
 
@@ -399,13 +423,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 			*keyFile)
 	}
 
-	selfPeer := p2p.Peer{
-		IP:              *ip,
-		Port:            *port,
-		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
-	}
-
-	myHost, err = p2p.NewHost(&selfPeer, nodeConfig.P2PPriKey)
+	myHost, err = setupHost(nodeConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
 	}
@@ -608,7 +626,6 @@ func main() {
 	// build time.
 	os.Setenv("GODEBUG", "netdns=go")
 
-	flag.Var(&p2p.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
 	switch *nodeType {

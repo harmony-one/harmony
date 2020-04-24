@@ -36,7 +36,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
-	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 )
@@ -357,7 +357,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 // Start kicks off the node message handling
 func (node *Node) Start() error {
-	allTopics := node.host.AllTopics()
+	allTopics := node.host.AllSubscriptions()
 	if len(allTopics) == 0 {
 		return errors.New("have no topics to listen to")
 	}
@@ -367,24 +367,22 @@ func (node *Node) Start() error {
 	ownID := node.host.GetID()
 	errChan := make(chan error)
 
-	for i, topic := range allTopics {
-		sub, err := topic.Subscribe()
-		if err != nil {
-			return err
-		}
+	for i, named := range allTopics {
+		topicName, sub := named.Topic, named.Sub
 		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
-		msgChan := make(chan *libp2p_pubsub.Message)
+		msgChan := make(chan ipfs_interface.PubSubMessage)
 
-		go func(msgChan chan *libp2p_pubsub.Message, sem *semaphore.Weighted) {
+		go func(msgChan chan ipfs_interface.PubSubMessage, sem *semaphore.Weighted) {
 			for msg := range msgChan {
-				payload := msg.GetData()
+				payload := msg.Data()
 				if len(payload) < p2pMsgPrefixSize {
 					continue
 				}
+				m := msg
 				if sem.TryAcquire(1) {
 					go func() {
 						node.HandleMessage(
-							payload[p2pMsgPrefixSize:], msg.GetFrom(),
+							payload[p2pMsgPrefixSize:], m.From(), topicName,
 						)
 						sem.Release(1)
 					}()
@@ -395,14 +393,14 @@ func (node *Node) Start() error {
 			}
 		}(msgChan, weighted[i])
 
-		go func(msgChan chan *libp2p_pubsub.Message) {
+		go func(msgChan chan ipfs_interface.PubSubMessage) {
 			for {
 				nextMsg, err := sub.Next(ctx)
 				if err != nil {
 					errChan <- err
 					continue
 				}
-				if nextMsg.GetFrom() == ownID {
+				if nextMsg.From() == ownID {
 					continue
 				}
 				msgChan <- nextMsg
@@ -448,7 +446,7 @@ func New(
 	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
 	if host != nil {
 		node.host = host
-		node.SelfPeer = host.GetSelfPeer()
+		node.SelfPeer = *host.GetSelfPeer()
 	}
 
 	networkType := node.NodeConfig.GetNetworkType()
@@ -640,15 +638,15 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 
 // AddPeers adds neighbors nodes
 func (node *Node) AddPeers(peers []*p2p.Peer) int {
-	for _, p := range peers {
-		key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-		_, ok := node.Neighbors.LoadOrStore(key, *p)
-		if !ok {
-			// !ok means new peer is stored
-			node.host.AddPeer(p)
-			continue
-		}
-	}
+	// for _, p := range peers {
+	// 	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
+	// 	_, ok := node.Neighbors.LoadOrStore(key, *p)
+	// 	if !ok {
+	// 		// !ok means new peer is stored
+	// 		node.host.AddPeer(p)
+	// 		continue
+	// 	}
+	// }
 
 	return node.host.GetPeerCount()
 }

@@ -79,7 +79,7 @@ func (s *Service) contactP2pPeers() {
 	if nodeConfig.Role() == nodeconfig.ExplorerNode {
 		return
 	}
-	pingMsg := proto_discovery.NewPingMessage(s.host.GetSelfPeer(), s.config.IsClient)
+	pingMsg := proto_discovery.NewPingMessage(*s.host.GetSelfPeer(), s.config.IsClient)
 	msgBuf := p2p.ConstructMessage(pingMsg.ConstructPingMessage())
 	s.sentPingMessage(s.config.ShardGroupID, msgBuf)
 	pingInterval := 5

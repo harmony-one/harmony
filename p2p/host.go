@@ -37,7 +37,8 @@ type Host interface {
 	GetSelfPeer() *Peer
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 	GetPeerCount() int
-	AllSubscriptions() []ipfs_interface.PubSubSubscription
+	GetID() libp2p_peer.ID
+	AllSubscriptions() []NamedSub
 }
 
 var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
@@ -52,7 +53,6 @@ type Opts struct {
 
 type hmyHost struct {
 	// Temp hack to satisfy all methods
-	Host
 	coreAPI ipfs_interface.CoreAPI
 	node    *ipfs_core.IpfsNode
 	log     *zerolog.Logger
@@ -84,6 +84,11 @@ func fatal(err error) {
 
 func (h *hmyHost) GetSelfPeer() *Peer {
 	return h.ownPeer
+}
+
+func (h *hmyHost) GetID() libp2p_peer.ID {
+	return h.node.PeerHost.ID()
+	// return h.ownPeer.IP
 }
 
 func (h *hmyHost) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
@@ -121,12 +126,17 @@ func (h *hmyHost) getTopic(topic string) (ipfs_interface.PubSubSubscription, err
 	return sub, nil
 }
 
-func (h *hmyHost) AllSubscriptions() []ipfs_interface.PubSubSubscription {
-	subs := []ipfs_interface.PubSubSubscription{}
+type NamedSub struct {
+	Topic string
+	Sub   ipfs_interface.PubSubSubscription
+}
+
+func (h *hmyHost) AllSubscriptions() []NamedSub {
+	subs := []NamedSub{}
 	h.lock.Lock()
 	defer h.lock.Unlock()
-	for _, g := range h.joined {
-		subs = append(subs, g)
+	for name, g := range h.joined {
+		subs = append(subs, NamedSub{name, g})
 	}
 	return subs
 }
