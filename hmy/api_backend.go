@@ -587,6 +587,18 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 		quorum.NewRegistry(stakedSlotsThen),
 		quorum.NewRegistry(stakedSlotsNow)
 
+	then.MedianStake, then.SlotPurchases =
+		committee.ComputeMedianRawStakeForShardCommittee(
+			b.hmy.BlockChain(),
+			prevCommittee.StakedValidators().Addrs,
+		)
+
+	now.MedianStake, now.SlotPurchases =
+		committee.ComputeMedianRawStakeForShardCommittee(
+			b.hmy.BlockChain(),
+			nowCommittee.StakedValidators().Addrs,
+		)
+
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {

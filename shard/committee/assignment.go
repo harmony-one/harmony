@@ -75,6 +75,24 @@ func (p CandidateOrder) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// ComputeMedianRawStakeForShardCommittee computes median and slot purchases for shard committee
+func ComputeMedianRawStakeForShardCommittee(
+	stakedReader StakingCandidatesReader,
+	candidates []common.Address,
+) (numeric.Dec, []effective.SlotPurchase) {
+	candidateSlotOrders, err := prepareOrdersSnapshot(stakedReader, candidates)
+	if err != nil {
+		return numeric.NewDec(0), nil
+	}
+	maxExternalSlots := shard.ExternalSlotsAvailableForEpoch(
+		stakedReader.CurrentBlock().Epoch(),
+	)
+	median, winners := effective.Apply(
+		candidateSlotOrders, maxExternalSlots,
+	)
+	return median, winners
+}
+
 // NewEPoSRound runs a fresh computation of EPoS using
 // latest data always
 func NewEPoSRound(stakedReader StakingCandidatesReader) (
@@ -147,6 +165,61 @@ func prepareOrders(
 		}
 
 		validatorStake := big.NewInt(0)
+		for i := range validator.Delegations {
+			validatorStake.Add(
+				validatorStake, validator.Delegations[i].Amount,
+			)
+		}
+
+		totalStaked.Add(totalStaked, validatorStake)
+
+		found := false
+		for _, key := range validator.SlotPubKeys {
+			if _, ok := blsKeys[key]; ok {
+				found = true
+			} else {
+				blsKeys[key] = struct{}{}
+			}
+		}
+
+		if found {
+			continue
+		}
+
+		essentials[validator.Address] = &effective.SlotOrder{
+			validatorStake,
+			validator.SlotPubKeys,
+			tempZero,
+		}
+	}
+	totalStakedDec := numeric.NewDecFromBigInt(totalStaked)
+
+	for _, value := range essentials {
+		value.Percentage = numeric.NewDecFromBigInt(value.Stake).Quo(totalStakedDec)
+	}
+
+	return essentials, nil
+}
+
+func prepareOrdersSnapshot(
+	stakedReader StakingCandidatesReader,
+	candidates []common.Address,
+) (map[common.Address]*effective.SlotOrder, error) {
+	blsKeys := map[shard.BLSPublicKey]struct{}{}
+	essentials := map[common.Address]*effective.SlotOrder{}
+	totalStaked, tempZero := big.NewInt(0), numeric.ZeroDec()
+
+	for i := range candidates {
+		snapshot, err := stakedReader.ReadValidatorSnapshot(
+			candidates[i],
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		validator := snapshot.Validator
+		validatorStake := big.NewInt(0)
+
 		for i := range validator.Delegations {
 			validatorStake.Add(
 				validatorStake, validator.Delegations[i].Amount,

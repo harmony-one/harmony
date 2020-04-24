@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/pkg/errors"
 )
 
@@ -125,13 +126,15 @@ type Decider interface {
 
 // Registry ..
 type Registry struct {
-	Deciders      map[string]Decider `json:"quorum-deciders"`
-	ExternalCount int                `json:"external-slot-count"`
+	Deciders      map[string]Decider       `json:"quorum-deciders"`
+	ExternalCount int                      `json:"external-slot-count"`
+	MedianStake   numeric.Dec              `json:"epos-median-stake"`
+	SlotPurchases []effective.SlotPurchase `json:"slot-purchases"`
 }
 
 // NewRegistry ..
 func NewRegistry(extern int) Registry {
-	return Registry{map[string]Decider{}, extern}
+	return Registry{map[string]Decider{}, extern, numeric.NewDec(0), nil}
 }
 
 // Transition  ..
