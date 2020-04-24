@@ -69,8 +69,6 @@ type Consensus struct {
 	vcLock       sync.Mutex // mutex for view change
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader *core.BlockChain
-	// map of nodeID to validator Peer object
-	validators sync.Map // key is the hex string of the blsKey, value is p2p.Peer
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers   int
@@ -187,7 +185,6 @@ func New(
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
-	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey
