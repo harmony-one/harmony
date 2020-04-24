@@ -84,13 +84,14 @@ func ComputeMedianRawStakeForShardCommittee(
 	if err != nil {
 		return numeric.NewDec(0), nil
 	}
+
 	maxExternalSlots := shard.ExternalSlotsAvailableForEpoch(
 		stakedReader.CurrentBlock().Epoch(),
 	)
-	median, winners := effective.Apply(
+
+	return effective.Apply(
 		candidateSlotOrders, maxExternalSlots,
 	)
-	return median, winners
 }
 
 // NewEPoSRound runs a fresh computation of EPoS using
