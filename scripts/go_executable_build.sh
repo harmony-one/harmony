@@ -4,7 +4,6 @@ export GO111MODULE=on
 
 declare -A SRC
 SRC[harmony]=cmd/harmony/main.go
-SRC[bootnode]=cmd/bootnode/main.go
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
@@ -69,7 +68,7 @@ ACTION:
    upload      upload binaries to s3
    release     upload binaries to release bucket
 
-   harmony|bootnode|
+   harmony
                only build the specified binary
 
 EXAMPLES:
@@ -263,6 +262,6 @@ case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
    "release") release ;;
-   "harmony"|"bootnode") build_only $ACTION ;;
+   "harmony") build_only $ACTION ;;
    *) usage ;;
 esac

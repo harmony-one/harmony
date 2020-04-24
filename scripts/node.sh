@@ -303,7 +303,7 @@ do
 done
 shift $((${OPTIND} - 1))
 
-unset -v bootnodes REL network_type dns_zone syncdir
+unset -v REL network_type dns_zone syncdir
 
 case "${node_type}" in
 validator) ;;
@@ -314,61 +314,36 @@ esac
 
 case "${network}" in
 mainnet)
-  bootnodes=(
-    /ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
-    /ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
-    /ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
-  )
   REL=mainnet
   network_type=mainnet
   dns_zone=t.hmny.io
   syncdir=mainnet.min
   ;;
 testnet)  # TODO: update Testnet configs once LRTN is upgraded
-  bootnodes=(
-    /ip4/54.218.73.167/tcp/9876/p2p/QmWBVCPXQmc2ULigm3b9ayCZa15gj25kywiQQwPhHCZeXj
-    /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
-  )
   REL=testnet
   network_type=testnet
   dns_zone=p.hmny.io
   syncdir=lrtn
   ;;
 staking)
-  bootnodes=(
-    /ip4/54.86.126.90/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/52.40.84.2/tcp/9867/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
-  )
   REL=pangaea
   network_type=pangaea
   dns_zone=os.hmny.io
   syncdir=ostn
   ;;
 partner)
-  bootnodes=(
-    /ip4/52.40.84.2/tcp/9800/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
-    /ip4/54.86.126.90/tcp/9800/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-  )
   REL=partner
   network_type=partner
   dns_zone=ps.hmny.io
   syncdir=pstn
   ;;
 stress)
-  bootnodes=(
-    /ip4/52.40.84.2/tcp/9842/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
-  )
   REL=stressnet
   network_type=stressnet
   dns_zone=stn.hmny.io
   syncdir=stn
   ;;
 devnet)
-  bootnodes=(
-    /ip4/52.40.84.2/tcp/9870/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
-    /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-  )
   REL=devnet
   network_type=devnet
   dns_zone=pga.hmny.io
@@ -671,12 +646,6 @@ fi
 myip
 check_pkg_management
 
-unset -v BN_MA bn
-for bn in "${bootnodes[@]}"
-do
-  BN_MA="${BN_MA+"${BN_MA},"}${bn}"
-done
-
 if [[ "${start_clean}" == "true" && "${network_type}" != "mainnet" ]]
 then
    msg "cleaning up old database (-c)"
@@ -889,7 +858,6 @@ while :
 do
    msg "############### Running Harmony Process ###############"
    args=(
-      -bootnodes "${BN_MA}"
       -ip "${PUB_IP}"
       -port "${NODE_PORT}"
       -network_type="${network_type}"
