@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"encoding/hex"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -78,13 +76,15 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
-	for i := range pubKeys {
-		utils.Logger().Info().
-			Int("index", i).
-			Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).
-			Msg("Member")
-	}
 	consensus.LeaderPubKey = pubKeys[0]
+
+	for _, key := range consensus.PubKey.PublicKey {
+		if key.IsEqual(consensus.LeaderPubKey) {
+			consensus.isLeader.Store(true)
+			break
+		}
+	}
+
 	utils.Logger().Info().
 		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
 	consensus.pubKeyLock.Unlock()
@@ -92,11 +92,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.ResetState()
 	consensus.ResetViewChangeState()
 	return consensus.Decider.ParticipantsCount()
-}
-
-// NewFaker returns a faker consensus.
-func NewFaker() *Consensus {
-	return &Consensus{}
 }
 
 // Sign on the hash of the message
@@ -156,27 +151,6 @@ func (consensus *Consensus) ResetState() {
 	consensus.commitBitmap = commitBitmap
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
-}
-
-// Returns a string representation of this consensus
-func (consensus *Consensus) String() string {
-	duty := ""
-	if consensus.IsLeader() {
-		duty = "leader"
-	} else {
-		duty = "validator"
-	}
-
-	return fmt.Sprintf(
-		"[Duty:%s Pub:%s Header:%s Num:%d View:%d Shard:%d Epoch:%d]",
-		duty,
-		consensus.PubKey.SerializeToHexStr(),
-		hex.EncodeToString(consensus.blockHeader),
-		consensus.blockNum,
-		consensus.viewID,
-		consensus.ShardID,
-		consensus.epoch,
-	)
 }
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
@@ -529,12 +503,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	for _, key := range consensus.PubKey.PublicKey {
-		if key.IsEqual(consensus.LeaderPubKey) {
-			return true
-		}
-	}
-	return false
+	return consensus.isLeader.Load().(bool)
+
 }
 
 // NeedsRandomNumberGeneration returns true if the current epoch needs random number generation

@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -73,6 +74,7 @@ type Consensus struct {
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers   int
 	pubKeyLock sync.Mutex
+	isLeader   atomic.Value
 	// private/public keys of current node
 	priKey *multibls.PrivateKey
 	PubKey *multibls.PublicKey
@@ -173,11 +175,18 @@ func New(
 	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey *multibls.PrivateKey,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
-	consensus := Consensus{}
-	consensus.Decider = Decider
-	consensus.host = host
-	consensus.msgSender = NewMessageSender(host)
-	consensus.BlockNumLowChan = make(chan struct{})
+
+	var isLeader atomic.Value
+	isLeader.Store(false)
+
+	consensus := Consensus{
+		Decider:         Decider,
+		host:            host,
+		msgSender:       NewMessageSender(host),
+		BlockNumLowChan: make(chan struct{}),
+		isLeader:        isLeader,
+	}
+
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce
