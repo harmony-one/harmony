@@ -349,7 +349,7 @@ func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (h
 // GetBlockSigners returns signers for a particular block.
 func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) ([]string, error) {
 	if uint64(blockNr) == 0 || uint64(blockNr) >= uint64(s.BlockNumber()) {
-		return make([]string, 0), nil
+		return []string{}, nil
 	}
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if err != nil {
@@ -368,22 +368,22 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 		pubkeys[i] = new(bls.PublicKey)
 		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
-	result := make([]string, 0)
 	mask, err := internal_bls.NewMask(pubkeys, nil)
 	if err != nil {
-		return result, err
+		return []string{}, err
 	}
 	if err != nil {
-		return result, err
+		return []string{}, err
 	}
 	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
 	if err != nil {
-		return result, err
+		return []string{}, err
 	}
+	result := []string{}
 	for _, validator := range committee.NodeList {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
-			return result, err
+			return []string{}, err
 		}
 		blsPublicKey := new(bls.PublicKey)
 		validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
