@@ -736,7 +736,7 @@ func main() {
 				chain.Rollback(rollbacks)
 				lastSig := curBlock.Header().LastCommitSignature()
 				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
-				chain.WriteLastCommits(sigAndBitMap)
+				chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)
 			}
 		}
 	}

@@ -393,7 +393,7 @@ func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(
-	newBlock *types.Block, commitSigAndBitmap []byte,
+	newBlock *types.Block,
 ) {
 	if _, err := node.Blockchain().InsertChain([]*types.Block{newBlock}, true); err != nil {
 		utils.Logger().Error().
@@ -420,7 +420,7 @@ func (node *Node) PostConsensusProcessing(
 			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
 			node.BroadcastCrossLink(newBlock)
 		}
-		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
+		node.BroadcastCXReceipts(newBlock)
 	} else {
 		if node.Consensus.Mode() != consensus.Listening {
 			utils.Logger().Info().
@@ -440,7 +440,7 @@ func (node *Node) PostConsensusProcessing(
 				if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 					node.BroadcastNewBlock(newBlock)
 				}
-				node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
+				node.BroadcastCXReceipts(newBlock)
 			}
 		}
 	}

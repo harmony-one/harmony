@@ -268,11 +268,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
-	consensus.ChainReader.WriteLastCommits(recvMsg.Payload)
-	consensus.getLogger().Debug().
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Msg("[OnCommitted] Committed message added")
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()

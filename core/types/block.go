@@ -217,6 +217,9 @@ type Block struct {
 	// inter-peer block relay.
 	ReceivedAt   time.Time
 	ReceivedFrom interface{}
+
+	// Commit Signatures/Bitmap
+	commitSigAndBitmap []byte
 }
 
 func (b *Block) String() string {
@@ -242,6 +245,22 @@ func (b *Block) SetLastCommitSig(sig []byte, signers []byte) {
 	copy(sig2[:], sig)
 	b.header.SetLastCommitSignature(sig2)
 	b.header.SetLastCommitBitmap(signers)
+}
+
+// SetCurrentCommitSig sets the commit group signature that signed on this block.
+func (b *Block) SetCurrentCommitSig(sigAndBitmap []byte) {
+	if len(sigAndBitmap) <= 96 {
+		utils.Logger().Warn().
+			Int("srcLen", len(sigAndBitmap)).
+			Int("dstLen", len(b.header.LastCommitSignature())).
+			Msg("SetCurrentCommitSig: sig size mismatch")
+	}
+	b.commitSigAndBitmap = sigAndBitmap
+}
+
+// GetCurrentCommitSig get the commit group signature that signed on this block.
+func (b *Block) GetCurrentCommitSig() []byte {
+	return b.commitSigAndBitmap
 }
 
 // DeprecatedTd is an old relic for extracting the TD of a block. It is in the

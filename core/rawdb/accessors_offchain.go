@@ -42,29 +42,6 @@ func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) error 
 	return nil
 }
 
-// ReadLastCommits retrieves the commit signatures on the current block of blockchain.
-func ReadLastCommits(db DatabaseReader) ([]byte, error) {
-	var data []byte
-	data, err := db.Get(lastCommitsKey)
-	if err != nil {
-		return nil, errors.New("cannot read last commits from rawdb")
-	}
-	return data, nil
-}
-
-// WriteLastCommits stores the commit signatures collected on the newly confirmed block into database.
-func WriteLastCommits(
-	db DatabaseWriter, data []byte,
-) (err error) {
-	if err = db.Put(lastCommitsKey, data); err != nil {
-		return errors.New("cannot write last commits")
-	}
-	utils.Logger().Info().
-		Int("size", len(data)).
-		Msg("wrote last commits")
-	return nil
-}
-
 // ReadCrossLinkShardBlock retrieves the blockHash given shardID and blockNum
 func ReadCrossLinkShardBlock(
 	db DatabaseReader, shardID uint32, blockNum uint64,
@@ -313,6 +290,26 @@ func ReadBlockRewardAccumulator(db DatabaseReader, number uint64) (*big.Int, err
 // WriteBlockRewardAccumulator ..
 func WriteBlockRewardAccumulator(db DatabaseWriter, newAccum *big.Int, number uint64) error {
 	return db.Put(blockRewardAccumKey(number), newAccum.Bytes())
+}
+
+// ReadBlockCommitSig retrieves the signature signed on a block.
+func ReadBlockCommitSig(db DatabaseReader, blockNum uint64) ([]byte, error) {
+	var data []byte
+	data, err := db.Get(blockCommitSigKey(blockNum))
+	if err != nil {
+		// TODO: remove this extra seeking of sig after the mainnet is fully upgraded.
+		//       this is only needed for the compatibility in the migration moment.
+		data, err = db.Get(lastCommitsKey)
+		if err != nil {
+			return nil, errors.New("cannot read commit sig for block " + string(blockNum))
+		}
+	}
+	return data, nil
+}
+
+// WriteBlockCommitSig ..
+func WriteBlockCommitSig(db DatabaseWriter, blockNum uint64, sigAndBitmap []byte) error {
+	return db.Put(blockCommitSigKey(blockNum), sigAndBitmap)
 }
 
 //// Resharding ////

@@ -47,6 +47,7 @@ var (
 	bloomBitsPrefix              = []byte("B")  // bloomBitsPrefix + bit (uint16 big endian) + section (uint64 big endian) + hash -> bloom bits
 	shardStatePrefix             = []byte("ss") // shardStatePrefix + num (uint64 big endian) + hash -> shardState
 	lastCommitsKey               = []byte("LastCommits")
+	blockCommitSigPrefix         = []byte("block-sig-")
 	pendingCrosslinkKey          = []byte("pendingCL")        // prefix for shard last pending crosslink
 	pendingSlashingKey           = []byte("pendingSC")        // prefix for shard last pending slashing record
 	preimagePrefix               = []byte("secure-key-")      // preimagePrefix + hash -> preimage
@@ -216,4 +217,8 @@ func validatorStatsKey(addr common.Address) []byte {
 
 func blockRewardAccumKey(number uint64) []byte {
 	return append(currentRewardGivenOutPrefix, encodeBlockNumber(number)...)
+}
+
+func blockCommitSigKey(number uint64) []byte {
+	return append(blockCommitSigPrefix, encodeBlockNumber(number)...)
 }

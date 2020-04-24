@@ -392,6 +392,7 @@ func (w *Worker) FinalizeNewBlock(
 		w.current.header.SetLastCommitSignature(sig2)
 		w.current.header.SetLastCommitBitmap(signers)
 	}
+
 	w.current.header.SetCoinbase(coinbase)
 	w.current.header.SetViewID(new(big.Int).SetUint64(viewID))
 

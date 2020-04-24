@@ -195,7 +195,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare last commit signatures
-	sig, mask, err := node.Consensus.LastCommitSig()
+	sig, mask, err := node.Consensus.BlockCommitSig(header.Number().Uint64() - 1)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 		return nil, err
