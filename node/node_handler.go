@@ -59,7 +59,6 @@ func (node *Node) processSkippedMsgTypeByteValue(
 func (node *Node) HandleMessage(
 	content []byte, sender libp2p_peer.ID, topicName string,
 ) {
-
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().

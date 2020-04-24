@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -41,58 +42,20 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// State is a state of a node.
-type State byte
+// State ..
+type State = string
 
 // All constants except the NodeLeader below are for validators only.
 const (
-	NodeInit              State = iota // Node just started, before contacting BeaconChain
-	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
-	NodeNotInSync                      // Node out of sync, might be just joined Shard or offline for a period of time
-	NodeOffline                        // Node is offline
-	NodeReadyForConsensus              // Node is ready for doing consensus
-	NodeDoingConsensus                 // Node is already doing consensus
-	NodeLeader                         // Node is the leader of some shard.
+	WaitToJoin        State = "wait-to-join"        // Node contacted BeaconChain, wait to join Shard
+	NotInSync         State = "not-in-sync"         // Node out of sync, might be just joined Shard or offline for a period of time
+	ReadyForConsensus State = "ready-for-consensus" // Node is ready for doing consensus
 )
 
 const (
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
-	// ClientRxQueueSize is the number of client messages to queue before tail-dropping.
-	ClientRxQueueSize = 16384
-	// ShardRxQueueSize is the number of shard messages to queue before tail-dropping.
-	ShardRxQueueSize = 16384
-	// GlobalRxQueueSize is the number of global messages to queue before tail-dropping.
-	GlobalRxQueueSize = 16384
-	// ClientRxWorkers is the number of concurrent client message handlers.
-	ClientRxWorkers = 8
-	// ShardRxWorkers is the number of concurrent shard message handlers.
-	ShardRxWorkers = 32
-	// GlobalRxWorkers is the number of concurrent global message handlers.
-	GlobalRxWorkers = 32
-)
 
-func (state State) String() string {
-	switch state {
-	case NodeInit:
-		return "NodeInit"
-	case NodeWaitToJoin:
-		return "NodeWaitToJoin"
-	case NodeNotInSync:
-		return "NodeNotInSync"
-	case NodeOffline:
-		return "NodeOffline"
-	case NodeReadyForConsensus:
-		return "NodeReadyForConsensus"
-	case NodeDoingConsensus:
-		return "NodeDoingConsensus"
-	case NodeLeader:
-		return "NodeLeader"
-	}
-	return "Unknown"
-}
-
-const (
 	maxBroadcastNodes       = 10              // broadcast at most maxBroadcastNodes peers that need in sync
 	broadcastTimeout  int64 = 60 * 1000000000 // 1 mins
 	//SyncIDLength is the length of bytes for syncID
@@ -118,9 +81,8 @@ type Node struct {
 	Client      *client.Client // The presence of a client object means this node will also act as a client
 	SelfPeer    p2p.Peer
 	// TODO: Neighbors should store only neighbor nodes in the same shard
-	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	State      State      // State of the Node
-	stateMutex sync.Mutex // mutex for change node state
+	Neighbors sync.Map     // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+	State     atomic.Value // State of the Node
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
 	BeaconNeighbors      sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	TxPool               *core.TxPool
@@ -428,8 +390,13 @@ func New(
 	blacklist map[common.Address]struct{},
 	isArchival bool,
 ) *Node {
-	node := Node{}
-	node.unixTimeAtNodeStart = time.Now().Unix()
+	var state atomic.Value
+	state.Store(WaitToJoin)
+	node := Node{
+		State:               state,
+		unixTimeAtNodeStart: time.Now().Unix(),
+	}
+
 	const sinkSize = 4096
 	node.errorSink = struct {
 		sync.Mutex

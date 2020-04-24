@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"sync/atomic"
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -334,7 +335,8 @@ func (consensus *Consensus) Start(
 	blockChannel chan *types.Block, stopChan, stoppedChan, startChannel chan struct{},
 ) {
 	go func() {
-		toStart := false
+		var toStart atomic.Value
+		toStart.Store(false)
 		isInitialLeader := consensus.IsLeader()
 		if isInitialLeader {
 			consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Waiting for consensus start")
@@ -342,7 +344,7 @@ func (consensus *Consensus) Start(
 			// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
 			go func() {
 				<-startChannel
-				toStart = true
+				toStart.Store(true)
 				consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 				consensus.ReadySignal <- struct{}{}
 			}()
@@ -364,7 +366,7 @@ func (consensus *Consensus) Start(
 			select {
 			case <-ticker.C:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ticker")
-				if !toStart && isInitialLeader {
+				if !toStart.Load().(bool) && isInitialLeader {
 					continue
 				}
 				for k, v := range consensus.consensusTimeout {

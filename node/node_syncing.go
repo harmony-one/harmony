@@ -240,23 +240,18 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 	}
 	// TODO: treat fake maximum height
 	if node.stateSync.IsOutOfSync(bc) {
-		node.stateMutex.Lock()
-		node.State = NodeNotInSync
-		node.stateMutex.Unlock()
+		node.State.Store(NotInSync)
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
 		}
 		node.stateSync.SyncLoop(bc, worker, false, node.Consensus)
 		if willJoinConsensus {
-			node.stateMutex.Lock()
-			node.State = NodeReadyForConsensus
-			node.stateMutex.Unlock()
+			node.State.Store(ReadyForConsensus)
 			node.Consensus.BlocksSynchronized()
 		}
 	}
-	node.stateMutex.Lock()
-	node.State = NodeReadyForConsensus
-	node.stateMutex.Unlock()
+
+	node.State.Store(ReadyForConsensus)
 }
 
 // SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node
@@ -268,19 +263,8 @@ func (node *Node) SupportBeaconSyncing() {
 func (node *Node) SupportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
-
-	joinConsensus := false
 	// Check if the current node is explorer node.
-	switch node.NodeConfig.Role() {
-	case nodeconfig.Validator:
-		joinConsensus = true
-	}
-
-	// Send new block to unsync node if the current node is not explorer node.
-	// TODO: leo this pushing logic has to be removed
-	if joinConsensus {
-		go node.SendNewBlockToUnsync()
-	}
+	joinConsensus := node.NodeConfig.Role() == nodeconfig.Validator
 
 	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
 }
@@ -300,42 +284,10 @@ func (node *Node) StartSyncingServer() {
 	}
 }
 
-// SendNewBlockToUnsync send latest verified block to unsync, registered nodes
-func (node *Node) SendNewBlockToUnsync() {
-	for {
-		block := <-node.Consensus.VerifiedNewBlock
-		blockHash, err := rlp.EncodeToBytes(block)
-		if err != nil {
-			utils.Logger().Warn().Msg("[SYNC] unable to encode block to hashes")
-			continue
-		}
-
-		node.stateMutex.Lock()
-		for peerID, config := range node.peerRegistrationRecord {
-			elapseTime := time.Now().UnixNano() - config.timestamp
-			if elapseTime > broadcastTimeout {
-				utils.Logger().Warn().Str("peerID", peerID).Msg("[SYNC] SendNewBlockToUnsync to peer timeout")
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-				continue
-			}
-			response, err := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
-			// close the connection if cannot push new block to unsync node
-			if err != nil {
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-			}
-			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-			}
-		}
-		node.stateMutex.Unlock()
-	}
-}
-
 // CalculateResponse implements DownloadInterface on Node object.
-func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, incomingPeer string) (*downloader_pb.DownloaderResponse, error) {
+func (node *Node) CalculateResponse(
+	request *downloader_pb.DownloaderRequest, incomingPeer string,
+) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_BLOCKHASH:
@@ -410,9 +362,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 
 	// this is the out of sync node acts as grpc server side
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
-		if node.State != NodeNotInSync {
+		if node.State.Load().(State) != NotInSync {
 			utils.Logger().Debug().
-				Str("state", node.State.String()).
 				Msg("[SYNC] new block received, but state is")
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
@@ -429,8 +380,6 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		peerID := string(request.PeerHash[:])
 		ip := request.Ip
 		port := request.Port
-		node.stateMutex.Lock()
-		defer node.stateMutex.Unlock()
 		if _, ok := node.peerRegistrationRecord[peerID]; ok {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
 			utils.Logger().Warn().
@@ -466,7 +415,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
-		if node.State == NodeNotInSync {
+		if node.State.Load().(State) == NotInSync {
 			count := node.stateSync.RegisterNodeInfo()
 			utils.Logger().Debug().
 				Int("number", count).
