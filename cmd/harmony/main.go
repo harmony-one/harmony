@@ -774,6 +774,11 @@ func main() {
 		).
 		Msg(startMsg)
 
+	if err := currentNode.ForceJoiningTopics(); err != nil {
+		fmt.Println("could not join necessary pubsub topics", err.Error())
+		os.Exit(-1)
+	}
+
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()

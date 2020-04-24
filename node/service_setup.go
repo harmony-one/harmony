@@ -1,26 +1,19 @@
 package node
 
 import (
-	"fmt"
-
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
 	"github.com/harmony-one/harmony/api/service/clientsupport"
 	"github.com/harmony-one/harmony/api/service/consensus"
-	"github.com/harmony-one/harmony/api/service/discovery"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 )
 
 func (node *Node) setupForValidator() {
-	nodeConfig, chanPeer, _ := node.initNodeConfiguration()
-	// Register peer discovery service
-	node.serviceManager.RegisterService(
-		service.PeerDiscovery,
-		discovery.New(node.host, nodeConfig, chanPeer, node.AddBeaconPeer),
-	)
+
 	// Register consensus service.
 	node.serviceManager.RegisterService(
 		service.Consensus,
@@ -44,12 +37,7 @@ func (node *Node) setupForValidator() {
 }
 
 func (node *Node) setupForExplorerNode() {
-	nodeConfig, chanPeer, _ := node.initNodeConfiguration()
 
-	// Register peer discovery service.
-	node.serviceManager.RegisterService(
-		service.PeerDiscovery, discovery.New(node.host, nodeConfig, chanPeer, nil),
-	)
 	// Register explorer service.
 	node.serviceManager.RegisterService(
 		service.SupportExplorer, explorer.New(&node.SelfPeer),
@@ -87,10 +75,17 @@ func (node *Node) StopServices() {
 	node.serviceManager.StopServicesByRole([]service.Type{})
 }
 
-func (node *Node) networkInfoDHTPath() string {
-	return fmt.Sprintf(".dht-%s-%s-c%s",
-		node.SelfPeer.IP,
-		node.SelfPeer.Port,
-		node.chainConfig.ChainID,
-	)
+// ForceJoiningTopics ..
+func (node *Node) ForceJoiningTopics() error {
+	groups := []nodeconfig.GroupID{
+		node.NodeConfig.GetShardGroupID(),
+		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
+		node.NodeConfig.GetClientGroupID(),
+	}
+
+	// force the side effect of topic join
+	if err := node.host.SendMessageToGroups(groups, []byte{}); err != nil {
+		return err
+	}
+	return nil
 }
