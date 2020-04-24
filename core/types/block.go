@@ -249,7 +249,7 @@ func (b *Block) SetLastCommitSig(sig []byte, signers []byte) {
 
 // SetCurrentCommitSig sets the commit group signature that signed on this block.
 func (b *Block) SetCurrentCommitSig(sigAndBitmap []byte) {
-	if len(sigAndBitmap) <= 94 {
+	if len(sigAndBitmap) <= 96 {
 		utils.Logger().Warn().
 			Int("srcLen", len(sigAndBitmap)).
 			Int("dstLen", len(b.header.LastCommitSignature())).
