@@ -603,30 +603,6 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	return nil
 }
 
-// AddPeers adds neighbors nodes
-func (node *Node) AddPeers(peers []*p2p.Peer) int {
-	// for _, p := range peers {
-	// 	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-	// 	_, ok := node.Neighbors.LoadOrStore(key, *p)
-	// 	if !ok {
-	// 		// !ok means new peer is stored
-	// 		node.host.AddPeer(p)
-	// 		continue
-	// 	}
-	// }
-
-	return node.host.GetPeerCount()
-}
-
-// AddBeaconPeer adds beacon chain neighbors nodes
-// Return false means new neighbor peer was added
-// Return true means redundant neighbor peer wasn't added
-func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
-	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
-	return ok
-}
-
 // ServiceManager ...
 func (node *Node) ServiceManager() *service.Manager {
 	return node.serviceManager
