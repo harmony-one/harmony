@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -210,26 +209,13 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 	if err != nil {
 		fatal(err)
 	}
-	// wait to get routing
-	<-crouting
-	// routing.RoutingTable().Print()
 
-	// fmt.Println("node->",
-	// 	node.Identity,
-	// 	node.PeerHost.Addrs(),
-	// 	routing,
-	// )
+	<-crouting
 
 	for {
 		if err := node.PeerHost.Connect(ctx, *rdvpeer); err != nil {
-			fmt.Println("something busted, why", err.Error())
 			opts.Logger.Error().Err(err).Msg("cannot dial rendezvous point")
 		} else {
-			// fmt.Println(
-			// 	"was able to connect to the rendevous peer",
-			// 	rdvpeer.Loggable(),
-			// 	rdvpeer.String(),
-			// )
 			break
 		}
 	}
@@ -253,31 +239,4 @@ func ConstructMessage(content []byte) []byte {
 	binary.BigEndian.PutUint32(message[1:5], uint32(len(content)))
 	copy(message[5:], content)
 	return message
-}
-
-// AddrList is a list of multiaddress
-type AddrList []multiaddr.Multiaddr
-
-// String is a function to print a string representation of the AddrList
-func (al *AddrList) String() string {
-	strs := make([]string, len(*al))
-	for i, addr := range *al {
-		strs[i] = addr.String()
-	}
-	return strings.Join(strs, ",")
-}
-
-// Set is a function to set the value of AddrList based on a string
-func (al *AddrList) Set(value string) error {
-	if len(*al) > 0 {
-		return fmt.Errorf("AddrList is already set")
-	}
-	for _, a := range strings.Split(value, ",") {
-		addr, err := multiaddr.NewMultiaddr(a)
-		if err != nil {
-			return err
-		}
-		*al = append(*al, addr)
-	}
-	return nil
 }

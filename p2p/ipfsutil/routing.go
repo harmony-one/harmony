@@ -50,7 +50,6 @@ func NewTinderRouting(
 		}
 
 		drivers := []tinder.Driver{}
-		// fmt.Println("got as rdvpeer->", rdvpeer)
 		if string(rdvpeer) != "" {
 			// @FIXME(gfanton): use rand as argument
 			rdvClient := tinder.NewRendezvousDiscovery(
