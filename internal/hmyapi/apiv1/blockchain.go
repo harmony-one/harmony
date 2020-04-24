@@ -3,9 +3,6 @@ package apiv1
 import (
 	"context"
 	"fmt"
-
-	"github.com/harmony-one/harmony/common/denominations"
-
 	"math/big"
 	"time"
 
@@ -13,9 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -336,4 +336,52 @@ func doEstimateGas(ctx context.Context, b Backend, args CallArgs, gasCap *big.In
 // given transaction against the current pending block.
 func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (hexutil.Uint64, error) {
 	return doEstimateGas(ctx, s.b, args, nil)
+}
+
+// GetBlockSigners returns signers for a particular block.
+func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) ([]string, error) {
+	if uint64(blockNr) == 0 || uint64(blockNr) >= uint64(s.BlockNumber()) {
+		return make([]string, 0), nil
+	}
+	block, err := s.b.BlockByNumber(ctx, blockNr)
+	if err != nil {
+		return nil, err
+	}
+	blockWithSigners, err := s.b.BlockByNumber(ctx, blockNr+1)
+	if err != nil {
+		return nil, err
+	}
+	committee, err := s.b.GetCommittee(block.Epoch())
+	if err != nil {
+		return nil, err
+	}
+	pubkeys := make([]*bls.PublicKey, len(committee.NodeList))
+	for i, validator := range committee.NodeList {
+		pubkeys[i] = new(bls.PublicKey)
+		validator.BlsPublicKey.ToLibBLSPublicKey(pubkeys[i])
+	}
+	result := make([]string, 0)
+	mask, err := internal_bls.NewMask(pubkeys, nil)
+	if err != nil {
+		return result, err
+	}
+	if err != nil {
+		return result, err
+	}
+	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
+	if err != nil {
+		return result, err
+	}
+	for _, validator := range committee.NodeList {
+		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
+		if err != nil {
+			return result, err
+		}
+		blsPublicKey := new(bls.PublicKey)
+		validator.BlsPublicKey.ToLibBLSPublicKey(blsPublicKey)
+		if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
+			result = append(result, oneAddress)
+		}
+	}
+	return result, nil
 }
