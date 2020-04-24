@@ -162,6 +162,11 @@ func (v *stakedVoteWeight) String() string {
 	return string(s)
 }
 
+// HACK later remove - unify votepower in UI (aka MarshalJSON)
+func (v *stakedVoteWeight) SetRawStake(key shard.BLSPublicKey, d numeric.Dec) {
+	v.roster.Voters[key].RawStake = d
+}
+
 // TODO remove this large method, use roster's own Marshal, mix it
 // specific logic here
 func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
@@ -173,6 +178,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 		RawPercent     string `json:"voting-power-unnormalized"`
 		VotingPower    string `json:"voting-power-%"`
 		EffectiveStake string `json:"effective-stake,omitempty"`
+		RawStake       string `json:"raw-stake,omitempty"`
 	}
 
 	type t struct {
@@ -196,10 +202,12 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 			voter.GroupPercent.String(),
 			voter.OverallPercent.String(),
 			"",
+			"",
 		}
 		if !voter.IsHarmonyNode {
 			externalCount++
 			member.EffectiveStake = voter.EffectiveStake.String()
+			member.RawStake = voter.RawStake.String()
 		}
 		parts[i] = member
 		i++

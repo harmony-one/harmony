@@ -71,6 +71,7 @@ type PureStakedVote struct {
 	Identity       shard.BLSPublicKey `json:"bls-public-key"`
 	GroupPercent   numeric.Dec        `json:"group-percent"`
 	EffectiveStake numeric.Dec        `json:"effective-stake"`
+	RawStake       numeric.Dec        `json:"raw-stake"`
 }
 
 // AccommodateHarmonyVote ..
@@ -186,6 +187,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 				Identity:       staked[i].BLSPublicKey,
 				GroupPercent:   numeric.ZeroDec(),
 				EffectiveStake: numeric.ZeroDec(),
+				RawStake:       numeric.ZeroDec(),
 			},
 			OverallPercent: numeric.ZeroDec(),
 			IsHarmonyNode:  false,
