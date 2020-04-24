@@ -182,7 +182,7 @@ func New(
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce
 	// TODO Refactor consensus.block* into State?
-	consensus.current = State{mode: Normal}
+	consensus.current = NewState()
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
 

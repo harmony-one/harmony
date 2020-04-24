@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/votepower"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 )
@@ -35,7 +36,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 					if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
 						var doubleSign bls.Sign
 						if err := doubleSign.Deserialize(recvMsg.Payload); err != nil {
-							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
+							utils.Logger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not deserialize potential double signer")
 							return true
 						}
@@ -43,7 +44,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 						curHeader := consensus.ChainReader.CurrentHeader()
 						committee, err := consensus.ChainReader.ReadShardState(curHeader.Epoch())
 						if err != nil {
-							consensus.getLogger().Err(err).
+							utils.Logger().Err(err).
 								Uint32("shard", consensus.ShardID).
 								Uint64("epoch", curHeader.Epoch().Uint64()).
 								Msg("could not read shard state")
@@ -51,7 +52,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 						}
 						offender := shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
 						if offender == nil {
-							consensus.getLogger().Error().
+							utils.Logger().Error().
 								Str("msg", recvMsg.String()).
 								Msg("could not get shard key from sender's key")
 							return true
@@ -60,7 +61,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 							consensus.ShardID,
 						)
 						if err != nil {
-							consensus.getLogger().Err(err).
+							utils.Logger().Err(err).
 								Str("msg", recvMsg.String()).
 								Msg("could not find subcommittee for bls key")
 							return true
@@ -68,7 +69,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 
 						addr, err := subComm.AddressForBLSKey(*offender)
 						if err != nil {
-							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
+							utils.Logger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not find address for bls key")
 							return true
 						}
@@ -77,14 +78,14 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 
 						leaderShardKey := shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey)
 						if leaderShardKey == nil {
-							consensus.getLogger().Error().
+							utils.Logger().Error().
 								Str("msg", recvMsg.String()).
 								Msg("could not get shard key from leader's key")
 							return true
 						}
 						leaderAddr, err := subComm.AddressForBLSKey(*leaderShardKey)
 						if err != nil {
-							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
+							utils.Logger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not find address for leader bls key")
 							return true
 						}
@@ -130,7 +131,7 @@ func (consensus *Consensus) couldThisBeADoubleSigner(
 	suspicious := !consensus.FBFTLog.HasMatchingAnnounce(num, hash) ||
 		!consensus.FBFTLog.HasMatchingPrepared(num, hash)
 	if suspicious {
-		consensus.getLogger().Debug().
+		utils.Logger().Debug().
 			Str("message", recvMsg.String()).
 			Uint64("block-on-consensus", num).
 			Msg("possible double signer")

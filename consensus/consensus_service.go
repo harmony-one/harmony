@@ -20,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -142,7 +141,7 @@ func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls.Sign {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.getLogger().Debug().
+	utils.Logger().Debug().
 		Str("Phase", consensus.phase.String()).
 		Msg("[ResetState] Resetting consensus state")
 	consensus.switchPhase(FBFTAnnounce, true)
@@ -244,7 +243,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 // SetViewID set the viewID to the height of the blockchain
 func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID = height
-	consensus.current.viewID = height
+	consensus.current.SetViewID(height)
 }
 
 // SetMode sets the mode of consensus
@@ -321,18 +320,6 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 	return chain.ReadSignatureBitmapByPublicKeys(
 		sigAndBitmapPayload, consensus.Decider.Participants(),
 	)
-}
-
-// getLogger returns logger for consensus contexts added
-func (consensus *Consensus) getLogger() *zerolog.Logger {
-	logger := utils.Logger().With().
-		Uint64("myEpoch", consensus.epoch).
-		Uint64("myBlock", consensus.blockNum).
-		Uint64("myViewID", consensus.viewID).
-		Interface("phase", consensus.phase).
-		Str("mode", consensus.current.Mode().String()).
-		Logger()
-	return &logger
 }
 
 // retrieve corresponding blsPublicKey from Coinbase Address
@@ -421,11 +408,11 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		return Syncing
 	}
 
-	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
+	utils.Logger().Info().Msg("[UpdateConsensusInformation] Updating.....")
 	if len(curHeader.ShardState()) > 0 {
 		// increase curEpoch by one if it's the last block
 		consensus.SetEpochNum(curEpoch.Uint64() + 1)
-		consensus.getLogger().Info().
+		utils.Logger().Info().
 			Uint64("headerNum", curHeader.Number().Uint64()).
 			Msg("Epoch updated for nextEpoch curEpoch")
 
@@ -466,7 +453,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	if len(committeeToSet.Slots) == 0 {
-		consensus.getLogger().Warn().
+		utils.Logger().Warn().
 			Msg("[UpdateConsensusInformation] No members in the committee to update")
 		hasError = true
 	}
@@ -475,7 +462,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	oldLeader := consensus.LeaderPubKey
 	pubKeys, _ := committeeToSet.BLSPublicKeys()
 
-	consensus.getLogger().Info().
+	utils.Logger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
 	consensus.UpdatePublicKeys(pubKeys)
@@ -502,12 +489,12 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		curHeader.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {
-			consensus.getLogger().Debug().Err(err).
+			utils.Logger().Debug().Err(err).
 				Msg("[UpdateConsensusInformation] Unable to get leaderPubKey from coinbase")
 			consensus.ignoreViewIDCheck = true
 			hasError = true
 		} else {
-			consensus.getLogger().Debug().
+			utils.Logger().Debug().
 				Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
 			consensus.LeaderPubKey = leaderPubKey

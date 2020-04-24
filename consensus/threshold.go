@@ -24,7 +24,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		msg_pb.MessageType_PREPARED, nil, consensus.LeaderPubKey, leaderPriKey,
 	)
 	if err != nil {
-		consensus.getLogger().Err(err).
+		utils.Logger().Err(err).
 			Str("message-type", msg_pb.MessageType_PREPARED.String()).
 			Msg("failed constructing message")
 		return err
@@ -57,7 +57,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		}
 
 		if err := consensus.commitBitmap.SetKey(key, true); err != nil {
-			consensus.getLogger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
+			utils.Logger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
 			return err
 		}
 	}
@@ -68,9 +68,9 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		},
 		p2p.ConstructMessage(msgToSend),
 	); err != nil {
-		consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
+		utils.Logger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 	} else {
-		consensus.getLogger().Debug().
+		utils.Logger().Debug().
 			Hex("blockHash", consensus.blockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] Sent Prepared Message!!")
@@ -79,7 +79,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	// Stop retry committed msg of last consensus
 	consensus.msgSender.StopRetry(msg_pb.MessageType_COMMITTED)
 
-	consensus.getLogger().Debug().
+	utils.Logger().Debug().
 		Str("From", consensus.phase.String()).
 		Str("To", FBFTCommit.String()).
 		Msg("[OnPrepare] Switching phase")
