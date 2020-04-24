@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/p2p/ipfsutil"
 	"github.com/ipfs/go-datastore"
 	sync_ds "github.com/ipfs/go-datastore/sync"
-	ipfs_cfg "github.com/ipfs/go-ipfs-config"
 	ipfs_core "github.com/ipfs/go-ipfs/core"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/juju/fslock"
@@ -39,8 +38,6 @@ type Host interface {
 	GetID() libp2p_peer.ID
 	AllSubscriptions() []NamedSub
 }
-
-var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
 
 type Opts struct {
 	Bootstrap             []string
@@ -196,7 +193,6 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 		fatal(err)
 	}
 
-	ipfsConfig.Bootstrap = append(opts.Bootstrap, opts.RendezVousServerMAddr)
 	if err := cfg.Repo.SetConfig(ipfsConfig); err != nil {
 		fatal(err)
 	}

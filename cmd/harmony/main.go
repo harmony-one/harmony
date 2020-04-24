@@ -367,8 +367,9 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 
 func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 	baseDS := datastore.NewMapDatastore()
-	const DevRendezVousPoint = "/ip4/167.99.223.55/tcp/4040/p2p/QmTo3RS6Uc8aCS5Cxx8EBHkNCe4C7vKRanbMEboxkA92Cn"
 	var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
+	DevRendezVousPoint := ipfs_cfg.DefaultBootstrapAddresses[0]
+
 	p, err := strconv.Atoi(*port)
 
 	if err != nil {
