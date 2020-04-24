@@ -3,7 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,38 +21,28 @@ const MaxViewIDDiff = 100
 
 // State contains current mode and current viewID
 type State struct {
-	mode   Mode
-	viewID uint64
-	mux    sync.Mutex
+	mode   atomic.Value
+	viewID atomic.Value
 }
 
 // Mode return the current node mode
 func (pm *State) Mode() Mode {
-	return pm.mode
+	return pm.mode.Load().(Mode)
 }
 
 // SetMode set the node mode as required
 func (pm *State) SetMode(s Mode) {
-	pm.mux.Lock()
-	defer pm.mux.Unlock()
-	pm.mode = s
+	pm.mode.Store(s)
 }
 
 // ViewID return the current viewchanging id
 func (pm *State) ViewID() uint64 {
-	return pm.viewID
+	return pm.viewID.Load().(uint64)
 }
 
 // SetViewID sets the viewchanging id accordingly
 func (pm *State) SetViewID(viewID uint64) {
-	pm.mux.Lock()
-	defer pm.mux.Unlock()
-	pm.viewID = viewID
-}
-
-// GetViewID returns the current viewchange viewID
-func (pm *State) GetViewID() uint64 {
-	return pm.viewID
+	pm.viewID.Store(viewID)
 }
 
 // switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
