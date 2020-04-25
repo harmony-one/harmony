@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"encoding/hex"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -41,12 +40,6 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	// Leader add commit phase signature
 	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
 		new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, consensus.viewID)
-	// TODO: remove debug msg after STN testing
-	utils.Logger().Debug().
-		Uint64("epoch", consensus.epoch).
-		Uint64("block-number", consensus.blockNum).
-		Uint64("view-id", consensus.viewID).
-		Msgf("[COMMIT-PAYLOAD] didReachPrepareQuorum %v", hex.EncodeToString(commitPayload))
 
 	// so by this point, everyone has committed to the blockhash of this block
 	// in prepare and so this is the actual block.

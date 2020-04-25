@@ -1,7 +1,6 @@
 package verify
 
 import (
-	"encoding/hex"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -57,12 +55,6 @@ func AggregateSigForCommittee(
 	}
 
 	commitPayload := signature.ConstructCommitPayload(chain, epoch, hash, blockNum, viewID)
-	// TODO: remove debug msg after STN testing
-	utils.Logger().Debug().
-		Uint64("epoch", epoch.Uint64()).
-		Uint64("block-number", blockNum).
-		Uint64("view-id", viewID).
-		Msgf("[COMMIT-PAYLOAD] AggregateSigForCommittee %v", hex.EncodeToString(commitPayload))
 	if !aggSignature.VerifyHash(mask.AggregatePublic, commitPayload) {
 		return errAggregateSigFail
 	}

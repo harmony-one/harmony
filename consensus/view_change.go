@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"math/big"
 	"sync"
 	"time"
@@ -366,12 +365,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			// Leader sign and add commit message
 			commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
 				new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, recvMsg.ViewID)
-			// TODO: remove debug msg after STN testing
-			utils.Logger().Debug().
-				Uint64("epoch", consensus.epoch).
-				Uint64("block-number", consensus.blockNum).
-				Uint64("view-id", recvMsg.ViewID).
-				Msgf("[COMMIT-PAYLOAD] onViewChange %v", hex.EncodeToString(commitPayload))
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
 				if _, err := consensus.Decider.SubmitVote(
@@ -542,12 +535,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		// Construct and send the commit message
 		commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
 			new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, consensus.viewID)
-		// TODO: remove debug msg after STN testing
-		utils.Logger().Debug().
-			Uint64("epoch", consensus.epoch).
-			Uint64("block-number", consensus.blockNum).
-			Uint64("view-id", consensus.viewID).
-			Msgf("[COMMIT-PAYLOAD] onNewView %v", hex.EncodeToString(commitPayload))
 		groupID := []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 		for i, key := range consensus.PubKey.PublicKey {

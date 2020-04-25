@@ -1,7 +1,6 @@
 package node
 
 import (
-	"encoding/hex"
 	"sort"
 	"sync"
 
@@ -65,12 +64,6 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 
 		commitPayload := signature.ConstructCommitPayload(node.Blockchain(),
 			block.Epoch(), block.Hash(), block.Number().Uint64(), block.Header().ViewID().Uint64())
-		// TODO: remove debug msg after STN testing
-		utils.Logger().Debug().
-			Uint64("epoch", block.Epoch().Uint64()).
-			Uint64("block-number", block.Number().Uint64()).
-			Uint64("view-id", block.Header().ViewID().Uint64()).
-			Msgf("[COMMIT-PAYLOAD] ExplorerMessageHandler %v", hex.EncodeToString(commitPayload))
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 			utils.Logger().
 				Error().Err(err).
