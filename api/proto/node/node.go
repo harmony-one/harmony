@@ -198,8 +198,7 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 		if parentHeader == nil {
 			continue
 		}
-		epoch := parentHeader.Epoch()
-		crosslinks = append(crosslinks, types.NewCrossLink(header, epoch))
+		crosslinks = append(crosslinks, types.NewCrossLink(header, parentHeader))
 	}
 	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
 	byteBuffer.Write(crosslinksData)
