@@ -48,13 +48,13 @@ type Opts struct {
 }
 
 type hmyHost struct {
-	// Temp hack to satisfy all methods
-	coreAPI ipfs_interface.CoreAPI
-	node    *ipfs_core.IpfsNode
-	log     *zerolog.Logger
-	ownPeer *Peer
-	lock    sync.Mutex
-	joined  map[string]ipfs_interface.PubSubSubscription
+	coreAPI    ipfs_interface.CoreAPI
+	node       *ipfs_core.IpfsNode
+	log        *zerolog.Logger
+	ownPeer    *Peer
+	lock       sync.Mutex
+	joined     map[string]ipfs_interface.PubSubSubscription
+	swarmAddrs []string
 }
 
 func unlockFS(l *fslock.Lock) {
@@ -84,7 +84,6 @@ func (h *hmyHost) GetSelfPeer() *Peer {
 
 func (h *hmyHost) GetID() libp2p_peer.ID {
 	return h.node.PeerHost.ID()
-	// return h.ownPeer.IP
 }
 
 func (h *hmyHost) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
@@ -122,6 +121,7 @@ func (h *hmyHost) getTopic(topic string) (ipfs_interface.PubSubSubscription, err
 	return sub, nil
 }
 
+// NamedSub ..
 type NamedSub struct {
 	Topic string
 	Sub   ipfs_interface.PubSubSubscription
@@ -147,23 +147,9 @@ const DefaultLocal = "127.0.0.1"
 
 // NewHost ..
 func NewHost(opts *Opts, own *Peer) (Host, error) {
-	var swarmAddresses []string
-
-	if own.IP != DefaultLocal {
-		swarmAddresses = []string{
-			fmt.Sprintf("/ip4/%s/tcp/%d", own.IP, opts.Port),
-			fmt.Sprintf("/ip6/%s/tcp/%d", own.IP, opts.Port),
-			// TODO Hold up, need httpu
-			// fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", opts.Port+1),
-			// fmt.Sprintf("/ip6/0.0.0.0/udp/%d/quic", opts.Port+1),
-		}
-	} else {
-		swarmAddresses = []string{
-			fmt.Sprintf("/ip4/%s/tcp/%d", DefaultLocal, opts.Port),
-			fmt.Sprintf("/ip6/%s/tcp/%d", DefaultLocal, opts.Port),
-			// "/ip4/0.0.0.0/udp/0/quic",
-			// "/ip6/0.0.0.0/udp/0/quic",
-		}
+	swarmAddresses := []string{
+		fmt.Sprintf("/ip4/%s/tcp/%d", DefaultLocal, opts.Port),
+		fmt.Sprintf("/ip6/%s/tcp/%d", DefaultLocal, opts.Port),
 	}
 
 	mardv, err := multiaddr.NewMultiaddr(opts.RendezVousServerMAddr)
@@ -223,12 +209,13 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 	own.PeerID = node.PeerHost.ID()
 
 	return &hmyHost{
-		coreAPI: api,
-		node:    node,
-		log:     opts.Logger,
-		ownPeer: own,
-		lock:    sync.Mutex{},
-		joined:  map[string]ipfs_interface.PubSubSubscription{},
+		coreAPI:    api,
+		node:       node,
+		log:        opts.Logger,
+		ownPeer:    own,
+		lock:       sync.Mutex{},
+		joined:     map[string]ipfs_interface.PubSubSubscription{},
+		swarmAddrs: swarmAddresses,
 	}, nil
 }
 
