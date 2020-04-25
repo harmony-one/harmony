@@ -206,6 +206,7 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 		fatal(err)
 	}
 
+	// block till have network connectivity
 	<-crouting
 
 	for {
