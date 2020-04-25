@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	libp2p_metrics "github.com/libp2p/go-libp2p-core/metrics"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	libp2p_pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -25,8 +26,8 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 		data := []byte{1, 2, 3}
 		joined := map[string]topicHandle{"OK": okTopic}
 		joiner := NewMocktopicJoiner(mc)
-		host := &HostV2{joiner: joiner, joined: joined}
-
+		newMetrics := libp2p_metrics.NewBandwidthCounter()
+		host := &HostV2{joiner: joiner, joined: joined, metrics: newMetrics}
 		gomock.InOrder(
 			// okTopic is already in joined map, JoinTopic shouldn't be called
 			joiner.EXPECT().JoinTopic("OK").Times(0),
@@ -50,7 +51,9 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 		groups := []nodeconfig.GroupID{"Error", "OK"}
 		data := []byte{1, 2, 3}
 		joiner := NewMocktopicJoiner(mc)
-		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+		newMetrics := libp2p_metrics.NewBandwidthCounter()
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{},
+			metrics: newMetrics}
 
 		gomock.InOrder(
 			// Make first join return an error
@@ -75,7 +78,9 @@ func TestHostV2_SendMessageToGroups(t *testing.T) {
 		groups := []nodeconfig.GroupID{"Error", "OK"}
 		data := []byte{1, 2, 3}
 		joiner := NewMocktopicJoiner(mc)
-		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+		newMetrics := libp2p_metrics.NewBandwidthCounter()
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{},
+			metrics: newMetrics}
 
 		gomock.InOrder(
 			// Make first publish return an error
@@ -169,7 +174,9 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 		sub := &libp2p_pubsub.Subscription{}
 		topic := NewMocktopicHandle(mc)
 		joiner := NewMocktopicJoiner(mc)
-		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+		newMetrics := libp2p_metrics.NewBandwidthCounter()
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{},
+			metrics: newMetrics}
 
 		gomock.InOrder(
 			joiner.EXPECT().JoinTopic("ABC").Return(topic, nil),
@@ -192,7 +199,9 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 		defer mc.Finish()
 
 		joiner := NewMocktopicJoiner(mc)
-		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+		newMetrics := libp2p_metrics.NewBandwidthCounter()
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{},
+			metrics: newMetrics}
 
 		joiner.EXPECT().JoinTopic("ABC").Return(nil, errors.New("join error"))
 
@@ -211,7 +220,9 @@ func TestHostV2_GroupReceiver(t *testing.T) {
 
 		topic := NewMocktopicHandle(mc)
 		joiner := NewMocktopicJoiner(mc)
-		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+		newMetrics := libp2p_metrics.NewBandwidthCounter()
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{},
+			metrics: newMetrics}
 
 		gomock.InOrder(
 			joiner.EXPECT().JoinTopic("ABC").Return(topic, nil),
@@ -243,7 +254,9 @@ func TestHostV2_getTopic(t *testing.T) {
 
 		joiner := NewMocktopicJoiner(mc)
 		want := NewMocktopicHandle(mc)
-		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+		newMetrics := libp2p_metrics.NewBandwidthCounter()
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{},
+			metrics: newMetrics}
 
 		joiner.EXPECT().JoinTopic("ABC").Return(want, nil)
 
@@ -264,7 +277,9 @@ func TestHostV2_getTopic(t *testing.T) {
 		defer mc.Finish()
 
 		joiner := NewMocktopicJoiner(mc)
-		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{}}
+		newMetrics := libp2p_metrics.NewBandwidthCounter()
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{},
+			metrics: newMetrics}
 
 		joiner.EXPECT().JoinTopic("ABC").Return(nil, errors.New("OMG"))
 
@@ -283,7 +298,9 @@ func TestHostV2_getTopic(t *testing.T) {
 
 		joiner := NewMocktopicJoiner(mc)
 		want := NewMocktopicHandle(mc)
-		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{"ABC": want}}
+		newMetrics := libp2p_metrics.NewBandwidthCounter()
+		host := &HostV2{joiner: joiner, joined: map[string]topicHandle{"ABC": want},
+			metrics: newMetrics}
 
 		joiner.EXPECT().JoinTopic("ABC").Times(0)
 

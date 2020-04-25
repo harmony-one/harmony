@@ -66,6 +66,12 @@ func (node *Node) receiveGroupMessage(
 
 // HandleMessage parses the message and dispatch the actions.
 func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
+	// log in-coming metrics
+	node.host.LogRecvMessage(content)
+	utils.Logger().Info().
+		Int64("TotalIn", node.host.GetBandwidthTotals().TotalIn).
+		Float64("RateIn", node.host.GetBandwidthTotals().RateIn).
+		Msg("[metrics][p2p] traffic in in bytes")
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
@@ -385,6 +391,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block, commitSigAndBit
 
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
+
+	// Clear metrics after one consensus cycle
+	node.host.ResetMetrics()
+	utils.Logger().Info().Msg("[metrics][p2p] Reset after 1 consensus cycle")
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if core.IsEpochLastBlock(newBlock) {

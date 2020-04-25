@@ -6,10 +6,11 @@ package mock_p2p
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	node "github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	p2p "github.com/harmony-one/harmony/p2p"
-	go_libp2p_host "github.com/libp2p/go-libp2p-host"
-	go_libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	metrics "github.com/libp2p/go-libp2p-core/metrics"
+	host "github.com/libp2p/go-libp2p-host"
+	peer "github.com/libp2p/go-libp2p-peer"
 	reflect "reflect"
 )
 
@@ -79,10 +80,10 @@ func (mr *MockHostMockRecorder) AddPeer(arg0 interface{}) *gomock.Call {
 }
 
 // GetID mocks base method
-func (m *MockHost) GetID() go_libp2p_peer.ID {
+func (m *MockHost) GetID() peer.ID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetID")
-	ret0, _ := ret[0].(go_libp2p_peer.ID)
+	ret0, _ := ret[0].(peer.ID)
 	return ret0
 }
 
@@ -93,10 +94,10 @@ func (mr *MockHostMockRecorder) GetID() *gomock.Call {
 }
 
 // GetP2PHost mocks base method
-func (m *MockHost) GetP2PHost() go_libp2p_host.Host {
+func (m *MockHost) GetP2PHost() host.Host {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetP2PHost")
-	ret0, _ := ret[0].(go_libp2p_host.Host)
+	ret0, _ := ret[0].(host.Host)
 	return ret0
 }
 
@@ -120,6 +121,44 @@ func (mr *MockHostMockRecorder) GetPeerCount() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPeerCount", reflect.TypeOf((*MockHost)(nil).GetPeerCount))
 }
 
+// GetBandwidthTotals mocks base method
+func (m *MockHost) GetBandwidthTotals() metrics.Stats {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBandwidthTotals")
+	ret0, _ := ret[0].(metrics.Stats)
+	return ret0
+}
+
+// GetBandwidthTotals indicates an expected call of GetBandwidthTotals
+func (mr *MockHostMockRecorder) GetBandwidthTotals() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBandwidthTotals", reflect.TypeOf((*MockHost)(nil).GetBandwidthTotals))
+}
+
+// LogRecvMessage mocks base method
+func (m *MockHost) LogRecvMessage(msg []byte) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "LogRecvMessage", msg)
+}
+
+// LogRecvMessage indicates an expected call of LogRecvMessage
+func (mr *MockHostMockRecorder) LogRecvMessage(msg interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogRecvMessage", reflect.TypeOf((*MockHost)(nil).LogRecvMessage), msg)
+}
+
+// ResetMetrics mocks base method
+func (m *MockHost) ResetMetrics() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ResetMetrics")
+}
+
+// ResetMetrics indicates an expected call of ResetMetrics
+func (mr *MockHostMockRecorder) ResetMetrics() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetMetrics", reflect.TypeOf((*MockHost)(nil).ResetMetrics))
+}
+
 // ConnectHostPeer mocks base method
 func (m *MockHost) ConnectHostPeer(arg0 p2p.Peer) {
 	m.ctrl.T.Helper()
@@ -133,7 +172,7 @@ func (mr *MockHostMockRecorder) ConnectHostPeer(arg0 interface{}) *gomock.Call {
 }
 
 // SendMessageToGroups mocks base method
-func (m *MockHost) SendMessageToGroups(groups []node.GroupID, msg []byte) error {
+func (m *MockHost) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendMessageToGroups", groups, msg)
 	ret0, _ := ret[0].(error)
@@ -147,7 +186,7 @@ func (mr *MockHostMockRecorder) SendMessageToGroups(groups, msg interface{}) *go
 }
 
 // GroupReceiver mocks base method
-func (m *MockHost) GroupReceiver(arg0 node.GroupID) (p2p.GroupReceiver, error) {
+func (m *MockHost) GroupReceiver(arg0 nodeconfig.GroupID) (p2p.GroupReceiver, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GroupReceiver", arg0)
 	ret0, _ := ret[0].(p2p.GroupReceiver)
