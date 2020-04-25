@@ -118,6 +118,9 @@ var (
 	)
 	// aws credentials
 	awsSettingString = ""
+	bootNodes        = flag.String(
+		"bootnodes", "", "a list of bootnode multiaddress (delimited by ,)",
+	)
 )
 
 func initSetup() {
@@ -628,12 +631,14 @@ func main() {
 
 	flag.Parse()
 
+	_ = bootNodes
+
 	switch *nodeType {
 	case "validator":
 	case "explorer":
 		break
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
+		fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
 		os.Exit(1)
 	}
 
@@ -667,7 +672,7 @@ func main() {
 		devnetConfig, err := shardingconfig.NewInstance(
 			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
+			fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
 			os.Exit(1)
 		}
