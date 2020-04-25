@@ -561,6 +561,40 @@ func (b *APIBackend) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) 
 	return network.NewUtilityMetricSnapshot(b.hmy.BlockChain())
 }
 
+func (b *APIBackend) readAndUpdateRawStakes(
+	epoch *big.Int,
+	decider quorum.Decider,
+	comm shard.Committee,
+	rawStakes []effective.SlotPurchase,
+	validatorSpreads map[common.Address]numeric.Dec,
+) {
+	for i := range comm.Slots {
+		slot := comm.Slots[i]
+		slotAddr := slot.EcdsaAddress
+		slotKey := slot.BLSPublicKey
+		spread, ok := validatorSpreads[slotAddr]
+		if !ok {
+			snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(epoch, slotAddr)
+			if err != nil {
+				continue
+			}
+			wrapper := snapshot.Validator
+			spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
+				QuoInt64(int64(len(wrapper.SlotPubKeys)))
+			validatorSpreads[slotAddr] = spread
+		}
+
+		commonRPC.SetRawStake(decider, slotKey, spread)
+		// add entry to array for median calculation
+		rawStakes = append(rawStakes, effective.SlotPurchase{
+			slotAddr,
+			slotKey,
+			spread,
+			spread,
+		})
+	}
+}
+
 // GetSuperCommittees ..
 func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	nowE := b.hmy.BlockChain().CurrentHeader().Epoch()
@@ -587,21 +621,30 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 		quorum.NewRegistry(stakedSlotsThen),
 		quorum.NewRegistry(stakedSlotsNow)
 
+	rawStakes := []effective.SlotPurchase{}
+	validatorSpreads := map[common.Address]numeric.Dec{}
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
 			return nil, err
 		}
+		b.readAndUpdateRawStakes(thenE, decider, comm, rawStakes, validatorSpreads)
 		then.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
+	then.MedianStake = effective.Median(rawStakes)
 
+	rawStakes = []effective.SlotPurchase{}
+	validatorSpreads = map[common.Address]numeric.Dec{}
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch); err != nil {
 			return nil, err
 		}
+		b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
 		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
+	then.MedianStake = effective.Median(rawStakes)
+
 	return &quorum.Transition{then, now}, nil
 }
 

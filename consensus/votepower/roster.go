@@ -6,11 +6,10 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -72,6 +71,7 @@ type PureStakedVote struct {
 	Identity       shard.BLSPublicKey `json:"bls-public-key"`
 	GroupPercent   numeric.Dec        `json:"group-percent"`
 	EffectiveStake numeric.Dec        `json:"effective-stake"`
+	RawStake       numeric.Dec        `json:"raw-stake"`
 }
 
 // AccommodateHarmonyVote ..
@@ -187,6 +187,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 				Identity:       staked[i].BLSPublicKey,
 				GroupPercent:   numeric.ZeroDec(),
 				EffectiveStake: numeric.ZeroDec(),
+				RawStake:       numeric.ZeroDec(),
 			},
 			OverallPercent: numeric.ZeroDec(),
 			IsHarmonyNode:  false,
