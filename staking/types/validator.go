@@ -127,7 +127,7 @@ func NewEmptyStats() *ValidatorStats {
 		numeric.ZeroDec(),
 		numeric.ZeroDec(),
 		[]VoteWithCurrentEpochEarning{},
-		effective.NotBooted,
+		effective.Booted,
 	}
 }
 
