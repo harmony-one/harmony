@@ -142,22 +142,25 @@ func (h *hmyHost) GetPeerCount() int {
 	return len(conns)
 }
 
+// DefaultLocal ..
+const DefaultLocal = "127.0.0.1"
+
 // NewHost ..
 func NewHost(opts *Opts, own *Peer) (Host, error) {
 	var swarmAddresses []string
 
-	if opts.Port != 0 {
+	if own.IP != DefaultLocal {
 		swarmAddresses = []string{
-			fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", opts.Port),
-			fmt.Sprintf("/ip6/127.0.0.1/tcp/%d", opts.Port),
+			fmt.Sprintf("/ip4/%s/tcp/%d", own.IP, opts.Port),
+			fmt.Sprintf("/ip6/%s/tcp/%d", own.IP, opts.Port),
 			// TODO Hold up, need httpu
 			// fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", opts.Port+1),
 			// fmt.Sprintf("/ip6/0.0.0.0/udp/%d/quic", opts.Port+1),
 		}
 	} else {
 		swarmAddresses = []string{
-			"/ip4/127.0.0.1/tcp/0",
-			"/ip6/127.0.0.1/tcp/0",
+			fmt.Sprintf("/ip4/%s/tcp/%d", DefaultLocal, opts.Port),
+			fmt.Sprintf("/ip6/%s/tcp/%d", DefaultLocal, opts.Port),
 			// "/ip4/0.0.0.0/udp/0/quic",
 			// "/ip6/0.0.0.0/udp/0/quic",
 		}

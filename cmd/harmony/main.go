@@ -64,7 +64,7 @@ func printVersion() {
 }
 
 var (
-	ip          = flag.String("ip", "127.0.0.1", "ip of the node")
+	ip          = flag.String("ip", p2p.DefaultLocal, "ip of the node")
 	port        = flag.String("port", "9000", "port of the node.")
 	logFolder   = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	logMaxSize  = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
@@ -386,11 +386,9 @@ func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 		RootDS:                baseDS,
 		Logger:                utils.NetworkLogger(),
 	}, &p2p.Peer{
-		IP: *ip,
-		// TODO Unify these
+		IP:              *ip,
 		Port:            *port,
 		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
-		PeerID:          "",
 	},
 	)
 	if err != nil {
