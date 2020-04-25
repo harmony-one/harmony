@@ -27,7 +27,7 @@ type CrossLink struct {
 }
 
 // NewCrossLink returns a new cross link object
-func NewCrossLink(header *block.Header, parentHeader *block.Header) CrossLink {
+func NewCrossLink(header *block.Header, parentHeader *block.Header) *CrossLink {
 	parentBlockNum := big.NewInt(0)
 	parentViewID := big.NewInt(0)
 	parentEpoch := big.NewInt(0)
@@ -36,7 +36,7 @@ func NewCrossLink(header *block.Header, parentHeader *block.Header) CrossLink {
 		parentViewID = parentHeader.ViewID()
 		parentEpoch = parentHeader.Epoch()
 	}
-	return CrossLink{
+	return &CrossLink{
 		HashF:        header.ParentHash(),
 		BlockNumberF: parentBlockNum,
 		ViewIDF:      parentViewID,
@@ -48,47 +48,47 @@ func NewCrossLink(header *block.Header, parentHeader *block.Header) CrossLink {
 }
 
 // ShardID returns shardID
-func (cl CrossLink) ShardID() uint32 {
+func (cl *CrossLink) ShardID() uint32 {
 	return cl.ShardIDF
 }
 
 // Number returns blockNum with big.Int format
-func (cl CrossLink) Number() *big.Int {
+func (cl *CrossLink) Number() *big.Int {
 	return cl.BlockNumberF
 }
 
 // ViewID returns viewID with big.Int format
-func (cl CrossLink) ViewID() *big.Int {
+func (cl *CrossLink) ViewID() *big.Int {
 	return cl.ViewIDF
 }
 
 // Epoch returns epoch with big.Int format
-func (cl CrossLink) Epoch() *big.Int {
+func (cl *CrossLink) Epoch() *big.Int {
 	return cl.EpochF
 }
 
 // BlockNum returns blockNum
-func (cl CrossLink) BlockNum() uint64 {
+func (cl *CrossLink) BlockNum() uint64 {
 	return cl.BlockNumberF.Uint64()
 }
 
 // Hash returns hash
-func (cl CrossLink) Hash() common.Hash {
+func (cl *CrossLink) Hash() common.Hash {
 	return cl.HashF
 }
 
 // Bitmap returns bitmap
-func (cl CrossLink) Bitmap() []byte {
+func (cl *CrossLink) Bitmap() []byte {
 	return cl.BitmapF
 }
 
 // Signature returns aggregated signature
-func (cl CrossLink) Signature() [96]byte {
+func (cl *CrossLink) Signature() [96]byte {
 	return cl.SignatureF
 }
 
 // MarshalJSON ..
-func (cl CrossLink) MarshalJSON() ([]byte, error) {
+func (cl *CrossLink) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Hash        common.Hash `json:"hash"`
 		BlockNumber *big.Int    `json:"block-number"`
@@ -109,7 +109,7 @@ func (cl CrossLink) MarshalJSON() ([]byte, error) {
 }
 
 // Serialize returns bytes of cross link rlp-encoded content
-func (cl CrossLink) Serialize() []byte {
+func (cl *CrossLink) Serialize() []byte {
 	bytes, _ := rlp.EncodeToBytes(cl)
 	return bytes
 }
