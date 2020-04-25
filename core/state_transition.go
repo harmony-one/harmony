@@ -403,7 +403,7 @@ func (st *StateTransition) checkDuplicateFields(validator common.Address, identi
 	}
 
 	for _, addr := range addrs {
-		if bytes.Compare(validator.Bytes(), addr.Bytes()) != 0 {
+		if !bytes.Equal(validator.Bytes(), addr.Bytes()) {
 			wrapper, err := st.state.ValidatorWrapperCopy(addr)
 
 			if err != nil {
