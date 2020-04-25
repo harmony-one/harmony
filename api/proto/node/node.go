@@ -189,7 +189,7 @@ func ConstructSlashMessage(witnesses slash.Records) []byte {
 // ConstructCrossLinkMessage constructs cross link message to send to beacon chain
 func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
 	byteBuffer := bytes.NewBuffer(crossLinkH)
-	crosslinks := []types.CrossLink{}
+	crosslinks := []*types.CrossLink{}
 	for _, header := range headers {
 		if header.Number().Uint64() <= 1 || !bc.Config().IsCrossLink(header.Epoch()) {
 			continue
@@ -198,8 +198,7 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 		if parentHeader == nil {
 			continue
 		}
-		epoch := parentHeader.Epoch()
-		crosslinks = append(crosslinks, types.NewCrossLink(header, epoch))
+		crosslinks = append(crosslinks, types.NewCrossLink(header, parentHeader))
 	}
 	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
 	byteBuffer.Write(crosslinksData)

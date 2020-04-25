@@ -145,6 +145,6 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	}
 
 	return verify.AggregateSigForCommittee(
-		committee, aggSig, cl.Hash(), cl.BlockNum(), cl.Epoch(), cl.Bitmap(),
+		node.Blockchain(), committee, aggSig, cl.Hash(), cl.BlockNum(), cl.ViewID().Uint64(), cl.Epoch(), cl.Bitmap(),
 	)
 }
