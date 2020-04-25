@@ -6,17 +6,15 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 )
 
 func TestNew(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := New(
-		nil, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(bls.RandPrivateKey()), decider,
+		nil, shard.BeaconChainShardID, multibls.GetPrivateKey(bls.RandPrivateKey()), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)

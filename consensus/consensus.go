@@ -206,7 +206,9 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, erro
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey *multibls.PrivateKey,
+	host p2p.Host,
+	shard uint32,
+	multiBLSPriKey *multibls.PrivateKey,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 

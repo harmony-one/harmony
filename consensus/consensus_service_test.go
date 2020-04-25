@@ -8,18 +8,16 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 )
 
 func TestPopulateMessageFields(t *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	blsPriKey := bls.RandPrivateKey()
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := New(
-		nil, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
+		nil, shard.BeaconChainShardID, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -49,11 +47,10 @@ func TestPopulateMessageFields(t *testing.T) {
 }
 
 func TestSignAndMarshalConsensusMessage(t *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
 	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		nil, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
+		nil, shard.BeaconChainShardID, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -73,13 +70,12 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 }
 
 func TestSetViewID(t *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		nil, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
+		nil, shard.BeaconChainShardID, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

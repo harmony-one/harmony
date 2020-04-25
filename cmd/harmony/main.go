@@ -52,11 +52,7 @@ var (
 	commit  string
 )
 
-// Host
-var (
-	myHost          p2p.Host
-	initialAccounts = []*genesis.DeployAccount{}
-)
+var initialAccounts = []*genesis.DeployAccount{}
 
 func printVersion() {
 	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
@@ -389,15 +385,17 @@ func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 		IP:              *ip,
 		Port:            *port,
 		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
-	},
-	)
+	})
+
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
 	}
 	return myHost, nil
 }
 
-func createGlobalConfig() (*nodeconfig.ConfigType, error) {
+func createGlobalConfig() (
+	*nodeconfig.ConfigType, p2p.Host, error,
+) {
 	var err error
 
 	if len(initialAccounts) == 0 {
@@ -421,13 +419,14 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	// P2P private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot load or create P2P key at %#v",
+		return nil, nil, errors.Wrapf(
+			err, "cannot load or create P2P key at %#v",
 			*keyFile)
 	}
 
-	myHost, err = setupHost(nodeConfig)
+	myHost, err := setupHost(nodeConfig)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot create P2P network host")
+		return nil, nil, errors.Wrap(err, "cannot create P2P network host")
 	}
 
 	nodeConfig.DBDir = *dbDir
@@ -443,17 +442,20 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 		nodeConfig.WebHooks.Hooks = config
 	}
 
-	return nodeConfig, nil
+	return nodeConfig, myHost, nil
 }
 
-func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
+func setupConsensusAndNode(
+	nodeConfig *nodeconfig.ConfigType,
+	myHost p2p.Host,
+) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(*shardID))
 
 	currentConsensus, err := consensus.New(
-		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
+		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, decider,
 	)
 	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 		return currentConsensus.PubKey, nil
@@ -712,12 +714,13 @@ func main() {
 		}
 	}
 
-	nodeConfig, err := createGlobalConfig()
+	nodeConfig, host, err := createGlobalConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
 		os.Exit(1)
 	}
-	currentNode := setupConsensusAndNode(nodeConfig)
+
+	currentNode := setupConsensusAndNode(nodeConfig, host)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 
 	// Prepare for graceful shutdown from os signals
@@ -773,9 +776,6 @@ func main() {
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).
 		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
 		Str("Role", currentNode.NodeConfig.Role().String()).
-		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, myHost.GetID().Pretty()),
-		).
 		Msg(startMsg)
 
 	if err := currentNode.ForceJoiningTopics(); err != nil {

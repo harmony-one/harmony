@@ -131,7 +131,7 @@ func lookupLogger(key string) (*zerolog.Logger, error) {
 	results, err, _ := loggersByTopic.Do(
 		key, func() (interface{}, error) {
 			log := Logger().With().
-				Str("log-topic", dataScienceTopic).
+				Str("log-topic", key).
 				Timestamp().
 				Logger()
 			return &log, nil

@@ -8,25 +8,26 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
+
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		nil, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
+		nil, shard.BeaconChainShardID, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, blsPriKey.GetPublicKey(), blsPriKey); err != nil {
+	if _, err = consensus.construct(
+		msg_pb.MessageType_ANNOUNCE, nil, blsPriKey.GetPublicKey(), blsPriKey,
+	); err != nil {
 		test.Fatalf("could not construct announce: %v", err)
 	}
 }
@@ -34,7 +35,6 @@ func TestConstructAnnounceMessage(test *testing.T) {
 func TestConstructPreparedMessage(test *testing.T) {
 	leaderPriKey := bls.RandPrivateKey()
 	leaderPubKey := leaderPriKey.GetPublicKey()
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999", ConsensusPubKey: leaderPubKey}
 	validatorPriKey := bls.RandPrivateKey()
 	validatorPubKey := leaderPriKey.GetPublicKey()
 	decider := quorum.NewDecider(
@@ -42,7 +42,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	)
 	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		nil, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
+		nil, shard.BeaconChainShardID, multibls.GetPrivateKey(blsPriKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
