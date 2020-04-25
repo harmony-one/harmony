@@ -18,9 +18,10 @@ package core
 
 import (
 	"bytes"
-	"github.com/harmony-one/harmony/shard"
 	"math"
 	"math/big"
+
+	"github.com/harmony-one/harmony/shard"
 
 	staking2 "github.com/harmony-one/harmony/staking"
 	"github.com/harmony-one/harmony/staking/network"
