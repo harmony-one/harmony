@@ -566,23 +566,24 @@ func (b *APIBackend) readAndUpdateRawStakes(
 	decider quorum.Decider,
 	comm shard.Committee,
 	rawStakes []effective.SlotPurchase,
-	validatorWrappers map[common.Address]*staking.ValidatorWrapper,
+	validatorWrappers map[common.Address]numeric.Dec,
 ) {
 	for i := range comm.Slots {
 		slot := comm.Slots[i]
 		slotAddr := slot.EcdsaAddress
 		slotKey := slot.BLSPublicKey
-		wrapper, ok := validatorWrappers[slotAddr]
+		spread, ok := validatorWrappers[slotAddr]
 		if !ok {
 			snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(epoch, slotAddr)
 			if err != nil {
 				continue
 			}
-			wrapper = snapshot.Validator
-			validatorWrappers[slotAddr] = wrapper
+			wrapper := snapshot.Validator
+			spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
+				QuoInt64(int64(len(wrapper.SlotPubKeys)))
+			validatorWrappers[slotAddr] = spread
 		}
-		spread := numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
-			QuoInt64(int64(len(wrapper.SlotPubKeys)))
+
 		commonRPC.SetRawStake(decider, slotKey, spread)
 		// add entry to array for median calculation
 		rawStakes = append(rawStakes, effective.SlotPurchase{
@@ -621,7 +622,7 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 		quorum.NewRegistry(stakedSlotsNow)
 
 	rawStakes := []effective.SlotPurchase{}
-	validatorWrappers := map[common.Address]*staking.ValidatorWrapper{}
+	validatorWrappers := map[common.Address]numeric.Dec{}
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
@@ -633,7 +634,7 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	then.MedianStake = effective.Median(rawStakes)
 
 	rawStakes = []effective.SlotPurchase{}
-	validatorWrappers = map[common.Address]*staking.ValidatorWrapper{}
+	validatorWrappers = map[common.Address]numeric.Dec{}
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch); err != nil {
