@@ -46,7 +46,6 @@ var (
 	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than maximum commission rate")
 	errNoRewardsToCollect          = errors.New("no rewards to collect")
 	errNegativeAmount              = errors.New("amount can not be negative")
-	errDupName                     = errors.New("validator name exists")
 	errDupIdentity                 = errors.New("validator identity exists")
 	errDupBlsKey                   = errors.New("BLS key exists")
 )
@@ -389,13 +388,12 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	return st.gasUsed(), err
 }
 
-func (st *StateTransition) checkDuplicateFields(validator common.Address, name, identity string, blsKeys []shard.BLSPublicKey) error {
+func (st *StateTransition) checkDuplicateFields(validator common.Address, identity string, blsKeys []shard.BLSPublicKey) error {
 	addrs, err := st.bc.ReadValidatorList()
 	if err != nil {
 		return err
 	}
 
-	checkName := name != ""
 	checkIdentity := identity != ""
 	checkBlsKeys := len(blsKeys) != 0
 
@@ -412,9 +410,6 @@ func (st *StateTransition) checkDuplicateFields(validator common.Address, name, 
 				return err
 			}
 
-			if checkName && wrapper.Name == name {
-				return errDupName
-			}
 			if checkIdentity && wrapper.Identity == identity {
 				return errDupIdentity
 			}
@@ -435,7 +430,6 @@ func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 ) error {
 	if err := st.checkDuplicateFields(
 		createValidator.ValidatorAddress,
-		createValidator.Name,
 		createValidator.Identity,
 		createValidator.SlotPubKeys); err != nil {
 		return err
@@ -463,7 +457,6 @@ func (st *StateTransition) verifyAndApplyEditValidatorTx(
 	}
 	if err := st.checkDuplicateFields(
 		editValidator.ValidatorAddress,
-		editValidator.Name,
 		editValidator.Identity,
 		newBlsKeys); err != nil {
 		return err
