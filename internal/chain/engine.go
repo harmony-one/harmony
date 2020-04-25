@@ -228,13 +228,14 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		}
 	}
 
-	lastCommitPayload := signature.ConstructCommitPayload(e.Beaconchain(),
-		parentHeader.Hash(), parentHeader.Epoch().Uint64(), parentHeader.Number().Uint64(), parentHeader.ViewID().Uint64())
-	utils.Logger().Debug(). // TODO: remove debug msg after STN testing
-				Uint64("epoch", parentHeader.Epoch().Uint64()).
-				Uint64("block-number", parentHeader.Number().Uint64()).
-				Uint64("view-id", parentHeader.ViewID().Uint64()).
-				Msgf("[COMMIT-PAYLOAD] VerifySeal %v", hex.EncodeToString(lastCommitPayload))
+	lastCommitPayload := signature.ConstructCommitPayload(chain,
+		parentHeader.Epoch(), parentHeader.Hash(), parentHeader.Number().Uint64(), parentHeader.ViewID().Uint64())
+	// TODO: remove debug msg after STN testing
+	utils.Logger().Debug().
+		Uint64("epoch", parentHeader.Epoch().Uint64()).
+		Uint64("block-number", parentHeader.Number().Uint64()).
+		Uint64("view-id", parentHeader.ViewID().Uint64()).
+		Msgf("[COMMIT-PAYLOAD] VerifySeal %v", hex.EncodeToString(lastCommitPayload))
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
 		const msg = "[VerifySeal] Unable to verify aggregated signature from last block"
 		return errors.New(msg)
@@ -546,13 +547,14 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 			)
 		}
 	}
-	commitPayload := signature.ConstructCommitPayload(e.Beaconchain(),
-		header.Hash(), header.Epoch().Uint64(), header.Number().Uint64(), header.ViewID().Uint64())
-	utils.Logger().Debug(). // TODO: remove debug msg after STN testing
-				Uint64("epoch", header.Epoch().Uint64()).
-				Uint64("block-number", header.Number().Uint64()).
-				Uint64("view-id", header.ViewID().Uint64()).
-				Msgf("[COMMIT-PAYLOAD] VerifyHeaderWithSignature %v", hex.EncodeToString(commitPayload))
+	commitPayload := signature.ConstructCommitPayload(chain,
+		header.Epoch(), header.Hash(), header.Epoch().Uint64(), header.ViewID().Uint64())
+	// TODO: remove debug msg after STN testing
+	utils.Logger().Debug().
+		Uint64("epoch", header.Epoch().Uint64()).
+		Uint64("block-number", header.Number().Uint64()).
+		Uint64("view-id", header.ViewID().Uint64()).
+		Msgf("[COMMIT-PAYLOAD] VerifyHeaderWithSignature %v", hex.EncodeToString(commitPayload))
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		return errors.New("[VerifySeal] Unable to verify aggregated signature for block")
