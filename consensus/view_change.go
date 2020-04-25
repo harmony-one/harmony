@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/big"
-
-	// HACK some merge conflict
-	_ "sync"
 	"sync/atomic"
 	"time"
 
@@ -210,7 +207,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 		for i, key := range consensus.PubKey.PublicKey {
 			priKey := consensus.priKey.PrivateKey[i]
-			consensus.viewIDSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(viewIDBytes)
+			consensus.viewIDSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(
+				viewIDBytes,
+			)
 			consensus.viewIDBitmap[recvMsg.ViewID].SetKey(key, true)
 		}
 	}
@@ -357,8 +356,13 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 			// Leader sign and add commit message
-			commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-				new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, recvMsg.ViewID)
+			commitPayload := signature.ConstructCommitPayload(
+				consensus.ChainReader,
+				new(big.Int).SetUint64(consensus.epoch),
+				consensus.blockHash,
+				consensus.blockNum,
+				recvMsg.ViewID,
+			)
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
 				if _, err := consensus.Decider.SubmitVote(
@@ -526,8 +530,13 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	// TODO: check magic number 32
 	if len(recvMsg.Payload) > 32 {
 		// Construct and send the commit message
-		commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-			new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, consensus.viewID)
+		commitPayload := signature.ConstructCommitPayload(
+			consensus.ChainReader,
+			new(big.Int).SetUint64(consensus.epoch),
+			consensus.blockHash,
+			consensus.blockNum,
+			consensus.viewID,
+		)
 		groupID := []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 		for i, key := range consensus.PubKey.PublicKey {
