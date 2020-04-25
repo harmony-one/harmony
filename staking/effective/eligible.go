@@ -78,8 +78,10 @@ func ValidatorStatus(currentlyInCommittee bool, status Eligibility) Candidacy {
 type BootedStatus byte
 
 const (
+	// Booted ..
+	Booted BootedStatus = iota
 	// NotBooted ..
-	NotBooted BootedStatus = iota
+	NotBooted
 	// LostEPoSAuction ..
 	LostEPoSAuction
 	// TurnedInactiveOrInsufficientUptime ..
@@ -90,6 +92,8 @@ const (
 
 func (r BootedStatus) String() string {
 	switch r {
+	case Booted:
+		return "booted"
 	case LostEPoSAuction:
 		return "lost epos auction"
 	case TurnedInactiveOrInsufficientUptime:

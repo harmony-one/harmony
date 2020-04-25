@@ -415,6 +415,9 @@ func (b *APIBackend) GetValidatorInformation(
 
 	stats, err := bc.ReadValidatorStats(addr)
 	if err != nil {
+		// when validator has no stats, default boot-status to not booted
+		notBooted := effective.NotBooted.String()
+		defaultReply.BootedStatus = &notBooted
 		return defaultReply, nil
 	}
 
