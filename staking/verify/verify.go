@@ -1,12 +1,13 @@
 package verify
 
 import (
-	"encoding/binary"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
@@ -20,10 +21,11 @@ var (
 
 // AggregateSigForCommittee ..
 func AggregateSigForCommittee(
+	chain *core.BlockChain,
 	committee *shard.Committee,
 	aggSignature *bls.Sign,
 	hash common.Hash,
-	blockNum uint64,
+	blockNum, viewID uint64,
 	epoch *big.Int,
 	bitmap []byte,
 ) error {
@@ -52,9 +54,7 @@ func AggregateSigForCommittee(
 		return errQuorumVerifyAggSign
 	}
 
-	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, blockNum)
-	commitPayload := append(blockNumBytes, hash[:]...)
+	commitPayload := signature.ConstructCommitPayload(chain, epoch, hash, blockNum, viewID)
 	if !aggSignature.VerifyHash(mask.AggregatePublic, commitPayload) {
 		return errAggregateSigFail
 	}

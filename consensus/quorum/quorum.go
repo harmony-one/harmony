@@ -127,11 +127,12 @@ type Decider interface {
 type Registry struct {
 	Deciders      map[string]Decider `json:"quorum-deciders"`
 	ExternalCount int                `json:"external-slot-count"`
+	MedianStake   numeric.Dec        `json:"epos-median-stake"`
 }
 
 // NewRegistry ..
 func NewRegistry(extern int) Registry {
-	return Registry{map[string]Decider{}, extern}
+	return Registry{map[string]Decider{}, extern, numeric.ZeroDec()}
 }
 
 // Transition  ..

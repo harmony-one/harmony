@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -399,7 +400,7 @@ func (mockOutChainReader) ReadShardState(epoch *big.Int) (*shard.State, error) {
 	return &shard.State{
 		Epoch: doubleSignEpochBig,
 		Shards: []shard.Committee{
-			shard.Committee{
+			{
 				ShardID: doubleSignShardID,
 				Slots: shard.SlotList{
 					shard.Slot{
@@ -411,6 +412,10 @@ func (mockOutChainReader) ReadShardState(epoch *big.Int) (*shard.State, error) {
 			},
 		},
 	}, nil
+}
+
+func (mockOutChainReader) Config() *params.ChainConfig {
+	return params.TestChainConfig
 }
 
 func TestVerify(t *testing.T) {

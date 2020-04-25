@@ -1,7 +1,6 @@
 package node
 
 import (
-	"encoding/binary"
 	"sort"
 	"sync"
 
@@ -11,6 +10,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -52,18 +52,6 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
-		// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
-		blockNumHash := make([]byte, 8)
-		binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
-		commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
-		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-			utils.Logger().
-				Error().Err(err).
-				Uint64("msgBlock", recvMsg.BlockNum).
-				Msg("[Explorer] Failed to verify the multi signature for commit phase")
-			return
-		}
-
 		block := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 
 		if block == nil {
@@ -71,6 +59,16 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 				Uint64("msgBlock", recvMsg.BlockNum).
 				Msg("[Explorer] Haven't received the block before the committed msg")
 			node.Consensus.FBFTLog.AddMessage(recvMsg)
+			return
+		}
+
+		commitPayload := signature.ConstructCommitPayload(node.Blockchain(),
+			block.Epoch(), block.Hash(), block.Number().Uint64(), block.Header().ViewID().Uint64())
+		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+			utils.Logger().
+				Error().Err(err).
+				Uint64("msgBlock", recvMsg.BlockNum).
+				Msg("[Explorer] Failed to verify the multi signature for commit phase")
 			return
 		}
 

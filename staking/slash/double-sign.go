@@ -1,7 +1,6 @@
 package slash
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
@@ -9,11 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -78,7 +79,7 @@ type Record struct {
 
 // Application tracks the slash application to state
 type Application struct {
-	TotalSlashed      *big.Int `json:'total-slashed`
+	TotalSlashed      *big.Int `json:"total-slashed"`
 	TotalSnitchReward *big.Int `json:"total-snitch-reward"`
 }
 
@@ -136,6 +137,7 @@ func (r Record) String() string {
 
 // CommitteeReader ..
 type CommitteeReader interface {
+	Config() *params.ChainConfig
 	ReadShardState(epoch *big.Int) (*shard.State, error)
 	CurrentBlock() *types.Block
 }
@@ -241,10 +243,15 @@ func Verify(
 			return err
 		}
 
-		blockNumBytes := make([]byte, 8)
-		// TODO(audit): add view ID into signature payload
-		binary.LittleEndian.PutUint64(blockNumBytes, ballot.Height)
-		commitPayload := append(blockNumBytes, ballot.BlockHeaderHash[:]...)
+		// slash verification only happens in staking era, therefore want commit payload for staking epoch
+		commitPayload := consensus_sig.ConstructCommitPayload(chain,
+			chain.Config().StakingEpoch, ballot.BlockHeaderHash, ballot.Height, ballot.ViewID)
+		utils.Logger().Debug().
+			Uint64("epoch", chain.Config().StakingEpoch.Uint64()).
+			Uint64("block-number", ballot.Height).
+			Uint64("view-id", ballot.ViewID).
+			Msgf("[COMMIT-PAYLOAD] doubleSignVerify %v", hex.EncodeToString(commitPayload))
+
 		if !signature.VerifyHash(publicKey, commitPayload) {
 			return errFailVerifySlash
 		}
