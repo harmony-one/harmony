@@ -27,14 +27,14 @@ require (
 	github.com/ipfs/go-datastore v0.4.4
 	github.com/ipfs/go-ipfs v0.5.0-rc1.0.20200409041533-6cb3ca41da70
 	github.com/ipfs/go-ipfs-config v0.4.0
-	github.com/ipfs/interface-go-ipfs-core v0.2.6
+	github.com/ipfs/interface-go-ipfs-core v0.2.7
 	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b
 	github.com/karalabe/hid v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/libp2p/go-libp2p v0.8.0
-	github.com/libp2p/go-libp2p-core v0.5.1
-	github.com/libp2p/go-libp2p-discovery v0.3.0
-	github.com/libp2p/go-libp2p-kad-dht v0.7.4
+	github.com/libp2p/go-libp2p v0.8.1
+	github.com/libp2p/go-libp2p-core v0.5.2
+	github.com/libp2p/go-libp2p-discovery v0.4.0
+	github.com/libp2p/go-libp2p-kad-dht v0.7.7
 	github.com/libp2p/go-libp2p-pubsub v0.2.7 // indirect
 	github.com/libp2p/go-libp2p-record v0.1.2
 	github.com/libp2p/go-libp2p-rendezvous v0.0.0-20190708065449-737144165c9e
