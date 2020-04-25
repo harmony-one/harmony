@@ -164,7 +164,9 @@ func (v *stakedVoteWeight) String() string {
 
 // HACK later remove - unify votepower in UI (aka MarshalJSON)
 func (v *stakedVoteWeight) SetRawStake(key shard.BLSPublicKey, d numeric.Dec) {
-	v.roster.Voters[key].RawStake = d
+	if voter, ok := v.roster.Voters[key]; ok {
+		voter.RawStake = d
+	}
 }
 
 // TODO remove this large method, use roster's own Marshal, mix it
