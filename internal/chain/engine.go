@@ -548,7 +548,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		}
 	}
 	commitPayload := signature.ConstructCommitPayload(chain,
-		header.Epoch(), header.Hash(), header.Epoch().Uint64(), header.ViewID().Uint64())
+		header.Epoch(), header.Hash(), header.Number().Uint64(), header.ViewID().Uint64())
 	// TODO: remove debug msg after STN testing
 	utils.Logger().Debug().
 		Uint64("epoch", header.Epoch().Uint64()).
