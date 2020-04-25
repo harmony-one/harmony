@@ -356,6 +356,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 			// Leader sign and add commit message
+
 			commitPayload := signature.ConstructCommitPayload(
 				consensus.ChainReader,
 				new(big.Int).SetUint64(consensus.epoch),
@@ -363,6 +364,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				consensus.blockNum,
 				recvMsg.ViewID,
 			)
+
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
 				if _, err := consensus.Decider.SubmitVote(
@@ -537,8 +539,10 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			consensus.blockNum,
 			consensus.viewID,
 		)
+
 		groupID := []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+		}
 		for i, key := range consensus.PubKey.PublicKey {
 			network, err := consensus.construct(
 				msg_pb.MessageType_COMMIT,
