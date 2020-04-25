@@ -411,12 +411,12 @@ func (st *StateTransition) checkDuplicateFields(validator common.Address, identi
 			}
 
 			if checkIdentity && wrapper.Identity == identity {
-				return errDupIdentity
+				return errors.Wrapf(errDupIdentity, "duplicate identity %s", identity)
 			}
 			if checkBlsKeys {
 				for _, existingKey := range wrapper.SlotPubKeys {
 					if _, ok := blsKeyMap[existingKey]; ok {
-						return errDupBlsKey
+						return errors.Wrapf(errDupBlsKey, "duplicate bls key %x", existingKey)
 					}
 				}
 			}
