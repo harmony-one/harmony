@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"math"
 	"math/big"
 
@@ -44,6 +45,8 @@ var (
 	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than maximum commission rate")
 	errNoRewardsToCollect          = errors.New("no rewards to collect")
 	errNegativeAmount              = errors.New("amount can not be negative")
+	errDupName                     = errors.New("validator name exists")
+	errDupIdentity                 = errors.New("validator identity exists")
 )
 
 /*
@@ -384,9 +387,42 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	return st.gasUsed(), err
 }
 
+func (st *StateTransition) checkDuplicateNameOrIdentity(validator common.Address, name, identity string) error {
+	addrs, err := st.bc.ReadValidatorList()
+	if err != nil {
+		return err
+	}
+
+	checkName := name != ""
+	checkIdentity := identity != ""
+	for _, addr := range addrs {
+		if bytes.Compare(validator.Bytes(), addr.Bytes()) != 0 {
+			wrapper, err := st.state.ValidatorWrapperCopy(addr)
+
+			if err != nil {
+				return err
+			}
+
+			if checkName && wrapper.Name == name {
+				return errDupName
+			}
+			if checkIdentity && wrapper.Identity == identity {
+				return errDupIdentity
+			}
+		}
+	}
+	return nil
+}
+
 func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 	createValidator *staking.CreateValidator, blockNum *big.Int,
 ) error {
+	if err := st.checkDuplicateNameOrIdentity(
+		createValidator.ValidatorAddress,
+		createValidator.Name,
+		createValidator.Identity); err != nil {
+		return err
+	}
 	wrapper, err := VerifyAndCreateValidatorFromMsg(
 		st.state, st.evm.EpochNumber, blockNum, createValidator,
 	)
@@ -404,6 +440,12 @@ func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 func (st *StateTransition) verifyAndApplyEditValidatorTx(
 	editValidator *staking.EditValidator, blockNum *big.Int,
 ) error {
+	if err := st.checkDuplicateNameOrIdentity(
+		editValidator.ValidatorAddress,
+		editValidator.Name,
+		editValidator.Identity); err != nil {
+		return err
+	}
 	wrapper, err := VerifyAndEditValidatorFromMsg(
 		st.state, st.bc, st.evm.EpochNumber, blockNum, editValidator,
 	)

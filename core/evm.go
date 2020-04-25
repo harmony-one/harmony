@@ -41,6 +41,9 @@ type ChainContext interface {
 
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
 	ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error)
+
+	// ReadValidatorList returns the list of all validators
+	ReadValidatorList() ([]common.Address, error)
 }
 
 // NewEVMContext creates a new context for use in the EVM.
