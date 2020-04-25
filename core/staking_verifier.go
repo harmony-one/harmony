@@ -162,62 +162,29 @@ func VerifyAndDelegateFromMsg(
 	if err != nil {
 		return nil, nil, err
 	}
-	// Check for redelegation
-	for i := range wrapper.Delegations {
-		delegation := &wrapper.Delegations[i]
-		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
-			totalInUndelegation := delegation.TotalInUndelegation()
-			balance := stateDB.GetBalance(msg.DelegatorAddress)
-			// If the sum of normal balance and the total amount of tokens in undelegation is greater than the amount to delegate
-			if big.NewInt(0).Add(totalInUndelegation, balance).Cmp(msg.Amount) >= 0 {
-				// Check if it can use tokens in undelegation to delegate (redelegate)
-				delegateBalance := big.NewInt(0).Set(msg.Amount)
-				// Use the latest undelegated token first as it has the longest remaining locking time.
-				i := len(delegation.Undelegations) - 1
-				for ; i >= 0; i-- {
-					if delegation.Undelegations[i].Amount.Cmp(delegateBalance) <= 0 {
-						delegateBalance.Sub(delegateBalance, delegation.Undelegations[i].Amount)
-					} else {
-						delegation.Undelegations[i].Amount.Sub(
-							delegation.Undelegations[i].Amount, delegateBalance,
-						)
-						delegateBalance = big.NewInt(0)
-						break
-					}
-				}
-				delegation.Undelegations = delegation.Undelegations[:i+1]
-				delegation.Amount.Add(delegation.Amount, msg.Amount)
-				if err := wrapper.SanityCheck(
-					staking.DoNotEnforceMaxBLS,
-				); err != nil {
-					return nil, nil, err
-				}
-				if delegateBalance.Cmp(big.NewInt(0)) < 0 {
-					return nil, nil, errNegativeAmount // shouldn't really happen
-				}
-				// Return remaining balance to be deducted for delegation
-				if !CanTransfer(stateDB, msg.DelegatorAddress, delegateBalance) {
-					return nil, nil, errors.Wrapf(
-						errInsufficientBalanceForStake, "had %v, tried to stake %v",
-						stateDB.GetBalance(msg.DelegatorAddress), delegateBalance)
-				}
-				return wrapper, delegateBalance, nil
-			}
-			return nil, nil, errors.Wrapf(
-				errInsufficientBalanceForStake,
-				"total-delegated %s own-current-balance %s amount-to-delegate %s",
-				totalInUndelegation.String(),
-				balance.String(),
-				msg.Amount.String(),
-			)
-		}
-	}
-	// If no redelegation, create new delegation
+
+	// Check if there is enough liquid token to delegate
 	if !CanTransfer(stateDB, msg.DelegatorAddress, msg.Amount) {
 		return nil, nil, errors.Wrapf(
 			errInsufficientBalanceForStake, "had %v, tried to stake %v",
 			stateDB.GetBalance(msg.DelegatorAddress), msg.Amount)
 	}
+
+	// Check for existing delegation
+	for i := range wrapper.Delegations {
+		delegation := &wrapper.Delegations[i]
+		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
+			delegation.Amount.Add(delegation.Amount, msg.Amount)
+			if err := wrapper.SanityCheck(
+				staking.DoNotEnforceMaxBLS,
+			); err != nil {
+				return nil, nil, err
+			}
+			return wrapper, msg.Amount, nil
+		}
+	}
+
+	// Add new delegation
 	wrapper.Delegations = append(
 		wrapper.Delegations, staking.NewDelegation(
 			msg.DelegatorAddress, msg.Amount,
