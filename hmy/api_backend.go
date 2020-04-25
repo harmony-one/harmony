@@ -566,13 +566,13 @@ func (b *APIBackend) readAndUpdateRawStakes(
 	decider quorum.Decider,
 	comm shard.Committee,
 	rawStakes []effective.SlotPurchase,
-	validatorWrappers map[common.Address]numeric.Dec,
+	validatorSpreads map[common.Address]numeric.Dec,
 ) {
 	for i := range comm.Slots {
 		slot := comm.Slots[i]
 		slotAddr := slot.EcdsaAddress
 		slotKey := slot.BLSPublicKey
-		spread, ok := validatorWrappers[slotAddr]
+		spread, ok := validatorSpreads[slotAddr]
 		if !ok {
 			snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(epoch, slotAddr)
 			if err != nil {
@@ -581,7 +581,7 @@ func (b *APIBackend) readAndUpdateRawStakes(
 			wrapper := snapshot.Validator
 			spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
 				QuoInt64(int64(len(wrapper.SlotPubKeys)))
-			validatorWrappers[slotAddr] = spread
+			validatorSpreads[slotAddr] = spread
 		}
 
 		commonRPC.SetRawStake(decider, slotKey, spread)
@@ -622,25 +622,25 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 		quorum.NewRegistry(stakedSlotsNow)
 
 	rawStakes := []effective.SlotPurchase{}
-	validatorWrappers := map[common.Address]numeric.Dec{}
+	validatorSpreads := map[common.Address]numeric.Dec{}
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
 			return nil, err
 		}
-		b.readAndUpdateRawStakes(thenE, decider, comm, rawStakes, validatorWrappers)
+		b.readAndUpdateRawStakes(thenE, decider, comm, rawStakes, validatorSpreads)
 		then.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
 	then.MedianStake = effective.Median(rawStakes)
 
 	rawStakes = []effective.SlotPurchase{}
-	validatorWrappers = map[common.Address]numeric.Dec{}
+	validatorSpreads = map[common.Address]numeric.Dec{}
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch); err != nil {
 			return nil, err
 		}
-		b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorWrappers)
+		b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
 		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
 	then.MedianStake = effective.Median(rawStakes)
