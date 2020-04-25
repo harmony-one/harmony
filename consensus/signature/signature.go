@@ -8,20 +8,21 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 )
 
-type configChainReader interface {
+type signatureChainReader interface {
 	Config() *params.ChainConfig
 }
 
 // ConstructCommitPayload returns the commit payload for consensus signatures.
 func ConstructCommitPayload(
-	chain configChainReader, blockHash common.Hash, epoch, blockNum, viewID uint64,
+	chain signatureChainReader, epoch *big.Int, blockHash common.Hash, blockNum, viewID uint64,
 ) []byte {
 	blockNumBytes := make([]byte, 8)
-	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(blockNumBytes, blockNum)
-	binary.LittleEndian.PutUint64(viewIDBytes, viewID)
-	if chain.Config().IsStaking(new(big.Int).SetUint64(epoch)) {
-		return append(blockNumBytes, append(viewIDBytes, blockHash.Bytes()...)...)
+	commitPayload := append(blockNumBytes, blockHash.Bytes()...)
+	if !chain.Config().IsStaking(epoch) {
+		return commitPayload
 	}
-	return append(blockNumBytes, blockHash.Bytes()...)
+	viewIDBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(viewIDBytes, viewID)
+	return append(commitPayload, viewIDBytes...)
 }
