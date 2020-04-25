@@ -18,6 +18,7 @@ package core
 
 import (
 	"bytes"
+	"github.com/harmony-one/harmony/shard"
 	"math"
 	"math/big"
 
@@ -47,6 +48,7 @@ var (
 	errNegativeAmount              = errors.New("amount can not be negative")
 	errDupName                     = errors.New("validator name exists")
 	errDupIdentity                 = errors.New("validator identity exists")
+	errDupBlsKey                   = errors.New("BLS key exists")
 )
 
 /*
@@ -387,7 +389,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	return st.gasUsed(), err
 }
 
-func (st *StateTransition) checkDuplicateNameOrIdentity(validator common.Address, name, identity string) error {
+func (st *StateTransition) checkDuplicateFields(validator common.Address, name, identity string, blsKeys []shard.BLSPublicKey) error {
 	addrs, err := st.bc.ReadValidatorList()
 	if err != nil {
 		return err
@@ -395,6 +397,13 @@ func (st *StateTransition) checkDuplicateNameOrIdentity(validator common.Address
 
 	checkName := name != ""
 	checkIdentity := identity != ""
+	checkBlsKeys := len(blsKeys) != 0
+
+	blsKeyMap := map[shard.BLSPublicKey]struct{}{}
+	for _, key := range blsKeys {
+		blsKeyMap[key] = struct{}{}
+	}
+
 	for _, addr := range addrs {
 		if bytes.Compare(validator.Bytes(), addr.Bytes()) != 0 {
 			wrapper, err := st.state.ValidatorWrapperCopy(addr)
@@ -409,6 +418,13 @@ func (st *StateTransition) checkDuplicateNameOrIdentity(validator common.Address
 			if checkIdentity && wrapper.Identity == identity {
 				return errDupIdentity
 			}
+			if checkBlsKeys {
+				for _, existingKey := range wrapper.SlotPubKeys {
+					if _, ok := blsKeyMap[existingKey]; ok {
+						return errDupBlsKey
+					}
+				}
+			}
 		}
 	}
 	return nil
@@ -417,10 +433,11 @@ func (st *StateTransition) checkDuplicateNameOrIdentity(validator common.Address
 func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 	createValidator *staking.CreateValidator, blockNum *big.Int,
 ) error {
-	if err := st.checkDuplicateNameOrIdentity(
+	if err := st.checkDuplicateFields(
 		createValidator.ValidatorAddress,
 		createValidator.Name,
-		createValidator.Identity); err != nil {
+		createValidator.Identity,
+		createValidator.SlotPubKeys); err != nil {
 		return err
 	}
 	wrapper, err := VerifyAndCreateValidatorFromMsg(
@@ -440,10 +457,15 @@ func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 func (st *StateTransition) verifyAndApplyEditValidatorTx(
 	editValidator *staking.EditValidator, blockNum *big.Int,
 ) error {
-	if err := st.checkDuplicateNameOrIdentity(
+	newBlsKeys := []shard.BLSPublicKey{}
+	if editValidator.SlotKeyToAdd != nil {
+		newBlsKeys = append(newBlsKeys, *editValidator.SlotKeyToAdd)
+	}
+	if err := st.checkDuplicateFields(
 		editValidator.ValidatorAddress,
 		editValidator.Name,
-		editValidator.Identity); err != nil {
+		editValidator.Identity,
+		newBlsKeys); err != nil {
 		return err
 	}
 	wrapper, err := VerifyAndEditValidatorFromMsg(
