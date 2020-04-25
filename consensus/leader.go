@@ -1,7 +1,8 @@
 package consensus
 
 import (
-	"encoding/binary"
+	"encoding/hex"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -9,8 +10,10 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -222,10 +225,14 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
-	blockNumHash := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
-	commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash, recvMsg.BlockNum, consensus.viewID)
+	// TODO: remove debug msg after STN testing
+	utils.Logger().Debug().
+		Uint64("epoch", consensus.epoch).
+		Uint64("block-number", recvMsg.BlockNum).
+		Uint64("view-id", recvMsg.ViewID).
+		Msgf("[COMMIT-PAYLOAD] onCommitted %v", hex.EncodeToString(commitPayload))
 	logger = logger.With().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).

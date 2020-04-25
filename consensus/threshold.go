@@ -1,11 +1,13 @@
 package consensus
 
 import (
-	"encoding/binary"
+	"encoding/hex"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/signature"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -37,10 +39,14 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// Leader add commit phase signature
-	// TODO(audit): sign signature on hash+blockNum+viewID (add a hard fork)
-	blockNumHash := [8]byte{}
-	binary.LittleEndian.PutUint64(blockNumHash[:], consensus.blockNum)
-	commitPayload := append(blockNumHash[:], consensus.blockHash[:]...)
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, consensus.viewID)
+	// TODO: remove debug msg after STN testing
+	utils.Logger().Debug().
+		Uint64("epoch", consensus.epoch).
+		Uint64("block-number", consensus.blockNum).
+		Uint64("view-id", consensus.viewID).
+		Msgf("[COMMIT-PAYLOAD] didReachPrepareQuorum %v", hex.EncodeToString(commitPayload))
 
 	// so by this point, everyone has committed to the blockhash of this block
 	// in prepare and so this is the actual block.

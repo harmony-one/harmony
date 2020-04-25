@@ -2,15 +2,17 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -199,16 +201,23 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if bytes.Equal(consensus.blockHash[:], emptyHash[:]) {
 		copy(consensus.blockHash[:], blockHash[:])
 	}
-	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
+
+	// local viewID may not be constant with other, so use received msg viewID.
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, recvMsg.ViewID)
+	// TODO: remove debug msg after STN testing
+	utils.Logger().Debug().
+		Uint64("epoch", consensus.epoch).
+		Uint64("block-number", consensus.blockNum).
+		Uint64("view-id", consensus.viewID).
+		Msgf("[COMMIT-PAYLOAD] onPrepared %v", hex.EncodeToString(commitPayload))
 	groupID := []nodeconfig.GroupID{
 		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 	}
 	for i, key := range consensus.PubKey.PublicKey {
 		networkMessage, _ := consensus.construct(
-			// TODO(audit): sign signature on hash+blockNum+viewID (add a hard fork)
 			msg_pb.MessageType_COMMIT,
-			append(blockNumBytes, consensus.blockHash[:]...),
+			commitPayload,
 			key, consensus.priKey.PrivateKey[i],
 		)
 
@@ -256,10 +265,15 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
-	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, recvMsg.BlockNum)
-	commitPayload := append(blockNumBytes, recvMsg.BlockHash[:]...)
+	// Received msg must be about same epoch, otherwise it's invalid anyways.
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash, recvMsg.BlockNum, recvMsg.ViewID)
+	// TODO: remove debug msg after STN testing
+	utils.Logger().Debug().
+		Uint64("epoch", consensus.epoch).
+		Uint64("block-number", recvMsg.BlockNum).
+		Uint64("view-id", recvMsg.ViewID).
+		Msgf("[COMMIT-PAYLOAD] onCommitted %v", hex.EncodeToString(commitPayload))
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		consensus.getLogger().Error().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
