@@ -1,13 +1,16 @@
 package verify
 
 import (
-	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -20,10 +23,11 @@ var (
 
 // AggregateSigForCommittee ..
 func AggregateSigForCommittee(
+	chain *core.BlockChain,
 	committee *shard.Committee,
 	aggSignature *bls.Sign,
 	hash common.Hash,
-	blockNum uint64,
+	blockNum, viewID uint64,
 	epoch *big.Int,
 	bitmap []byte,
 ) error {
@@ -52,9 +56,13 @@ func AggregateSigForCommittee(
 		return errQuorumVerifyAggSign
 	}
 
-	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, blockNum)
-	commitPayload := append(blockNumBytes, hash[:]...)
+	commitPayload := signature.ConstructCommitPayload(chain, epoch, hash, blockNum, viewID)
+	// TODO: remove debug msg after STN testing
+	utils.Logger().Debug().
+		Uint64("epoch", epoch.Uint64()).
+		Uint64("block-number", blockNum).
+		Uint64("view-id", viewID).
+		Msgf("[COMMIT-PAYLOAD] AggregateSigForCommittee %v", hex.EncodeToString(commitPayload))
 	if !aggSignature.VerifyHash(mask.AggregatePublic, commitPayload) {
 		return errAggregateSigFail
 	}
