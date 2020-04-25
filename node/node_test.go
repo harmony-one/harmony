@@ -5,12 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/stretchr/testify/assert"
 )
-
-var testDBFactory = &shardchain.MemDBFactory{}
 
 func TestLegacySyncingPeerProvider(t *testing.T) {
 	t.Run("ShardChain", func(t *testing.T) {
