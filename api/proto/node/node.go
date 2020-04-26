@@ -2,11 +2,8 @@ package node
 
 import (
 	"bytes"
-	"encoding/gob"
-	"fmt"
 	"log"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
@@ -15,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -26,26 +22,10 @@ const (
 	Transaction MessageType = iota
 	Block
 	Client
-	_          // used to be Control
-	PING       // node send ip/pki to register with leader
-	ShardState // Deprecated
-	Staking
-)
-
-// BlockchainSyncMessage is a struct for blockchain sync message.
-type BlockchainSyncMessage struct {
-	BlockHeight int
-	BlockHashes []common.Hash
-}
-
-// BlockchainSyncMessageType represents BlockchainSyncMessageType type.
-type BlockchainSyncMessageType int
-
-// Constant of blockchain sync-up message subtype
-const (
-	Done BlockchainSyncMessageType = iota
-	GetLastBlockHashes
-	GetBlock
+	_       // used to be Control
+	_       // used to be Ping node send ip/pki to register with leader
+	_       // Used to be ShardState
+	Staking // Used to be Staking
 )
 
 // TransactionMessageType representa the types of messages used for Node/Transaction
@@ -56,40 +36,6 @@ const (
 	Send TransactionMessageType = iota
 	Unlock
 )
-
-// RoleType defines the role of the node
-type RoleType int
-
-// Type of roles of a node
-const (
-	ValidatorRole RoleType = iota
-	ClientRole
-)
-
-func (r RoleType) String() string {
-	switch r {
-	case ValidatorRole:
-		return "Validator"
-	case ClientRole:
-		return "Client"
-	}
-	return "Unknown"
-}
-
-// Info refers to Peer struct in p2p/peer.go
-// this is basically a simplified version of Peer
-// for network transportation
-type Info struct {
-	IP     string
-	Port   string
-	PubKey []byte
-	Role   RoleType
-	PeerID libp2p_peer.ID // Peerstore ID
-}
-
-func (info Info) String() string {
-	return fmt.Sprintf("Info:%v/%v=>%v", info.IP, info.Port, info.PeerID.Pretty())
-}
 
 // BlockMessageType represents the type of messages used for Node/Block
 type BlockMessageType int
@@ -121,28 +67,6 @@ var (
 	crossLinkH       = []byte{nodeB, blockB, crossLinkB}
 	cxReceiptH       = []byte{nodeB, blockB, receiptB}
 )
-
-// SerializeBlockchainSyncMessage serializes BlockchainSyncMessage.
-func SerializeBlockchainSyncMessage(blockchainSyncMessage *BlockchainSyncMessage) []byte {
-	var result bytes.Buffer
-	encoder := gob.NewEncoder(&result)
-	err := encoder.Encode(blockchainSyncMessage)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to serialize blockchain sync message")
-	}
-	return result.Bytes()
-}
-
-// DeserializeBlockchainSyncMessage deserializes BlockchainSyncMessage.
-func DeserializeBlockchainSyncMessage(d []byte) (*BlockchainSyncMessage, error) {
-	var blockchainSyncMessage BlockchainSyncMessage
-	decoder := gob.NewDecoder(bytes.NewReader(d))
-	err := decoder.Decode(&blockchainSyncMessage)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to deserialize blockchain sync message")
-	}
-	return &blockchainSyncMessage, err
-}
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
 func ConstructTransactionListMessageAccount(transactions types.Transactions) []byte {

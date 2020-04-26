@@ -794,7 +794,7 @@ func main() {
 		g.Go(currentNode.HandleConsensusBlockProcessing)
 	}
 
-	g.Go(currentNode.HandleIncomingBlocks)
+	g.Go(currentNode.HandleIncomingBeaconBlock)
 	g.Go(currentNode.StartP2PMessageHandling)
 
 	// if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&

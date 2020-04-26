@@ -273,19 +273,23 @@ func (node *Node) postConsensusProcessing(
 	newBlock *types.Block,
 ) error {
 
-	utils.Logger().Info().
-		Uint64("blockNum", newBlock.NumberU64()).
-		Str("hash", newBlock.Header().Hash().Hex()).
-		Msg("Added New Block to Blockchain!!!")
-
 	if node.Consensus.IsLeader() {
-		if node.Consensus.ShardID == shard.BeaconChainShardID {
-			// node.Gossiper.NewBeaconChainBlock(newBlock)
+
+		if err := node.Gossiper.AcceptedBlock(
+			node.Consensus.ShardID, newBlock,
+		); err != nil {
+			return err
 		}
 
-		if node.Consensus.ShardID != shard.BeaconChainShardID {
-			// node.Gossiper.NewShardChainBlock(newBlock)
-		}
+		// node.Gossiper.NewBeaconChainBlock(newBlock)
+
+		// if node.Consensus.ShardID == shard.BeaconChainShardID {
+		// 	// node.Gossiper.NewBeaconChainBlock(newBlock)
+		// }
+
+		// if node.Consensus.ShardID != shard.BeaconChainShardID {
+		// 	node.Gossiper.NewShardChainBlock(newBlock)
+		// }
 
 		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
 			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {

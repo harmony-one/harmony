@@ -26,10 +26,16 @@ type BlockCaster interface {
 	NewBeaconChainBlock(newBlock *types.Block) error
 }
 
+// ConsensusCaster ..
+type ConsensusCaster interface {
+	AcceptedBlock(shardID uint32, blk *types.Block) error
+}
+
 // BroadCaster ..
 type BroadCaster interface {
 	TxnCaster
 	BlockCaster
+	ConsensusCaster
 	NewSlashRecord(witness *slash.Record) error
 }
 
@@ -110,6 +116,12 @@ func (c *caster) newBlock(
 var (
 	errBlockToBroadCastWrong = errors.New("wrong shard id")
 )
+
+func (c *caster) AcceptedBlock(shardID uint32, blk *types.Block) error {
+	grps := []nodeconfig.GroupID{c.config.GetShardGroupID()}
+	fmt.Println("accepted block", grps)
+	return c.newBlock(blk, grps)
+}
 
 func (c *caster) NewBeaconChainBlock(newBlock *types.Block) error {
 	// HACK need to think through the groups/topics later, its not a client

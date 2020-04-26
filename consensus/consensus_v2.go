@@ -248,9 +248,7 @@ func (consensus *Consensus) tryCatchup() {
 			}
 
 			resp := make(chan error)
-			fmt.Println("this came in", tmpBlock.String())
 			consensus.Verify.Request <- blkComeback{tmpBlock, resp}
-
 			if err := <-resp; err != nil {
 				utils.Logger().Error().Err(err).
 					Msg("block verification failed in try catchup")
@@ -480,11 +478,9 @@ func (consensus *Consensus) Start(
 			// Only Leader execute this condition
 			go func() {
 				if viewID == consensus.viewID {
-					fmt.Println("before finalize")
 					consensus.finalizeCommits()
-					fmt.Println("after finalize")
 					consensus.ReadySignal <- struct{}{}
-					fmt.Println("sent ready signal again")
+					fmt.Println("after finalize and sent ready signal")
 				}
 			}()
 

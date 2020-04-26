@@ -14,23 +14,22 @@ func (node *Node) HandleConsensusBlockProcessing() error {
 
 	g.Go(func() error {
 		for accepted := range node.Consensus.RoundCompleted.Request {
-			fmt.Println("received block post consensus process", accepted.Blk.String())
-			if err := node.postConsensusProcessing(accepted.Blk); err != nil {
+			// fmt.Println("received block post consensus process", accepted.Blk.String())
+			if _, err := node.Blockchain().InsertChain(types.Blocks{accepted.Blk}, true); err != nil {
 				accepted.Err <- err
 				continue
 			}
-			_, err := node.Blockchain().InsertChain(types.Blocks{accepted.Blk}, true)
-			accepted.Err <- err
-			fmt.Println("received block post consensus process-finished", accepted.Blk.String())
+			accepted.Err <- node.postConsensusProcessing(accepted.Blk)
+			// fmt.Println("received block post consensus process-finished", accepted.Blk.String())
 		}
 		return nil
 	})
 
 	g.Go(func() error {
 		for verify := range node.Consensus.Verify.Request {
-			fmt.Println("received block verify process", verify.Blk.String())
+			// fmt.Println("received block verify process", verify.Blk.String())
 			verify.Err <- node.verifyBlock(verify.Blk)
-			fmt.Println("received block verify process", verify.Blk.String())
+			// fmt.Println("received block verify process", verify.Blk.String())
 		}
 		return nil
 	})
@@ -39,8 +38,8 @@ func (node *Node) HandleConsensusBlockProcessing() error {
 
 }
 
-// HandleIncomingBlocks ..
-func (node *Node) HandleIncomingBlocks() error {
+// HandleIncomingBeaconBlock ..
+func (node *Node) HandleIncomingBeaconBlock() error {
 	var g errgroup.Group
 	chans := []chan *types.Block{
 		make(chan *types.Block), make(chan *types.Block),
