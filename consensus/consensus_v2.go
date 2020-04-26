@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Handlemessageupdate will update the consensus state according to received message
+// HandleMessageUpdate will update the consensus state according to received message
 func (consensus *Consensus) HandleMessageUpdate(payload []byte) {
 	if len(payload) == 0 {
 		return
@@ -42,20 +42,20 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) {
 
 	if msg.Type == msg_pb.MessageType_VIEWCHANGE ||
 		msg.Type == msg_pb.MessageType_NEWVIEW {
-		if msg.GetViewchange() != nil &&
-			msg.GetViewchange().ShardId != consensus.ShardID {
+		if vc := msg.GetViewchange(); vc != nil &&
+			vc.ShardId != consensus.ShardID {
 			utils.Logger().Warn().
 				Uint32("myShardId", consensus.ShardID).
-				Uint32("receivedShardId", msg.GetViewchange().ShardId).
+				Uint32("receivedShardId", vc.ShardId).
 				Msg("Received view change message from different shard")
 			return
 		}
 	} else {
-		if msg.GetConsensus() != nil &&
-			msg.GetConsensus().ShardId != consensus.ShardID {
+		if con := msg.GetConsensus(); con != nil &&
+			con.ShardId != consensus.ShardID {
 			utils.Logger().Warn().
 				Uint32("myShardId", consensus.ShardID).
-				Uint32("receivedShardId", msg.GetConsensus().ShardId).
+				Uint32("receivedShardId", con.ShardId).
 				Msg("Received consensus message from different shard")
 			return
 		}
