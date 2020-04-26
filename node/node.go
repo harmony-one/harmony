@@ -54,22 +54,12 @@ const (
 const (
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
-
-	maxBroadcastNodes       = 10              // broadcast at most maxBroadcastNodes peers that need in sync
-	broadcastTimeout  int64 = 60 * 1000000000 // 1 mins
 	//SyncIDLength is the length of bytes for syncID
 	SyncIDLength = 20
 )
 
-// use to push new block to outofsync node
-type syncConfig struct {
-	timestamp int64
-	client    *downloader.Client
-}
-
 // Node represents a protocol-participating node in the network
 type Node struct {
-	// Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
 	Consensus            *consensus.Consensus
 	BlockChannel         chan *types.Block // The channel to send newly proposed blocks
 	BeaconBlockChannel   chan *types.Block // The channel to send beacon blocks for non-beaconchain nodes
