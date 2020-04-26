@@ -1,6 +1,7 @@
 package service
 
 import (
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -25,30 +26,7 @@ type Type byte
 const (
 	ClientSupport Type = iota
 	SupportExplorer
-	Consensus
-	BlockProposal
-	NetworkInfo
-	PeerDiscovery
 )
-
-func (t Type) String() string {
-	switch t {
-	case SupportExplorer:
-		return "SupportExplorer"
-	case ClientSupport:
-		return "ClientSupport"
-	case Consensus:
-		return "Consensus"
-	case BlockProposal:
-		return "BlockProposal"
-	case NetworkInfo:
-		return "NetworkInfo"
-	case PeerDiscovery:
-		return "PeerDiscovery"
-	default:
-		return "Unknown"
-	}
-}
 
 // Constants for timing.
 const (
@@ -76,42 +54,41 @@ type Interface interface {
 
 // Manager stores all services for service manager.
 type Manager struct {
+	sync.Mutex
 	services      map[Type]Interface
 	actionChannel chan *Action
 }
 
+// NewManager ..
+func NewManager() *Manager {
+	return &Manager{
+		services:      map[Type]Interface{},
+		actionChannel: make(chan *Action),
+	}
+}
+
 // GetServices returns all registered services.
 func (m *Manager) GetServices() map[Type]Interface {
+	m.Lock()
+	defer m.Unlock()
 	return m.services
 }
 
 // Register registers new service to service store.
 func (m *Manager) Register(t Type, service Interface) {
 	utils.Logger().Info().Int("service", int(t)).Msg("Register Service")
-	if m.services == nil {
-		m.services = make(map[Type]Interface)
-	}
 	if _, ok := m.services[t]; ok {
 		utils.Logger().Error().Int("servie", int(t)).Msg("This service is already included")
 		return
 	}
+	m.Lock()
+	defer m.Unlock()
 	m.services[t] = service
-}
-
-// SetupServiceManager inits service map and start service manager.
-func (m *Manager) SetupServiceManager() {
-	m.InitServiceMap()
-	m.actionChannel = m.StartServiceManager()
 }
 
 // RegisterService is used for testing.
 func (m *Manager) RegisterService(t Type, service Interface) {
 	m.Register(t, service)
-}
-
-// InitServiceMap initializes service map.
-func (m *Manager) InitServiceMap() {
-	m.services = make(map[Type]Interface)
 }
 
 // SendAction sends action to action channel which is observed by service manager.
@@ -121,10 +98,6 @@ func (m *Manager) SendAction(action *Action) {
 
 // TakeAction is how service manager handles the action.
 func (m *Manager) TakeAction(action *Action) {
-	if m.services == nil {
-		utils.Logger().Error().Msg("Service store is not initialized")
-		return
-	}
 	if service, ok := m.services[action.ServiceType]; ok {
 		switch action.Action {
 		case Start:
@@ -135,22 +108,6 @@ func (m *Manager) TakeAction(action *Action) {
 			service.NotifyService(action.Params)
 		}
 	}
-}
-
-// StartServiceManager starts service manager.
-func (m *Manager) StartServiceManager() chan *Action {
-	ch := make(chan *Action)
-	go func() {
-		for {
-			select {
-			case action := <-ch:
-				m.TakeAction(action)
-			case <-time.After(WaitForStatusUpdate):
-				utils.Logger().Info().Msg("Waiting for new action")
-			}
-		}
-	}()
-	return ch
 }
 
 // RunServices run registered services.
@@ -171,26 +128,5 @@ func (m *Manager) SetupServiceMessageChan(
 	for serviceType, service := range m.services {
 		mapServiceTypeChan[serviceType] = make(chan *msg_pb.Message)
 		service.SetMessageChan(mapServiceTypeChan[serviceType])
-	}
-}
-
-// StopService stops service with type t.
-func (m *Manager) StopService(t Type) {
-	if service, ok := m.services[t]; ok {
-		service.StopService()
-	}
-}
-
-// StopServicesByRole stops all service of the given role.
-func (m *Manager) StopServicesByRole(liveServices []Type) {
-	marked := make(map[Type]bool)
-	for _, s := range liveServices {
-		marked[s] = true
-	}
-
-	for t := range m.GetServices() {
-		if _, ok := marked[t]; !ok {
-			m.StopService(t)
-		}
 	}
 }

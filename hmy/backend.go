@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -52,6 +53,7 @@ type NodeAPI interface {
 	ErroredTransactionSink() []types.RPCTransactionError
 	PendingCXReceipts() []*types.CXReceiptsProof
 	GetNodeBootTime() int64
+	GetNodeConfig() *nodeconfig.ConfigType
 }
 
 // New creates a new Harmony object (including the

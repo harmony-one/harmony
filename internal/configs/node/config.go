@@ -40,18 +40,18 @@ func (role Role) String() string {
 	}
 }
 
-// NetworkType describes the type of Harmony network
-type NetworkType string
+// Network describes the type of Harmony network
+type Network = string
 
 // Constants for NetworkType
 const (
-	Mainnet   = "mainnet"
-	Testnet   = "testnet"
-	Pangaea   = "pangaea"
-	Partner   = "partner"
-	Stressnet = "stressnet"
-	Devnet    = "devnet"
-	Localnet  = "localnet"
+	Mainnet   Network = "mainnet"
+	Testnet   Network = "testnet"
+	Pangaea   Network = "pangaea"
+	Partner   Network = "partner"
+	Stressnet Network = "stressnet"
+	Devnet    Network = "devnet"
+	Localnet  Network = "localnet"
 )
 
 // Global is the index of the global node configuration
@@ -80,7 +80,7 @@ type ConfigType struct {
 	ConsensusPubKey *multibls.PublicKey
 	// Database directory
 	DBDir            string
-	networkType      NetworkType
+	networkType      Network
 	shardingSchedule shardingconfig.Schedule
 	DNSZone          string
 	isArchival       bool
@@ -92,9 +92,21 @@ type ConfigType struct {
 // configs is a list of node configuration.
 // It has at least one configuration.
 // The first one is the default, global node configuration
-var shardConfigs []ConfigType
-var defaultConfig ConfigType
-var onceForConfigs sync.Once
+var (
+	defaultConfig  ConfigType
+	shardConfigs   []ConfigType
+	onceForConfigs sync.Once
+)
+
+// GetDefaultConfig returns default config.
+func GetDefaultConfig() *ConfigType {
+	return &defaultConfig
+}
+
+// SetDefaultRole ..
+func SetDefaultRole(r Role) {
+	defaultConfig.role = r
+}
 
 func ensureShardConfigs() {
 	onceForConfigs.Do(func() {
@@ -114,18 +126,11 @@ func GetShardConfig(shardID uint32) *ConfigType {
 	return &shardConfigs[shardID]
 }
 
-// GetDefaultConfig returns default config.
-func GetDefaultConfig() *ConfigType {
-	return &defaultConfig
-}
-
-// SetDefaultRole ..
-func SetDefaultRole(r Role) {
-	defaultConfig.role = r
-}
-
 func (conf *ConfigType) String() string {
-	return fmt.Sprintf("%s/%s/%s:%v,%v", conf.beacon, conf.group, conf.client, conf.isClient, conf.ShardID)
+	return fmt.Sprintf(
+		"%s/%s/%s:%v,%v", conf.beacon, conf.group,
+		conf.client, conf.isClient, conf.ShardID,
+	)
 }
 
 // SetBeaconGroupID set the groupID for beacon group
@@ -183,6 +188,11 @@ func (conf *ConfigType) GetArchival() bool {
 	return conf.isArchival
 }
 
+// SetArchival ..
+func (conf *ConfigType) SetArchival(a bool) {
+	conf.isArchival = a
+}
+
 // IsClient returns the isClient configuration
 func (conf *ConfigType) IsClient() bool {
 	return conf.isClient
@@ -194,21 +204,15 @@ func (conf *ConfigType) Role() Role {
 }
 
 // SetNetworkType set the networkType
-func SetNetworkType(networkType NetworkType) {
+func SetNetworkType(networkType Network) {
 	ensureShardConfigs()
-	defaultConfig.networkType = networkType
 	for i := range shardConfigs {
 		shardConfigs[i].networkType = networkType
 	}
 }
 
-// SetArchival set archival mode
-func (conf *ConfigType) SetArchival(archival bool) {
-	defaultConfig.isArchival = archival
-}
-
 // GetNetworkType gets the networkType
-func (conf *ConfigType) GetNetworkType() NetworkType {
+func (conf *ConfigType) GetNetworkType() Network {
 	return conf.networkType
 }
 
@@ -220,6 +224,11 @@ func SetVersion(ver string) {
 // GetVersion return the version of the node binary
 func GetVersion() string {
 	return version
+}
+
+// SetNetworkType ..
+func (conf *ConfigType) SetNetworkType(t Network) {
+	conf.networkType = t
 }
 
 // SetPublicRPC set the boolean value of public RPC access
@@ -259,7 +268,7 @@ func (conf *ConfigType) ShardIDFromKey(key *bls.PublicKey) (uint32, error) {
 			"cannot convert libbls public key %s to internal form",
 			key.SerializeToHexStr())
 	}
-	epoch := conf.networkType.ChainConfig().StakingEpoch
+	epoch := ChainConfig(conf.networkType).StakingEpoch
 	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
 	shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
 	return uint32(shardID.Uint64()), nil
@@ -271,8 +280,11 @@ func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
 	return conf.ShardIDFromKey(conf.ConsensusPubKey.PublicKey[0])
 }
 
-// ValidateConsensusKeysForSameShard checks if all consensus public keys belong to the same shard
-func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys []*bls.PublicKey, sID uint32) error {
+// ValidateConsensusKeysForSameShard checks if all consensus
+// public keys belong to the same shard
+func (conf *ConfigType) ValidateConsensusKeysForSameShard(
+	pubkeys []*bls.PublicKey, sID uint32,
+) error {
 	keyShardStrs := []string{}
 	isSameShard := true
 	for _, key := range pubkeys {
@@ -289,13 +301,15 @@ func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys []*bls.PublicK
 		)
 	}
 	if !isSameShard {
-		return errors.Errorf("bls keys do not belong to same shard\n%s", strings.Join(keyShardStrs, "\n"))
+		return errors.Errorf(
+			"bls keys do not belong to same shard\n%s", strings.Join(keyShardStrs, "\n"),
+		)
 	}
 	return nil
 }
 
 // ChainConfig returns the chain configuration for the network type.
-func (t NetworkType) ChainConfig() params.ChainConfig {
+func ChainConfig(t Network) params.ChainConfig {
 	switch t {
 	case Mainnet:
 		return *params.MainnetChainConfig

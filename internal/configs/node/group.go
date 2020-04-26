@@ -31,7 +31,7 @@ const (
 )
 
 // ShardID defines the ID of a shard
-type ShardID uint32
+type ShardID = uint32
 
 func getNetworkPrefix(shardID ShardID) (netPre string) {
 	switch GetShardConfig(uint32(shardID)).GetNetworkType() {

@@ -119,7 +119,9 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 				Msg("[Explorer] Populating explorer data from state synced blocks")
 			go func() {
 				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(
+					explorer.GetStorageInstance(
+						node.SelfPeer.IP, node.SelfPeer.Port, true, node.NodeConfig.DBDir,
+					).Dump(
 						node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
 				}
 			}()
@@ -135,8 +137,12 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 		return
 	}
 	// Dump new block into level db.
-	utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
-	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(block, block.NumberU64())
+	utils.Logger().Info().
+		Uint64("blockNum", block.NumberU64()).
+		Msg("[Explorer] Committing block into explorer DB")
+	explorer.GetStorageInstance(
+		node.SelfPeer.IP, node.SelfPeer.Port, true, node.NodeConfig.DBDir,
+	).Dump(block, block.NumberU64())
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {
@@ -149,7 +155,9 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 func (node *Node) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	bytes, err := explorer.GetStorageInstance(
+		node.SelfPeer.IP, node.SelfPeer.Port, false, node.NodeConfig.DBDir,
+	).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
 		return make([]common.Hash, 0), nil
@@ -178,10 +186,14 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 }
 
 // GetStakingTransactionsHistory returns list of staking transactions hashes of address.
-func (node *Node) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+func (node *Node) GetStakingTransactionsHistory(
+	address, txType, order string,
+) ([]common.Hash, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	bytes, err := explorer.GetStorageInstance(
+		node.SelfPeer.IP, node.SelfPeer.Port, false, node.NodeConfig.DBDir,
+	).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
 		return make([]common.Hash, 0), nil
@@ -213,7 +225,9 @@ func (node *Node) GetStakingTransactionsHistory(address, txType, order string) (
 func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	bytes, err := explorer.GetStorageInstance(
+		node.SelfPeer.IP, node.SelfPeer.Port, false, node.NodeConfig.DBDir,
+	).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
 		return 0, nil
@@ -236,7 +250,9 @@ func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	bytes, err := explorer.GetStorageInstance(
+		node.SelfPeer.IP, node.SelfPeer.Port, false, node.NodeConfig.DBDir,
+	).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
 		return 0, nil

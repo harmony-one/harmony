@@ -35,17 +35,22 @@ type HTTPError struct {
 
 // Service is the struct for explorer service.
 type Service struct {
-	router      *mux.Router
-	IP          string
-	Port        string
-	Storage     *Storage
-	server      *http.Server
-	messageChan chan *msg_pb.Message
+	router         *mux.Router
+	IP             string
+	Port           string
+	Storage        *Storage
+	server         *http.Server
+	explorerDBPath string
+	messageChan    chan *msg_pb.Message
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer) *Service {
-	return &Service{IP: selfPeer.IP, Port: selfPeer.Port}
+func New(selfPeer *p2p.Peer, explorerDBPath string) *Service {
+	return &Service{
+		IP:             selfPeer.IP,
+		Port:           selfPeer.Port,
+		explorerDBPath: explorerDBPath,
+	}
 }
 
 // StartService starts explorer service.
@@ -76,7 +81,9 @@ func GetExplorerPort(nodePort string) string {
 
 // Init is to initialize for ExplorerService.
 func (s *Service) Init(remove bool) {
-	s.Storage = GetStorageInstance(s.IP, s.Port, remove)
+	s.Storage = GetStorageInstance(
+		s.IP, s.Port, remove, s.explorerDBPath,
+	)
 }
 
 // Run is to run serving explorer.

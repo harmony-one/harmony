@@ -5,8 +5,6 @@ import (
 	"math/big"
 	"sort"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -164,7 +162,7 @@ func (bc *BlockChain) CommitOffChainData(
 
 		// clean/update local database cache after crosslink inserted into blockchain
 		num, err := bc.DeleteFromPendingCrossLinks(*crossLinks)
-		if err != nil && nodeconfig.GetDefaultConfig().ShardID == shard.BeaconChainShardID {
+		if err != nil && bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 			// Only beacon chain worries about this
 			const msg = "DeleteFromPendingCrossLinks, crosslinks in header %d,  pending crosslinks: %d, problem: %+v"
 			utils.Logger().Debug().Msgf(msg, len(*crossLinks), num, err)

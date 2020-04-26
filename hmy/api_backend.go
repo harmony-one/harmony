@@ -669,7 +669,7 @@ func (b *APIBackend) GetLastCrossLinks() ([]*types.CrossLink, error) {
 
 // GetNodeMetadata ..
 func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
-	cfg := nodeconfig.GetDefaultConfig()
+	cfg := b.hmy.nodeAPI.GetNodeConfig()
 	header := b.CurrentBlock().Header()
 	var blockEpoch *uint64
 

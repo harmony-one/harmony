@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
@@ -45,17 +44,19 @@ type Storage struct {
 }
 
 // GetStorageInstance returns attack model by using singleton pattern.
-func GetStorageInstance(ip, port string, remove bool) *Storage {
+func GetStorageInstance(
+	ip, port string, remove bool, path string,
+) *Storage {
 	once.Do(func() {
 		storage = &Storage{}
-		storage.Init(ip, port, remove)
+		storage.Init(ip, port, remove, path)
 	})
 	return storage
 }
 
-// Init initializes the block update.
-func (storage *Storage) Init(ip, port string, remove bool) {
-	dbFileName := path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
+// Init initializes the block update ..
+func (storage *Storage) Init(ip, port string, remove bool, dir string) {
+	dbFileName := path.Join(dir, "explorer_storage_"+ip+"_"+port)
 	utils.Logger().Info().Msg("explorer storage folder: " + dbFileName)
 	var err error
 	if remove {

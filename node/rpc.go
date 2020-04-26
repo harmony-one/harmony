@@ -73,6 +73,11 @@ func (node *Node) GetNodeBootTime() int64 {
 	return node.unixTimeAtNodeStart
 }
 
+// GetNodeConfig ..
+func (node *Node) GetNodeConfig() *nodeconfig.ConfigType {
+	return node.NodeConfig
+}
+
 // ErroredTransactionSink is the inmemory failed transactions this node has
 func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
 	node.errorSink.Lock()

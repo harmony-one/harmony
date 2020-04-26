@@ -19,56 +19,37 @@ const (
 	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
 )
 
-// WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
+// ProposeBlock listen for the readiness signal
+// from consensus and generate new block for consensus.
 // only leader will receive the ready signal
 // TODO: clean pending transactions for validators; or validators not prepare pending transactions
-func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{}) {
-	go func() {
-		// Setup stoppedChan
-		defer close(stoppedChan)
+func (node *Node) ProposeBlock() error {
+	for range node.Consensus.ReadySignal {
+		if node.Consensus.IsLeader() {
+			utils.Logger().Debug().
+				Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
+				Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
-		utils.Logger().Debug().
-			Msg("Waiting for Consensus ready")
-		// TODO: make local net start faster
-		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
+			newBlock, err := node.proposeNewBlock()
 
-		for {
-			// keep waiting for Consensus ready
-			select {
-			case <-stopChan:
-				utils.Logger().Debug().
-					Msg("Consensus new block proposal: STOPPED!")
-				return
-			case <-readySignal:
-				for node.Consensus != nil && node.Consensus.IsLeader() {
-					time.Sleep(SleepPeriod)
-
-					utils.Logger().Debug().
-						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
-						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
-
-					newBlock, err := node.proposeNewBlock()
-
-					if err == nil {
-						utils.Logger().Debug().
-							Uint64("blockNum", newBlock.NumberU64()).
-							Uint64("epoch", newBlock.Epoch().Uint64()).
-							Uint64("viewID", newBlock.Header().ViewID().Uint64()).
-							Int("numTxs", newBlock.Transactions().Len()).
-							Int("numStakingTxs", newBlock.StakingTransactions().Len()).
-							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
-							Msg("=========Successfully Proposed New Block==========")
-
-						// Send the new block to Consensus so it can be confirmed.
-						node.BlockChannel <- newBlock
-						break
-					} else {
-						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
-					}
-				}
+			if err != nil {
+				return err
 			}
+
+			utils.Logger().Debug().
+				Uint64("blockNum", newBlock.NumberU64()).
+				Uint64("epoch", newBlock.Epoch().Uint64()).
+				Uint64("viewID", newBlock.Header().ViewID().Uint64()).
+				Int("numTxs", newBlock.Transactions().Len()).
+				Int("numStakingTxs", newBlock.StakingTransactions().Len()).
+				Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
+				Msg("=========Successfully Proposed New Block==========")
+			// Send the new block to Consensus so it can be confirmed.
+			node.BlockChannel <- newBlock
 		}
-	}()
+	}
+
+	return nil
 }
 
 func (node *Node) proposeNewBlock() (*types.Block, error) {

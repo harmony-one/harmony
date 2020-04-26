@@ -479,25 +479,6 @@ func (node *Node) PostConsensusProcessing(
 	}
 }
 
-// bootstrapConsensus is the a goroutine to check number of peers and start the consensus
-func (node *Node) bootstrapConsensus() {
-	tick := time.NewTicker(5 * time.Second)
-	defer tick.Stop()
-	for range tick.C {
-		numPeersNow := node.host.GetPeerCount()
-		if numPeersNow >= node.Consensus.MinPeers {
-			utils.Logger().Info().Msg("[bootstrap] StartConsensus")
-			node.startConsensus <- struct{}{}
-			return
-		}
-		utils.Logger().Info().
-			Int("numPeersNow", numPeersNow).
-			Int("targetNumPeers", node.Consensus.MinPeers).
-			Int("next-peer-count-check-in-seconds", 5).
-			Msg("do not have enough min peers yet in bootstrap of consensus")
-	}
-}
-
 // ConsensusMessageHandler passes received message in node_handler to consensus
 func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
 	node.Consensus.MsgChan <- msgPayload

@@ -24,7 +24,9 @@ type Server struct {
 }
 
 // Query returns the feature at the given point.
-func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.DownloaderResponse, error) {
+func (s *Server) Query(
+	ctx context.Context, request *pb.DownloaderRequest,
+) (*pb.DownloaderResponse, error) {
 	var pinfo string
 	// retrieve ip/port information; used for debug only
 	p, ok := peer.FromContext(ctx)
@@ -33,7 +35,12 @@ func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.
 	} else {
 		pinfo = p.Addr.String()
 	}
+
+	// fmt.Println("ask around", request.String(), pinfo)
+
 	response, err := s.downloadInterface.CalculateResponse(request, pinfo)
+
+	// fmt.Println("reply->", response.String(), err)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +69,8 @@ func (s *Server) Start(ip, port string) (*grpc.Server, error) {
 }
 
 // NewServer creates new Server which implements DownloadInterface.
-func NewServer(dlInterface DownloadInterface) *Server {
+func NewServer(dlInterface DownloadInterface) (*Server, error) {
 	s := &Server{downloadInterface: dlInterface}
-	return s
+	// TODO Move the start logic to the NewServer
+	return s, nil
 }

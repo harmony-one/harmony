@@ -21,7 +21,6 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -35,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/node/state"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -42,6 +42,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	ipfs_cfg "github.com/ipfs/go-ipfs-config"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // Version string variables
@@ -53,6 +54,10 @@ var (
 )
 
 var initialAccounts = []*genesis.DeployAccount{}
+
+func fatal(err error) {
+	panic("died because" + err.Error())
+}
 
 func printVersion() {
 	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
@@ -412,7 +417,7 @@ func createGlobalConfig() (
 	}
 
 	// Set network type
-	netType := nodeconfig.NetworkType(*networkType)
+	netType := nodeconfig.Network(*networkType)
 	nodeconfig.SetNetworkType(netType) // sets for both global and shard configs
 	nodeConfig.SetArchival(*isArchival)
 
@@ -478,30 +483,36 @@ func setupConsensusAndNode(
 		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
 	}
 
-	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
+	var configUsed *nodeconfig.ConfigType
 
-	switch {
-	case *networkType == nodeconfig.Localnet:
-		epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
-		selfPort, err := strconv.ParseUint(*port, 10, 16)
-		if err != nil {
-			utils.Logger().Fatal().
-				Err(err).
-				Str("self_port_string", *port).
-				Msg("cannot convert self port string into port number")
-		}
-		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
-			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
-	case *dnsZone != "":
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*port))
-	case *dnsFlag:
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider("t.hmny.io", syncing.GetSyncingPort(*port))
-	default:
-		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
+	if currentConsensus != nil {
+		configUsed = nodeconfig.GetShardConfig(currentConsensus.ShardID)
+	} else {
+		configUsed = nodeconfig.GetDefaultConfig()
+	}
 
+	syncProvider, err := state.NewPeerProvider(
+		*port, *networkType, *dnsZone, *dnsFlag, configUsed,
+	)
+
+	if err != nil {
+		fatal(err)
+	}
+
+	currentNode, err := node.New(
+		myHost,
+		currentConsensus,
+		chainDBFactory,
+		blacklist,
+		*isArchival,
+		syncProvider,
+		configUsed,
+	)
+
+	if err != nil {
+		fatal(err)
 	}
 
 	// TODO: refactor the creation of blockchain out of node.New()
@@ -737,14 +748,6 @@ func main() {
 		}
 	}()
 
-	if nodeConfig.ShardID != shard.BeaconChainShardID &&
-		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
-		utils.Logger().Info().
-			Uint32("shardID", currentNode.Blockchain().ShardID()).
-			Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
-		currentNode.SupportBeaconSyncing()
-	}
-
 	if uint64(*doRevertBefore) != 0 && uint64(*revertTo) != 0 {
 		chain := currentNode.Blockchain()
 		if *revertBeacon {
@@ -778,14 +781,7 @@ func main() {
 		Str("Role", currentNode.NodeConfig.Role().String()).
 		Msg(startMsg)
 
-	if err := currentNode.ForceJoiningTopics(); err != nil {
-		fmt.Println("could not join necessary pubsub topics", err.Error())
-		os.Exit(-1)
-	}
-
-	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
-	currentNode.RunServices()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
 		utils.Logger().Warn().
@@ -793,8 +789,23 @@ func main() {
 			Msg("StartRPC failed")
 	}
 
-	if err := currentNode.Start(); err != nil {
-		fmt.Println("could not begin network message handling for node", err.Error())
-		os.Exit(-1)
+	var g errgroup.Group
+
+	g.Go(currentNode.StartBlockStateSync)
+	g.Go(currentNode.StartP2PMessageHandling)
+
+	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
+		g.Go(currentNode.ProposeBlock)
+		g.Go(currentNode.StartConsensus)
 	}
+
+	if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&
+		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+		g.Go(currentNode.StartBeaconBlockStateSync)
+	}
+
+	if err := g.Wait(); err != nil {
+		fatal(err)
+	}
+
 }

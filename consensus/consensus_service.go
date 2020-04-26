@@ -20,23 +20,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
-func (consensus *Consensus) WaitForNewRandomness() {
-	go func() {
-		for {
-			vdfOutput := <-consensus.RndChannel
-			consensus.pendingRnds = append(consensus.pendingRnds, vdfOutput)
-		}
-	}()
-}
-
 // GetNextRnd returns the oldest available randomness along with the hash of the block there randomness preimage is committed.
 func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error) {
 	if len(consensus.pendingRnds) == 0 {
 		return [vdFAndProofSize]byte{}, [32]byte{}, errors.New("No available randomness")
 	}
 	vdfOutput := consensus.pendingRnds[0]
-
 	vdfBytes := [vdFAndProofSize]byte{}
 	seed := [32]byte{}
 	copy(vdfBytes[:], vdfOutput[:vdFAndProofSize])
@@ -44,23 +33,19 @@ func (consensus *Consensus) GetNextRnd() ([vdFAndProofSize]byte, [32]byte, error
 
 	//pop the first vdfOutput from the list
 	consensus.pendingRnds = consensus.pendingRnds[1:]
-
 	return vdfBytes, seed, nil
 }
 
-var (
-	empty = []byte{}
-)
-
 // Signs the consensus message and returns the marshaled message.
-func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message,
-	priKey *bls.SecretKey) ([]byte, error) {
+func (consensus *Consensus) signAndMarshalConsensusMessage(
+	message *msg_pb.Message, priKey *bls.SecretKey,
+) ([]byte, error) {
 	if err := consensus.signConsensusMessage(message, priKey); err != nil {
-		return empty, err
+		return nil, err
 	}
 	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
-		return empty, err
+		return nil, err
 	}
 	return marshaledMessage, nil
 }
