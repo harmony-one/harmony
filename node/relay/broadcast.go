@@ -36,13 +36,6 @@ type BroadCaster interface {
 type caster struct {
 	config *nodeconfig.ConfigType
 	host   p2p.Host
-
-	consensusTopics struct {
-		ownShard    []nodeconfig.GroupID
-		beaconChain []nodeconfig.GroupID
-	}
-
-	allOtherTopics []nodeconfig.GroupID
 }
 
 // NewBroadCaster ..
@@ -50,26 +43,6 @@ func NewBroadCaster(
 	configUsed *nodeconfig.ConfigType,
 	host p2p.Host,
 ) BroadCaster {
-	// cast := caster{}
-
-	// cast.consensusTopics.ownShard = []nodeconfig.GroupID{
-	// 	configUsed.GetShardGroupID(),
-	// }
-	// cast.consensusTopics.beaconChain = []nodeconfig.GroupID{
-	// 	configUsed.GetShardGroupID(),
-	// 	nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
-	// }
-	// cast.allOtherTopics = []nodeconfig.GroupID{
-	// 	nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
-	// 	configUsed.GetClientGroupID(),
-	// }
-
-	// groups := []nodeconfig.GroupID{
-	// 	configUsed.GetShardGroupID(),
-	// 	nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
-	// 	configUsed.GetClientGroupID(),
-	// }
-
 	return &caster{
 		config: configUsed,
 		host:   host,
@@ -145,21 +118,26 @@ func (c *caster) NewBeaconChainBlock(newBlock *types.Block) error {
 	}
 
 	groups := []nodeconfig.GroupID{
-		c.config.GetClientGroupID(),
+		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
+		// c.config.GetClientGroupID(),
 	}
+
 	fmt.Println("beaconchain broadcast", groups, newBlock.String())
+
 	return c.newBlock(newBlock, groups)
 }
 
 func (c *caster) NewShardChainBlock(newBlock *types.Block) error {
 	shardID := newBlock.Header().ShardID()
-	if shardID == shard.BeaconChainShardID {
+	if shardID == shard.BeaconChainShardID ||
+		c.config.ShardID == shard.BeaconChainShardID {
 		return errBlockToBroadCastWrong
 	}
 
 	groups := []nodeconfig.GroupID{
-		nodeconfig.NewClientGroupIDByShardID(shardID),
+		nodeconfig.NewClientGroupIDByShardID(c.config.ShardID),
 	}
+
 	fmt.Println("shardChain broadcast", groups, newBlock.String())
 	return c.newBlock(newBlock, groups)
 }

@@ -225,7 +225,8 @@ type Block struct {
 func (b *Block) String() string {
 	m := b.Header()
 	return fmt.Sprintf(
-		"[ViewID:%d Num:%d BlockHash:%s]",
+		"[ShardID: %d ViewID:%d Num:%d BlockHash:%s]",
+		m.ShardID(),
 		m.ViewID(),
 		m.Number(),
 		m.Hash().Hex(),

@@ -1,10 +1,13 @@
 package node
 
 import (
+	"fmt"
 	"time"
 
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/node/state"
 	"github.com/harmony-one/harmony/node/worker"
 )
 
@@ -44,8 +47,8 @@ func (node *Node) DoSyncing(
 		select {
 		case <-ticker.C:
 			node.doSync(bc, worker, willJoinConsensus)
-		case <-node.Consensus.BlockNumLowChan:
-			node.doSync(bc, worker, willJoinConsensus)
+			// case <-node.Consensus.BlockNumLowChan:
+			// 	node.doSync(bc, worker, willJoinConsensus)
 		}
 	}
 
@@ -92,22 +95,21 @@ func (node *Node) doSync(
 	// 		node.Consensus.BlocksSynchronized()
 	// 	}
 	// }
-	// node.State.Store(ReadyForConsensus)
+	node.State.Store(ReadyForConsensus)
 }
 
 // StartBlockStateSync ..
 func (node *Node) StartBlockStateSync() error {
-	// if node.downloaderServer.GrpcServer == nil {
-	// 	if _, err := node.downloaderServer.Start(
-	// 		node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port),
-	// 	); err != nil {
-	// 		return err
-	// 	}
-	// }
+	if node.downloaderServer.GrpcServer == nil {
+		if _, err := node.downloaderServer.Start(
+			node.SelfPeer.IP, state.GetSyncingPort(node.SelfPeer.Port),
+		); err != nil {
+			return err
+		}
+	}
 
-	// joinConsensus := node.NodeConfig.Role() == nodeconfig.Validator
-	// return node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
-	return nil
+	joinConsensus := node.NodeConfig.Role() == nodeconfig.Validator
+	return node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
@@ -115,5 +117,6 @@ func (node *Node) CalculateResponse(
 	request *downloader_pb.DownloaderRequest, incomingPeer string,
 ) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
+	fmt.Println("something came in", request.String())
 	return response, nil
 }

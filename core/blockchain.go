@@ -246,8 +246,6 @@ func NewBlockChain(
 	if err := bc.loadLastState(); err != nil {
 		return nil, err
 	}
-	// Take ownership of this particular state
-	go bc.update()
 	return bc, nil
 }
 
@@ -1465,19 +1463,6 @@ func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 
 		case ChainSideEvent:
 			bc.chainSideFeed.Send(ev)
-		}
-	}
-}
-
-func (bc *BlockChain) update() {
-	futureTimer := time.NewTicker(5 * time.Second)
-	defer futureTimer.Stop()
-	for {
-		select {
-		case <-futureTimer.C:
-			bc.procFutureBlocks()
-		case <-bc.quit:
-			return
 		}
 	}
 }

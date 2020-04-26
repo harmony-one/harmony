@@ -57,7 +57,15 @@ func newRoundTimeoutWithDefaults() *roundTimeout {
 		consensus:  comeDue{duration: con},
 		viewChange: comeDue{duration: vc},
 	}
+}
 
+type blkComeback struct {
+	Blk *types.Block
+	Err chan error
+}
+
+type ProcessBlock struct {
+	Request chan blkComeback
 }
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -130,16 +138,9 @@ type Consensus struct {
 	// consensus information update mutex
 	infoMutex sync.Mutex
 	// Signal channel for starting a new consensus process
-	ReadySignal chan struct{}
-	// The post-consensus processing func passed from Node object
-	// Called when consensus on a new block is done
-	OnConsensusDone func(*types.Block)
-	// The verifier func passed from Node object
-	BlockVerifier func(*types.Block) error
-	// verified block to state sync broadcast
-	VerifiedNewBlock chan *types.Block
-	// will trigger state syncing when blockNum is low
-	BlockNumLowChan chan struct{}
+	ReadySignal    chan struct{}
+	RoundCompleted ProcessBlock
+	Verify         ProcessBlock
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
 	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -188,7 +189,9 @@ func (consensus *Consensus) VdfSeedSize() int {
 }
 
 // GetLeaderPrivateKey returns leader private key if node is the leader
-func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls.PublicKey) (*bls.SecretKey, error) {
+func (consensus *Consensus) GetLeaderPrivateKey(
+	leaderKey *bls.PublicKey,
+) (*bls.SecretKey, error) {
 	for i, key := range consensus.PubKey.PublicKey {
 		if key.IsEqual(leaderKey) {
 			return consensus.priKey.PrivateKey[i], nil
@@ -202,9 +205,7 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, erro
 	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey)
 }
 
-// TODO: put shardId into chain reader's chain config
-
-// New create a new Consensus record
+// New ..
 func New(
 	host p2p.Host,
 	shard uint32,
@@ -216,16 +217,27 @@ func New(
 	isLeader.Store(false)
 
 	consensus := Consensus{
-		Decider:         Decider,
-		host:            host,
-		msgSender:       NewMessageSender(host),
-		BlockNumLowChan: make(chan struct{}),
-		isLeader:        isLeader,
-		timeouts:        newRoundTimeoutWithDefaults(),
-		FBFTLog:         NewFBFTLog(),
-		phase:           FBFTAnnounce,
+		Decider:   Decider,
+		host:      host,
+		msgSender: NewMessageSender(host),
+		isLeader:  isLeader,
+		timeouts:  newRoundTimeoutWithDefaults(),
+		FBFTLog:   NewFBFTLog(),
+		phase:     FBFTAnnounce,
 		// TODO Refactor consensus.block* into State?
-		current: NewState(),
+		current:          NewState(),
+		MsgChan:          make(chan []byte),
+		syncReadyChan:    make(chan struct{}),
+		syncNotReadyChan: make(chan struct{}),
+		SlashChan:        make(chan slash.Record),
+		commitFinishChan: make(chan uint64),
+		ReadySignal:      make(chan struct{}),
+		RoundCompleted:   ProcessBlock{make(chan blkComeback)},
+		Verify:           ProcessBlock{make(chan blkComeback)},
+		// channel for receiving newly generated VDF
+		RndChannel: make(chan [vdfAndSeedSize]byte),
+		viewID:     0,
+		ShardID:    shard,
 	}
 
 	if multiBLSPriKey != nil {
@@ -238,18 +250,5 @@ func New(
 		return nil, fmt.Errorf("nil bls key, aborting")
 	}
 
-	// viewID has to be initialized as the height of
-	// the blockchain during initialization as it was
-	// displayed on explorer as Height right now
-	consensus.viewID = 0
-	consensus.ShardID = shard
-	consensus.MsgChan = make(chan []byte)
-	consensus.syncReadyChan = make(chan struct{})
-	consensus.syncNotReadyChan = make(chan struct{})
-	consensus.SlashChan = make(chan slash.Record)
-	consensus.commitFinishChan = make(chan uint64)
-	consensus.ReadySignal = make(chan struct{})
-	// channel for receiving newly generated VDF
-	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	return &consensus, nil
 }

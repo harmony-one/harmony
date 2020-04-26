@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -278,17 +279,18 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.commitBitmap = mask
 
 	if recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
+		fmt.Println("out of sync actually happened")
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnCommitted] OUT OF SYNC")
-		go func() {
-			select {
-			case consensus.BlockNumLowChan <- struct{}{}:
-				consensus.current.SetMode(Syncing)
-			case <-time.After(1 * time.Second):
-			}
-		}()
-		return
+		// go func() {
+		// 	select {
+		// 	case consensus.BlockNumLowChan <- struct{}{}:
+		// 		consensus.current.SetMode(Syncing)
+		// 	case <-time.After(1 * time.Second):
+		// 	}
+		// }()
+		// return
 	}
 
 	consensus.tryCatchup()

@@ -563,9 +563,6 @@ func setupConsensusAndNode(
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
 
-	// Assign closure functions to the consensus object
-	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
-	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
 	// Setup block period and block due time.
@@ -791,18 +788,21 @@ func main() {
 
 	var g errgroup.Group
 
-	g.Go(currentNode.StartBlockStateSync)
+	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
+		g.Go(currentNode.StartConsensus)
+		g.Go(currentNode.ProposeBlock)
+		g.Go(currentNode.HandleConsensusBlockProcessing)
+	}
+
+	g.Go(currentNode.HandleIncomingBlocks)
 	g.Go(currentNode.StartP2PMessageHandling)
 
-	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
-		g.Go(currentNode.ProposeBlock)
-		g.Go(currentNode.StartConsensus)
-	}
+	// if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&
+	// 	currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+	// g.Go(currentNode.StartBeaconBlockStateSync)
+	// g.Go(currentNode.StartBlockStateSync)
 
-	if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&
-		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
-		g.Go(currentNode.StartBeaconBlockStateSync)
-	}
+	// }
 
 	if err := g.Wait(); err != nil {
 		fatal(err)

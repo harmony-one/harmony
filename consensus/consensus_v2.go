@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -107,7 +108,9 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, leaderPriKey.GetPublicKey(), leaderPriKey)
+	network, err := consensus.construct(
+		msg_pb.MessageType_COMMITTED, nil, leaderPriKey.GetPublicKey(), leaderPriKey,
+	)
 	if err != nil {
 		utils.Logger().Warn().Err(err).
 			Msg("[FinalizeCommits] Unable to construct Committed message")
@@ -169,8 +172,6 @@ func (consensus *Consensus) finalizeCommits() {
 		utils.Logger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
 		time.Sleep(consensus.NextBlockDue.Sub(n))
 	}
-	// Send signal to Node to propose the new block for consensus
-	consensus.ReadySignal <- struct{}{}
 
 	// Update time due for next block
 	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
@@ -223,7 +224,7 @@ func (consensus *Consensus) tryCatchup() {
 		if len(msgs) > 1 {
 			utils.Logger().Error().
 				Int("numMsgs", len(msgs)).
-				Msg("[TryCatchup] DANGER!!! we should only get one committed message for a given blockNum")
+				Msg("DANGER!!! we should only get one committed message for a given blockNum")
 		}
 
 		var committedMsg *FBFTMessage
@@ -246,12 +247,16 @@ func (consensus *Consensus) tryCatchup() {
 				continue
 			}
 
-			if consensus.BlockVerifier == nil {
-				// do nothing
-			} else if err := consensus.BlockVerifier(tmpBlock); err != nil {
-				utils.Logger().Info().Msg("[TryCatchup] block verification failed")
+			resp := make(chan error)
+			fmt.Println("this came in", tmpBlock.String())
+			consensus.Verify.Request <- blkComeback{tmpBlock, resp}
+
+			if err := <-resp; err != nil {
+				utils.Logger().Error().Err(err).
+					Msg("block verification failed in try catchup")
 				continue
 			}
+
 			committedMsg = msgs[i]
 			block = tmpBlock
 			break
@@ -286,20 +291,20 @@ func (consensus *Consensus) tryCatchup() {
 
 		// Fill in the commit signatures
 		block.SetCurrentCommitSig(committedMsg.Payload)
-		consensus.OnConsensusDone(block)
-		consensus.ResetState()
+		resp := make(chan error)
+		consensus.RoundCompleted.Request <- blkComeback{block, resp}
 
-		select {
-		case consensus.VerifiedNewBlock <- block:
-		default:
-			utils.Logger().Info().
-				Str("blockHash", block.Hash().String()).
-				Msg("[TryCatchup] consensus verified block send to chan failed")
-			continue
+		if err := <-resp; err != nil {
+			utils.Logger().Error().Err(err).
+				Msg("block processing after finishing consensus failed")
 		}
+
+		consensus.ResetState()
+		// TODO need to let state sync know that i caught up somehow
 
 		break
 	}
+
 	if currentBlockNum < consensus.blockNum {
 		utils.Logger().Info().
 			Uint64("From", currentBlockNum).
@@ -472,13 +477,17 @@ func (consensus *Consensus) Start(
 
 		case viewID := <-consensus.commitFinishChan:
 			utils.Logger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
-
 			// Only Leader execute this condition
-			func() {
+			go func() {
 				if viewID == consensus.viewID {
+					fmt.Println("before finalize")
 					consensus.finalizeCommits()
+					fmt.Println("after finalize")
+					consensus.ReadySignal <- struct{}{}
+					fmt.Println("sent ready signal again")
 				}
 			}()
+
 		}
 	}
 	return nil
@@ -555,7 +564,9 @@ func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
 }
 
 // GenerateVdfAndProof generates new VDF/Proof from VRFs in the current epoch
-func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockNumbers []uint64) {
+func (consensus *Consensus) GenerateVdfAndProof(
+	newBlock *types.Block, vrfBlockNumbers []uint64,
+) {
 	//derive VDF seed from VRFs generated in the current epoch
 	seed := [32]byte{}
 	for i := 0; i < consensus.VdfSeedSize(); i++ {

@@ -177,12 +177,15 @@ func (consensus *Consensus) onPreparedSanityChecks(
 				Msg("[OnPrepared] Block header is not verified successfully")
 			return false
 		}
-		if consensus.BlockVerifier == nil {
-			// do nothing
-		} else if err := consensus.BlockVerifier(blockObj); err != nil {
-			utils.Logger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
-			return false
+
+		resp := make(chan error)
+		consensus.Verify.Request <- blkComeback{blockObj, resp}
+
+		if err := <-resp; err != nil {
+			utils.Logger().Error().Err(err).
+				Msg("block verification failed in onprepared sanitychecks")
 		}
+
 	}
 
 	return true
