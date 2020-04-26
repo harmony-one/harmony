@@ -59,7 +59,7 @@ func (node *Node) HandleMessage(
 		if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 			node.ExplorerMessageHandler(msgPayload)
 		} else {
-			node.ConsensusMessageHandler(msgPayload)
+			node.Consensus.HandleMessageUpdate(msgPayload)
 		}
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
@@ -331,11 +331,6 @@ func (node *Node) postConsensusProcessing(
 		node.Consensus.SetMode(node.Consensus.UpdateConsensusInformation())
 	}
 	return nil
-}
-
-// ConsensusMessageHandler passes received message in node_handler to consensus
-func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
-	node.Consensus.MsgChan <- msgPayload
 }
 
 // BroadcastCrossLink is called by consensus leader to

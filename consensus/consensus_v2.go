@@ -20,8 +20,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// handlemessageupdate will update the consensus state according to received message
-func (consensus *Consensus) handleMessageUpdate(payload []byte) {
+// Handlemessageupdate will update the consensus state according to received message
+func (consensus *Consensus) HandleMessageUpdate(payload []byte) {
 	if len(payload) == 0 {
 		return
 	}
@@ -461,7 +461,6 @@ func (consensus *Consensus) Start(
 
 			startTime = time.Now()
 			consensus.msgSender.Reset(newBlock.NumberU64())
-
 			utils.Logger().Debug().
 				Int("numTxs", len(newBlock.Transactions())).
 				Int("numStakingTxs", len(newBlock.StakingTransactions())).
@@ -469,9 +468,6 @@ func (consensus *Consensus) Start(
 				Int64("publicKeys", consensus.Decider.ParticipantsCount()).
 				Msg("[ConsensusMainLoop] STARTING CONSENSUS")
 			consensus.announce(newBlock)
-
-		case msg := <-consensus.MsgChan:
-			consensus.handleMessageUpdate(msg)
 
 		case viewID := <-consensus.commitFinishChan:
 			utils.Logger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")

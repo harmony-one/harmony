@@ -82,8 +82,6 @@ type Consensus struct {
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
-	// channel to receive consensus message
-	MsgChan chan []byte
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 	// Consensus rounds whose commit phase finished
@@ -226,7 +224,6 @@ func New(
 		phase:     FBFTAnnounce,
 		// TODO Refactor consensus.block* into State?
 		current:          NewState(),
-		MsgChan:          make(chan []byte),
 		syncReadyChan:    make(chan struct{}),
 		syncNotReadyChan: make(chan struct{}),
 		SlashChan:        make(chan slash.Record),
