@@ -143,19 +143,7 @@ func ComputeCurrentSigning(
 	)
 
 	if toSign.Cmp(common.Big0) == 0 {
-		utils.Logger().Info().
-			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
 		return computed
-	}
-
-	if signed.Sign() == -1 {
-		// Shouldn't happen
-		utils.Logger().Error().Msg("negative number of signed blocks")
-	}
-
-	if toSign.Sign() == -1 {
-		// Shouldn't happen
-		utils.Logger().Error().Msg("negative number of blocks to sign")
 	}
 
 	s1, s2 := numeric.NewDecFromBigInt(signed), numeric.NewDecFromBigInt(toSign)
