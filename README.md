@@ -122,15 +122,49 @@ run `test/debug.sh` again, get the correct environment again easily by `exec bas
 
 GMP and OpenSSL
 
+MacOS
 ```bash
 brew install gmp
 brew install openssl
 ```
 
+Ubuntu
+
+install GMP
+
+download the gmp pkg from[https://gmplib.org/](https://gmplib.org/)
+```bash
+sudo ./configure --prefix=/usr --enable-cxx
+make
+make check 
+sudo make install 
+```
+install openssl
+```bash
+apt-get install openssl
+apt-get install libssl-dev
+```
+CentOS
+
+download the gmp pkg from[https://gmplib.org/](https://gmplib.org/)
+```bash
+sudo ./configure --prefix=/usr --enable-cxx
+make
+make check 
+sudo make install 
+```
+install openssl
+```bash
+yum install openssl
+yum install openssl-devel
+```
+
+
 ## Dev Environment Setup
 
 The required go version is: **go1.13.6**
 
+In MacOS
 ```bash
 export GOPATH=$HOME/<path_of_your_choice>
 
@@ -147,9 +181,21 @@ cd harmony
 make
 
 ```
+Note: In CentOS/Ubuntu please use the Makefile.ubuntu as alternative.
 
 Note: make sure to run `scripts/install_build_tools.sh`to make sure build tools are of correct versions.
 
+Note : Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
+
+alternative solution is
+```bash
+brew install bash
+```
+and use 
+```bash
+#!/usr/local/bin/bash
+```
+in scripts.
 ## Build
 
 If you want to bypass the Makefile:
@@ -162,8 +208,6 @@ export LIBRARY_PATH=$LD_LIBRARY_PATH
 export DYLD_FALLBACK_LIBRARY_PATH=$LD_LIBRARY_PATH
 export GO111MODULE=on
 ```
-
-Note : Some of our scripts require bash 4.x support, please [install bash 4.x](http://tldrdevnotes.com/bash-upgrade-3-4-macos) on MacOS X.
 
 ### Build all executables
 
