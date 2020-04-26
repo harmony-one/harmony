@@ -1,4 +1,4 @@
-#!/usr/bin/env /usr/local/bin/bash
+#!/usr/bin/env /bin/bash
 #alternative solution  !/usr/bin/env /usr/local/bin/bash
 export GO111MODULE=on
 
