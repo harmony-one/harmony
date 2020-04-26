@@ -26,36 +26,10 @@ import (
 
 const p2pMsgPrefixSize = 5
 
-// some messages have uninteresting fields in header, slash, receipt and crosslink are
-// such messages. This function assumes that input bytes are a slice which already
-// past those not relevant header bytes.
-func (node *Node) processSkippedMsgTypeByteValue(
-	cat proto_node.BlockMessageType, content []byte,
-) {
-	switch cat {
-	case proto_node.SlashCandidate:
-		node.processSlashCandidateMessage(content)
-	case proto_node.Receipt:
-		utils.Logger().Debug().Msg("NET: received message: Node/Receipt")
-		node.ProcessReceiptMessage(content)
-	case proto_node.CrossLink:
-		// only beacon chain will accept the header from other shards
-		utils.Logger().Debug().
-			Uint32("shardID", node.NodeConfig.ShardID).
-			Msg("NET: received message: Node/CrossLink")
-		if node.NodeConfig.ShardID != shard.BeaconChainShardID {
-			return
-		}
-		node.ProcessCrossLinkMessage(content)
-	default:
-		utils.Logger().Error().
-			Int("message-iota-value", int(cat)).
-			Msg("Invariant usage of processSkippedMsgTypeByteValue violated")
-	}
-}
-
 // HandleMessage parses the message and dispatch the actions.
-func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID, topic string) {
+func (node *Node) HandleMessage(
+	content []byte, sender libp2p_peer.ID, topic string,
+) {
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
@@ -416,4 +390,32 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 		p2p.ConstructMessage(
 			proto_node.ConstructCrossLinkMessage(node.Consensus.ChainReader, headers)),
 	)
+}
+
+// some messages have uninteresting fields in header, slash, receipt and crosslink are
+// such messages. This function assumes that input bytes are a slice which already
+// past those not relevant header bytes.
+func (node *Node) processSkippedMsgTypeByteValue(
+	cat proto_node.BlockMessageType, content []byte,
+) {
+	switch cat {
+	case proto_node.SlashCandidate:
+		node.processSlashCandidateMessage(content)
+	case proto_node.Receipt:
+		utils.Logger().Debug().Msg("NET: received message: Node/Receipt")
+		node.ProcessReceiptMessage(content)
+	case proto_node.CrossLink:
+		// only beacon chain will accept the header from other shards
+		utils.Logger().Debug().
+			Uint32("shardID", node.NodeConfig.ShardID).
+			Msg("NET: received message: Node/CrossLink")
+		if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+			return
+		}
+		node.ProcessCrossLinkMessage(content)
+	default:
+		utils.Logger().Error().
+			Int("message-iota-value", int(cat)).
+			Msg("Invariant usage of processSkippedMsgTypeByteValue violated")
+	}
 }

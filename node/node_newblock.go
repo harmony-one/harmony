@@ -133,19 +133,6 @@ func (node *Node) HandleIncomingBlocks() error {
 		return nil
 	})
 
-	// g.Go(func() error {
-	// 	for blk := range node.Consensus.VerifiedNewBlock {
-	// 		if b := blk; b != nil {
-	// 			if b.ShardID() == shard.BeaconChainShardID {
-	// 				chans[0] <- b
-	// 			} else {
-	// 				chans[1] <- b
-	// 			}
-	// 		}
-	// 	}
-	// 	return nil
-	// })
-
 	return g.Wait()
 
 }
