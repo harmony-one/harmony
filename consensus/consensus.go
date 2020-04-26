@@ -64,7 +64,7 @@ type blkComeback struct {
 	Err chan error
 }
 
-type ProcessBlock struct {
+type processBlock struct {
 	Request chan blkComeback
 }
 
@@ -137,8 +137,8 @@ type Consensus struct {
 	infoMutex sync.Mutex
 	// Signal channel for starting a new consensus process
 	ReadySignal    chan struct{}
-	RoundCompleted ProcessBlock
-	Verify         ProcessBlock
+	RoundCompleted processBlock
+	Verify         processBlock
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
 	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -229,8 +229,8 @@ func New(
 		SlashChan:        make(chan slash.Record),
 		commitFinishChan: make(chan uint64),
 		ReadySignal:      make(chan struct{}),
-		RoundCompleted:   ProcessBlock{make(chan blkComeback)},
-		Verify:           ProcessBlock{make(chan blkComeback)},
+		RoundCompleted:   processBlock{make(chan blkComeback)},
+		Verify:           processBlock{make(chan blkComeback)},
 		// channel for receiving newly generated VDF
 		RndChannel: make(chan [vdfAndSeedSize]byte),
 		viewID:     0,
