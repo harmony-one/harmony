@@ -1,0 +1,20 @@
+github.com/ethereum/go-ethereum/account/abi  >> github.com/harmony-one/harmony/account/abi
+github.com/ethereum/go-ethereum/common  >> github.com/harmony-one/harmony/common
+github.com/ethereum/go-ethereum/common/hexutil >> github.com/harmony-one/harmony/common/hexutil
+github.com/ethereum/go-ethereum/core/types >> github.com/harmony-one/harmony/ethcore/types
+github.com/ethereum/go-ethereum/core/bloombits >> github.com/harmony-one/harmony/ethcore/bloombits
+github.com/ethereum/go-ethereum/crypto  >> github.com/harmony-one/harmony/crypto
+github.com/ethereum/go-ethereum/event  >> github.com/harmony-one/harmony/event
+github.com/ethereum/go-ethereum/ethdb  >> github.com/harmony-one/harmony/ethdb
+github.com/ethereum/go-ethereum/log  >> github.com/harmony-one/harmony/log
+github.com/ethereum/go-ethereum/metrics  >> github.com/harmony-one/harmony/metrics
+github.com/ethereum/go-ethereum/node  >> github.com/harmony-one/harmony/ethnode
+github.com/ethereum/go-ethereum/p2p  >> github.com/harmony-one/harmony/ethp2p
+github.com/ethereum/go-ethereum/params  >> github.com/harmony-one/harmony/params
+github.com/ethereum/go-ethereum/rlp  >> github.com/harmony-one/harmony/rlp
+github.com/ethereum/go-ethereum/rpc  >> github.com/harmony-one/harmony/rpc
+github.com/ethereum/go-ethereum/swarm  >> github.com/harmony-one/harmony/swarm
+github.com/ethereum/go-ethereum/trie  >> github.com/harmony-one/harmony/trie
+
+
+github.com/harmony-one/taggedrlp  >> github.com/harmony-one/harmony/taggedrlp
