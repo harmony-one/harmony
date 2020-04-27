@@ -61,13 +61,14 @@ func (pm *State) SetViewID(viewID uint64) {
 
 // switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
 func (consensus *Consensus) switchPhase(desired FBFTPhase, override bool) {
+
 	if override {
-		consensus.phase = desired
+		consensus.phase.Store(desired)
 		return
 	}
 
 	var nextPhase FBFTPhase
-	switch consensus.phase {
+	switch consensus.phase.Load().(FBFTPhase) {
 	case FBFTAnnounce:
 		nextPhase = FBFTPrepare
 	case FBFTPrepare:
@@ -75,9 +76,15 @@ func (consensus *Consensus) switchPhase(desired FBFTPhase, override bool) {
 	case FBFTCommit:
 		nextPhase = FBFTAnnounce
 	}
+
 	if nextPhase == desired {
-		consensus.phase = nextPhase
+		utils.Logger().Debug().
+			Str("From", consensus.phase.Load().(FBFTPhase).String()).
+			Str("To", nextPhase.String()).
+			Msg("switching phase")
+		consensus.phase.Store(nextPhase)
 	}
+
 }
 
 // GetNextLeaderKey uniquely determine who is the leader for given viewID
@@ -85,7 +92,6 @@ func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKey {
 	wasFound, next := consensus.Decider.NextAfter(consensus.LeaderPubKey)
 	if !wasFound {
 		utils.Logger().Warn().
-			Str("key", consensus.LeaderPubKey.SerializeToHexStr()).
 			Msg("GetNextLeaderKey: currentLeaderKey not found")
 	}
 	return next
@@ -93,9 +99,7 @@ func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKey {
 
 // ResetViewChangeState reset the state for viewchange
 func (consensus *Consensus) ResetViewChangeState() {
-	utils.Logger().Debug().
-		Str("Phase", consensus.phase.String()).
-		Msg("[ResetViewChangeState] Resetting view change state")
+	utils.Logger().Debug().Msg("[ResetViewChangeState] Resetting view change state")
 	consensus.current.SetMode(Normal)
 	consensus.m1Payload = []byte{}
 	consensus.bhpSigs = map[uint64]map[string]*bls.Sign{}
@@ -120,7 +124,6 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	utils.Logger().Info().
 		Uint64("ViewChangingID", viewID).
 		Dur("timeoutDuration", duration).
-		Str("NextLeader", consensus.LeaderPubKey.SerializeToHexStr()).
 		Msg("[startViewChange]")
 
 	for i, key := range consensus.PubKey.PublicKey {
@@ -156,7 +159,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		utils.Logger().Debug().
 			Int64("have", consensus.Decider.SignersCount(quorum.ViewChange)).
 			Int64("need", consensus.Decider.TwoThirdsSignersCount()).
-			Str("validatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
 			Msg("[onViewChange] Received Enough View Change Messages")
 		return
 	}
@@ -219,7 +221,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		_, ok := consensus.nilSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()]
 		if ok {
 			utils.Logger().Debug().
-				Str("validatorPubKey", senderKey.SerializeToHexStr()).
 				Msg("[onViewChange] Already Received M2 message from validator")
 			return
 		}
@@ -230,7 +231,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		}
 
 		utils.Logger().Debug().
-			Str("validatorPubKey", senderKey.SerializeToHexStr()).
 			Msg("[onViewChange] Add M2 (NIL) type message")
 		consensus.nilSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()] = recvMsg.ViewchangeSig
 		consensus.nilBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
@@ -238,12 +238,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		_, ok := consensus.bhpSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()]
 		if ok {
 			utils.Logger().Debug().
-				Str("validatorPubKey", senderKey.SerializeToHexStr()).
 				Msg("[onViewChange] Already Received M1 Message From the Validator")
 			return
 		}
 		if !recvMsg.ViewchangeSig.VerifyHash(recvMsg.SenderPubkey, recvMsg.Payload) {
-			utils.Logger().Warn().Msg("[onViewChange] Failed to Verify Signature for M1 Type Viewchange Message")
+			utils.Logger().Warn().
+				Msg("[onViewChange] Failed to Verify Signature for M1 Type Viewchange Message")
 			return
 		}
 
@@ -295,7 +295,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 		}
 		utils.Logger().Debug().
-			Str("validatorPubKey", senderKey.SerializeToHexStr()).
 			Msg("[onViewChange] Add M1 (prepared) type message")
 		consensus.bhpSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()] = recvMsg.ViewchangeSig
 		consensus.bhpBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
@@ -304,7 +303,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	// check and add viewID (m3 type) message signature
 	if _, ok := consensus.viewIDSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()]; ok {
 		utils.Logger().Debug().
-			Str("validatorPubKey", senderKey.SerializeToHexStr()).
 			Msg("[onViewChange] Already Received M3(ViewID) message from the validator")
 		return
 	}
@@ -317,7 +315,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 	utils.Logger().Debug().
-		Str("validatorPubKey", senderKey.SerializeToHexStr()).
 		Msg("[onViewChange] Add M3 (ViewID) type message")
 
 	consensus.viewIDSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()] = recvMsg.ViewidSig
@@ -340,7 +337,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}()
 		} else {
 			utils.Logger().Debug().
-				Str("From", consensus.phase.String()).
 				Str("To", FBFTCommit.String()).
 				Msg("[OnViewChange] Switching phase")
 			consensus.switchPhase(FBFTCommit, true)
@@ -411,7 +407,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Uint64("viewChangingID", consensus.current.ViewID()).
 			Msg("[onViewChange] New Leader Start Consensus Timer and Stop View Change Timer")
 		utils.Logger().Debug().
-			Str("myKey", newLeaderKey.SerializeToHexStr()).
 			Uint64("viewID", consensus.viewID).
 			Uint64("block", consensus.blockNum).
 			Msg("[onViewChange] I am the New Leader")
@@ -453,7 +448,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 	if !m3Sig.VerifyHash(m3Mask.AggregatePublic, viewIDBytes) {
 		utils.Logger().Warn().
-			Str("m3Sig", m3Sig.SerializeToHexStr()).
 			Hex("m3Mask", m3Mask.Bitmap).
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Msg("[onNewView] Unable to Verify Aggregated Signature of M3 (ViewID) payload")
@@ -519,7 +513,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	// change view and leaderKey to keep in sync with network
 	if consensus.blockNum != recvMsg.BlockNum {
 		utils.Logger().Debug().
-			Str("newLeaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[onNewView] New Leader Changed")
 		return
@@ -558,7 +551,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			)
 		}
 		utils.Logger().Debug().
-			Str("From", consensus.phase.String()).
 			Str("To", FBFTCommit.String()).
 			Msg("[OnViewChange] Switching phase")
 		consensus.switchPhase(FBFTCommit, true)
@@ -567,7 +559,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		utils.Logger().Info().Msg("onNewView === announce")
 	}
 	utils.Logger().Debug().
-		Str("newLeaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
 		Msg("new leader changed")
 	utils.Logger().Debug().
 		Msg("validator start consensus timer and stop view change timer")

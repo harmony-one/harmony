@@ -94,7 +94,6 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
-			Str("ValidatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
 			Msg("[OnCommit] BlockNum/viewID not match")
 		return false
 	}
@@ -109,13 +108,10 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 		if logMsgs[0].BlockHash != recvMsg.BlockHash &&
 			logMsgs[0].SenderPubkey.IsEqual(recvMsg.SenderPubkey) {
 			utils.Logger().Debug().
-				Str("logMsgSenderKey", logMsgs[0].SenderPubkey.SerializeToHexStr()).
 				Str("logMsgBlockHash", logMsgs[0].BlockHash.Hex()).
-				Str("recvMsg.SenderPubkey", recvMsg.SenderPubkey.SerializeToHexStr()).
 				Uint64("recvMsg.BlockNum", recvMsg.BlockNum).
 				Uint64("recvMsg.ViewID", recvMsg.ViewID).
 				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).
-				Str("LeaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
 				Msg("[OnAnnounce] Leader is malicious")
 			if consensus.current.Mode() == ViewChanging {
 				utils.Logger().Debug().Msg(
@@ -125,9 +121,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 				consensus.startViewChange(consensus.viewID + 1)
 			}
 		}
-		utils.Logger().Debug().
-			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
-			Msg("[OnAnnounce] Announce message received again")
+		utils.Logger().Debug().Msg("[OnAnnounce] Announce message received again")
 	}
 	return consensus.isRightBlockNumCheck(recvMsg)
 }

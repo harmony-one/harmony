@@ -70,8 +70,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 		}
 	}
 
-	utils.Logger().Info().
-		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	consensus.ResetState()
@@ -121,9 +119,7 @@ func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls.Sign {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
-	utils.Logger().Debug().
-		Str("Phase", consensus.phase.String()).
-		Msg("[ResetState] Resetting consensus state")
+	utils.Logger().Debug().Msg("[ResetState] Resetting consensus state")
 	consensus.switchPhase(FBFTAnnounce, true)
 	consensus.blockHash = [32]byte{}
 	consensus.blockHeader = []byte{}
@@ -136,13 +132,6 @@ func (consensus *Consensus) ResetState() {
 	consensus.commitBitmap = commitBitmap
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
-}
-
-// ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
-func (consensus *Consensus) ToggleConsensusCheck() {
-	consensus.infoMutex.Lock()
-	defer consensus.infoMutex.Unlock()
-	consensus.ignoreViewIDCheck = !consensus.ignoreViewIDCheck
 }
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
@@ -239,7 +228,6 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.timeouts.consensus.Start()
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
-			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:20]).
 			Msg("viewID and leaderKey override")
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
@@ -454,7 +442,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			hasError = true
 		} else {
 			utils.Logger().Debug().
-				Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
 			consensus.LeaderPubKey = leaderPubKey
 		}
@@ -471,7 +458,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.IsLeader() {
 				go func() {
 					utils.Logger().Debug().
-						Str("myKey", consensus.PubKey.SerializeToHexStr()).
 						Uint64("viewID", consensus.viewID).
 						Uint64("block", consensus.blockNum).
 						Msg("[UpdateConsensusInformation] I am the New Leader")

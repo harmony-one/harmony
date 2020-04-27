@@ -93,7 +93,6 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 
 	utils.Logger().Debug().
-		Str("From", consensus.phase.String()).
 		Str("To", FBFTPrepare.String()).
 		Msg("[Announce] Switching phase")
 	consensus.switchPhase(FBFTPrepare, true)
@@ -129,11 +128,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	validatorPubKey := recvMsg.SenderPubkey
 	prepareSig := recvMsg.Payload
 	prepareBitmap := consensus.prepareBitmap
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	logger := utils.Logger().With().
-		Str("validatorPubKey", validatorPubKey.SerializeToHexStr()).Logger()
+	logger := utils.Logger().With().Logger()
 
 	// proceed only when the message is not received before
 	signed := consensus.Decider.ReadBallot(quorum.Prepare, validatorPubKey)
@@ -201,9 +196,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	// Check for potential double signing
 	if consensus.checkDoubleSign(recvMsg) {
 		return
@@ -211,8 +203,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	validatorPubKey, commitSig, commitBitmap :=
 		recvMsg.SenderPubkey, recvMsg.Payload, consensus.commitBitmap
-	logger := utils.Logger().With().
-		Str("validatorPubKey", validatorPubKey.SerializeToHexStr()).Logger()
+	logger := utils.Logger().With().Logger()
 
 	// has to be called before verifying signature
 	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
@@ -223,8 +214,11 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash, recvMsg.BlockNum, consensus.viewID)
+	commitPayload := signature.ConstructCommitPayload(
+		consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash,
+		recvMsg.BlockNum, consensus.viewID,
+	)
 	logger = logger.With().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).

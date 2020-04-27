@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -39,6 +38,9 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) {
 			msg.Type == msg_pb.MessageType_COMMIT) {
 		return
 	}
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 
 	if msg.Type == msg_pb.MessageType_VIEWCHANGE ||
 		msg.Type == msg_pb.MessageType_NEWVIEW {
@@ -469,11 +471,14 @@ func (consensus *Consensus) Start(
 		case viewID := <-consensus.commitFinishChan:
 			utils.Logger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
 			// Only Leader execute this condition
-			go func() {
+			func() {
+				consensus.mutex.Lock()
+				defer consensus.mutex.Unlock()
 				if viewID == consensus.viewID {
 					consensus.finalizeCommits()
+
 					consensus.ReadySignal <- struct{}{}
-					fmt.Println("after finalize and sent ready signal")
+
 				}
 			}()
 

@@ -37,8 +37,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Msg("[OnAnnounce] Announce message Added")
 	consensus.FBFTLog.AddMessage(recvMsg)
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 	consensus.blockHash = recvMsg.BlockHash
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
@@ -89,10 +87,6 @@ func (consensus *Consensus) prepare() {
 			}
 		}
 	}
-	utils.Logger().Debug().
-		Str("From", consensus.phase.String()).
-		Str("To", FBFTPrepare.String()).
-		Msg("[Announce] Switching Phase")
 	consensus.switchPhase(FBFTPrepare, true)
 }
 
@@ -152,8 +146,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
 		return
 	}
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	consensus.FBFTLog.AddBlock(&blockObj)
 	// add block field
@@ -233,10 +225,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			}
 		}
 	}
-	utils.Logger().Debug().
-		Str("From", consensus.phase.String()).
-		Str("To", FBFTCommit.String()).
-		Msg("[OnPrepared] Switching phase")
 	consensus.switchPhase(FBFTCommit, true)
 }
 
@@ -274,10 +262,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 

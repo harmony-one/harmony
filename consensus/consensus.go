@@ -77,7 +77,7 @@ type Consensus struct {
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
-	phase FBFTPhase
+	phase atomic.Value
 	// current indicates what state a node is in
 	current State
 	// epoch: current epoch number
@@ -212,8 +212,9 @@ func New(
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 
-	var isLeader atomic.Value
+	var isLeader, phase atomic.Value
 	isLeader.Store(false)
+	phase.Store(FBFTAnnounce)
 
 	consensus := Consensus{
 		Decider:  Decider,
@@ -221,7 +222,7 @@ func New(
 		isLeader: isLeader,
 		timeouts: newRoundTimeoutWithDefaults(),
 		FBFTLog:  NewFBFTLog(),
-		phase:    FBFTAnnounce,
+		phase:    phase,
 		// TODO Refactor consensus.block* into State?
 		current:          NewState(),
 		syncReadyChan:    make(chan struct{}),
@@ -240,8 +241,6 @@ func New(
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey
 		consensus.PubKey = multiBLSPriKey.GetPublicKey()
-		utils.Logger().Info().
-			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
 	} else {
 		utils.Logger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")

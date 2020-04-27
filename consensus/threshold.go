@@ -13,8 +13,7 @@ import (
 )
 
 func (consensus *Consensus) didReachPrepareQuorum() error {
-	logger := utils.Logger()
-	logger.Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
+	utils.Logger().Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("[OnPrepare] leader not found")
@@ -76,7 +75,6 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	}
 
 	utils.Logger().Debug().
-		Str("From", consensus.phase.String()).
 		Str("To", FBFTCommit.String()).
 		Msg("[OnPrepare] Switching phase")
 
