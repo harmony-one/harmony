@@ -141,11 +141,9 @@ func (consensus *Consensus) finalizeCommits() {
 	}
 
 	// if leader success finalize the block, send committed message to validators
-	if err := consensus.msgSender.SendWithRetry(
-		block.NumberU64(),
-		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		},
+	if err := consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
+		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+	},
 		p2p.ConstructMessage(msgToSend)); err != nil {
 		utils.Logger().Warn().Err(err).Msg("[finalizeCommits] Cannot send committed message")
 	} else {
@@ -460,7 +458,6 @@ func (consensus *Consensus) Start(
 			}
 
 			startTime = time.Now()
-			consensus.msgSender.Reset(newBlock.NumberU64())
 			utils.Logger().Debug().
 				Int("numTxs", len(newBlock.Transactions())).
 				Int("numStakingTxs", len(newBlock.StakingTransactions())).

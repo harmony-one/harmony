@@ -61,9 +61,13 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) prepare() {
-	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+	groupID := []nodeconfig.GroupID{
+		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+	}
 	for i, key := range consensus.PubKey.PublicKey {
-		networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, key, consensus.priKey.PrivateKey[i])
+		networkMessage, err := consensus.construct(
+			msg_pb.MessageType_PREPARE, nil, key, consensus.priKey.PrivateKey[i],
+		)
 		if err != nil {
 			utils.Logger().Err(err).
 				Str("message-type", msg_pb.MessageType_PREPARE.String()).
@@ -73,7 +77,7 @@ func (consensus *Consensus) prepare() {
 
 		// TODO: this will not return immediatey, may block
 		if consensus.current.Mode() != Listening {
-			if err := consensus.msgSender.SendWithoutRetry(
+			if err := consensus.host.SendMessageToGroups(
 				groupID,
 				p2p.ConstructMessage(networkMessage.Bytes),
 			); err != nil {
@@ -217,8 +221,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		)
 
 		if consensus.current.Mode() != Listening {
-			if err := consensus.msgSender.SendWithoutRetry(
-				groupID,
+			if err := consensus.host.SendMessageToGroups(groupID,
 				p2p.ConstructMessage(networkMessage.Bytes),
 			); err != nil {
 				utils.Logger().Warn().Msg("[OnPrepared] Cannot send commit message!!")

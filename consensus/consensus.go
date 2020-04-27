@@ -151,8 +151,6 @@ type Consensus struct {
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
-	// MessageSender takes are of sending consensus message and the corresponding retry logic.
-	msgSender *MessageSender
 	// Used to convey to the consensus main loop that block syncing has finished.
 	syncReadyChan chan struct{}
 	// Used to convey to the consensus main loop that node is out of sync
@@ -218,13 +216,12 @@ func New(
 	isLeader.Store(false)
 
 	consensus := Consensus{
-		Decider:   Decider,
-		host:      host,
-		msgSender: NewMessageSender(host),
-		isLeader:  isLeader,
-		timeouts:  newRoundTimeoutWithDefaults(),
-		FBFTLog:   NewFBFTLog(),
-		phase:     FBFTAnnounce,
+		Decider:  Decider,
+		host:     host,
+		isLeader: isLeader,
+		timeouts: newRoundTimeoutWithDefaults(),
+		FBFTLog:  NewFBFTLog(),
+		phase:    FBFTAnnounce,
 		// TODO Refactor consensus.block* into State?
 		current:          NewState(),
 		syncReadyChan:    make(chan struct{}),

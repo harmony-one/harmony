@@ -76,11 +76,10 @@ func (consensus *Consensus) announce(block *types.Block) {
 			return
 		}
 	}
-	// Construct broadcast p2p message
-	if err := consensus.msgSender.SendWithRetry(
-		consensus.blockNum, msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		}, p2p.ConstructMessage(msgToSend)); err != nil {
+
+	if err := consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
+		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+	}, p2p.ConstructMessage(msgToSend)); err != nil {
 		utils.Logger().Warn().
 			Str("groupID", string(nodeconfig.NewGroupIDByShardID(
 				nodeconfig.ShardID(consensus.ShardID),
@@ -273,7 +272,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			consensus.commitFinishChan <- myViewID
 		}()
 
-		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
 
 	if consensus.Decider.IsAllSigsCollected() {

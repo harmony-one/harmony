@@ -38,8 +38,11 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// Leader add commit phase signature
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, consensus.viewID)
+	commitPayload := signature.ConstructCommitPayload(
+		consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.epoch),
+		consensus.blockHash, consensus.blockNum, consensus.viewID,
+	)
 
 	// so by this point, everyone has committed to the blockhash of this block
 	// in prepare and so this is the actual block.
@@ -60,12 +63,9 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			return err
 		}
 	}
-	if err := consensus.msgSender.SendWithRetry(
-		consensus.blockNum,
-		msg_pb.MessageType_PREPARED, []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		},
-		p2p.ConstructMessage(msgToSend),
+	if err := consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
+		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+	}, p2p.ConstructMessage(msgToSend),
 	); err != nil {
 		utils.Logger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 	} else {
@@ -74,9 +74,6 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] Sent Prepared Message!!")
 	}
-	consensus.msgSender.StopRetry(msg_pb.MessageType_ANNOUNCE)
-	// Stop retry committed msg of last consensus
-	consensus.msgSender.StopRetry(msg_pb.MessageType_COMMITTED)
 
 	utils.Logger().Debug().
 		Str("From", consensus.phase.String()).
