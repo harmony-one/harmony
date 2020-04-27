@@ -23,7 +23,9 @@ const (
 	vdfAndSeedSize  = 548 // size of VDF/Proof and Seed
 )
 
-var errLeaderPriKeyNotFound = errors.New("getting leader private key from consensus public keys failed")
+var errLeaderPriKeyNotFound = errors.New(
+	"getting leader private key from consensus public keys failed",
+)
 
 type comeDue struct {
 	duration  atomic.Value
@@ -39,10 +41,11 @@ func (d *comeDue) SetDuration(dur time.Duration) {
 }
 
 func (d *comeDue) WithinLimit() bool {
-	return time.Since(
-		d.startTime.Load().(time.Time),
-	) > d.duration.Load().(time.Duration)
+	elapsed := time.Since(d.startTime.Load().(time.Time))
+	return elapsed.Round(time.Second) < d.duration.Load().(time.Duration)
 }
+
+// TODO Add method to kick off roundTimeout -> then send signal to node loop
 
 type roundTimeout struct {
 	consensus  comeDue
