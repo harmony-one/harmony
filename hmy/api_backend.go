@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -460,14 +459,16 @@ func (b *APIBackend) GetValidatorInformation(
 func (b *APIBackend) GetMedianRawStakeSnapshot() (
 	*committee.CompletedEPoSRound, error,
 ) {
+	blockNr := b.CurrentBlock().NumberU64()
+	key := fmt.Sprintf("median-%d", blockNr)
+
+	// delete cache for previous block
+	prevKey := fmt.Sprintf("median-%d", blockNr-1)
+	b.apiCache.Forget(prevKey)
+
 	res, err := b.SingleFlightRequest(
-		"median",
+		key,
 		func() (interface{}, error) {
-			go func() {
-				// approximately one block time cache
-				time.Sleep(8 * time.Second)
-				b.apiCache.Forget("median")
-			}()
 			return committee.NewEPoSRound(b.hmy.BlockChain())
 		},
 	)
