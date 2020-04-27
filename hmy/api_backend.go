@@ -31,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/singleflight"
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
@@ -41,6 +42,7 @@ type APIBackend struct {
 		BlockHeight  int64
 		TotalStaking *big.Int
 	}
+	requestGroup singleflight.Group
 }
 
 // ChainDb ...
@@ -443,7 +445,13 @@ func (b *APIBackend) GetValidatorInformation(
 func (b *APIBackend) GetMedianRawStakeSnapshot() (
 	*committee.CompletedEPoSRound, error,
 ) {
-	return committee.NewEPoSRound(b.hmy.BlockChain())
+	res, err, _ := b.requestGroup.Do("median", func() (interface{}, error) {
+		return committee.NewEPoSRound(b.hmy.BlockChain())
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res.(*committee.CompletedEPoSRound), nil
 }
 
 // GetLatestChainHeaders ..
