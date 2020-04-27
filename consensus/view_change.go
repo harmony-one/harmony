@@ -60,31 +60,12 @@ func (pm *State) SetViewID(viewID uint64) {
 }
 
 // switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
-func (consensus *Consensus) switchPhase(desired FBFTPhase, override bool) {
-
-	if override {
-		consensus.phase.Store(desired)
-		return
-	}
-
-	var nextPhase FBFTPhase
-	switch consensus.phase.Load().(FBFTPhase) {
-	case FBFTAnnounce:
-		nextPhase = FBFTPrepare
-	case FBFTPrepare:
-		nextPhase = FBFTCommit
-	case FBFTCommit:
-		nextPhase = FBFTAnnounce
-	}
-
-	if nextPhase == desired {
-		utils.Logger().Debug().
-			Str("From", consensus.phase.Load().(FBFTPhase).String()).
-			Str("To", nextPhase.String()).
-			Msg("switching phase")
-		consensus.phase.Store(nextPhase)
-	}
-
+func (consensus *Consensus) switchPhase(desired FBFTPhase) {
+	utils.Logger().Debug().
+		Str("From", consensus.phase.Load().(FBFTPhase).String()).
+		Str("To", desired.String()).
+		Msg("switching phase")
+	consensus.phase.Store(desired)
 }
 
 // GetNextLeaderKey uniquely determine who is the leader for given viewID
@@ -336,10 +317,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				consensus.ReadySignal <- struct{}{}
 			}()
 		} else {
-			utils.Logger().Debug().
-				Str("To", FBFTCommit.String()).
-				Msg("[OnViewChange] Switching phase")
-			consensus.switchPhase(FBFTCommit, true)
+			consensus.switchPhase(FBFTCommit)
 			copy(consensus.blockHash[:], consensus.m1Payload[:32])
 			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 32)
 
@@ -553,7 +531,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		utils.Logger().Debug().
 			Str("To", FBFTCommit.String()).
 			Msg("[OnViewChange] Switching phase")
-		consensus.switchPhase(FBFTCommit, true)
+		consensus.switchPhase(FBFTCommit)
 	} else {
 		consensus.ResetState()
 		utils.Logger().Info().Msg("onNewView === announce")

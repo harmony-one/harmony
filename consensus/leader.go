@@ -39,7 +39,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 		utils.Logger().Warn().Err(err).Msg("[Announce] Node not a leader")
 		return
 	}
-	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, key.GetPublicKey(), key)
+	networkMessage, err := consensus.construct(
+		msg_pb.MessageType_ANNOUNCE, nil, key.GetPublicKey(), key,
+	)
 	if err != nil {
 		utils.Logger().Err(err).
 			Str("message-type", msg_pb.MessageType_ANNOUNCE.String()).
@@ -92,10 +94,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 			Msg("[Announce] Sent Announce Message!!")
 	}
 
-	utils.Logger().Debug().
-		Str("To", FBFTPrepare.String()).
-		Msg("[Announce] Switching phase")
-	consensus.switchPhase(FBFTPrepare, true)
+	consensus.switchPhase(FBFTPrepare)
 }
 
 func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
@@ -180,7 +179,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		if err := consensus.didReachPrepareQuorum(); err != nil {
 			return
 		}
-		consensus.switchPhase(FBFTCommit, true)
+		consensus.switchPhase(FBFTCommit)
 	}
 }
 

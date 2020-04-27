@@ -308,7 +308,7 @@ func (consensus *Consensus) tryCatchup() {
 			Uint64("From", currentBlockNum).
 			Uint64("To", consensus.blockNum).
 			Msg("[TryCatchup] Caught up!")
-		consensus.switchPhase(FBFTAnnounce, true)
+		consensus.switchPhase(FBFTAnnounce)
 	}
 	// catup up and skip from view change trap
 	if currentBlockNum < consensus.blockNum &&
@@ -363,33 +363,8 @@ func (consensus *Consensus) Start(
 				}
 			}
 
-		// case <-consensus.syncReadyChan:
-		// 	utils.Logger().Debug().Msg("[ConsensusMainLoop] syncReadyChan")
-		// 	consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
-		// 	consensus.SetViewID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
-		// 	mode := consensus.UpdateConsensusInformation()
-		// 	consensus.current.SetMode(mode)
-		// 	utils.Logger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
-
-		// case <-consensus.syncNotReadyChan:
-		// 	utils.Logger().Debug().Msg("[ConsensusMainLoop] syncNotReadyChan")
-		// 	consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
-		// 	consensus.current.SetMode(Syncing)
-		// 	utils.Logger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
-
 		case newBlock := <-blockChannel:
-
-			utils.Logger().Info().
-				Uint64("MsgBlockNum", newBlock.NumberU64()).
-				Msg("[ConsensusMainLoop] Received Proposed New Block!")
-
-			startTime = time.Now()
-			utils.Logger().Debug().
-				Int("numTxs", len(newBlock.Transactions())).
-				Int("numStakingTxs", len(newBlock.StakingTransactions())).
-				Time("startTime", startTime).
-				Int64("publicKeys", consensus.Decider.ParticipantsCount()).
-				Msg("[ConsensusMainLoop] STARTING CONSENSUS")
+			utils.Logger().Debug().Msg("new block came in, starting consensus")
 			consensus.announce(newBlock)
 
 		case viewID := <-consensus.commitFinishChan:

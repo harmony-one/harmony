@@ -120,7 +120,7 @@ func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls.Sign {
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	utils.Logger().Debug().Msg("[ResetState] Resetting consensus state")
-	consensus.switchPhase(FBFTAnnounce, true)
+	consensus.switchPhase(FBFTAnnounce)
 	consensus.blockHash = [32]byte{}
 	consensus.blockHeader = []byte{}
 	consensus.block = []byte{}
