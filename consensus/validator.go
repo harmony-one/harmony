@@ -32,12 +32,12 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 
-	utils.Logger().Debug().
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Msg("[OnAnnounce] Announce message Added")
 	consensus.FBFTLog.AddMessage(recvMsg)
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	consensus.blockHash = recvMsg.BlockHash
+
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
 	if consensus.current.Mode() == ViewChanging {
@@ -146,6 +146,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
 		return
 	}
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 
 	consensus.FBFTLog.AddBlock(&blockObj)
 	// add block field
@@ -262,6 +265,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 

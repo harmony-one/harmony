@@ -39,9 +39,6 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) {
 		return
 	}
 
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	if msg.Type == msg_pb.MessageType_VIEWCHANGE ||
 		msg.Type == msg_pb.MessageType_NEWVIEW {
 		if vc := msg.GetViewchange(); vc != nil &&
@@ -281,9 +278,11 @@ func (consensus *Consensus) tryCatchup() {
 
 		// TODO(Chao): Explain the reasoning for these code
 		consensus.blockHash = [32]byte{}
-		consensus.blockNum = consensus.blockNum + 1
+		consensus.SetBlockNum(consensus.blockNum + 1)
 		consensus.viewID = committedMsg.ViewID + 1
+		consensus.pubKeyLock.Lock()
 		consensus.LeaderPubKey = committedMsg.SenderPubkey
+		consensus.pubKeyLock.Unlock()
 
 		utils.Logger().Info().Msg("[TryCatchup] Adding block to chain")
 

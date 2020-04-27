@@ -31,6 +31,8 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		}
 		return false
 	}
+	consensus.pubKeyLock.Lock()
+	defer consensus.pubKeyLock.Unlock()
 
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
 		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
@@ -101,6 +103,9 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 }
 
 func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
+	consensus.infoMutex.Lock()
+	defer consensus.infoMutex.Unlock()
+
 	logMsgs := consensus.FBFTLog.GetMessagesByTypeSeqView(
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
 	)
@@ -127,6 +132,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 }
 
 func (consensus *Consensus) isRightBlockNumCheck(recvMsg *FBFTMessage) bool {
+
 	if recvMsg.BlockNum < consensus.blockNum {
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -145,6 +151,7 @@ func (consensus *Consensus) isRightBlockNumCheck(recvMsg *FBFTMessage) bool {
 func (consensus *Consensus) onPreparedSanityChecks(
 	blockObj *types.Block, recvMsg *FBFTMessage,
 ) bool {
+
 	if blockObj.NumberU64() != recvMsg.BlockNum ||
 		recvMsg.BlockNum < consensus.blockNum {
 		utils.Logger().Warn().
@@ -178,6 +185,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 		if err := <-resp; err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("block verification failed in onprepared sanitychecks")
+			return false
 		}
 
 	}
@@ -220,6 +228,7 @@ func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
 func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 	// TODO: if difference is only one, new leader can still propose the same committed block to avoid another view change
 	// TODO: new leader catchup without ignore view change message
+
 	if consensus.blockNum > recvMsg.BlockNum {
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).

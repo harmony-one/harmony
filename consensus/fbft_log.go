@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"fmt"
+	"sync"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
@@ -10,10 +11,12 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 )
 
 // FBFTLog represents the log stored by a node during FBFT process
 type FBFTLog struct {
+	sync.Mutex
 	blocks     mapset.Set //store blocks received in FBFT
 	messages   mapset.Set // store messages received in FBFT
 	maxLogSize uint32
@@ -102,6 +105,9 @@ func (log *FBFTLog) GetBlocksByNumber(number uint64) []*types.Block {
 // DeleteBlocksLessThan deletes blocks less than given block number
 func (log *FBFTLog) DeleteBlocksLessThan(number uint64) {
 	found := mapset.NewSet()
+	log.Lock()
+	defer log.Unlock()
+
 	it := log.Blocks().Iterator()
 	for block := range it.C {
 		if block.(*types.Block).NumberU64() < number {
@@ -126,6 +132,9 @@ func (log *FBFTLog) DeleteBlockByNumber(number uint64) {
 // DeleteMessagesLessThan deletes messages less than given block number
 func (log *FBFTLog) DeleteMessagesLessThan(number uint64) {
 	found := mapset.NewSet()
+	log.Lock()
+	defer log.Unlock()
+
 	it := log.Messages().Iterator()
 	for msg := range it.C {
 		if msg.(*FBFTMessage).BlockNum < number {
@@ -140,12 +149,22 @@ func (log *FBFTLog) AddMessage(msg *FBFTMessage) {
 	log.messages.Add(msg)
 }
 
-// GetMessagesByTypeSeqViewHash returns pbft messages with matching type, blockNum, viewID and blockHash
-func (log *FBFTLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, blockNum uint64, viewID uint64, blockHash common.Hash) []*FBFTMessage {
+// GetMessagesByTypeSeqViewHash returns
+// pbft messages with matching type, blockNum, viewID and blockHash
+func (log *FBFTLog) GetMessagesByTypeSeqViewHash(
+	typ msg_pb.MessageType, blockNum uint64,
+	viewID uint64, blockHash common.Hash,
+) []*FBFTMessage {
 	found := []*FBFTMessage{}
+	log.Lock()
+	defer log.Unlock()
+
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType == typ && msg.(*FBFTMessage).BlockNum == blockNum && msg.(*FBFTMessage).ViewID == viewID && msg.(*FBFTMessage).BlockHash == blockHash {
+		if msg.(*FBFTMessage).MessageType == typ &&
+			msg.(*FBFTMessage).BlockNum == blockNum &&
+			msg.(*FBFTMessage).ViewID == viewID &&
+			msg.(*FBFTMessage).BlockHash == blockHash {
 			found = append(found, msg.(*FBFTMessage))
 		}
 	}
@@ -153,11 +172,14 @@ func (log *FBFTLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, blockNu
 }
 
 // GetMessagesByTypeSeq returns pbft messages with matching type, blockNum
-func (log *FBFTLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64) []*FBFTMessage {
+func (log *FBFTLog) GetMessagesByTypeSeq(
+	typ msg_pb.MessageType, blockNum uint64,
+) []*FBFTMessage {
 	found := []*FBFTMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType == typ && msg.(*FBFTMessage).BlockNum == blockNum {
+		if msg.(*FBFTMessage).MessageType == typ &&
+			msg.(*FBFTMessage).BlockNum == blockNum {
 			found = append(found, msg.(*FBFTMessage))
 		}
 	}
@@ -165,7 +187,9 @@ func (log *FBFTLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64
 }
 
 // GetMessagesByTypeSeqHash returns pbft messages with matching type, blockNum
-func (log *FBFTLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum uint64, blockHash common.Hash) []*FBFTMessage {
+func (log *FBFTLog) GetMessagesByTypeSeqHash(
+	typ msg_pb.MessageType, blockNum uint64, blockHash common.Hash,
+) []*FBFTMessage {
 	found := []*FBFTMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
@@ -201,11 +225,19 @@ func (log *FBFTLog) HasMatchingViewPrepared(blockNum uint64, viewID uint64, bloc
 }
 
 // GetMessagesByTypeSeqView returns pbft messages with matching type, blockNum and viewID
-func (log *FBFTLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, blockNum uint64, viewID uint64) []*FBFTMessage {
+func (log *FBFTLog) GetMessagesByTypeSeqView(
+	typ msg_pb.MessageType, blockNum uint64, viewID uint64,
+) []*FBFTMessage {
+
 	found := []*FBFTMessage{}
+	log.Lock()
+	defer log.Unlock()
+
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType != typ || msg.(*FBFTMessage).BlockNum != blockNum || msg.(*FBFTMessage).ViewID != viewID {
+		if msg.(*FBFTMessage).MessageType != typ ||
+			msg.(*FBFTMessage).BlockNum != blockNum ||
+			msg.(*FBFTMessage).ViewID != viewID {
 			continue
 		}
 		found = append(found, msg.(*FBFTMessage))
@@ -255,7 +287,7 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	pbftMsg := FBFTMessage{}
 	pbftMsg.MessageType = msg.GetType()
 	if pbftMsg.MessageType != msg_pb.MessageType_VIEWCHANGE {
-		return nil, fmt.Errorf("ParseViewChangeMessage: incorrect message type %s", pbftMsg.MessageType)
+		return nil, errors.Errorf("incorrect message type %s", pbftMsg.MessageType)
 	}
 
 	vcMsg := msg.GetViewchange()
@@ -301,7 +333,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 	FBFTMsg.MessageType = msg.GetType()
 
 	if FBFTMsg.MessageType != msg_pb.MessageType_NEWVIEW {
-		return nil, fmt.Errorf("ParseNewViewMessage: incorrect message type %s", FBFTMsg.MessageType)
+		return nil, errors.Errorf("incorrect message type %s", FBFTMsg.MessageType)
 	}
 
 	vcMsg := msg.GetViewchange()
@@ -312,7 +344,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 
 	pubKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
 	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to parse senderpubkey")
+		utils.Logger().Warn().Err(err).Msg("failed to parse senderpubkey")
 		return nil, err
 	}
 	FBFTMsg.SenderPubkey = pubKey
@@ -321,12 +353,14 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 		m3Sig := bls.Sign{}
 		err = m3Sig.Deserialize(vcMsg.M3Aggsigs)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M3 viewID signature")
+			utils.Logger().Warn().Err(err).
+				Msg("failed to deserialize the multi signature for M3 viewID signature")
 			return nil, err
 		}
 		m3mask, err := bls_cosi.NewMask(consensus.Decider.Participants(), nil)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
+			utils.Logger().Warn().Err(err).
+				Msg("failed to create mask for multi signature")
 			return nil, err
 		}
 		m3mask.SetMask(vcMsg.M3Bitmap)
@@ -338,12 +372,14 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 		m2Sig := bls.Sign{}
 		err = m2Sig.Deserialize(vcMsg.M2Aggsigs)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M2 aggregated signature")
+			utils.Logger().Warn().Err(err).
+				Msg("failed to deserialize the multi signature for M2 aggregated signature")
 			return nil, err
 		}
 		m2mask, err := bls_cosi.NewMask(consensus.Decider.Participants(), nil)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
+			utils.Logger().Warn().Err(err).
+				Msg("failed to create mask for multi signature")
 			return nil, err
 		}
 		m2mask.SetMask(vcMsg.M2Bitmap)

@@ -127,6 +127,10 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	validatorPubKey := recvMsg.SenderPubkey
 	prepareSig := recvMsg.Payload
 	prepareBitmap := consensus.prepareBitmap
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	logger := utils.Logger().With().Logger()
 
 	// proceed only when the message is not received before
@@ -194,6 +198,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 
 	// Check for potential double signing
 	if consensus.checkDoubleSign(recvMsg) {
