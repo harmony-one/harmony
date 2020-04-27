@@ -156,6 +156,7 @@ function upload
 		[ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}/${FOLDER}/$bin --acl public-read
    done
 
+<<<<<<< HEAD
 	if [ "$STATIC" != "true" ]; then
 		for lib in "${!LIB[@]}"; do
 			if [ -e ${LIB[$lib]} ]; then
@@ -167,6 +168,12 @@ function upload
 	fi
 
 	[ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}/$FOLDER/md5sum.txt --acl public-read
+=======
+   # copy node.sh
+   $AWSCLI s3 cp scripts/node.sh s3://${BUCKET}/$FOLDER/node.sh --acl public-read
+
+   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}/$FOLDER/md5sum.txt --acl public-read
+>>>>>>> 42969054... [build] upload node.sh
 }
 
 function release
@@ -215,6 +222,9 @@ function release
 			fi
 		done
 	fi
+
+   # copy node.sh
+   $AWSCLI s3 cp scripts/node.sh s3://${BUCKET}/$FOLDER/node.sh --acl public-read
 
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${PUBBUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
