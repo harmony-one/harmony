@@ -12,6 +12,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/consensus/timeouts"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -100,8 +101,8 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.current.SetMode(ViewChanging)
 	consensus.current.SetViewID(viewID)
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
-	diff := int64(viewID - consensus.viewID)
-	duration := time.Duration(diff * diff * int64(viewChangeDuration))
+	diff := int64(viewID - consensus.ViewID())
+	duration := time.Duration(diff * diff * int64(timeouts.ViewChangeDuration))
 	utils.Logger().Info().
 		Uint64("ViewChangingID", viewID).
 		Dur("timeoutDuration", duration).
@@ -116,8 +117,9 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		)
 	}
 
-	consensus.timeouts.viewChange.SetDuration(duration)
-	consensus.timeouts.viewChange.Start()
+	consensus.timeouts.ViewChange.SetDuration(duration)
+	consensus.timeouts.ViewChange.Start()
+
 	utils.Logger().Debug().
 		Uint64("ViewChangingID", consensus.current.ViewID()).
 		Msg("[startViewChange] start view change timer")
@@ -330,12 +332,13 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 			// Leader sign and add commit message
+			num := consensus.BlockNum()
 
 			commitPayload := signature.ConstructCommitPayload(
 				consensus.ChainReader,
 				new(big.Int).SetUint64(consensus.epoch),
 				consensus.blockHash,
-				consensus.blockNum,
+				num,
 				recvMsg.ViewID,
 			)
 
@@ -346,7 +349,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 					key,
 					priKey.SignHash(commitPayload),
 					common.BytesToHash(consensus.blockHash[:]),
-					consensus.blockNum,
+					num,
 					recvMsg.ViewID,
 				); err != nil {
 					utils.Logger().Debug().Msg("submit vote on viewchange commit failed")
@@ -378,15 +381,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				Msg("could not send out the NEWVIEW message")
 		}
 
-		consensus.viewID = recvMsg.ViewID
+		consensus.SetViewID(recvMsg.ViewID)
 		consensus.ResetViewChangeState()
-		consensus.timeouts.consensus.Start()
+		consensus.timeouts.Consensus.Start()
 		utils.Logger().Debug().
-			Uint64("viewChangingID", consensus.current.ViewID()).
-			Msg("[onViewChange] New Leader Start Consensus Timer and Stop View Change Timer")
-		utils.Logger().Debug().
-			Uint64("viewID", consensus.viewID).
-			Uint64("block", consensus.blockNum).
+			Uint64("viewID", consensus.ViewID()).
+			Uint64("block", consensus.BlockNum()).
 			Msg("[onViewChange] I am the New Leader")
 	}
 }
@@ -483,13 +483,14 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// newView message verified success, override my state
-	consensus.viewID = recvMsg.ViewID
+	consensus.SetViewID(recvMsg.ViewID)
 	consensus.current.SetViewID(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
+	num := consensus.BlockNum()
 
 	// change view and leaderKey to keep in sync with network
-	if consensus.blockNum != recvMsg.BlockNum {
+	if num != recvMsg.BlockNum {
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[onNewView] New Leader Changed")
@@ -504,8 +505,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			consensus.ChainReader,
 			new(big.Int).SetUint64(consensus.epoch),
 			consensus.blockHash,
-			consensus.blockNum,
-			consensus.viewID,
+			num,
+			consensus.ViewID(),
 		)
 
 		groupID := []nodeconfig.GroupID{
@@ -540,5 +541,5 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		Msg("new leader changed")
 	utils.Logger().Debug().
 		Msg("validator start consensus timer and stop view change timer")
-	consensus.timeouts.consensus.Start()
+	consensus.timeouts.Consensus.Start()
 }

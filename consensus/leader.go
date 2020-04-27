@@ -58,7 +58,8 @@ func (consensus *Consensus) announce(block *types.Block) {
 		Uint64("MsgBlockNum", FPBTMsg.BlockNum).
 		Msg("[Announce] Added Announce message in FPBT")
 	consensus.FBFTLog.AddBlock(block)
-
+	num := consensus.BlockNum()
+	viewID := consensus.ViewID()
 	// Leader sign the block hash itself
 	for i, key := range consensus.PubKey.PublicKey {
 		if _, err := consensus.Decider.SubmitVote(
@@ -66,8 +67,8 @@ func (consensus *Consensus) announce(block *types.Block) {
 			key,
 			consensus.priKey.PrivateKey[i].SignHash(consensus.blockHash[:]),
 			common.BytesToHash(consensus.blockHash[:]),
-			consensus.blockNum,
-			consensus.viewID,
+			num,
+			viewID,
 		); err != nil {
 			return
 		}
@@ -104,22 +105,23 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
+	num := consensus.BlockNum()
+	viewID := consensus.ViewID()
+
+	if recvMsg.ViewID != viewID || recvMsg.BlockNum != num {
 		utils.Logger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] Message ViewId or BlockNum not match")
 		return
 	}
 
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
-		consensus.blockNum, consensus.viewID, recvMsg.BlockHash,
+		num, viewID, recvMsg.BlockHash,
 	) {
 		utils.Logger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] No Matching Announce message")
 		//return
 	}
@@ -223,7 +225,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
 		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash,
-		recvMsg.BlockNum, consensus.viewID,
+		recvMsg.BlockNum, consensus.ViewID(),
 	)
 	logger = logger.With().
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -254,7 +256,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	myViewID := consensus.viewID
+	myViewID := consensus.ViewID()
 	quorumIsMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 
 	if !quorumWasMet && quorumIsMet {

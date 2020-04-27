@@ -3,12 +3,14 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/timeouts"
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -18,6 +20,84 @@ import (
 	"github.com/harmony-one/vdf/src/vdf_go"
 	"github.com/pkg/errors"
 )
+
+// Start waits for the next new block and run consensus
+func (consensus *Consensus) Start(
+	blockChannel chan *types.Block,
+) error {
+
+	if consensus.IsLeader() {
+		consensus.current.SetMode(Normal)
+		go func() {
+			// give other nodes at network startup a chance to do things
+			time.Sleep(10 * time.Second)
+			consensus.ReadySignal <- struct{}{}
+			utils.Logger().Info().Msg("leader sent out consensus ready signal")
+
+		}()
+	}
+
+	// Set up next block due time.
+	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
+	consensus.timeouts.Consensus.Start()
+	consensus.timeouts.ViewChange.Start()
+
+	for {
+
+		select {
+		case kind := <-consensus.timeouts.Notify(
+			consensus.BlockNum(), consensus.ViewID(),
+		):
+
+			if kind.Name == timeouts.Consensus {
+				fmt.Println(
+					"consensus timeout went off, block then",
+					kind.Value,
+					"blck now",
+					consensus.BlockNum(),
+				)
+			}
+
+			fmt.Println("actually wow I got it", kind)
+		// case <-ticker.C:
+		// 	utils.Logger().Debug().Msg("[ConsensusMainLoop] Ticker")
+		// 	if !consensus.IsLeader() {
+		// 		continue
+		// 	}
+		// 	// TODO think about this some more
+		// 	if m := consensus.current.Mode(); m == Syncing || m == Listening {
+		// 		if !consensus.timeouts.consensus.WithinLimit() {
+		// 			utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
+		// 			consensus.startViewChange(consensus.viewID + 1)
+		// 		} else if !consensus.timeouts.viewChange.WithinLimit() {
+		// 			utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
+		// 			viewID := consensus.current.ViewID()
+		// 			consensus.startViewChange(viewID + 1)
+		// 		}
+		// 	}
+
+		case newBlock := <-blockChannel:
+			utils.Logger().Debug().Msg("new block came in, starting consensus")
+			consensus.announce(newBlock)
+
+		case viewID := <-consensus.commitFinishChan:
+			utils.Logger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
+			// Only Leader execute this condition
+			func() {
+				consensus.mutex.Lock()
+				defer consensus.mutex.Unlock()
+				if viewID == consensus.ViewID() {
+					consensus.finalizeCommits()
+
+					consensus.ReadySignal <- struct{}{}
+
+				}
+			}()
+
+		}
+	}
+	return nil
+}
 
 // HandleMessageUpdate will update the consensus state according to received message
 func (consensus *Consensus) HandleMessageUpdate(payload []byte) {
@@ -100,7 +180,7 @@ func (consensus *Consensus) finalizeCommits() {
 	utils.Logger().Info().
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
 		Msg("[finalizeCommits] Finalizing Block")
-	beforeCatchupNum := consensus.blockNum
+	beforeCatchupNum := consensus.BlockNum()
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[FinalizeCommits] leader not found")
@@ -132,7 +212,7 @@ func (consensus *Consensus) finalizeCommits() {
 	}
 
 	consensus.tryCatchup()
-	if consensus.blockNum-beforeCatchupNum != 1 {
+	if consensus.BlockNum()-beforeCatchupNum != 1 {
 		utils.Logger().Warn().
 			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
 			Msg("[FinalizeCommits] Leader cannot provide the correct block for committed message")
@@ -148,11 +228,11 @@ func (consensus *Consensus) finalizeCommits() {
 	} else {
 		utils.Logger().Info().
 			Hex("blockHash", curBlockHash[:]).
-			Uint64("blockNum", consensus.blockNum).
+			Uint64("blockNum", consensus.BlockNum()).
 			Msg("[finalizeCommits] Sent Committed Message")
 	}
 
-	consensus.timeouts.consensus.Start()
+	consensus.timeouts.Consensus.Start()
 
 	utils.Logger().Info().
 		Uint64("blockNum", block.NumberU64()).
@@ -177,14 +257,15 @@ func (consensus *Consensus) finalizeCommits() {
 // BlockCommitSig returns the byte array of aggregated
 // commit signature and bitmap signed on the block
 func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, error) {
-	if consensus.blockNum <= 1 {
+	num := consensus.BlockNum()
+	if num <= 1 {
 		return nil, nil, nil
 	}
 	lastCommits, err := consensus.ChainReader.ReadCommitSig(blockNum)
 	if err != nil ||
 		len(lastCommits) < shard.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
-			msg_pb.MessageType_COMMITTED, consensus.blockNum-1,
+			msg_pb.MessageType_COMMITTED, num-1,
 		)
 		if len(msgs) != 1 {
 			utils.Logger().Error().
@@ -210,10 +291,10 @@ func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, err
 // try to catch up if fall behind
 func (consensus *Consensus) tryCatchup() {
 	utils.Logger().Info().Msg("[TryCatchup] commit new blocks")
-	currentBlockNum := consensus.blockNum
+	currentBlockNum := consensus.BlockNum()
 	for {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
-			msg_pb.MessageType_COMMITTED, consensus.blockNum,
+			msg_pb.MessageType_COMMITTED, consensus.BlockNum(),
 		)
 		if len(msgs) == 0 {
 			break
@@ -278,8 +359,8 @@ func (consensus *Consensus) tryCatchup() {
 
 		// TODO(Chao): Explain the reasoning for these code
 		consensus.blockHash = [32]byte{}
-		consensus.SetBlockNum(consensus.blockNum + 1)
-		consensus.viewID = committedMsg.ViewID + 1
+		consensus.SetBlockNum(consensus.BlockNum() + 1)
+		consensus.SetViewID(committedMsg.ViewID + 1)
 		consensus.pubKeyLock.Lock()
 		consensus.LeaderPubKey = committedMsg.SenderPubkey
 		consensus.pubKeyLock.Unlock()
@@ -302,87 +383,22 @@ func (consensus *Consensus) tryCatchup() {
 		break
 	}
 
-	if currentBlockNum < consensus.blockNum {
+	if num := consensus.BlockNum(); currentBlockNum < num {
 		utils.Logger().Info().
 			Uint64("From", currentBlockNum).
-			Uint64("To", consensus.blockNum).
+			Uint64("To", num).
 			Msg("[TryCatchup] Caught up!")
 		consensus.switchPhase(FBFTAnnounce)
 	}
 	// catup up and skip from view change trap
-	if currentBlockNum < consensus.blockNum &&
+	if currentBlockNum < consensus.BlockNum() &&
 		consensus.current.Mode() == ViewChanging {
 		consensus.current.SetMode(Normal)
 	}
 	// clean up old log
-	consensus.FBFTLog.DeleteBlocksLessThan(consensus.blockNum - 1)
-	consensus.FBFTLog.DeleteMessagesLessThan(consensus.blockNum - 1)
-}
-
-// Start waits for the next new block and run consensus
-func (consensus *Consensus) Start(
-	blockChannel chan *types.Block,
-) error {
-
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
-
-	if consensus.IsLeader() {
-		consensus.current.SetMode(Normal)
-		go func() {
-			// give other nodes at network startup a chance to do things
-			time.Sleep(10 * time.Second)
-			consensus.ReadySignal <- struct{}{}
-			utils.Logger().Info().Msg("leader sent out consensus ready signal")
-		}()
-	}
-
-	// Set up next block due time.
-	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-	consensus.timeouts.consensus.Start()
-	consensus.timeouts.viewChange.Start()
-
-	for {
-
-		select {
-		case <-ticker.C:
-			utils.Logger().Debug().Msg("[ConsensusMainLoop] Ticker")
-			if !consensus.IsLeader() {
-				continue
-			}
-			// TODO think about this some more
-			if m := consensus.current.Mode(); m == Syncing || m == Listening {
-				if !consensus.timeouts.consensus.WithinLimit() {
-					utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
-					consensus.startViewChange(consensus.viewID + 1)
-				} else if !consensus.timeouts.viewChange.WithinLimit() {
-					utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
-					viewID := consensus.current.ViewID()
-					consensus.startViewChange(viewID + 1)
-				}
-			}
-
-		case newBlock := <-blockChannel:
-			utils.Logger().Debug().Msg("new block came in, starting consensus")
-			consensus.announce(newBlock)
-
-		case viewID := <-consensus.commitFinishChan:
-			utils.Logger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
-			// Only Leader execute this condition
-			func() {
-				consensus.mutex.Lock()
-				defer consensus.mutex.Unlock()
-				if viewID == consensus.viewID {
-					consensus.finalizeCommits()
-
-					consensus.ReadySignal <- struct{}{}
-
-				}
-			}()
-
-		}
-	}
-	return nil
+	num := consensus.BlockNum()
+	consensus.FBFTLog.DeleteBlocksLessThan(num - 1)
+	consensus.FBFTLog.DeleteMessagesLessThan(num - 1)
 }
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block

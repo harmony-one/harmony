@@ -8,6 +8,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/timeouts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -27,41 +28,6 @@ var errLeaderPriKeyNotFound = errors.New(
 	"getting leader private key from consensus public keys failed",
 )
 
-type comeDue struct {
-	duration  atomic.Value
-	startTime atomic.Value
-}
-
-func (d *comeDue) Start() {
-	d.startTime.Store(time.Now())
-}
-
-func (d *comeDue) SetDuration(dur time.Duration) {
-	d.duration.Store(dur)
-}
-
-func (d *comeDue) WithinLimit() bool {
-	elapsed := time.Since(d.startTime.Load().(time.Time))
-	return elapsed.Round(time.Second) < d.duration.Load().(time.Duration)
-}
-
-// TODO Add method to kick off roundTimeout -> then send signal to node loop
-
-type roundTimeout struct {
-	consensus  comeDue
-	viewChange comeDue
-}
-
-func newRoundTimeoutWithDefaults() *roundTimeout {
-	var con, vc atomic.Value
-	con.Store(phaseDuration)
-	vc.Store(viewChangeDuration)
-	return &roundTimeout{
-		consensus:  comeDue{duration: con},
-		viewChange: comeDue{duration: vc},
-	}
-}
-
 type blkComeback struct {
 	Blk *types.Block
 	Err chan error
@@ -69,6 +35,21 @@ type blkComeback struct {
 
 type processBlock struct {
 	Request chan blkComeback
+}
+
+// BlockNum ..
+func (consensus *Consensus) BlockNum() uint64 {
+	return consensus.blockNum.Load().(uint64)
+}
+
+// SetBlockNum ..
+func (consensus *Consensus) SetBlockNum(num uint64) {
+	consensus.blockNum.Store(num)
+}
+
+// ViewID ..
+func (consensus *Consensus) ViewID() uint64 {
+	return consensus.viewID.Load().(uint64)
 }
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -84,12 +65,14 @@ type Consensus struct {
 	epoch uint64
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
-	blockNum uint64
+	// blockNum, viewID are both uint64
+	blockNum atomic.Value
+	viewID   atomic.Value
+
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 	// Consensus rounds whose commit phase finished
 	commitFinishChan chan uint64
-	timeouts         *roundTimeout
 	// Commits collected from validators.
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
@@ -125,7 +108,6 @@ type Consensus struct {
 	PubKey *multibls.PublicKey
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
-	viewID       uint64
 	// Blockhash - 32 byte
 	blockHash [32]byte
 	// Block to run consensus on
@@ -152,7 +134,8 @@ type Consensus struct {
 	RndChannel  chan [vdfAndSeedSize]byte
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 	// The p2p host used to send/receive p2p messages
-	host p2p.Host
+	host     p2p.Host
+	timeouts *timeouts.Notifier
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
@@ -199,15 +182,19 @@ func New(
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 
-	var isLeader, phase atomic.Value
+	var isLeader, phase, blk, view atomic.Value
 	isLeader.Store(false)
 	phase.Store(FBFTAnnounce)
+	blk.Store(uint64(0))
+	view.Store(uint64(0))
 
 	consensus := Consensus{
 		Decider:          Decider,
 		host:             host,
+		timeouts:         timeouts.NewNotifier(),
+		blockNum:         blk,
+		viewID:           view,
 		isLeader:         isLeader,
-		timeouts:         newRoundTimeoutWithDefaults(),
 		FBFTLog:          NewFBFTLog(),
 		phase:            phase,
 		current:          NewState(),
@@ -218,7 +205,6 @@ func New(
 		Verify:           processBlock{make(chan blkComeback)},
 		// channel for receiving newly generated VDF
 		RndChannel: make(chan [vdfAndSeedSize]byte),
-		viewID:     0,
 		ShardID:    shard,
 	}
 

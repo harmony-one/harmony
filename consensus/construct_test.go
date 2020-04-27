@@ -49,23 +49,24 @@ func TestConstructPreparedMessage(test *testing.T) {
 	}
 	consensus.ResetState()
 	consensus.blockHash = [32]byte{}
-
+	num := consensus.BlockNum()
+	viewID := consensus.ViewID()
 	message := "test string"
 	consensus.Decider.SubmitVote(
 		quorum.Prepare,
 		leaderPubKey,
 		leaderPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
-		consensus.blockNum,
-		consensus.viewID,
+		num,
+		viewID,
 	)
 	if _, err := consensus.Decider.SubmitVote(
 		quorum.Prepare,
 		validatorPubKey,
 		validatorPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
-		consensus.blockNum,
-		consensus.viewID,
+		num,
+		viewID,
 	); err != nil {
 		test.Log(err)
 	}

@@ -50,11 +50,6 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(
 	return marshaledMessage, nil
 }
 
-// GetViewID returns the consensus ID
-func (consensus *Consensus) GetViewID() uint64 {
-	return consensus.viewID
-}
-
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
@@ -190,8 +185,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 
 // SetViewID set the viewID to the height of the blockchain
 func (consensus *Consensus) SetViewID(height uint64) {
-	consensus.viewID = height
-	consensus.current.SetViewID(height)
+	consensus.viewID.Store(height)
 }
 
 // SetMode sets the mode of consensus
@@ -216,37 +210,24 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [548]byte) {
 
 // Check viewID, caller's responsibility to hold lock when change ignoreViewIDCheck
 func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
+	viewID := consensus.ViewID()
 	// just ignore consensus check for the first time when node join
 	if consensus.ignoreViewIDCheck {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
 		consensus.current.SetMode(Normal)
-		consensus.viewID = msg.ViewID
+		consensus.SetViewID(msg.ViewID)
 		consensus.current.SetViewID(msg.ViewID)
 		consensus.LeaderPubKey = msg.SenderPubkey
 		consensus.ignoreViewIDCheck = false
-		consensus.timeouts.consensus.Start()
-		utils.Logger().Debug().
-			Uint64("viewID", consensus.viewID).
-			Msg("viewID and leaderKey override")
-		utils.Logger().Debug().
-			Uint64("viewID", consensus.viewID).
-			Uint64("block", consensus.blockNum).
-			Msg("Start consensus timer")
+		consensus.timeouts.Consensus.Start()
 		return nil
-	} else if msg.ViewID > consensus.viewID {
+	} else if msg.ViewID > viewID {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.viewID {
+	} else if msg.ViewID < viewID {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil
-}
-
-// SetBlockNum sets the blockNum in consensus object, called at node bootstrap
-func (consensus *Consensus) SetBlockNum(blockNum uint64) {
-	consensus.infoMutex.Lock()
-	defer consensus.infoMutex.Unlock()
-	consensus.blockNum = blockNum
 }
 
 // SetEpochNum sets the epoch in consensus object
@@ -458,8 +439,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.IsLeader() {
 				go func() {
 					utils.Logger().Debug().
-						Uint64("viewID", consensus.viewID).
-						Uint64("block", consensus.blockNum).
+						Uint64("viewID", consensus.ViewID()).
+						Uint64("block", consensus.BlockNum()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
 					consensus.ReadySignal <- struct{}{}
 				}()

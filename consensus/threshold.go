@@ -37,10 +37,13 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// Leader add commit phase signature
+	num := consensus.BlockNum()
+	viewID := consensus.ViewID()
+
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
 		new(big.Int).SetUint64(consensus.epoch),
-		consensus.blockHash, consensus.blockNum, consensus.viewID,
+		consensus.blockHash, num, viewID,
 	)
 
 	// so by this point, everyone has committed to the blockhash of this block
@@ -51,8 +54,8 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			key,
 			consensus.priKey.PrivateKey[i].SignHash(commitPayload),
 			common.BytesToHash(consensus.blockHash[:]),
-			consensus.blockNum,
-			consensus.viewID,
+			num,
+			viewID,
 		); err != nil {
 			return err
 		}
@@ -70,7 +73,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	} else {
 		utils.Logger().Debug().
 			Hex("blockHash", consensus.blockHash[:]).
-			Uint64("blockNum", consensus.blockNum).
+			Uint64("blockNum", num).
 			Msg("[OnPrepare] Sent Prepared Message!!")
 	}
 

@@ -11,7 +11,9 @@ import (
 )
 
 // construct the view change message
-func (consensus *Consensus) constructViewChangeMessage(pubKey *bls.PublicKey, priKey *bls.SecretKey) []byte {
+func (consensus *Consensus) constructViewChangeMessage(
+	pubKey *bls.PublicKey, priKey *bls.SecretKey,
+) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_VIEWCHANGE,
@@ -20,9 +22,10 @@ func (consensus *Consensus) constructViewChangeMessage(pubKey *bls.PublicKey, pr
 		},
 	}
 
+	num := consensus.BlockNum()
 	vcMsg := message.GetViewchange()
 	vcMsg.ViewId = consensus.current.ViewID()
-	vcMsg.BlockNum = consensus.blockNum
+	vcMsg.BlockNum = num
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
 	vcMsg.SenderPubkey = pubKey.Serialize()
@@ -31,7 +34,7 @@ func (consensus *Consensus) constructViewChangeMessage(pubKey *bls.PublicKey, pr
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
 
 	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
-		msg_pb.MessageType_PREPARED, consensus.blockNum, consensus.blockHash,
+		msg_pb.MessageType_PREPARED, num, consensus.blockHash,
 	)
 	preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
@@ -73,7 +76,9 @@ func (consensus *Consensus) constructViewChangeMessage(pubKey *bls.PublicKey, pr
 }
 
 // new leader construct newview message
-func (consensus *Consensus) constructNewViewMessage(viewID uint64, pubKey *bls.PublicKey, priKey *bls.SecretKey) []byte {
+func (consensus *Consensus) constructNewViewMessage(
+	viewID uint64, pubKey *bls.PublicKey, priKey *bls.SecretKey,
+) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_NEWVIEW,
@@ -84,7 +89,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, pubKey *bls.P
 
 	vcMsg := message.GetViewchange()
 	vcMsg.ViewId = consensus.current.ViewID()
-	vcMsg.BlockNum = consensus.blockNum
+	vcMsg.BlockNum = consensus.BlockNum()
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
 	vcMsg.SenderPubkey = pubKey.Serialize()

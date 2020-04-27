@@ -103,7 +103,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Msg("[OnPrepared] Received prepared message")
 
-	if recvMsg.BlockNum < consensus.blockNum {
+	if recvMsg.BlockNum < consensus.BlockNum() {
 		utils.Logger().Debug().Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
@@ -178,10 +178,10 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		}
 		return
 	}
-	if recvMsg.BlockNum > consensus.blockNum {
+	if num := consensus.BlockNum(); recvMsg.BlockNum > num {
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
+			Uint64("blockNum", num).
 			Msg("[OnPrepared] Future Block Received, ignoring!!")
 		return
 	}
@@ -203,8 +203,13 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	// local viewID may not be constant with other, so use received msg viewID.
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, recvMsg.ViewID)
+	commitPayload := signature.ConstructCommitPayload(
+		consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.epoch),
+		consensus.blockHash,
+		consensus.BlockNum(),
+		recvMsg.ViewID,
+	)
 	groupID := []nodeconfig.GroupID{
 		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 	}
@@ -222,7 +227,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 				utils.Logger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
 			} else {
 				utils.Logger().Info().
-					Uint64("blockNum", consensus.blockNum).
 					Hex("blockHash", consensus.blockHash[:]).
 					Msg("[OnPrepared] Sent Commit Message!!")
 			}
@@ -272,7 +276,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 
-	if recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
+	if recvMsg.BlockNum-consensus.BlockNum() > consensusBlockNumBuffer {
 		fmt.Println("out of sync actually happened")
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -294,5 +298,5 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	utils.Logger().Debug().Msg("[OnCommitted] Start consensus timer")
-	consensus.timeouts.consensus.Start()
+	consensus.timeouts.Consensus.Start()
 }
