@@ -45,7 +45,12 @@ func (c *composeDriver) Name() string {
 	return c.name
 }
 
-func ComposeDriver(name string, advertiser p2p_discovery.Advertiser, discover p2p_discovery.Discoverer, unregister Unregisterer) Driver {
+// ComposeDriver ..
+func ComposeDriver(name string,
+	advertiser p2p_discovery.Advertiser,
+	discover p2p_discovery.Discoverer,
+	unregister Unregisterer,
+) Driver {
 	return &composeDriver{
 		Advertiser:   advertiser,
 		Discoverer:   discover,

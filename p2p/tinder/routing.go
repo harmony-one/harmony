@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Routing ..
 type Routing interface {
 	p2p_routing.Routing
 	Driver
@@ -25,6 +26,7 @@ func (r *routing) Bootstrap(ctx context.Context) error {
 	return r.bootstrap(ctx)
 }
 
+// NewRouting ..
 func NewRouting(
 	logger *zerolog.Logger,
 	name string,

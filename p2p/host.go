@@ -173,7 +173,7 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 	}
 
 	routingOpt, crouting := ipfsutil.NewTinderRouting(
-		opts.Logger, rdvpeer.ID, false,
+		opts.Logger, rdvpeer, false,
 	)
 	cfg.Routing = routingOpt
 

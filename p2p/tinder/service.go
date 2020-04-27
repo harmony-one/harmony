@@ -5,11 +5,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Tinder service is a simple driver backed by a cache,
+// Service is a simple driver backed by a cache,
 type Service interface {
 	Driver
 }
 
+// NewService ..
 func NewService(
 	logger *zerolog.Logger,
 	drivers []Driver,

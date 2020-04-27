@@ -2,14 +2,18 @@ package ipfsutil
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/harmony-one/harmony/p2p/tinder"
 	datastore "github.com/ipfs/go-datastore"
 	ipfs_p2p "github.com/ipfs/go-ipfs/core/node/libp2p"
 	host "github.com/libp2p/go-libp2p-core/host"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/routing"
+	p2p_discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	record "github.com/libp2p/go-libp2p-record"
@@ -19,13 +23,13 @@ import (
 // RoutingOut ..
 type RoutingOut struct {
 	*dht.IpfsDHT
-	tinder.Routing
+	tinder.Service
 }
 
 // NewTinderRouting ..
 func NewTinderRouting(
 	log *zerolog.Logger,
-	rdvpeer peer.ID,
+	rdvpeer *peer.AddrInfo,
 	dhtclient bool,
 ) (ipfs_p2p.RoutingOption, <-chan *RoutingOut) {
 	crout := make(chan *RoutingOut, 1)
@@ -50,16 +54,33 @@ func NewTinderRouting(
 		}
 
 		drivers := []tinder.Driver{}
-		if string(rdvpeer) != "" {
+		if rdvpeer != nil {
+			h.Peerstore().AddAddrs(rdvpeer.ID, rdvpeer.Addrs, libp2p_peer.PermanentAddrTTL)
 			// @FIXME(gfanton): use rand as argument
 			rdvClient := tinder.NewRendezvousDiscovery(
-				log, h, rdvpeer, rand.New(rand.NewSource(rand.Int63())),
+				log, h, rdvpeer.ID, rand.New(rand.NewSource(rand.Int63())),
 			)
+
 			drivers = append(drivers, rdvClient)
 		}
 
 		tinderRouting := tinder.NewRouting(log, "dht", dht, drivers...)
-		crout <- &RoutingOut{dht, tinderRouting}
+
+		drivers = append(drivers, tinderRouting)
+
+		serv, err := tinder.NewService(
+			log,
+			drivers,
+			p2p_discovery.NewFixedBackoff(time.Minute),
+			p2p_discovery.WithBackoffDiscoveryReturnedChannelSize(24),
+			p2p_discovery.WithBackoffDiscoverySimultaneousQueryBufferSize(24),
+		)
+
+		if err != nil {
+			fmt.Println("why this busted", err.Error())
+		}
+
+		crout <- &RoutingOut{dht, serv}
 
 		return tinderRouting, nil
 	}, crout

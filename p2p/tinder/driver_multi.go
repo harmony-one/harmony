@@ -24,7 +24,7 @@ func NewMultiDriver(logger *zerolog.Logger, drivers ...Driver) Driver {
 	return &MultiDriver{
 		logger:  logger,
 		drivers: drivers,
-		mapc:    make(map[string]context.CancelFunc),
+		mapc:    map[string]context.CancelFunc{},
 	}
 }
 
