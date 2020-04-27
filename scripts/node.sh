@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200411.0"
+version="v1 20200427.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -180,6 +180,7 @@ options:
    -z             run in staking mode
    -y             run in legacy, foundational-node mode (default)
    -Y             verify the signature of the downloaded binaries (default: off)
+   -m minpeer     specify minpeers for bootstrap (default: 6)
    -M             support multi-key mode (default: off)
    -f blsfolder   folder that stores the bls keys and corresponding passphrases (default: ./.hmy/blskeys)
    -A             enable archival node mode (default: off)
@@ -238,7 +239,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers
 start_clean=false
 loop=true
 run_as_root=true
@@ -257,12 +258,13 @@ blacklist=./.hmy/blacklist.txt
 pprof=""
 static=true
 verify=false
+minpeers=6
 ${BLSKEYFILE=}
 ${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDN:T:i:ba:U:PvVyzn:MAIB:r:Y:f:R: opt
+while getopts :1chk:sSp:dDN:T:i:ba:U:PvVyzn:MAIB:r:Y:f:R:m: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -277,6 +279,7 @@ do
    p) blspass="${OPTARG}";;
    d) download_only=true;;
    D) do_not_download=true;;
+   m) minpeers="${OPTARG}";;
    M) multi_key=true;;
    f) blsfolder="${OPTARG}";;
    N) network="${OPTARG}";;
@@ -366,8 +369,8 @@ stress)
   ;;
 devnet)
   bootnodes=(
-    /ip4/52.40.84.2/tcp/9870/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
     /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/52.40.84.2/tcp/9870/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
   )
   REL=devnet
   network_type=devnet
@@ -895,6 +898,7 @@ do
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
       -blacklist="${blacklist}"
+      -min_peers="${minpeers}"
    )
    args+=(
       -is_archival="${archival}"
