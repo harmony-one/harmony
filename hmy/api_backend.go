@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -42,7 +43,20 @@ type APIBackend struct {
 		BlockHeight  int64
 		TotalStaking *big.Int
 	}
-	requestGroup singleflight.Group
+	apiCache singleflight.Group
+}
+
+// SingleFlightRequest ...
+func (b *APIBackend) SingleFlightRequest(
+	key string,
+	fn func() (interface{}, error),
+) (interface{}, error, bool) {
+	return b.apiCache.Do(key, fn)
+}
+
+// SingleFlightForgetKey ...
+func (b *APIBackend) SingleFlightForgetKey(key string) {
+	b.apiCache.Forget(key)
 }
 
 // ChainDb ...
@@ -445,9 +459,17 @@ func (b *APIBackend) GetValidatorInformation(
 func (b *APIBackend) GetMedianRawStakeSnapshot() (
 	*committee.CompletedEPoSRound, error,
 ) {
-	res, err, _ := b.requestGroup.Do("median", func() (interface{}, error) {
-		return committee.NewEPoSRound(b.hmy.BlockChain())
-	})
+	res, err, _ := b.SingleFlightRequest(
+		"median",
+		func() (interface{}, error) {
+			go func() {
+				// approximately one block time cache
+				time.Sleep(8 * time.Second)
+				b.apiCache.Forget("median")
+			}()
+			return committee.NewEPoSRound(b.hmy.BlockChain())
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -606,8 +628,7 @@ func (b *APIBackend) readAndUpdateRawStakes(
 	}
 }
 
-// GetSuperCommittees ..
-func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
+func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 	nowE := b.hmy.BlockChain().CurrentHeader().Epoch()
 	thenE := new(big.Int).Sub(nowE, common.Big1)
 
@@ -657,6 +678,24 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	then.MedianStake = effective.Median(rawStakes)
 
 	return &quorum.Transition{then, now}, nil
+}
+
+// GetSuperCommittees ..
+func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
+	nowE := b.hmy.BlockChain().CurrentHeader().Epoch()
+	key := fmt.Sprintf("sc-%s", nowE.String())
+
+	res, err, _ := b.SingleFlightRequest(
+		key, func() (interface{}, error) {
+			thenE := new(big.Int).Sub(nowE, common.Big1)
+			thenKey := fmt.Sprintf("sc-%s", thenE.String())
+			b.apiCache.Forget(thenKey)
+			return b.getSuperCommittees()
+		})
+	if err != nil {
+		return nil, err
+	}
+	return res.(*quorum.Transition), err
 }
 
 // GetCurrentBadBlocks ..
