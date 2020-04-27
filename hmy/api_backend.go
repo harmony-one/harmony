@@ -50,8 +50,9 @@ type APIBackend struct {
 func (b *APIBackend) SingleFlightRequest(
 	key string,
 	fn func() (interface{}, error),
-) (interface{}, error, bool) {
-	return b.apiCache.Do(key, fn)
+) (interface{}, error) {
+	res, err, _ := b.apiCache.Do(key, fn)
+	return res, err
 }
 
 // SingleFlightForgetKey ...
@@ -459,7 +460,7 @@ func (b *APIBackend) GetValidatorInformation(
 func (b *APIBackend) GetMedianRawStakeSnapshot() (
 	*committee.CompletedEPoSRound, error,
 ) {
-	res, err, _ := b.SingleFlightRequest(
+	res, err := b.SingleFlightRequest(
 		"median",
 		func() (interface{}, error) {
 			go func() {
@@ -685,7 +686,7 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	nowE := b.hmy.BlockChain().CurrentHeader().Epoch()
 	key := fmt.Sprintf("sc-%s", nowE.String())
 
-	res, err, _ := b.SingleFlightRequest(
+	res, err := b.SingleFlightRequest(
 		key, func() (interface{}, error) {
 			thenE := new(big.Int).Sub(nowE, common.Big1)
 			thenKey := fmt.Sprintf("sc-%s", thenE.String())

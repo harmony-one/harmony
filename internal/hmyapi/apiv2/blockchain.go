@@ -607,7 +607,7 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 	s.b.SingleFlightForgetKey(prevKey)
 
 	key := fmt.Sprintf("all-info-%d", blockNr)
-	res, err, _ := s.b.SingleFlightRequest(
+	res, err := s.b.SingleFlightRequest(
 		key,
 		func() (interface{}, error) {
 			return s.getAllValidatorInformation(ctx, page, rpc.LatestBlockNumber)

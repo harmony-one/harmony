@@ -29,7 +29,7 @@ import (
 type Backend interface {
 	NetVersion() uint64
 	ProtocolVersion() int
-	SingleFlightRequest(key string, fn func() (interface{}, error)) (interface{}, error, bool)
+	SingleFlightRequest(key string, fn func() (interface{}, error)) (interface{}, error)
 	SingleFlightForgetKey(key string)
 	ChainDb() ethdb.Database
 	EventMux() *event.TypeMux
