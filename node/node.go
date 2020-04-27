@@ -78,9 +78,7 @@ type Node struct {
 	Worker, BeaconWorker *worker.Worker
 	downloaderServer     *downloader.Server
 	// Syncing component.
-	SyncID     [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-	stateSync  state.Syncer
-	beaconSync state.Syncer
+	SyncID [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 	// Service manager.
