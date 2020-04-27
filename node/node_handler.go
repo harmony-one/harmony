@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -65,23 +64,18 @@ func (node *Node) HandleMessage(
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
 		case proto_node.Transaction:
-			utils.Logger().Debug().Msg("NET: received message: Node/Transaction")
 			node.transactionMessageHandler(msgPayload)
 		case proto_node.Staking:
-			utils.Logger().Debug().Msg("NET: received message: Node/Staking")
 			node.stakingMessageHandler(msgPayload)
 		case proto_node.Block:
-			utils.Logger().Debug().Msg("NET: received message: Node/Block")
 			if len(msgPayload) < 1 {
 				utils.Logger().Debug().Msgf("Invalid block message size")
 				return
 			}
 			switch blockMsgType := proto_node.BlockMessageType(msgPayload[0]); blockMsgType {
 			case proto_node.Sync:
-				utils.Logger().Debug().Msg("NET: received message: Node/Sync")
 				var blocks []*types.Block
 				if err := rlp.DecodeBytes(msgPayload[1:], &blocks); err != nil {
-					utils.Logger().Error().Err(err).Msg("block sync")
 					return
 				}
 
@@ -178,20 +172,12 @@ func (node *Node) verifyBlock(newBlock *types.Block) error {
 	}
 
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
-		utils.Logger().Error().
-			Uint32("my shard ID", node.Blockchain().ShardID()).
-			Uint32("new block's shard ID", newBlock.ShardID()).
-			Msg("[VerifyNewBlock] Wrong shard ID of the new block")
 		return errors.New("[VerifyNewBlock] Wrong shard ID of the new block")
 	}
 
 	if err := node.Blockchain().Engine().VerifyShardState(
 		node.Blockchain(), node.Beaconchain(), newBlock.Header(),
 	); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot verify shard state for the new block")
 		return errors.New(
 			"[VerifyNewBlock] Cannot verify shard state for the new block",
 		)
@@ -209,12 +195,6 @@ func (node *Node) verifyBlock(newBlock *types.Block) error {
 				}()
 			}
 		}
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Int("numTx", len(newBlock.Transactions())).
-			Int("numStakingTx", len(newBlock.StakingTransactions())).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
 		return errors.Errorf(
 			"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
 			newBlock.Hash().Hex(),
@@ -234,35 +214,11 @@ func (node *Node) verifyBlock(newBlock *types.Block) error {
 
 	// TODO: move into ValidateNewBlock
 	if err := node.verifyIncomingReceipts(newBlock); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Int("numIncomingReceipts", len(newBlock.IncomingReceipts())).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot ValidateNewBlock")
 		return errors.Wrapf(
-			err, "[VerifyNewBlock] Cannot ValidateNewBlock",
+			err, "cannot verify incoming receipts",
 		)
 	}
 	return nil
-}
-
-func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
-	count := uint32(0)
-	pubkeys := node.Consensus.Decider.Participants()
-	mask, err := internal_bls.NewMask(pubkeys, nil)
-	if err != nil {
-		return count
-	}
-	err = mask.SetMask(block.Header().LastCommitBitmap())
-	if err != nil {
-		return count
-	}
-	for _, key := range node.Consensus.PubKey.PublicKey {
-		if ok, err := mask.KeyEnabled(key); err == nil && ok {
-			count++
-		}
-	}
-	return count
 }
 
 // postConsensusProcessing is called by consensus participants, after consensus is done, to:
@@ -275,11 +231,11 @@ func (node *Node) postConsensusProcessing(
 
 	if node.Consensus.IsLeader() {
 
-		if err := node.Gossiper.AcceptedBlock(
-			node.Consensus.ShardID, newBlock,
-		); err != nil {
-			return err
-		}
+		// if err := node.Gossiper.AcceptedBlock(
+		// 	node.Consensus.ShardID, newBlock,
+		// ); err != nil {
+		// 	return err
+		// }
 
 		// node.Gossiper.NewBeaconChainBlock(newBlock)
 
@@ -300,15 +256,6 @@ func (node *Node) postConsensusProcessing(
 
 	} else {
 		if node.Consensus.Mode() != consensus.Listening {
-			utils.Logger().Info().
-				Uint64("blockNum", newBlock.NumberU64()).
-				Uint64("epochNum", newBlock.Epoch().Uint64()).
-				Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
-				Str("blockHash", newBlock.Hash().String()).
-				Int("numTxns", len(newBlock.Transactions())).
-				Int("numStakingTxns", len(newBlock.StakingTransactions())).
-				Uint32("numSignatures", node.numSignaturesIncludedInBlock(newBlock)).
-				Msg("BINGO !!! Reached Consensus")
 			// 1% of the validator also need to do broadcasting
 			rand.Seed(time.Now().UTC().UnixNano())
 			rnd := rand.Intn(100)
@@ -377,13 +324,11 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 		}
 	}
 
-	utils.Logger().Info().Msgf("[BroadcastCrossLink] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, newBlock.NumberU64(), len(headers))
 	for _, header := range headers {
-		utils.Logger().Debug().Msgf(
-			"[BroadcastCrossLink] Broadcasting %d",
-			header.Number().Uint64(),
-		)
+		utils.Logger().Debug().
+			Msgf("[BroadcastCrossLink] Broadcasting %d", header.Number().Uint64())
 	}
+
 	node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
 		p2p.ConstructMessage(
