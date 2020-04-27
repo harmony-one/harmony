@@ -178,50 +178,6 @@ func (ks *KeyStore) refreshWallets() {
 	}
 }
 
-// Subscribe implements accounts.Backend, creating an async subscription to
-// receive notifications on the addition or removal of keystore wallets.
-func (ks *KeyStore) Subscribe(sink chan<- accounts.WalletEvent) event.Subscription {
-	// We need the mutex to reliably start/stop the update loop
-	ks.mu.Lock()
-	defer ks.mu.Unlock()
-
-	// Subscribe the caller and track the subscriber count
-	sub := ks.updateScope.Track(ks.updateFeed.Subscribe(sink))
-
-	// Subscribers require an active notification loop, start it
-	if !ks.updating {
-		ks.updating = true
-		go ks.updater()
-	}
-	return sub
-}
-
-// updater is responsible for maintaining an up-to-date list of wallets stored in
-// the keystore, and for firing wallet addition/removal events. It listens for
-// account change events from the underlying account cache, and also periodically
-// forces a manual refresh (only triggers for systems where the filesystem notifier
-// is not running).
-func (ks *KeyStore) updater() {
-	for {
-		// Wait for an account update or a refresh timeout
-		select {
-		case <-ks.changes:
-		case <-time.After(walletRefreshCycle):
-		}
-		// Run the wallet refresher
-		ks.refreshWallets()
-
-		// If all our subscribers left, stop the updater
-		ks.mu.Lock()
-		if ks.updateScope.Count() == 0 {
-			ks.updating = false
-			ks.mu.Unlock()
-			return
-		}
-		ks.mu.Unlock()
-	}
-}
-
 // HasAddress reports whether a key with the given address is present.
 func (ks *KeyStore) HasAddress(addr common.Address) bool {
 	return ks.cache.hasAddress(addr)
