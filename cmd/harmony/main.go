@@ -372,7 +372,8 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 	baseDS := datastore.NewMapDatastore()
 	var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
-	DevRendezVousPoint := ipfs_cfg.DefaultBootstrapAddresses[0]
+	// DevRendezVousPoint := ipfs_cfg.DefaultBootstrapAddresses[0]
+	const DevRendezVousPoint = "/ip4/167.99.223.55/tcp/4040/p2p/QmTo3RS6Uc8aCS5Cxx8EBHkNCe4C7vKRanbMEboxkA92Cn"
 
 	p, err := strconv.Atoi(*port)
 
@@ -764,20 +765,6 @@ func main() {
 		}
 	}
 
-	startMsg := "==== New Harmony Node ===="
-	if *nodeType == "explorer" {
-		startMsg = "==== New Explorer Node ===="
-	}
-
-	utils.Logger().Info().
-		Str("BLSPubKey", nodeConfig.ConsensusPubKey.SerializeToHexStr()).
-		Uint32("ShardID", nodeConfig.ShardID).
-		Str("ShardGroupID", nodeConfig.GetShardGroupID().String()).
-		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).
-		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
-		Str("Role", currentNode.NodeConfig.Role().String()).
-		Msg(startMsg)
-
 	currentNode.ServiceManagerSetup()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
@@ -788,14 +775,14 @@ func main() {
 
 	var g errgroup.Group
 
+	g.Go(currentNode.HandleIncomingBeaconBlock)
+	g.Go(currentNode.StartP2PMessageHandling)
+
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		g.Go(currentNode.StartConsensus)
 		g.Go(currentNode.ProposeBlock)
 		g.Go(currentNode.HandleConsensusBlockProcessing)
 	}
-
-	g.Go(currentNode.HandleIncomingBeaconBlock)
-	g.Go(currentNode.StartP2PMessageHandling)
 
 	// if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&
 	// 	currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {

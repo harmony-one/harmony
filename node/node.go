@@ -312,7 +312,8 @@ const maxWaitBootstrap = 60 * time.Second
 
 // bootstrapConsensus is the a goroutine to check number of peers and start the consensus
 func (node *Node) bootstrapConsensus() error {
-	haveEnoughPeers := make(chan struct{}, 1)
+	haveEnoughPeers := make(chan struct{})
+	t := time.NewTimer(maxWaitBootstrap)
 
 	go func() {
 		min := node.Consensus.MinPeers
@@ -330,8 +331,9 @@ func (node *Node) bootstrapConsensus() error {
 
 	select {
 	case <-haveEnoughPeers:
+		t.Stop()
 		return nil
-	case <-time.After(maxWaitBootstrap):
+	case <-t.C:
 		return errors.New("exceeded 60 seconds waiting for enough min peers")
 	}
 }
