@@ -327,7 +327,6 @@ func (consensus *Consensus) Start(
 
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
-	vdfInProgress := false
 
 	if consensus.IsLeader() {
 		consensus.current.SetMode(Normal)
@@ -364,100 +363,25 @@ func (consensus *Consensus) Start(
 				}
 			}
 
-		case <-consensus.syncReadyChan:
-			utils.Logger().Debug().Msg("[ConsensusMainLoop] syncReadyChan")
-			consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
-			consensus.SetViewID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
-			mode := consensus.UpdateConsensusInformation()
-			consensus.current.SetMode(mode)
-			utils.Logger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
+		// case <-consensus.syncReadyChan:
+		// 	utils.Logger().Debug().Msg("[ConsensusMainLoop] syncReadyChan")
+		// 	consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
+		// 	consensus.SetViewID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
+		// 	mode := consensus.UpdateConsensusInformation()
+		// 	consensus.current.SetMode(mode)
+		// 	utils.Logger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 
-		case <-consensus.syncNotReadyChan:
-			utils.Logger().Debug().Msg("[ConsensusMainLoop] syncNotReadyChan")
-			consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
-			consensus.current.SetMode(Syncing)
-			utils.Logger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
+		// case <-consensus.syncNotReadyChan:
+		// 	utils.Logger().Debug().Msg("[ConsensusMainLoop] syncNotReadyChan")
+		// 	consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
+		// 	consensus.current.SetMode(Syncing)
+		// 	utils.Logger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 
 		case newBlock := <-blockChannel:
 
 			utils.Logger().Info().
 				Uint64("MsgBlockNum", newBlock.NumberU64()).
 				Msg("[ConsensusMainLoop] Received Proposed New Block!")
-
-			//VRF/VDF is only generated in the beacon chain
-			if consensus.NeedsRandomNumberGeneration(newBlock.Header().Epoch()) {
-				// generate VRF if the current block has a new leader
-				if !consensus.ChainReader.IsSameLeaderAsPreviousBlock(newBlock) {
-					vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(
-						newBlock.Header().Epoch(),
-					)
-					if err != nil {
-						utils.Logger().Info().
-							Uint64("MsgBlockNum", newBlock.NumberU64()).
-							Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
-							Msg("[ConsensusMainLoop] no VRF block number from local db")
-					}
-
-					//check if VRF is already generated for the current block
-					vrfAlreadyGenerated := false
-					for _, v := range vrfBlockNumbers {
-						if v == newBlock.NumberU64() {
-							utils.Logger().Info().
-								Uint64("MsgBlockNum", newBlock.NumberU64()).
-								Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
-								Msg("[ConsensusMainLoop] VRF is already generated for this block")
-							vrfAlreadyGenerated = true
-							break
-						}
-					}
-
-					if !vrfAlreadyGenerated {
-						//generate a new VRF for the current block
-						vrfBlockNumbers := consensus.GenerateVrfAndProof(newBlock, vrfBlockNumbers)
-
-						//generate a new VDF for the current epoch if there are enough VRFs in the current epoch
-						//note that  >= instead of == is used, because it is possible the current leader
-						//can commit this block, go offline without finishing VDF
-						if (!vdfInProgress) && len(vrfBlockNumbers) >= consensus.VdfSeedSize() {
-							//check local database to see if there's a VDF generated for this epoch
-							//generate a VDF if no blocknum is available
-							_, err := consensus.ChainReader.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
-							if err != nil {
-								consensus.GenerateVdfAndProof(newBlock, vrfBlockNumbers)
-								vdfInProgress = true
-							}
-						}
-					}
-				}
-
-				vdfOutput, seed, err := consensus.GetNextRnd()
-				if err == nil {
-					vdfInProgress = false
-					// Verify the randomness
-					vdfObject := vdf_go.New(shard.Schedule.VdfDifficulty(), seed)
-					if !vdfObject.Verify(vdfOutput) {
-						utils.Logger().Warn().
-							Uint64("MsgBlockNum", newBlock.NumberU64()).
-							Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
-							Msg("[ConsensusMainLoop] failed to verify the VDF output")
-					} else {
-						//write the VDF only if VDF has not been generated
-						_, err := consensus.ChainReader.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
-						if err == nil {
-							utils.Logger().Info().
-								Uint64("MsgBlockNum", newBlock.NumberU64()).
-								Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
-								Msg("[ConsensusMainLoop] VDF has already been generated previously")
-						} else {
-							utils.Logger().Info().
-								Uint64("MsgBlockNum", newBlock.NumberU64()).
-								Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
-								Msg("[ConsensusMainLoop] Generated a new VDF")
-							newBlock.AddVdf(vdfOutput[:])
-						}
-					}
-				}
-			}
 
 			startTime = time.Now()
 			utils.Logger().Debug().

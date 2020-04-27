@@ -109,8 +109,10 @@ type Consensus struct {
 	bhpBitmap    map[uint64]*bls_cosi.Mask
 	nilBitmap    map[uint64]*bls_cosi.Mask
 	viewIDBitmap map[uint64]*bls_cosi.Mask
-	m1Payload    []byte     // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
-	vcLock       sync.Mutex // mutex for view change
+	// message payload for
+	// type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
+	m1Payload []byte
+	vcLock    sync.Mutex // mutex for view change
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader *core.BlockChain
 	// Minimal number of peers in the shard
@@ -151,10 +153,6 @@ type Consensus struct {
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
-	// Used to convey to the consensus main loop that block syncing has finished.
-	syncReadyChan chan struct{}
-	// Used to convey to the consensus main loop that node is out of sync
-	syncNotReadyChan chan struct{}
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
@@ -169,17 +167,6 @@ type Consensus struct {
 // validator delays commit message by the amount.
 func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
 	consensus.delayCommit = delay
-}
-
-// BlocksSynchronized lets the main loop know that block synchronization finished
-// thus the blockchain is likely to be up to date.
-func (consensus *Consensus) BlocksSynchronized() {
-	consensus.syncReadyChan <- struct{}{}
-}
-
-// BlocksNotSynchronized lets the main loop know that block is not synchronized
-func (consensus *Consensus) BlocksNotSynchronized() {
-	consensus.syncNotReadyChan <- struct{}{}
 }
 
 // VdfSeedSize returns the number of VRFs for VDF computation
@@ -217,16 +204,13 @@ func New(
 	phase.Store(FBFTAnnounce)
 
 	consensus := Consensus{
-		Decider:  Decider,
-		host:     host,
-		isLeader: isLeader,
-		timeouts: newRoundTimeoutWithDefaults(),
-		FBFTLog:  NewFBFTLog(),
-		phase:    phase,
-		// TODO Refactor consensus.block* into State?
+		Decider:          Decider,
+		host:             host,
+		isLeader:         isLeader,
+		timeouts:         newRoundTimeoutWithDefaults(),
+		FBFTLog:          NewFBFTLog(),
+		phase:            phase,
 		current:          NewState(),
-		syncReadyChan:    make(chan struct{}),
-		syncNotReadyChan: make(chan struct{}),
 		SlashChan:        make(chan slash.Record),
 		commitFinishChan: make(chan uint64),
 		ReadySignal:      make(chan struct{}),
