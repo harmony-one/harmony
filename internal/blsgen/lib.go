@@ -118,12 +118,15 @@ func Readln(timeout time.Duration) (string, error) {
 		close(e)
 	}()
 
+	t := time.NewTimer(timeout)
+	defer t.Stop()
+
 	select {
 	case line := <-s:
 		return line, nil
 	case err := <-e:
 		return "", err
-	case <-time.After(timeout):
+	case <-t.C:
 		return "", errors.New("Timeout")
 	}
 }

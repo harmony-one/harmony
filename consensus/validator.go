@@ -298,5 +298,5 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	utils.Logger().Debug().Msg("[OnCommitted] Start consensus timer")
-	consensus.timeouts.Consensus.Start()
+	consensus.timeouts.Consensus.Start(consensus.BlockNum())
 }

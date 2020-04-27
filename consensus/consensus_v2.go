@@ -3,14 +3,12 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/consensus/timeouts"
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -39,26 +37,27 @@ func (consensus *Consensus) Start(
 
 	// Set up next block due time.
 	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-	consensus.timeouts.Consensus.Start()
-	consensus.timeouts.ViewChange.Start()
+	consensus.timeouts.Consensus.Start(consensus.BlockNum())
+	consensus.timeouts.ViewChange.Start(consensus.ViewID())
+	// notifer := consensus.timeouts.Notify()
 
 	for {
 
 		select {
-		case kind := <-consensus.timeouts.Notify(
-			consensus.BlockNum(), consensus.ViewID(),
-		):
+		// case kind := <-notifer:
+		// 	fmt.Println("hit this case", kind)
+		// 	continue
 
-			if kind.Name == timeouts.Consensus {
-				fmt.Println(
-					"consensus timeout went off, block then",
-					kind.Value,
-					"blck now",
-					consensus.BlockNum(),
-				)
-			}
+		// if kind.Name == timeouts.Consensus {
+		// 	fmt.Println(
+		// 		"consensus timeout went off, block then",
+		// 		kind.Value,
+		// 		"blck now",
+		// 		consensus.BlockNum(),
+		// 	)
+		// }
 
-			fmt.Println("actually wow I got it", kind)
+		// fmt.Println("actually wow I got it", kind)
 		// case <-ticker.C:
 		// 	utils.Logger().Debug().Msg("[ConsensusMainLoop] Ticker")
 		// 	if !consensus.IsLeader() {
@@ -83,16 +82,14 @@ func (consensus *Consensus) Start(
 		case viewID := <-consensus.commitFinishChan:
 			utils.Logger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
 			// Only Leader execute this condition
-			func() {
+			if viewID == consensus.ViewID() {
 				consensus.mutex.Lock()
-				defer consensus.mutex.Unlock()
-				if viewID == consensus.ViewID() {
-					consensus.finalizeCommits()
-
+				consensus.finalizeCommits()
+				consensus.mutex.Unlock()
+				go func() {
 					consensus.ReadySignal <- struct{}{}
-
-				}
-			}()
+				}()
+			}
 
 		}
 	}
@@ -232,7 +229,7 @@ func (consensus *Consensus) finalizeCommits() {
 			Msg("[finalizeCommits] Sent Committed Message")
 	}
 
-	consensus.timeouts.Consensus.Start()
+	consensus.timeouts.Consensus.Start(consensus.BlockNum())
 
 	utils.Logger().Info().
 		Uint64("blockNum", block.NumberU64()).

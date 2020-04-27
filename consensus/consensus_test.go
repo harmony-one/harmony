@@ -19,11 +19,5 @@ func TestNew(test *testing.T) {
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	if consensus.viewID != 0 {
-		test.Errorf("Consensus Id is initialized to the wrong value: %d", consensus.viewID)
-	}
 
-	if consensus.ReadySignal == nil {
-		test.Error("Consensus ReadySignal should be initialized")
-	}
 }

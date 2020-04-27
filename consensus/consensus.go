@@ -68,7 +68,6 @@ type Consensus struct {
 	// blockNum, viewID are both uint64
 	blockNum atomic.Value
 	viewID   atomic.Value
-
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 	// Consensus rounds whose commit phase finished

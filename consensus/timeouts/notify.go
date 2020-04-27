@@ -31,14 +31,16 @@ const (
 
 // ComeDue ..
 type ComeDue struct {
-	Name      Named
-	startTime atomic.Value
-	limit     atomic.Value
+	Name       Named
+	startTime  atomic.Value
+	limit      atomic.Value
+	startValue atomic.Value
 }
 
 // Start ..
-func (d *ComeDue) Start() {
+func (d *ComeDue) Start(value uint64) {
 	d.startTime.Store(time.Now())
+	d.startValue.Store(value)
 }
 
 // SetDuration ..
@@ -53,19 +55,23 @@ func (d *ComeDue) SetDuration(dur time.Duration) {
 
 // DueWithValue ..
 type DueWithValue struct {
-	ComeDue
+	Name  Named
 	Value uint64
 }
 
 // Notify ..
-func (r *Notifier) Notify(blkNum uint64, viewID uint64) <-chan DueWithValue {
+func (r *Notifier) Notify() <-chan DueWithValue {
+	fmt.Println("did this call?")
 	timedOut := make(chan DueWithValue)
 
 	go func() {
 		for {
 			then := time.Now()
 			time.Sleep(r.Consensus.limit.Load().(time.Duration))
-			timedOut <- DueWithValue{ComeDue: r.Consensus, Value: blkNum}
+			timedOut <- DueWithValue{
+				Name:  r.Consensus.Name,
+				Value: r.Consensus.startValue.Load().(uint64),
+			}
 			fmt.Println("notify occured this much later", time.Since(then).Round(time.Second))
 			return
 		}
@@ -75,7 +81,10 @@ func (r *Notifier) Notify(blkNum uint64, viewID uint64) <-chan DueWithValue {
 		for {
 			then := time.Now()
 			time.Sleep(r.ViewChange.limit.Load().(time.Duration))
-			timedOut <- DueWithValue{ComeDue: r.ViewChange, Value: viewID}
+			timedOut <- DueWithValue{
+				Name:  r.ViewChange.Name,
+				Value: r.ViewChange.startValue.Load().(uint64),
+			}
 			fmt.Println("notify occured this much later", time.Since(then).Round(time.Second))
 			return
 		}
@@ -93,19 +102,23 @@ type Notifier struct {
 
 // NewNotifier ..
 func NewNotifier() *Notifier {
-	var d, v atomic.Value
+	var d, v, s1, s2 atomic.Value
 
 	d.Store(PhaseDuration)
 	v.Store(ViewChangeDuration)
+	s1.Store(uint64(0))
+	s2.Store(uint64(0))
 
 	return &Notifier{
 		Consensus: ComeDue{
-			Name:  Consensus,
-			limit: d,
+			Name:       Consensus,
+			limit:      d,
+			startValue: s1,
 		},
 		ViewChange: ComeDue{
-			Name:  ViewChange,
-			limit: v,
+			Name:       ViewChange,
+			limit:      v,
+			startValue: s2,
 		},
 	}
 }

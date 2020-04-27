@@ -67,9 +67,11 @@ func (md *MultiDriver) advertise(
 				if ctx.Err() != nil {
 					return
 				}
+				timeMin := time.NewTimer(time.Minute)
 
 				select {
-				case <-time.After(time.Minute):
+				case <-timeMin.C:
+					timeMin.Stop()
 					continue
 				case <-ctx.Done():
 					return
@@ -80,9 +82,12 @@ func (md *MultiDriver) advertise(
 				Str("driver", d.Name()).
 				Str("key", ns).Msg("advertise")
 
-			wait := 7 * ttl / 8
+			timer := time.NewTimer(7 * ttl / 8)
+
 			select {
-			case <-time.After(wait):
+			case <-timer.C:
+				timer.Stop()
+				return
 			case <-ctx.Done():
 				return
 			}
@@ -153,11 +158,11 @@ func (md *MultiDriver) FindPeers(
 
 			// we can safely get our peer
 			peer := value.Interface().(p2p_peer.AddrInfo)
-			md.logger.Debug().
-				Str("driver", driverRefs[idx]).
-				Str("key", ns).
-				Str("peer", peer.ID.String()).
-				Msg("found a peer")
+			// md.logger.Debug().
+			// 	Str("driver", driverRefs[idx]).
+			// 	Str("key", ns).
+			// 	Str("peer", peer.ID.String()).
+			// 	Msg("found a peer")
 
 			// forward the peer
 			select {

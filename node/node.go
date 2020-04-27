@@ -374,9 +374,6 @@ func (node *Node) StartP2PMessageHandling() error {
 						)
 						sem.Release(1)
 					}()
-				} else {
-					utils.Logger().Info().
-						Msg("could not acquire semaphore to process incoming message")
 				}
 			}
 		}(msgChan, weighted[i])
