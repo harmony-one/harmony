@@ -27,10 +27,15 @@ const p2pMsgPrefixSize = 5
 
 // HandleConsensusMessageProcessing ..
 func (node *Node) HandleConsensusMessageProcessing() error {
+	i := 0
 	for msg := range node.Consensus.IncomingConsensusMessage {
+
 		if err := node.Consensus.HandleMessageUpdate(msg); err != nil {
 			fmt.Println("some visibility into consensus messages", err.Error())
+			return err
 		}
+		i++
+		fmt.Println("handling ith consensus message", i)
 	}
 
 	return nil
@@ -96,11 +101,11 @@ func (node *Node) HandleMessage(
 				if isValidatorNode {
 					for _, block := range blocks {
 						// for the closure
-						blk := block
+						_ = block
 
 						go func() {
 							// node.IncomingBlocksClient <- blk
-							fmt.Println("check myself-> is beaconchain node?", blk.String(), topic)
+							// fmt.Println("check myself-> is beaconchain node?", blk.String(), topic)
 						}()
 					}
 

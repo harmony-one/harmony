@@ -2,11 +2,14 @@ package node
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -21,13 +24,16 @@ const (
 	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
 )
 
-// ProposeBlock listen for the readiness signal
+// StartLeaderWork listen for the readiness signal
 // from consensus and generate new block for consensus.
 // only leader will receive the ready signal
-// TODO: clean pending transactions for validators; or validators not prepare pending transactions
-func (node *Node) ProposeBlock() error {
-	for range node.Consensus.ReadySignal {
-		if node.Consensus.IsLeader() {
+// TODO: clean pending transactions for
+// validators; or validators not prepare pending transactions
+func (node *Node) StartLeaderWork() error {
+	var g errgroup.Group
+
+	g.Go(func() error {
+		for range node.Consensus.ProposalNewBlock {
 			utils.Logger().Debug().
 				Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 				Msg("PROPOSING NEW BLOCK ------------------------------------------------")
@@ -47,11 +53,35 @@ func (node *Node) ProposeBlock() error {
 				Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 				Msg("=========Successfully Proposed New Block==========")
 			// Send the new block to Consensus so it can be confirmed.
-			node.BlockChannel <- newBlock
+			fmt.Println("now announced")
+			node.Consensus.Announce(newBlock)
 		}
-	}
+		return nil
+	})
 
-	return nil
+	g.Go(func() error {
+		for viewID := range node.Consensus.CommitFinishChan {
+			// Only Leader execute this condition
+			if viewID == node.Consensus.ViewID() {
+				fmt.Println("\nbefore finalize ", node.Consensus.ShardID)
+
+				node.Consensus.Locks.Global.Lock()
+				if err := node.Consensus.FinalizeCommits(); err != nil {
+					node.Consensus.Locks.Global.Unlock()
+					return err
+				}
+				node.Consensus.Locks.Global.Unlock()
+
+				node.Consensus.ProposalNewBlock <- struct{}{}
+				fmt.Println("after finalize", node.Consensus.ShardID)
+				fmt.Println("after sending readysignal ", node.Consensus.ShardID)
+				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+			}
+		}
+		return nil
+	})
+
+	return g.Wait()
 }
 
 func (node *Node) proposeNewBlock() (*types.Block, error) {

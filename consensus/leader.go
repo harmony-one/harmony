@@ -16,7 +16,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-func (consensus *Consensus) announce(block *types.Block) {
+// Announce ..
+func (consensus *Consensus) Announce(block *types.Block) {
 	blockHash := block.Hash()
 	copy(consensus.blockHash[:], blockHash[:])
 	// prepare message and broadcast to validators
@@ -116,8 +117,8 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.locks.leader.Lock()
-	defer consensus.locks.leader.Unlock()
+	consensus.Locks.Leader.Lock()
+	defer consensus.Locks.Leader.Unlock()
 
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
 		num, viewID, recvMsg.BlockHash,
@@ -196,8 +197,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.locks.leader.Lock()
-	defer consensus.locks.leader.Unlock()
+	consensus.Locks.Leader.Lock()
+	defer consensus.Locks.Leader.Unlock()
 
 	// NOTE let it handle its own log
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
@@ -280,7 +281,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// }
 
 	if consensus.Decider.IsAllSigsCollected() {
-		consensus.commitFinishChan <- myViewID
+		consensus.CommitFinishChan <- myViewID
 		logger.Info().Msg("[OnCommit] 100% Enough commits received")
 	}
 }

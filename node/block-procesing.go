@@ -39,7 +39,7 @@ func (node *Node) HandleConsensusBlockProcessing() error {
 }
 
 // HandleIncomingBeaconBlock ..
-func (node *Node) HandleIncomingBeaconBlock() error {
+func (node *Node) HandleIncomingBlock() error {
 	var g errgroup.Group
 	chans := []chan *types.Block{
 		make(chan *types.Block), make(chan *types.Block),

@@ -22,8 +22,8 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		Str("msgType", msg.Type.String()).
 		Msg("[validatorSanityChecks] Checking new message")
 
-	consensus.locks.pubKey.Lock()
-	defer consensus.locks.pubKey.Unlock()
+	consensus.Locks.PubKey.Lock()
+	defer consensus.Locks.PubKey.Unlock()
 
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {

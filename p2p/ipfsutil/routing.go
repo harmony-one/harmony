@@ -59,8 +59,6 @@ func NewTinderRouting(
 		// drivers = append(drivers, rdvClient)
 		// }
 
-		fmt.Println("Using plain kadameila")
-
 		tinderRouting := tinder.NewRouting(
 			log, dht, tinder.NewDHTDriver(dht),
 		)

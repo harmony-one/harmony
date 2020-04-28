@@ -152,8 +152,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 	senderKey := recvMsg.SenderPubkey
 
-	consensus.locks.vc.Lock()
-	defer consensus.locks.vc.Unlock()
+	consensus.Locks.VC.Lock()
+	defer consensus.Locks.VC.Unlock()
 
 	// update the dictionary key if the viewID is first time received
 	consensus.addViewIDKeyIfNotExist(recvMsg.ViewID)
@@ -316,7 +316,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		if len(consensus.m1Payload) == 0 {
 			// TODO(Chao): explain why ReadySignal is sent only in this case but not the other case.
 			go func() {
-				consensus.ReadySignal <- struct{}{}
+				consensus.ProposalNewBlock <- struct{}{}
 			}()
 		} else {
 			consensus.switchPhase(FBFTCommit)
@@ -405,8 +405,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	senderKey := recvMsg.SenderPubkey
-	consensus.locks.vc.Lock()
-	defer consensus.locks.vc.Unlock()
+	consensus.Locks.VC.Lock()
+	defer consensus.Locks.VC.Unlock()
 
 	if recvMsg.M3AggSig == nil || recvMsg.M3Bitmap == nil {
 		utils.Logger().Error().Msg("[onNewView] M3AggSig or M3Bitmap is nil")

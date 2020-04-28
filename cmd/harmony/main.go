@@ -780,14 +780,26 @@ func main() {
 
 	var g errgroup.Group
 
-	g.Go(currentNode.HandleIncomingBeaconBlock)
+	g.Go(currentNode.HandleIncomingBlock)
 	g.Go(currentNode.StartP2PMessageHandling)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
-		g.Go(currentNode.StartConsensus)
-		g.Go(currentNode.ProposeBlock)
 		g.Go(currentNode.HandleConsensusBlockProcessing)
 		g.Go(currentNode.HandleConsensusMessageProcessing)
+
+		if currentNode.IsCurrentlyLeader() {
+			currentNode.Consensus.SetMode(consensus.Normal)
+			g.Go(currentNode.StartLeaderWork)
+			go func() {
+				time.Sleep(time.Second * 10)
+				fmt.Println("kicking off first block")
+				currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+				currentNode.Consensus.ProposalNewBlock <- struct{}{}
+			}()
+		}
+
+		g.Go(currentNode.BootstrapConsensus)
+
 	}
 
 	// if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&
@@ -796,16 +808,6 @@ func main() {
 	// g.Go(currentNode.StartBlockStateSync)
 
 	// }
-	if currentNode.IsCurrentlyLeader() {
-		currentNode.Consensus.SetMode(consensus.Normal)
-		go func() {
-			// give other nodes at network startup a chance to do things
-			time.Sleep(6 * time.Second)
-			currentNode.Consensus.ReadySignal <- struct{}{}
-			fmt.Println("Kicked off the ready signal for initial leader on", currentNode.Consensus.ShardID)
-			utils.Logger().Info().Msg("leader sent out consensus ready signal")
-		}()
-	}
 
 	if err := g.Wait(); err != nil {
 		fatal(err)

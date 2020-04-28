@@ -81,7 +81,7 @@ type Consensus struct {
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 	// Consensus rounds whose commit phase finished
-	commitFinishChan chan uint64
+	CommitFinishChan chan uint64
 	// Commits collected from validators.
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
@@ -124,16 +124,16 @@ type Consensus struct {
 	ShardID uint32
 	// whether to ignore viewID check
 	ignoreViewIDCheck bool
-	locks             struct {
-		vc     sync.Mutex // mutex for view change
-		global sync.Mutex
-		leader sync.Mutex
-		pubKey sync.Mutex
+	Locks             struct {
+		VC     sync.Mutex // mutex for view change
+		Global sync.Mutex
+		Leader sync.Mutex
+		PubKey sync.Mutex
 	}
 	// Signal channel for starting a new consensus process
-	ReadySignal    chan struct{}
-	RoundCompleted processBlock
-	Verify         processBlock
+	ProposalNewBlock chan struct{}
+	RoundCompleted   processBlock
+	Verify           processBlock
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
 	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -199,17 +199,17 @@ func New(
 
 	consensus := Consensus{
 		Decider:          Decider,
-		host:             host,
-		timeouts:         timeouts.NewNotifier(),
-		blockNum:         blk,
-		epoch:            epoch,
-		viewID:           view,
 		FBFTLog:          NewFBFTLog(),
 		phase:            phase,
 		current:          NewState(),
+		epoch:            epoch,
+		blockNum:         blk,
+		viewID:           view,
+		CommitFinishChan: make(chan uint64),
+		host:             host,
+		timeouts:         timeouts.NewNotifier(),
 		SlashChan:        make(chan slash.Record),
-		commitFinishChan: make(chan uint64),
-		ReadySignal:      make(chan struct{}),
+		ProposalNewBlock: make(chan struct{}),
 		RoundCompleted:   processBlock{make(chan blkComeback)},
 		Verify:           processBlock{make(chan blkComeback)},
 		// channel for receiving newly generated VDF

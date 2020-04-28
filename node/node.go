@@ -61,7 +61,6 @@ const (
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus            *consensus.Consensus
-	BlockChannel         chan *types.Block // The channel to send newly proposed blocks
 	BeaconBlockChannel   chan *types.Block // The channel to send beacon blocks for non-beaconchain nodes
 	IncomingBlocksClient chan *types.Block
 	Gossiper             relay.BroadCaster
@@ -298,20 +297,10 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 		Msg("Got ONE more receipt message")
 }
 
-// StartConsensus ..
-func (node *Node) StartConsensus() error {
-	// block until have peers or timeout error
-	if err := node.bootstrapConsensus(); err != nil {
-		return err
-	}
-
-	return node.Consensus.Start(node.BlockChannel)
-}
-
 const maxWaitBootstrap = 60 * time.Second
 
-// bootstrapConsensus is the a goroutine to check number of peers and start the consensus
-func (node *Node) bootstrapConsensus() error {
+// BootstrapConsensus is the a goroutine to check number of peers and start the consensus
+func (node *Node) BootstrapConsensus() error {
 	haveEnoughPeers := make(chan struct{})
 	t := time.NewTimer(maxWaitBootstrap)
 
@@ -429,7 +418,6 @@ func New(
 		unixTimeAtNodeStart:  time.Now().Unix(),
 		CxPool:               core.NewCxPool(core.CxPoolSize),
 		pendingCXReceipts:    map[string]*types.CXReceiptsProof{},
-		BlockChannel:         make(chan *types.Block),
 		BeaconBlockChannel:   make(chan *types.Block),
 		IncomingBlocksClient: make(chan *types.Block),
 		serviceManager:       service.NewManager(),
