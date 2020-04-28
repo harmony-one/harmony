@@ -1,9 +1,11 @@
 package types
 
 import (
+	"bytes"
 	"container/heap"
 	"io"
 	"math/big"
+	"sort"
 
 	"github.com/pkg/errors"
 
@@ -142,8 +144,19 @@ type PoolTransactionsByPriceAndNonce struct {
 // if after providing it to the constructor.
 func NewPoolTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]PoolTransactions) *PoolTransactionsByPriceAndNonce {
 	// Initialize a price based heap with the head transactions
+	sortedAddrs := []common.Address{}
+
+	for from := range txs {
+		sortedAddrs = append(sortedAddrs, from)
+	}
+
+	sort.SliceStable(sortedAddrs, func(i, j int) bool {
+		return bytes.Compare(sortedAddrs[i].Bytes(), sortedAddrs[j].Bytes()) < 0
+	})
+
 	heads := make(PoolTxByPrice, 0, len(txs))
-	for from, accTxs := range txs {
+	for _, from := range sortedAddrs {
+		accTxs := txs[from]
 		heads = append(heads, accTxs[0])
 		// Ensure the sender address is from the signer
 		var acc common.Address
