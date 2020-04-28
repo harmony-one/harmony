@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -121,13 +121,13 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 	pendingPlainTxs := map[common.Address]types.Transactions{}
-	pendingStakingTxs := types2.StakingTransactions{}
+	pendingStakingTxs := staking.StakingTransactions{}
 	for addr, poolTxs := range pendingPoolTxs {
 		plainTxsPerAcc := types.Transactions{}
 		for _, tx := range poolTxs {
 			if plainTx, ok := tx.(*types.Transaction); ok {
 				plainTxsPerAcc = append(plainTxsPerAcc, plainTx)
-			} else if stakingTx, ok := tx.(*types2.StakingTransaction); ok {
+			} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
 				// Only process staking transactions after pre-staking epoch happened.
 				if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
 					pendingStakingTxs = append(pendingStakingTxs, stakingTx)
