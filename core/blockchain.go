@@ -550,7 +550,7 @@ func (bc *BlockChain) repair(head **types.Block) error {
 		// Otherwise rewind one block and recheck state availability there
 		for _, stkTxn := range (*head).StakingTransactions() {
 			if stkTxn.StakingType() == staking.DirectiveCreateValidator {
-				if addr, err := stkTxn.SenderAddress(); err != nil {
+				if addr, err := stkTxn.SenderAddress(); err == nil {
 					valsToRemove[addr] = struct{}{}
 				} else {
 					return err
@@ -913,7 +913,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 
 				for _, stkTxn := range currentBlock.StakingTransactions() {
 					if stkTxn.StakingType() == staking.DirectiveCreateValidator {
-						if addr, err := stkTxn.SenderAddress(); err != nil {
+						if addr, err := stkTxn.SenderAddress(); err == nil {
 							valsToRemove[addr] = struct{}{}
 						}
 					}
