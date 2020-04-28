@@ -600,7 +600,24 @@ func (s *PublicBlockChainAPI) getAllValidatorInformation(
 func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 	ctx context.Context, page int,
 ) ([]*staking.ValidatorRPCEnchanced, error) {
-	return s.getAllValidatorInformation(ctx, page, rpc.LatestBlockNumber)
+	blockNr := s.b.CurrentBlock().NumberU64()
+
+	// delete cache for previous block
+	prevKey := fmt.Sprintf("all-info-%d", blockNr-1)
+	s.b.SingleFlightForgetKey(prevKey)
+
+	key := fmt.Sprintf("all-info-%d", blockNr)
+	res, err := s.b.SingleFlightRequest(
+		key,
+		func() (interface{}, error) {
+			return s.getAllValidatorInformation(ctx, page, rpc.LatestBlockNumber)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return res.([]*staking.ValidatorRPCEnchanced), nil
+
 }
 
 // GetAllValidatorInformationByBlockNumber returns information about all validators.
