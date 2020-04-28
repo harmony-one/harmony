@@ -17,6 +17,7 @@
 package core
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"math/big"
@@ -32,6 +33,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
@@ -737,6 +739,43 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	return nil
 }
 
+func (pool *TxPool) checkDuplicateFields(validator common.Address, identity string, blsKeys []shard.BLSPublicKey) error {
+	addrs, err := rawdb.ReadValidatorList(pool.currentState.Database().TrieDB().DiskDB())
+	if err != nil {
+		return err
+	}
+
+	checkIdentity := identity != ""
+	checkBlsKeys := len(blsKeys) != 0
+
+	blsKeyMap := map[shard.BLSPublicKey]struct{}{}
+	for _, key := range blsKeys {
+		blsKeyMap[key] = struct{}{}
+	}
+
+	for _, addr := range addrs {
+		if !bytes.Equal(validator.Bytes(), addr.Bytes()) {
+			wrapper, err := pool.currentState.ValidatorWrapperCopy(addr)
+
+			if err != nil {
+				return err
+			}
+
+			if checkIdentity && wrapper.Identity == identity {
+				return errors.Wrapf(errDupIdentity, "duplicate identity %s", identity)
+			}
+			if checkBlsKeys {
+				for _, existingKey := range wrapper.SlotPubKeys {
+					if _, ok := blsKeyMap[existingKey]; ok {
+						return errors.Wrapf(errDupBlsKey, "duplicate bls key %x", existingKey)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // validateStakingTx checks the staking message based on the staking directive
 func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 	// from address already validated
@@ -756,6 +795,13 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if from != stkMsg.ValidatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
+		if err := pool.checkDuplicateFields(
+			stkMsg.ValidatorAddress,
+			stkMsg.Identity,
+			stkMsg.SlotPubKeys); err != nil {
+			return err
+		}
+
 		currentBlockNumber := pool.chain.CurrentBlock().Number()
 		pendingBlockNumber := new(big.Int).Add(currentBlockNumber, big.NewInt(1))
 		pendingEpoch := pool.chain.CurrentBlock().Epoch()
@@ -776,6 +822,16 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		}
 		if from != stkMsg.ValidatorAddress {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
+		}
+		newBlsKeys := []shard.BLSPublicKey{}
+		if stkMsg.SlotKeyToAdd != nil {
+			newBlsKeys = append(newBlsKeys, *stkMsg.SlotKeyToAdd)
+		}
+		if err := pool.checkDuplicateFields(
+			stkMsg.ValidatorAddress,
+			stkMsg.Identity,
+			newBlsKeys); err != nil {
+			return err
 		}
 		chainContext, ok := pool.chain.(ChainContext)
 		if !ok {
