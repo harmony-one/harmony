@@ -29,6 +29,8 @@ type Backend interface {
 	NetVersion() uint64
 	ProtocolVersion() int
 	ChainDb() ethdb.Database
+	SingleFlightRequest(key string, fn func() (interface{}, error)) (interface{}, error)
+	SingleFlightForgetKey(key string)
 	EventMux() *event.TypeMux
 	RPCGasCap() *big.Int // global gas cap for hmy_call over rpc: DoS protection
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error)
