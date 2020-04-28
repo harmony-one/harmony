@@ -3,7 +3,7 @@ module github.com/harmony-one/harmony
 go 1.14
 
 require (
-	github.com/Workiva/go-datastructures v1.0.50
+	github.com/Workiva/go-datastructures v1.0.52
 	github.com/allegro/bigcache v1.2.1 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200423211322-0b5ff220aee9 // indirect
 	github.com/aws/aws-sdk-go v1.30.1
@@ -15,7 +15,7 @@ require (
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/golang/protobuf v1.3.5
 	github.com/golangci/golangci-lint v1.22.2
-	github.com/gorilla/mux v1.7.2
+	github.com/gorilla/mux v1.7.4
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
 	github.com/harmony-one/bls v0.0.6
 	github.com/harmony-one/taggedrlp v0.1.4
@@ -26,10 +26,10 @@ require (
 	github.com/ipfs/go-ipfs-config v0.4.0
 	github.com/ipfs/interface-go-ipfs-core v0.2.7
 	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b
-	github.com/libp2p/go-libp2p v0.8.1
+	github.com/libp2p/go-libp2p v0.8.3
 	github.com/libp2p/go-libp2p-core v0.5.2
 	github.com/libp2p/go-libp2p-discovery v0.4.0
-	github.com/libp2p/go-libp2p-kad-dht v0.7.7
+	github.com/libp2p/go-libp2p-kad-dht v0.7.10
 	github.com/libp2p/go-libp2p-peerstore v0.2.3
 	github.com/libp2p/go-libp2p-record v0.1.2
 	github.com/libp2p/go-libp2p-rendezvous v0.0.0-20190708065449-737144165c9e
