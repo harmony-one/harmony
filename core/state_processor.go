@@ -85,92 +85,33 @@ func (p *StateProcessor) Process(
 		return nil, nil, nil, 0, nil, err
 	}
 
-	// Signer specific for normal transactions
-	// For staking tx directly available from tx
-	signer := types.MakeSigner(p.config, header.Epoch())
-
-	poolTransactions := map[common.Address]types.PoolTransactions{}
-
-	// to account for processing transactions in the existing blocks before prestaking
-	if !p.config.IsPreStaking(header.Epoch()) {
-		// Iterate over and process the individual transactions
-		for i, tx := range block.Transactions() {
-			statedb.Prepare(tx.Hash(), block.Hash(), i)
-			receipt, cxReceipt, _, err := ApplyTransaction(
-				p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
-			)
-			if err != nil {
-				return nil, nil, nil, 0, nil, err
-			}
-			receipts = append(receipts, receipt)
-			if cxReceipt != nil {
-				outcxs = append(outcxs, cxReceipt)
-			}
-			allLogs = append(allLogs, receipt.Logs...)
+	// Iterate over and process the individual transactions
+	for i, tx := range block.Transactions() {
+		statedb.Prepare(tx.Hash(), block.Hash(), i)
+		receipt, cxReceipt, _, err := ApplyTransaction(
+			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+		)
+		if err != nil {
+			return nil, nil, nil, 0, nil, err
 		}
-	} else {
-		// Iterate over and add normal transactions to poolTransactions
-		for _, tx := range block.Transactions() {
-			from, err := types.Sender(signer, tx)
-			if err != nil {
-				return nil, nil, nil, 0, nil, err
-			}
-			poolTransactions[from] = append(poolTransactions[from], tx)
+		receipts = append(receipts, receipt)
+		if cxReceipt != nil {
+			outcxs = append(outcxs, cxReceipt)
 		}
-
-		// Iterate over and add staking transactions to poolTransactions
-		for _, tx := range block.StakingTransactions() {
-			from, err := tx.SenderAddress()
-			if err != nil {
-				return nil, nil, nil, 0, nil, err
-			}
-			poolTransactions[from] = append(poolTransactions[from], tx)
+		allLogs = append(allLogs, receipt.Logs...)
+	}
+	// Iterate over and process the staking transactions
+	L := len(block.Transactions())
+	for i, tx := range block.StakingTransactions() {
+		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
+		receipt, _, err := ApplyStakingTransaction(
+			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
+		)
+		if err != nil {
+			return nil, nil, nil, 0, nil, err
 		}
-
-		txs := types.NewPoolTransactionsByPriceAndNonce(signer, poolTransactions)
-		dbIndex := 0
-		// NORMAL
-		for {
-			// Retrieve the next transaction and abort if all done
-			tx := txs.Peek()
-			if tx == nil {
-				break
-			}
-
-			statedb.Prepare(tx.Hash(), block.Hash(), dbIndex)
-			dbIndex = dbIndex + 1
-
-			var (
-				err       error
-				receipt   *types.Receipt
-				cxReceipt *types.CXReceipt
-			)
-
-			if plainTx, ok := tx.(*types.Transaction); ok {
-				if receipt, cxReceipt, _, err = ApplyTransaction(
-					p.config, p.bc, &beneficiary, gp, statedb, header, plainTx, usedGas, cfg,
-				); err != nil {
-					return nil, nil, nil, 0, nil, err
-				}
-				if cxReceipt != nil {
-					outcxs = append(outcxs, cxReceipt)
-				}
-			} else if stx, ok := tx.(*staking.StakingTransaction); ok {
-				if receipt, _, err = ApplyStakingTransaction(
-					p.config, p.bc, &beneficiary, gp, statedb, header, stx, usedGas, cfg,
-				); err != nil {
-					return nil, nil, nil, 0, nil, err
-				}
-			} else {
-				txs.Shift()
-				continue
-			}
-
-			receipts = append(receipts, receipt)
-			allLogs = append(allLogs, receipt.Logs...)
-			// Everything ok
-			txs.Shift()
-		}
+		receipts = append(receipts, receipt)
+		allLogs = append(allLogs, receipt.Logs...)
 	}
 
 	// incomingReceipts should always be processed

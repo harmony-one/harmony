@@ -53,15 +53,15 @@ type Worker struct {
 
 // CommitTransactions commits transactions for new block.
 func (w *Worker) CommitTransactions(
-	poolTransactions map[common.Address]types.PoolTransactions, coinbase common.Address,
+	pendingNormal map[common.Address]types.Transactions,
+	pendingStaking staking.StakingTransactions, coinbase common.Address,
 ) error {
 
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
 	}
 
-	txs := types.NewPoolTransactionsByPriceAndNonce(w.current.signer, poolTransactions)
-	dbIndex := 0
+	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
 	// NORMAL
 	for {
 		// If we don't have enough gas for any further transactions then we're done
@@ -74,7 +74,10 @@ func (w *Worker) CommitTransactions(
 		if tx == nil {
 			break
 		}
-
+		// Error may be ignored here. The error has already been checked
+		// during transaction acceptance is the transaction pool.
+		// We use the eip155 signer regardless of the current hf.
+		from, _ := types.Sender(w.current.signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
@@ -82,37 +85,16 @@ func (w *Worker) CommitTransactions(
 			txs.Pop()
 			continue
 		}
-
 		// Start executing the transaction
-		w.current.state.Prepare(tx.Hash(), common.Hash{}, dbIndex)
+		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
 
 		if tx.ShardID() != w.chain.ShardID() {
 			txs.Shift()
 			continue
 		}
 
-		var (
-			err  error
-			from common.Address
-		)
+		_, err := w.commitTransaction(tx, coinbase)
 
-		if plainTx, ok := tx.(*types.Transaction); ok {
-			// Error may be ignored here. The error has already been checked
-			// during transaction acceptance is the transaction pool.
-			// We use the eip155 signer regardless of the current hf.
-			from, _ = types.Sender(w.current.signer, plainTx)
-			_, err = w.commitTransaction(plainTx, coinbase)
-		} else if stx, ok := tx.(*staking.StakingTransaction); ok {
-			// STAKING - only beaconchain process staking transaction
-			if w.chain.ShardID() != shard.BeaconChainShardID ||
-				!w.config.IsPreStaking(w.current.header.Epoch()) {
-				txs.Shift()
-				continue
-			}
-			from, _ = stx.SenderAddress()
-			_, err = w.commitStakingTransaction(stx, coinbase)
-		}
-		// TODO(rj): rollback for staking errors
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
 		case core.ErrGasLimitReached:
@@ -132,17 +114,48 @@ func (w *Worker) CommitTransactions(
 
 		case nil:
 			// Everything ok, collect the logs and shift in the next transaction from the same account
-			utils.Logger().Info().Str("txHash", tx.Hash().Hex()).
-				Uint64("txGasLimit", tx.Gas()).
-				Msg("Successfully committed transaction")
 			txs.Shift()
-			dbIndex = dbIndex + 1
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).
 			utils.Logger().Info().Str("hash", tx.Hash().Hex()).AnErr("err", err).Msg("Transaction failed, account skipped")
 			txs.Shift()
+		}
+	}
+
+	// STAKING - only beaconchain process staking transaction
+	if w.chain.ShardID() == shard.BeaconChainShardID {
+		for _, tx := range pendingStaking {
+			// TODO: merge staking transaction processing with normal transaction processing.
+			// <<THESE CODE ARE DUPLICATED AS ABOVE
+			// If we don't have enough gas for any further transactions then we're done
+			if w.current.gasPool.Gas() < params.TxGas {
+				utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("Not enough gas for further transactions")
+				break
+			}
+			// Check whether the tx is replay protected. If we're not in the EIP155 hf
+			// phase, start ignoring the sender until we do.
+			if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
+				utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
+				txs.Pop()
+				continue
+			}
+
+			// Start executing the transaction
+			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs)+len(w.current.stakingTxs))
+			// THESE CODE ARE DUPLICATED AS ABOVE>>
+			if _, err := w.commitStakingTransaction(tx, coinbase); err != nil {
+				txID := tx.Hash().Hex()
+				utils.Logger().Error().Err(err).
+					Str("stakingTxID", txID).
+					Interface("stakingTx", tx).
+					Msg("Failed committing staking transaction")
+			} else {
+				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).
+					Uint64("txGasLimit", tx.Gas()).
+					Msg("Successfully committed staking transaction")
+			}
 		}
 	}
 
