@@ -88,6 +88,7 @@ var (
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, pangaea, partner, stressnet, devnet, localnet")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
+	// NOTE deprecate via flag, no one used it
 	blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	// staking indicates whether the node is operating in staking mode.
 	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
@@ -542,8 +543,12 @@ func setupConsensusAndNode(
 			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID))
 			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 		} else {
-			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
-			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
+			currentNode.NodeConfig.SetShardGroupID(
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)),
+			)
+			currentNode.NodeConfig.SetClientGroupID(
+				nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)),
+			)
 		}
 	}
 	currentNode.NodeConfig.ConsensusPubKey = nodeConfig.ConsensusPubKey
@@ -566,9 +571,6 @@ func setupConsensusAndNode(
 
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
-	// Setup block period and block due time.
-	currentConsensus.BlockPeriod = time.Duration(*blockPeriod) * time.Second
-	currentConsensus.NextBlockDue = time.Now()
 	return currentNode
 }
 
@@ -679,7 +681,10 @@ func main() {
 		}
 		// TODO (leo): use a passing list of accounts here
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
+			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize,
+			numeric.OneDec(), genesis.HarmonyAccounts,
+			genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE,
+		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
@@ -687,7 +692,7 @@ func main() {
 		}
 		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
+		fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
 		os.Exit(2)
 	}
 

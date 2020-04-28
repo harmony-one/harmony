@@ -139,10 +139,9 @@ type Consensus struct {
 	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
 	SlashChan chan slash.Record
-	// How long in second the leader needs to wait to propose a new block.
-	BlockPeriod time.Duration
+
 	// The time due for next block proposal
-	NextBlockDue             time.Time
+	nextBlockDue             atomic.Value
 	IncomingConsensusMessage chan []byte
 }
 

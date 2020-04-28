@@ -46,15 +46,15 @@ func (consensus *Consensus) Start(
 		consensus.current.SetMode(Normal)
 		go func() {
 			// give other nodes at network startup a chance to do things
-			time.Sleep(10 * time.Second)
+			time.Sleep(1 * time.Second)
 			consensus.ReadySignal <- struct{}{}
 			utils.Logger().Info().Msg("leader sent out consensus ready signal")
 
 		}()
 	}
 
-	// Set up next block due time.
-	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
+	// Set up next block due time. // TODO make 8 second duration
+	consensus.SetNextBlockDue(time.Now().Add(8))
 	consensus.timeouts.Consensus.Start(consensus.BlockNum())
 	consensus.timeouts.ViewChange.Start(consensus.ViewID())
 	// notifer := consensus.timeouts.Notify()
@@ -247,14 +247,25 @@ func (consensus *Consensus) finalizeCommits() {
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
-	if n := time.Now(); n.Before(consensus.NextBlockDue) {
+	if n := time.Now(); n.Before(consensus.NextBlockDue()) {
 		// Sleep to wait for the full block time
 		utils.Logger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
-		time.Sleep(consensus.NextBlockDue.Sub(n))
+		time.Sleep(consensus.NextBlockDue().Sub(n))
 	}
 
 	// Update time due for next block
-	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
+	// consensus.nextBlockDue = time.Now().Add(consensus.BlockPeriod)
+	consensus.SetNextBlockDue(time.Now().Add(8))
+}
+
+// NextBlockDue ..
+func (consensus *Consensus) NextBlockDue() time.Time {
+	return consensus.nextBlockDue.Load().(time.Time)
+}
+
+// SetNextBlockDue ..
+func (consensus *Consensus) SetNextBlockDue(newTime time.Time) {
+	consensus.nextBlockDue.Store(newTime)
 }
 
 // BlockCommitSig returns the byte array of aggregated

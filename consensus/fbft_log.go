@@ -193,14 +193,17 @@ func (log *FBFTLog) GetMessagesByTypeSeqHash(
 	found := []*FBFTMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType == typ && msg.(*FBFTMessage).BlockNum == blockNum && msg.(*FBFTMessage).BlockHash == blockHash {
+		if msg.(*FBFTMessage).MessageType == typ &&
+			msg.(*FBFTMessage).BlockNum == blockNum &&
+			msg.(*FBFTMessage).BlockHash == blockHash {
 			found = append(found, msg.(*FBFTMessage))
 		}
 	}
 	return found
 }
 
-// HasMatchingAnnounce returns whether the log contains announce type message with given blockNum, blockHash
+// HasMatchingAnnounce returns whether the log
+// contains announce type message with given blockNum, blockHash
 func (log *FBFTLog) HasMatchingAnnounce(blockNum uint64, blockHash common.Hash) bool {
 	found := log.GetMessagesByTypeSeqHash(msg_pb.MessageType_ANNOUNCE, blockNum, blockHash)
 	return len(found) >= 1
