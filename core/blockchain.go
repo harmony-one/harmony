@@ -28,12 +28,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -57,8 +55,6 @@ import (
 )
 
 var (
-	// blockInsertTimer
-	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
 	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 	// errExceedMaxPendingSlashes ..
@@ -1200,7 +1196,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 	// faster than direct delivery and requires much less mutex
 	// acquiring.
 	var (
-		stats         = insertStats{startTime: mclock.Now()}
 		events        = make([]interface{}, 0, len(chain))
 		lastCanon     *types.Block
 		coalescedLogs []*types.Log
@@ -1248,7 +1243,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 			// Block and state both already known. However if the current block is below
 			// this number we did a rollback and we should reimport it nonetheless.
 			if bc.CurrentBlock().NumberU64() >= block.NumberU64() {
-				stats.ignored++
 				continue
 			}
 
@@ -1260,12 +1254,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 				return i, events, coalescedLogs, fmt.Errorf("future block: %v > %v", block.Time(), max)
 			}
 			bc.futureBlocks.Add(block.Hash(), block)
-			stats.queued++
 			continue
 
-		case err == consensus_engine.ErrUnknownAncestor && bc.futureBlocks.Contains(block.ParentHash()):
+		case err == consensus_engine.ErrUnknownAncestor &&
+			bc.futureBlocks.Contains(block.ParentHash()):
 			bc.futureBlocks.Add(block.Hash(), block)
-			stats.queued++
+
 			continue
 
 		case err == consensus_engine.ErrPrunedAncestor:
@@ -1362,18 +1356,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		case CanonStatTy:
 			logger.Info().Msg("Inserted new block")
 			coalescedLogs = append(coalescedLogs, logs...)
-			blockInsertTimer.UpdateSince(bstart)
 			events = append(events, ChainEvent{block, block.Hash(), logs})
 			lastCanon = block
-
 			// Only count canonical blocks for GC processing time
 			bc.gcproc += proctime
 		}
 
-		stats.processed++
-		stats.usedGas += usedGas
-		cache, _ := bc.stateCache.TrieDB().Size()
-		stats.report(chain, i, cache)
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
@@ -1383,67 +1371,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 	return 0, events, coalescedLogs, nil
 }
 
-// insertStats tracks and reports on block insertion.
-type insertStats struct {
-	queued, processed, ignored int
-	usedGas                    uint64
-	lastIndex                  int
-	startTime                  mclock.AbsTime
-}
-
 // statsReportLimit is the time limit during import and export after which we
 // always print out progress. This avoids the user wondering what's going on.
 const statsReportLimit = 8 * time.Second
-
-// report prints statistics if some number of blocks have been processed
-// or more than a few seconds have passed since the last message.
-func (st *insertStats) report(chain []*types.Block, index int, cache common.StorageSize) {
-	// Fetch the timings for the batch
-	var (
-		now     = mclock.Now()
-		elapsed = time.Duration(now) - time.Duration(st.startTime)
-	)
-	// If we're at the last block of the batch or report period reached, log
-	if index == len(chain)-1 || elapsed >= statsReportLimit {
-		var (
-			end = chain[index]
-			txs = countTransactions(chain[st.lastIndex : index+1])
-		)
-
-		context := utils.Logger().With().
-			Int("blocks", st.processed).
-			Int("txs", txs).
-			Float64("mgas", float64(st.usedGas)/1000000).
-			Str("elapsed", common.PrettyDuration(elapsed).String()).
-			Float64("mgasps", float64(st.usedGas)*1000/float64(elapsed)).
-			Str("number", end.Number().String()).
-			Str("hash", end.Hash().Hex()).
-			Str("cache", cache.String())
-
-		if timestamp := time.Unix(end.Time().Int64(), 0); time.Since(timestamp) > time.Minute {
-			context = context.Str("age", common.PrettyAge(timestamp).String())
-		}
-
-		if st.queued > 0 {
-			context = context.Int("queued", st.queued)
-		}
-		if st.ignored > 0 {
-			context = context.Int("ignored", st.ignored)
-		}
-
-		logger := context.Logger()
-		logger.Info().Msg("Imported new chain segment")
-
-		*st = insertStats{startTime: now, lastIndex: index + 1}
-	}
-}
-
-func countTransactions(chain []*types.Block) (c int) {
-	for _, b := range chain {
-		c += len(b.Transactions())
-	}
-	return c
-}
 
 // PostChainEvents iterates over the events generated by a chain insertion and
 // posts them into the event feed.
