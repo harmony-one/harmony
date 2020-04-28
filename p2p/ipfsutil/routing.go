@@ -3,19 +3,14 @@ package ipfsutil
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/harmony-one/harmony/p2p/tinder"
 	datastore "github.com/ipfs/go-datastore"
 	ipfs_p2p "github.com/ipfs/go-ipfs/core/node/libp2p"
 	host "github.com/libp2p/go-libp2p-core/host"
 	peer "github.com/libp2p/go-libp2p-core/peer"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/routing"
-	p2p_discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/rs/zerolog"
 )
@@ -46,41 +41,43 @@ func NewTinderRouting(
 			ctx, h,
 			dht.Datastore(dstore),
 			dht.Validator(validator),
-			dhtopts.Client(dhtclient),
+			dht.Mode(dht.ModeAuto),
 		)
 
 		if err != nil {
 			return nil, err
 		}
 
-		drivers := []tinder.Driver{}
-		if rdvpeer != nil {
-			h.Peerstore().AddAddrs(rdvpeer.ID, rdvpeer.Addrs, libp2p_peer.PermanentAddrTTL)
-			// @FIXME(gfanton): use rand as argument
-			rdvClient := tinder.NewRendezvousDiscovery(
-				log, h, rdvpeer.ID, rand.New(rand.NewSource(rand.Int63())),
-			)
+		// drivers := []tinder.Driver{}
+		// if rdvpeer != nil {
+		// h.Peerstore().AddAddrs(rdvpeer.ID, rdvpeer.Addrs, libp2p_peer.PermanentAddrTTL)
+		// // @FIXME(gfanton): use rand as argument
+		// rdvClient := tinder.NewRendezvousDiscovery(
+		// 	log, h, rdvpeer.ID, rand.New(rand.NewSource(rand.Int63())),
+		// )
 
-			drivers = append(drivers, rdvClient)
-		}
+		// drivers = append(drivers, rdvClient)
+		// }
 
-		tinderRouting := tinder.NewRouting(log, "dht", dht, drivers...)
+		fmt.Println("Using plain kadameila")
 
-		drivers = append(drivers, tinderRouting)
-
-		serv, err := tinder.NewService(
-			log,
-			drivers,
-			p2p_discovery.NewFixedBackoff(time.Minute),
-			p2p_discovery.WithBackoffDiscoveryReturnedChannelSize(24),
-			p2p_discovery.WithBackoffDiscoverySimultaneousQueryBufferSize(24),
+		tinderRouting := tinder.NewRouting(
+			log, dht, tinder.NewDHTDriver(dht),
 		)
+
+		// serv, err := tinder.NewService(
+		// 	log,
+		// 	drivers,
+		// 	p2p_discovery.NewFixedBackoff(time.Minute),
+		// 	p2p_discovery.WithBackoffDiscoveryReturnedChannelSize(24),
+		// 	p2p_discovery.WithBackoffDiscoverySimultaneousQueryBufferSize(24),
+		// )
 
 		if err != nil {
 			fmt.Println("why this busted", err.Error())
 		}
 
-		crout <- &RoutingOut{dht, serv}
+		crout <- &RoutingOut{dht, tinderRouting}
 
 		return tinderRouting, nil
 	}, crout

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	p2p_routing "github.com/libp2p/go-libp2p-core/routing"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	"github.com/rs/zerolog"
 )
 
@@ -29,16 +28,19 @@ func (r *routing) Bootstrap(ctx context.Context) error {
 // NewRouting ..
 func NewRouting(
 	logger *zerolog.Logger,
-	name string,
 	r p2p_routing.Routing,
 	drivers ...Driver,
 ) Routing {
-	rdisc := discovery.NewRoutingDiscovery(r)
-	drivers = append(drivers, ComposeDriver(name, rdisc, rdisc, nil))
+	// rdisc := discovery.NewRoutingDiscovery(r)
+	// drivers = append(
+	// 	drivers,
+	// 	ComposeDriver("harmony-one/p2p-router", r, r, nil),
+	// )
+
 	md := NewMultiDriver(logger, drivers...)
-	cr := discovery.NewDiscoveryRouting(md)
+
 	return &routing{
-		ContentRouting: cr,
+		ContentRouting: r,
 		ValueStore:     r,
 		PeerRouting:    r,
 		Driver:         md,

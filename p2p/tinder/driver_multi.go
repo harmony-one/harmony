@@ -2,6 +2,7 @@ package tinder
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -178,6 +179,7 @@ func (md *MultiDriver) FindPeers(
 
 // Unregister ..
 func (md *MultiDriver) Unregister(ctx context.Context, ns string) error {
+	fmt.Println("this sometihg calling unregister?")
 	// first cancel advertiser
 	md.muc.Lock()
 	if cf, ok := md.mapc[ns]; ok {
