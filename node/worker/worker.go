@@ -77,7 +77,7 @@ func (w *Worker) CommitTransactions(
 
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
-		if tx.Protected() && !w.config.IsEIP155(w.current.header.Number()) {
+		if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
 			utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
 			txs.Pop()
 			continue
