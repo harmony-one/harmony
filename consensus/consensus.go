@@ -142,7 +142,8 @@ type Consensus struct {
 	// How long in second the leader needs to wait to propose a new block.
 	BlockPeriod time.Duration
 	// The time due for next block proposal
-	NextBlockDue time.Time
+	NextBlockDue             time.Time
+	IncomingConsensusMessage chan []byte
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
@@ -203,8 +204,9 @@ func New(
 		RoundCompleted:   processBlock{make(chan blkComeback)},
 		Verify:           processBlock{make(chan blkComeback)},
 		// channel for receiving newly generated VDF
-		RndChannel: make(chan [vdfAndSeedSize]byte),
-		ShardID:    shard,
+		RndChannel:               make(chan [vdfAndSeedSize]byte),
+		ShardID:                  shard,
+		IncomingConsensusMessage: make(chan []byte),
 	}
 
 	if multiBLSPriKey != nil {

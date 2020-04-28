@@ -782,6 +782,7 @@ func main() {
 		g.Go(currentNode.StartConsensus)
 		g.Go(currentNode.ProposeBlock)
 		g.Go(currentNode.HandleConsensusBlockProcessing)
+		g.Go(currentNode.HandleConsensusMessageProcessing)
 	}
 
 	// if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&

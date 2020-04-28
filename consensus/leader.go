@@ -1,8 +1,8 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -214,7 +214,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	logger := utils.Logger().With().Logger()
 
 	// has to be called before verifying signature
-	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
+	// quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 	// Verify the signature on commitPayload is correct
 	var sign bls.Sign
 	if err := sign.Deserialize(commitSig); err != nil {
@@ -237,16 +237,16 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	logger = logger.With().
+	utils.Logger().Info().
 		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).
-		Logger()
-	logger.Info().Msg("[OnCommit] Received new commit message")
+		Msg("[OnCommit] Received new commit message")
 
 	if _, err := consensus.Decider.SubmitVote(
 		quorum.Commit, validatorPubKey,
 		&sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
 	); err != nil {
+		fmt.Println("How can I be given an error?", err.Error())
 		return
 	}
 	// Set the bitmap indicating that this validator signed.
@@ -257,29 +257,29 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	myViewID := consensus.ViewID()
-	quorumIsMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 
-	if !quorumWasMet && quorumIsMet {
-		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
-		nextDue := consensus.NextBlockDue
-		go func() {
-			utils.Logger().Debug().Msg("[OnCommit] Starting Grace Period")
-			// Always wait for 2 seconds as minimum grace period
-			time.Sleep(2 * time.Second)
-			if n := time.Now(); n.Before(nextDue) {
-				// Sleep to wait for the full block time
-				time.Sleep(nextDue.Sub(n))
-			}
-			logger.Debug().Msg("[OnCommit] Commit Grace Period Ended")
-			consensus.commitFinishChan <- myViewID
-		}()
+	// Reading from this commitfinish chan should be own thread
 
-	}
+	// quorumIsMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
+
+	// if !quorumWasMet && quorumIsMet {
+	// 	logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
+	// 	nextDue := consensus.NextBlockDue
+	// 	go func() {
+	// 		utils.Logger().Debug().Msg("[OnCommit] Starting Grace Period")
+	// 		// Always wait for 2 seconds as minimum grace period
+	// 		time.Sleep(2 * time.Second)
+	// 		if n := time.Now(); n.Before(nextDue) {
+	// 			// Sleep to wait for the full block time
+	// 			time.Sleep(nextDue.Sub(n))
+	// 		}
+	// 		logger.Debug().Msg("[OnCommit] Commit Grace Period Ended")
+	// 		consensus.commitFinishChan <- myViewID
+	// 	}()
+	// }
 
 	if consensus.Decider.IsAllSigsCollected() {
-		go func() {
-			consensus.commitFinishChan <- myViewID
-			logger.Info().Msg("[OnCommit] 100% Enough commits received")
-		}()
+		consensus.commitFinishChan <- myViewID
+		logger.Info().Msg("[OnCommit] 100% Enough commits received")
 	}
 }

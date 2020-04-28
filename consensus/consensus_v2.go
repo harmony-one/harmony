@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -18,6 +19,23 @@ import (
 	"github.com/harmony-one/vdf/src/vdf_go"
 	"github.com/pkg/errors"
 )
+
+func (consensus *Consensus) leaderHandleFinish() {
+	for viewID := range consensus.commitFinishChan {
+		// Only Leader execute this condition
+		if viewID == consensus.ViewID() {
+			fmt.Println("\nbefore finalize", consensus.ShardID)
+			consensus.mutex.Lock()
+			consensus.finalizeCommits()
+			consensus.mutex.Unlock()
+			fmt.Println("after finalize", consensus.ShardID)
+			consensus.ReadySignal <- struct{}{}
+			fmt.Println("after sending readysignal\n", consensus.ShardID)
+
+		}
+	}
+
+}
 
 // Start waits for the next new block and run consensus
 func (consensus *Consensus) Start(
@@ -40,6 +58,8 @@ func (consensus *Consensus) Start(
 	consensus.timeouts.Consensus.Start(consensus.BlockNum())
 	consensus.timeouts.ViewChange.Start(consensus.ViewID())
 	// notifer := consensus.timeouts.Notify()
+
+	go consensus.leaderHandleFinish()
 
 	for {
 
@@ -79,32 +99,24 @@ func (consensus *Consensus) Start(
 			utils.Logger().Debug().Msg("new block came in, starting consensus")
 			consensus.announce(newBlock)
 
-		case viewID := <-consensus.commitFinishChan:
-			utils.Logger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
-			// Only Leader execute this condition
-			if viewID == consensus.ViewID() {
-				consensus.mutex.Lock()
-				consensus.finalizeCommits()
-				consensus.mutex.Unlock()
-				go func() {
-					consensus.ReadySignal <- struct{}{}
-				}()
-			}
-
 		}
 	}
 	return nil
 }
 
+var (
+	// ErrEmptyMessage ..
+	ErrEmptyMessage = errors.New("empty consensus message")
+)
+
 // HandleMessageUpdate will update the consensus state according to received message
-func (consensus *Consensus) HandleMessageUpdate(payload []byte) {
+func (consensus *Consensus) HandleMessageUpdate(payload []byte) error {
 	if len(payload) == 0 {
-		return
+		return ErrEmptyMessage
 	}
 	msg := &msg_pb.Message{}
 	if err := protobuf.Unmarshal(payload, msg); err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to unmarshal message payload.")
-		return
+		return err
 	}
 
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
@@ -113,27 +125,19 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) {
 	if (consensus.current.Mode() == ViewChanging) &&
 		(msg.Type == msg_pb.MessageType_PREPARE ||
 			msg.Type == msg_pb.MessageType_COMMIT) {
-		return
+		return errors.New("omething about this")
 	}
 
 	if msg.Type == msg_pb.MessageType_VIEWCHANGE ||
 		msg.Type == msg_pb.MessageType_NEWVIEW {
 		if vc := msg.GetViewchange(); vc != nil &&
 			vc.ShardId != consensus.ShardID {
-			utils.Logger().Warn().
-				Uint32("myShardId", consensus.ShardID).
-				Uint32("receivedShardId", vc.ShardId).
-				Msg("Received view change message from different shard")
-			return
+			return errors.New("something else about here")
 		}
 	} else {
 		if con := msg.GetConsensus(); con != nil &&
 			con.ShardId != consensus.ShardID {
-			utils.Logger().Warn().
-				Uint32("myShardId", consensus.ShardID).
-				Uint32("receivedShardId", con.ShardId).
-				Msg("Received consensus message from different shard")
-			return
+			return errors.New("dont know")
 		}
 	}
 
@@ -171,6 +175,8 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) {
 		consensus.viewChangeSanityCheck(msg):
 		consensus.onNewView(msg)
 	}
+
+	return nil
 }
 
 func (consensus *Consensus) finalizeCommits() {
@@ -358,9 +364,8 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.blockHash = [32]byte{}
 		consensus.SetBlockNum(consensus.BlockNum() + 1)
 		consensus.SetViewID(committedMsg.ViewID + 1)
-		consensus.pubKeyLock.Lock()
+		// TODO Need to make this one atomic as well , the publock is bad, blocks updateconsensus
 		consensus.LeaderPubKey = committedMsg.SenderPubkey
-		consensus.pubKeyLock.Unlock()
 
 		utils.Logger().Info().Msg("[TryCatchup] Adding block to chain")
 

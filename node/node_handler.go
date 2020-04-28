@@ -25,6 +25,17 @@ import (
 
 const p2pMsgPrefixSize = 5
 
+// HandleConsensusMessageProcessing ..
+func (node *Node) HandleConsensusMessageProcessing() error {
+	for msg := range node.Consensus.IncomingConsensusMessage {
+		if err := node.Consensus.HandleMessageUpdate(msg); err != nil {
+			fmt.Println("some visibility into consensus messages", err.Error())
+		}
+	}
+
+	return nil
+}
+
 // HandleMessage parses the message and dispatch the actions.
 func (node *Node) HandleMessage(
 	content []byte, sender libp2p_peer.ID, topic string,
@@ -58,7 +69,8 @@ func (node *Node) HandleMessage(
 		if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 			node.ExplorerMessageHandler(msgPayload)
 		} else {
-			node.Consensus.HandleMessageUpdate(msgPayload)
+			// TODO handle this higher up, give conesnsus a weight of 1, others a weight of 2
+			node.Consensus.IncomingConsensusMessage <- msgPayload
 		}
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)

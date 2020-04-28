@@ -4,7 +4,7 @@ package consensus
 const (
 	maxLogSize uint32 = 1000
 	// threshold between received consensus message blockNum and my blockNum
-	consensusBlockNumBuffer uint64 = 2
+	consensusBlockNumBuffer uint64 = 6
 )
 
 var (
