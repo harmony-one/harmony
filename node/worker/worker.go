@@ -62,6 +62,8 @@ func (w *Worker) CommitTransactions(
 
 	txs := types.NewPoolTransactionsByPriceAndNonce(w.current.signer, poolTransactions)
 	dbIndex := 0
+
+	oneStaking := false
 	// NORMAL
 	for {
 		// If we don't have enough gas for any further transactions then we're done
@@ -102,7 +104,7 @@ func (w *Worker) CommitTransactions(
 			// We use the eip155 signer regardless of the current hf.
 			from, _ = types.Sender(w.current.signer, plainTx)
 			_, err = w.commitTransaction(plainTx, coinbase)
-		} else if stx, ok := tx.(*staking.StakingTransaction); ok {
+		} else if stx, ok := tx.(*staking.StakingTransaction); ok && !oneStaking {
 			// STAKING - only beaconchain process staking transaction
 			if w.chain.ShardID() != shard.BeaconChainShardID ||
 				!w.config.IsPreStaking(w.current.header.Epoch()) {
@@ -111,6 +113,9 @@ func (w *Worker) CommitTransactions(
 			}
 			from, _ = stx.SenderAddress()
 			_, err = w.commitStakingTransaction(stx, coinbase)
+			if err == nil {
+				oneStaking = true
+			}
 		}
 		// TODO(rj): rollback for staking errors
 		sender, _ := common2.AddressToBech32(from)
