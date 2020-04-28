@@ -143,8 +143,6 @@ func ComputeCurrentSigning(
 	)
 
 	if toSign.Cmp(common.Big0) == 0 {
-		utils.Logger().Info().
-			Msg("toSign is 0, perhaps did not receive crosslink proving signing")
 		return computed
 	}
 
