@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"fmt"
-	"sync"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
@@ -16,7 +15,6 @@ import (
 
 // FBFTLog represents the log stored by a node during FBFT process
 type FBFTLog struct {
-	sync.Mutex
 	blocks     mapset.Set //store blocks received in FBFT
 	messages   mapset.Set // store messages received in FBFT
 	maxLogSize uint32
@@ -105,8 +103,6 @@ func (log *FBFTLog) GetBlocksByNumber(number uint64) []*types.Block {
 // DeleteBlocksLessThan deletes blocks less than given block number
 func (log *FBFTLog) DeleteBlocksLessThan(number uint64) {
 	found := mapset.NewSet()
-	log.Lock()
-	defer log.Unlock()
 
 	it := log.Blocks().Iterator()
 	for block := range it.C {
@@ -132,8 +128,6 @@ func (log *FBFTLog) DeleteBlockByNumber(number uint64) {
 // DeleteMessagesLessThan deletes messages less than given block number
 func (log *FBFTLog) DeleteMessagesLessThan(number uint64) {
 	found := mapset.NewSet()
-	log.Lock()
-	defer log.Unlock()
 
 	it := log.Messages().Iterator()
 	for msg := range it.C {
@@ -156,8 +150,6 @@ func (log *FBFTLog) GetMessagesByTypeSeqViewHash(
 	viewID uint64, blockHash common.Hash,
 ) []*FBFTMessage {
 	found := []*FBFTMessage{}
-	log.Lock()
-	defer log.Unlock()
 
 	it := log.Messages().Iterator()
 	for msg := range it.C {
@@ -233,8 +225,6 @@ func (log *FBFTLog) GetMessagesByTypeSeqView(
 ) []*FBFTMessage {
 
 	found := []*FBFTMessage{}
-	log.Lock()
-	defer log.Unlock()
 
 	it := log.Messages().Iterator()
 	for msg := range it.C {

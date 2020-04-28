@@ -21,6 +21,10 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
 		Msg("[validatorSanityChecks] Checking new message")
+
+	consensus.locks.pubKey.Lock()
+	defer consensus.locks.pubKey.Unlock()
+
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
@@ -31,8 +35,6 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		}
 		return false
 	}
-	consensus.pubKeyLock.Lock()
-	defer consensus.pubKeyLock.Unlock()
 
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
 		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
@@ -104,8 +106,6 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 }
 
 func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
-	consensus.infoMutex.Lock()
-	defer consensus.infoMutex.Unlock()
 
 	logMsgs := consensus.FBFTLog.GetMessagesByTypeSeqView(
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,

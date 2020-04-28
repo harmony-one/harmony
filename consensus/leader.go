@@ -116,6 +116,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
+	consensus.locks.leader.Lock()
+	defer consensus.locks.leader.Unlock()
+
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
 		num, viewID, recvMsg.BlockHash,
 	) {
@@ -129,9 +132,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	validatorPubKey := recvMsg.SenderPubkey
 	prepareSig := recvMsg.Payload
 	prepareBitmap := consensus.prepareBitmap
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	logger := utils.Logger().With().Logger()
 
@@ -196,13 +196,13 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
+	consensus.locks.leader.Lock()
+	defer consensus.locks.leader.Unlock()
+
 	// NOTE let it handle its own log
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	// Check for potential double signing
 	if consensus.checkDoubleSign(recvMsg) {
@@ -224,7 +224,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash,
+		new(big.Int).SetUint64(consensus.Epoch()),
+		recvMsg.BlockHash,
 		recvMsg.BlockNum, consensus.ViewID(),
 	)
 	logger = logger.With().

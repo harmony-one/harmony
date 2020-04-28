@@ -33,9 +33,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	consensus.blockHash = recvMsg.BlockHash
 
 	// we have already added message and block, skip check viewID
@@ -147,9 +144,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	consensus.FBFTLog.AddBlock(&blockObj)
 	// add block field
 	blockPayload := make([]byte, len(recvMsg.Block))
@@ -205,7 +199,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	// local viewID may not be constant with other, so use received msg viewID.
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch),
+		new(big.Int).SetUint64(consensus.Epoch()),
 		consensus.blockHash,
 		consensus.BlockNum(),
 		recvMsg.ViewID,
@@ -259,8 +253,12 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	// Received msg must be about same epoch, otherwise it's invalid anyways.
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash, recvMsg.BlockNum, recvMsg.ViewID)
+	commitPayload := signature.ConstructCommitPayload(
+		consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.Epoch()),
+		recvMsg.BlockHash, recvMsg.BlockNum,
+		recvMsg.ViewID,
+	)
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		utils.Logger().Error().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -269,9 +267,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask

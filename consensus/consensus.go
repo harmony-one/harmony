@@ -47,6 +47,16 @@ func (consensus *Consensus) SetBlockNum(num uint64) {
 	consensus.blockNum.Store(num)
 }
 
+// Epoch ..
+func (consensus *Consensus) Epoch() uint64 {
+	return consensus.epoch.Load().(uint64)
+}
+
+// SetEpoch ..
+func (consensus *Consensus) SetEpoch(e uint64) {
+	consensus.epoch.Store(e)
+}
+
 // ViewID ..
 func (consensus *Consensus) ViewID() uint64 {
 	return consensus.viewID.Load().(uint64)
@@ -62,7 +72,7 @@ type Consensus struct {
 	// current indicates what state a node is in
 	current State
 	// epoch: current epoch number
-	epoch uint64
+	epoch atomic.Value
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	// blockNum, viewID are both uint64
@@ -94,14 +104,11 @@ type Consensus struct {
 	// message payload for
 	// type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 	m1Payload []byte
-	vcLock    sync.Mutex // mutex for view change
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader *core.BlockChain
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
-	MinPeers   int
-	pubKeyLock sync.Mutex
-	isLeader   atomic.Value
+	MinPeers int
 	// private/public keys of current node
 	priKey *multibls.PrivateKey
 	PubKey *multibls.PublicKey
@@ -117,10 +124,12 @@ type Consensus struct {
 	ShardID uint32
 	// whether to ignore viewID check
 	ignoreViewIDCheck bool
-	// global consensus mutex
-	mutex sync.Mutex
-	// consensus information update mutex
-	infoMutex sync.Mutex
+	locks             struct {
+		vc     sync.Mutex // mutex for view change
+		global sync.Mutex
+		leader sync.Mutex
+		pubKey sync.Mutex
+	}
 	// Signal channel for starting a new consensus process
 	ReadySignal    chan struct{}
 	RoundCompleted processBlock
@@ -181,19 +190,20 @@ func New(
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 
-	var isLeader, phase, blk, view atomic.Value
-	isLeader.Store(false)
+	var phase, blk, view, epoch atomic.Value
+
 	phase.Store(FBFTAnnounce)
 	blk.Store(uint64(0))
 	view.Store(uint64(0))
+	epoch.Store(uint64(0))
 
 	consensus := Consensus{
 		Decider:          Decider,
 		host:             host,
 		timeouts:         timeouts.NewNotifier(),
 		blockNum:         blk,
+		epoch:            epoch,
 		viewID:           view,
-		isLeader:         isLeader,
 		FBFTLog:          NewFBFTLog(),
 		phase:            phase,
 		current:          NewState(),

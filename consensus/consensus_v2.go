@@ -20,18 +20,25 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	// BlockTime ..
+	BlockTime time.Duration = 8 * time.Second
+)
+
 func (consensus *Consensus) leaderHandleFinish() {
 	for viewID := range consensus.commitFinishChan {
 		// Only Leader execute this condition
 		if viewID == consensus.ViewID() {
-			fmt.Println("\nbefore finalize", consensus.ShardID)
-			consensus.mutex.Lock()
+			fmt.Println("\nbefore finalize ", consensus.ShardID)
+
+			consensus.locks.global.Lock()
 			consensus.finalizeCommits()
-			consensus.mutex.Unlock()
+			consensus.locks.global.Unlock()
+
 			fmt.Println("after finalize", consensus.ShardID)
 			consensus.ReadySignal <- struct{}{}
-			fmt.Println("after sending readysignal\n", consensus.ShardID)
-
+			fmt.Println("after sending readysignal ", consensus.ShardID)
+			consensus.SetNextBlockDue(time.Now().Add(BlockTime))
 		}
 	}
 
@@ -42,19 +49,7 @@ func (consensus *Consensus) Start(
 	blockChannel chan *types.Block,
 ) error {
 
-	if consensus.IsLeader() {
-		consensus.current.SetMode(Normal)
-		go func() {
-			// give other nodes at network startup a chance to do things
-			time.Sleep(1 * time.Second)
-			consensus.ReadySignal <- struct{}{}
-			utils.Logger().Info().Msg("leader sent out consensus ready signal")
-
-		}()
-	}
-
 	// Set up next block due time. // TODO make 8 second duration
-	consensus.SetNextBlockDue(time.Now().Add(8))
 	consensus.timeouts.Consensus.Start(consensus.BlockNum())
 	consensus.timeouts.ViewChange.Start(consensus.ViewID())
 	// notifer := consensus.timeouts.Notify()
@@ -97,6 +92,7 @@ func (consensus *Consensus) Start(
 
 		case newBlock := <-blockChannel:
 			utils.Logger().Debug().Msg("new block came in, starting consensus")
+			consensus.SetNextBlockDue(time.Now().Add(BlockTime))
 			consensus.announce(newBlock)
 
 		}
@@ -253,9 +249,6 @@ func (consensus *Consensus) finalizeCommits() {
 		time.Sleep(consensus.NextBlockDue().Sub(n))
 	}
 
-	// Update time due for next block
-	// consensus.nextBlockDue = time.Now().Add(consensus.BlockPeriod)
-	consensus.SetNextBlockDue(time.Now().Add(8))
 }
 
 // NextBlockDue ..

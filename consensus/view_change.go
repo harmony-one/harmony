@@ -152,8 +152,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 	senderKey := recvMsg.SenderPubkey
 
-	consensus.vcLock.Lock()
-	defer consensus.vcLock.Unlock()
+	consensus.locks.vc.Lock()
+	defer consensus.locks.vc.Unlock()
 
 	// update the dictionary key if the viewID is first time received
 	consensus.addViewIDKeyIfNotExist(recvMsg.ViewID)
@@ -336,7 +336,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 			commitPayload := signature.ConstructCommitPayload(
 				consensus.ChainReader,
-				new(big.Int).SetUint64(consensus.epoch),
+				new(big.Int).SetUint64(consensus.Epoch()),
 				consensus.blockHash,
 				num,
 				recvMsg.ViewID,
@@ -405,8 +405,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	senderKey := recvMsg.SenderPubkey
-	consensus.vcLock.Lock()
-	defer consensus.vcLock.Unlock()
+	consensus.locks.vc.Lock()
+	defer consensus.locks.vc.Unlock()
 
 	if recvMsg.M3AggSig == nil || recvMsg.M3Bitmap == nil {
 		utils.Logger().Error().Msg("[onNewView] M3AggSig or M3Bitmap is nil")
@@ -503,7 +503,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		// Construct and send the commit message
 		commitPayload := signature.ConstructCommitPayload(
 			consensus.ChainReader,
-			new(big.Int).SetUint64(consensus.epoch),
+			new(big.Int).SetUint64(consensus.Epoch()),
 			consensus.blockHash,
 			num,
 			consensus.ViewID(),

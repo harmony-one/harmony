@@ -42,7 +42,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch),
+		new(big.Int).SetUint64(consensus.Epoch()),
 		consensus.blockHash, num, viewID,
 	)
 

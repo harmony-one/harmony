@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -53,19 +54,11 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
-	consensus.pubKeyLock.Lock()
+	consensus.locks.pubKey.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	consensus.LeaderPubKey = pubKeys[0]
-
-	for _, key := range consensus.PubKey.PublicKey {
-		if key.IsEqual(consensus.LeaderPubKey) {
-			consensus.isLeader.Store(true)
-			break
-		}
-	}
-
-	consensus.pubKeyLock.Unlock()
+	consensus.locks.pubKey.Unlock()
 	// reset states after update public keys
 	consensus.ResetState()
 	consensus.ResetViewChangeState()
@@ -230,14 +223,8 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 	return nil
 }
 
-// SetEpochNum sets the epoch in consensus object
-func (consensus *Consensus) SetEpochNum(epoch uint64) {
-	consensus.infoMutex.Lock()
-	defer consensus.infoMutex.Unlock()
-	consensus.epoch = epoch
-}
-
-// ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
+// ReadSignatureBitmapPayload read the payload
+// for signature and bitmap; offset is the beginning position of reading
 func (consensus *Consensus) ReadSignatureBitmapPayload(
 	recvPayload []byte, offset int,
 ) (*bls.Sign, *bls_cosi.Mask, error) {
@@ -339,7 +326,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	utils.Logger().Info().Msg("[UpdateConsensusInformation] Updating.....")
 	if len(curHeader.ShardState()) > 0 {
 		// increase curEpoch by one if it's the last block
-		consensus.SetEpochNum(curEpoch.Uint64() + 1)
+		consensus.SetEpoch(curEpoch.Uint64() + 1)
+		fmt.Println("changed consensu's epoch to next one")
+
 		utils.Logger().Info().
 			Uint64("headerNum", curHeader.Number().Uint64()).
 			Msg("Epoch updated for nextEpoch curEpoch")
@@ -367,7 +356,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		committeeToSet = subComm
 		epochToSet = nextEpoch
 	} else {
-		consensus.SetEpochNum(curEpoch.Uint64())
+		consensus.SetEpoch(curEpoch.Uint64())
 		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
 		if err != nil {
 			utils.Logger().Error().
@@ -455,8 +444,14 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	return consensus.isLeader.Load().(bool)
-
+	for i := range consensus.PubKey.PublicKey {
+		if consensus.PubKey.PublicKey[i].IsEqual(
+			consensus.LeaderPubKey,
+		) {
+			return true
+		}
+	}
+	return false
 }
 
 // NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
