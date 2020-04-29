@@ -58,12 +58,11 @@ func (node *Node) StartLeaderWork() error {
 			// Send the new block to Consensus so it can be confirmed.
 			fmt.Println("now announced", newBlock.Header().String())
 
-			node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-
 			if err := node.Consensus.Announce(newBlock); err != nil {
 				fmt.Println("problem with annunce why")
 				return err
 			}
+			node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 
 		}
 		return nil

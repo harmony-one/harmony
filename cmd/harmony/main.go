@@ -793,12 +793,14 @@ func main() {
 		if currentNode.IsCurrentlyLeader() {
 			currentNode.Consensus.SetMode(consensus.Normal)
 			g.Go(currentNode.StartLeaderWork)
-			g.Go(func() error {
+			go func() {
 				time.Sleep(time.Second * 10)
-				fmt.Println("kicking off first block")
+				fmt.Println(">>>>>>>>kicking off first block<<<<<<<",
+					currentNode.Consensus.ShardID,
+				)
 				currentNode.Consensus.ProposalNewBlock <- struct{}{}
-				return nil
-			})
+				currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+			}()
 		}
 
 		g.Go(currentNode.BootstrapConsensus)
@@ -811,7 +813,6 @@ func main() {
 	// 	currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 	// g.Go(currentNode.StartBeaconBlockStateSync)
 	// g.Go(currentNode.StartBlockStateSync)
-
 	// }
 
 	if err := g.Wait(); err != nil {
