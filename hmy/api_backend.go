@@ -602,7 +602,7 @@ func (b *APIBackend) readAndUpdateRawStakes(
 	comm shard.Committee,
 	rawStakes []effective.SlotPurchase,
 	validatorSpreads map[common.Address]numeric.Dec,
-) {
+) []effective.SlotPurchase {
 	for i := range comm.Slots {
 		slot := comm.Slots[i]
 		slotAddr := slot.EcdsaAddress
@@ -628,6 +628,7 @@ func (b *APIBackend) readAndUpdateRawStakes(
 			spread,
 		})
 	}
+	return rawStakes
 }
 
 func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
@@ -662,7 +663,7 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 		if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
 			return nil, err
 		}
-		b.readAndUpdateRawStakes(thenE, decider, comm, rawStakes, validatorSpreads)
+		rawStakes = b.readAndUpdateRawStakes(thenE, decider, comm, rawStakes, validatorSpreads)
 		then.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
 	then.MedianStake = effective.Median(rawStakes)
@@ -674,7 +675,7 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch); err != nil {
 			return nil, err
 		}
-		b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
+		rawStakes = b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
 		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
 	then.MedianStake = effective.Median(rawStakes)

@@ -2354,6 +2354,22 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		}
 		stats.MetricsPerShard = earningWrapping
 
+		// fetch raw-stake from snapshot and update per-key metrics
+		if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
+			newEpochSuperCommittee.Epoch, key,
+		); err == nil {
+			wrapper := snapshot.Validator
+			spread := numeric.ZeroDec()
+			if len(wrapper.SlotPubKeys) > 0 {
+				spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
+					QuoInt64(int64(len(wrapper.SlotPubKeys)))
+			}
+			for i := range stats.MetricsPerShard {
+				metric := stats.MetricsPerShard[i]
+				metric.Vote.RawStake = spread
+			}
+		}
+
 		// This means it's already in staking epoch
 		if currentEpochSuperCommittee.Epoch != nil {
 			wrapper, err := state.ValidatorWrapper(key)
