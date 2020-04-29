@@ -206,7 +206,7 @@ func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) (uint64, error) {
 
 // GetBlockSigners returns signers for a particular block.
 func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) ([]string, error) {
-	if uint64(blockNr) == 0 || uint64(blockNr) >= uint64(s.BlockNumber()) {
+	if uint64(blockNr) == 0 {
 		return []string{}, nil
 	}
 	block, err := s.b.BlockByNumber(ctx, blockNr)
@@ -757,8 +757,10 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, add
 	return result, nil
 }
 
-// GetDelegationsByDelegatorAt returns list of delegations for a delegator address at given block number
-func (s *PublicBlockChainAPI) GetDelegationsByDelegatorAt(ctx context.Context, address string, blockNum rpc.BlockNumber) ([]*RPCDelegation, error) {
+// GetDelegationsByDelegatorByBlockNumber returns list of delegations for a delegator address at given block number
+func (s *PublicBlockChainAPI) GetDelegationsByDelegatorByBlockNumber(
+	ctx context.Context, address string, blockNum rpc.BlockNumber,
+) ([]*RPCDelegation, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -767,7 +769,7 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegatorAt(ctx context.Context, a
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not retrieve the block information for block number: %d", blockNum)
 	}
-	validators, delegations := s.b.GetDelegationsByDelegatorAt(delegatorAddress, block)
+	validators, delegations := s.b.GetDelegationsByDelegatorByBlockNumber(delegatorAddress, block)
 	result := []*RPCDelegation{}
 	for i := range delegations {
 		delegation := delegations[i]

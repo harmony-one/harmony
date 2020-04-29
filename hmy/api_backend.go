@@ -530,13 +530,14 @@ func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*stak
 	return delegations
 }
 
-// GetDelegationsByDelegator returns all delegation information of a delegator
-func (b *APIBackend) GetDelegationsByDelegatorAt(
+// GetDelegationsByDelegatorByBlockNumber returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegatorByBlockNumber(
 	delegator common.Address, block *types.Block,
 ) ([]common.Address, []*staking.Delegation) {
 	addresses := []common.Address{}
 	delegations := []*staking.Delegation{}
-	delegationIndexes, err := b.hmy.BlockChain().ReadDelegationsByDelegatorAt(delegator, block.Number())
+	delegationIndexes, err := b.hmy.BlockChain().
+		ReadDelegationsByDelegatorAt(delegator, block.Number())
 	if err != nil {
 		return nil, nil
 	}
@@ -564,7 +565,7 @@ func (b *APIBackend) GetDelegationsByDelegator(
 	delegator common.Address,
 ) ([]common.Address, []*staking.Delegation) {
 	block := b.hmy.BlockChain().CurrentBlock()
-	return b.GetDelegationsByDelegatorAt(delegator, block)
+	return b.GetDelegationsByDelegatorByBlockNumber(delegator, block)
 }
 
 // GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
