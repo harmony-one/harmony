@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -219,6 +220,39 @@ func WriteValidatorStats(
 	}
 	if err := batch.Put(validatorStatsKey(addr), bytes); err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorStats] Failed to store to database")
+		return err
+	}
+	return err
+}
+
+// ReadValidatorAPR retrieves validator's apr snapshot
+func ReadValidatorAPR(
+	db DatabaseReader, addr common.Address, epoch *big.Int,
+) (numeric.Dec, error) {
+	data, err := db.Get(validatorAPRKey(addr, epoch))
+	if err != nil || len(data) == 0 {
+		utils.Logger().Info().Err(err).Msg("ReadValidatorAPR")
+		return numeric.ZeroDec(), err
+	}
+	d := numeric.ZeroDec()
+	if err := rlp.DecodeBytes(data, &d); err != nil {
+		utils.Logger().Error().Err(err).
+			Str("address", addr.Hex()).
+			Msg("Unable to decode validator snapshot from database")
+		return numeric.ZeroDec(), err
+	}
+	return d, nil
+}
+
+// WriteValidatorAPR stores validator's apr snapshot by its address
+func WriteValidatorAPR(batch DatabaseWriter, addr common.Address, epoch *big.Int, d numeric.Dec) error {
+	bytes, err := rlp.EncodeToBytes(d)
+	if err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorAPR] Failed to encode")
+		return err
+	}
+	if err := batch.Put(validatorAPRKey(addr, epoch), bytes); err != nil {
+		utils.Logger().Error().Msg("[WriteValidatorAPR] Failed to store to database")
 		return err
 	}
 	return err

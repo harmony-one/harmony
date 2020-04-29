@@ -437,7 +437,43 @@ func (b *APIBackend) GetValidatorInformation(
 		return defaultReply, nil
 	}
 
-	defaultReply.Lifetime.APR = stats.APR
+	// average apr cache keys
+	key := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64())
+	prevKey := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64()-1)
+
+	// delete entry for previous epoch
+	b.apiCache.Forget(prevKey)
+
+	// calculate last 100 epochs for averaging APR
+	epochFrom := bc.Config().StakingEpoch
+	nowMinus100 := now.Sub(now, big.NewInt(100))
+	if nowMinus100.Cmp(epochFrom) > 0 {
+		epochFrom = nowMinus100
+	}
+
+	if avgAPR, err := b.SingleFlightRequest(
+		key, func() (interface{}, error) {
+			total := numeric.ZeroDec()
+			count := 0
+			for i := now.Int64(); i > nowMinus100.Int64(); i-- {
+				epoch := big.NewInt(i)
+				if apr, err := bc.ReadValidatorAPRAt(epoch, addr); err == nil {
+					total = total.Add(apr)
+					count = count + 1
+				}
+			}
+			if count == 0 {
+				return numeric.ZeroDec(), errors.New("no apr snapshots available")
+			}
+			return total.QuoInt64(int64(count)), nil
+		},
+	); err != nil {
+		// could not compute average apr from snapshot
+		// assign the latest apr available from stats
+		defaultReply.Lifetime.APR = stats.APR
+	} else {
+		defaultReply.Lifetime.APR = avgAPR.(numeric.Dec)
+	}
 
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.Performance = &staking.CurrentEpochPerformance{

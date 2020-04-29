@@ -59,6 +59,7 @@ var (
 	cxReceiptSpentPrefix    = []byte("cxReceiptSpent")     // prefix for indicator of unspent of cxReceiptsProof
 	validatorSnapshotPrefix = []byte("validator-snapshot") // prefix for staking validator's snapshot information
 	validatorStatsPrefix    = []byte("validator-stats")    // prefix for staking validator's stats information
+	validatorAPRPrefix      = []byte("validator-apr")      // prefix for staking validator's apr information
 	validatorListKey        = []byte("validator-list")     // key for all validators list
 	// epochBlockNumberPrefix + epoch (big.Int.Bytes())
 	// -> epoch block number (big.Int.Bytes())
@@ -213,6 +214,12 @@ func validatorSnapshotKey(addr common.Address, epoch *big.Int) []byte {
 func validatorStatsKey(addr common.Address) []byte {
 	prefix := validatorStatsPrefix
 	return append(prefix, addr.Bytes()...)
+}
+
+func validatorAPRKey(addr common.Address, epoch *big.Int) []byte {
+	prefix := validatorAPRPrefix
+	tmp := append(prefix, addr.Bytes()...)
+	return append(tmp, epoch.Bytes()...)
 }
 
 func blockRewardAccumKey(number uint64) []byte {

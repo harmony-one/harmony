@@ -2231,6 +2231,13 @@ func (bc *BlockChain) ReadValidatorSnapshotAtEpoch(
 	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
 }
 
+// ReadValidatorAPRAt read the snapshot APR for validator
+func (bc *BlockChain) ReadValidatorAPRAt(
+	epoch *big.Int, addr common.Address,
+) (numeric.Dec, error) {
+	return rawdb.ReadValidatorAPR(bc.db, addr, epoch)
+}
+
 // ReadValidatorSnapshot reads the snapshot staking information of given validator address
 func (bc *BlockChain) ReadValidatorSnapshot(
 	addr common.Address,
@@ -2373,6 +2380,19 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 					}
 				} else {
 					stats.APR = *aprComputed
+					// snapshot validator's apr if not exists
+					if _, err := rawdb.ReadValidatorAPR(
+						bc.db, key, newEpochSuperCommittee.Epoch,
+					); err != nil {
+						// apr snapshot does not exists, hence store
+						if err := rawdb.WriteValidatorAPR(
+							bc.db, key, newEpochSuperCommittee.Epoch, *aprComputed,
+						); err != nil {
+							utils.Logger().Info().Err(err).
+								Str("validator address", key.Hex()).
+								Msg("could not write apr stats for validator")
+						}
+					}
 				}
 			} else {
 				utils.Logger().Info().Msg("zero total delegation, skipping apr computation")
