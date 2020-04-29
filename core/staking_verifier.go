@@ -23,6 +23,46 @@ var (
 	errBlockNumMissing     = errors.New("no block number was provided")
 )
 
+func checkDuplicateFields(
+	bc ChainContext, state vm.StateDB,
+	validator common.Address, identity string, blsKeys []shard.BLSPublicKey,
+) error {
+	addrs, err := bc.ReadValidatorList()
+	if err != nil {
+		return err
+	}
+
+	checkIdentity := identity != ""
+	checkBlsKeys := len(blsKeys) != 0
+
+	blsKeyMap := map[shard.BLSPublicKey]struct{}{}
+	for _, key := range blsKeys {
+		blsKeyMap[key] = struct{}{}
+	}
+
+	for _, addr := range addrs {
+		if !bytes.Equal(validator.Bytes(), addr.Bytes()) {
+			wrapper, err := state.ValidatorWrapperCopy(addr)
+
+			if err != nil {
+				return err
+			}
+
+			if checkIdentity && wrapper.Identity == identity {
+				return errors.Wrapf(errDupIdentity, "duplicate identity %s", identity)
+			}
+			if checkBlsKeys {
+				for _, existingKey := range wrapper.SlotPubKeys {
+					if _, ok := blsKeyMap[existingKey]; ok {
+						return errors.Wrapf(errDupBlsKey, "duplicate bls key %x", existingKey)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // TODO: add unit tests to check staking msg verification
 
 // VerifyAndCreateValidatorFromMsg verifies the create validator message using
@@ -31,11 +71,13 @@ var (
 //
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndCreateValidatorFromMsg(
-	stateDB vm.StateDB, epoch *big.Int, blockNum *big.Int, msg *staking.CreateValidator,
+	stateDB vm.StateDB, chainContext ChainContext, epoch *big.Int, blockNum *big.Int, msg *staking.CreateValidator,
 ) (*staking.ValidatorWrapper, error) {
-
 	if stateDB == nil {
 		return nil, errStateDBIsMissing
+	}
+	if chainContext == nil {
+		return nil, errChainContextMissing
 	}
 	if epoch == nil {
 		return nil, errEpochMissing
@@ -50,6 +92,13 @@ func VerifyAndCreateValidatorFromMsg(
 		return nil, errors.Wrapf(
 			errValidatorExist, common2.MustAddressToBech32(msg.ValidatorAddress),
 		)
+	}
+	if err := checkDuplicateFields(
+		chainContext, stateDB,
+		msg.ValidatorAddress,
+		msg.Identity,
+		msg.SlotPubKeys); err != nil {
+		return nil, err
 	}
 	if !CanTransfer(stateDB, msg.ValidatorAddress, msg.Amount) {
 		return nil, errInsufficientBalanceForStake
@@ -82,7 +131,6 @@ func VerifyAndEditValidatorFromMsg(
 	stateDB vm.StateDB, chainContext ChainContext,
 	epoch, blockNum *big.Int, msg *staking.EditValidator,
 ) (*staking.ValidatorWrapper, error) {
-
 	if stateDB == nil {
 		return nil, errStateDBIsMissing
 	}
@@ -94,6 +142,17 @@ func VerifyAndEditValidatorFromMsg(
 	}
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
 		return nil, errValidatorNotExist
+	}
+	newBlsKeys := []shard.BLSPublicKey{}
+	if msg.SlotKeyToAdd != nil {
+		newBlsKeys = append(newBlsKeys, *msg.SlotKeyToAdd)
+	}
+	if err := checkDuplicateFields(
+		chainContext, stateDB,
+		msg.ValidatorAddress,
+		msg.Identity,
+		newBlsKeys); err != nil {
+		return nil, err
 	}
 	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
 	if err != nil {
