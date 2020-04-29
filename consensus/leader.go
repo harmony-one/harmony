@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -289,37 +290,13 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 		return err
 	}
 
-	// Reading from this commitfinish chan should be own thread
-
-	// quorumIsMet :=
-
-	// if !quorumWasMet && quorumIsMet {
-	// 	logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
-	// 	nextDue := consensus.NextBlockDue
-	// 	go func() {
-	// 		utils.Logger().Debug().Msg("[OnCommit] Starting Grace Period")
-	// 		// Always wait for 2 seconds as minimum grace period
-	// 		time.Sleep(2 * time.Second)
-	// 		if n := time.Now(); n.Before(nextDue) {
-	// 			// Sleep to wait for the full block time
-	// 			time.Sleep(nextDue.Sub(n))
-	// 		}
-	// 		logger.Debug().Msg("[OnCommit] Commit Grace Period Ended")
-	// 		consensus.commitFinishChan <- myViewID
-	// 	}()
-	// }
-
 	if consensus.Decider.IsQuorumAchieved(quorum.Commit) {
-		// go func(viewID uint64) {
-		// 	time.AfterFunc(time.Until(consensus.NextBlockDue()), func() {
-		// 		fmt.Println("waited the full block time needed", consensus.ShardID)
-		// 		fmt.Println("sent the viewID", viewID)
-		// 	})
-		// }(consensus.ViewID())
-
-		consensus.CommitFinishChan <- Finished{
-			consensus.ViewID(), consensus.ShardID,
-		}
+		viewID := consensus.ViewID()
+		time.AfterFunc(time.Second*2, func() {
+			consensus.CommitFinishChan <- Finished{
+				viewID, consensus.ShardID,
+			}
+		})
 
 	}
 

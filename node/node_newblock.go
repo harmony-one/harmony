@@ -58,6 +58,7 @@ func (node *Node) StartLeaderWork() error {
 			// Send the new block to Consensus so it can be confirmed.
 			fmt.Println("now announced", newBlock.Header().String())
 
+			node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 			if err := node.Consensus.Announce(newBlock); err != nil {
 				fmt.Println("problem with annunce why")
 				return err
@@ -77,19 +78,22 @@ func (node *Node) StartLeaderWork() error {
 		for quorumReached := range node.Consensus.CommitFinishChan {
 			if node.Consensus.IsLeader() {
 				viewID, shardID := quorumReached.ViewID, quorumReached.ShardID
-				nextDue := node.Consensus.NextBlockDue()
-
 				results, err, evicted := roundDone.Do(
 					fmt.Sprintf("%d-%d", viewID, shardID),
 					func() (interface{}, error) {
 
-						fmt.Println(
-							"viewid, isleader", viewID, shardID, node.Consensus.IsLeader(),
-						)
+						if bufferTime := time.Until(
+							node.Consensus.NextBlockDue(),
+						); bufferTime > time.Second*3 {
+							fmt.Println(
+								"got the block done faster",
+								node.Consensus.ShardID,
+								bufferTime.Round(time.Second),
+							)
+							time.Sleep(time.Second)
+						}
 
-						time.AfterFunc(time.Until(nextDue), func() {
-							fmt.Println("waited the full block period", viewID)
-						})
+						fmt.Println("before finalize", node.Consensus.ShardID)
 
 						if err := node.Consensus.FinalizeCommits(); err != nil {
 							fmt.Println("why could not finalize?", err.Error())
@@ -105,7 +109,6 @@ func (node *Node) StartLeaderWork() error {
 					return err
 				}
 
-				fmt.Println("\nbefore finalize ", node.Consensus.ShardID)
 				node.Consensus.ProposalNewBlock <- struct{}{}
 				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 				fmt.Println("after sending Proposal for new block ", node.Consensus.ShardID)
