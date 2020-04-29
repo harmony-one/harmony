@@ -83,7 +83,7 @@ func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKey {
 // ResetViewChangeState reset the state for viewchange
 func (consensus *Consensus) ResetViewChangeState() {
 	utils.Logger().Debug().Msg("[ResetViewChangeState] Resetting view change state")
-	consensus.current.SetMode(Normal)
+	consensus.Current.SetMode(Normal)
 	consensus.m1Payload = []byte{}
 	consensus.bhpSigs = map[uint64]map[string]*bls.Sign{}
 	consensus.nilSigs = map[uint64]map[string]*bls.Sign{}
@@ -94,13 +94,14 @@ func (consensus *Consensus) ResetViewChangeState() {
 	consensus.Decider.ResetViewChangeVotes()
 }
 
-// startViewChange send a  new view change
-func (consensus *Consensus) startViewChange(viewID uint64) {
+// StartViewChange ..
+func (consensus *Consensus) StartViewChange(viewID uint64) {
+
 	if consensus.disableViewChange {
 		return
 	}
-	consensus.current.SetMode(ViewChanging)
-	consensus.current.SetViewID(viewID)
+	consensus.Current.SetMode(ViewChanging)
+	consensus.Current.SetViewID(viewID)
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
 	diff := int64(viewID - consensus.ViewID())
 	duration := time.Duration(diff * diff * int64(timeouts.ViewChangeDuration))
@@ -122,7 +123,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.Timeouts.ViewChange.Start(consensus.ViewID())
 
 	utils.Logger().Debug().
-		Uint64("ViewChangingID", consensus.current.ViewID()).
+		Uint64("ViewChangingID", consensus.Current.ViewID()).
 		Msg("[startViewChange] start view change timer")
 }
 
@@ -311,7 +312,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 
 	// received enough view change messages, change state to normal consensus
 	if consensus.Decider.IsQuorumAchievedByMask(consensus.viewIDBitmap[recvMsg.ViewID]) {
-		consensus.current.SetMode(Normal)
+		consensus.Current.SetMode(Normal)
 		consensus.LeaderPubKey = newLeaderKey
 		consensus.ResetState()
 		if len(consensus.m1Payload) == 0 {
@@ -366,7 +367,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 			}
 		}
 
-		consensus.current.SetViewID(recvMsg.ViewID)
+		consensus.Current.SetViewID(recvMsg.ViewID)
 		msgToSend := consensus.constructNewViewMessage(
 			recvMsg.ViewID, newLeaderKey, newLeaderPriKey,
 		)
@@ -489,7 +490,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) error {
 
 	// newView message verified success, override my state
 	consensus.SetViewID(recvMsg.ViewID)
-	consensus.current.SetViewID(recvMsg.ViewID)
+	consensus.Current.SetViewID(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
 

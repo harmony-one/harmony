@@ -108,7 +108,7 @@ type Consensus struct {
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
 	phase atomic.Value
 	// current indicates what state a node is in
-	current State
+	Current State
 	// epoch: current epoch number
 	epoch atomic.Value
 	// blockNum: the next blockNumber that FBFT is going to agree on,
@@ -213,7 +213,7 @@ func (consensus *Consensus) GetLeaderPrivateKey(
 	// 	len(consensus.PubKey.PublicKey),
 	// 	consensus.PubKey,
 	// )
-	// panic("die")
+	panic("die")
 	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
 }
 
@@ -243,7 +243,7 @@ func New(
 		Decider:          Decider,
 		FBFTLog:          NewFBFTLog(),
 		phase:            phase,
-		current:          NewState(),
+		Current:          NewState(),
 		epoch:            epoch,
 		blockNum:         blk,
 		viewID:           view,

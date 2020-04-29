@@ -108,6 +108,7 @@ func (node *Node) StartLeaderWork() error {
 						return err
 					}
 
+					// NOTE comment this out to cause a view change
 					node.Consensus.ProposalNewBlock <- struct{}{}
 					node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 

@@ -15,6 +15,11 @@ const (
 	Consensus Named = "consensus-timeout"
 )
 
+// DueWithValue ..
+// type DueWithValue struct {
+// 	Value uint64
+// }
+
 const (
 	// The duration of viewChangeTimeout; when a view change is initialized with v+1
 	// timeout will be equal to viewChangeDuration; if view change failed and start v+2
@@ -34,73 +39,35 @@ type ComeDue struct {
 	startTime  atomic.Value
 	limit      atomic.Value
 	startValue atomic.Value
+	TimedOut   chan uint64
 }
 
 // Start ..
 func (d *ComeDue) Start(value uint64) {
-	d.startTime.Store(time.Now())
-	d.startValue.Store(value)
+	var t *time.Timer
+
+	if t != nil {
+		t.Stop()
+	}
+
+	n := time.Now()
+
+	func() {
+		d.startTime.Store(n)
+		d.startValue.Store(value)
+
+		t = time.AfterFunc(time.Until(n.Add(d.limit.Load().(time.Duration))), func() {
+			d.TimedOut <- value
+			// t.Stop()
+		})
+
+	}()
 }
 
 // SetDuration ..
 func (d *ComeDue) SetDuration(dur time.Duration) {
 	d.limit.Store(dur)
 }
-
-// Notify ..
-func (d *ComeDue) Notify() <-chan uint64 {
-	timedOut := make(chan uint64)
-
-	go func() {
-		for {
-
-			time.AfterFunc(d.limit.Load().(time.Duration), func() {
-				elapsed := time.Since(d.startTime.Load().(time.Time))
-				if elapsed.Round(time.Second) > d.limit.Load().(time.Duration) {
-					timedOut <- d.startValue.Load().(uint64)
-				}
-			})
-
-		}
-	}()
-
-	return timedOut
-}
-
-// func (d *ComeDue) WithinLimit() bool {
-// }
-
-// DueWithValue ..
-// type DueWithValue struct {
-// 	Value uint64
-// }
-
-// Notify ..
-// func (r *Notifier) Notify() <-chan DueWithValue {
-
-// 	time.AfterFunc(r.Consensus.limit.Load().(time.Duration), func() {
-// 		timedOut <- DueWithValue{
-// 			Name:  r.Consensus.Name,
-// 			Value: r.Consensus.startValue.Load().(uint64),
-// 		}
-// 	})
-
-// 	// go func() {
-// 	// 	for {
-// 	// 		then := time.Now()
-// 	// 		time.Sleep(r.ViewChange.limit.Load().(time.Duration))
-// 	// 		timedOut <- DueWithValue{
-// 	// 			Name:  r.ViewChange.Name,
-// 	// 			Value: r.ViewChange.startValue.Load().(uint64),
-// 	// 		}
-// 	// 		fmt.Println("notify occured this much later", time.Since(then).Round(time.Second))
-// 	// 		return
-// 	// 	}
-// 	// }()
-
-// 	return timedOut
-
-// }
 
 // Notifier ..
 type Notifier struct {
@@ -122,11 +89,13 @@ func NewNotifier() *Notifier {
 			Name:       Consensus,
 			limit:      d,
 			startValue: s1,
+			TimedOut:   make(chan uint64),
 		},
 		ViewChange: ComeDue{
 			Name:       ViewChange,
 			limit:      v,
 			startValue: s2,
+			TimedOut:   make(chan uint64),
 		},
 	}
 }

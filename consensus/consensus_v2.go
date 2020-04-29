@@ -108,7 +108,7 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) error {
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
-	if (consensus.current.Mode() == ViewChanging) &&
+	if (consensus.Current.Mode() == ViewChanging) &&
 		(msg.Type == msg_pb.MessageType_PREPARE ||
 			msg.Type == msg_pb.MessageType_COMMIT) {
 		return errors.New("omething about this")
@@ -384,8 +384,8 @@ func (consensus *Consensus) tryCatchup() error {
 	}
 
 	// catup up and skip from view change trap
-	if then < now && consensus.current.Mode() == ViewChanging {
-		consensus.current.SetMode(Normal)
+	if then < now && consensus.Current.Mode() == ViewChanging {
+		consensus.Current.SetMode(Normal)
 	}
 
 	// clean up old log

@@ -182,12 +182,12 @@ func (consensus *Consensus) SetViewID(height uint64) {
 
 // SetMode sets the mode of consensus
 func (consensus *Consensus) SetMode(m Mode) {
-	consensus.current.SetMode(m)
+	consensus.Current.SetMode(m)
 }
 
 // Mode returns the mode of consensus
 func (consensus *Consensus) Mode() Mode {
-	return consensus.current.Mode()
+	return consensus.Current.Mode()
 }
 
 // RegisterPRndChannel registers the channel for receiving randomness preimage from DRG protocol
@@ -206,9 +206,9 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 	if consensus.ignoreViewIDCheck {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
-		consensus.current.SetMode(Normal)
+		consensus.Current.SetMode(Normal)
 		consensus.SetViewID(msg.ViewID)
-		consensus.current.SetViewID(msg.ViewID)
+		consensus.Current.SetViewID(msg.ViewID)
 		consensus.LeaderPubKey = msg.SenderPubkey
 		consensus.ignoreViewIDCheck = false
 		consensus.Timeouts.Consensus.Start(consensus.BlockNum())

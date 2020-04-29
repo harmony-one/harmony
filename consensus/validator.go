@@ -38,14 +38,14 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) error {
 
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
-	if consensus.current.Mode() == ViewChanging {
+	if consensus.Current.Mode() == ViewChanging {
 		utils.Logger().Debug().
 			Msg("[OnAnnounce] Still in ViewChanging Mode, Exiting !!")
 		return nil
 	}
 
 	if consensus.checkViewID(recvMsg) != nil {
-		if consensus.current.Mode() == Normal {
+		if consensus.Current.Mode() == Normal {
 			utils.Logger().Debug().
 				Uint64("MsgViewID", recvMsg.ViewID).
 				Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -159,13 +159,13 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 	if err := consensus.tryCatchup(); err != nil {
 		return err
 	}
-	if consensus.current.Mode() == ViewChanging {
+	if consensus.Current.Mode() == ViewChanging {
 		utils.Logger().Debug().Msg("[OnPrepared] Still in ViewChanging mode, Exiting!!")
 		return nil
 	}
 
 	if consensus.checkViewID(recvMsg) != nil {
-		if consensus.current.Mode() == Normal {
+		if consensus.Current.Mode() == Normal {
 			utils.Logger().Debug().
 				Uint64("MsgViewID", recvMsg.ViewID).
 				Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -209,7 +209,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 			key, consensus.priKey.PrivateKey[i],
 		)
 
-		if consensus.current.Mode() != Listening {
+		if consensus.Current.Mode() != Listening {
 			if err := consensus.host.SendMessageToGroups(groupID,
 				p2p.ConstructMessage(networkMessage.Bytes),
 			); err != nil {
@@ -292,7 +292,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 		return err
 	}
 
-	if consensus.current.Mode() == ViewChanging {
+	if consensus.Current.Mode() == ViewChanging {
 		utils.Logger().Debug().Msg("[OnCommitted] Still in ViewChanging mode, Exiting!!")
 		return nil
 	}

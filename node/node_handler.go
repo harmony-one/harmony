@@ -24,18 +24,6 @@ import (
 
 const p2pMsgPrefixSize = 5
 
-// HandleConsensusMessageProcessing ..
-func (node *Node) HandleConsensusMessageProcessing() error {
-
-	for msg := range node.Consensus.IncomingConsensusMessage {
-		if err := node.Consensus.HandleMessageUpdate(msg); err != nil {
-			fmt.Println("some visibility into consensus messages", err.Error())
-		}
-	}
-
-	return nil
-}
-
 // HandleMessage parses the message and dispatch the actions.
 func (node *Node) HandleMessage(
 	content []byte, sender libp2p_peer.ID, topic string,
