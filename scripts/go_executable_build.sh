@@ -235,7 +235,7 @@ function release
    done
 
    # copy node.sh
-   $AWSCLI s3 cp scripts/node.sh s3://${BUCKET}/$FOLDER/node.sh --acl public-read
+   $AWSCLI s3 cp scripts/node.sh s3://${PUBBUCKET}/$FOLDER/node.sh --acl public-read
 
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${PUBBUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
