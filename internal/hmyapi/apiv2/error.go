@@ -13,7 +13,7 @@ var (
 	ErrIncorrectChainID = errors.New("incorrect chain id")
 	// ErrInvalidChainID when ChainID of signer does not match that of running node
 	ErrInvalidChainID = errors.New("invalid chain id for signer")
-	// ErrNotBeaconChainShard when rpc is called on not beacon chain node
+	// ErrNotBeaconShard when rpc is called on not beacon chain node
 	ErrNotBeaconShard = errors.New("cannot call this rpc on non beaconchain node")
 	// ErrRequestedBlockTooHigh when given block is greater than latest block number
 	ErrRequestedBlockTooHigh = errors.New("requested block number greater than current block number")

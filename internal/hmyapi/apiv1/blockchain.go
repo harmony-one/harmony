@@ -953,7 +953,7 @@ func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
-		return s.b.GetCurrentUtilityMetrics()
+	return s.b.GetCurrentUtilityMetrics()
 }
 
 // GetSuperCommittees ..
@@ -961,7 +961,7 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
-		return s.b.GetSuperCommittees()
+	return s.b.GetSuperCommittees()
 }
 
 // GetCurrentBadBlocks ..
@@ -1007,5 +1007,5 @@ func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.CrossLink, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
-		return s.b.GetLastCrossLinks()
+	return s.b.GetLastCrossLinks()
 }

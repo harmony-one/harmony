@@ -2471,7 +2471,7 @@ func (bc *BlockChain) ReadDelegationsByDelegator(
 	return m, nil
 }
 
-// ReadDelegationsByDelegator reads the addresses of validators delegated by a delegator
+// ReadDelegationsByDelegatorAt reads the addresses of validators delegated by a delegator at a given block
 func (bc *BlockChain) ReadDelegationsByDelegatorAt(
 	delegator common.Address, blockNum *big.Int,
 ) (m staking.DelegationIndexes, err error) {
