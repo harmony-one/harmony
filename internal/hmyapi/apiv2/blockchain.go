@@ -684,6 +684,39 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, add
 	return result, nil
 }
 
+// GetDelegationsByDelegatorAt returns list of delegations for a delegator address at given block number
+func (s *PublicBlockChainAPI) GetDelegationsByDelegatorAt(ctx context.Context, address string, blockNum rpc.BlockNumber) ([]*RPCDelegation, error) {
+	delegatorAddress := internal_common.ParseAddr(address)
+	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not retrieve the block information for block number: %d", blockNum)
+	}
+	validators, delegations := s.b.GetDelegationsByDelegatorAt(delegatorAddress, block)
+	result := []*RPCDelegation{}
+	for i := range delegations {
+		delegation := delegations[i]
+
+		undelegations := []RPCUndelegation{}
+
+		for j := range delegation.Undelegations {
+			undelegations = append(undelegations, RPCUndelegation{
+				delegation.Undelegations[j].Amount,
+				delegation.Undelegations[j].Epoch,
+			})
+		}
+		valAddr, _ := internal_common.AddressToBech32(validators[i])
+		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
+		result = append(result, &RPCDelegation{
+			valAddr,
+			delAddr,
+			delegation.Amount,
+			delegation.Reward,
+			undelegations,
+		})
+	}
+	return result, nil
+}
+
 // GetDelegationsByValidator returns list of delegations for a validator address.
 func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, address string) ([]*RPCDelegation, error) {
 	validatorAddress := internal_common.ParseAddr(address)
