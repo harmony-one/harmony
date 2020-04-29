@@ -61,6 +61,9 @@ type BlockArgs struct {
 // GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return nil, err
+	}
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if block != nil {
 		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
@@ -91,6 +94,9 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
 // it shows block signers for this block in list of one addresses.
 func (s *PublicBlockChainAPI) GetBlockByNumberNew(ctx context.Context, blockNr rpc.BlockNumber, blockArgs BlockArgs) (map[string]interface{}, error) {
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return nil, err
+	}
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	blockArgs.InclTx = true
 	if blockArgs.WithSigners {
@@ -209,6 +215,9 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 	if uint64(blockNr) == 0 {
 		return []string{}, nil
 	}
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return nil, err
+	}
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if err != nil {
 		return nil, err
@@ -227,9 +236,6 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 		validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
 	mask, err := internal_bls.NewMask(pubkeys, nil)
-	if err != nil {
-		return nil, err
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -254,8 +260,11 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 
 // IsBlockSigner returns true if validator with address signed blockNr block.
 func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.BlockNumber, address string) (bool, error) {
-	if uint64(blockNr) == 0 || uint64(blockNr) >= uint64(s.BlockNumber()) {
+	if uint64(blockNr) == 0 {
 		return false, nil
+	}
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return false, err
 	}
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if err != nil {
@@ -389,6 +398,9 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 
 // GetBalanceByBlockNumber returns balance by block number.
 func (s *PublicBlockChainAPI) GetBalanceByBlockNumber(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return nil, err
+	}
 	addr := internal_common.ParseAddr(address)
 	balance, err := s.b.GetBalance(ctx, addr, blockNr)
 	if balance == nil {
@@ -429,6 +441,9 @@ func (s *PublicBlockChainAPI) ResendCx(ctx context.Context, txID common.Hash) (b
 // Call executes the given transaction on the state for the given block number.
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return nil, err
+	}
 	result, _, _, err := doCall(ctx, s.b, args, blockNr, vm.Config{}, 5*time.Second, s.b.RPCGasCap())
 	return (hexutil.Bytes)(result), err
 }
@@ -610,6 +625,9 @@ func (s *PublicBlockChainAPI) GetValidatorInformationByBlockNumber(
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return nil, err
+	}
 	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not retrieve the block information for block number: %d", blockNr)
@@ -688,6 +706,9 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformationByBlockNumber(
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return nil, err
+	}
 	return s.getAllValidatorInformation(ctx, page, blockNr)
 }
 
@@ -762,6 +783,9 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegatorByBlockNumber(
 	ctx context.Context, address string, blockNum rpc.BlockNumber,
 ) ([]*RPCDelegation, error) {
 	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
+	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
 		return nil, err
 	}
 	delegatorAddress := internal_common.ParseAddr(address)

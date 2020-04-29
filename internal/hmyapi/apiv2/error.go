@@ -15,11 +15,20 @@ var (
 	ErrInvalidChainID = errors.New("invalid chain id for signer")
 	// ErrNotBeaconChainShard when rpc is called on not beacon chain node
 	ErrNotBeaconShard = errors.New("cannot call this rpc on non beaconchain node")
+	// ErrRequestedBlockTooHigh when given block is greater than latest block number
+	ErrRequestedBlockTooHigh = errors.New("requested block number greater than current block number")
 )
 
 func (s *PublicBlockChainAPI) isBeaconShard() error {
 	if s.b.GetShardID() != shard.BeaconChainShardID {
 		return ErrNotBeaconShard
+	}
+	return nil
+}
+
+func (s *PublicBlockChainAPI) isBlockGreaterThanLatest(blockNum uint64) error {
+	if blockNum >= uint64(s.BlockNumber()) {
+		return ErrRequestedBlockTooHigh
 	}
 	return nil
 }
