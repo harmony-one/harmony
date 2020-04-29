@@ -245,7 +245,9 @@ func ReadValidatorAPR(
 }
 
 // WriteValidatorAPR stores validator's apr snapshot by its address
-func WriteValidatorAPR(batch DatabaseWriter, addr common.Address, epoch *big.Int, d numeric.Dec) error {
+func WriteValidatorAPR(
+	batch DatabaseWriter, addr common.Address, epoch *big.Int, d numeric.Dec,
+) error {
 	bytes, err := rlp.EncodeToBytes(d)
 	if err != nil {
 		utils.Logger().Error().Msg("[WriteValidatorAPR] Failed to encode")
