@@ -294,9 +294,12 @@ func AccumulateRewardsAndCountSigs(
 					return network.EmptyPayout, err
 				}
 
-				shardExternalShare := shard.Schedule.InstanceForEpoch(
-					epoch,
-				).ExternalVotePercent()
+				shardExternalShare := numeric.ZeroDec()
+				for j := range payableSigners {
+					voterShare := votingPower.Voters[payableSigners[j].BLSPublicKey].OverallPercent
+					shardExternalShare = shardExternalShare.Add(voterShare)
+				}
+
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BLSPublicKey]
 					if !voter.IsHarmonyNode && !voter.OverallPercent.IsZero() {
