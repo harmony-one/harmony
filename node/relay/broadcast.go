@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/rlp"
+	protobuf "github.com/golang/protobuf/proto"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -12,6 +15,9 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+
+	// protobuf "google.golang.org/protobuf/proto"
+	"github.com/harmony-one/harmony/api/proto"
 )
 
 // TxnCaster ..
@@ -104,13 +110,33 @@ func (c *caster) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 func (c *caster) newBlock(
 	newBlock *types.Block, groups []nodeconfig.GroupID,
 ) error {
-	msg := p2p.ConstructMessage(
-		proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}),
-	)
-	if err := c.host.SendMessageToGroups(groups, msg); err != nil {
+
+	blockData, err := rlp.EncodeToBytes(newBlock)
+	if err != nil {
 		return err
 	}
-	return nil
+
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msg_pb.MessageType_BROADCASTED_NEW_BLOCK,
+		Request: &msg_pb.Message_NewBlock{
+			NewBlock: &msg_pb.LeaderBroadCastedBlockRequest{
+				Block: blockData,
+			},
+		},
+	}
+
+	marshaledMessage, err := protobuf.Marshal(message)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("here sending->", marshaledMessage, err)
+
+	return c.host.SendMessageToGroups(
+		groups, p2p.ConstructMessage(proto.ConstructConsensusMessage(marshaledMessage)),
+	)
 }
 
 var (
@@ -118,8 +144,11 @@ var (
 )
 
 func (c *caster) AcceptedBlock(shardID uint32, blk *types.Block) error {
-	grps := []nodeconfig.GroupID{c.config.GetShardGroupID()}
-	fmt.Println("accepted block", grps)
+	grps := []nodeconfig.GroupID{
+		c.config.GetShardGroupID(),
+		// c.config.GetClientGroupID(),
+	}
+	fmt.Println("accepted block sent to", grps)
 	return c.newBlock(blk, grps)
 }
 

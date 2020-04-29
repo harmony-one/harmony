@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -99,6 +100,11 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) error {
 		return err
 	}
 
+	if b := msg.GetNewBlock(); b != nil {
+		fmt.Println("got my new block from leader")
+		panic("did receive")
+	}
+
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
@@ -138,6 +144,7 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) error {
 		return consensus.onViewChange(msg)
 	case t == msg_pb.MessageType_NEWVIEW && consensus.viewChangeSanityCheck(msg):
 		return consensus.onNewView(msg)
+
 	}
 
 	return nil

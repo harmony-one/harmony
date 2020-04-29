@@ -123,7 +123,7 @@ cleanup
 # On windows, your system will pop up a network security dialog for each instance
 # and you won't be able to turn it off. With `go build` generating one
 # exe, the dialog will only pop up once at the very first time.
-# Also it's recommended to use `go build` for testing the whole exe. 
+# Also it's recommended to use `go build` for testing the whole exe.
 if [ "${NOBUILD}" != "true" ]; then
    pushd $ROOT
    scripts/go_executable_build.sh

@@ -3,14 +3,13 @@ package node
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/api/proto"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -41,6 +40,7 @@ func (node *Node) HandleConsensusMessageProcessing() error {
 func (node *Node) HandleMessage(
 	content []byte, sender libp2p_peer.ID, topic string,
 ) {
+
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
@@ -71,8 +71,33 @@ func (node *Node) HandleMessage(
 			node.ExplorerMessageHandler(msgPayload)
 		} else {
 			// TODO handle this higher up, give conesnsus a weight of 1, others a weight of 2
-			node.Consensus.IncomingConsensusMessage <- msgPayload
+			var msg msg_pb.Message
+
+			if err := protobuf.Unmarshal(msgPayload, &msg); err != nil {
+				fmt.Println("could not deserialize on ", err.Error(), topic)
+				return
+			}
+
+			if msg.Type == msg_pb.MessageType_BROADCASTED_NEW_BLOCK {
+				var block types.Block
+				if err := rlp.DecodeBytes(
+					msg.GetNewBlock().GetBlock(), &block,
+				); err != nil {
+					fmt.Println("issue here?", err.Error())
+					return
+				}
+
+				// fmt.Println("before sent")
+				// go func() {
+				// node.IncomingBlocks <- &block
+				// }()
+				// fmt.Println("after", block.String())
+
+			} else {
+				node.Consensus.IncomingConsensusMessage <- msgPayload
+			}
 		}
+
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
@@ -231,66 +256,6 @@ func (node *Node) verifyBlock(newBlock *types.Block) error {
 			err, "cannot verify incoming receipts",
 		)
 	}
-	return nil
-}
-
-// postConsensusProcessing is called by consensus participants, after consensus is done, to:
-// 1. add the new block to blockchain
-// 2. [leader] send new block to the client
-// 3. [leader] send cross shard tx receipts to destination shard
-func (node *Node) postConsensusProcessing(
-	newBlock *types.Block,
-) error {
-
-	if node.Consensus.IsLeader() {
-
-		// if err := node.Gossiper.AcceptedBlock(
-		// 	node.Consensus.ShardID, newBlock,
-		// ); err != nil {
-		// 	return err
-		// }
-
-		// node.Gossiper.NewBeaconChainBlock(newBlock)
-
-		// if node.Consensus.ShardID == shard.BeaconChainShardID {
-		// 	// node.Gossiper.NewBeaconChainBlock(newBlock)
-		// }
-
-		// if node.Consensus.ShardID != shard.BeaconChainShardID {
-		// 	node.Gossiper.NewShardChainBlock(newBlock)
-		// }
-
-		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
-			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
-			node.BroadcastCrossLink(newBlock)
-		}
-
-		node.BroadcastCXReceipts(newBlock)
-
-	} else {
-		if node.Consensus.Mode() != consensus.Listening {
-			// 1% of the validator also need to do broadcasting
-			rand.Seed(time.Now().UTC().UnixNano())
-			rnd := rand.Intn(100)
-			if rnd < 1 {
-				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
-				// if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-				// 	node.Gossiper.NewBeaconChainBlock(newBlock)
-				// }
-
-				node.BroadcastCXReceipts(newBlock)
-			}
-		}
-	}
-
-	// Broadcast client requested missing cross shard receipts if there is any
-	node.BroadcastMissingCXReceipts()
-
-	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
-	if len(newBlock.Header().ShardState()) > 0 {
-		node.Consensus.SetMode(node.Consensus.UpdateConsensusInformation())
-	}
-
 	return nil
 }
 

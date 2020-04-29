@@ -65,55 +65,55 @@ func (node *Node) StartLeaderWork() error {
 				return err
 			}
 
-			// if err != nil {
-			// 	return err
-			// }
-
 		}
 		return nil
 	})
 
 	var roundDone singleflight.Group
-	res := make(chan singleflight.Result)
-
-	g.Go(func() error {
-		for result := range res {
-			fmt.Println("now I can do finalize?", result)
-			if err := node.Consensus.FinalizeCommits(); err != nil {
-				return err
-			}
-
-			node.Consensus.ProposalNewBlock <- struct{}{}
-			fmt.Println("after kick off proposal")
-		}
-		return nil
-	})
 
 	g.Go(func() error {
 		for quorumReached := range node.Consensus.CommitFinishChan {
 			if node.Consensus.IsLeader() {
-				due := node.Consensus.NextBlockDue()
 				viewID, shardID := quorumReached.ViewID, quorumReached.ShardID
 				key := fmt.Sprintf("%d-%d", viewID, shardID)
 
-				res <- <-roundDone.DoChan(key,
+				result, err, shared := roundDone.Do(key,
 					func() (interface{}, error) {
 
-						if bufferTime := time.Until(due); bufferTime > 0 {
+						// NOTE always give 2 second buffer time
+						time.Sleep(time.Second * 2)
+
+						if bufferTime := time.Until(
+							node.Consensus.NextBlockDue(),
+						); bufferTime > 0 {
+
 							fmt.Println(
 								"got the block done faster",
 								node.Consensus.ShardID,
 								bufferTime.Round(time.Second),
 							)
-							time.Sleep(time.Second * 5)
+
+							// On local net, this is the block time basically
+							if b := bufferTime - time.Second; b > 0 {
+								fmt.Println("will sleep for", b.Round(time.Second))
+								time.Sleep(b)
+							}
 						}
 
-						// time.Sleep(time.Until(due))
 						return key, nil
+					})
 
-					},
-				)
+				if !shared {
+					fmt.Println("hello finished on", key, result, err, shared)
+					if err := node.Consensus.FinalizeCommits(); err != nil {
+						return err
+					}
 
+					node.Consensus.ProposalNewBlock <- struct{}{}
+					node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+
+					fmt.Println("finished finalize")
+				}
 			}
 		}
 

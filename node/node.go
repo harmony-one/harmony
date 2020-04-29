@@ -60,10 +60,10 @@ const (
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus            *consensus.Consensus
-	BeaconBlockChannel   chan *types.Block // The channel to send beacon blocks for non-beaconchain nodes
-	IncomingBlocksClient chan *types.Block
-	Gossiper             relay.BroadCaster
+	Consensus          *consensus.Consensus
+	BeaconBlockChannel chan *types.Block // The channel to send beacon blocks for non-beaconchain nodes
+	IncomingBlocks     chan *types.Block
+	Gossiper           relay.BroadCaster
 	// All the receipts received but not yet processed for Consensus
 	pendingCXReceipts map[string]*types.CXReceiptsProof
 	pendingCXMutex    sync.Mutex
@@ -409,20 +409,20 @@ func New(
 	chainConfig := nodeconfig.ChainConfig(networkType)
 
 	node := &Node{
-		host:                 host,
-		Consensus:            consensusObj,
-		Gossiper:             relay.NewBroadCaster(configUsed, host),
-		NodeConfig:           configUsed,
-		chainConfig:          chainConfig,
-		SelfPeer:             host.GetSelfPeer(),
-		unixTimeAtNodeStart:  time.Now().Unix(),
-		CxPool:               core.NewCxPool(core.CxPoolSize),
-		pendingCXReceipts:    map[string]*types.CXReceiptsProof{},
-		BeaconBlockChannel:   make(chan *types.Block),
-		IncomingBlocksClient: make(chan *types.Block),
-		serviceManager:       service.NewManager(),
-		serviceMessageChan:   make(map[service.Type]chan *msg_pb.Message),
-		State:                state,
+		host:                host,
+		Consensus:           consensusObj,
+		Gossiper:            relay.NewBroadCaster(configUsed, host),
+		NodeConfig:          configUsed,
+		chainConfig:         chainConfig,
+		SelfPeer:            host.GetSelfPeer(),
+		unixTimeAtNodeStart: time.Now().Unix(),
+		CxPool:              core.NewCxPool(core.CxPoolSize),
+		pendingCXReceipts:   map[string]*types.CXReceiptsProof{},
+		BeaconBlockChannel:  make(chan *types.Block),
+		IncomingBlocks:      make(chan *types.Block),
+		serviceManager:      service.NewManager(),
+		serviceMessageChan:  make(map[service.Type]chan *msg_pb.Message),
+		State:               state,
 		errorSink: struct {
 			sync.Mutex
 			failedStakingTxns *ring.Ring

@@ -3,7 +3,6 @@ package consensus
 import (
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -219,6 +218,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 }
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
+
 	if !consensus.IsLeader() {
 		return nil
 	}
@@ -229,15 +229,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 		return err
 	}
 
-	// fmt.Println("am I leader?")
-
 	// NOTE let it handle its own log
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return nil
 	}
-
-	consensus.Locks.Global.Lock()
-	defer consensus.Locks.Global.Unlock()
 
 	// Check for potential double signing
 	if consensus.checkDoubleSign(recvMsg) {
@@ -256,6 +251,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return err
 	}
+
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
 
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
@@ -294,13 +292,13 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.Commit) {
-		viewID := consensus.ViewID()
-		time.AfterFunc(time.Second*2, func() {
+		go func() {
 			consensus.CommitFinishChan <- Finished{
-				viewID, consensus.ShardID,
+				consensus.ViewID(),
+				consensus.ShardID,
+				consensus.BlockHash(),
 			}
-		})
-
+		}()
 	}
 
 	return nil

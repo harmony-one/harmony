@@ -95,8 +95,9 @@ func (consensus *Consensus) ViewID() uint64 {
 
 // Finished ..
 type Finished struct {
-	ViewID  uint64
-	ShardID uint32
+	ViewID    uint64
+	ShardID   uint32
+	BlockHash common.Hash
 }
 
 // Consensus is the main struct with all states and data related to consensus process.

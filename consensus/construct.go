@@ -36,7 +36,10 @@ func (consensus *Consensus) populateMessageFields(
 
 // construct is the single creation point of messages intended for the wire.
 func (consensus *Consensus) construct(
-	p msg_pb.MessageType, payloadForSign []byte, pubKey *bls.PublicKey, priKey *bls.SecretKey,
+	p msg_pb.MessageType,
+	payloadForSign []byte,
+	pubKey *bls.PublicKey,
+	priKey *bls.SecretKey,
 ) (*NetworkMessage, error) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
