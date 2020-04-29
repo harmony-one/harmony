@@ -159,7 +159,7 @@ func (s *PublicBlockChainAPI) IsLastBlock(blockNum uint64) (bool, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return shard.Schedule.IsLastBlock(blockNum), nil
 	}
-	return false, errNotBeaconChainShard
+	return false, ErrNotBeaconChainShard
 }
 
 // EpochLastBlock returns epoch last block.
@@ -167,13 +167,13 @@ func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) (uint64, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return shard.Schedule.EpochLastBlock(epoch), nil
 	}
-	return 0, errNotBeaconChainShard
+	return 0, ErrNotBeaconChainShard
 }
 
 // GetBlockSigners returns signers for a particular block.
 func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr uint64) ([]string, error) {
 	if blockNr == 0 || blockNr >= uint64(s.BlockNumber()) {
-		return make([]string, 0), nil
+		return []string{}, nil
 	}
 	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
 	if err != nil {
@@ -192,22 +192,22 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr uint6
 		pubkeys[i] = new(bls.PublicKey)
 		validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
 	}
-	result := make([]string, 0)
 	mask, err := internal_bls.NewMask(pubkeys, nil)
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
 	if err != nil {
-		return result, err
+		return nil, err
 	}
+	result := []string{}
 	for _, validator := range committee.Slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 		blsPublicKey := new(bls.PublicKey)
 		validator.BLSPublicKey.ToLibBLSPublicKey(blsPublicKey)
@@ -491,17 +491,13 @@ func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformati
 	return newHeaderInformation(header)
 }
 
-var (
-	errNotBeaconChainShard = errors.New("cannot call this rpc on non beaconchain node")
-)
-
 // GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetTotalStakingSnapshot(), nil
 	}
-	return nil, errNotBeaconChainShard
+	return nil, ErrNotBeaconChainShard
 }
 
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
@@ -512,7 +508,7 @@ func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetMedianRawStakeSnapshot()
 	}
-	return nil, errNotBeaconChainShard
+	return nil, ErrNotBeaconChainShard
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
@@ -816,7 +812,7 @@ func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetCurrentUtilityMetrics()
 	}
-	return nil, errNotBeaconChainShard
+	return nil, ErrNotBeaconChainShard
 }
 
 // GetSuperCommittees ..
@@ -824,7 +820,7 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetSuperCommittees()
 	}
-	return nil, errNotBeaconChainShard
+	return nil, ErrNotBeaconChainShard
 }
 
 // GetCurrentBadBlocks ..
@@ -848,7 +844,7 @@ func (s *PublicBlockChainAPI) GetStakingNetworkInfo(
 	ctx context.Context,
 ) (*StakingNetworkInfo, error) {
 	if s.b.GetShardID() != shard.BeaconChainShardID {
-		return nil, errNotBeaconChainShard
+		return nil, ErrNotBeaconChainShard
 	}
 	totalStaking, _ := s.GetTotalStaking()
 	round, _ := s.GetMedianRawStakeSnapshot()
@@ -870,5 +866,5 @@ func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.CrossLink, error) {
 	if s.b.GetShardID() == shard.BeaconChainShardID {
 		return s.b.GetLastCrossLinks()
 	}
-	return nil, errNotBeaconChainShard
+	return nil, ErrNotBeaconChainShard
 }

@@ -16,11 +16,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	// ErrInvalidChainID when ChainID of signer does not match that of running node
-	errInvalidChainID = errors.New("invalid chain id for signer")
-)
-
 // TxHistoryArgs is struct to make GetTransactionsHistory request
 type TxHistoryArgs struct {
 	Address   string `json:"address"`
@@ -216,7 +211,7 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	c := s.b.ChainConfig().ChainID
 	if id := tx.ChainID(); id.Cmp(c) != 0 {
 		return common.Hash{}, errors.Wrapf(
-			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
 		)
 	}
 	return SubmitStakingTransaction(ctx, s.b, tx)
@@ -238,7 +233,7 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(
 	c := s.b.ChainConfig().ChainID
 	if id := tx.ChainID(); id.Cmp(c) != 0 {
 		return common.Hash{}, errors.Wrapf(
-			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
 		)
 	}
 	return SubmitTransaction(ctx, s.b, tx)
