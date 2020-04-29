@@ -125,8 +125,7 @@ func NewComputed(
 // NewEmptyStats ..
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
-		make([]numeric.Dec, APRHistoryLength), // fixed size circular slice
-		0,                                     // replace index start at zero
+		map[int64]numeric.Dec{},
 		numeric.ZeroDec(),
 		[]VoteWithCurrentEpochEarning{},
 		effective.Booted,
@@ -185,10 +184,8 @@ type VoteWithCurrentEpochEarning struct {
 
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
-	// APRs is the APR history
-	APRs []numeric.Dec `json:"-"`
-	// APRReplaceIndex is the position of the next insert in the circular slice
-	APRReplaceIndex uint64 `json:"-"`
+	// APRs is the APR history containing APR's of epochs
+	APRs map[int64]numeric.Dec `json:"-"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `json:"-"`
 	// MetricsPerShard ..
