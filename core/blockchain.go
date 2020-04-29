@@ -2371,7 +2371,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 						return nil, err
 					}
 				} else {
-					now := newEpochSuperCommittee.Epoch
+					now := currentEpochSuperCommittee.Epoch
 					// only insert if APR for current epoch does not exists
 					if _, ok := stats.APRs[now.Int64()]; !ok {
 						stats.APRs[now.Int64()] = *aprComputed
