@@ -455,10 +455,14 @@ func (b *APIBackend) GetValidatorInformation(
 		key, func() (interface{}, error) {
 			total := numeric.ZeroDec()
 			count := 0
-			for i := now.Int64(); i > nowMinus100.Int64(); i-- {
+			activated := false
+			for i := nowMinus100.Int64(); i < now.Int64(); i++ {
 				epoch := big.NewInt(i)
 				if apr, err := bc.ReadValidatorAPRAt(epoch, addr); err == nil {
 					total = total.Add(apr)
+					activated = true
+				}
+				if activated {
 					count = count + 1
 				}
 			}
