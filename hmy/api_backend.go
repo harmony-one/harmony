@@ -444,9 +444,9 @@ func (b *APIBackend) GetValidatorInformation(
 	// delete entry for previous epoch
 	b.apiCache.Forget(prevKey)
 
-	// calculate last 100 epochs for averaging APR
+	// calculate last APRHistoryLength epochs for averaging APR
 	epochFrom := bc.Config().StakingEpoch
-	nowMinus100 := now.Sub(now, big.NewInt(100))
+	nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength))
 	if nowMinus100.Cmp(epochFrom) > 0 {
 		epochFrom = nowMinus100
 	}
