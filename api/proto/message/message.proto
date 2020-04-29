@@ -27,7 +27,9 @@ enum MessageType {
   NEWVIEW = 7;
   DRAND_INIT = 10 [deprecated=true];
   DRAND_COMMIT = 11 [deprecated=true];
-  LOTTERY_REQUEST = 12 [deprecated=true]; // it should be either ENTER or GETPLAYERS but it will be removed later.
+  // it should be either ENTER or GETPLAYERS but it will be removed later.
+  LOTTERY_REQUEST = 12 [deprecated=true];
+  BROADCASTED_NEW_BLOCK = 13;
 }
 
 // This is universal message for all communication protocols.
@@ -46,6 +48,7 @@ message Message {
     ViewChangeRequest viewchange = 7;
     // Refactor this later after demo.
     LotteryRequest lottery_request = 8 [deprecated=true];
+    LeaderBroadCastedBlockRequest new_block = 9;
   }
 }
 
@@ -87,6 +90,10 @@ message ConsensusRequest {
   bytes block = 5;
   bytes sender_pubkey = 6;
   bytes payload = 7;
+}
+
+message LeaderBroadCastedBlockRequest {
+  bytes block = 1;
 }
 
 message DrandRequest {
