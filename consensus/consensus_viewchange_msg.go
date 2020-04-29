@@ -34,7 +34,7 @@ func (consensus *Consensus) constructViewChangeMessage(
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
 
 	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
-		msg_pb.MessageType_PREPARED, num, consensus.blockHash,
+		msg_pb.MessageType_PREPARED, num, consensus.BlockHash(),
 	)
 	preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 

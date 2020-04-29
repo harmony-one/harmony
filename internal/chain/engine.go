@@ -227,8 +227,13 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		}
 	}
 
-	lastCommitPayload := signature.ConstructCommitPayload(chain,
-		parentHeader.Epoch(), parentHeader.Hash(), parentHeader.Number().Uint64(), parentHeader.ViewID().Uint64())
+	lastCommitPayload := signature.ConstructCommitPayload(
+		chain,
+		parentHeader.Epoch(),
+		parentHeader.Hash().Bytes(),
+		parentHeader.Number().Uint64(),
+		parentHeader.ViewID().Uint64(),
+	)
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
 		const msg = "[VerifySeal] Unable to verify aggregated signature from last block"
 		return errors.New(msg)
@@ -541,7 +546,11 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		}
 	}
 	commitPayload := signature.ConstructCommitPayload(chain,
-		header.Epoch(), header.Hash(), header.Number().Uint64(), header.ViewID().Uint64())
+		header.Epoch(),
+		header.Hash().Bytes(),
+		header.Number().Uint64(),
+		header.ViewID().Uint64(),
+	)
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		return errors.New("[VerifySeal] Unable to verify aggregated signature for block")
@@ -553,7 +562,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 func GetPublicKeys(
 	chain engine.ChainReader, header *block.Header, reCalculate bool,
 ) ([]*bls.PublicKey, error) {
-	shardState := new(shard.State)
+	var shardState *shard.State
 	var err error
 	if reCalculate {
 		shardState, _ = committee.WithStakingEnabled.Compute(header.Epoch(), chain)

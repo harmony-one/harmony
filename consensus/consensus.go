@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/timeouts"
@@ -37,6 +38,16 @@ type processBlock struct {
 	Request chan blkComeback
 }
 
+// BlockHash ..
+func (consensus *Consensus) BlockHash() common.Hash {
+	return consensus.blockHash.Load().(common.Hash)
+}
+
+// SetBlockHash ..
+func (consensus *Consensus) SetBlockHash(h common.Hash) {
+	consensus.blockHash.Store(h)
+}
+
 // BlockNum ..
 func (consensus *Consensus) BlockNum() uint64 {
 	return consensus.blockNum.Load().(uint64)
@@ -45,6 +56,26 @@ func (consensus *Consensus) BlockNum() uint64 {
 // SetBlockNum ..
 func (consensus *Consensus) SetBlockNum(num uint64) {
 	consensus.blockNum.Store(num)
+}
+
+// Block ..
+func (consensus *Consensus) Block() []byte {
+	return consensus.block.Load().([]byte)
+}
+
+// SetBlock ..
+func (consensus *Consensus) SetBlock(b []byte) {
+	consensus.block.Store(b)
+}
+
+// BlockHeader ..
+func (consensus *Consensus) BlockHeader() []byte {
+	return consensus.blockHeader.Load().([]byte)
+}
+
+// SetBlockHeader ..
+func (consensus *Consensus) SetBlockHeader(b []byte) {
+	consensus.blockHeader.Store(b)
 }
 
 // Epoch ..
@@ -60,6 +91,12 @@ func (consensus *Consensus) SetEpoch(e uint64) {
 // ViewID ..
 func (consensus *Consensus) ViewID() uint64 {
 	return consensus.viewID.Load().(uint64)
+}
+
+// Finished ..
+type Finished struct {
+	ViewID  uint64
+	ShardID uint32
 }
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -81,7 +118,7 @@ type Consensus struct {
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 	// Consensus rounds whose commit phase finished
-	CommitFinishChan chan uint64
+	CommitFinishChan chan Finished
 	// Commits collected from validators.
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
@@ -115,11 +152,11 @@ type Consensus struct {
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 	// Blockhash - 32 byte
-	blockHash [32]byte
+	blockHash atomic.Value
 	// Block to run consensus on
-	block []byte
+	block atomic.Value
 	// BlockHeader to run consensus on
-	blockHeader []byte
+	blockHeader atomic.Value
 	// Shard Id which this node belongs to
 	ShardID uint32
 	// whether to ignore viewID check
@@ -208,7 +245,7 @@ func New(
 		epoch:            epoch,
 		blockNum:         blk,
 		viewID:           view,
-		CommitFinishChan: make(chan uint64),
+		CommitFinishChan: make(chan Finished),
 		host:             host,
 		timeouts:         timeouts.NewNotifier(),
 		SlashChan:        make(chan slash.Record),

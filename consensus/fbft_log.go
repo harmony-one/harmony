@@ -201,9 +201,14 @@ func (log *FBFTLog) HasMatchingAnnounce(blockNum uint64, blockHash common.Hash) 
 	return len(found) >= 1
 }
 
-// HasMatchingViewAnnounce returns whether the log contains announce type message with given blockNum, viewID and blockHash
-func (log *FBFTLog) HasMatchingViewAnnounce(blockNum uint64, viewID uint64, blockHash common.Hash) bool {
-	found := log.GetMessagesByTypeSeqViewHash(msg_pb.MessageType_ANNOUNCE, blockNum, viewID, blockHash)
+// HasMatchingViewAnnounce returns whether
+// the log contains announce type message with given blockNum, viewID and blockHash
+func (log *FBFTLog) HasMatchingViewAnnounce(
+	blockNum uint64, viewID uint64, blockHash common.Hash,
+) bool {
+	found := log.GetMessagesByTypeSeqViewHash(
+		msg_pb.MessageType_ANNOUNCE, blockNum, viewID, blockHash,
+	)
 	return len(found) >= 1
 }
 

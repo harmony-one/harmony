@@ -27,16 +27,11 @@ const p2pMsgPrefixSize = 5
 
 // HandleConsensusMessageProcessing ..
 func (node *Node) HandleConsensusMessageProcessing() error {
-	i := 0
-	for msg := range node.Consensus.IncomingConsensusMessage {
 
+	for msg := range node.Consensus.IncomingConsensusMessage {
 		if err := node.Consensus.HandleMessageUpdate(msg); err != nil {
 			fmt.Println("some visibility into consensus messages", err.Error())
-			return err
 		}
-		i++
-
-		// fmt.Println("handling ith consensus message", i, "on shard", node.Consensus.ShardID)
 	}
 
 	return nil

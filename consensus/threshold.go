@@ -3,7 +3,6 @@ package consensus
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -13,6 +12,9 @@ import (
 )
 
 func (consensus *Consensus) didReachPrepareQuorum() error {
+	// consensus.Locks.Leader.Lock()
+	// defer consensus.Locks.Leader.Unlock()
+
 	utils.Logger().Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
@@ -37,44 +39,43 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// Leader add commit phase signature
-	num := consensus.BlockNum()
-	viewID := consensus.ViewID()
 
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
 		new(big.Int).SetUint64(consensus.Epoch()),
-		consensus.blockHash, num, viewID,
+		consensus.BlockHash().Bytes(),
+		consensus.BlockNum(),
+		consensus.ViewID(),
 	)
 
 	// so by this point, everyone has committed to the blockhash of this block
 	// in prepare and so this is the actual block.
-	for i, key := range consensus.PubKey.PublicKey {
+	for i := range consensus.PubKey.PublicKey {
 		if _, err := consensus.Decider.SubmitVote(
 			quorum.Commit,
-			key,
+			consensus.PubKey.PublicKey[i],
 			consensus.priKey.PrivateKey[i].SignHash(commitPayload),
-			common.BytesToHash(consensus.blockHash[:]),
-			num,
-			viewID,
+			consensus.BlockHash(),
+			consensus.BlockNum(),
+			consensus.ViewID(),
 		); err != nil {
 			return err
 		}
 
-		if err := consensus.commitBitmap.SetKey(key, true); err != nil {
+		if err := consensus.commitBitmap.SetKey(
+			consensus.PubKey.PublicKey[i], true,
+		); err != nil {
 			utils.Logger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
 			return err
 		}
 	}
+
 	if err := consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
 		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 	}, p2p.ConstructMessage(msgToSend),
 	); err != nil {
 		utils.Logger().Warn().Msg("[OnPrepare] Cannot send prepared message")
-	} else {
-		utils.Logger().Debug().
-			Hex("blockHash", consensus.blockHash[:]).
-			Uint64("blockNum", num).
-			Msg("[OnPrepare] Sent Prepared Message!!")
+		return err
 	}
 
 	utils.Logger().Debug().

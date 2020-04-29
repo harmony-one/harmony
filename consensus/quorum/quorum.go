@@ -3,6 +3,7 @@ package quorum
 import (
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -144,6 +145,7 @@ type Transition struct {
 // These maps represent the signatories (validators), keys are BLS public keys
 // and values are BLS private key signed signatures
 type cIdentities struct {
+	sync.Mutex
 	// Public keys of the committee including leader and validators
 	publicKeys []*bls.PublicKey
 	prepare    *votepower.Round
@@ -227,6 +229,8 @@ func (s *cIdentities) SubmitVote(
 	sig *bls.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
+	// s.Lock()
+	// defer s.Unlock()
 	// Note safe to assume by this point because key has been
 	// checked earlier
 	key := *shard.FromLibBLSPublicKeyUnsafe(PubKey)

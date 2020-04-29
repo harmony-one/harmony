@@ -63,7 +63,11 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		}
 
 		commitPayload := signature.ConstructCommitPayload(node.Blockchain(),
-			block.Epoch(), block.Hash(), block.Number().Uint64(), block.Header().ViewID().Uint64())
+			block.Epoch(),
+			block.Hash().Bytes(),
+			block.Number().Uint64(),
+			block.Header().ViewID().Uint64(),
+		)
 		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 			utils.Logger().
 				Error().Err(err).

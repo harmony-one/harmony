@@ -53,6 +53,8 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
+	consensus.Locks.PubKey.Lock()
+	defer consensus.Locks.PubKey.Unlock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	consensus.LeaderPubKey = pubKeys[0]
@@ -106,9 +108,9 @@ func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls.Sign {
 func (consensus *Consensus) ResetState() {
 	utils.Logger().Debug().Msg("[ResetState] Resetting consensus state")
 	consensus.switchPhase(FBFTAnnounce)
-	consensus.blockHash = [32]byte{}
-	consensus.blockHeader = []byte{}
-	consensus.block = []byte{}
+	consensus.SetBlockHash(common.Hash{})
+	consensus.SetBlockHeader([]byte{})
+	consensus.SetBlock([]byte{})
 	consensus.Decider.ResetPrepareAndCommitVotes()
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
@@ -200,7 +202,6 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [548]byte) {
 
 // Check viewID, caller's responsibility to hold lock when change ignoreViewIDCheck
 func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
-	viewID := consensus.ViewID()
 	// just ignore consensus check for the first time when node join
 	if consensus.ignoreViewIDCheck {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
@@ -212,9 +213,9 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.ignoreViewIDCheck = false
 		consensus.timeouts.Consensus.Start(consensus.BlockNum())
 		return nil
-	} else if msg.ViewID > viewID {
+	} else if msg.ViewID > consensus.ViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < viewID {
+	} else if msg.ViewID < consensus.ViewID() {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil
@@ -288,9 +289,6 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
-	consensus.Locks.PubKey.Lock()
-	defer consensus.Locks.PubKey.Unlock()
-
 	curHeader := consensus.ChainReader.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
@@ -445,6 +443,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
+	consensus.Locks.Leader.Lock()
+	defer consensus.Locks.Leader.Unlock()
+
 	for i := range consensus.PubKey.PublicKey {
 		if consensus.PubKey.PublicKey[i].IsEqual(
 			consensus.LeaderPubKey,

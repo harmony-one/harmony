@@ -321,7 +321,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 			}()
 		} else {
 			consensus.switchPhase(FBFTCommit)
-			copy(consensus.blockHash[:], consensus.m1Payload[:32])
+
+			consensus.SetBlockHash(common.BytesToHash(consensus.m1Payload[:32]))
+
 			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 32)
 
 			if err != nil {
@@ -333,13 +335,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 			// Leader sign and add commit message
-			num := consensus.BlockNum()
 
 			commitPayload := signature.ConstructCommitPayload(
 				consensus.ChainReader,
 				new(big.Int).SetUint64(consensus.Epoch()),
-				consensus.blockHash,
-				num,
+				consensus.BlockHash().Bytes(),
+				consensus.BlockNum(),
 				recvMsg.ViewID,
 			)
 
@@ -349,8 +350,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 					quorum.Commit,
 					key,
 					priKey.SignHash(commitPayload),
-					common.BytesToHash(consensus.blockHash[:]),
-					num,
+					consensus.BlockHash(),
+					consensus.BlockNum(),
 					recvMsg.ViewID,
 				); err != nil {
 					utils.Logger().Debug().Msg("submit vote on viewchange commit failed")
@@ -468,7 +469,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) error {
 				Msg("[onNewView] Failed to Verify Signature for M1 (prepare) message")
 			return nil
 		}
-		copy(consensus.blockHash[:], blockHash)
+
+		consensus.SetBlockHash(common.BytesToHash(blockHash))
 		consensus.aggregatedPrepareSig = aggSig
 		consensus.prepareBitmap = mask
 		// create prepared message from newview
@@ -490,10 +492,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) error {
 	consensus.current.SetViewID(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
-	num := consensus.BlockNum()
 
 	// change view and leaderKey to keep in sync with network
-	if num != recvMsg.BlockNum {
+	if consensus.BlockNum() != recvMsg.BlockNum {
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[onNewView] New Leader Changed")
@@ -507,8 +508,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) error {
 		commitPayload := signature.ConstructCommitPayload(
 			consensus.ChainReader,
 			new(big.Int).SetUint64(consensus.Epoch()),
-			consensus.blockHash,
-			num,
+			consensus.BlockHash().Bytes(),
+			consensus.BlockNum(),
 			consensus.ViewID(),
 		)
 

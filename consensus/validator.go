@@ -1,13 +1,10 @@
 package consensus
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -28,13 +25,16 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) error {
 		return err
 	}
 
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
+
 	// NOTE let it handle its own logs
 	if !consensus.onAnnounceSanityChecks(recvMsg) {
 		return nil
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
-	consensus.blockHash = recvMsg.BlockHash
+	consensus.SetBlockHash(recvMsg.BlockHash)
 
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
@@ -50,8 +50,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) error {
 				Uint64("MsgViewID", recvMsg.ViewID).
 				Uint64("MsgBlockNum", recvMsg.BlockNum).
 				Msg("[OnAnnounce] ViewID check failed")
+			return errors.New("viewID check failed")
 		}
-		return errors.New("viewID check failed")
 	}
 	return consensus.prepare()
 }
@@ -60,10 +60,12 @@ func (consensus *Consensus) prepare() error {
 	groupID := []nodeconfig.GroupID{
 		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 	}
+
 	for i, key := range consensus.PubKey.PublicKey {
 		networkMessage, err := consensus.construct(
 			msg_pb.MessageType_PREPARE, nil, key, consensus.priKey.PrivateKey[i],
 		)
+
 		if err != nil {
 			utils.Logger().Err(err).
 				Str("message-type", msg_pb.MessageType_PREPARE.String()).
@@ -71,19 +73,17 @@ func (consensus *Consensus) prepare() error {
 			return err
 		}
 
-		// TODO: this will not return immediatey, may block
-		if consensus.current.Mode() != Listening {
-			if err := consensus.host.SendMessageToGroups(
-				groupID,
-				p2p.ConstructMessage(networkMessage.Bytes),
-			); err != nil {
-				utils.Logger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
-				return err
-			}
-			utils.Logger().Info().
-				Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
-				Msg("[OnAnnounce] Sent Prepare Message!!")
+		if err := consensus.host.SendMessageToGroups(
+			groupID,
+			p2p.ConstructMessage(networkMessage.Bytes),
+		); err != nil {
+			utils.Logger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
+			return err
 		}
+
+		utils.Logger().Info().
+			Msg("[OnAnnounce] Sent Prepare Message!!")
+
 	}
 	consensus.switchPhase(FBFTPrepare)
 	return nil
@@ -108,6 +108,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 		return err
 	}
 
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
+
 	// check validity of prepared signature
 	blockHash := recvMsg.BlockHash
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
@@ -123,8 +126,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 	}
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
-		myBlockHash := common.Hash{}
-		myBlockHash.SetBytes(consensus.blockHash[:])
 		utils.Logger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("MsgViewID", recvMsg.ViewID).
@@ -147,11 +148,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 	}
 
 	consensus.FBFTLog.AddBlock(&blockObj)
-	// add block field
-	blockPayload := make([]byte, len(recvMsg.Block))
-	copy(blockPayload[:], recvMsg.Block[:])
-	consensus.block = blockPayload
-	recvMsg.Block = []byte{} // save memory space
+	consensus.SetBlock(recvMsg.Block)
 	consensus.FBFTLog.AddMessage(recvMsg)
 	utils.Logger().Debug().
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -173,8 +170,8 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 				Uint64("MsgViewID", recvMsg.ViewID).
 				Uint64("MsgBlockNum", recvMsg.BlockNum).
 				Msg("[OnPrepared] ViewID check failed")
+			return errors.New("viewID check failed")
 		}
-		return errors.New("viewID check failed")
 	}
 	if num := consensus.BlockNum(); recvMsg.BlockNum > num {
 		utils.Logger().Debug().
@@ -194,17 +191,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
 
-	// Optimistically add blockhash field of prepare message
-	emptyHash := [32]byte{}
-	if bytes.Equal(consensus.blockHash[:], emptyHash[:]) {
-		copy(consensus.blockHash[:], blockHash[:])
-	}
-
 	// local viewID may not be constant with other, so use received msg viewID.
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
 		new(big.Int).SetUint64(consensus.Epoch()),
-		consensus.blockHash,
+		consensus.BlockHash().Bytes(),
 		consensus.BlockNum(),
 		recvMsg.ViewID,
 	)
@@ -226,7 +217,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 				return err
 			}
 			utils.Logger().Info().
-				Hex("blockHash", consensus.blockHash[:]).
+				Hex("blockHash", consensus.BlockHash().Bytes()).
 				Msg("[OnPrepared] Sent Commit Message!!")
 
 		}
@@ -241,6 +232,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 		utils.Logger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return err
 	}
+
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
+
 	// NOTE let it handle its own logs
 	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return nil
@@ -262,7 +257,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
 		new(big.Int).SetUint64(consensus.Epoch()),
-		recvMsg.BlockHash, recvMsg.BlockNum,
+		recvMsg.BlockHash.Bytes(),
+		recvMsg.BlockNum,
 		recvMsg.ViewID,
 	)
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {

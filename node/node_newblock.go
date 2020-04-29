@@ -7,15 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harmony-one/harmony/consensus"
-	staking "github.com/harmony-one/harmony/staking/types"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 )
 
 // Constants of proposing a new block
@@ -45,6 +45,7 @@ func (node *Node) StartLeaderWork() error {
 			}
 			if !node.Consensus.IsLeader() {
 				fmt.Println("this should NOT be happening")
+				return errors.New(" I am not leader should not propose")
 			}
 			utils.Logger().Debug().
 				Uint64("blockNum", newBlock.NumberU64()).
@@ -59,6 +60,7 @@ func (node *Node) StartLeaderWork() error {
 
 			if err := node.Consensus.Announce(newBlock); err != nil {
 				fmt.Println("problem with annunce why")
+				return err
 			}
 
 			// if err != nil {
@@ -69,26 +71,47 @@ func (node *Node) StartLeaderWork() error {
 		return nil
 	})
 
+	var roundDone singleflight.Group
+
 	g.Go(func() error {
-		for viewID := range node.Consensus.CommitFinishChan {
-			// Only Leader execute this condition
+		for quorumReached := range node.Consensus.CommitFinishChan {
+			if node.Consensus.IsLeader() {
+				viewID, shardID := quorumReached.ViewID, quorumReached.ShardID
+				nextDue := node.Consensus.NextBlockDue()
 
-			fmt.Println(
-				"viewid, isleader", viewID, node.Consensus.ViewID(), node.Consensus.IsLeader(),
-			)
+				results, err, evicted := roundDone.Do(
+					fmt.Sprintf("%d-%d", viewID, shardID),
+					func() (interface{}, error) {
 
-			if viewID == node.Consensus.ViewID() {
-				fmt.Println("\nbefore finalize ", node.Consensus.ShardID)
-				if err := node.Consensus.FinalizeCommits(); err != nil {
+						fmt.Println(
+							"viewid, isleader", viewID, shardID, node.Consensus.IsLeader(),
+						)
+
+						time.AfterFunc(time.Until(nextDue), func() {
+							fmt.Println("waited the full block period", viewID)
+						})
+
+						if err := node.Consensus.FinalizeCommits(); err != nil {
+							fmt.Println("why could not finalize?", err.Error())
+							return nil, err
+						}
+						return nil, nil
+					},
+				)
+
+				fmt.Println("single flight thing", results, err, evicted)
+
+				if err != nil {
 					return err
 				}
+
+				fmt.Println("\nbefore finalize ", node.Consensus.ShardID)
 				node.Consensus.ProposalNewBlock <- struct{}{}
 				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 				fmt.Println("after sending Proposal for new block ", node.Consensus.ShardID)
-			} else {
-				fmt.Println("why non leader trying to run this commit finish chan code?")
 			}
 		}
+
 		return nil
 	})
 

@@ -54,7 +54,9 @@ func AggregateSigForCommittee(
 		return errQuorumVerifyAggSign
 	}
 
-	commitPayload := signature.ConstructCommitPayload(chain, epoch, hash, blockNum, viewID)
+	commitPayload := signature.ConstructCommitPayload(
+		chain, epoch, hash.Bytes(), blockNum, viewID,
+	)
 	if !aggSignature.VerifyHash(mask.AggregatePublic, commitPayload) {
 		return errAggregateSigFail
 	}

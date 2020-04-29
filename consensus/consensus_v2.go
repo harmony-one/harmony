@@ -2,9 +2,9 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/hex"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
@@ -148,6 +148,9 @@ func (consensus *Consensus) FinalizeCommits() error {
 	utils.Logger().Info().
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
 		Msg("[finalizeCommits] Finalizing Block")
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
+
 	beforeCatchupNum := consensus.BlockNum()
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
@@ -170,12 +173,10 @@ func (consensus *Consensus) FinalizeCommits() error {
 	consensus.aggregatedCommitSig = aggSig // this may not needed
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// find correct block content
-	curBlockHash := consensus.blockHash
-	block := consensus.FBFTLog.GetBlockByHash(curBlockHash)
+
+	block := consensus.FBFTLog.GetBlockByHash(consensus.BlockHash())
 	if block == nil {
-		utils.Logger().Warn().
-			Str("blockHash", hex.EncodeToString(curBlockHash[:])).
-			Msg("[FinalizeCommits] Cannot find block by hash")
+		utils.Logger().Warn().Msg("[FinalizeCommits] Cannot find block by hash")
 		return errors.New("could not find block by hash")
 	}
 
@@ -198,7 +199,6 @@ func (consensus *Consensus) FinalizeCommits() error {
 		return err
 	}
 	utils.Logger().Info().
-		Hex("blockHash", curBlockHash[:]).
 		Uint64("blockNum", consensus.BlockNum()).
 		Msg("[finalizeCommits] Sent Committed Message")
 
@@ -214,11 +214,11 @@ func (consensus *Consensus) FinalizeCommits() error {
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
-	if n := time.Now(); n.Before(consensus.NextBlockDue()) {
-		// Sleep to wait for the full block time
-		utils.Logger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
-		time.Sleep(consensus.NextBlockDue().Sub(n))
-	}
+	// if n := time.Now(); n.Before(consensus.NextBlockDue()) {
+	// 	// Sleep to wait for the full block time
+	// 	utils.Logger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
+	// 	time.Sleep(consensus.NextBlockDue().Sub(n))
+	// }
 	return nil
 }
 
@@ -269,7 +269,8 @@ func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, err
 // try to catch up if fall behind
 func (consensus *Consensus) tryCatchup() error {
 	utils.Logger().Info().Msg("[TryCatchup] commit new blocks")
-	currentBlockNum := consensus.BlockNum()
+	then := consensus.BlockNum()
+
 	for {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
 			msg_pb.MessageType_COMMITTED, consensus.BlockNum(),
@@ -281,7 +282,8 @@ func (consensus *Consensus) tryCatchup() error {
 			utils.Logger().Error().
 				Int("numMsgs", len(msgs)).
 				Msg("DANGER!!! we should only get one committed message for a given blockNum")
-			return errors.New("we should only get one committed message for a given blockNum")
+			// break
+			// return errors.New("we should only get one committed message for a given blockNum")
 		}
 
 		var committedMsg *FBFTMessage
@@ -333,17 +335,17 @@ func (consensus *Consensus) tryCatchup() error {
 		)
 		msg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 		if msg == nil {
-			return errors.New("could not find message by max viewid in fbftlog")
+			// return errors.New("could not find message by max viewid in fbftlog")
 			break
 		}
 		utils.Logger().Info().Msg("[TryCatchup] prepared message found to commit")
 
 		// TODO(Chao): Explain the reasoning for these code
-		consensus.blockHash = [32]byte{}
+		consensus.SetBlockHash(common.Hash{})
 		consensus.SetBlockNum(consensus.BlockNum() + 1)
 		consensus.SetViewID(committedMsg.ViewID + 1)
 		// TODO Need to make this one atomic as well , the publock is bad, blocks updateconsensus
-		consensus.LeaderPubKey = committedMsg.SenderPubkey
+		// consensus.LeaderPubKey = committedMsg.SenderPubkey
 
 		utils.Logger().Info().Msg("[TryCatchup] Adding block to chain")
 
@@ -360,26 +362,26 @@ func (consensus *Consensus) tryCatchup() error {
 
 		consensus.ResetState()
 		// TODO need to let state sync know that i caught up somehow
-
 		break
 	}
 
-	if num := consensus.BlockNum(); currentBlockNum < num {
+	now := consensus.BlockNum()
+	if then < now {
 		utils.Logger().Info().
-			Uint64("From", currentBlockNum).
-			Uint64("To", num).
+			Uint64("From", then).
+			Uint64("To", now).
 			Msg("[TryCatchup] Caught up!")
 		consensus.switchPhase(FBFTAnnounce)
 	}
+
 	// catup up and skip from view change trap
-	if currentBlockNum < consensus.BlockNum() &&
-		consensus.current.Mode() == ViewChanging {
+	if then < now && consensus.current.Mode() == ViewChanging {
 		consensus.current.SetMode(Normal)
 	}
+
 	// clean up old log
-	num := consensus.BlockNum()
-	consensus.FBFTLog.DeleteBlocksLessThan(num - 1)
-	consensus.FBFTLog.DeleteMessagesLessThan(num - 1)
+	// consensus.FBFTLog.DeleteBlocksLessThan(now - 1)
+	// consensus.FBFTLog.DeleteMessagesLessThan(now - 1)
 	return nil
 }
 

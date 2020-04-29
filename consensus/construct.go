@@ -49,15 +49,16 @@ func (consensus *Consensus) construct(
 		consensusMsg *msg_pb.ConsensusRequest
 		aggSig       *bls.Sign
 	)
+	h := consensus.BlockHash()
 
 	consensusMsg = consensus.populateMessageFields(
-		message.GetConsensus(), consensus.blockHash[:], pubKey,
+		message.GetConsensus(), h[:], pubKey,
 	)
 
 	// Do the signing, 96 byte of bls signature
 	switch p {
 	case msg_pb.MessageType_PREPARED:
-		consensusMsg.Block = consensus.block
+		consensusMsg.Block = consensus.Block()
 		// Payload
 		buffer := bytes.Buffer{}
 		// 96 bytes aggregated signature
@@ -83,7 +84,7 @@ func (consensus *Consensus) construct(
 		buffer.Write(consensus.commitBitmap.Bitmap)
 		consensusMsg.Payload = buffer.Bytes()
 	case msg_pb.MessageType_ANNOUNCE:
-		consensusMsg.Payload = consensus.blockHash[:]
+		consensusMsg.Payload = h[:]
 	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey)

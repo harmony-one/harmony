@@ -3,7 +3,6 @@ package consensus
 import (
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -20,10 +19,9 @@ import (
 
 // Announce ..
 func (consensus *Consensus) Announce(block *types.Block) error {
-	blockHash := block.Hash()
-	copy(consensus.blockHash[:], blockHash[:])
-	// prepare message and broadcast to validators
+	consensus.SetBlockHash(block.Hash())
 	encodedBlock, err := rlp.EncodeToBytes(block)
+
 	if err != nil {
 		utils.Logger().Debug().Msg("[Announce] Failed encoding block")
 		return err
@@ -34,8 +32,8 @@ func (consensus *Consensus) Announce(block *types.Block) error {
 		return err
 	}
 
-	consensus.block = encodedBlock
-	consensus.blockHeader = encodedBlockHeader
+	consensus.SetBlock(encodedBlock)
+	consensus.SetBlockHeader(encodedBlockHeader)
 
 	key, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
@@ -62,21 +60,25 @@ func (consensus *Consensus) Announce(block *types.Block) error {
 		Uint64("MsgBlockNum", FPBTMsg.BlockNum).
 		Msg("[Announce] Added Announce message in FPBT")
 	consensus.FBFTLog.AddBlock(block)
-	num := consensus.BlockNum()
-	viewID := consensus.ViewID()
+
+	h := block.Hash()
+	d := common.BytesToHash(h[:])
+
 	// Leader sign the block hash itself
-	for i, key := range consensus.PubKey.PublicKey {
+	for i := range consensus.PubKey.PublicKey {
 		if _, err := consensus.Decider.SubmitVote(
 			quorum.Prepare,
-			key,
-			consensus.priKey.PrivateKey[i].SignHash(consensus.blockHash[:]),
-			common.BytesToHash(consensus.blockHash[:]),
-			num,
-			viewID,
+			consensus.PubKey.PublicKey[i],
+			consensus.priKey.PrivateKey[i].SignHash(h[:]),
+			d,
+			consensus.BlockNum(),
+			consensus.ViewID(),
 		); err != nil {
 			return err
 		}
-		if err := consensus.prepareBitmap.SetKey(key, true); err != nil {
+		if err := consensus.prepareBitmap.SetKey(
+			consensus.PubKey.PublicKey[i], true,
+		); err != nil {
 			utils.Logger().Warn().Err(err).Msg(
 				"[Announce] Leader prepareBitmap SetKey failed",
 			)
@@ -114,24 +116,37 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 		return err
 	}
 
-	num := consensus.BlockNum()
-	viewID := consensus.ViewID()
-
-	if recvMsg.ViewID != viewID || recvMsg.BlockNum != num {
+	if recvMsg.ViewID != consensus.ViewID() {
 		utils.Logger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
+			Msg("OnPrepare message viewID not match")
+		return errors.Errorf(
+			"on prepare message viewID not match %d %d",
+			recvMsg.ViewID,
+			consensus.ViewID(),
+		)
+	}
+
+	if recvMsg.BlockNum != consensus.BlockNum() {
+		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Msg("[OnPrepare] Message ViewId or BlockNum not match")
-		return errors.New("Message ViewId or BlockNum not match")
+			Msg("[OnPrepare] blockNum not match")
+		return errors.Errorf(
+			"on prepare message blockNum not match %d %d",
+			recvMsg.BlockNum,
+			consensus.BlockNum(),
+		)
+
 	}
 
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
-		num, viewID, recvMsg.BlockHash,
+		consensus.BlockNum(), consensus.ViewID(), recvMsg.BlockHash,
 	) {
 		utils.Logger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnPrepare] No Matching Announce message")
+		fmt.Println("does this ever happen")
 		//return
 	}
 
@@ -140,6 +155,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 	prepareBitmap := consensus.prepareBitmap
 
 	logger := utils.Logger().With().Logger()
+
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
 
 	// proceed only when the message is not received before
 	signed := consensus.Decider.ReadBallot(quorum.Prepare, validatorPubKey)
@@ -163,7 +181,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 			Msg("[OnPrepare] Failed to deserialize bls signature")
 		return err
 	}
-	if !sign.VerifyHash(recvMsg.SenderPubkey, consensus.blockHash[:]) {
+	if h := consensus.BlockHash(); !sign.VerifyHash(recvMsg.SenderPubkey, h[:]) {
 		utils.Logger().Error().Msg("[OnPrepare] Received invalid BLS signature")
 		return errors.New("Received invalid BLS signature")
 	}
@@ -214,6 +232,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 		return nil
 	}
 
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
+
 	// Check for potential double signing
 	if consensus.checkDoubleSign(recvMsg) {
 		return nil
@@ -235,8 +256,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
 		new(big.Int).SetUint64(consensus.Epoch()),
-		recvMsg.BlockHash,
-		recvMsg.BlockNum, consensus.ViewID(),
+		recvMsg.BlockHash[:],
+		recvMsg.BlockNum,
+		consensus.ViewID(),
 	)
 	logger = logger.With().
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -269,7 +291,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 
 	// Reading from this commitfinish chan should be own thread
 
-	// quorumIsMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
+	// quorumIsMet :=
 
 	// if !quorumWasMet && quorumIsMet {
 	// 	logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
@@ -287,17 +309,18 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 	// 	}()
 	// }
 
-	if consensus.Decider.IsAllSigsCollected() {
-		go func() {
-			time.AfterFunc(time.Until(consensus.NextBlockDue()), func() {
-				fmt.Println("waited the full block time needed", consensus.ShardID)
-				consensus.CommitFinishChan <- consensus.ViewID()
-				fmt.Println("sent the viewID", consensus.ShardID)
-			})
-		}()
-		logger.Info().Msg("[OnCommit] 100% Enough commits received")
-	} else {
-		fmt.Println("did not collect all signatures yet", consensus.ShardID)
+	if consensus.Decider.IsQuorumAchieved(quorum.Commit) {
+		// go func(viewID uint64) {
+		// 	time.AfterFunc(time.Until(consensus.NextBlockDue()), func() {
+		// 		fmt.Println("waited the full block time needed", consensus.ShardID)
+		// 		fmt.Println("sent the viewID", viewID)
+		// 	})
+		// }(consensus.ViewID())
+
+		consensus.CommitFinishChan <- Finished{
+			consensus.ViewID(), consensus.ShardID,
+		}
+
 	}
 
 	return nil

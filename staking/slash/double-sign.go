@@ -243,9 +243,14 @@ func Verify(
 			return err
 		}
 
-		// slash verification only happens in staking era, therefore want commit payload for staking epoch
+		// slash verification only happens in staking era,
+		// therefore want commit payload for staking epoch
 		commitPayload := consensus_sig.ConstructCommitPayload(chain,
-			chain.Config().StakingEpoch, ballot.BlockHeaderHash, ballot.Height, ballot.ViewID)
+			chain.Config().StakingEpoch,
+			ballot.BlockHeaderHash.Bytes(),
+			ballot.Height,
+			ballot.ViewID,
+		)
 		utils.Logger().Debug().
 			Uint64("epoch", chain.Config().StakingEpoch.Uint64()).
 			Uint64("block-number", ballot.Height).
