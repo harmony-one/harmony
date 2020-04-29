@@ -31,7 +31,7 @@ func (consensus *Consensus) constructViewChangeMessage(
 	vcMsg.SenderPubkey = pubKey.Serialize()
 
 	// next leader key already updated
-	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
+	vcMsg.LeaderPubkey = consensus.LeaderPubKey().Serialize()
 
 	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
 		msg_pb.MessageType_PREPARED, num, consensus.BlockHash(),

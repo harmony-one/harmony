@@ -218,7 +218,7 @@ func (consensus *Consensus) FinalizeCommits() error {
 		Uint64("epochNum", block.Epoch().Uint64()).
 		Uint64("ViewId", block.Header().ViewID().Uint64()).
 		Str("blockHash", block.Hash().String()).
-		Int("index", consensus.Decider.IndexOf(consensus.LeaderPubKey)).
+		Int("index", consensus.Decider.IndexOf(consensus.LeaderPubKey())).
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
@@ -427,7 +427,7 @@ func (consensus *Consensus) GenerateVrfAndProof(
 
 // ValidateVrfAndProof validates a VRF/Proof from hash of previous block
 func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
-	vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey)
+	vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey())
 	var blockHash [32]byte
 	previousHeader := consensus.ChainReader.GetHeaderByNumber(
 		headerObj.Number().Uint64() - 1,

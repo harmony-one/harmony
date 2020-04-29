@@ -72,7 +72,7 @@ func (consensus *Consensus) switchPhase(desired FBFTPhase) {
 
 // GetNextLeaderKey uniquely determine who is the leader for given viewID
 func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKey {
-	wasFound, next := consensus.Decider.NextAfter(consensus.LeaderPubKey)
+	wasFound, next := consensus.Decider.NextAfter(consensus.LeaderPubKey())
 	if !wasFound {
 		utils.Logger().Warn().
 			Msg("GetNextLeaderKey: currentLeaderKey not found")
@@ -102,7 +102,7 @@ func (consensus *Consensus) StartViewChange(viewID uint64) {
 	}
 	consensus.Current.SetMode(ViewChanging)
 	consensus.Current.SetViewID(viewID)
-	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
+	consensus.SetLeaderPubKey(consensus.GetNextLeaderKey())
 	diff := int64(viewID - consensus.ViewID())
 	duration := time.Duration(diff * diff * int64(timeouts.ViewChangeDuration))
 	utils.Logger().Info().
@@ -313,7 +313,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 	// received enough view change messages, change state to normal consensus
 	if consensus.Decider.IsQuorumAchievedByMask(consensus.viewIDBitmap[recvMsg.ViewID]) {
 		consensus.Current.SetMode(Normal)
-		consensus.LeaderPubKey = newLeaderKey
+		consensus.SetLeaderPubKey(newLeaderKey)
 		consensus.ResetState()
 		if len(consensus.m1Payload) == 0 {
 			// TODO(Chao): explain why ReadySignal is sent only in this case but not the other case.
@@ -491,7 +491,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) error {
 	// newView message verified success, override my state
 	consensus.SetViewID(recvMsg.ViewID)
 	consensus.Current.SetViewID(recvMsg.ViewID)
-	consensus.LeaderPubKey = senderKey
+	consensus.SetLeaderPubKey(senderKey)
 	consensus.ResetViewChangeState()
 
 	// change view and leaderKey to keep in sync with network

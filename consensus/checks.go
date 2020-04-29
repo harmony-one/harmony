@@ -33,7 +33,7 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		return false
 	}
 
-	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
+	if !senderKey.IsEqual(consensus.LeaderPubKey()) &&
 		consensus.Current.Mode() == Normal && !consensus.ignoreViewIDCheck {
 		utils.Logger().Warn().Msgf(
 			"[%s] SenderKey not match leader PubKey",

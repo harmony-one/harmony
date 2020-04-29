@@ -76,7 +76,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 
 						now := big.NewInt(time.Now().UnixNano())
 
-						leaderShardKey := shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey)
+						leaderShardKey := shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey())
 						if leaderShardKey == nil {
 							utils.Logger().Error().
 								Str("msg", recvMsg.String()).

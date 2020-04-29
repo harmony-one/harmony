@@ -57,7 +57,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	defer consensus.Locks.PubKey.Unlock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
-	consensus.LeaderPubKey = pubKeys[0]
+	consensus.SetLeaderPubKey(pubKeys[0])
 	// reset states after update public keys
 	consensus.ResetState()
 	consensus.ResetViewChangeState()
@@ -209,7 +209,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.Current.SetMode(Normal)
 		consensus.SetViewID(msg.ViewID)
 		consensus.Current.SetViewID(msg.ViewID)
-		consensus.LeaderPubKey = msg.SenderPubkey
+		consensus.SetLeaderPubKey(msg.SenderPubkey)
 		consensus.ignoreViewIDCheck = false
 		consensus.Timeouts.Consensus.Start(consensus.BlockNum())
 		return nil
@@ -288,7 +288,9 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 // (a) node not in committed: Listening mode
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
-func (consensus *Consensus) UpdateConsensusInformation() Mode {
+func (consensus *Consensus) UpdateConsensusInformation(
+	currentLeader string,
+) Mode {
 	curHeader := consensus.ChainReader.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
@@ -375,7 +377,13 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	// update public keys in the committee
-	oldLeader := consensus.LeaderPubKey
+	oldLeader := &bls.PublicKey{}
+	if err := oldLeader.DeserializeHexStr(
+		currentLeader,
+	); err != nil {
+		return Syncing
+	}
+
 	pubKeys, _ := committeeToSet.BLSPublicKeys()
 
 	utils.Logger().Info().
@@ -412,7 +420,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		} else {
 			utils.Logger().Debug().
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
-			consensus.LeaderPubKey = leaderPubKey
+			consensus.SetLeaderPubKey(leaderPubKey)
 		}
 	}
 
@@ -424,7 +432,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			}
 
 			// If the leader changed and I myself become the leader
-			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.IsLeader() {
+			if !consensus.LeaderPubKey().IsEqual(oldLeader) && consensus.IsLeader() {
 				go func() {
 					utils.Logger().Debug().
 						Uint64("viewID", consensus.ViewID()).
@@ -443,12 +451,12 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	consensus.Locks.Leader.Lock()
-	defer consensus.Locks.Leader.Unlock()
+	consensus.Locks.PubKey.Lock()
+	defer consensus.Locks.PubKey.Unlock()
 
 	for i := range consensus.PubKey.PublicKey {
 		if consensus.PubKey.PublicKey[i].IsEqual(
-			consensus.LeaderPubKey,
+			consensus.LeaderPubKey(),
 		) {
 			return true
 		}

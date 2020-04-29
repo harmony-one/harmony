@@ -573,7 +573,6 @@ func setupConsensusAndNode(
 		Msg("Init Blockchain")
 
 	// update consensus information based on the blockchain
-	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
 	return currentNode
 }
 
@@ -773,6 +772,10 @@ func main() {
 		}
 	}
 
+	currentNode.Consensus.SetMode(
+		currentNode.Consensus.UpdateConsensusInformation(""),
+	)
+
 	currentNode.ServiceManagerSetup()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
@@ -789,19 +792,17 @@ func main() {
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		g.Go(currentNode.HandleConsensusBlockProcessing)
 		g.Go(currentNode.HandleConsensusMessageProcessing)
+		// currentNode.Consensus.SetMode(consensus.Normal)
 
-		if currentNode.IsCurrentlyLeader() {
-			currentNode.Consensus.SetMode(consensus.Normal)
-			g.Go(currentNode.StartLeaderWork)
-			go func() {
-				time.Sleep(time.Second * 10)
-				fmt.Println(">>>>>>>>kicking off first block<<<<<<<",
-					currentNode.Consensus.ShardID,
-				)
-				currentNode.Consensus.ProposalNewBlock <- struct{}{}
-				currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-			}()
-		}
+		g.Go(currentNode.StartLeaderWork)
+		go func() {
+			time.Sleep(time.Second * 3)
+			fmt.Println(">>>>>>>>kicking off first block<<<<<<<",
+				currentNode.Consensus.ShardID,
+			)
+			currentNode.Consensus.ProposalNewBlock <- struct{}{}
+			currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+		}()
 
 		g.Go(currentNode.BootstrapConsensus)
 		// g.Go(currentNode.EnsureConsensusLiviness)

@@ -16,7 +16,7 @@ import (
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
 func (node *Node) postConsensusProcessing(
-	newBlock *types.Block,
+	newBlock *types.Block, leader string,
 ) error {
 
 	if node.Consensus.IsLeader() {
@@ -65,7 +65,9 @@ func (node *Node) postConsensusProcessing(
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
-		node.Consensus.SetMode(node.Consensus.UpdateConsensusInformation())
+		node.Consensus.SetMode(
+			node.Consensus.UpdateConsensusInformation(leader),
+		)
 	}
 
 	return nil
@@ -89,8 +91,13 @@ func (node *Node) HandleConsensusBlockProcessing() error {
 				if len(accepted.Blk.Header().ShardState()) > 0 {
 					fmt.Println("before post consensus on new shard state header")
 				}
-
-				accepted.Err <- node.postConsensusProcessing(accepted.Blk)
+				fmt.Println("WHAT is leader public key now?",
+					node.Consensus.LeaderPubKey().SerializeToHexStr(),
+					"should be SOMETHING",
+				)
+				accepted.Err <- node.postConsensusProcessing(
+					accepted.Blk, node.Consensus.LeaderPubKey().SerializeToHexStr(),
+				)
 
 				if len(accepted.Blk.Header().ShardState()) > 0 {
 					fmt.Println("after post consensus on new shard state header")

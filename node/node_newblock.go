@@ -34,36 +34,39 @@ func (node *Node) StartLeaderWork() error {
 
 	g.Go(func() error {
 		for range node.Consensus.ProposalNewBlock {
-			utils.Logger().Debug().
-				Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
-				Msg("PROPOSING NEW BLOCK ------------------------------------------------")
+			if node.Consensus.IsLeader() {
 
-			newBlock, err := node.proposeNewBlock()
+				utils.Logger().Debug().
+					Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
+					Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
-			if err != nil {
-				return err
+				newBlock, err := node.proposeNewBlock()
+
+				if err != nil {
+					return err
+				}
+				if !node.Consensus.IsLeader() {
+					fmt.Println("this should NOT be happening")
+					return errors.New(" I am not leader should not propose")
+				}
+				utils.Logger().Debug().
+					Uint64("blockNum", newBlock.NumberU64()).
+					Uint64("epoch", newBlock.Epoch().Uint64()).
+					Uint64("viewID", newBlock.Header().ViewID().Uint64()).
+					Int("numTxs", newBlock.Transactions().Len()).
+					Int("numStakingTxs", newBlock.StakingTransactions().Len()).
+					Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
+					Msg("=========Successfully Proposed New Block==========")
+				// Send the new block to Consensus so it can be confirmed.
+				fmt.Println("now announced", newBlock.Header().String())
+
+				if err := node.Consensus.Announce(newBlock); err != nil {
+					fmt.Println("problem with annunce why")
+					return err
+				}
+				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+
 			}
-			if !node.Consensus.IsLeader() {
-				fmt.Println("this should NOT be happening")
-				return errors.New(" I am not leader should not propose")
-			}
-			utils.Logger().Debug().
-				Uint64("blockNum", newBlock.NumberU64()).
-				Uint64("epoch", newBlock.Epoch().Uint64()).
-				Uint64("viewID", newBlock.Header().ViewID().Uint64()).
-				Int("numTxs", newBlock.Transactions().Len()).
-				Int("numStakingTxs", newBlock.StakingTransactions().Len()).
-				Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
-				Msg("=========Successfully Proposed New Block==========")
-			// Send the new block to Consensus so it can be confirmed.
-			fmt.Println("now announced", newBlock.Header().String())
-
-			if err := node.Consensus.Announce(newBlock); err != nil {
-				fmt.Println("problem with annunce why")
-				return err
-			}
-			node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-
 		}
 		return nil
 	})
@@ -166,14 +169,16 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
 	var (
-		coinbase    = node.GetAddressForBLSKey(node.Consensus.LeaderPubKey, header.Epoch())
+		coinbase = node.GetAddressForBLSKey(
+			node.Consensus.LeaderPubKey(), header.Epoch(),
+		)
 		beneficiary = coinbase
 		err         error
 	)
 
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
-		blsPubKeyBytes := node.Consensus.LeaderPubKey.GetAddress()
+		blsPubKeyBytes := node.Consensus.LeaderPubKey().GetAddress()
 		coinbase.SetBytes(blsPubKeyBytes[:])
 	}
 

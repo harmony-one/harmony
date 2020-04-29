@@ -88,6 +88,16 @@ func (consensus *Consensus) SetEpoch(e uint64) {
 	consensus.epoch.Store(e)
 }
 
+// LeaderPubKey ..
+func (consensus *Consensus) LeaderPubKey() *bls.PublicKey {
+	return consensus.leaderPubKey.Load().(*bls.PublicKey)
+}
+
+// SetLeaderPubKey ..
+func (consensus *Consensus) SetLeaderPubKey(k *bls.PublicKey) {
+	consensus.leaderPubKey.Store(k)
+}
+
 // ViewID ..
 func (consensus *Consensus) ViewID() uint64 {
 	return consensus.viewID.Load().(uint64)
@@ -152,7 +162,7 @@ type Consensus struct {
 	priKey *multibls.PrivateKey
 	PubKey *multibls.PublicKey
 	// the publickey of leader
-	LeaderPubKey *bls.PublicKey
+	leaderPubKey atomic.Value
 	// Blockhash - 32 byte
 	blockHash atomic.Value
 	// Block to run consensus on
@@ -202,24 +212,21 @@ func (consensus *Consensus) VdfSeedSize() int {
 func (consensus *Consensus) GetLeaderPrivateKey(
 	leaderKey *bls.PublicKey,
 ) (*bls.SecretKey, error) {
-
 	for i := range consensus.PubKey.PublicKey {
 		if consensus.PubKey.PublicKey[i].IsEqual(leaderKey) {
 			return consensus.priKey.PrivateKey[i], nil
 		}
 	}
 
-	// fmt.Println("how this happen",
-	// 	len(consensus.PubKey.PublicKey),
-	// 	consensus.PubKey,
-	// )
-	panic("die")
 	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
 }
 
 // GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
 func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, error) {
-	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey)
+	if consensus.IsLeader() {
+		return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey())
+	}
+	return nil, errors.New("this node is not leader")
 }
 
 // New ..
@@ -232,12 +239,13 @@ func New(
 	minPeer int,
 ) (*Consensus, error) {
 
-	var phase, blk, view, epoch atomic.Value
+	var phase, blk, view, epoch, leader atomic.Value
 
 	phase.Store(FBFTAnnounce)
 	blk.Store(uint64(0))
 	view.Store(uint64(0))
 	epoch.Store(uint64(0))
+	leader.Store(&bls.PublicKey{})
 
 	consensus := Consensus{
 		Decider:          Decider,
@@ -249,6 +257,7 @@ func New(
 		viewID:           view,
 		CommitFinishChan: make(chan Finished),
 		host:             host,
+		leaderPubKey:     leader,
 		Timeouts:         timeouts.NewNotifier(),
 		SlashChan:        make(chan slash.Record),
 		ProposalNewBlock: make(chan struct{}),
