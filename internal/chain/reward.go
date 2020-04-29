@@ -195,9 +195,11 @@ func AccumulateRewardsAndCountSigs(
 			return network.EmptyPayout, err
 		}
 
-		beaconExternalShare := shard.Schedule.InstanceForEpoch(
-			headerE,
-		).ExternalVotePercent()
+		allSignersShare := numeric.ZeroDec()
+		for j := range payable {
+			voterShare := votingPower.Voters[payable[j].BLSPublicKey].OverallPercent
+			allSignersShare = allSignersShare.Add(voterShare)
+		}
 		for beaconMember := range payable {
 			// TODO Give out whatever leftover to the last voter/handle
 			// what to do about share of those that didn't sign
@@ -209,7 +211,7 @@ func AccumulateRewardsAndCountSigs(
 					return network.EmptyPayout, err
 				}
 				due := defaultReward.Mul(
-					voter.OverallPercent.Quo(beaconExternalShare),
+					voter.OverallPercent.Quo(allSignersShare),
 				).RoundInt()
 				newRewards.Add(newRewards, due)
 
@@ -294,14 +296,17 @@ func AccumulateRewardsAndCountSigs(
 					return network.EmptyPayout, err
 				}
 
-				shardExternalShare := shard.Schedule.InstanceForEpoch(
-					epoch,
-				).ExternalVotePercent()
+				allSignersShare := numeric.ZeroDec()
+				for j := range payableSigners {
+					voterShare := votingPower.Voters[payableSigners[j].BLSPublicKey].OverallPercent
+					allSignersShare = allSignersShare.Add(voterShare)
+				}
+
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BLSPublicKey]
 					if !voter.IsHarmonyNode && !voter.OverallPercent.IsZero() {
 						due := defaultReward.Mul(
-							voter.OverallPercent.Quo(shardExternalShare),
+							voter.OverallPercent.Quo(allSignersShare),
 						)
 						allPayables = append(allPayables, slotPayable{
 							Slot:    payableSigners[j],
