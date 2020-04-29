@@ -154,12 +154,6 @@ type Consensus struct {
 	IncomingConsensusMessage chan []byte
 }
 
-// SetCommitDelay sets the commit message delay.  If set to non-zero,
-// validator delays commit message by the amount.
-func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
-	consensus.delayCommit = delay
-}
-
 // VdfSeedSize returns the number of VRFs for VDF computation
 func (consensus *Consensus) VdfSeedSize() int {
 	return int(consensus.Decider.ParticipantsCount()) * 2 / 3
@@ -169,11 +163,18 @@ func (consensus *Consensus) VdfSeedSize() int {
 func (consensus *Consensus) GetLeaderPrivateKey(
 	leaderKey *bls.PublicKey,
 ) (*bls.SecretKey, error) {
-	for i, key := range consensus.PubKey.PublicKey {
-		if key.IsEqual(leaderKey) {
+
+	for i := range consensus.PubKey.PublicKey {
+		if consensus.PubKey.PublicKey[i].IsEqual(leaderKey) {
 			return consensus.priKey.PrivateKey[i], nil
 		}
 	}
+
+	// fmt.Println("how this happen",
+	// 	len(consensus.PubKey.PublicKey),
+	// 	consensus.PubKey,
+	// )
+	// panic("die")
 	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
 }
 
@@ -188,6 +189,8 @@ func New(
 	shard uint32,
 	multiBLSPriKey *multibls.PrivateKey,
 	Decider quorum.Decider,
+	commitDelay time.Duration,
+	minPeer int,
 ) (*Consensus, error) {
 
 	var phase, blk, view, epoch atomic.Value
@@ -216,6 +219,8 @@ func New(
 		RndChannel:               make(chan [vdfAndSeedSize]byte),
 		ShardID:                  shard,
 		IncomingConsensusMessage: make(chan []byte),
+		delayCommit:              commitDelay,
+		MinPeers:                 minPeer,
 	}
 
 	if multiBLSPriKey != nil {

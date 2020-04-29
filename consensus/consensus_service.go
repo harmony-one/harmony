@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -54,11 +53,9 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
-	consensus.Locks.PubKey.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	consensus.LeaderPubKey = pubKeys[0]
-	consensus.Locks.PubKey.Unlock()
 	// reset states after update public keys
 	consensus.ResetState()
 	consensus.ResetViewChangeState()
@@ -291,6 +288,9 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
+	consensus.Locks.PubKey.Lock()
+	defer consensus.Locks.PubKey.Unlock()
+
 	curHeader := consensus.ChainReader.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
@@ -327,7 +327,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if len(curHeader.ShardState()) > 0 {
 		// increase curEpoch by one if it's the last block
 		consensus.SetEpoch(curEpoch.Uint64() + 1)
-		fmt.Println("changed consensu's epoch to next one", curEpoch.Uint64(), consensus.Epoch())
+
+		// fmt.Println("changed consensu's epoch to next one", curEpoch.Uint64(), consensus.Epoch())
 
 		utils.Logger().Info().
 			Uint64("headerNum", curHeader.Number().Uint64()).

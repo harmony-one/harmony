@@ -15,21 +15,22 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/pkg/errors"
 )
 
-func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
+func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) error {
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnAnnounce] Unparseable leader message")
-		return
+		return err
 	}
 
 	// NOTE let it handle its own logs
 	if !consensus.onAnnounceSanityChecks(recvMsg) {
-		return
+		return nil
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
@@ -40,7 +41,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if consensus.current.Mode() == ViewChanging {
 		utils.Logger().Debug().
 			Msg("[OnAnnounce] Still in ViewChanging Mode, Exiting !!")
-		return
+		return nil
 	}
 
 	if consensus.checkViewID(recvMsg) != nil {
@@ -50,12 +51,12 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 				Uint64("MsgBlockNum", recvMsg.BlockNum).
 				Msg("[OnAnnounce] ViewID check failed")
 		}
-		return
+		return errors.New("viewID check failed")
 	}
-	consensus.prepare()
+	return consensus.prepare()
 }
 
-func (consensus *Consensus) prepare() {
+func (consensus *Consensus) prepare() error {
 	groupID := []nodeconfig.GroupID{
 		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 	}
@@ -67,7 +68,7 @@ func (consensus *Consensus) prepare() {
 			utils.Logger().Err(err).
 				Str("message-type", msg_pb.MessageType_PREPARE.String()).
 				Msg("could not construct message")
-			return
+			return err
 		}
 
 		// TODO: this will not return immediatey, may block
@@ -77,23 +78,24 @@ func (consensus *Consensus) prepare() {
 				p2p.ConstructMessage(networkMessage.Bytes),
 			); err != nil {
 				utils.Logger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
-			} else {
-				utils.Logger().Info().
-					Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
-					Msg("[OnAnnounce] Sent Prepare Message!!")
+				return err
 			}
+			utils.Logger().Info().
+				Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
+				Msg("[OnAnnounce] Sent Prepare Message!!")
 		}
 	}
 	consensus.switchPhase(FBFTPrepare)
+	return nil
 }
 
 // if onPrepared accepts the prepared message from the leader, then
 // it will send a COMMIT message for the leader to receive on the network.
-func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
+func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {
 		utils.Logger().Debug().Err(err).Msg("[OnPrepared] Unparseable validator message")
-		return
+		return err
 	}
 	utils.Logger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -103,7 +105,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if recvMsg.BlockNum < consensus.BlockNum() {
 		utils.Logger().Debug().Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("Wrong BlockNum Received, ignoring!")
-		return
+		return err
 	}
 
 	// check validity of prepared signature
@@ -111,13 +113,13 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!")
-		return
+		return err
 	}
 
 	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 		utils.Logger().Warn().
 			Msgf("[OnPrepared] Quorum Not achieved")
-		return
+		return nil
 	}
 
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
@@ -127,7 +129,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Msg("[OnPrepared] failed to verify multi signature for prepare phase")
-		return
+		return errors.New("failed to verify multi signature for prepare phase")
 	}
 
 	// check validity of block
@@ -137,11 +139,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnPrepared] Unparseable block header data")
-		return
+		return err
 	}
 	// let this handle it own logs
 	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
-		return
+		return nil
 	}
 
 	consensus.FBFTLog.AddBlock(&blockObj)
@@ -157,10 +159,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Hex("blockHash", recvMsg.BlockHash[:]).
 		Msg("[OnPrepared] Prepared message and block added")
 
-	consensus.tryCatchup()
+	if err := consensus.tryCatchup(); err != nil {
+		return err
+	}
 	if consensus.current.Mode() == ViewChanging {
 		utils.Logger().Debug().Msg("[OnPrepared] Still in ViewChanging mode, Exiting!!")
-		return
+		return nil
 	}
 
 	if consensus.checkViewID(recvMsg) != nil {
@@ -170,14 +174,14 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 				Uint64("MsgBlockNum", recvMsg.BlockNum).
 				Msg("[OnPrepared] ViewID check failed")
 		}
-		return
+		return errors.New("viewID check failed")
 	}
 	if num := consensus.BlockNum(); recvMsg.BlockNum > num {
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", num).
 			Msg("[OnPrepared] Future Block Received, ignoring!!")
-		return
+		return nil
 	}
 
 	// TODO: genesis account node delay for 1 second,
@@ -219,37 +223,39 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 				p2p.ConstructMessage(networkMessage.Bytes),
 			); err != nil {
 				utils.Logger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
-			} else {
-				utils.Logger().Info().
-					Hex("blockHash", consensus.blockHash[:]).
-					Msg("[OnPrepared] Sent Commit Message!!")
+				return err
 			}
+			utils.Logger().Info().
+				Hex("blockHash", consensus.blockHash[:]).
+				Msg("[OnPrepared] Sent Commit Message!!")
+
 		}
 	}
 	consensus.switchPhase(FBFTCommit)
+	return nil
 }
 
-func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
+func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {
 		utils.Logger().Warn().Msg("[OnCommitted] unable to parse msg")
-		return
+		return err
 	}
 	// NOTE let it handle its own logs
 	if !consensus.isRightBlockNumCheck(recvMsg) {
-		return
+		return nil
 	}
 
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
-		return
+		return err
 	}
 
 	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
 		utils.Logger().Warn().
 			Msgf("[OnCommitted] Quorum Not achieved")
-		return
+		return nil
 	}
 
 	// Received msg must be about same epoch, otherwise it's invalid anyways.
@@ -263,7 +269,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		utils.Logger().Error().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnCommitted] Failed to verify the multi signature for commit phase")
-		return
+		return errors.New("Failed to verify the multi signature for commit phase")
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
@@ -286,12 +292,16 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		// return
 	}
 
-	consensus.tryCatchup()
+	if err := consensus.tryCatchup(); err != nil {
+		return err
+	}
+
 	if consensus.current.Mode() == ViewChanging {
 		utils.Logger().Debug().Msg("[OnCommitted] Still in ViewChanging mode, Exiting!!")
-		return
+		return nil
 	}
 
 	utils.Logger().Debug().Msg("[OnCommitted] Start consensus timer")
 	consensus.timeouts.Consensus.Start(consensus.BlockNum())
+	return nil
 }

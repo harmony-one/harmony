@@ -35,7 +35,8 @@ func (node *Node) HandleConsensusMessageProcessing() error {
 			return err
 		}
 		i++
-		fmt.Println("handling ith consensus message", i)
+
+		// fmt.Println("handling ith consensus message", i, "on shard", node.Consensus.ShardID)
 	}
 
 	return nil
@@ -294,6 +295,7 @@ func (node *Node) postConsensusProcessing(
 	if len(newBlock.Header().ShardState()) > 0 {
 		node.Consensus.SetMode(node.Consensus.UpdateConsensusInformation())
 	}
+
 	return nil
 }
 

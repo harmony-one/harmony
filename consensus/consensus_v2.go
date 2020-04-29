@@ -25,64 +25,64 @@ const (
 )
 
 // Start just ensures that consensus is happening via timeouts.
-func (consensus *Consensus) Start() error {
+// func (consensus *Consensus) Start() error {
 
-	consensus.timeouts.Consensus.Start(consensus.BlockNum())
-	consensus.timeouts.ViewChange.Start(consensus.ViewID())
-	// notify := consensus.timeouts.Consensus.
+// 	consensus.timeouts.Consensus.Start(consensus.BlockNum())
+// 	consensus.timeouts.ViewChange.Start(consensus.ViewID())
+// 	// notify := consensus.timeouts.Consensus.
 
-	select {}
+// 	select {}
 
-	// g.Go()
+// g.Go()
 
-	// Set up next block due time. // TODO make 8 second duration
-	// notifer := consensus.timeouts.Notify()
+// Set up next block due time. // TODO make 8 second duration
+// notifer := consensus.timeouts.Notify()
 
-	// go consensus.leaderHandleFinish()
+// go consensus.leaderHandleFinish()
 
-	// for {
+// for {
 
-	// 	select {
-	// case kind := <-notifer:
-	// 	fmt.Println("hit this case", kind)
-	// 	continue
+// 	select {
+// case kind := <-notifer:
+// 	fmt.Println("hit this case", kind)
+// 	continue
 
-	// if kind.Name == timeouts.Consensus {
-	// 	fmt.Println(
-	// 		"consensus timeout went off, block then",
-	// 		kind.Value,
-	// 		"blck now",
-	// 		consensus.BlockNum(),
-	// 	)
-	// }
+// if kind.Name == timeouts.Consensus {
+// 	fmt.Println(
+// 		"consensus timeout went off, block then",
+// 		kind.Value,
+// 		"blck now",
+// 		consensus.BlockNum(),
+// 	)
+// }
 
-	// fmt.Println("actually wow I got it", kind)
-	// case <-ticker.C:
-	// 	utils.Logger().Debug().Msg("[ConsensusMainLoop] Ticker")
-	// 	if !consensus.IsLeader() {
-	// 		continue
-	// 	}
-	// 	// TODO think about this some more
-	// 	if m := consensus.current.Mode(); m == Syncing || m == Listening {
-	// 		if !consensus.timeouts.consensus.WithinLimit() {
-	// 			utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
-	// 			consensus.startViewChange(consensus.viewID + 1)
-	// 		} else if !consensus.timeouts.viewChange.WithinLimit() {
-	// 			utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
-	// 			viewID := consensus.current.ViewID()
-	// 			consensus.startViewChange(viewID + 1)
-	// 		}
-	// 	}
+// fmt.Println("actually wow I got it", kind)
+// case <-ticker.C:
+// 	utils.Logger().Debug().Msg("[ConsensusMainLoop] Ticker")
+// 	if !consensus.IsLeader() {
+// 		continue
+// 	}
+// 	// TODO think about this some more
+// 	if m := consensus.current.Mode(); m == Syncing || m == Listening {
+// 		if !consensus.timeouts.consensus.WithinLimit() {
+// 			utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
+// 			consensus.startViewChange(consensus.viewID + 1)
+// 		} else if !consensus.timeouts.viewChange.WithinLimit() {
+// 			utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
+// 			viewID := consensus.current.ViewID()
+// 			consensus.startViewChange(viewID + 1)
+// 		}
+// 	}
 
-	// 	case newBlock := <-blockChannel:
-	// 		utils.Logger().Debug().Msg("new block came in, starting consensus")
-	// 		consensus.SetNextBlockDue(time.Now().Add(BlockTime))
-	// 		consensus.announce(newBlock)
+// 	case newBlock := <-blockChannel:
+// 		utils.Logger().Debug().Msg("new block came in, starting consensus")
+// 		consensus.SetNextBlockDue(time.Now().Add(BlockTime))
+// 		consensus.announce(newBlock)
 
-	// 	}
-	// }
-	// return nil
-}
+// 	}
+// }
+// return nil
+// }
 
 var (
 	// ErrEmptyMessage ..
@@ -121,39 +121,23 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) error {
 		}
 	}
 
-	intendedForValidator, intendedForLeader :=
-		!consensus.IsLeader(),
-		consensus.IsLeader()
-
 	switch t := msg.Type; true {
 	// Handle validator intended messages first
-	case t == msg_pb.MessageType_ANNOUNCE &&
-		intendedForValidator &&
-		consensus.validatorSanityChecks(msg):
-		consensus.onAnnounce(msg)
-	case t == msg_pb.MessageType_PREPARED &&
-		intendedForValidator &&
-		consensus.validatorSanityChecks(msg):
-		consensus.onPrepared(msg)
-	case t == msg_pb.MessageType_COMMITTED &&
-		intendedForValidator &&
-		consensus.validatorSanityChecks(msg):
-		consensus.onCommitted(msg)
+	case t == msg_pb.MessageType_ANNOUNCE && consensus.validatorSanityChecks(msg):
+		return consensus.onAnnounce(msg)
+	case t == msg_pb.MessageType_PREPARED && consensus.validatorSanityChecks(msg):
+		return consensus.onPrepared(msg)
+	case t == msg_pb.MessageType_COMMITTED && consensus.validatorSanityChecks(msg):
+		return consensus.onCommitted(msg)
 	// Handle leader intended messages now
-	case t == msg_pb.MessageType_PREPARE &&
-		intendedForLeader &&
-		consensus.leaderSanityChecks(msg):
-		consensus.onPrepare(msg)
-	case t == msg_pb.MessageType_COMMIT &&
-		intendedForLeader &&
-		consensus.leaderSanityChecks(msg):
-		consensus.onCommit(msg)
-	case t == msg_pb.MessageType_VIEWCHANGE &&
-		consensus.viewChangeSanityCheck(msg):
-		consensus.onViewChange(msg)
-	case t == msg_pb.MessageType_NEWVIEW &&
-		consensus.viewChangeSanityCheck(msg):
-		consensus.onNewView(msg)
+	case t == msg_pb.MessageType_PREPARE && consensus.leaderSanityChecks(msg):
+		return consensus.onPrepare(msg)
+	case t == msg_pb.MessageType_COMMIT && consensus.leaderSanityChecks(msg):
+		return consensus.onCommit(msg)
+	case t == msg_pb.MessageType_VIEWCHANGE && consensus.viewChangeSanityCheck(msg):
+		return consensus.onViewChange(msg)
+	case t == msg_pb.MessageType_NEWVIEW && consensus.viewChangeSanityCheck(msg):
+		return consensus.onNewView(msg)
 	}
 
 	return nil

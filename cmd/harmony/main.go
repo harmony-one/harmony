@@ -458,27 +458,30 @@ func setupConsensusAndNode(
 ) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
-	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(*shardID))
+	commitDelay, err := time.ParseDuration(*delayCommit)
+	if err != nil || commitDelay < 0 {
+		fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", *delayCommit)
+		os.Exit(1)
+	}
 
 	currentConsensus, err := consensus.New(
-		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, decider,
+		myHost,
+		nodeConfig.ShardID,
+		nodeConfig.ConsensusPriKey,
+		decider,
+		commitDelay,
+		*minPeers,
 	)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR invalid consensus obj issue  %#v", err)
+		os.Exit(1)
+	}
+
 	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 		return currentConsensus.PubKey, nil
 	})
-
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
-		os.Exit(1)
-	}
-	commitDelay, err := time.ParseDuration(*delayCommit)
-	if err != nil || commitDelay < 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", *delayCommit)
-		os.Exit(1)
-	}
-	currentConsensus.SetCommitDelay(commitDelay)
-	currentConsensus.MinPeers = *minPeers
 
 	blacklist, err := setupBlacklist()
 	if err != nil {
@@ -790,12 +793,13 @@ func main() {
 		if currentNode.IsCurrentlyLeader() {
 			currentNode.Consensus.SetMode(consensus.Normal)
 			g.Go(currentNode.StartLeaderWork)
-			go func() {
+			g.Go(func() error {
 				time.Sleep(time.Second * 10)
 				fmt.Println("kicking off first block")
 				currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 				currentNode.Consensus.ProposalNewBlock <- struct{}{}
-			}()
+				return nil
+			})
 		}
 
 		g.Go(currentNode.BootstrapConsensus)

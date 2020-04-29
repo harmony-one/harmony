@@ -43,7 +43,9 @@ func (node *Node) StartLeaderWork() error {
 			if err != nil {
 				return err
 			}
-
+			if !node.Consensus.IsLeader() {
+				fmt.Println("this should NOT be happening")
+			}
 			utils.Logger().Debug().
 				Uint64("blockNum", newBlock.NumberU64()).
 				Uint64("epoch", newBlock.Epoch().Uint64()).
@@ -53,8 +55,16 @@ func (node *Node) StartLeaderWork() error {
 				Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 				Msg("=========Successfully Proposed New Block==========")
 			// Send the new block to Consensus so it can be confirmed.
-			fmt.Println("now announced")
-			node.Consensus.Announce(newBlock)
+			fmt.Println("now announced", newBlock.Header().String())
+
+			if err := node.Consensus.Announce(newBlock); err != nil {
+				fmt.Println("problem with annunce why")
+			}
+
+			// if err != nil {
+			// 	return err
+			// }
+
 		}
 		return nil
 	})
@@ -62,20 +72,21 @@ func (node *Node) StartLeaderWork() error {
 	g.Go(func() error {
 		for viewID := range node.Consensus.CommitFinishChan {
 			// Only Leader execute this condition
+
+			fmt.Println(
+				"viewid, isleader", viewID, node.Consensus.ViewID(), node.Consensus.IsLeader(),
+			)
+
 			if viewID == node.Consensus.ViewID() {
 				fmt.Println("\nbefore finalize ", node.Consensus.ShardID)
-
-				node.Consensus.Locks.Global.Lock()
 				if err := node.Consensus.FinalizeCommits(); err != nil {
-					node.Consensus.Locks.Global.Unlock()
 					return err
 				}
-				node.Consensus.Locks.Global.Unlock()
-
 				node.Consensus.ProposalNewBlock <- struct{}{}
-				fmt.Println("after finalize", node.Consensus.ShardID)
-				fmt.Println("after sending readysignal ", node.Consensus.ShardID)
 				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+				fmt.Println("after sending Proposal for new block ", node.Consensus.ShardID)
+			} else {
+				fmt.Println("why non leader trying to run this commit finish chan code?")
 			}
 		}
 		return nil

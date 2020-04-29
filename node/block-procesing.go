@@ -19,7 +19,17 @@ func (node *Node) HandleConsensusBlockProcessing() error {
 				accepted.Err <- err
 				continue
 			}
+			if len(accepted.Blk.Header().ShardState()) > 0 {
+				fmt.Println("before post consensus on new shard state header")
+			}
+
 			accepted.Err <- node.postConsensusProcessing(accepted.Blk)
+
+			if len(accepted.Blk.Header().ShardState()) > 0 {
+				fmt.Println("after post consensus on new shard state header")
+
+			}
+
 			// fmt.Println("received block post consensus process-finished", accepted.Blk.String())
 		}
 		return nil
