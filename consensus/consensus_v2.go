@@ -145,11 +145,12 @@ func (consensus *Consensus) HandleMessageUpdate(payload []byte) error {
 
 // FinalizeCommits ..
 func (consensus *Consensus) FinalizeCommits() error {
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
+
 	utils.Logger().Info().
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
 		Msg("[finalizeCommits] Finalizing Block")
-	consensus.Locks.Global.Lock()
-	defer consensus.Locks.Global.Unlock()
 
 	beforeCatchupNum := consensus.BlockNum()
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
