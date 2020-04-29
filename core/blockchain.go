@@ -2377,7 +2377,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				return nil, err
 			}
 
-			stats.APR = numeric.ZeroDec()
 			if wrapper.Delegations[0].Amount.Cmp(common.Big0) > 0 {
 				if aprComputed, err := apr.ComputeForValidator(
 					bc, block, wrapper,
@@ -2388,7 +2387,22 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 						return nil, err
 					}
 				} else {
-					stats.APR = *aprComputed
+					now := currentEpochSuperCommittee.Epoch
+					// only insert if APR for current epoch does not exists
+					if _, ok := stats.APRs[now.Int64()]; !ok {
+						stats.APRs[now.Int64()] = *aprComputed
+						// check and clean aprs for epochs prior to current minus APRHistoryLength
+						nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength)).Int64()
+						keysToRemove := []int64{}
+						for i := range stats.APRs {
+							if i < nowMinus100 {
+								keysToRemove = append(keysToRemove, i)
+							}
+						}
+						for i := range keysToRemove {
+							delete(stats.APRs, keysToRemove[i])
+						}
+					}
 				}
 			} else {
 				utils.Logger().Info().Msg("zero total delegation, skipping apr computation")
