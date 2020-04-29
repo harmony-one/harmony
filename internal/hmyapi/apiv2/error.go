@@ -1,6 +1,10 @@
 package apiv2
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/harmony-one/harmony/shard"
+)
 
 var (
 	// ErrInvalidLogLevel when invalid log level is provided
@@ -10,5 +14,12 @@ var (
 	// ErrInvalidChainID when ChainID of signer does not match that of running node
 	ErrInvalidChainID = errors.New("invalid chain id for signer")
 	// ErrNotBeaconChainShard when rpc is called on not beacon chain node
-	ErrNotBeaconChainShard = errors.New("cannot call this rpc on non beaconchain node")
+	ErrNotBeaconShard = errors.New("cannot call this rpc on non beaconchain node")
 )
+
+func (s *PublicBlockChainAPI) isBeaconShard() error {
+	if s.b.GetShardID() != shard.BeaconChainShardID {
+		return ErrNotBeaconShard
+	}
+	return nil
+}

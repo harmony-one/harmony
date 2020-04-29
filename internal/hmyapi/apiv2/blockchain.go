@@ -127,6 +127,9 @@ func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart, blockEn
 
 // GetValidators returns validators list for a particular epoch.
 func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (map[string]interface{}, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	committee, err := s.b.GetValidators(big.NewInt(epoch))
 	if err != nil {
 		return nil, err
@@ -156,18 +159,18 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 
 // IsLastBlock checks if block is last epoch block.
 func (s *PublicBlockChainAPI) IsLastBlock(blockNum uint64) (bool, error) {
-	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return shard.Schedule.IsLastBlock(blockNum), nil
+	if err := s.isBeaconShard(); err != nil {
+		return false, err
 	}
-	return false, ErrNotBeaconChainShard
+	return shard.Schedule.IsLastBlock(blockNum), nil
 }
 
 // EpochLastBlock returns epoch last block.
 func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) (uint64, error) {
-	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return shard.Schedule.EpochLastBlock(epoch), nil
+	if err := s.isBeaconShard(); err != nil {
+		return 0, err
 	}
-	return 0, ErrNotBeaconChainShard
+	return shard.Schedule.EpochLastBlock(epoch), nil
 }
 
 // GetBlockSigners returns signers for a particular block.
@@ -293,18 +296,24 @@ func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 }
 
 // GetValidatorSelfDelegation returns validator stake.
-func (s *PublicBlockChainAPI) GetValidatorSelfDelegation(ctx context.Context, address string) *big.Int {
-	return s.b.GetValidatorSelfDelegation(internal_common.ParseAddr(address))
+func (s *PublicBlockChainAPI) GetValidatorSelfDelegation(ctx context.Context, address string) (*big.Int, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
+	return s.b.GetValidatorSelfDelegation(internal_common.ParseAddr(address)), nil
 }
 
 // GetValidatorTotalDelegation returns total balace stacking for validator with delegation.
-func (s *PublicBlockChainAPI) GetValidatorTotalDelegation(ctx context.Context, address string) *big.Int {
+func (s *PublicBlockChainAPI) GetValidatorTotalDelegation(ctx context.Context, address string) (*big.Int, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	delegations := s.b.GetDelegationsByValidator(internal_common.ParseAddr(address))
 	totalStake := big.NewInt(0)
 	for _, delegation := range delegations {
 		totalStake.Add(totalStake, delegation.Amount)
 	}
-	return totalStake
+	return totalStake, nil
 }
 
 // GetShardingStructure returns an array of sharding structures.
@@ -494,10 +503,10 @@ func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformati
 // GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
-	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return s.b.GetTotalStakingSnapshot(), nil
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
 	}
-	return nil, ErrNotBeaconChainShard
+	return s.b.GetTotalStakingSnapshot(), nil
 }
 
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
@@ -505,14 +514,17 @@ func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
 func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (
 	*committee.CompletedEPoSRound, error,
 ) {
-	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return s.b.GetMedianRawStakeSnapshot()
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
 	}
-	return nil, ErrNotBeaconChainShard
+	return s.b.GetMedianRawStakeSnapshot()
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
 func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	addresses := []string{}
 	for _, addr := range s.b.GetAllValidatorAddresses() {
 		oneAddr, _ := internal_common.AddressToBech32(addr)
@@ -523,6 +535,9 @@ func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
 
 // GetElectedValidatorAddresses returns elected validator addresses.
 func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	addresses := []string{}
 	for _, addr := range s.b.GetElectedValidatorAddresses() {
 		oneAddr, _ := internal_common.AddressToBech32(addr)
@@ -535,6 +550,9 @@ func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 func (s *PublicBlockChainAPI) GetValidatorInformation(
 	ctx context.Context, address string,
 ) (*staking.ValidatorRPCEnchanced, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(rpc.LatestBlockNumber))
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not retrieve the latest block information")
@@ -596,6 +614,10 @@ func (s *PublicBlockChainAPI) getAllValidatorInformation(
 func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 	ctx context.Context, page int,
 ) ([]*staking.ValidatorRPCEnchanced, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
+
 	blockNr := s.b.CurrentBlock().NumberU64()
 
 	// delete cache for previous block
@@ -621,6 +643,9 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 func (s *PublicBlockChainAPI) GetAllValidatorInformationByBlockNumber(
 	ctx context.Context, page int, blockNr rpc.BlockNumber,
 ) ([]*staking.ValidatorRPCEnchanced, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	return s.getAllValidatorInformation(ctx, page, blockNr)
 }
 
@@ -628,6 +653,10 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformationByBlockNumber(
 // starting at `page*validatorsPageSize`.
 // If page is -1, return all instead of `validatorsPageSize` elements.
 func (s *PublicBlockChainAPI) GetAllDelegationInformation(ctx context.Context, page int) ([][]*RPCDelegation, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
+
 	if page < -1 {
 		return make([][]*RPCDelegation, 0), nil
 	}
@@ -657,6 +686,9 @@ func (s *PublicBlockChainAPI) GetAllDelegationInformation(ctx context.Context, p
 
 // GetDelegationsByDelegator returns list of delegations for a delegator address.
 func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, address string) ([]*RPCDelegation, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	delegatorAddress := internal_common.ParseAddr(address)
 	validators, delegations := s.b.GetDelegationsByDelegator(delegatorAddress)
 	result := []*RPCDelegation{}
@@ -686,6 +718,9 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, add
 
 // GetDelegationsByDelegatorAt returns list of delegations for a delegator address at given block number
 func (s *PublicBlockChainAPI) GetDelegationsByDelegatorAt(ctx context.Context, address string, blockNum rpc.BlockNumber) ([]*RPCDelegation, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	delegatorAddress := internal_common.ParseAddr(address)
 	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
 	if err != nil {
@@ -719,6 +754,9 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegatorAt(ctx context.Context, a
 
 // GetDelegationsByValidator returns list of delegations for a validator address.
 func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, address string) ([]*RPCDelegation, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	validatorAddress := internal_common.ParseAddr(address)
 	delegations := s.b.GetDelegationsByValidator(validatorAddress)
 	result := make([]*RPCDelegation, 0)
@@ -747,6 +785,9 @@ func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, add
 
 // GetDelegationByDelegatorAndValidator returns a delegation for delegator and validator.
 func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.Context, address string, validator string) (*RPCDelegation, error) {
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
+	}
 	delegatorAddress := internal_common.ParseAddr(address)
 	validatorAddress := internal_common.ParseAddr(validator)
 	validators, delegations := s.b.GetDelegationsByDelegator(delegatorAddress)
@@ -842,18 +883,18 @@ func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (h
 
 // GetCurrentUtilityMetrics ..
 func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
-	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return s.b.GetCurrentUtilityMetrics()
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
 	}
-	return nil, ErrNotBeaconChainShard
+	return s.b.GetCurrentUtilityMetrics()
 }
 
 // GetSuperCommittees ..
 func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
-	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return s.b.GetSuperCommittees()
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
 	}
-	return nil, ErrNotBeaconChainShard
+	return s.b.GetSuperCommittees()
 }
 
 // GetCurrentBadBlocks ..
@@ -876,8 +917,8 @@ func (s *PublicBlockChainAPI) GetCirculatingSupply() (numeric.Dec, error) {
 func (s *PublicBlockChainAPI) GetStakingNetworkInfo(
 	ctx context.Context,
 ) (*StakingNetworkInfo, error) {
-	if s.b.GetShardID() != shard.BeaconChainShardID {
-		return nil, ErrNotBeaconChainShard
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
 	}
 	totalStaking, _ := s.GetTotalStaking()
 	round, _ := s.GetMedianRawStakeSnapshot()
@@ -896,8 +937,8 @@ func (s *PublicBlockChainAPI) GetStakingNetworkInfo(
 
 // GetLastCrossLinks ..
 func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.CrossLink, error) {
-	if s.b.GetShardID() == shard.BeaconChainShardID {
-		return s.b.GetLastCrossLinks()
+	if err := s.isBeaconShard(); err != nil {
+		return nil, err
 	}
-	return nil, ErrNotBeaconChainShard
+	return s.b.GetLastCrossLinks()
 }
