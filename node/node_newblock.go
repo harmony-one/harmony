@@ -59,6 +59,7 @@ func (node *Node) StartLeaderWork() error {
 			fmt.Println("now announced", newBlock.Header().String())
 
 			node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+
 			if err := node.Consensus.Announce(newBlock); err != nil {
 				fmt.Println("problem with annunce why")
 				return err
@@ -73,50 +74,82 @@ func (node *Node) StartLeaderWork() error {
 	})
 
 	var roundDone singleflight.Group
+	res := make(chan singleflight.Result)
+
+	g.Go(func() error {
+		for result := range res {
+			fmt.Println("now I can do finalize?", result)
+			if err := node.Consensus.FinalizeCommits(); err != nil {
+				return err
+			}
+
+			node.Consensus.ProposalNewBlock <- struct{}{}
+			fmt.Println("after kick off proposal")
+		}
+		return nil
+	})
 
 	g.Go(func() error {
 		for quorumReached := range node.Consensus.CommitFinishChan {
 			if node.Consensus.IsLeader() {
+				due := node.Consensus.NextBlockDue()
 				viewID, shardID := quorumReached.ViewID, quorumReached.ShardID
-				results, err, evicted := roundDone.Do(
-					fmt.Sprintf("%d-%d", viewID, shardID),
+				key := fmt.Sprintf("%d-%d", viewID, shardID)
+
+				res <- <-roundDone.DoChan(key,
 					func() (interface{}, error) {
 
-						if bufferTime := time.Until(
-							node.Consensus.NextBlockDue(),
-						); bufferTime > time.Second*3 {
+						if bufferTime := time.Until(due); bufferTime > 0 {
 							fmt.Println(
 								"got the block done faster",
 								node.Consensus.ShardID,
 								bufferTime.Round(time.Second),
 							)
-							time.Sleep(time.Second)
+							time.Sleep(time.Second * 5)
 						}
 
-						fmt.Println("before finalize", node.Consensus.ShardID)
+						// time.Sleep(time.Until(due))
+						return key, nil
 
-						if err := node.Consensus.FinalizeCommits(); err != nil {
-							fmt.Println("why could not finalize?", err.Error())
-							return nil, err
-						}
-						return nil, nil
 					},
 				)
 
-				fmt.Println("single flight thing", results, err, evicted)
-
-				if err != nil {
-					return err
-				}
-
-				node.Consensus.ProposalNewBlock <- struct{}{}
-				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-				fmt.Println("after sending Proposal for new block ", node.Consensus.ShardID)
 			}
 		}
 
 		return nil
 	})
+
+	return g.Wait()
+}
+
+// func (node *Node) EnsureConsensusInSync() error {
+// 	select {}
+// 	return nil
+// }
+
+// EnsureConsensusLiviness ..
+func (node *Node) EnsureConsensusLiviness() error {
+	var g errgroup.Group
+
+	// node.Consensus.Timeouts.Consensus.Start(node.Consensus.BlockNum())
+
+	// g.Go(func() error {
+	// 	for {
+	// 		n := node.Consensus.Timeouts.Consensus.Notify()
+	// 		select {
+	// 		case issue := <-n:
+	// 			fmt.Println("we got the timeout ->", issue)
+
+	// 		}
+	// 	}
+
+	// 	return nil
+	// })
+
+	// g.Go(func() error {
+	// 	return nil
+	// })
 
 	return g.Wait()
 }

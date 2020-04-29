@@ -298,6 +298,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 	}
 
 	utils.Logger().Debug().Msg("[OnCommitted] Start consensus timer")
-	consensus.timeouts.Consensus.Start(consensus.BlockNum())
+	consensus.Timeouts.Consensus.Start(consensus.BlockNum())
 	return nil
 }

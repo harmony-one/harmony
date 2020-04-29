@@ -1,7 +1,6 @@
 package timeouts
 
 import (
-	"fmt"
 	"sync/atomic"
 	"time"
 )
@@ -26,7 +25,7 @@ const (
 	// timeout duration for announce/prepare/commit
 
 	// PhaseDuration ..
-	PhaseDuration time.Duration = 60 * time.Second
+	PhaseDuration time.Duration = 15 * time.Second
 )
 
 // ComeDue ..
@@ -48,51 +47,60 @@ func (d *ComeDue) SetDuration(dur time.Duration) {
 	d.limit.Store(dur)
 }
 
-// func (d *ComeDue) WithinLimit() bool {
-// 	elapsed := time.Since(d.startTime.Load().(time.Time))
-// 	return elapsed.Round(time.Second) < d.duration
-// }
-
-// DueWithValue ..
-type DueWithValue struct {
-	Name  Named
-	Value uint64
-}
-
 // Notify ..
-func (r *Notifier) Notify() <-chan DueWithValue {
-	fmt.Println("did this call?")
-	timedOut := make(chan DueWithValue)
+func (d *ComeDue) Notify() <-chan uint64 {
+	timedOut := make(chan uint64)
 
 	go func() {
 		for {
-			then := time.Now()
-			time.Sleep(r.Consensus.limit.Load().(time.Duration))
-			timedOut <- DueWithValue{
-				Name:  r.Consensus.Name,
-				Value: r.Consensus.startValue.Load().(uint64),
-			}
-			fmt.Println("notify occured this much later", time.Since(then).Round(time.Second))
-			return
-		}
-	}()
 
-	go func() {
-		for {
-			then := time.Now()
-			time.Sleep(r.ViewChange.limit.Load().(time.Duration))
-			timedOut <- DueWithValue{
-				Name:  r.ViewChange.Name,
-				Value: r.ViewChange.startValue.Load().(uint64),
-			}
-			fmt.Println("notify occured this much later", time.Since(then).Round(time.Second))
-			return
+			time.AfterFunc(d.limit.Load().(time.Duration), func() {
+				elapsed := time.Since(d.startTime.Load().(time.Time))
+				if elapsed.Round(time.Second) > d.limit.Load().(time.Duration) {
+					timedOut <- d.startValue.Load().(uint64)
+				}
+			})
+
 		}
 	}()
 
 	return timedOut
-
 }
+
+// func (d *ComeDue) WithinLimit() bool {
+// }
+
+// DueWithValue ..
+// type DueWithValue struct {
+// 	Value uint64
+// }
+
+// Notify ..
+// func (r *Notifier) Notify() <-chan DueWithValue {
+
+// 	time.AfterFunc(r.Consensus.limit.Load().(time.Duration), func() {
+// 		timedOut <- DueWithValue{
+// 			Name:  r.Consensus.Name,
+// 			Value: r.Consensus.startValue.Load().(uint64),
+// 		}
+// 	})
+
+// 	// go func() {
+// 	// 	for {
+// 	// 		then := time.Now()
+// 	// 		time.Sleep(r.ViewChange.limit.Load().(time.Duration))
+// 	// 		timedOut <- DueWithValue{
+// 	// 			Name:  r.ViewChange.Name,
+// 	// 			Value: r.ViewChange.startValue.Load().(uint64),
+// 	// 		}
+// 	// 		fmt.Println("notify occured this much later", time.Since(then).Round(time.Second))
+// 	// 		return
+// 	// 	}
+// 	// }()
+
+// 	return timedOut
+
+// }
 
 // Notifier ..
 type Notifier struct {

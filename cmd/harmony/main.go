@@ -796,13 +796,14 @@ func main() {
 			g.Go(func() error {
 				time.Sleep(time.Second * 10)
 				fmt.Println("kicking off first block")
-				currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 				currentNode.Consensus.ProposalNewBlock <- struct{}{}
 				return nil
 			})
 		}
 
 		g.Go(currentNode.BootstrapConsensus)
+		// g.Go(currentNode.EnsureConsensusLiviness)
+		// g.Go(currentNode.EnsureConsensusInSync)
 
 	}
 

@@ -118,8 +118,8 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		)
 	}
 
-	consensus.timeouts.ViewChange.SetDuration(duration)
-	consensus.timeouts.ViewChange.Start(consensus.ViewID())
+	consensus.Timeouts.ViewChange.SetDuration(duration)
+	consensus.Timeouts.ViewChange.Start(consensus.ViewID())
 
 	utils.Logger().Debug().
 		Uint64("ViewChangingID", consensus.current.ViewID()).
@@ -386,7 +386,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 
 		consensus.SetViewID(recvMsg.ViewID)
 		consensus.ResetViewChangeState()
-		consensus.timeouts.Consensus.Start(consensus.BlockNum())
+		consensus.Timeouts.Consensus.Start(consensus.BlockNum())
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.ViewID()).
 			Uint64("block", consensus.BlockNum()).
@@ -545,6 +545,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) error {
 	}
 	utils.Logger().Debug().
 		Msg("validator start consensus timer and stop view change timer")
-	consensus.timeouts.Consensus.Start(consensus.BlockNum())
+	consensus.Timeouts.Consensus.Start(consensus.BlockNum())
 	return nil
 }

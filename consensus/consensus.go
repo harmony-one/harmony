@@ -122,8 +122,9 @@ type Consensus struct {
 	// Commits collected from validators.
 	aggregatedPrepareSig *bls.Sign
 	aggregatedCommitSig  *bls.Sign
-	prepareBitmap        *bls_cosi.Mask
-	commitBitmap         *bls_cosi.Mask
+	// TODO Make these two be atomic.Value as well
+	prepareBitmap *bls_cosi.Mask
+	commitBitmap  *bls_cosi.Mask
 	// Commits collected from view change
 	// for each viewID, we need keep track of corresponding sigs and bitmap
 	// until one of the viewID has enough votes (>=2f+1)
@@ -180,7 +181,7 @@ type Consensus struct {
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 	// The p2p host used to send/receive p2p messages
 	host     p2p.Host
-	timeouts *timeouts.Notifier
+	Timeouts *timeouts.Notifier
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
@@ -247,7 +248,7 @@ func New(
 		viewID:           view,
 		CommitFinishChan: make(chan Finished),
 		host:             host,
-		timeouts:         timeouts.NewNotifier(),
+		Timeouts:         timeouts.NewNotifier(),
 		SlashChan:        make(chan slash.Record),
 		ProposalNewBlock: make(chan struct{}),
 		RoundCompleted:   processBlock{make(chan blkComeback)},

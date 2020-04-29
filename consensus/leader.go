@@ -20,6 +20,7 @@ import (
 
 // Announce ..
 func (consensus *Consensus) Announce(block *types.Block) error {
+
 	consensus.SetBlockHash(block.Hash())
 	encodedBlock, err := rlp.EncodeToBytes(block)
 
@@ -77,6 +78,7 @@ func (consensus *Consensus) Announce(block *types.Block) error {
 		); err != nil {
 			return err
 		}
+		// TODO race condition on the prepare bitmap
 		if err := consensus.prepareBitmap.SetKey(
 			consensus.PubKey.PublicKey[i], true,
 		); err != nil {
@@ -107,6 +109,7 @@ func (consensus *Consensus) Announce(block *types.Block) error {
 }
 
 func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
+
 	if !consensus.IsLeader() {
 		return nil
 	}
@@ -153,8 +156,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 
 	validatorPubKey := recvMsg.SenderPubkey
 	prepareSig := recvMsg.Payload
-	prepareBitmap := consensus.prepareBitmap
-
 	logger := utils.Logger().With().Logger()
 
 	consensus.Locks.Global.Lock()
@@ -200,7 +201,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 		return err
 	}
 	// Set the bitmap indicating that this validator signed.
-	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
+	if err := consensus.prepareBitmap.SetKey(
+		recvMsg.SenderPubkey, true,
+	); err != nil {
 		utils.Logger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
 		return err
 	}
