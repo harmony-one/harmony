@@ -762,8 +762,11 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if shard.Schedule.IsLastBlock(currentBlockNumber.Uint64()) {
 			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
 		}
-
-		_, err = VerifyAndCreateValidatorFromMsg(pool.currentState, pendingEpoch, pendingBlockNumber, stkMsg)
+		chainContext, ok := pool.chain.(ChainContext)
+		if !ok {
+			chainContext = nil // might use testing blockchain, set to nil for verifier to handle.
+		}
+		_, err = VerifyAndCreateValidatorFromMsg(pool.currentState, chainContext, pendingEpoch, pendingBlockNumber, stkMsg)
 		return err
 	case staking.DirectiveEditValidator:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveEditValidator)
