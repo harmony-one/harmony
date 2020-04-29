@@ -28,7 +28,7 @@ func (s *PublicBlockChainAPI) isBeaconShard() error {
 }
 
 func (s *PublicBlockChainAPI) isBlockGreaterThanLatest(blockNum rpc.BlockNumber) error {
-	if uint64(blockNum) >= uint64(s.BlockNumber()) {
+	if uint64(blockNum) > uint64(s.BlockNumber()) {
 		return ErrRequestedBlockTooHigh
 	}
 	return nil
