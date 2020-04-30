@@ -2,10 +2,12 @@ package node
 
 import (
 	"bufio"
+	"bytes"
 	"container/ring"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"strings"
@@ -13,8 +15,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"encoding/binary"
+	"encoding/hex"
+
 	"github.com/ethereum/go-ethereum/common"
+	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
@@ -679,39 +686,65 @@ func (node *Node) ForceJoiningTopics() error {
 // StartStateSyncStreams ..
 func (node *Node) StartStateSyncStreams() error {
 
+	var g errgroup.Group
+
 	node.host.IPFSNode.PeerHost.SetStreamHandler(
 		p2p.Protocol, func(stream libp2p_network.Stream) {
-			rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
-			fmt.Println("set the stream handler")
-			// syncing request reader
-			go func() {
+			s := stream
+
+			g.Go(func() error {
+				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+
 				for {
-					str, _ := rw.ReadString('\n')
 
-					fmt.Println("got->", str)
-
-					if str == "" {
-						return
+					time.Sleep(time.Second * 2)
+					// this must be our message
+					buf, err := rw.Peek(1)
+					if err != nil {
+						return err
 					}
-					if str != "\n" {
+
+					if buf[0] == 0x11 {
+
+						_, err := rw.ReadByte()
+						if err != nil {
+							return err
+						}
+
+						var msgBuf msg_pb.Message
+						contentSizeBuf := make([]byte, 4)
+
+						if _, err := io.ReadFull(rw, contentSizeBuf); err != nil {
+							return err
+						}
+
+						sized := binary.BigEndian.Uint32(contentSizeBuf)
+						fmt.Println("sized", sized)
+
+						payload := make([]byte, sized)
+
+						if _, err := io.ReadFull(rw, payload); err != nil {
+							return err
+						}
+
+						fmt.Println("what does the payload look like", hex.EncodeToString(payload))
+						// 0x1100000005020803100e
+						// 0x          020803100e
+
+						if err := protobuf.Unmarshal(payload[1:], &msgBuf); err != nil {
+							fmt.Println(err.Error())
+						}
 						// Green console colour: 	\x1b[32m
 						// Reset console colour: 	\x1b[0m
-						fmt.Printf("\x1b[32m%s\x1b[0m> ", str)
+						fmt.Printf("\x1b[32m%s\x1b[0m> ", msgBuf.String())
+
 					}
 				}
-			}()
 
-			// syncing request writer
-			// go func() {
-			// 	for {
-			// 		fmt.Println("sync request writer called")
-			// 	}
-			// }()
+				return nil
+			})
 
-		},
-	)
-
-	var g errgroup.Group
+		})
 
 	g.Go(func() error {
 		time.Sleep(time.Second * 5)
@@ -733,14 +766,38 @@ func (node *Node) StartStateSyncStreams() error {
 				return err
 			}
 
-			fmt.Println("here is a state sync stream", stateSyncStream.Protocol())
-
 			rw := bufio.NewReadWriter(
 				bufio.NewReader(stateSyncStream), bufio.NewWriter(stateSyncStream),
 			)
 
 			h.Go(func() error {
-				if _, err := rw.WriteString(" hello world\n"); err != nil {
+
+				message := &msg_pb.Message{
+					ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+					Type:        msg_pb.MessageType_BLOCK_HEIGHT,
+				}
+
+				msg, err := protobuf.Marshal(message)
+
+				if err != nil {
+					return err
+				}
+
+				byteBuffer := bytes.NewBuffer([]byte{byte(proto_node.Client)})
+				byteBuffer.Write(msg)
+				syncingMessage := p2p.ConstructMessage(byteBuffer.Bytes())
+
+				fmt.Println(
+					"sync message len is ",
+					len(syncingMessage),
+					syncingMessage,
+					hex.EncodeToString(syncingMessage),
+					message.String(),
+					"just protbuf",
+					hex.EncodeToString(msg),
+				)
+
+				if _, err := rw.Write(syncingMessage); err != nil {
 					fmt.Println("some problem -> ", err.Error())
 					return err
 				}

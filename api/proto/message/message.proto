@@ -30,6 +30,7 @@ enum MessageType {
   // it should be either ENTER or GETPLAYERS but it will be removed later.
   LOTTERY_REQUEST = 12 [deprecated=true];
   BROADCASTED_NEW_BLOCK = 13;
+  BLOCK_HEIGHT = 14;
 }
 
 // This is universal message for all communication protocols.
