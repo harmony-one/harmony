@@ -32,6 +32,9 @@ type TxRecord struct {
 	Timestamp string
 }
 
+// TxRecords ...
+type TxRecords []*TxRecord
+
 // Data ...
 type Data struct {
 	Addresses []string `json:"Addresses"`
@@ -39,10 +42,10 @@ type Data struct {
 
 // Address ...
 type Address struct {
-	ID         string      `json:"id"`
-	Balance    *big.Int    `json:"balance"`
-	TXs        []*TxRecord `json:"txs"`
-	StakingTXs []*TxRecord `json:"staking_txs"`
+	ID         string    `json:"id"`
+	Balance    *big.Int  `json:"balance"`
+	TXs        TxRecords `json:"txs"`
+	StakingTXs TxRecords `json:"staking_txs"`
 }
 
 // Transaction ...
