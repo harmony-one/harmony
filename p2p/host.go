@@ -37,6 +37,7 @@ type Host interface {
 	GetPeerCount() int
 	GetID() libp2p_peer.ID
 	AllSubscriptions() []NamedSub
+	RawHandles() (ipfs_interface.CoreAPI, *ipfs_core.IpfsNode)
 }
 
 type Opts struct {
@@ -55,6 +56,11 @@ type hmyHost struct {
 	lock       sync.Mutex
 	joined     map[string]ipfs_interface.PubSubSubscription
 	swarmAddrs []string
+}
+
+// RawHandles ..
+func (h *hmyHost) RawHandles() (ipfs_interface.CoreAPI, *ipfs_core.IpfsNode) {
+	return h.coreAPI, h.node
 }
 
 func unlockFS(l *fslock.Lock) {

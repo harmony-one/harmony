@@ -67,6 +67,15 @@ func (node *Node) StartStateSync() error {
 	in := make(chan *types.Block)
 
 	simple := &simpleSyncer{}
+	ip := "127.0.0.1"
+	port := defaultDownloadPort
+
+	connection, _ := grpc.Dial(fmt.Sprintf(ip+":"+port), grpc.WithInsecure())
+
+	syncingHandle := downloader_pb.NewDownloaderClient(connection)
+	fmt.Println("here is a syncing handle", syncingHandle)
+	// syncingHandle.Query(ctx.TODO(),
+	// in *downloader_pb.DownloaderRequest, opts ...grpc.CallOption)
 	grpcServer := grpc.NewServer()
 
 	downloader_pb.RegisterDownloaderServer(grpcServer, simple)
@@ -75,6 +84,36 @@ func (node *Node) StartStateSync() error {
 
 	g.Go(func() error {
 		return grpcServer.Serve(lis)
+	})
+
+	g.Go(func() error {
+		coreAPI, ipfsNode := node.host.RawHandles()
+		addrs := ipfsNode.Peerstore.PeersWithAddrs()
+		// ipfsNode.Peerstore.Addrs(p peer.ID)
+		conns, err := coreAPI.Swarm().Peers(context.TODO())
+		if err != nil {
+			return err
+		}
+
+		peersViaPubSub, err := coreAPI.PubSub().Peers(context.TODO())
+		if err != nil {
+			return err
+		}
+
+		for _, peer := range peersViaPubSub {
+			fmt.Println("came in via pub-sub", peer.Pretty())
+		}
+
+		for _, conn := range conns {
+			fmt.Println("conn what is it from swarm", conn.Address(), conn)
+		}
+
+		for _, h := range addrs {
+			fmt.Println("addr- what is diff", h.Pretty())
+		}
+
+		return nil
+
 	})
 
 	g.Go(func() error {
