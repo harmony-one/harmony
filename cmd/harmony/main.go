@@ -797,9 +797,6 @@ func main() {
 		g.Go(currentNode.StartLeaderWork)
 		go func() {
 			time.Sleep(time.Second * 3)
-			fmt.Println(">>>>>>>>kicking off first block<<<<<<<",
-				currentNode.Consensus.ShardID,
-			)
 			currentNode.Consensus.ProposalNewBlock <- struct{}{}
 			currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 		}()

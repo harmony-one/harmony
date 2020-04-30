@@ -23,7 +23,7 @@ func (node *Node) HandleConsensusMessageProcessing() error {
 		for due := range node.Consensus.Timeouts.Consensus.TimedOut {
 			blkNow := node.Blockchain().CurrentHeader().Number().Uint64()
 
-			fmt.Println("PLAIN CONSENSUS TIMEOUT", due, blkNow)
+			// fmt.Println("PLAIN CONSENSUS TIMEOUT", due, blkNow)
 
 			if blkNow <= due {
 				fmt.Println("starting a view change ->", node.Consensus.ViewID())
@@ -37,7 +37,7 @@ func (node *Node) HandleConsensusMessageProcessing() error {
 		for due := range node.Consensus.Timeouts.ViewChange.TimedOut {
 			viewIDNow := node.Consensus.Current.ViewID()
 
-			fmt.Println("VIEWCHANGE TIMEOUT", due, viewIDNow)
+			// fmt.Println("VIEWCHANGE TIMEOUT", due, viewIDNow)
 
 			if viewIDNow <= due {
 				fmt.Println("starting a view change ->", node.Consensus.Current.ViewID())

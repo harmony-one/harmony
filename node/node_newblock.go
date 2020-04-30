@@ -45,10 +45,7 @@ func (node *Node) StartLeaderWork() error {
 				if err != nil {
 					return err
 				}
-				if !node.Consensus.IsLeader() {
-					fmt.Println("this should NOT be happening")
-					return errors.New(" I am not leader should not propose")
-				}
+
 				utils.Logger().Debug().
 					Uint64("blockNum", newBlock.NumberU64()).
 					Uint64("epoch", newBlock.Epoch().Uint64()).
@@ -58,10 +55,8 @@ func (node *Node) StartLeaderWork() error {
 					Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 					Msg("=========Successfully Proposed New Block==========")
 				// Send the new block to Consensus so it can be confirmed.
-				fmt.Println("now announced", newBlock.Header().String())
 
 				if err := node.Consensus.Announce(newBlock); err != nil {
-					fmt.Println("problem with annunce why")
 					return err
 				}
 				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
@@ -79,7 +74,7 @@ func (node *Node) StartLeaderWork() error {
 				viewID, shardID := quorumReached.ViewID, quorumReached.ShardID
 				key := fmt.Sprintf("%d-%d", viewID, shardID)
 
-				result, err, shared := roundDone.Do(key,
+				_, err, shared := roundDone.Do(key,
 					func() (interface{}, error) {
 
 						// NOTE always give 2 second buffer time
@@ -89,15 +84,15 @@ func (node *Node) StartLeaderWork() error {
 							node.Consensus.NextBlockDue(),
 						); bufferTime > 0 {
 
-							fmt.Println(
-								"got the block done faster",
-								node.Consensus.ShardID,
-								bufferTime.Round(time.Second),
-							)
+							// fmt.Println(
+							// 	"got the block done faster",
+							// 	node.Consensus.ShardID,
+							// 	bufferTime.Round(time.Second),
+							// )
 
 							// On local net, this is the block time basically
 							if b := bufferTime - time.Second; b > 0 {
-								fmt.Println("will sleep for", b.Round(time.Second))
+								// fmt.Println("will sleep for", b.Round(time.Second))
 								time.Sleep(b)
 							}
 						}
@@ -105,8 +100,12 @@ func (node *Node) StartLeaderWork() error {
 						return key, nil
 					})
 
+				if err != nil {
+					return err
+				}
+
 				if !shared {
-					fmt.Println("hello finished on", key, result, err, shared)
+					// fmt.Println("hello finished on", key, result, err, shared)
 					if err := node.Consensus.FinalizeCommits(); err != nil {
 						return err
 					}
@@ -115,7 +114,7 @@ func (node *Node) StartLeaderWork() error {
 					node.Consensus.ProposalNewBlock <- struct{}{}
 					node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 
-					fmt.Println("finished finalize")
+					// fmt.Println("finished finalize")
 				}
 			}
 		}

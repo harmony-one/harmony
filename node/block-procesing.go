@@ -89,18 +89,18 @@ func (node *Node) HandleConsensusBlockProcessing() error {
 				}
 
 				if len(accepted.Blk.Header().ShardState()) > 0 {
-					fmt.Println("before post consensus on new shard state header")
+					// fmt.Println("before post consensus on new shard state header")
 				}
-				fmt.Println("WHAT is leader public key now?",
-					node.Consensus.LeaderPubKey().SerializeToHexStr(),
-					"should be SOMETHING",
-				)
+				// fmt.Println("WHAT is leader public key now?",
+				// 	node.Consensus.LeaderPubKey().SerializeToHexStr(),
+				// 	"should be SOMETHING",
+				// )
 				accepted.Err <- node.postConsensusProcessing(
 					accepted.Blk, node.Consensus.LeaderPubKey().SerializeToHexStr(),
 				)
 
 				if len(accepted.Blk.Header().ShardState()) > 0 {
-					fmt.Println("after post consensus on new shard state header")
+					// fmt.Println("after post consensus on new shard state header")
 
 				}
 			} else {

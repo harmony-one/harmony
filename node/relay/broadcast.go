@@ -132,7 +132,7 @@ func (c *caster) newBlock(
 		return err
 	}
 
-	fmt.Println("here sending->", marshaledMessage, err)
+	// fmt.Println("here sending->", marshaledMessage, err)
 
 	return c.host.SendMessageToGroups(
 		groups, p2p.ConstructMessage(proto.ConstructConsensusMessage(marshaledMessage)),
@@ -148,7 +148,7 @@ func (c *caster) AcceptedBlock(shardID uint32, blk *types.Block) error {
 		c.config.GetShardGroupID(),
 		// c.config.GetClientGroupID(),
 	}
-	fmt.Println("accepted block sent to", grps)
+	// fmt.Println("accepted block sent to", grps)
 	return c.newBlock(blk, grps)
 }
 

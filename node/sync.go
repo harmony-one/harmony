@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core/types"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	manet "github.com/multiformats/go-multiaddr-net"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
@@ -87,36 +90,6 @@ func (node *Node) StartStateSync() error {
 	})
 
 	g.Go(func() error {
-		coreAPI, ipfsNode := node.host.RawHandles()
-		addrs := ipfsNode.Peerstore.PeersWithAddrs()
-		// ipfsNode.Peerstore.Addrs(p peer.ID)
-		conns, err := coreAPI.Swarm().Peers(context.TODO())
-		if err != nil {
-			return err
-		}
-
-		peersViaPubSub, err := coreAPI.PubSub().Peers(context.TODO())
-		if err != nil {
-			return err
-		}
-
-		for _, peer := range peersViaPubSub {
-			fmt.Println("came in via pub-sub", peer.Pretty())
-		}
-
-		for _, conn := range conns {
-			fmt.Println("conn what is it from swarm", conn.Address(), conn)
-		}
-
-		for _, h := range addrs {
-			fmt.Println("addr- what is diff", h.Pretty())
-		}
-
-		return nil
-
-	})
-
-	g.Go(func() error {
 		for beaconBlock := range in {
 			_ = beaconBlock
 		}
@@ -126,6 +99,51 @@ func (node *Node) StartStateSync() error {
 	g.Go(func() error {
 		for ownChain := range in {
 			_ = ownChain
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		coreAPI, _ := node.host.RawHandles()
+		// addrs := ipfsNode.Peerstore.PeersWithAddrs()
+		tick := time.NewTicker(time.Second * 10)
+		defer tick.Stop()
+
+		for range tick.C {
+			conns, err := coreAPI.Swarm().Peers(context.TODO())
+
+			if err != nil {
+				return err
+			}
+
+			fmt.Println("ATTTTTTTTTTTTTTTTTT", len(conns))
+
+			for _, conn := range conns {
+				fmt.Println("from what to what", conn.Address())
+				a, err := manet.ToNetAddr(conn.Address())
+
+				if err != nil {
+					return err
+				}
+
+				fmt.Println("nasty cast->", a.(*net.TCPAddr).Port)
+
+				plainIP, err := manet.ToIP(conn.Address())
+				fmt.Println("\nATTTTTN->", plainIP, "\n")
+
+				if err != nil {
+					return err
+				}
+
+				peer, err := libp2p_peer.AddrInfoFromP2pAddr(conn.Address())
+				if err != nil {
+					return err
+				}
+
+				fmt.Println("peeeeeeer", peer.String(), "and plain IP", plainIP)
+				// panic("die ")
+			}
+
 		}
 		return nil
 	})
