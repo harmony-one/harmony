@@ -34,7 +34,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/node"
-	"github.com/harmony-one/harmony/node/state"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -498,21 +497,12 @@ func setupConsensusAndNode(
 		configUsed = nodeconfig.GetDefaultConfig()
 	}
 
-	syncProvider, err := state.NewPeerProvider(
-		*port, *networkType, *dnsZone, *dnsFlag, configUsed,
-	)
-
-	if err != nil {
-		fatal(err)
-	}
-
 	currentNode, err := node.New(
 		myHost,
 		currentConsensus,
 		chainDBFactory,
 		blacklist,
 		*isArchival,
-		syncProvider,
 		configUsed,
 	)
 
@@ -776,7 +766,6 @@ func main() {
 		currentNode.Consensus.UpdateConsensusInformation(""),
 	)
 
-	currentNode.ServiceManagerSetup()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
 		utils.Logger().Warn().

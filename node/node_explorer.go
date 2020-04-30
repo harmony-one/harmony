@@ -126,7 +126,7 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 			go func() {
 				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
 					explorer.GetStorageInstance(
-						node.SelfPeer.IP, node.SelfPeer.Port, true, node.NodeConfig.DBDir,
+						node.Peer.IP, node.Peer.Port, true, node.NodeConfig.DBDir,
 					).Dump(
 						node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
 				}
@@ -147,7 +147,7 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 		Uint64("blockNum", block.NumberU64()).
 		Msg("[Explorer] Committing block into explorer DB")
 	explorer.GetStorageInstance(
-		node.SelfPeer.IP, node.SelfPeer.Port, true, node.NodeConfig.DBDir,
+		node.Peer.IP, node.Peer.Port, true, node.NodeConfig.DBDir,
 	).Dump(block, block.NumberU64())
 
 	curNum := block.NumberU64()
@@ -162,7 +162,7 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(
-		node.SelfPeer.IP, node.SelfPeer.Port, false, node.NodeConfig.DBDir,
+		node.Peer.IP, node.Peer.Port, false, node.NodeConfig.DBDir,
 	).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
@@ -198,7 +198,7 @@ func (node *Node) GetStakingTransactionsHistory(
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(
-		node.SelfPeer.IP, node.SelfPeer.Port, false, node.NodeConfig.DBDir,
+		node.Peer.IP, node.Peer.Port, false, node.NodeConfig.DBDir,
 	).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
@@ -232,7 +232,7 @@ func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(
-		node.SelfPeer.IP, node.SelfPeer.Port, false, node.NodeConfig.DBDir,
+		node.Peer.IP, node.Peer.Port, false, node.NodeConfig.DBDir,
 	).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
@@ -257,7 +257,7 @@ func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, e
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(
-		node.SelfPeer.IP, node.SelfPeer.Port, false, node.NodeConfig.DBDir,
+		node.Peer.IP, node.Peer.Port, false, node.NodeConfig.DBDir,
 	).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")

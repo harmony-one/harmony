@@ -14,10 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/api/client"
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -29,7 +26,6 @@ import (
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/relay"
-	"github.com/harmony-one/harmony/node/state"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
@@ -68,18 +64,14 @@ type Node struct {
 	pendingCXMutex    sync.Mutex
 	// Shard databases
 	shardChains          shardchain.Collection
-	Client               *client.Client // The presence of a client object means this node will also act as a client
-	SelfPeer             *p2p.Peer
+	Peer                 *p2p.Peer
 	State                atomic.Value // State of the Node
 	TxPool               *core.TxPool
 	CxPool               *core.CxPool // pool for missing cross shard receipts resend
 	Worker, BeaconWorker *worker.Worker
-	// Syncing component.
-	SyncID [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 	// Service manager.
-	serviceManager               *service.Manager
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
@@ -88,8 +80,7 @@ type Node struct {
 	// Chain configuration.
 	chainConfig params.ChainConfig
 	// map of service type to its message channel.
-	serviceMessageChan map[service.Type]chan *msg_pb.Message
-	isFirstTime        bool // the node was started with a fresh database
+	isFirstTime bool // the node was started with a fresh database
 	// Last 1024 staking transaction error, only in memory
 	errorSink struct {
 		sync.Mutex
@@ -396,7 +387,6 @@ func New(
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
 	isArchival bool,
-	stateSyncPeerProvider state.SyncPeerProvider,
 	configUsed *nodeconfig.ConfigType,
 ) (*Node, error) {
 
@@ -412,14 +402,12 @@ func New(
 		Gossiper:            relay.NewBroadCaster(configUsed, host),
 		NodeConfig:          configUsed,
 		chainConfig:         chainConfig,
-		SelfPeer:            host.GetSelfPeer(),
+		Peer:                host.GetSelfPeer(),
 		unixTimeAtNodeStart: time.Now().Unix(),
 		CxPool:              core.NewCxPool(core.CxPoolSize),
 		pendingCXReceipts:   map[string]*types.CXReceiptsProof{},
 		BeaconBlockChannel:  make(chan *types.Block),
 		IncomingBlocks:      make(chan *types.Block),
-		serviceManager:      service.NewManager(),
-		serviceMessageChan:  make(map[service.Type]chan *msg_pb.Message),
 		State:               state,
 		errorSink: struct {
 			sync.Mutex
@@ -427,8 +415,6 @@ func New(
 			failedTxns        *ring.Ring
 		}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)},
 	}
-
-	copy(node.SyncID[:], GenerateRandomString(SyncIDLength))
 
 	collection := shardchain.NewCollection(
 		chainDBFactory, &genesisInitializer{node}, chain.Engine, &chainConfig,
@@ -584,11 +570,6 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		}
 	}
 	return nil
-}
-
-// ServiceManager ...
-func (node *Node) ServiceManager() *service.Manager {
-	return node.serviceManager
 }
 
 // ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.

@@ -95,14 +95,14 @@ func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
 	harmony, _ = hmy.New(
-		node, node.TxPool, node.CxPool, new(event.TypeMux), node.Consensus.ShardID,
+		node, node.TxPool,
+		node.CxPool,
+		new(event.TypeMux),
+		node.Consensus.ShardID,
 	)
 
+	// TODO put in explorer service that came via service manager
 	apis := node.APIs()
-
-	for _, service := range node.serviceManager.GetServices() {
-		apis = append(apis, service.APIs()...)
-	}
 
 	port, _ := strconv.Atoi(nodePort)
 	ip := ""

@@ -4,18 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core/types"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	manet "github.com/multiformats/go-multiaddr-net"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc"
-)
-
-const (
-	defaultDownloadPort = "6666"
 )
 
 type simpleSyncer struct {
@@ -61,26 +58,16 @@ func (s *simpleSyncer) Query(
 
 // StartStateSync ..
 func (node *Node) StartStateSync() error {
-	addr := net.JoinHostPort("", defaultDownloadPort)
+	addr := net.JoinHostPort("", offSetSyncingPort(node.Peer.Port))
 	lis, err := net.Listen("tcp4", addr)
+
 	if err != nil {
 		return err
 	}
 
 	in := make(chan *types.Block)
-
 	simple := &simpleSyncer{}
-	ip := "127.0.0.1"
-	port := defaultDownloadPort
-
-	connection, _ := grpc.Dial(fmt.Sprintf(ip+":"+port), grpc.WithInsecure())
-
-	syncingHandle := downloader_pb.NewDownloaderClient(connection)
-	fmt.Println("here is a syncing handle", syncingHandle)
-	// syncingHandle.Query(ctx.TODO(),
-	// in *downloader_pb.DownloaderRequest, opts ...grpc.CallOption)
 	grpcServer := grpc.NewServer()
-
 	downloader_pb.RegisterDownloaderServer(grpcServer, simple)
 
 	var g errgroup.Group
@@ -104,11 +91,13 @@ func (node *Node) StartStateSync() error {
 	})
 
 	g.Go(func() error {
-		coreAPI, _ := node.host.RawHandles()
-		// addrs := ipfsNode.Peerstore.PeersWithAddrs()
-		tick := time.NewTicker(time.Second * 10)
-		defer tick.Stop()
+		var clients singleflight.Group
 
+		coreAPI, _ := node.host.RawHandles()
+		tick := time.NewTicker(time.Second * 10)
+
+		defer tick.Stop()
+		// NOTE while coding it, do return err, later do continue
 		for range tick.C {
 			conns, err := coreAPI.Swarm().Peers(context.TODO())
 
@@ -116,32 +105,57 @@ func (node *Node) StartStateSync() error {
 				return err
 			}
 
-			fmt.Println("ATTTTTTTTTTTTTTTTTT", len(conns))
+			fmt.Println("how many swarm connections?", len(conns))
 
 			for _, conn := range conns {
-				fmt.Println("from what to what", conn.Address())
-				a, err := manet.ToNetAddr(conn.Address())
+
+				_, ip, err := manet.DialArgs(conn.Address())
+				if err != nil {
+					return err
+				}
+
+				peerID := conn.ID().ShortString()
+
+				handle, err, _ := clients.Do(
+					peerID, func() (interface{}, error) {
+
+						time.AfterFunc(time.Minute*10, func() {
+							clients.Forget(peerID)
+						})
+
+						host, port, err := net.SplitHostPort(ip)
+						if err != nil {
+							return nil, err
+						}
+
+						fmt.Println("ripped the dial args", host, port, err)
+
+						if host != "127.0.0.1" {
+							return nil, nil
+						}
+						otherSide := ip + ":" + offSetSyncingPort(port)
+						fmt.Println("gonna try to talk to ", otherSide)
+						connection, err := grpc.Dial(otherSide, grpc.WithInsecure())
+						if err != nil {
+							return nil, err
+						}
+
+						return downloader_pb.NewDownloaderClient(connection), nil
+					},
+				)
 
 				if err != nil {
 					return err
 				}
 
-				fmt.Println("nasty cast->", a.(*net.TCPAddr).Port)
+				client := handle.(downloader_pb.DownloaderClient)
+				resp, err := client.Query(
+					context.TODO(),
+					&downloader_pb.DownloaderRequest{},
+				)
 
-				plainIP, err := manet.ToIP(conn.Address())
-				fmt.Println("\nATTTTTN->", plainIP, "\n")
+				fmt.Println("cant believe i got a response", resp, err)
 
-				if err != nil {
-					return err
-				}
-
-				peer, err := libp2p_peer.AddrInfoFromP2pAddr(conn.Address())
-				if err != nil {
-					return err
-				}
-
-				fmt.Println("peeeeeeer", peer.String(), "and plain IP", plainIP)
-				// panic("die ")
 			}
 
 		}
@@ -150,3 +164,14 @@ func (node *Node) StartStateSync() error {
 
 	return g.Wait()
 }
+
+func offSetSyncingPort(nodePort string) string {
+	if port, err := strconv.Atoi(nodePort); err == nil {
+		return fmt.Sprintf("%d", port-syncingPortDifference)
+	}
+	return ""
+}
+
+const (
+	syncingPortDifference = 3000
+)

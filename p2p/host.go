@@ -23,8 +23,7 @@ import (
 
 // Peer is the object for a p2p peer (node)
 type Peer struct {
-	IP string // IP address of the peer
-	// TODO this should not be string
+	IP              string         // IP address of the peer
 	Port            string         // Port number of the peer
 	ConsensusPubKey *bls.PublicKey // Public key of the peer, used for consensus signing
 	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
