@@ -305,7 +305,7 @@ func (node *Node) BootstrapConsensus() error {
 	t := time.NewTimer(maxWaitBootstrap)
 	defer t.Stop()
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(30 * time.Second)
 
 	go func() {
 		min := node.Consensus.MinPeers
@@ -336,7 +336,7 @@ func (node *Node) BootstrapConsensus() error {
 					}
 				}
 
-				if current >= min {
+				if current >= min-2 {
 					utils.Logger().Info().
 						Int("have", current).
 						Int("needed", min).
@@ -786,7 +786,7 @@ func (node *Node) StartStateSyncStreams() error {
 		})
 
 	g.Go(func() error {
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 2)
 		conns, err := node.host.CoreAPI.Swarm().Peers(context.TODO())
 
 		if err != nil {

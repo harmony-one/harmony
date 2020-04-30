@@ -798,7 +798,10 @@ func main() {
 	g.Go(currentNode.StartStateSyncStreams)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
-		g.Go(currentNode.BootstrapConsensus)
+
+		if err := currentNode.BootstrapConsensus(); err != nil {
+			fatal(err)
+		}
 
 		if currentNode.IsCurrentlyLeader() {
 			utils.Logger().Info().Msg("this node is leader and kicked off consensus")
@@ -809,7 +812,6 @@ func main() {
 		utils.Logger().Info().
 			Time("next-block-due", currentNode.Consensus.NextBlockDue()).
 			Msg("set the initial next block due")
-
 	}
 
 	if err := g.Wait(); err != nil {
