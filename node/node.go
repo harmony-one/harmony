@@ -301,30 +301,63 @@ const maxWaitBootstrap = 60 * time.Second
 // BootstrapConsensus is the a goroutine to check number of peers and start the consensus
 func (node *Node) BootstrapConsensus() error {
 	haveEnoughPeers := make(chan struct{})
+	errored := make(chan error)
 	t := time.NewTimer(maxWaitBootstrap)
+	defer t.Stop()
+
+	time.Sleep(2 * time.Second)
 
 	go func() {
 		min := node.Consensus.MinPeers
-		for {
-			c := node.host.GetPeerCount()
-			if c >= min {
-				utils.Logger().Info().
-					Int("have", c).
-					Int("needed", min).
-					Msg("got enough peers for consensus")
 
-				haveEnoughPeers <- struct{}{}
+		for {
+			current := 0
+			conns, err := node.host.CoreAPI.Swarm().Peers(context.Background())
+
+			if err != nil {
+				errored <- err
 				return
 			}
+
+			for _, conn := range conns {
+				protocols, err := node.host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
+					conn.ID(), p2p.Protocol,
+				)
+
+				if err != nil {
+					errored <- err
+					return
+				}
+
+				for _, protocol := range protocols {
+					if protocol == p2p.Protocol {
+						current++
+						break
+					}
+				}
+
+				if current >= min {
+					utils.Logger().Info().
+						Int("have", current).
+						Int("needed", min).
+						Msg("got enough peers for consensus")
+					haveEnoughPeers <- struct{}{}
+					return
+				}
+			}
+
 			time.Sleep(500 * time.Millisecond)
-			utils.Logger().Info().Int("have", c).Int("need", min).
+			utils.Logger().Info().
+				Int("have", current).
+				Int("need", min).
 				Msg("not enough peers for consensus")
 		}
 	}()
 
 	select {
+	case err := <-errored:
+		return err
 	case <-haveEnoughPeers:
-		t.Stop()
 		return nil
 	case <-t.C:
 		return errors.New("exceeded 60 seconds waiting for enough min peers")
