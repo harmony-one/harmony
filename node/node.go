@@ -346,7 +346,8 @@ func (node *Node) BootstrapConsensus() error {
 				}
 			}
 
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(2 * time.Second)
+
 			utils.Logger().Info().
 				Int("have", current).
 				Int("need", min).

@@ -798,9 +798,7 @@ func main() {
 	g.Go(currentNode.StartStateSyncStreams)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
-		if err := currentNode.BootstrapConsensus(); err != nil {
-			fatal(err)
-		}
+		g.Go(currentNode.BootstrapConsensus)
 
 		if currentNode.IsCurrentlyLeader() {
 			utils.Logger().Info().Msg("this node is leader and kicked off consensus")
