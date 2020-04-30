@@ -308,6 +308,11 @@ func (node *Node) BootstrapConsensus() error {
 		for {
 			c := node.host.GetPeerCount()
 			if c >= min {
+				utils.Logger().Info().
+					Int("have", c).
+					Int("needed", min).
+					Msg("got enough peers for consensus")
+
 				haveEnoughPeers <- struct{}{}
 				return
 			}

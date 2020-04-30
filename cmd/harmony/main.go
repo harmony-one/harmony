@@ -787,13 +787,7 @@ func main() {
 		g.Go(currentNode.HandleConsensusMessageProcessing)
 
 		g.Go(currentNode.StartLeaderWork)
-		go func() {
-			time.Sleep(time.Second * 3)
-			currentNode.Consensus.ProposalNewBlock <- struct{}{}
-			currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-		}()
 
-		g.Go(currentNode.BootstrapConsensus)
 		g.Go(currentNode.EnsureConsensusLiviness)
 		// g.Go(currentNode.EnsureConsensusInSync)
 
@@ -803,7 +797,16 @@ func main() {
 	// 	currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 	g.Go(currentNode.StartStateSyncStreams)
 
-	// }
+	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
+		if err := currentNode.BootstrapConsensus(); err != nil {
+			fatal(err)
+		}
+
+		time.Sleep(time.Second * 5)
+		currentNode.Consensus.ProposalNewBlock <- struct{}{}
+		currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+		utils.Logger().Info().Msg("kicked off consensus")
+	}
 
 	if err := g.Wait(); err != nil {
 		fatal(err)
