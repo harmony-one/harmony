@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package downloader;
 
-// Downloader is the service used for downloading/sycning blocks.
+// Downloader is the service used for downloading/syncing blocks.
 service Downloader {
   rpc Query(DownloaderRequest) returns (DownloaderResponse) {}
 }

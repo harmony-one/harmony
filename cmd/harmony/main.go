@@ -813,7 +813,8 @@ func main() {
 	// if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&
 	// 	currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 	// g.Go(currentNode.StartBeaconBlockStateSync)
-	// g.Go(currentNode.StartBlockStateSync)
+	g.Go(currentNode.StartStateSync)
+
 	// }
 
 	if err := g.Wait(); err != nil {

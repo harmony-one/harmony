@@ -18,7 +18,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
-	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -75,7 +74,6 @@ type Node struct {
 	TxPool               *core.TxPool
 	CxPool               *core.CxPool // pool for missing cross shard receipts resend
 	Worker, BeaconWorker *worker.Worker
-	downloaderServer     *downloader.Server
 	// Syncing component.
 	SyncID [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	// The p2p host used to send/receive p2p messages
@@ -503,12 +501,6 @@ func New(
 	// TODO mutating these fields after literal construction is code smell
 	// TODO Move the IP/ADDr creation to this thing, actually pass the creation
 	// of this syncing client, server to the node as input
-	serv, err := downloader.NewServer(node)
-	if err != nil {
-		return nil, err
-	}
-
-	node.downloaderServer = serv
 
 	// node.stateSync = syncing.CreateStateSync(
 	// 	node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID,
