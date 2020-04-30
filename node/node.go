@@ -1,6 +1,7 @@
 package node
 
 import (
+	"bufio"
 	"container/ring"
 	"context"
 	"crypto/ecdsa"
@@ -32,7 +33,9 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
+	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -70,7 +73,7 @@ type Node struct {
 	CxPool               *core.CxPool // pool for missing cross shard receipts resend
 	Worker, BeaconWorker *worker.Worker
 	// The p2p host used to send/receive p2p messages
-	host p2p.Host
+	host *p2p.Host
 	// Service manager.
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
@@ -325,7 +328,7 @@ func (node *Node) StartP2PMessageHandling() error {
 	weighted := make([]*semaphore.Weighted, len(allTopics))
 	const maxMessageHandlers = 200
 	ctx := context.Background()
-	ownID := node.host.GetID()
+	ownID := node.host.IPFSNode.PeerHost.ID()
 	errChan := make(chan error)
 
 	for i, named := range allTopics {
@@ -382,7 +385,7 @@ const sinkSize = 4096
 
 // New creates a new node.
 func New(
-	host p2p.Host,
+	host *p2p.Host,
 	consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
@@ -402,7 +405,7 @@ func New(
 		Gossiper:            relay.NewBroadCaster(configUsed, host),
 		NodeConfig:          configUsed,
 		chainConfig:         chainConfig,
-		Peer:                host.GetSelfPeer(),
+		Peer:                host.OwnPeer,
 		unixTimeAtNodeStart: time.Now().Unix(),
 		CxPool:              core.NewCxPool(core.CxPoolSize),
 		pendingCXReceipts:   map[string]*types.CXReceiptsProof{},
@@ -671,4 +674,88 @@ func (node *Node) ForceJoiningTopics() error {
 		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
 	}
 	return node.host.SendMessageToGroups(groups, []byte{})
+}
+
+// StartStateSyncStreams ..
+func (node *Node) StartStateSyncStreams() error {
+
+	node.host.IPFSNode.PeerHost.SetStreamHandler(
+		p2p.Protocol, func(stream libp2p_network.Stream) {
+			rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+			fmt.Println("set the stream handler")
+			// syncing request reader
+			go func() {
+				for {
+					str, _ := rw.ReadString('\n')
+
+					fmt.Println("got->", str)
+
+					if str == "" {
+						return
+					}
+					if str != "\n" {
+						// Green console colour: 	\x1b[32m
+						// Reset console colour: 	\x1b[0m
+						fmt.Printf("\x1b[32m%s\x1b[0m> ", str)
+					}
+				}
+			}()
+
+			// syncing request writer
+			// go func() {
+			// 	for {
+			// 		fmt.Println("sync request writer called")
+			// 	}
+			// }()
+
+		},
+	)
+
+	var g errgroup.Group
+
+	g.Go(func() error {
+		time.Sleep(time.Second * 5)
+		conns, err := node.host.CoreAPI.Swarm().Peers(context.TODO())
+
+		if err != nil {
+			return err
+		}
+		var h errgroup.Group
+
+		for _, neighbor := range conns {
+			stateSyncStream, err := node.host.IPFSNode.PeerHost.NewStream(
+				context.Background(),
+				neighbor.ID(),
+				p2p.Protocol,
+			)
+
+			if err != nil {
+				return err
+			}
+
+			fmt.Println("here is a state sync stream", stateSyncStream.Protocol())
+
+			rw := bufio.NewReadWriter(
+				bufio.NewReader(stateSyncStream), bufio.NewWriter(stateSyncStream),
+			)
+
+			h.Go(func() error {
+				if _, err := rw.WriteString(" hello world\n"); err != nil {
+					fmt.Println("some problem -> ", err.Error())
+					return err
+				}
+
+				if err := rw.Flush(); err != nil {
+					return err
+				}
+
+				return nil
+			})
+		}
+
+		return h.Wait()
+
+	})
+
+	return g.Wait()
 }

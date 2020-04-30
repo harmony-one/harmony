@@ -77,6 +77,19 @@ func (c *grpcClientWrapper) askHeight() (*downloader_pb.DownloaderResponse, erro
 func (s *simpleSyncer) Query(
 	ctx context.Context, request *downloader_pb.DownloaderRequest,
 ) (*downloader_pb.DownloaderResponse, error) {
+
+	switch request.GetType() {
+	case downloader_pb.DownloaderRequest_BLOCKHASH:
+	case downloader_pb.DownloaderRequest_BLOCK:
+	case downloader_pb.DownloaderRequest_NEWBLOCK:
+	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
+	case downloader_pb.DownloaderRequest_REGISTER:
+	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
+	case downloader_pb.DownloaderRequest_UNKNOWN:
+	case downloader_pb.DownloaderRequest_BLOCKHEADER:
+
+	}
+
 	response := &downloader_pb.DownloaderResponse{}
 	blk := <-s.currentBlockHeight
 	response.BlockHeight = blk.NumberU64()
@@ -201,7 +214,7 @@ func (node *Node) StartStateSync() error {
 	})
 
 	g.Go(func() error {
-		coreAPI, _ := node.host.RawHandles()
+		coreAPI := node.host.CoreAPI
 		tick := time.NewTicker(time.Second * 10)
 		defer tick.Stop()
 

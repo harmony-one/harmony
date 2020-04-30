@@ -369,7 +369,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 	return *consensusMultiPubKey
 }
 
-func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
+func setupHost(nodeConfig *nodeconfig.ConfigType) (*p2p.Host, error) {
 	baseDS := datastore.NewMapDatastore()
 	var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
 	// DevRendezVousPoint := ipfs_cfg.DefaultBootstrapAddresses[0]
@@ -400,7 +400,7 @@ func setupHost(nodeConfig *nodeconfig.ConfigType) (p2p.Host, error) {
 }
 
 func createGlobalConfig() (
-	*nodeconfig.ConfigType, p2p.Host, error,
+	*nodeconfig.ConfigType, *p2p.Host, error,
 ) {
 	var err error
 
@@ -453,7 +453,7 @@ func createGlobalConfig() (
 
 func setupConsensusAndNode(
 	nodeConfig *nodeconfig.ConfigType,
-	myHost p2p.Host,
+	myHost *p2p.Host,
 ) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
@@ -803,7 +803,8 @@ func main() {
 	// if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&
 	// 	currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
 	// g.Go(currentNode.StartBeaconBlockStateSync)
-	g.Go(currentNode.StartStateSync)
+
+	g.Go(currentNode.StartStateSyncStreams)
 
 	// }
 

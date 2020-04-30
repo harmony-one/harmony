@@ -9,12 +9,12 @@ import (
 
 // PublicNetAPI offers network related RPC methods
 type PublicNetAPI struct {
-	net            p2p.Host
+	net            *p2p.Host
 	networkVersion uint64
 }
 
 // NewPublicNetAPI creates a new net API instance.
-func NewPublicNetAPI(net p2p.Host, networkVersion uint64) *PublicNetAPI {
+func NewPublicNetAPI(net *p2p.Host, networkVersion uint64) *PublicNetAPI {
 	return &PublicNetAPI{net, networkVersion}
 }
 

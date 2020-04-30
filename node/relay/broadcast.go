@@ -47,13 +47,13 @@ type BroadCaster interface {
 
 type caster struct {
 	config *nodeconfig.ConfigType
-	host   p2p.Host
+	host   *p2p.Host
 }
 
 // NewBroadCaster ..
 func NewBroadCaster(
 	configUsed *nodeconfig.ConfigType,
-	host p2p.Host,
+	host *p2p.Host,
 ) BroadCaster {
 	return &caster{
 		config: configUsed,

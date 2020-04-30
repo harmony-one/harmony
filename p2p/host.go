@@ -21,6 +21,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Protocol ..
+const Protocol = "/hmy/0.0.1"
+
 // Peer is the object for a p2p peer (node)
 type Peer struct {
 	IP              string         // IP address of the peer
@@ -29,16 +32,7 @@ type Peer struct {
 	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
 }
 
-// Host is the client + server in p2p network.
-type Host interface {
-	GetSelfPeer() *Peer
-	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-	GetPeerCount() int
-	GetID() libp2p_peer.ID
-	AllSubscriptions() []NamedSub
-	RawHandles() (ipfs_interface.CoreAPI, *ipfs_core.IpfsNode)
-}
-
+// Opts ..
 type Opts struct {
 	Bootstrap             []string
 	RendezVousServerMAddr string
@@ -47,19 +41,15 @@ type Opts struct {
 	Logger                *zerolog.Logger
 }
 
-type hmyHost struct {
-	coreAPI    ipfs_interface.CoreAPI
-	node       *ipfs_core.IpfsNode
+// Host ..
+type Host struct {
+	CoreAPI    ipfs_interface.CoreAPI
+	IPFSNode   *ipfs_core.IpfsNode
 	log        *zerolog.Logger
-	ownPeer    *Peer
+	OwnPeer    *Peer
 	lock       sync.Mutex
 	joined     map[string]ipfs_interface.PubSubSubscription
 	swarmAddrs []string
-}
-
-// RawHandles ..
-func (h *hmyHost) RawHandles() (ipfs_interface.CoreAPI, *ipfs_core.IpfsNode) {
-	return h.coreAPI, h.node
 }
 
 func unlockFS(l *fslock.Lock) {
@@ -83,15 +73,8 @@ func fatal(err error) {
 	panic("end")
 }
 
-func (h *hmyHost) GetSelfPeer() *Peer {
-	return h.ownPeer
-}
-
-func (h *hmyHost) GetID() libp2p_peer.ID {
-	return h.node.PeerHost.ID()
-}
-
-func (h *hmyHost) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
+// SendMessagesToGroups ..
+func (h *Host) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
 	ctx := context.Background()
 	var g errgroup.Group
 
@@ -102,21 +85,21 @@ func (h *hmyHost) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) e
 			return err
 		}
 		g.Go(func() error {
-			return h.coreAPI.PubSub().Publish(ctx, top, msg)
+			return h.CoreAPI.PubSub().Publish(ctx, top, msg)
 		})
 	}
 
 	return g.Wait()
 }
 
-func (h *hmyHost) getTopic(topic string) (ipfs_interface.PubSubSubscription, error) {
+func (h *Host) getTopic(topic string) (ipfs_interface.PubSubSubscription, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	if t, ok := h.joined[topic]; ok {
 		return t, nil
 	}
 
-	sub, err := h.coreAPI.PubSub().Subscribe(context.Background(), topic)
+	sub, err := h.CoreAPI.PubSub().Subscribe(context.Background(), topic)
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot join pubsub topic %x", topic)
@@ -132,7 +115,8 @@ type NamedSub struct {
 	Sub   ipfs_interface.PubSubSubscription
 }
 
-func (h *hmyHost) AllSubscriptions() []NamedSub {
+// AllSubscriptions ..
+func (h *Host) AllSubscriptions() []NamedSub {
 	subs := []NamedSub{}
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -142,8 +126,9 @@ func (h *hmyHost) AllSubscriptions() []NamedSub {
 	return subs
 }
 
-func (h *hmyHost) GetPeerCount() int {
-	conns, _ := h.coreAPI.Swarm().Peers(context.Background())
+// GetPeerCount ..
+func (h *Host) GetPeerCount() int {
+	conns, _ := h.CoreAPI.Swarm().Peers(context.Background())
 	return len(conns)
 }
 
@@ -151,7 +136,7 @@ func (h *hmyHost) GetPeerCount() int {
 const DefaultLocal = "127.0.0.1"
 
 // NewHost ..
-func NewHost(opts *Opts, own *Peer) (Host, error) {
+func NewHost(opts *Opts, own *Peer) (*Host, error) {
 	swarmAddresses := []string{
 		fmt.Sprintf("/ip4/%s/tcp/%d", DefaultLocal, opts.Port),
 		fmt.Sprintf("/ip6/%s/tcp/%d", DefaultLocal, opts.Port),
@@ -213,11 +198,11 @@ func NewHost(opts *Opts, own *Peer) (Host, error) {
 
 	own.PeerID = node.PeerHost.ID()
 
-	return &hmyHost{
-		coreAPI:    api,
-		node:       node,
+	return &Host{
+		CoreAPI:    api,
+		IPFSNode:   node,
 		log:        opts.Logger,
-		ownPeer:    own,
+		OwnPeer:    own,
 		lock:       sync.Mutex{},
 		joined:     map[string]ipfs_interface.PubSubSubscription{},
 		swarmAddrs: swarmAddresses,

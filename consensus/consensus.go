@@ -191,7 +191,7 @@ type Consensus struct {
 	RndChannel  chan [vdfAndSeedSize]byte
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 	// The p2p host used to send/receive p2p messages
-	host     p2p.Host
+	host     *p2p.Host
 	Timeouts *timeouts.Notifier
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
@@ -231,7 +231,7 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, erro
 
 // New ..
 func New(
-	host p2p.Host,
+	host *p2p.Host,
 	shard uint32,
 	multiBLSPriKey *multibls.PrivateKey,
 	Decider quorum.Decider,
