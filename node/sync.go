@@ -8,6 +8,7 @@ import (
 	"time"
 
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	manet "github.com/multiformats/go-multiaddr-net"
 	"github.com/pkg/errors"
@@ -17,13 +18,32 @@ import (
 )
 
 type simpleSyncer struct {
+	currentBlockHeight chan *types.Block
+}
+
+type grpcClientWrapper struct {
+	downloader_pb.DownloaderClient
+}
+
+var (
+	askBlockHeight = &downloader_pb.DownloaderRequest{
+		Type: downloader_pb.DownloaderRequest_BLOCKHEIGHT,
+	}
+)
+
+func (c *grpcClientWrapper) askHeight() (*downloader_pb.DownloaderResponse, error) {
+	return c.Query(context.TODO(), askBlockHeight, grpc.WaitForReady(true))
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
 func (s *simpleSyncer) CalculateResponse(
 	request *downloader_pb.DownloaderRequest, incomingPeer string,
 ) (*downloader_pb.DownloaderResponse, error) {
+
 	response := &downloader_pb.DownloaderResponse{}
+	blk := <-s.currentBlockHeight
+	response.BlockHeight = blk.NumberU64()
+
 	fmt.Println("something came in", request.String())
 	return response, nil
 }
@@ -33,28 +53,8 @@ func (s *simpleSyncer) Query(
 ) (*downloader_pb.DownloaderResponse, error) {
 
 	response := &downloader_pb.DownloaderResponse{}
-
 	fmt.Println("called in query")
-
 	return response, nil
-	// var pinfo string
-	// // retrieve ip/port information; used for debug only
-	// p, ok := peer.FromContext(ctx)
-	// if !ok {
-	// 	pinfo = ""
-	// } else {
-	// 	pinfo = p.Addr.String()
-	// }
-
-	// // fmt.Println("ask around", request.String(), pinfo)
-
-	// response, err := s.downloadInterface.CalculateResponse(request, pinfo)
-
-	// // fmt.Println("reply->", response.String(), err)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return response, nil
 }
 
 // StartStateSync ..
@@ -66,12 +66,33 @@ func (node *Node) StartStateSync() error {
 		return err
 	}
 
+	var g errgroup.Group
+
 	in := make(chan *types.Block)
-	simple := &simpleSyncer{}
+
+	simple := &simpleSyncer{
+		currentBlockHeight: in,
+	}
+
 	grpcServer := grpc.NewServer()
 	downloader_pb.RegisterDownloaderServer(grpcServer, simple)
 
-	var g errgroup.Group
+	g.Go(func() error {
+		chainEvent := make(chan core.ChainHeadEvent)
+		sub := node.Blockchain().SubscribeChainHeadEvent(chainEvent)
+		defer sub.Unsubscribe()
+		currentBlock := node.Blockchain().CurrentBlock()
+
+		for {
+			select {
+			case e := <-chainEvent:
+				currentBlock = e.Block
+			case in <- currentBlock:
+			}
+		}
+
+		return nil
+	})
 
 	g.Go(func() error {
 		return grpcServer.Serve(lis)
@@ -95,7 +116,7 @@ func (node *Node) StartStateSync() error {
 		var clients singleflight.Group
 
 		coreAPI, _ := node.host.RawHandles()
-		tick := time.NewTicker(time.Second * 10)
+		tick := time.NewTicker(time.Second * 100)
 
 		defer tick.Stop()
 		// NOTE while coding it, do return err, later do continue
@@ -142,7 +163,9 @@ func (node *Node) StartStateSync() error {
 							return nil, err
 						}
 
-						return downloader_pb.NewDownloaderClient(connection), nil
+						return grpcClientWrapper{
+							DownloaderClient: downloader_pb.NewDownloaderClient(connection),
+						}, nil
 					},
 				)
 
@@ -151,11 +174,8 @@ func (node *Node) StartStateSync() error {
 					continue
 				}
 
-				client := handle.(downloader_pb.DownloaderClient)
-				resp, err := client.Query(
-					context.TODO(),
-					&downloader_pb.DownloaderRequest{},
-				)
+				client := handle.(grpcClientWrapper)
+				resp, err := client.askHeight()
 
 				fmt.Println("cant believe i got a response", resp, err)
 

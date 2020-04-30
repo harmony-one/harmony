@@ -663,3 +663,12 @@ func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 	// self addresses map can never be nil
 	return node.KeysToAddrs
 }
+
+// ForceJoiningTopics ..
+func (node *Node) ForceJoiningTopics() error {
+	groups := []nodeconfig.GroupID{
+		node.NodeConfig.GetShardGroupID(),
+		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
+	}
+	return node.host.SendMessageToGroups(groups, []byte{})
+}

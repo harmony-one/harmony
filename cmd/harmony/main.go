@@ -773,6 +773,10 @@ func main() {
 			Msg("StartRPC failed")
 	}
 
+	if err := currentNode.ForceJoiningTopics(); err != nil {
+		fatal(err)
+	}
+
 	var g errgroup.Group
 
 	g.Go(currentNode.HandleIncomingBlock)
