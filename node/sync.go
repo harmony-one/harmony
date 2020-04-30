@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"sync"
 	"time"
 
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core/types"
+	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	manet "github.com/multiformats/go-multiaddr-net"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -32,14 +32,11 @@ func lookupClient(peerID string, ip string) (*grpcClientWrapper, error) {
 				return nil, err
 			}
 
-			fmt.Println("ripped the dial args", host, port, err)
-
 			if host != "127.0.0.1" {
 				return nil, errors.Errorf("was not a localhost %s", host)
 			}
 
 			otherSide := host + ":" + offSetSyncingPort(port)
-			fmt.Println("gonna try to talk to ", otherSide)
 			connection, err := grpc.Dial(otherSide, grpc.WithInsecure())
 			if err != nil {
 				return nil, err
@@ -76,17 +73,75 @@ func (c *grpcClientWrapper) askHeight() (*downloader_pb.DownloaderResponse, erro
 	return c.Query(context.TODO(), askBlockHeight, grpc.WaitForReady(true))
 }
 
+// NOTE maybe better named handle incoming request
 func (s *simpleSyncer) Query(
 	ctx context.Context, request *downloader_pb.DownloaderRequest,
 ) (*downloader_pb.DownloaderResponse, error) {
-
-	fmt.Println("called in query")
 	response := &downloader_pb.DownloaderResponse{}
 	blk := <-s.currentBlockHeight
 	response.BlockHeight = blk.NumberU64()
-
-	fmt.Println("sending out", response.String(), request.String())
 	return response, nil
+}
+
+type r struct {
+	result interface{}
+	err    error
+}
+
+func heightOfPeers(conns []ipfs_interface.ConnectionInfo) {
+	var collect errgroup.Group
+
+	results := make(chan r, len(conns))
+
+	for _, conn := range conns {
+		collect.Go(func() error {
+
+			_, ip, err := manet.DialArgs(conn.Address())
+			if err != nil {
+				go func() {
+					results <- r{nil, err}
+				}()
+				return err
+			}
+			peerID := conn.ID().ShortString()
+			time.Sleep(1 * time.Second)
+			client, err := lookupClient(peerID, ip)
+
+			if err != nil {
+				go func() {
+					results <- r{nil, err}
+				}()
+				return err
+			}
+
+			resp, err := client.askHeight()
+			if err != nil {
+				go func() {
+					results <- r{nil, err}
+				}()
+				return err
+			}
+			go func() {
+				results <- r{resp, nil}
+			}()
+			return nil
+		})
+	}
+
+	if firstErr := collect.Wait(); firstErr != nil {
+		fmt.Println("here is the first error from whole group", firstErr.Error())
+	}
+
+	// drain the channel
+	for i := 0; i < len(conns); i++ {
+		syncResult := <-results
+		if e := syncResult.err; e != nil {
+			fmt.Println("sync result had problem", e.Error())
+		} else {
+			fmt.Println("sync result was:", syncResult.result)
+		}
+	}
+
 }
 
 // StartStateSync ..
@@ -146,12 +201,10 @@ func (node *Node) StartStateSync() error {
 	})
 
 	g.Go(func() error {
-
 		coreAPI, _ := node.host.RawHandles()
 		tick := time.NewTicker(time.Second * 10)
-
 		defer tick.Stop()
-		// NOTE while coding it, do return err, later do continue
+
 		for range tick.C {
 			conns, err := coreAPI.Swarm().Peers(context.TODO())
 
@@ -159,33 +212,9 @@ func (node *Node) StartStateSync() error {
 				return err
 			}
 
-			var collect sync.WaitGroup
-
-			for _, conn := range conns {
-				_, ip, err := manet.DialArgs(conn.Address())
-				if err != nil {
-					return err
-				}
-				peerID := conn.ID().ShortString()
-				time.Sleep(1 * time.Second)
-				client, err := lookupClient(peerID, ip)
-				if err != nil {
-					fmt.Println("died here but will continue", err.Error())
-					continue
-				}
-
-				collect.Add(1)
-				go func() {
-					defer collect.Done()
-					resp, err := client.askHeight()
-				}()
-
-				fmt.Println("cant believe i got a response", resp, err)
-			}
-
-			collect.Wait()
-
+			heightOfPeers(conns)
 		}
+
 		return nil
 	})
 

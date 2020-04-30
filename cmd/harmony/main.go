@@ -779,22 +779,22 @@ func main() {
 
 	var g errgroup.Group
 
-	g.Go(currentNode.HandleIncomingBlock)
+	// g.Go(currentNode.HandleIncomingBlock)
 	g.Go(currentNode.StartP2PMessageHandling)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
-		g.Go(currentNode.HandleConsensusBlockProcessing)
-		g.Go(currentNode.HandleConsensusMessageProcessing)
+		// g.Go(currentNode.HandleConsensusBlockProcessing)
+		// g.Go(currentNode.HandleConsensusMessageProcessing)
 		// currentNode.Consensus.SetMode(consensus.Normal)
 
-		g.Go(currentNode.StartLeaderWork)
+		// g.Go(currentNode.StartLeaderWork)
 		go func() {
 			time.Sleep(time.Second * 3)
 			currentNode.Consensus.ProposalNewBlock <- struct{}{}
 			currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 		}()
 
-		g.Go(currentNode.BootstrapConsensus)
+		// g.Go(currentNode.BootstrapConsensus)
 		// g.Go(currentNode.EnsureConsensusLiviness)
 		// g.Go(currentNode.EnsureConsensusInSync)
 
