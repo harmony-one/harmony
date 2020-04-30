@@ -802,10 +802,16 @@ func main() {
 			fatal(err)
 		}
 
-		time.Sleep(time.Second * 5)
-		currentNode.Consensus.ProposalNewBlock <- struct{}{}
+		if currentNode.IsCurrentlyLeader() {
+			utils.Logger().Info().Msg("this node is leader and kicked off consensus")
+			currentNode.Consensus.ProposalNewBlock <- struct{}{}
+		}
+
 		currentNode.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-		utils.Logger().Info().Msg("kicked off consensus")
+		utils.Logger().Info().
+			Time("next-block-due", currentNode.Consensus.NextBlockDue()).
+			Msg("set the initial next block due")
+
 	}
 
 	if err := g.Wait(); err != nil {
