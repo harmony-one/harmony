@@ -10,6 +10,7 @@ import (
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core/types"
 	manet "github.com/multiformats/go-multiaddr-net"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc"
@@ -131,9 +132,10 @@ func (node *Node) StartStateSync() error {
 						fmt.Println("ripped the dial args", host, port, err)
 
 						if host != "127.0.0.1" {
-							return nil, nil
+							return nil, errors.Errorf("was not a localhost %s", host)
 						}
-						otherSide := ip + ":" + offSetSyncingPort(port)
+
+						otherSide := host + ":" + offSetSyncingPort(port)
 						fmt.Println("gonna try to talk to ", otherSide)
 						connection, err := grpc.Dial(otherSide, grpc.WithInsecure())
 						if err != nil {
@@ -145,7 +147,8 @@ func (node *Node) StartStateSync() error {
 				)
 
 				if err != nil {
-					return err
+					fmt.Println("died here but will continue", err.Error())
+					continue
 				}
 
 				client := handle.(downloader_pb.DownloaderClient)
