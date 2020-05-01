@@ -449,9 +449,6 @@ func (s *PublicBlockChainAPI) ResendCx(ctx context.Context, txID common.Hash) (b
 // Call executes the given transaction on the state for the given block number.
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
-	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
-		return nil, err
-	}
 	result, _, _, err := doCall(ctx, s.b, args, blockNr, vm.Config{}, 5*time.Second, s.b.RPCGasCap())
 	return (hexutil.Bytes)(result), err
 }
