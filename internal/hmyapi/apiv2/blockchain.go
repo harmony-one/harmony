@@ -137,13 +137,18 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 	if err != nil {
 		return nil, err
 	}
+	balanceQueryBlock := shard.Schedule.EpochLastBlock(uint64(epoch))
+	if balanceQueryBlock > s.b.CurrentBlock().NumberU64() {
+		balanceQueryBlock = s.b.CurrentBlock().NumberU64()
+	}
 	validators := make([]map[string]interface{}, 0)
 	for _, validator := range committee.Slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return nil, err
 		}
-		validatorBalance, err := s.GetBalance(ctx, oneAddress)
+		addr := internal_common.ParseAddr(oneAddress)
+		validatorBalance, err := s.b.GetBalance(ctx, addr, rpc.BlockNumber(balanceQueryBlock))
 		if err != nil {
 			return nil, err
 		}
@@ -379,9 +384,9 @@ func (s *PublicBlockChainAPI) GetAccountNonce(ctx context.Context, address strin
 // GetBalance returns the amount of Nano for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string) (*big.Int, error) {
-	block := s.b.CurrentBlock().NumberU64()
-	return s.GetBalanceByBlockNumber(ctx, address, block)
+func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*big.Int, error) {
+	addr := internal_common.ParseAddr(address)
+	return s.b.GetBalance(ctx, addr, rpc.BlockNumber(blockNr))
 }
 
 // BlockNumber returns the block number of the chain head.

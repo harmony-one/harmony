@@ -171,13 +171,17 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 	if err != nil {
 		return nil, err
 	}
+	balanceQueryBlock := shard.Schedule.EpochLastBlock(uint64(epoch))
+	if balanceQueryBlock > s.b.CurrentBlock().NumberU64() {
+		balanceQueryBlock = s.b.CurrentBlock().NumberU64()
+	}
 	validators := make([]map[string]interface{}, 0)
 	for _, validator := range committee.Slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return nil, err
 		}
-		validatorBalance, err := s.GetBalance(ctx, oneAddress, rpc.LatestBlockNumber)
+		validatorBalance, err := s.getBalanceByBlockNumber(ctx, oneAddress, rpc.BlockNumber(balanceQueryBlock))
 		if err != nil {
 			return nil, err
 		}
@@ -396,17 +400,21 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 	return res[:], state.Error()
 }
 
-// GetBalanceByBlockNumber returns balance by block number.
-func (s *PublicBlockChainAPI) GetBalanceByBlockNumber(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
-	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
-		return nil, err
-	}
+func (s *PublicBlockChainAPI) getBalanceByBlockNumber(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	addr := internal_common.ParseAddr(address)
 	balance, err := s.b.GetBalance(ctx, addr, blockNr)
 	if balance == nil {
 		return nil, err
 	}
 	return (*hexutil.Big)(balance), err
+}
+
+// GetBalanceByBlockNumber returns balance by block number.
+func (s *PublicBlockChainAPI) GetBalanceByBlockNumber(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return nil, err
+	}
+	return s.getBalanceByBlockNumber(ctx, address, blockNr)
 }
 
 // GetAccountNonce returns the nonce value of the given address for the given block number
@@ -419,7 +427,7 @@ func (s *PublicBlockChainAPI) GetAccountNonce(ctx context.Context, address strin
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
-	return s.GetBalanceByBlockNumber(ctx, address, rpc.LatestBlockNumber)
+	return s.getBalanceByBlockNumber(ctx, address, rpc.BlockNumber(blockNr))
 }
 
 // BlockNumber returns the block number of the chain head.
