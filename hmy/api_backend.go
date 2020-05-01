@@ -718,7 +718,7 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 		rawStakes = b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
 		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
-	then.MedianStake = effective.Median(rawStakes)
+	now.MedianStake = effective.Median(rawStakes)
 
 	return &quorum.Transition{then, now}, nil
 }
