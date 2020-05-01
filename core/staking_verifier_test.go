@@ -232,7 +232,8 @@ func makeValidatorWrapper(params validatorWrapperParams) staking.ValidatorWrappe
 	wrapper.Counters.NumBlocksToSign = params.numBlocksToSign
 	wrapper.Counters.NumBlocksSigned = params.numBlocksSigned
 	wrapper.Rate = params.rate
-	wrapper.maxRate = params.maxRate
+	wrapper.MaxRate = params.maxRate
+	wrapper.MaxChangeRate = params.maxChangeRate
 	return wrapper
 }
 
@@ -308,7 +309,10 @@ func newBLSKeyPool() blsKeyPool {
 	return blsKeyPool{keys}
 }
 
-func (kp blsKeyPool) get(index int) blsKeyPair {
+func (kp *blsKeyPool) get(index int) blsKeyPair {
+	if index < len(kp.keys) {
+		return kp.keys[index]
+	}
 	for i := len(kp.keys); i <= index; i++ {
 		kp.keys = append(kp.keys, makeBLSKeyPair())
 	}
