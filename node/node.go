@@ -1,8 +1,6 @@
 package node
 
 import (
-	"bufio"
-	"bytes"
 	"container/ring"
 	"context"
 	"crypto/ecdsa"
@@ -15,9 +13,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
@@ -37,7 +33,6 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -721,73 +716,4 @@ func (node *Node) ForceJoiningTopics() error {
 		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
 	}
 	return node.host.SendMessageToGroups(groups, []byte{})
-}
-
-// StartStateSyncStreams ..
-func (node *Node) StartStateSyncStreams() error {
-
-	var g errgroup.Group
-
-	g.Go(func() error {
-		time.Sleep(time.Second * 2)
-		conns, err := node.host.CoreAPI.Swarm().Peers(context.TODO())
-
-		if err != nil {
-			return err
-		}
-		var h errgroup.Group
-
-		for _, neighbor := range conns {
-			stateSyncStream, err := node.host.IPFSNode.PeerHost.NewStream(
-				context.Background(),
-				neighbor.ID(),
-				p2p.Protocol,
-			)
-
-			if err != nil {
-				return err
-			}
-			time.Sleep(time.Second * 2)
-
-			rw := bufio.NewReadWriter(
-				bufio.NewReader(stateSyncStream), bufio.NewWriter(stateSyncStream),
-			)
-
-			h.Go(func() error {
-
-				message := &msg_pb.Message{
-					ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-					Type:        msg_pb.MessageType_BLOCK_HEIGHT,
-				}
-
-				msg, err := protobuf.Marshal(message)
-
-				if err != nil {
-					return err
-				}
-
-				time.Sleep(time.Second * 2)
-
-				byteBuffer := bytes.NewBuffer([]byte{byte(proto_node.Client)})
-				byteBuffer.Write(msg)
-				syncingMessage := p2p.ConstructMessage(byteBuffer.Bytes())
-
-				if _, err := rw.Write(syncingMessage); err != nil {
-					fmt.Println("some problem -> ", err.Error())
-					return err
-				}
-
-				if err := rw.Flush(); err != nil {
-					return err
-				}
-
-				return nil
-			})
-		}
-
-		return h.Wait()
-
-	})
-
-	return g.Wait()
 }

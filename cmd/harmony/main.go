@@ -791,7 +791,7 @@ func main() {
 		// g.Go(currentNode.BootstrapConsensus)
 	}
 
-	g.Go(currentNode.StartStateSyncStreams)
+	g.Go(currentNode.HandleBlockSyncing)
 
 	if err := g.Wait(); err != nil {
 		fatal(err)
