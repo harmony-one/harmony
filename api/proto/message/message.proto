@@ -30,7 +30,16 @@ enum MessageType {
   // it should be either ENTER or GETPLAYERS but it will be removed later.
   LOTTERY_REQUEST = 12 [deprecated=true];
   BROADCASTED_NEW_BLOCK = 13;
-  BLOCK_HEIGHT = 14;
+
+  SYNC_REQUEST_BLOCK_HEIGHT = 14;
+  SYNC_RESPONSE_BLOCK_HEIGHT = 15;
+
+  SYNC_REQUEST_BLOCK_HEADER = 16;
+  SYNC_RESPONSE_BLOCK_HEADER = 17;
+
+  SYNC_REQUEST_BLOCK = 18;
+  SYNC_RESPONSE_BLOCK = 19;
+
 }
 
 // This is universal message for all communication protocols.
@@ -50,6 +59,9 @@ message Message {
     // Refactor this later after demo.
     LotteryRequest lottery_request = 8 [deprecated=true];
     LeaderBroadCastedBlockRequest new_block = 9;
+    SyncBlockHeight sync_block_height = 10;
+    SyncBlockHeader sync_block_header = 11;
+    SyncBlock sync_block = 12;
   }
 }
 
@@ -95,6 +107,21 @@ message ConsensusRequest {
 
 message LeaderBroadCastedBlockRequest {
   bytes block = 1;
+}
+
+message SyncBlockHeight {
+  uint64 beacon_height = 1;
+  bytes beacon_hash = 2;
+  uint64 shard_height = 3;
+  bytes shard_hash = 4;
+}
+
+message SyncBlockHeader {
+  bytes header_rlp = 1;
+}
+
+message SyncBlock {
+  bytes block_rlp = 1;
 }
 
 message DrandRequest {

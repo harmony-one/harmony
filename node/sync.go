@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"time"
@@ -14,19 +13,34 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/pkg/errors"
 )
 
-func newSyncer(
+func newSyncerForIncoming(
+	stream libp2p_network.Stream,
 	host *p2p.Host,
+	current chan latestInfo,
+) (*syncingHandler, error) {
+	rw := bufio.NewReadWriter(
+		bufio.NewReader(stream), bufio.NewWriter(stream),
+	)
+	return &syncingHandler{
+		stream, host, rw, current,
+	}, nil
+
+}
+
+func newSyncerToPeerID(
 	peerID libp2p_peer.ID,
+	host *p2p.Host,
+	current chan latestInfo,
 ) (*syncingHandler, error) {
 
-	stateSyncStream, err := host.IPFSNode.PeerHost.NewStream(
+	stream, err := host.IPFSNode.PeerHost.NewStream(
 		context.Background(),
 		peerID,
 		p2p.Protocol,
@@ -37,13 +51,11 @@ func newSyncer(
 	}
 
 	rw := bufio.NewReadWriter(
-		bufio.NewReader(stateSyncStream), bufio.NewWriter(stateSyncStream),
+		bufio.NewReader(stream), bufio.NewWriter(stream),
 	)
 
 	// TODO probably need to expose the raw stream as well
-	return &syncingHandler{
-		peerID, host, rw,
-	}, nil
+	return &syncingHandler{stream, host, rw, current}, nil
 
 }
 
@@ -67,16 +79,16 @@ func syncFromHMYPeersIfNeeded(
 		protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
 			id, p2p.Protocol,
 		)
+
 		if err != nil {
 			return err
 		}
 
 		if len(protocols) == 0 {
-			fmt.Println("here the protocols", protocols)
-			return nil
+			continue
 		}
 
-		handler, err := newSyncer(host, id)
+		handler, err := newSyncerToPeerID(id, host, nil)
 
 		if err != nil {
 			return err
@@ -88,124 +100,135 @@ func syncFromHMYPeersIfNeeded(
 			return err
 		}
 
-		fmt.Println("chain heights", beaconC, shardC)
+		fmt.Println(beaconC, shardC, err)
 	}
 	// everyonesHeaderHashs := askEveryoneInHMYProtocolTheirHeight(conns)
 
 	return nil
 }
 
+type latestInfo struct {
+	beacon *height
+	shard  *height
+}
+
 type syncingHandler struct {
-	handlingFor libp2p_peer.ID
-	host        *p2p.Host
-	rw          *bufio.ReadWriter
+	rawStream libp2p_network.Stream
+	host      *p2p.Host
+	rw        *bufio.ReadWriter
+	current   chan latestInfo
+}
+
+var (
+	requestBlockHeight []byte
+	requestBlockHeader []byte
+	requestBlock       []byte
+)
+
+func init() {
+	allMessage := make([][]byte, 3)
+
+	for i, m := range [...]msg_pb.MessageType{
+		msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT,
+		msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEADER,
+		msg_pb.MessageType_SYNC_REQUEST_BLOCK,
+	} {
+		message := &msg_pb.Message{
+			ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+			Type:        m,
+		}
+		msg, err := protobuf.Marshal(message)
+		if err != nil {
+			panic("die ->" + err.Error())
+		}
+		byteBuffer := bytes.NewBuffer([]byte{byte(proto_node.Client)})
+		byteBuffer.Write(msg)
+		allMessage[i] = p2p.ConstructMessage(byteBuffer.Bytes())
+	}
+
+	requestBlockHeight = allMessage[0]
+	requestBlockHeader = allMessage[1]
+	requestBlock = allMessage[2]
+}
+
+func (sync *syncingHandler) receiveHeightResponse() (*height, *height, error) {
+	return nil, nil, nil
 }
 
 func (sync *syncingHandler) askHeight() (*height, *height, error) {
-	message := &msg_pb.Message{
-		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-		Type:        msg_pb.MessageType_BLOCK_HEIGHT,
-	}
-
-	msg, err := protobuf.Marshal(message)
-
-	if err != nil {
+	if _, err := sync.rw.Write(requestBlockHeight); err != nil {
 		return nil, nil, err
 	}
-
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto_node.Client)})
-	byteBuffer.Write(msg)
-	syncingMessage := p2p.ConstructMessage(byteBuffer.Bytes())
-
-	if _, err := sync.rw.Write(syncingMessage); err != nil {
-		return nil, nil, err
-	}
-
 	if err := sync.rw.Flush(); err != nil {
 		return nil, nil, err
 	}
 
-	return nil, nil, nil
-
+	return sync.receiveHeightResponse()
 }
 
-func (sync *syncingHandler) processIncoming(s libp2p_network.Stream) error {
-	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-	fmt.Println("something incoming->", rw)
-	for {
+var (
+	errNotClientSupport   = errors.New("not a client support message")
+	errNotAHarmonyMessage = errors.New(
+		"incoming message from stream did not begin with 0x11",
+	)
+)
 
-		time.Sleep(time.Second * 2)
-		// this must be our message
-		buf, err := rw.Peek(1)
-		if err != nil {
-			return err
-		}
+func (sync *syncingHandler) replyWithCurrentBlockHeight() error {
+	fmt.Println("need to give reply")
+	return nil
+}
 
-		if buf[0] == 0x11 {
+func (sync *syncingHandler) handleMessage(msg *msg_pb.Message) error {
+	if msg.GetServiceType() != msg_pb.ServiceType_CLIENT_SUPPORT {
+		return errNotClientSupport
+	}
 
-			_, err := rw.ReadByte()
-			if err != nil {
-				return err
-			}
+	if msg.GetType() == msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT {
+		fmt.Printf("\x1b[32m%s\x1b[0m> ", msg.String())
 
-			var msgBuf msg_pb.Message
-			contentSizeBuf := make([]byte, 4)
-
-			if _, err := io.ReadFull(rw, contentSizeBuf); err != nil {
-				return err
-			}
-
-			sized := binary.BigEndian.Uint32(contentSizeBuf)
-			fmt.Println("sized", sized)
-
-			payload := make([]byte, sized)
-
-			if _, err := io.ReadFull(rw, payload); err != nil {
-				return err
-			}
-
-			fmt.Println("what does the payload look like", hex.EncodeToString(payload))
-			// 0x1100000005020803100e
-			// 0x          020803100e
-
-			if err := protobuf.Unmarshal(payload[1:], &msgBuf); err != nil {
-				fmt.Println(err.Error())
-			}
-			// Green console colour: 	\x1b[32m
-			// Reset console colour: 	\x1b[0m
-			fmt.Printf("\x1b[32m%s\x1b[0m> ", msgBuf.String())
-		}
+		return sync.replyWithCurrentBlockHeight()
 	}
 
 	return nil
 }
 
-var (
-	askBlockHeight = &downloader_pb.DownloaderRequest{
-		Type: downloader_pb.DownloaderRequest_BLOCKHEIGHT,
+func (sync *syncingHandler) processIncoming() error {
+	// this must be our message
+	buf, err := sync.rw.Peek(1)
+	if err != nil {
+		return err
 	}
-)
 
-// NOTE maybe better named handle incoming request
-// switch request.GetType() {
-// case downloader_pb.DownloaderRequest_BLOCKHASH:
-// case downloader_pb.DownloaderRequest_BLOCK:
-// case downloader_pb.DownloaderRequest_NEWBLOCK:
-// case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
-// case downloader_pb.DownloaderRequest_REGISTER:
-// case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
-// case downloader_pb.DownloaderRequest_UNKNOWN:
-// case downloader_pb.DownloaderRequest_BLOCKHEADER:
-// response := &downloader_pb.DownloaderResponse{}
-// blk := <-s.currentBlockHeight
-// response.BlockHeight = blk.NumberU64()
-// return response, nil
+	if buf[0] == 0x11 {
+		_, err := sync.rw.ReadByte()
+		if err != nil {
+			return err
+		}
 
-// block downloading consumer side pipeline
+		var msgBuf msg_pb.Message
+		contentSizeBuf := make([]byte, 4)
 
-// allBlockHeightsAndHashOfNeighbors <- askEveryoneInHMYProtocolTheirHeight()
-// for each block := range downloadedBlocksFromPeersWithMostCommonHash <- previouslyDownloaded()
-//
+		if _, err := io.ReadFull(sync.rw, contentSizeBuf); err != nil {
+			return err
+		}
+
+		sized := binary.BigEndian.Uint32(contentSizeBuf)
+		payload := make([]byte, sized)
+
+		if _, err := io.ReadFull(sync.rw, payload); err != nil {
+			return err
+		}
+
+		// That one extra middle offset byte --
+		if err := protobuf.Unmarshal(payload[1:], &msgBuf); err != nil {
+			return err
+		}
+
+		return sync.handleMessage(&msgBuf)
+	}
+
+	return errNotAHarmonyMessage
+}
 
 type height struct {
 	blockNum  uint64
@@ -242,30 +265,32 @@ func (node *Node) HandleBlockSyncing() error {
 
 // HandleIncomingHMYProtocolStreams ..
 func (node *Node) HandleIncomingHMYProtocolStreams() error {
-
 	errs := make(chan error)
+	info := make(chan latestInfo)
+	incoming := 0
 
 	for stream := range node.host.IncomingStream {
-		handler, err := newSyncer(
-			node.host,
-			stream.Conn().RemotePeer(),
+		handler, err := newSyncerForIncoming(
+			stream, node.host, info,
 		)
 		if err != nil {
 			return err
 		}
 
-		go func() {
-			errs <- handler.processIncoming(stream)
-		}()
+		incoming++
+		fmt.Println(
+			"incoming so far",
+			incoming,
+			node.host.OwnPeer.ConsensusPubKey.SerializeToHexStr(),
+		)
+		errs <- handler.processIncoming()
 
 	}
 
-	go func() {
-		for err := range errs {
-			utils.Logger().Info().Err(err).
-				Msg("incoming stream handling had some problem")
-		}
-	}()
+	for err := range errs {
+		utils.Logger().Info().Err(err).
+			Msg("incoming stream handling had some problem")
+	}
 
 	return nil
 }
