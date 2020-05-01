@@ -110,6 +110,11 @@ type Finished struct {
 	BlockHash common.Hash
 }
 
+type Range struct {
+	Start uint64
+	End   uint64
+}
+
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	Decider quorum.Decider
@@ -197,10 +202,10 @@ type Consensus struct {
 	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
 	SlashChan chan slash.Record
-
 	// The time due for next block proposal
 	nextBlockDue             atomic.Value
 	IncomingConsensusMessage chan []byte
+	SyncNeeded               chan Range
 }
 
 // VdfSeedSize returns the number of VRFs for VDF computation
@@ -267,6 +272,7 @@ func New(
 		RndChannel:               make(chan [vdfAndSeedSize]byte),
 		ShardID:                  shard,
 		IncomingConsensusMessage: make(chan []byte),
+		SyncNeeded:               make(chan Range),
 		delayCommit:              commitDelay,
 		MinPeers:                 minPeer,
 	}

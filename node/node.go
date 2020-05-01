@@ -747,6 +747,7 @@ func (node *Node) StartStateSyncStreams() error {
 			if err != nil {
 				return err
 			}
+			time.Sleep(time.Second * 2)
 
 			rw := bufio.NewReadWriter(
 				bufio.NewReader(stateSyncStream), bufio.NewWriter(stateSyncStream),
@@ -765,19 +766,11 @@ func (node *Node) StartStateSyncStreams() error {
 					return err
 				}
 
+				time.Sleep(time.Second * 2)
+
 				byteBuffer := bytes.NewBuffer([]byte{byte(proto_node.Client)})
 				byteBuffer.Write(msg)
 				syncingMessage := p2p.ConstructMessage(byteBuffer.Bytes())
-
-				// fmt.Println(
-				// 	"sync message len is ",
-				// 	len(syncingMessage),
-				// 	syncingMessage,
-				// 	hex.EncodeToString(syncingMessage),
-				// 	message.String(),
-				// 	"just protbuf",
-				// 	hex.EncodeToString(msg),
-				// )
 
 				if _, err := rw.Write(syncingMessage); err != nil {
 					fmt.Println("some problem -> ", err.Error())

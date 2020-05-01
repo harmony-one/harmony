@@ -779,16 +779,16 @@ func main() {
 
 	var g errgroup.Group
 
-	g.Go(currentNode.HandleIncomingBlock)
-	g.Go(currentNode.StartP2PMessageHandling)
+	// g.Go(currentNode.HandleIncomingBlock)
+	// g.Go(currentNode.StartP2PMessageHandling)
 	g.Go(currentNode.HandleIncomingHMYProtocolStreams)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
-		g.Go(currentNode.HandleConsensusBlockProcessing)
-		g.Go(currentNode.HandleConsensusMessageProcessing)
-		g.Go(currentNode.StartLeaderWork)
-		g.Go(currentNode.EnsureConsensusLiviness)
-		g.Go(currentNode.BootstrapConsensus)
+		// g.Go(currentNode.HandleConsensusBlockProcessing)
+		// g.Go(currentNode.HandleConsensusMessageProcessing)
+		// g.Go(currentNode.StartLeaderWork)
+		// g.Go(currentNode.EnsureConsensusLiviness)
+		// g.Go(currentNode.BootstrapConsensus)
 	}
 
 	g.Go(currentNode.StartStateSyncStreams)

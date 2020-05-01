@@ -2,71 +2,201 @@ package node
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
-	"net"
-	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
-	"github.com/harmony-one/harmony/core/types"
-	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
-	manet "github.com/multiformats/go-multiaddr-net"
-	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
+	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
+	libp2p_network "github.com/libp2p/go-libp2p-core/network"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"golang.org/x/sync/singleflight"
-	"google.golang.org/grpc"
 )
 
 var clients singleflight.Group
 
-func lookupClient(peerID string, ip string) (*grpcClientWrapper, error) {
-	handle, err, _ := clients.Do(
-		peerID, func() (interface{}, error) {
+func lookupHandler(
+	host *p2p.Host,
+	peerID libp2p_peer.ID,
+) (*syncingHandler, error) {
+	s := peerID.ShortString()
+	handle, err, _ := clients.Do(s, func() (interface{}, error) {
 
-			time.AfterFunc(time.Minute*10, func() {
-				clients.Forget(peerID)
-			})
+		stateSyncStream, err := host.IPFSNode.PeerHost.NewStream(
+			context.Background(),
+			peerID,
+			p2p.Protocol,
+		)
 
-			host, port, err := net.SplitHostPort(ip)
-			if err != nil {
-				return nil, err
-			}
+		if err != nil {
+			return nil, err
+		}
 
-			if host != "127.0.0.1" {
-				return nil, errors.Errorf("was not a localhost %s", host)
-			}
+		time.AfterFunc(time.Minute*10, func() {
+			clients.Forget(s)
+		})
 
-			otherSide := host + ":" + offSetSyncingPort(port)
-			connection, err := grpc.Dial(otherSide, grpc.WithInsecure())
-			if err != nil {
-				return nil, err
-			}
+		rw := bufio.NewReadWriter(
+			bufio.NewReader(stateSyncStream), bufio.NewWriter(stateSyncStream),
+		)
 
-			return &grpcClientWrapper{
-				DownloaderClient: downloader_pb.NewDownloaderClient(connection),
-			}, nil
-		},
-	)
+		// TODO probably need to expose the raw stream as well
+		return &syncingHandler{
+			peerID, host, rw,
+		}, nil
+	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return handle.(*grpcClientWrapper), nil
+	return handle.(*syncingHandler), nil
 }
 
-type simpleSyncer struct {
-	currentBlockHeight chan *types.Block
+func askEveryoneInHMYProtocolTheirHeight(host *p2p.Host) error {
+	//
+	return nil
 }
 
-type grpcClientWrapper struct {
-	downloader_pb.DownloaderClient
+func syncFromHMYPeersIfNeeded(
+	host *p2p.Host,
+	currentBeacon, currentShard height,
+) error {
+
+	conns, err := host.CoreAPI.Swarm().Peers(context.Background())
+	if err != nil {
+		return err
+	}
+
+	for _, neighbor := range conns {
+		id := neighbor.ID()
+		protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
+			id, p2p.Protocol,
+		)
+		if err != nil {
+			return err
+		}
+
+		if len(protocols) == 0 {
+			fmt.Println("here the protocols", protocols)
+			return nil
+		}
+
+		handler, err := lookupHandler(host, id)
+
+		if err != nil {
+			return err
+		}
+
+		beaconC, shardC, err := handler.askHeight()
+
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("chain heights", beaconC, shardC)
+	}
+	// everyonesHeaderHashs := askEveryoneInHMYProtocolTheirHeight(conns)
+
+	return nil
+}
+
+type syncingHandler struct {
+	handlingFor libp2p_peer.ID
+	host        *p2p.Host
+	rw          *bufio.ReadWriter
+}
+
+func (sync *syncingHandler) askHeight() (*height, *height, error) {
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+		Type:        msg_pb.MessageType_BLOCK_HEIGHT,
+	}
+
+	msg, err := protobuf.Marshal(message)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto_node.Client)})
+	byteBuffer.Write(msg)
+	syncingMessage := p2p.ConstructMessage(byteBuffer.Bytes())
+
+	if _, err := sync.rw.Write(syncingMessage); err != nil {
+		return nil, nil, err
+	}
+
+	if err := sync.rw.Flush(); err != nil {
+		return nil, nil, err
+	}
+
+	return nil, nil, nil
+
+}
+
+func (sync *syncingHandler) process(s libp2p_network.Stream) error {
+	stat := s.Stat()
+	fmt.Println("stats coming in->",
+		stat.Direction, stat.Extra, s.Conn().RemotePeer().Pretty(),
+	)
+	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+	fmt.Println("something incoming->", rw)
+	for {
+
+		time.Sleep(time.Second * 2)
+		// this must be our message
+		buf, err := rw.Peek(1)
+		if err != nil {
+			return err
+		}
+
+		if buf[0] == 0x11 {
+
+			_, err := rw.ReadByte()
+			if err != nil {
+				return err
+			}
+
+			var msgBuf msg_pb.Message
+			contentSizeBuf := make([]byte, 4)
+
+			if _, err := io.ReadFull(rw, contentSizeBuf); err != nil {
+				return err
+			}
+
+			sized := binary.BigEndian.Uint32(contentSizeBuf)
+			fmt.Println("sized", sized)
+
+			payload := make([]byte, sized)
+
+			if _, err := io.ReadFull(rw, payload); err != nil {
+				return err
+			}
+
+			fmt.Println("what does the payload look like", hex.EncodeToString(payload))
+			// 0x1100000005020803100e
+			// 0x          020803100e
+
+			if err := protobuf.Unmarshal(payload[1:], &msgBuf); err != nil {
+				fmt.Println(err.Error())
+			}
+			// Green console colour: 	\x1b[32m
+			// Reset console colour: 	\x1b[0m
+			fmt.Printf("\x1b[32m%s\x1b[0m> ", msgBuf.String())
+		}
+	}
+
+	return nil
 }
 
 var (
@@ -75,248 +205,86 @@ var (
 	}
 )
 
-func (c *grpcClientWrapper) askHeight() (*downloader_pb.DownloaderResponse, error) {
-	return c.Query(context.TODO(), askBlockHeight, grpc.WaitForReady(true))
-}
-
 // NOTE maybe better named handle incoming request
-func (s *simpleSyncer) Query(
-	ctx context.Context, request *downloader_pb.DownloaderRequest,
-) (*downloader_pb.DownloaderResponse, error) {
+// switch request.GetType() {
+// case downloader_pb.DownloaderRequest_BLOCKHASH:
+// case downloader_pb.DownloaderRequest_BLOCK:
+// case downloader_pb.DownloaderRequest_NEWBLOCK:
+// case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
+// case downloader_pb.DownloaderRequest_REGISTER:
+// case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
+// case downloader_pb.DownloaderRequest_UNKNOWN:
+// case downloader_pb.DownloaderRequest_BLOCKHEADER:
+// response := &downloader_pb.DownloaderResponse{}
+// blk := <-s.currentBlockHeight
+// response.BlockHeight = blk.NumberU64()
+// return response, nil
 
-	switch request.GetType() {
-	case downloader_pb.DownloaderRequest_BLOCKHASH:
-	case downloader_pb.DownloaderRequest_BLOCK:
-	case downloader_pb.DownloaderRequest_NEWBLOCK:
-	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
-	case downloader_pb.DownloaderRequest_REGISTER:
-	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
-	case downloader_pb.DownloaderRequest_UNKNOWN:
-	case downloader_pb.DownloaderRequest_BLOCKHEADER:
+// block downloading consumer side pipeline
 
-	}
+// allBlockHeightsAndHashOfNeighbors <- askEveryoneInHMYProtocolTheirHeight()
+// for each block := range downloadedBlocksFromPeersWithMostCommonHash <- previouslyDownloaded()
+//
 
-	response := &downloader_pb.DownloaderResponse{}
-	blk := <-s.currentBlockHeight
-	response.BlockHeight = blk.NumberU64()
-	return response, nil
+type height struct {
+	blockNum  uint64
+	blockHash common.Hash
 }
 
-type r struct {
-	result interface{}
-	err    error
-}
+// HandleBlockSyncing ..
+func (node *Node) HandleBlockSyncing() error {
+	t := time.NewTicker(time.Second * 30)
+	defer t.Stop()
 
-func heightOfPeers(conns []ipfs_interface.ConnectionInfo) {
-	var collect errgroup.Group
-
-	results := make(chan r, len(conns))
-
-	for _, conn := range conns {
-		collect.Go(func() error {
-
-			_, ip, err := manet.DialArgs(conn.Address())
-			if err != nil {
-				go func() {
-					results <- r{nil, err}
-				}()
-				return err
-			}
-			peerID := conn.ID().ShortString()
-			time.Sleep(1 * time.Second)
-			client, err := lookupClient(peerID, ip)
-
-			if err != nil {
-				go func() {
-					results <- r{nil, err}
-				}()
-				return err
-			}
-
-			resp, err := client.askHeight()
-			if err != nil {
-				go func() {
-					results <- r{nil, err}
-				}()
-				return err
-			}
-			go func() {
-				results <- r{resp, nil}
-			}()
-			return nil
-		})
-	}
-
-	if firstErr := collect.Wait(); firstErr != nil {
-		fmt.Println("here is the first error from whole group", firstErr.Error())
-	}
-
-	// drain the channel
-	for i := 0; i < len(conns); i++ {
-		syncResult := <-results
-		if e := syncResult.err; e != nil {
-			fmt.Println("sync result had problem", e.Error())
-		} else {
-			fmt.Println("sync result was:", syncResult.result)
-		}
-	}
-
-}
-
-// StartStateSync ..
-func (node *Node) StartStateSync() error {
-	addr := net.JoinHostPort("", offSetSyncingPort(node.Peer.Port))
-	lis, err := net.Listen("tcp4", addr)
-
-	if err != nil {
-		return err
-	}
-
-	var g errgroup.Group
-
-	in := make(chan *types.Block, 1)
-	// beacon := make(chan *types.Block)
-
-	simple := &simpleSyncer{
-		currentBlockHeight: in,
-	}
-
-	go func() {
-		go func() {
-			for {
-				in <- node.Blockchain().CurrentBlock()
-			}
-		}()
-
-		// if node.Consensus.ShardID == shard.BeaconChainShardID {
-		// 	go func() {
-		// 		for {
-		// 			in <- node.Beaconchain().CurrentBlock()
-		// 		}
-		// 	}()
-		// }
-
-	}()
-
-	grpcServer := grpc.NewServer()
-	downloader_pb.RegisterDownloaderServer(grpcServer, simple)
-
-	g.Go(func() error {
-		return grpcServer.Serve(lis)
-	})
-
-	g.Go(func() error {
-		for beaconBlock := range in {
-			_ = beaconBlock
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		for ownChain := range in {
-			_ = ownChain
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		coreAPI := node.host.CoreAPI
-		tick := time.NewTicker(time.Second * 10)
-		defer tick.Stop()
-
-		for range tick.C {
-			conns, err := coreAPI.Swarm().Peers(context.TODO())
-
-			if err != nil {
-				return err
-			}
-
-			heightOfPeers(conns)
+	select {
+	case blockRange := <-node.Consensus.SyncNeeded:
+		_ = blockRange
+	case <-t.C:
+		if err := syncFromHMYPeersIfNeeded(
+			node.host,
+			height{
+				node.Beaconchain().CurrentHeader().Number().Uint64(),
+				node.Beaconchain().CurrentHeader().Hash(),
+			},
+			height{
+				node.Blockchain().CurrentHeader().Number().Uint64(),
+				node.Blockchain().CurrentHeader().Hash(),
+			},
+		); err != nil {
+			return err
 		}
 
-		return nil
-	})
-
-	return g.Wait()
-}
-
-func offSetSyncingPort(nodePort string) string {
-	if port, err := strconv.Atoi(nodePort); err == nil {
-		return fmt.Sprintf("%d", port-syncingPortDifference)
 	}
-	return ""
-}
 
-const (
-	syncingPortDifference = 3000
-)
+	return nil
+}
 
 // HandleIncomingHMYProtocolStreams ..
 func (node *Node) HandleIncomingHMYProtocolStreams() error {
 
-	var g errgroup.Group
+	errs := make(chan error)
 
 	for stream := range node.host.IncomingStream {
-		s := stream
+		handler, err := lookupHandler(
+			node.host,
+			stream.Conn().RemotePeer(),
+		)
+		if err != nil {
+			return err
+		}
 
-		g.Go(func() error {
-			//
-			stat := s.Stat()
-			fmt.Println("stats coming in->",
-				stat.Direction, stat.Extra, stream.Conn().RemotePeer().Pretty(),
-			)
-			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-			fmt.Println("something incoming->", rw)
-			for {
-
-				time.Sleep(time.Second * 2)
-				// this must be our message
-				buf, err := rw.Peek(1)
-				if err != nil {
-					return err
-				}
-
-				if buf[0] == 0x11 {
-
-					_, err := rw.ReadByte()
-					if err != nil {
-						return err
-					}
-
-					var msgBuf msg_pb.Message
-					contentSizeBuf := make([]byte, 4)
-
-					if _, err := io.ReadFull(rw, contentSizeBuf); err != nil {
-						return err
-					}
-
-					sized := binary.BigEndian.Uint32(contentSizeBuf)
-					fmt.Println("sized", sized)
-
-					payload := make([]byte, sized)
-
-					if _, err := io.ReadFull(rw, payload); err != nil {
-						return err
-					}
-
-					fmt.Println("what does the payload look like", hex.EncodeToString(payload))
-					// 0x1100000005020803100e
-					// 0x          020803100e
-
-					if err := protobuf.Unmarshal(payload[1:], &msgBuf); err != nil {
-						fmt.Println(err.Error())
-					}
-					// Green console colour: 	\x1b[32m
-					// Reset console colour: 	\x1b[0m
-					fmt.Printf("\x1b[32m%s\x1b[0m> ", msgBuf.String())
-
-				}
-			}
-
-			return nil
-		})
+		go func() {
+			errs <- handler.process(stream)
+		}()
 
 	}
 
-	return g.Wait()
+	go func() {
+		for err := range errs {
+			utils.Logger().Info().Err(err).
+				Msg("incoming stream handling had some problem")
+		}
+	}()
+
+	return nil
 }
