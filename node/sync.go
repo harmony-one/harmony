@@ -19,47 +19,32 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-	"golang.org/x/sync/singleflight"
 )
 
-var clients singleflight.Group
-
-func lookupHandler(
+func newSyncer(
 	host *p2p.Host,
 	peerID libp2p_peer.ID,
 ) (*syncingHandler, error) {
-	s := peerID.ShortString()
-	handle, err, _ := clients.Do(s, func() (interface{}, error) {
 
-		stateSyncStream, err := host.IPFSNode.PeerHost.NewStream(
-			context.Background(),
-			peerID,
-			p2p.Protocol,
-		)
-
-		if err != nil {
-			return nil, err
-		}
-
-		time.AfterFunc(time.Minute*10, func() {
-			clients.Forget(s)
-		})
-
-		rw := bufio.NewReadWriter(
-			bufio.NewReader(stateSyncStream), bufio.NewWriter(stateSyncStream),
-		)
-
-		// TODO probably need to expose the raw stream as well
-		return &syncingHandler{
-			peerID, host, rw,
-		}, nil
-	})
+	stateSyncStream, err := host.IPFSNode.PeerHost.NewStream(
+		context.Background(),
+		peerID,
+		p2p.Protocol,
+	)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return handle.(*syncingHandler), nil
+	rw := bufio.NewReadWriter(
+		bufio.NewReader(stateSyncStream), bufio.NewWriter(stateSyncStream),
+	)
+
+	// TODO probably need to expose the raw stream as well
+	return &syncingHandler{
+		peerID, host, rw,
+	}, nil
+
 }
 
 func askEveryoneInHMYProtocolTheirHeight(host *p2p.Host) error {
@@ -91,7 +76,7 @@ func syncFromHMYPeersIfNeeded(
 			return nil
 		}
 
-		handler, err := lookupHandler(host, id)
+		handler, err := newSyncer(host, id)
 
 		if err != nil {
 			return err
@@ -144,11 +129,7 @@ func (sync *syncingHandler) askHeight() (*height, *height, error) {
 
 }
 
-func (sync *syncingHandler) process(s libp2p_network.Stream) error {
-	stat := s.Stat()
-	fmt.Println("stats coming in->",
-		stat.Direction, stat.Extra, s.Conn().RemotePeer().Pretty(),
-	)
+func (sync *syncingHandler) processIncoming(s libp2p_network.Stream) error {
 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 	fmt.Println("something incoming->", rw)
 	for {
@@ -265,7 +246,7 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 	errs := make(chan error)
 
 	for stream := range node.host.IncomingStream {
-		handler, err := lookupHandler(
+		handler, err := newSyncer(
 			node.host,
 			stream.Conn().RemotePeer(),
 		)
@@ -274,7 +255,7 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 		}
 
 		go func() {
-			errs <- handler.process(stream)
+			errs <- handler.processIncoming(stream)
 		}()
 
 	}
