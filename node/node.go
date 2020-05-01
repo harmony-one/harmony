@@ -309,7 +309,7 @@ func (node *Node) BootstrapConsensus() error {
 		min := node.Consensus.MinPeers
 
 		for {
-			current := 0
+
 			conns, err := node.host.CoreAPI.Swarm().Peers(context.Background())
 
 			if err != nil {
@@ -317,39 +317,49 @@ func (node *Node) BootstrapConsensus() error {
 				return
 			}
 
-			for _, conn := range conns {
-				protocols, err := node.host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
-					conn.ID(), p2p.Protocol,
-				)
-
-				if err != nil {
-					errored <- err
-					return
-				}
-
-				for _, protocol := range protocols {
-					if protocol == p2p.Protocol {
-						current++
-						break
-					}
-				}
-
-				if current >= min-2 {
-					utils.Logger().Info().
-						Int("have", current).
-						Int("needed", min).
-						Msg("got enough peers for consensus")
-					haveEnoughPeers <- struct{}{}
-					return
-				}
+			if c := len(conns); c >= min {
+				utils.Logger().Info().
+					Int("have", c).
+					Int("needed", min).
+					Msg("got enough peers for consensus")
+				haveEnoughPeers <- struct{}{}
+				return
 			}
 
 			time.Sleep(2 * time.Second)
 
 			utils.Logger().Info().
-				Int("have", current).
+				Int("have", len(conns)).
 				Int("need", min).
 				Msg("not enough peers for consensus")
+
+			// for _, conn := range conns {
+			// protocols, err := node.host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
+			// 	conn.ID(), p2p.Protocol,
+			// )
+
+			// if err != nil {
+			// 	errored <- err
+			// 	return
+			// }
+
+			// for _, protocol := range protocols {
+			// 	if protocol == p2p.Protocol {
+			// 		current++
+			// 		break
+			// 	}
+			// }
+
+			// if current >= min-2 {
+			// 	utils.Logger().Info().
+			// 		Int("have", current).
+			// 		Int("needed", min).
+			// 		Msg("got enough peers for consensus")
+			// 	haveEnoughPeers <- struct{}{}
+			// 	return
+			// }
+			// }
+
 		}
 	}()
 

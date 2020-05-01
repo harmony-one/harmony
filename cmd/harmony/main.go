@@ -785,17 +785,14 @@ func main() {
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		g.Go(currentNode.HandleConsensusBlockProcessing)
 		g.Go(currentNode.HandleConsensusMessageProcessing)
-
 		g.Go(currentNode.StartLeaderWork)
-
 		g.Go(currentNode.EnsureConsensusLiviness)
 		// g.Go(currentNode.EnsureConsensusInSync)
-
 	}
 
 	// if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&
 	// 	currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
-	g.Go(currentNode.StartStateSyncStreams)
+	// g.Go(currentNode.StartStateSyncStreams)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		g.Go(currentNode.BootstrapConsensus)
