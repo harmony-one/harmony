@@ -296,7 +296,7 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 		Msg("Got ONE more receipt message")
 }
 
-const maxWaitBootstrap = 60 * time.Second
+const maxWaitBootstrap = 90 * time.Second
 
 // BootstrapConsensus is the a goroutine to check number of peers and start the consensus
 func (node *Node) BootstrapConsensus() error {
@@ -304,8 +304,6 @@ func (node *Node) BootstrapConsensus() error {
 	errored := make(chan error)
 	t := time.NewTimer(maxWaitBootstrap)
 	defer t.Stop()
-
-	time.Sleep(30 * time.Second)
 
 	go func() {
 		min := node.Consensus.MinPeers
@@ -359,6 +357,11 @@ func (node *Node) BootstrapConsensus() error {
 	case err := <-errored:
 		return err
 	case <-haveEnoughPeers:
+		node.Consensus.ProposalNewBlock <- struct{}{}
+		node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+		utils.Logger().Info().
+			Time("next-block-due", node.Consensus.NextBlockDue()).
+			Msg("this node is leader, kicked off consensus")
 		return nil
 	case <-t.C:
 		return errors.New("exceeded 60 seconds waiting for enough min peers")
