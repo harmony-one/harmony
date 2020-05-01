@@ -7,8 +7,6 @@ import (
 	"sort"
 	"time"
 
-	common2 "github.com/harmony-one/harmony/internal/common"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
@@ -18,12 +16,13 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/ctxerror"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -63,7 +62,6 @@ func (w *Worker) CommitTransactions(
 	}
 
 	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
-	coalescedLogs := []*types.Log{}
 	// NORMAL
 	for {
 		// If we don't have enough gas for any further transactions then we're done
@@ -82,7 +80,7 @@ func (w *Worker) CommitTransactions(
 		from, _ := types.Sender(w.current.signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
-		if tx.Protected() && !w.config.IsEIP155(w.current.header.Number()) {
+		if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
 			utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
 			txs.Pop()
 			continue
@@ -95,7 +93,7 @@ func (w *Worker) CommitTransactions(
 			continue
 		}
 
-		logs, err := w.commitTransaction(tx, coinbase)
+		_, err := w.commitTransaction(tx, coinbase)
 
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
@@ -116,7 +114,6 @@ func (w *Worker) CommitTransactions(
 
 		case nil:
 			// Everything ok, collect the logs and shift in the next transaction from the same account
-			coalescedLogs = append(coalescedLogs, logs...)
 			txs.Shift()
 
 		default:
@@ -139,25 +136,22 @@ func (w *Worker) CommitTransactions(
 			}
 			// Check whether the tx is replay protected. If we're not in the EIP155 hf
 			// phase, start ignoring the sender until we do.
-			if tx.Protected() && !w.config.IsEIP155(w.current.header.Number()) {
+			if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
 				utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
 				txs.Pop()
 				continue
 			}
 
 			// Start executing the transaction
-			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
+			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs)+len(w.current.stakingTxs))
 			// THESE CODE ARE DUPLICATED AS ABOVE>>
-
-			logs, err := w.commitStakingTransaction(tx, coinbase)
-			if err != nil {
+			if _, err := w.commitStakingTransaction(tx, coinbase); err != nil {
 				txID := tx.Hash().Hex()
 				utils.Logger().Error().Err(err).
 					Str("stakingTxID", txID).
 					Interface("stakingTx", tx).
 					Msg("Failed committing staking transaction")
 			} else {
-				coalescedLogs = append(coalescedLogs, logs...)
 				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).
 					Uint64("txGasLimit", tx.Gas()).
 					Msg("Successfully committed staking transaction")
@@ -197,20 +191,37 @@ func (w *Worker) commitStakingTransaction(
 	return receipt.Logs, nil
 }
 
-func (w *Worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
-	snap := w.current.state.Snapshot()
+var (
+	errNilReceipt = errors.New("nil receipt")
+)
 
+func (w *Worker) commitTransaction(
+	tx *types.Transaction, coinbase common.Address,
+) ([]*types.Log, error) {
+	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, cx, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &gasUsed, vm.Config{})
+	receipt, cx, _, err := core.ApplyTransaction(
+		w.config,
+		w.chain,
+		&coinbase,
+		w.current.gasPool,
+		w.current.state,
+		w.current.header,
+		tx,
+		&gasUsed,
+		vm.Config{},
+	)
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
-		utils.Logger().Error().Err(err).Str("stakingTxId", tx.Hash().Hex()).Msg("Offchain ValidatorMap Read/Write Error")
-		return nil, err
+		utils.Logger().Error().
+			Err(err).Str("stakingTxId", tx.Hash().Hex()).
+			Msg("Offchain ValidatorMap Read/Write Error")
+		return nil, errNilReceipt
 	}
 	if receipt == nil {
 		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
-		return nil, fmt.Errorf("Receipt is Nil")
+		return nil, errNilReceipt
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
@@ -236,15 +247,13 @@ func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 	}
 
 	for _, cx := range receiptsList {
-		err := core.ApplyIncomingReceipt(w.config, w.current.state, w.current.header, cx)
-		if err != nil {
-			return ctxerror.New("Failed applying cross-shard receipts").WithCause(err)
+		if err := core.ApplyIncomingReceipt(
+			w.config, w.current.state, w.current.header, cx,
+		); err != nil {
+			return errors.Wrapf(err, "Failed applying cross-shard receipts")
 		}
 	}
-
-	for _, cx := range receiptsList {
-		w.current.incxs = append(w.current.incxs, cx)
-	}
+	w.current.incxs = append(w.current.incxs, receiptsList...)
 	return nil
 }
 
@@ -396,6 +405,7 @@ func (w *Worker) FinalizeNewBlock(
 		w.current.header.SetLastCommitSignature(sig2)
 		w.current.header.SetLastCommitBitmap(signers)
 	}
+
 	w.current.header.SetCoinbase(coinbase)
 	w.current.header.SetViewID(new(big.Int).SetUint64(viewID))
 
@@ -451,17 +461,15 @@ func (w *Worker) FinalizeNewBlock(
 			return nil, err
 		}
 	}
-
 	state := w.current.state.Copy()
 	copyHeader := types.CopyHeader(w.current.header)
-	// TODO: feed coinbase into here so the proposer gets extra rewards.
 	block, _, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
 		w.current.slashes,
 	)
 	if err != nil {
-		return nil, ctxerror.New("cannot finalize block").WithCause(err)
+		return nil, errors.Wrapf(err, "cannot finalize block")
 	}
 
 	return block, nil

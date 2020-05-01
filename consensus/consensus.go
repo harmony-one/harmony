@@ -2,17 +2,14 @@ package consensus
 
 import (
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/memprofiling"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
@@ -81,8 +78,6 @@ type Consensus struct {
 	// private/public keys of current node
 	priKey *multibls.PrivateKey
 	PubKey *multibls.PublicKey
-	// TODO(audit): SelfAddresses doesn't have the ECDSA address for external validators. Don't use it that way.
-	SelfAddresses map[string]common.Address
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKey
 	viewID       uint64
@@ -92,8 +87,6 @@ type Consensus struct {
 	block []byte
 	// BlockHeader to run consensus on
 	blockHeader []byte
-	// Array of block hashes.
-	blockHashes [][32]byte
 	// Shard Id which this node belongs to
 	ShardID uint32
 	// whether to ignore viewID check
@@ -106,13 +99,13 @@ type Consensus struct {
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
-	OnConsensusDone func(*types.Block, []byte)
+	OnConsensusDone func(*types.Block)
 	// The verifier func passed from Node object
 	BlockVerifier func(*types.Block) error
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// will trigger state syncing when blockNum is low
-	blockNumLowChan chan struct{}
+	BlockNumLowChan chan struct{}
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
 	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -130,26 +123,18 @@ type Consensus struct {
 	syncNotReadyChan chan struct{}
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
-	// last node block reward for metrics
-	lastBlockReward *big.Int
 	// Have a dedicated reader thread pull from this chan, like in node
 	SlashChan chan slash.Record
+	// How long in second the leader needs to wait to propose a new block.
+	BlockPeriod time.Duration
+	// The time due for next block proposal
+	NextBlockDue time.Time
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
 // validator delays commit message by the amount.
 func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
 	consensus.delayCommit = delay
-}
-
-// DisableViewChangeForTestingOnly makes the receiver not propose view
-// changes when it should, e.g. leader timeout.
-//
-// As the name implies, this is intended for testing only,
-// and should not be used on production network.
-// This is also not part of the long-term consensus API and may go away later.
-func (consensus *Consensus) DisableViewChangeForTestingOnly() {
-	consensus.disableViewChange = true
 }
 
 // BlocksSynchronized lets the main loop know that block synchronization finished
@@ -163,19 +148,9 @@ func (consensus *Consensus) BlocksNotSynchronized() {
 	consensus.syncNotReadyChan <- struct{}{}
 }
 
-// WaitForSyncing informs the node syncing service to start syncing
-func (consensus *Consensus) WaitForSyncing() {
-	<-consensus.blockNumLowChan
-}
-
 // VdfSeedSize returns the number of VRFs for VDF computation
 func (consensus *Consensus) VdfSeedSize() int {
 	return int(consensus.Decider.ParticipantsCount()) * 2 / 3
-}
-
-// GetBlockReward returns last node block reward
-func (consensus *Consensus) GetBlockReward() *big.Int {
-	return consensus.lastBlockReward
 }
 
 // GetLeaderPrivateKey returns leader private key if node is the leader
@@ -197,14 +172,14 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, erro
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, multiBlsPriKey *multibls.PrivateKey,
+	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey *multibls.PrivateKey,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.Decider = Decider
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
-	consensus.blockNumLowChan = make(chan struct{})
+	consensus.BlockNumLowChan = make(chan struct{})
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce
@@ -214,9 +189,9 @@ func New(
 	consensus.consensusTimeout = createTimeout()
 	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
-	if multiBlsPriKey != nil {
-		consensus.priKey = multiBlsPriKey
-		consensus.PubKey = multiBlsPriKey.GetPublicKey()
+	if multiBLSPriKey != nil {
+		consensus.priKey = multiBLSPriKey
+		consensus.PubKey = multiBLSPriKey.GetPublicKey()
 		utils.Logger().Info().
 			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
 	} else {
@@ -235,9 +210,7 @@ func New(
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.commitFinishChan = make(chan uint64)
 	consensus.ReadySignal = make(chan struct{})
-	consensus.lastBlockReward = common.Big0
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
-	memprofiling.GetMemProfiling().Add("consensus.FBFTLog", consensus.FBFTLog)
 	return &consensus, nil
 }

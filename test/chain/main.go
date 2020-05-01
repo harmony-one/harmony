@@ -21,9 +21,7 @@ import (
 )
 
 const (
-	//StakingContractBinary is binary for staking contract.
-	StakingContractBinary = "0x608060405234801561001057600080fd5b506103f7806100206000396000f3fe608060405260043610610067576000357c01000000000000000000000000000000000000000000000000000000009004806317437a2c1461006c5780632e1a7d4d146100975780638da5cb5b146100e6578063b69ef8a81461013d578063d0e30db014610168575b600080fd5b34801561007857600080fd5b50610081610186565b6040518082815260200191505060405180910390f35b3480156100a357600080fd5b506100d0600480360360208110156100ba57600080fd5b81019080803590602001909291905050506101a5565b6040518082815260200191505060405180910390f35b3480156100f257600080fd5b506100fb6102cd565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b34801561014957600080fd5b506101526102f3565b6040518082815260200191505060405180910390f35b610170610339565b6040518082815260200191505060405180910390f35b60003073ffffffffffffffffffffffffffffffffffffffff1631905090565b60008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054821115156102c757816000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825403925050819055503373ffffffffffffffffffffffffffffffffffffffff166108fc839081150290604051600060405180830381858888f19350505050158015610280573d6000803e3d6000fd5b506000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490506102c8565b5b919050565b600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054905090565b6000346000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825401925050819055506000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205490509056fea165627a7a723058204acf95662eb95006df1e0b8ba32316211039c7872bc6eb99d12689c1624143d80029"
-	//FaucetContractBinary is binary for faucet contract.
+	// FaucetContractBinary is binary for faucet contract.
 	FaucetContractBinary = "0x60806040526706f05b59d3b2000060015560028054600160a060020a031916331790556101aa806100316000396000f3fe608060405260043610610045577c0100000000000000000000000000000000000000000000000000000000600035046327c78c42811461004a578063b69ef8a81461008c575b600080fd5b34801561005657600080fd5b5061008a6004803603602081101561006d57600080fd5b503573ffffffffffffffffffffffffffffffffffffffff166100b3565b005b34801561009857600080fd5b506100a1610179565b60408051918252519081900360200190f35b60025473ffffffffffffffffffffffffffffffffffffffff1633146100d757600080fd5b600154303110156100e757600080fd5b73ffffffffffffffffffffffffffffffffffffffff811660009081526020819052604090205460ff161561011a57600080fd5b73ffffffffffffffffffffffffffffffffffffffff8116600081815260208190526040808220805460ff1916600190811790915554905181156108fc0292818181858888f19350505050158015610175573d6000803e3d6000fd5b5050565b30319056fea165627a7a723058206b894c1f3badf3b26a7a2768ab8141b1e6fa1c1ddc4622f4f44a7d5041edc9350029"
 )
 
@@ -34,19 +32,14 @@ var (
 	FaucetAddress = crypto.PubkeyToAddress(FaucetPriKey.PublicKey)
 	//FaucetInitFunds initial funds in facuet contract
 	FaucetInitFunds = big.NewInt(8000000000000000000)
-
 	testUserKey, _  = crypto.GenerateKey()
 	testUserAddress = crypto.PubkeyToAddress(testUserKey.PublicKey)
-
-	chainConfig  = params.TestChainConfig
-	blockFactory = blockfactory.ForTest
-
+	chainConfig     = params.TestChainConfig
+	blockFactory    = blockfactory.ForTest
 	// Test transactions
 	pendingTxs []*types.Transaction
-	newTxs     []*types.Transaction
-
-	database = ethdb.NewMemDatabase()
-	gspec    = core.Genesis{
+	database   = ethdb.NewMemDatabase()
+	gspec      = core.Genesis{
 		Config:  chainConfig,
 		Factory: blockFactory,
 		Alloc:   core.GenesisAlloc{FaucetAddress: {Balance: FaucetInitFunds}},
@@ -59,12 +52,9 @@ var (
 	allRandomUserAddress  []common.Address
 	allRandomUserKey      []*ecdsa.PrivateKey
 	faucetContractAddress common.Address
-	stakeContractAddress  common.Address
 	chain                 *core.BlockChain
 	err                   error
-	block                 *types.Block
 	state                 *core_state.DB
-	stakingtxns           []*types.Transaction
 )
 
 func init() {
@@ -104,11 +94,15 @@ func fundFaucetContract(chain *core.BlockChain) {
 	contractworker = pkgworker.New(params.TestChainConfig, chain, chain.Engine())
 	nonce = contractworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
 	dataEnc = common.FromHex(FaucetContractBinary)
-	ftx, _ := types.SignTx(types.NewContractCreation(nonce, 0, big.NewInt(7000000000000000000), params.TxGasContractCreation*10, nil, dataEnc), types.HomesteadSigner{}, FaucetPriKey)
+	ftx, _ := types.SignTx(
+		types.NewContractCreation(
+			nonce, 0, big.NewInt(7000000000000000000),
+			params.TxGasContractCreation*10, nil, dataEnc),
+		types.HomesteadSigner{}, FaucetPriKey,
+	)
 	faucetContractAddress = crypto.CreateAddress(FaucetAddress, nonce)
-	state := contractworker.GetCurrentState()
 	txs = append(txs, ftx)
-	//Funding the user addressed
+	// Funding the user addressed
 	for i := 1; i <= 3; i++ {
 		randomUserKey, _ := crypto.GenerateKey()
 		randomUserAddress := crypto.PubkeyToAddress(randomUserKey.PublicKey)

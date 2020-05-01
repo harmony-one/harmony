@@ -934,7 +934,7 @@ func TestBlock_EncodeRLP(t *testing.T) {
 				t.Errorf("EncodeRLP() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if gotBytes := w.Bytes(); bytes.Compare(gotBytes, tt.wantBytes) != 0 {
+			if gotBytes := w.Bytes(); !bytes.Equal(gotBytes, tt.wantBytes) {
 				t.Errorf("EncodeRLP() got  %x", gotBytes)
 				t.Errorf("EncodeRLP() want %x", tt.wantBytes)
 			}
@@ -993,7 +993,7 @@ func TestBody_EncodeRLP(t *testing.T) {
 				t.Errorf("EncodeRLP() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if haveBytes := w.Bytes(); bytes.Compare(haveBytes, tt.wantBytes) != 0 {
+			if haveBytes := w.Bytes(); !bytes.Equal(haveBytes, tt.wantBytes) {
 				t.Errorf("EncodeRLP() have %x", haveBytes)
 				t.Errorf("EncodeRLP() want %x", tt.wantBytes)
 			}

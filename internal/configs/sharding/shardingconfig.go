@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/harmony-one/harmony/internal/genesis"
 )
-
-//go:generate mockgen -source=shardingconfig.go -destination=mock/shardingconfig.go
 
 // Schedule returns the sharding configuration instance for the given
 // epoch.
@@ -56,6 +56,12 @@ type Instance interface {
 	// NumHarmonyOperatedNodesPerShard returns number of nodes in each shard
 	// that are operated by Harmony.
 	NumHarmonyOperatedNodesPerShard() int
+
+	// HarmonyVotePercent returns total percentage of voting power harmony nodes possess.
+	HarmonyVotePercent() numeric.Dec
+
+	// ExternalVotePercent returns total percentage of voting power external validators possess.
+	ExternalVotePercent() numeric.Dec
 
 	// HmyAccounts returns a list of Harmony accounts
 	HmyAccounts() []genesis.DeployAccount

@@ -12,10 +12,10 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
+	"github.com/pkg/errors"
 )
 
 // handlemessageupdate will update the consensus state according to received message
@@ -32,12 +32,9 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
-	switch {
-	case (consensus.current.Mode() == ViewChanging) &&
+	if (consensus.current.Mode() == ViewChanging) &&
 		(msg.Type == msg_pb.MessageType_PREPARE ||
-			msg.Type == msg_pb.MessageType_COMMIT):
-		return
-	case consensus.current.Mode() == Listening:
+			msg.Type == msg_pb.MessageType_COMMIT) {
 		return
 	}
 
@@ -62,16 +59,8 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		}
 	}
 
-	notMemberButStillCatchup := !consensus.Decider.AmIMemberOfCommitee() &&
-		msg.Type == msg_pb.MessageType_COMMITTED
-
-	if notMemberButStillCatchup {
-		consensus.onCommitted(msg)
-		return
-	}
-
 	intendedForValidator, intendedForLeader :=
-		!(consensus.IsLeader() && consensus.current.Mode() == Normal),
+		!consensus.IsLeader(),
 		consensus.IsLeader()
 
 	switch t := msg.Type; true {
@@ -109,7 +98,7 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 func (consensus *Consensus) finalizeCommits() {
 	consensus.getLogger().Info().
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
-		Msg("[Finalizing] Finalizing Block")
+		Msg("[finalizeCommits] Finalizing Block")
 	beforeCatchupNum := consensus.blockNum
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
@@ -147,28 +136,20 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 
-	if err := consensus.ChainReader.WriteLastCommits(FBFTMsg.Payload); err != nil {
-		consensus.getLogger().Err(err).
-			Msg("[FinalizeCommits] could not write last commits")
-		return
-	}
-
 	// if leader success finalize the block, send committed message to validators
 	if err := consensus.msgSender.SendWithRetry(
 		block.NumberU64(),
 		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
-		host.ConstructP2pMessage(byte(17), msgToSend)); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[Finalizing] Cannot send committed message")
+		p2p.ConstructMessage(msgToSend)); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalizeCommits] Cannot send committed message")
 	} else {
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
-			Msg("[Finalizing] Sent Committed Message")
+			Msg("[finalizeCommits] Sent Committed Message")
 	}
-
-	consensus.reportMetrics(*block)
 
 	// Dump new block into level db
 	// In current code, we add signatures in block in tryCatchup, the block dump to explorer does not contains signatures
@@ -178,9 +159,9 @@ func (consensus *Consensus) finalizeCommits() {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Debug().Msg("[Finalizing] Start consensus timer; stop bootstrap timer only once")
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Start consensus timer; stop bootstrap timer only once")
 	} else {
-		consensus.getLogger().Debug().Msg("[Finalizing] Start consensus timer")
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
@@ -193,25 +174,38 @@ func (consensus *Consensus) finalizeCommits() {
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
-	// Send signal to Node so the new block can be added and new round of consensus can be triggered
+
+	if n := time.Now(); n.Before(consensus.NextBlockDue) {
+		// Sleep to wait for the full block time
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
+		time.Sleep(consensus.NextBlockDue.Sub(n))
+	}
+	// Send signal to Node to propose the new block for consensus
 	consensus.ReadySignal <- struct{}{}
+
+	// Update time due for next block
+	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 }
 
-// LastCommitSig returns the byte array of aggregated
-// commit signature and bitmap of last block
-func (consensus *Consensus) LastCommitSig() ([]byte, []byte, error) {
+// BlockCommitSig returns the byte array of aggregated
+// commit signature and bitmap signed on the block
+func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, error) {
 	if consensus.blockNum <= 1 {
 		return nil, nil, nil
 	}
-	lastCommits, err := consensus.ChainReader.ReadLastCommits()
+	lastCommits, err := consensus.ChainReader.ReadCommitSig(blockNum)
 	if err != nil ||
 		len(lastCommits) < shard.BLSSignatureSizeInBytes {
-		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum-1)
+		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
+			msg_pb.MessageType_COMMITTED, consensus.blockNum-1,
+		)
 		if len(msgs) != 1 {
 			consensus.getLogger().Error().
 				Int("numCommittedMsg", len(msgs)).
 				Msg("GetLastCommitSig failed with wrong number of committed message")
-			return nil, nil, ctxerror.New("GetLastCommitSig failed with wrong number of committed message", "numCommittedMsg", len(msgs))
+			return nil, nil, errors.Errorf(
+				"GetLastCommitSig failed with wrong number of committed message %d", len(msgs),
+			)
 		}
 		lastCommits = msgs[0].Payload
 	}
@@ -231,7 +225,9 @@ func (consensus *Consensus) tryCatchup() {
 	consensus.getLogger().Info().Msg("[TryCatchup] commit new blocks")
 	currentBlockNum := consensus.blockNum
 	for {
-		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(msg_pb.MessageType_COMMITTED, consensus.blockNum)
+		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
+			msg_pb.MessageType_COMMITTED, consensus.blockNum,
+		)
 		if len(msgs) == 0 {
 			break
 		}
@@ -240,18 +236,40 @@ func (consensus *Consensus) tryCatchup() {
 				Int("numMsgs", len(msgs)).
 				Msg("[TryCatchup] DANGER!!! we should only get one committed message for a given blockNum")
 		}
-		consensus.getLogger().Info().Msg("[TryCatchup] committed message found")
 
-		block := consensus.FBFTLog.GetBlockByHash(msgs[0].BlockHash)
-		if block == nil {
+		var committedMsg *FBFTMessage
+		var block *types.Block
+		for i := range msgs {
+			tmpBlock := consensus.FBFTLog.GetBlockByHash(msgs[i].BlockHash)
+			if tmpBlock == nil {
+				blksRepr, msgsRepr, incomingMsg :=
+					consensus.FBFTLog.Blocks().String(),
+					consensus.FBFTLog.Messages().String(),
+					msgs[i].String()
+				consensus.getLogger().Debug().
+					Str("FBFT-log-blocks", blksRepr).
+					Str("FBFT-log-messages", msgsRepr).
+					Str("incoming-message", incomingMsg).
+					Uint64("blockNum", msgs[i].BlockNum).
+					Uint64("viewID", msgs[i].ViewID).
+					Str("blockHash", msgs[i].BlockHash.Hex()).
+					Msg("[TryCatchup] Failed finding a matching block for committed message")
+				continue
+			}
+
+			if consensus.BlockVerifier == nil {
+				// do nothing
+			} else if err := consensus.BlockVerifier(tmpBlock); err != nil {
+				consensus.getLogger().Info().Msg("[TryCatchup] block verification failed")
+				continue
+			}
+			committedMsg = msgs[i]
+			block = tmpBlock
 			break
 		}
-
-		if consensus.BlockVerifier == nil {
-			// do nothing
-		} else if err := consensus.BlockVerifier(block); err != nil {
-			consensus.getLogger().Info().Msg("[TryCatchup] block verification failed")
-			return
+		if block == nil || committedMsg == nil {
+			consensus.getLogger().Error().Msg("[TryCatchup] Failed finding a valid committed message.")
+			break
 		}
 
 		if block.ParentHash() != consensus.ChainReader.CurrentHeader().Hash() {
@@ -261,7 +279,7 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
 
 		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
-			msg_pb.MessageType_PREPARED, msgs[0].BlockNum, msgs[0].BlockHash,
+			msg_pb.MessageType_PREPARED, committedMsg.BlockNum, committedMsg.BlockHash,
 		)
 		msg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 		if msg == nil {
@@ -272,11 +290,14 @@ func (consensus *Consensus) tryCatchup() {
 		// TODO(Chao): Explain the reasoning for these code
 		consensus.blockHash = [32]byte{}
 		consensus.blockNum = consensus.blockNum + 1
-		consensus.viewID = msgs[0].ViewID + 1
-		consensus.LeaderPubKey = msgs[0].SenderPubkey
+		consensus.viewID = committedMsg.ViewID + 1
+		consensus.LeaderPubKey = committedMsg.SenderPubkey
 
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
-		consensus.OnConsensusDone(block, msgs[0].Payload)
+
+		// Fill in the commit signatures
+		block.SetCurrentCommitSig(committedMsg.Payload)
+		consensus.OnConsensusDone(block)
 		consensus.ResetState()
 
 		select {
@@ -337,11 +358,13 @@ func (consensus *Consensus) Start(
 			Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
 
 		vdfInProgress := false
+		// Set up next block due time.
+		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 		for {
 			select {
 			case <-ticker.C:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ticker")
-				if toStart == false && isInitialLeader {
+				if !toStart && isInitialLeader {
 					continue
 				}
 				for k, v := range consensus.consensusTimeout {
@@ -369,20 +392,15 @@ func (consensus *Consensus) Start(
 				consensus.SetViewID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
 				mode := consensus.UpdateConsensusInformation()
 				consensus.current.SetMode(mode)
-				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is in sync")
+				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 
 			case <-consensus.syncNotReadyChan:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] syncNotReadyChan")
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
 				consensus.current.SetMode(Syncing)
-				consensus.getLogger().Info().Msg("Node is out of sync")
+				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 
 			case newBlock := <-blockChannel:
-				// Debug code to trigger leader change.
-				//if consensus.ShardID == 0 && newBlock.NumberU64() == 2 && strings.Contains(consensus.PubKey.SerializeToHexStr(), "65f55eb") {
-				//	continue
-				//}
-
 				consensus.getLogger().Info().
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
@@ -454,12 +472,9 @@ func (consensus *Consensus) Start(
 									Uint64("MsgBlockNum", newBlock.NumberU64()).
 									Uint64("Epoch", newBlock.Header().Epoch().Uint64()).
 									Msg("[ConsensusMainLoop] Generated a new VDF")
-
 								newBlock.AddVdf(vdfOutput[:])
 							}
 						}
-					} else {
-						//consensus.getLogger().Error().Err(err). Msg("[ConsensusMainLoop] Failed to get randomness")
 					}
 				}
 
@@ -468,17 +483,18 @@ func (consensus *Consensus) Start(
 
 				consensus.getLogger().Debug().
 					Int("numTxs", len(newBlock.Transactions())).
+					Int("numStakingTxs", len(newBlock.StakingTransactions())).
 					Time("startTime", startTime).
 					Int64("publicKeys", consensus.Decider.ParticipantsCount()).
 					Msg("[ConsensusMainLoop] STARTING CONSENSUS")
 				consensus.announce(newBlock)
 
 			case msg := <-consensus.MsgChan:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] MsgChan")
 				consensus.handleMessageUpdate(msg)
 
 			case viewID := <-consensus.commitFinishChan:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
+
 				// Only Leader execute this condition
 				func() {
 					consensus.mutex.Lock()
@@ -588,7 +604,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 		outputChannel := vdf.GetOutputChannel()
 		start := time.Now()
 		vdf.Execute()
-		duration := time.Now().Sub(start)
+		duration := time.Since(start)
 		consensus.getLogger().Info().
 			Dur("duration", duration).
 			Msg("[ConsensusMainLoop] VDF computation finished")

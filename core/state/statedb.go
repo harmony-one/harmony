@@ -29,8 +29,10 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/staking"
+	"github.com/harmony-one/harmony/staking/effective"
 	stk "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -67,6 +69,7 @@ type DB struct {
 	// This map holds 'live' objects, which will get modified while processing a state transition.
 	stateObjects      map[common.Address]*Object
 	stateObjectsDirty map[common.Address]struct{}
+	stateValidators   map[common.Address]*stk.ValidatorWrapper
 
 	// DB error.
 	// State objects are used by the consensus core and VM which are
@@ -103,6 +106,7 @@ func New(root common.Hash, db Database) (*DB, error) {
 		trie:              tr,
 		stateObjects:      make(map[common.Address]*Object),
 		stateObjectsDirty: make(map[common.Address]struct{}),
+		stateValidators:   make(map[common.Address]*stk.ValidatorWrapper),
 		logs:              make(map[common.Hash][]*types.Log),
 		preimages:         make(map[common.Hash][]byte),
 		journal:           newJournal(),
@@ -130,6 +134,7 @@ func (db *DB) Reset(root common.Hash) error {
 	db.trie = tr
 	db.stateObjects = make(map[common.Address]*Object)
 	db.stateObjectsDirty = make(map[common.Address]struct{})
+	db.stateValidators = make(map[common.Address]*stk.ValidatorWrapper)
 	db.thash = common.Hash{}
 	db.bhash = common.Hash{}
 	db.txIndex = 0
@@ -518,6 +523,7 @@ func (db *DB) Copy() *DB {
 		trie:              db.db.CopyTrie(db.trie),
 		stateObjects:      make(map[common.Address]*Object, len(db.journal.dirties)),
 		stateObjectsDirty: make(map[common.Address]struct{}, len(db.journal.dirties)),
+		stateValidators:   make(map[common.Address]*stk.ValidatorWrapper),
 		refund:            db.refund,
 		logs:              make(map[common.Hash][]*types.Log, len(db.logs)),
 		logSize:           db.logSize,
@@ -544,6 +550,7 @@ func (db *DB) Copy() *DB {
 			state.stateObjectsDirty[addr] = struct{}{}
 		}
 	}
+
 	for hash, logs := range db.logs {
 		cpy := make([]*types.Log, len(logs))
 		for i, l := range logs {
@@ -590,6 +597,11 @@ func (db *DB) GetRefund() uint64 {
 // Finalise finalises the state by removing the db destructed objects
 // and clears the journal as well as the refunds.
 func (db *DB) Finalise(deleteEmptyObjects bool) {
+	// Commit validator changes in cache to stateObjects
+	for addr, val := range db.stateValidators {
+		db.UpdateValidatorWrapper(addr, val)
+	}
+
 	for addr := range db.journal.dirties {
 		stateObject, exist := db.stateObjects[addr]
 		if !exist {
@@ -689,8 +701,33 @@ var (
 	errAddressNotPresent = errors.New("address not present in state")
 )
 
-// ValidatorWrapper  ..
+// ValidatorWrapper retrieves the existing validator in the cache.
+// The return value is a reference to the actual validator object in state.
+// The modification on it will be committed to the state object when Finalize()
+// is called.
 func (db *DB) ValidatorWrapper(
+	addr common.Address,
+) (*stk.ValidatorWrapper, error) {
+	// Read cache first
+	cached, ok := db.stateValidators[addr]
+	if ok {
+		return cached, nil
+	}
+
+	val, err := db.ValidatorWrapperCopy(addr)
+	if err != nil {
+		return nil, err
+	}
+	// populate cache if the validator is not in it
+	db.stateValidators[addr] = val
+	return val, nil
+
+}
+
+// ValidatorWrapperCopy retrieves the existing validator as a copy from state object.
+// Changes on the copy has to be explicitly commited with UpdateValidatorWrapper()
+// to take effect.
+func (db *DB) ValidatorWrapperCopy(
 	addr common.Address,
 ) (*stk.ValidatorWrapper, error) {
 	by := db.GetCode(addr)
@@ -724,6 +761,8 @@ func (db *DB) UpdateValidatorWrapper(
 		return err
 	}
 	db.SetCode(addr, by)
+	// update cache
+	db.stateValidators[addr] = val
 	return nil
 }
 
@@ -746,30 +785,53 @@ func (db *DB) IsValidator(addr common.Address) bool {
 	return so.IsValidator(db.db)
 }
 
-// AddReward distributes the reward to all the delegators based on stake percentage.
-func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
-	rewardPool := big.NewInt(0).Set(reward)
+var (
+	zero = numeric.ZeroDec()
+)
 
-	curValidator, err := db.ValidatorWrapper(snapshot.Validator.Address)
+// AddReward distributes the reward to all the delegators based on stake percentage.
+func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int, shareLookup map[common.Address]numeric.Dec) error {
+	if reward.Cmp(common.Big0) == 0 {
+		utils.Logger().Info().RawJSON("validator", []byte(snapshot.String())).
+			Msg("0 given as reward")
+		return nil
+	}
+
+	curValidator, err := db.ValidatorWrapper(snapshot.Address)
 	if err != nil {
 		return errors.Wrapf(err, "failed to distribute rewards: validator does not exist")
 	}
 
+	if curValidator.Status == effective.Banned {
+		utils.Logger().Info().
+			RawJSON("slashed-validator", []byte(curValidator.String())).
+			Msg("cannot add reward to banned validator")
+		return nil
+	}
+
+	rewardPool := big.NewInt(0).Set(reward)
+	curValidator.BlockReward.Add(curValidator.BlockReward, reward)
 	// Payout commission
-	commissionInt := snapshot.Validator.CommissionRates.Rate.MulInt(reward).RoundInt()
-
-	curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, commissionInt)
-	rewardPool.Sub(rewardPool, commissionInt)
-
-	totalRewardForDelegators := big.NewInt(0).Set(rewardPool)
+	if r := snapshot.Validator.CommissionRates.Rate; r.GT(zero) {
+		commissionInt := r.MulInt(reward).RoundInt()
+		curValidator.Delegations[0].Reward.Add(
+			curValidator.Delegations[0].Reward,
+			commissionInt,
+		)
+		rewardPool.Sub(rewardPool, commissionInt)
+	}
 
 	// Payout each delegator's reward pro-rata
-	totalDelegationDec := numeric.NewDecFromBigInt(snapshot.TotalDelegation())
+	totalRewardForDelegators := big.NewInt(0).Set(rewardPool)
 	for i := range snapshot.Delegations {
 		delegation := snapshot.Delegations[i]
-		percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec) // percentage = <this_delegator_amount>/<total_delegation>
-		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
+		percentage, ok := shareLookup[delegation.DelegatorAddress]
 
+		if !ok {
+			return errors.Wrapf(err, "missing delegation shares for reward distribution")
+		}
+
+		rewardInt := percentage.MulInt(totalRewardForDelegators).RoundInt()
 		curDelegation := curValidator.Delegations[i]
 		curDelegation.Reward.Add(curDelegation.Reward, rewardInt)
 		rewardPool.Sub(rewardPool, rewardInt)
@@ -781,5 +843,5 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int) error {
 		curValidator.Delegations[0].Reward.Add(curValidator.Delegations[0].Reward, rewardPool)
 	}
 
-	return db.UpdateValidatorWrapper(curValidator.Validator.Address, curValidator)
+	return nil
 }

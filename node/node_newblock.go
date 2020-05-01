@@ -6,12 +6,13 @@ import (
 	"strings"
 	"time"
 
+	staking "github.com/harmony-one/harmony/staking/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // Constants of proposing a new block
@@ -33,8 +34,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 		// TODO: make local net start faster
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
-		// Set up the very first deadline.
-		deadline := time.Now().Add(node.BlockPeriod)
 		for {
 			// keep waiting for Consensus ready
 			select {
@@ -45,12 +44,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 			case <-readySignal:
 				for node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(SleepPeriod)
-					if time.Now().Before(deadline) {
-						continue
-					}
-
-					// Start counting for block time before block proposal.
-					tmpDeadline := time.Now().Add(node.BlockPeriod)
 
 					utils.Logger().Debug().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
@@ -68,9 +61,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 							Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 							Msg("=========Successfully Proposed New Block==========")
 
-						// Set deadline only if block proposal is successful, otherwise, we should
-						// immediately start retrying block proposal
-						deadline = tmpDeadline
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
 						break
@@ -84,16 +74,22 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 }
 
 func (node *Node) proposeNewBlock() (*types.Block, error) {
+	currentHeader := node.Blockchain().CurrentHeader()
+	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
+	utils.AnalysisStart("proposeNewBlock", nowEpoch, blockNow)
+	defer utils.AnalysisEnd("proposeNewBlock", nowEpoch, blockNow)
+
 	node.Worker.UpdateCurrent()
 
-	// Update worker's current header and state data in preparation to propose/process new transactions
+	header := node.Worker.GetCurrentHeader()
+	// Update worker's current header and
+	// state data in preparation to propose/process new transactions
 	var (
-		coinbase    = node.Consensus.SelfAddresses[node.Consensus.LeaderPubKey.SerializeToHexStr()]
+		coinbase    = node.GetAddressForBLSKey(node.Consensus.LeaderPubKey, header.Epoch())
 		beneficiary = coinbase
 		err         error
 	)
 
-	header := node.Worker.GetCurrentHeader()
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
 		blsPubKeyBytes := node.Consensus.LeaderPubKey.GetAddress()
@@ -117,6 +113,8 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare normal and staking transactions retrieved from transaction pool
+	utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
+
 	pendingPoolTxs, err := node.TxPool.Pending()
 	if err != nil {
 		utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
@@ -144,6 +142,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 			pendingPlainTxs[addr] = plainTxsPerAcc
 		}
 	}
+	utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 
 	// Try commit normal and staking transactions based on the current state
 	// The successfully committed transactions will be put in the proposed block
@@ -168,6 +167,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	isBeaconchainInStakingEra := node.NodeConfig.ShardID == shard.BeaconChainShardID &&
 		node.Blockchain().Config().IsStaking(node.Worker.GetCurrentHeader().Epoch())
 
+	utils.AnalysisStart("proposeNewBlockVerifyCrossLinks")
 	// Prepare cross links and slashing messages
 	var crossLinksToPropose types.CrossLinks
 	if isBeaconchainInCrossLinkEra {
@@ -202,6 +202,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		}
 		node.Blockchain().DeleteFromPendingCrossLinks(invalidToDelete)
 	}
+	utils.AnalysisEnd("proposeNewBlockVerifyCrossLinks")
 
 	if isBeaconchainInStakingEra {
 		// this will set a meaningful w.current.slashes
@@ -211,7 +212,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare shard state
-	shardState := new(shard.State)
+	var shardState *shard.State
 	if shardState, err = node.Blockchain().SuperCommitteeForNextEpoch(
 		node.Beaconchain(), node.Worker.GetCurrentHeader(), false,
 	); err != nil {
@@ -219,7 +220,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	// Prepare last commit signatures
-	sig, mask, err := node.Consensus.LastCommitSig()
+	sig, mask, err := node.Consensus.BlockCommitSig(header.Number().Uint64() - 1)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 		return nil, err
@@ -258,7 +259,7 @@ func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {
 		return shardCMP || (shardEQ && blockCMP)
 	})
 
-	m := make(map[common.Hash]bool)
+	m := map[common.Hash]struct{}{}
 
 Loop:
 	for _, cxp := range node.pendingCXReceipts {
@@ -276,7 +277,7 @@ Loop:
 		if _, ok := m[hash]; ok {
 			continue
 		} else {
-			m[hash] = true
+			m[hash] = struct{}{}
 		}
 
 		for _, item := range cxp.Receipts {

@@ -1,7 +1,6 @@
 package node
 
 import (
-	"encoding/binary"
 	"sort"
 	"sync"
 
@@ -11,6 +10,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
+	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -52,18 +52,6 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
-		// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
-		blockNumHash := make([]byte, 8)
-		binary.LittleEndian.PutUint64(blockNumHash, recvMsg.BlockNum)
-		commitPayload := append(blockNumHash, recvMsg.BlockHash[:]...)
-		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-			utils.Logger().
-				Error().Err(err).
-				Uint64("msgBlock", recvMsg.BlockNum).
-				Msg("[Explorer] Failed to verify the multi signature for commit phase")
-			return
-		}
-
 		block := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 
 		if block == nil {
@@ -71,6 +59,16 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 				Uint64("msgBlock", recvMsg.BlockNum).
 				Msg("[Explorer] Haven't received the block before the committed msg")
 			node.Consensus.FBFTLog.AddMessage(recvMsg)
+			return
+		}
+
+		commitPayload := signature.ConstructCommitPayload(node.Blockchain(),
+			block.Epoch(), block.Hash(), block.Number().Uint64(), block.Header().ViewID().Uint64())
+		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+			utils.Logger().
+				Error().Err(err).
+				Uint64("msgBlock", recvMsg.BlockNum).
+				Msg("[Explorer] Failed to verify the multi signature for commit phase")
 			return
 		}
 
@@ -83,10 +81,11 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			utils.Logger().Error().Err(err).Msg("[Explorer] Unable to parse Prepared msg")
 			return
 		}
-		block := recvMsg.Block
-
-		blockObj := &types.Block{}
-		err = rlp.DecodeBytes(block, blockObj)
+		block, blockObj := recvMsg.Block, &types.Block{}
+		if err := rlp.DecodeBytes(block, blockObj); err != nil {
+			utils.Logger().Error().Err(err).Msg("explorer could not rlp decode block")
+			return
+		}
 		// Add the block into FBFT log.
 		node.Consensus.FBFTLog.AddBlock(blockObj)
 		// Try to search for MessageType_COMMITTED message from pbft log.
@@ -101,7 +100,6 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			node.commitBlockForExplorer(blockObj)
 		}
 	}
-	return
 }
 
 // AddNewBlockForExplorer add new block for explorer.
@@ -153,6 +151,7 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
 	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
 		return make([]common.Hash, 0), nil
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
@@ -171,9 +170,87 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 	hashes := make([]common.Hash, 0)
 	for _, tx := range addressData.TXs {
 		if txType == "" || txType == "ALL" || txType == tx.Type {
-			hash := common.HexToHash(tx.ID)
+			hash := common.HexToHash(tx.Hash)
 			hashes = append(hashes, hash)
 		}
 	}
 	return hashes, nil
+}
+
+// GetStakingTransactionsHistory returns list of staking transactions hashes of address.
+func (node *Node) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
+	addressData := &explorer.Address{}
+	key := explorer.GetAddressKey(address)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
+		return make([]common.Hash, 0), nil
+	}
+	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
+		return nil, err
+	}
+	if order == "DESC" {
+		sort.Slice(addressData.StakingTXs[:], func(i, j int) bool {
+			return addressData.StakingTXs[i].Timestamp > addressData.StakingTXs[j].Timestamp
+		})
+	} else {
+		sort.Slice(addressData.StakingTXs[:], func(i, j int) bool {
+			return addressData.StakingTXs[i].Timestamp < addressData.StakingTXs[j].Timestamp
+		})
+	}
+	hashes := make([]common.Hash, 0)
+	for _, tx := range addressData.StakingTXs {
+		if txType == "" || txType == "ALL" || txType == tx.Type {
+			hash := common.HexToHash(tx.Hash)
+			hashes = append(hashes, hash)
+		}
+	}
+	return hashes, nil
+}
+
+// GetTransactionsCount returns the number of regular transactions hashes of address for input type.
+func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
+	addressData := &explorer.Address{}
+	key := explorer.GetAddressKey(address)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
+		return 0, nil
+	}
+	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
+		return 0, err
+	}
+
+	count := uint64(0)
+	for _, tx := range addressData.TXs {
+		if txType == "" || txType == "ALL" || txType == tx.Type {
+			count++
+		}
+	}
+	return count, nil
+}
+
+// GetStakingTransactionsCount returns the number of staking transactions hashes of address for input type.
+func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, error) {
+	addressData := &explorer.Address{}
+	key := explorer.GetAddressKey(address)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
+		return 0, nil
+	}
+	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
+		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
+		return 0, err
+	}
+
+	count := uint64(0)
+	for _, tx := range addressData.StakingTXs {
+		if txType == "" || txType == "ALL" || txType == tx.Type {
+			count++
+		}
+	}
+	return count, nil
 }

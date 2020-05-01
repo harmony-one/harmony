@@ -26,11 +26,8 @@ const (
 
 var (
 	// HTTP RPC
-	rpcAPIs          []rpc.API
 	httpListener     net.Listener
 	httpHandler      *rpc.Server
-	wsListener       net.Listener
-	wsHandler        *rpc.Server
 	httpEndpoint     = ""
 	wsEndpoint       = ""
 	httpModules      = []string{"hmy", "hmyv2", "net", "netv2", "explorer"}
@@ -69,6 +66,11 @@ func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError 
 		}
 	})
 	return result
+}
+
+// GetNodeBootTime ..
+func (node *Node) GetNodeBootTime() int64 {
+	return node.unixTimeAtNodeStart
 }
 
 // ErroredTransactionSink is the inmemory failed transactions this node has
@@ -114,7 +116,6 @@ func (node *Node) StartRPC(nodePort string) error {
 		return err
 	}
 
-	rpcAPIs = apis
 	return nil
 }
 
@@ -155,33 +156,21 @@ func (node *Node) stopHTTP() {
 }
 
 // startWS initializes and starts the websocket RPC endpoint.
-func (node *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsOrigins []string, exposeAll bool) error {
+func (node *Node) startWS(
+	endpoint string, apis []rpc.API, modules []string, wsOrigins []string, exposeAll bool,
+) error {
 	// Short circuit if the WS endpoint isn't being exposed
 	if endpoint == "" {
 		return nil
 	}
-	listener, handler, err := rpc.StartWSEndpoint(endpoint, apis, modules, wsOrigins, exposeAll)
+	listener, _, err := rpc.StartWSEndpoint(endpoint, apis, modules, wsOrigins, exposeAll)
 	if err != nil {
 		return err
 	}
-	utils.Logger().Info().Str("url", fmt.Sprintf("ws://%s", listener.Addr())).Msg("WebSocket endpoint opened")
-	// All listeners booted successfully
-	wsListener = listener
-	wsHandler = handler
+	utils.Logger().Info().
+		Str("url", fmt.Sprintf("ws://%s", listener.Addr())).
+		Msg("WebSocket endpoint opened")
 	return nil
-}
-
-// stopWS terminates the websocket RPC endpoint.
-func (node *Node) stopWS() {
-	if wsListener != nil {
-		wsListener.Close()
-		wsListener = nil
-		utils.Logger().Info().Str("url", fmt.Sprintf("ws://%s", wsEndpoint)).Msg("WebSocket endpoint closed")
-	}
-	if wsHandler != nil {
-		wsHandler.Stop()
-		wsHandler = nil
-	}
 }
 
 // APIs return the collection of RPC services the ethereum package offers.

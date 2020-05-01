@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200212.0"
+version="v1 20200427.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -56,6 +56,7 @@ function check_root
    if [[ $EUID -ne 0 ]]; then
       msg "this script must be run as root to setup environment"
       msg please use \"sudo ${progname}\"
+      msg "you may use -S option to run as normal user"
       exit 1
    fi
 }
@@ -70,15 +71,62 @@ function add_env
 function setup_env
 {
    check_root
-
-# setup environment variables, may not be nessary
-   sysctl -w net.core.somaxconn=1024
+   ### KERNEL TUNING ###
+   # Increase size of file handles and inode cache
+   sysctl -w fs.file-max=2097152
+   # Do less swapping
+   sysctl -w vm.swappiness=10
+   sysctl -w vm.dirty_ratio=60
+   sysctl -w vm.dirty_background_ratio=2
+   # Sets the time before the kernel considers migrating a proccess to another core
+   sysctl -w kernel.sched_migration_cost_ns=5000000
+   ### GENERAL NETWORK SECURITY OPTIONS ###
+   # Number of times SYNACKs for passive TCP connection.
+   sysctl -w net.ipv4.tcp_synack_retries=2
+   # Allowed local port range
+   sysctl -w net.ipv4.ip_local_port_range='2000 65535'
+   # Protect Against TCP Time-Wait
+   sysctl -w net.ipv4.tcp_rfc1337=1
+   # Control Syncookies
+   sysctl -w net.ipv4.tcp_syncookies=1
+   # Decrease the time default value for tcp_fin_timeout connection
+   sysctl -w net.ipv4.tcp_fin_timeout=15
+   # Decrease the time default value for connections to keep alive
+   sysctl -w net.ipv4.tcp_keepalive_time=300
+   sysctl -w net.ipv4.tcp_keepalive_probes=5
+   sysctl -w net.ipv4.tcp_keepalive_intvl=15
+   ### TUNING NETWORK PERFORMANCE ###
+   # Default Socket Receive Buffer
+   sysctl -w net.core.rmem_default=31457280
+   # Maximum Socket Receive Buffer
+   sysctl -w net.core.rmem_max=33554432
+   # Default Socket Send Buffer
+   sysctl -w net.core.wmem_default=31457280
+   # Maximum Socket Send Buffer
+   sysctl -w net.core.wmem_max=33554432
+   # Increase number of incoming connections
+   sysctl -w net.core.somaxconn=8096
+   # Increase number of incoming connections backlog
    sysctl -w net.core.netdev_max_backlog=65536
+   # Increase the maximum amount of option memory buffers
+   sysctl -w net.core.optmem_max=25165824
+   sysctl -w net.ipv4.tcp_max_syn_backlog=8192
+   # Increase the maximum total buffer-space allocatable
+   # This is measured in units of pages (4096 bytes)
+   sysctl -w net.ipv4.tcp_mem='786432 1048576 26777216'
+   sysctl -w net.ipv4.udp_mem='65536 131072 262144'
+   # Increase the read-buffer space allocatable
+   sysctl -w net.ipv4.tcp_rmem='8192 87380 33554432'
+   sysctl -w net.ipv4.udp_rmem_min=16384
+   # Increase the write-buffer-space allocatable
+   sysctl -w net.ipv4.tcp_wmem='8192 65536 33554432'
+   sysctl -w net.ipv4.udp_wmem_min=16384
+   # Increase the tcp-time-wait buckets pool size to prevent simple DOS attacks
+   sysctl -w net.ipv4.tcp_max_tw_buckets=1440000
    sysctl -w net.ipv4.tcp_tw_reuse=1
-   sysctl -w net.ipv4.tcp_rmem='4096 65536 16777216'
-   sysctl -w net.ipv4.tcp_wmem='4096 65536 16777216'
-   sysctl -w net.ipv4.tcp_mem='65536 131072 262144'
-
+   sysctl -w net.ipv4.tcp_fastopen=3
+   sysctl -w net.ipv4.tcp_window_scaling=1
+   
    add_env /etc/security/limits.conf "* soft     nproc          65535"
    add_env /etc/security/limits.conf "* hard     nproc          65535"
    add_env /etc/security/limits.conf "* soft     nofile         65535"
@@ -90,6 +138,18 @@ function setup_env
    add_env /etc/pam.d/common-session "session required pam_limits.so"
 }
 
+function check_pkg_management
+{
+   if which yum > /dev/null; then
+      PKG_INSTALL='sudo yum install -y'
+      return
+   fi
+   if which apt-get > /dev/null; then
+      PKG_INSTALL='sudo apt-get install -y'
+      return
+   fi
+}
+
 ######## main #########
 print_usage() {
    cat <<- ENDEND
@@ -97,7 +157,7 @@ print_usage() {
 usage: ${progname} [options]
 
 options:
-   -c             back up database/logs and start clean
+   -c             back up database/logs and start clean (not for mainnet)
                   (use only when directed by Harmony)
    -1             do not loop; run once and exit
    -h             print this help and exit
@@ -107,10 +167,8 @@ options:
    -p passfile    use the given BLS passphrase file
    -d             just download the Harmony binaries (default: off)
    -D             do not download Harmony binaries (default: download when start)
-   -m             collect and upload node metrics to harmony prometheus + grafana
    -N network     join the given network (mainnet, testnet, staking, partner, stress, devnet; default: mainnet)
    -n port        specify the public base port of the node (default: 9000)
-   -t             equivalent to -N testnet (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
    -b             download harmony_db files from shard specified by -i <shardid> (default: off)
@@ -122,11 +180,14 @@ options:
    -z             run in staking mode
    -y             run in legacy, foundational-node mode (default)
    -Y             verify the signature of the downloaded binaries (default: off)
+   -m minpeer     specify minpeers for bootstrap (default: 6)
    -M             support multi-key mode (default: off)
+   -f blsfolder   folder that stores the bls keys and corresponding passphrases (default: ./.hmy/blskeys)
    -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
-   -R address     start a pprof profiling server listening on the specified address
-   -I             use statically linked Harmony binary
+   -r address     start a pprof profiling server listening on the specified address
+   -I             use statically linked Harmony binary (default: true)
+   -R tracefile   enable p2p trace using tracefile (default: off)
 
 examples:
 
@@ -153,9 +214,16 @@ examples:
 # e.g. <blskey>.key and <blskey>.pass
    ${progname} -S -M 
 
+# multi-bls: specify folder that contains bls keys
+   ${progname} -S -M -f /home/xyz/myfolder
+
 # multi-bls using default passphrase: place all keys under .hmy/blskeys
 # supply passphrase file using -p option (single passphrase will be used for all bls keys)
    ${progname} -S -M -p blspass.txt
+
+# multi-bls using user input passphrase: place all keys under .hmy/blskeys
+# supply passphrase for each of the bls key file when prompted
+   ${progname} -S -M
 
 ENDEND
 }
@@ -170,14 +238,13 @@ usage() {
 BUCKET=pub.harmony.one
 OS=$(uname -s)
 
-unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blacklist verify
+unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id download_harmony_db db_file_to_dl
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers
 start_clean=false
 loop=true
 run_as_root=true
 do_not_download=false
 download_only=false
-metrics=false
 network=mainnet
 node_type=validator
 shard_id=-1
@@ -185,16 +252,19 @@ download_harmony_db=false
 public_rpc=false
 staking_mode=false
 multi_key=false
+blsfolder=./.hmy/blskeys
 archival=false
 blacklist=./.hmy/blacklist.txt
 pprof=""
-static=false
+static=true
 verify=false
+minpeers=6
 ${BLSKEYFILE=}
+${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVyzn:MAIB:R:Y opt
+while getopts :1chk:sSp:dDN:T:i:ba:U:PvVyzn:MAIB:r:Y:f:R:m: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -209,11 +279,11 @@ do
    p) blspass="${OPTARG}";;
    d) download_only=true;;
    D) do_not_download=true;;
+   m) minpeers="${OPTARG}";;
    M) multi_key=true;;
-   m) metrics=true;;
+   f) blsfolder="${OPTARG}";;
    N) network="${OPTARG}";;
    n) pub_port="${OPTARG}";;
-   t) network=devnet;;
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
    I) static=true;;
@@ -221,7 +291,7 @@ do
    U) upgrade_rel="${OPTARG}";;
    P) public_rpc=true;;
    B) blacklist="${OPTARG}";;
-   R) pprof="${OPTARG}";;
+   r) pprof="${OPTARG}";;
    v) msg "version: $version"
       exit 0 ;;
    V) LD_LIBRARY_PATH=. ./harmony -version
@@ -230,15 +300,17 @@ do
    z) staking_mode=true;;
    y) staking_mode=false;;
    A) archival=true;;
+   R) TRACEFILE="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
 shift $((${OPTIND} - 1))
 
-unset -v bootnodes REL network_type dns_zone
+unset -v bootnodes REL network_type dns_zone syncdir
 
 case "${node_type}" in
-validator|explorer) ;;
+validator) ;;
+explorer) archival=true;;
 *)
    usage ;;
 esac
@@ -254,6 +326,7 @@ mainnet)
   REL=mainnet
   network_type=mainnet
   dns_zone=t.hmny.io
+  syncdir=mainnet.min
   ;;
 testnet)  # TODO: update Testnet configs once LRTN is upgraded
   bootnodes=(
@@ -263,6 +336,7 @@ testnet)  # TODO: update Testnet configs once LRTN is upgraded
   REL=testnet
   network_type=testnet
   dns_zone=p.hmny.io
+  syncdir=lrtn
   ;;
 staking)
   bootnodes=(
@@ -272,6 +346,7 @@ staking)
   REL=pangaea
   network_type=pangaea
   dns_zone=os.hmny.io
+  syncdir=ostn
   ;;
 partner)
   bootnodes=(
@@ -281,6 +356,7 @@ partner)
   REL=partner
   network_type=partner
   dns_zone=ps.hmny.io
+  syncdir=pstn
   ;;
 stress)
   bootnodes=(
@@ -289,15 +365,17 @@ stress)
   REL=stressnet
   network_type=stressnet
   dns_zone=stn.hmny.io
+  syncdir=stn
   ;;
 devnet)
   bootnodes=(
-    /ip4/52.40.84.2/tcp/9870/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9
     /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/52.40.84.2/tcp/9870/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
   )
   REL=devnet
   network_type=devnet
   dns_zone=pga.hmny.io
+  syncdir=devnet
   ;;
 *)
   err 64 "${network}: invalid network"
@@ -581,7 +659,6 @@ fi
 
 NODE_PORT=${pub_port:-9000}
 PUB_IP=
-METRICS=
 PUSHGATEWAY_IP=
 PUSHGATEWAY_PORT=
 
@@ -595,6 +672,7 @@ fi
 
 # find my public ip address
 myip
+check_pkg_management
 
 unset -v BN_MA bn
 for bn in "${bootnodes[@]}"
@@ -602,15 +680,45 @@ do
   BN_MA="${BN_MA+"${BN_MA},"}${bn}"
 done
 
-if ${start_clean}
+if [[ "${start_clean}" == "true" && "${network_type}" != "mainnet" ]]
 then
-   msg "backing up old database/logs (-c)"
-   unset -v backup_dir now
-   now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-   mkdir -p backups
-   backup_dir=$(mktemp -d "backups/${now}.XXXXXX")
-   mv harmony_db_* latest "${backup_dir}/" || :
-   rm -rf latest
+   msg "cleaning up old database (-c)"
+   # set a 2s timeout, and set its default return value to Y (true)
+   read -t 2 -rp "Remove old database? (Y/n) " yesno
+   yesno=${yesno:-Y}
+   echo
+   if [[ "$yesno" == "y" || "$yesno" == "Y" ]]; then
+      unset -v backup_dir now
+      now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      mkdir -p backups; rm -rf backups/*
+      backup_dir=$(mktemp -d "backups/${now}.XXXXXX")
+      mv -f harmony_db_* .dht* "${backup_dir}/" 2>/dev/null || :
+   fi
+
+   # install unzip as dependency of rclone
+   if ! which unzip > /dev/null; then
+      $PKG_INSTALL unzip
+   fi
+   # do rclone sync
+   if ! which rclone > /dev/null; then
+      msg "installing rclone to fast sync db"
+      msg "curl https://rclone.org/install.sh | sudo bash"
+      curl https://rclone.org/install.sh | sudo bash
+      mkdir -p ~/.config/rclone
+   fi
+   if ! grep -q 'hmy' ~/.config/rclone/rclone.conf 2> /dev/null; then
+      msg "adding [hmy] profile to rclone.conf"
+      cat<<-EOT>>~/.config/rclone/rclone.conf
+[hmy]
+type = s3
+provider = AWS
+env_auth = false
+region = us-west-1
+acl = public-read
+EOT
+   fi
+   msg "Syncing harmony_db_0"
+   rclone sync -P hmy://pub.harmony.one/$syncdir/harmony_db_0 harmony_db_0
 fi
 mkdir -p latest
 
@@ -694,6 +802,52 @@ kill_node() {
    done
 }
 
+unset -v save_pass_file
+save_pass_file=true
+prompt_save=false
+read_bls_pass() {
+   for f in ${blsfolder}/*.key
+   do
+      if [ ! -f $f ]; then
+         err 10 "could not find bls key file: $f"
+      fi
+      passfile=${blsfolder}/$(basename "${f%.*}").pass
+      if [ ! -f "$passfile" ]; then
+         unset -v passphrase
+         read -rsp "Enter passphrase for the BLS key file $f: " passphrase
+         echo ${passphrase} | tee $passfile
+         echo "Passphrase is temporarely saved to: $passfile"
+         prompt_save=true
+      fi
+   done
+   if ${prompt_save} ; then
+      while true
+      do
+         read -t 3 -rp "Do you wish to delete the saved passphrase files after successful start of node? (y|n):" yn
+         yn=${yn:-Y}
+         case $yn in
+            [Yy]*) save_pass_file=false
+            break;;
+            [Nn]*) save_pass_file=true
+            break;;
+            *) sleep 1 && echo "Please answer yes (y|Y) or no (n|N)";;
+         esac
+      done
+      prompt_save=false
+   fi
+}
+
+rm_bls_pass() {
+   if ! ${save_pass_file} ; then
+      for f in ${blsfolder}/*.pass
+      do
+         if [ -f $f ]; then
+            rm $f
+         fi
+      done
+   fi
+}
+
 {
    while ${loop}
    do
@@ -730,6 +884,8 @@ if ! ${multi_key}; then
    elif [ ! -f "${blspass}" ]; then
       err 10 "can't find the ${blspass} file"
    fi
+else
+   read_bls_pass
 fi
 
 while :
@@ -739,10 +895,10 @@ do
       -bootnodes "${BN_MA}"
       -ip "${PUB_IP}"
       -port "${NODE_PORT}"
-      -is_genesis
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
       -blacklist="${blacklist}"
+      -min_peers="${minpeers}"
    )
    args+=(
       -is_archival="${archival}"
@@ -750,6 +906,11 @@ do
    if ! ${multi_key}; then
       args+=(
       -blskey_file "${BLSKEYFILE}"
+      )
+   fi
+   if ${multi_key}; then
+      args+=(
+         -blsfolder "${blsfolder}"
       )
    fi
    if ${public_rpc}; then
@@ -784,20 +945,17 @@ do
       )
       ;;
    esac
-   case "${metrics}" in
-   true)
-      args+=(
-         -metrics "${metrics}"
-         -pushgateway_ip "${PUSHGATEWAY_IP}"
-         -pushgateway_port "${PUSHGATEWAY_PORT}"
-      )
-      ;;
+   case "${TRACEFILE}" in
+      "") ;;
+      *) msg "WARN: enabled p2p tracefile: $TRACEFILE. Be aware of the file size."
+         export P2P_TRACEFILE=${TRACEFILE} ;;
    esac
    case "$OS" in
    Darwin) ld_path_var=DYLD_FALLBACK_LIBRARY_PATH;;
    *) ld_path_var=LD_LIBRARY_PATH;;
    esac
    run() {
+      (sleep 30 && rm_bls_pass)&
       env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
    }
    case "${blspass:+set}" in
@@ -806,5 +964,12 @@ do
    esac || msg "node process finished with status $?"
    ${loop} || break
    msg "restarting in 10s..."
+   save_pass_file=false
+   rm_bls_pass
    sleep 10
+   if ${multi_key}; then
+      read_bls_pass
+   fi
 done
+
+# vim: set expandtab:ts=3

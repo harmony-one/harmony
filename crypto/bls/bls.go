@@ -1,11 +1,10 @@
 package bls
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/pkg/errors"
 )
 
 func init() {
@@ -19,10 +18,10 @@ func RandPrivateKey() *bls.SecretKey {
 	return &sec
 }
 
-// BytesToBlsPublicKey converts bytes into bls.PublicKey pointer.
-func BytesToBlsPublicKey(bytes []byte) (*bls.PublicKey, error) {
+// BytesToBLSPublicKey converts bytes into bls.PublicKey pointer.
+func BytesToBLSPublicKey(bytes []byte) (*bls.PublicKey, error) {
 	if len(bytes) == 0 {
-		return nil, fmt.Errorf("[BytesToBlsPublicKey] bytes is empty")
+		return nil, fmt.Errorf("[BytesToBLSPublicKey] bytes is empty")
 	}
 	pubKey := &bls.PublicKey{}
 	err := pubKey.Deserialize(bytes)
@@ -88,9 +87,11 @@ func (m *Mask) Len() int {
 // cosigners 0-7, bits 0-7 of byte 1 correspond to cosigners 8-15, etc.
 func (m *Mask) SetMask(mask []byte) error {
 	if m.Len() != len(mask) {
-		return ctxerror.New("mismatching bitmap lengths",
-			"expectedBitmapLength", m.Len(),
-			"providedBitmapLength", len(mask))
+		return errors.Errorf(
+			"mismatching bitmap lengths expectedBitmapLength %d providedBitmapLength %d",
+			m.Len(),
+			len(mask),
+		)
 	}
 	for i := range m.Publics {
 		byt := i >> 3
@@ -133,7 +134,7 @@ func (m *Mask) GetPubKeyFromMask(flag bool) []*bls.PublicKey {
 	for i := range m.Publics {
 		byt := i >> 3
 		msk := byte(1) << uint(i&7)
-		if flag == true {
+		if flag {
 			if (m.Bitmap[byt] & msk) != 0 {
 				pubKeys = append(pubKeys, m.Publics[i])
 			}

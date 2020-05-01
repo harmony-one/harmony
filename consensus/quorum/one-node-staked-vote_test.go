@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
@@ -26,10 +28,11 @@ var (
 	stakeGen      = rand.New(rand.NewSource(541))
 )
 
-type secretKeyMap map[shard.BlsPublicKey]bls.SecretKey
+type secretKeyMap map[shard.BLSPublicKey]bls.SecretKey
 
 func init() {
-	basicDecider = NewDecider(SuperMajorityStake)
+	basicDecider = NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
+	shard.Schedule = shardingconfig.LocalnetSchedule
 }
 
 func generateRandomSlot() (shard.Slot, bls.SecretKey) {
@@ -37,7 +40,7 @@ func generateRandomSlot() (shard.Slot, bls.SecretKey) {
 	addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
 	secretKey := bls.SecretKey{}
 	secretKey.Deserialize(big.NewInt(int64(keyGen.Int63n(maxKeyGen))).Bytes())
-	key := shard.BlsPublicKey{}
+	key := shard.BLSPublicKey{}
 	key.FromLibBLSPublicKey(secretKey.GetPublicKey())
 	stake := numeric.NewDecFromBigInt(big.NewInt(int64(stakeGen.Int63n(maxStakeGen))))
 	return shard.Slot{addr, key, &stake}, secretKey
@@ -46,26 +49,28 @@ func generateRandomSlot() (shard.Slot, bls.SecretKey) {
 // 50 Harmony Nodes, 50 Staked Nodes
 func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKeyMap) {
 	slotList := shard.SlotList{}
-	sKeys := make(map[string]secretKeyMap)
-	sKeys[hmy] = make(secretKeyMap)
-	sKeys[reg] = make(secretKeyMap)
+	sKeys := map[string]secretKeyMap{}
+	sKeys[hmy] = secretKeyMap{}
+	sKeys[reg] = secretKeyMap{}
 	pubKeys := []*bls.PublicKey{}
 
 	for i := 0; i < quorumNodes; i++ {
 		newSlot, sKey := generateRandomSlot()
 		if i < 50 {
 			newSlot.EffectiveStake = nil
-			sKeys[hmy][newSlot.BlsPublicKey] = sKey
+			sKeys[hmy][newSlot.BLSPublicKey] = sKey
 		} else {
-			sKeys[reg][newSlot.BlsPublicKey] = sKey
+			sKeys[reg][newSlot.BLSPublicKey] = sKey
 		}
 		slotList = append(slotList, newSlot)
 		pubKeys = append(pubKeys, sKey.GetPublicKey())
 	}
 
-	decider := NewDecider(SuperMajorityStake)
+	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 	decider.UpdateParticipants(pubKeys)
-	tally, err := decider.SetVoters(slotList)
+	tally, err := decider.SetVoters(&shard.Committee{
+		shard.BeaconChainShardID, slotList,
+	}, big.NewInt(3))
 	if err != nil {
 		panic("Unable to SetVoters for Base Case")
 	}
@@ -75,22 +80,24 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 // 33 Harmony Nodes, 67 Staked Nodes
 func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	slotList := shard.SlotList{}
-	sKeys := make(secretKeyMap)
+	sKeys := secretKeyMap{}
 	pubKeys := []*bls.PublicKey{}
 
 	for i := 0; i < quorumNodes; i++ {
 		newSlot, sKey := generateRandomSlot()
 		if i < 33 {
 			newSlot.EffectiveStake = nil
-			sKeys[newSlot.BlsPublicKey] = sKey
+			sKeys[newSlot.BLSPublicKey] = sKey
 		}
 		slotList = append(slotList, newSlot)
 		pubKeys = append(pubKeys, sKey.GetPublicKey())
 	}
 
-	decider := NewDecider(SuperMajorityStake)
+	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 	decider.UpdateParticipants(pubKeys)
-	tally, err := decider.SetVoters(slotList)
+	tally, err := decider.SetVoters(&shard.Committee{
+		shard.BeaconChainShardID, slotList,
+	}, big.NewInt(3))
 	if err != nil {
 		panic("Unable to SetVoters for Edge Case")
 	}
@@ -154,9 +161,9 @@ func TestEvenNodes(t *testing.T) {
 			ViewChange, strconv.FormatBool(achieved))
 	}
 	// RewardThreshold
-	rewarded := stakedVote.IsRewardThresholdAchieved()
+	rewarded := stakedVote.IsAllSigsCollected()
 	if rewarded {
-		t.Errorf("[IsRewardThresholdAchieved] Got: %s, Expected: false (All Staker nodes = 32%%)",
+		t.Errorf("[IsAllSigsCollected] Got: %s, Expected: false (All Staker nodes = 32%%)",
 			strconv.FormatBool(rewarded))
 	}
 
@@ -182,9 +189,9 @@ func TestEvenNodes(t *testing.T) {
 			ViewChange, strconv.FormatBool(achieved))
 	}
 	// RewardThreshold
-	rewarded = stakedVote.IsRewardThresholdAchieved()
+	rewarded = stakedVote.IsAllSigsCollected()
 	if !rewarded {
-		t.Errorf("[IsRewardThresholdAchieved] Got: %s, Expected: true (All nodes = 100%%)",
+		t.Errorf("[IsAllSigsCollected] Got: %s, Expected: true (All nodes = 100%%)",
 			strconv.FormatBool(rewarded))
 	}
 }
@@ -221,9 +228,9 @@ func Test33HarmonyNodes(t *testing.T) {
 			ViewChange, strconv.FormatBool(achieved))
 	}
 	// RewardThreshold
-	rewarded := stakedVote.IsRewardThresholdAchieved()
+	rewarded := stakedVote.IsAllSigsCollected()
 	if rewarded {
-		t.Errorf("[IsRewardThresholdAchieved] Got: %s, Expected: false (All Harmony nodes = 68%%)",
+		t.Errorf("[IsAllSigsCollected] Got: %s, Expected: false (All Harmony nodes = 68%%)",
 			strconv.FormatBool(rewarded))
 	}
 }

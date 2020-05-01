@@ -37,21 +37,18 @@ import (
 // BlockGen creates blocks for testing.
 // See GenerateChain for a detailed explanation.
 type BlockGen struct {
-	i       int
-	parent  *types.Block
-	chain   []*types.Block
-	factory blockfactory.Factory
-	header  *block.Header
-	statedb *state.DB
-
+	i        int
+	parent   *types.Block
+	chain    []*types.Block
+	factory  blockfactory.Factory
+	header   *block.Header
+	statedb  *state.DB
 	gasPool  *GasPool
 	txs      []*types.Transaction
-	stkTxs   staking.StakingTransactions
 	receipts []*types.Receipt
 	uncles   []*block.Header
-
-	config *params.ChainConfig
-	engine consensus_engine.Engine
+	config   *params.ChainConfig
+	engine   consensus_engine.Engine
 }
 
 // SetCoinbase sets the coinbase of the generated block.
@@ -248,27 +245,8 @@ func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *
 		Header()
 }
 
-// makeHeaderChain creates a deterministic chain of headers rooted at parent.
-func makeHeaderChain(parent *block.Header, n int, engine consensus_engine.Engine, db ethdb.Database, seed int) []*block.Header {
-	blocks := makeBlockChain(types.NewBlockWithHeader(parent), n, engine, db, seed)
-	headers := make([]*block.Header, len(blocks))
-	for i, block := range blocks {
-		headers[i] = block.Header()
-	}
-	return headers
-}
-
-// makeBlockChain creates a deterministic chain of blocks rooted at parent.
-func makeBlockChain(parent *types.Block, n int, engine consensus_engine.Engine, db ethdb.Database, seed int) []*types.Block {
-	blocks, _ := GenerateChain(params.TestChainConfig, parent, engine, db, n, func(i int, b *BlockGen) {
-		b.SetCoinbase(common.Address{0: byte(seed), 19: byte(i)})
-	})
-	return blocks
-}
-
 type fakeChainReader struct {
-	config  *params.ChainConfig
-	genesis *types.Block
+	config *params.ChainConfig
 }
 
 // Config returns the chain configuration.
@@ -283,7 +261,6 @@ func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *block.Header      
 func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Header { return nil }
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
 func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (*shard.State, error)     { return nil, nil }
-func (cr *fakeChainReader) ReadElectedValidatorList() ([]common.Address, error)     { return nil, nil }
 func (cr *fakeChainReader) ReadValidatorList() ([]common.Address, error)            { return nil, nil }
 func (cr *fakeChainReader) ValidatorCandidates() []common.Address                   { return nil }
 func (cr *fakeChainReader) SuperCommitteeForNextEpoch(
@@ -298,17 +275,33 @@ func (cr *fakeChainReader) ReadValidatorInformation(
 }
 func (cr *fakeChainReader) ReadValidatorSnapshot(
 	addr common.Address,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	return nil, nil
 }
 func (cr *fakeChainReader) ReadValidatorSnapshotAtEpoch(
 	epoch *big.Int, addr common.Address,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	return nil, nil
 }
 
-func (cr *fakeChainReader) ReadBlockRewardAccumulator(uint64) (*big.Int, error)         { return nil, nil }
-func (cr *fakeChainReader) ValidatorStakingWithDelegation(addr common.Address) *big.Int { return nil }
-func (cr *fakeChainReader) ReadValidatorStats(addr common.Address) (*staking.ValidatorStats, error) {
+func (cr *fakeChainReader) ReadBlockRewardAccumulator(
+	uint64,
+) (*big.Int, error) {
+	return nil, nil
+}
+
+func (cr *fakeChainReader) CurrentBlock() *types.Block {
+	return nil
+}
+
+func (cr *fakeChainReader) ValidatorStakingWithDelegation(
+	addr common.Address,
+) *big.Int {
+	return nil
+}
+
+func (cr *fakeChainReader) ReadValidatorStats(
+	addr common.Address,
+) (*staking.ValidatorStats, error) {
 	return nil, nil
 }

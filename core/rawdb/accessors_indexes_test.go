@@ -47,12 +47,27 @@ func TestLookupStorage(t *testing.T) {
 	tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), 0, big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
 	txs := []*types.Transaction{tx1, tx2, tx3}
 
-	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, types.Receipts{&types.Receipt{}, &types.Receipt{}, &types.Receipt{}}, nil, nil, nil)
+	stx := sampleCreateValidatorStakingTxn()
+	stxs := []*staking.StakingTransaction{stx}
+
+	receipts := types.Receipts{
+		&types.Receipt{},
+		&types.Receipt{},
+		&types.Receipt{},
+		&types.Receipt{},
+	}
+
+	block := types.NewBlock(blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header(), txs, receipts, nil, nil, stxs)
 
 	// Check that no transactions entries are in a pristine database
 	for i, tx := range txs {
 		if txn, _, _, _ := ReadTransaction(db, tx.Hash()); txn != nil {
 			t.Fatalf("tx #%d [%x]: non existent transaction returned: %v", i, tx.Hash(), txn)
+		}
+	}
+	for i, stx := range stxs {
+		if stxn, _, _, _ := ReadStakingTransaction(db, stx.Hash()); stxn != nil {
+			t.Fatalf("stx #%d [%x]: non existent staking transaction returned: %v", i, stxn.Hash(), stxn)
 		}
 	}
 	// Insert all the transactions into the database, and verify contents
@@ -71,11 +86,29 @@ func TestLookupStorage(t *testing.T) {
 			}
 		}
 	}
+	for i, stx := range stxs {
+		if txn, hash, number, index := ReadStakingTransaction(db, stx.Hash()); txn == nil {
+			t.Fatalf("tx #%d [%x]: staking transaction not found", i, stx.Hash())
+		} else {
+			if hash != block.Hash() || number != block.NumberU64() || index != uint64(i) {
+				t.Fatalf("stx #%d [%x]: positional metadata mismatch: have %x/%d/%d, want %x/%v/%v", i, stx.Hash(), hash, number, index, block.Hash(), block.NumberU64(), i)
+			}
+			if stx.Hash() != txn.Hash() {
+				t.Fatalf("stx #%d [%x]: staking transaction mismatch: have %v, want %v", i, stx.Hash(), txn, stx)
+			}
+		}
+	}
 	// Delete the transactions and check purge
 	for i, tx := range txs {
 		DeleteTxLookupEntry(db, tx.Hash())
 		if txn, _, _, _ := ReadTransaction(db, tx.Hash()); txn != nil {
 			t.Fatalf("tx #%d [%x]: deleted transaction returned: %v", i, tx.Hash(), txn)
+		}
+	}
+	for i, tx := range txs {
+		DeleteTxLookupEntry(db, tx.Hash())
+		if stxn, _, _, _ := ReadStakingTransaction(db, tx.Hash()); stxn != nil {
+			t.Fatalf("stx #%d [%x]: deleted staking transaction returned: %v", i, stx.Hash(), stxn)
 		}
 	}
 }
@@ -84,13 +117,32 @@ func TestLookupStorage(t *testing.T) {
 func TestMixedLookupStorage(t *testing.T) {
 	db := ethdb.NewMemDatabase()
 	tx := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
+	stx := sampleCreateValidatorStakingTxn()
+
+	txs := []*types.Transaction{tx}
+	stxs := []*staking.StakingTransaction{stx}
+	header := blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header()
+	block := types.NewBlock(header, txs, types.Receipts{&types.Receipt{}, &types.Receipt{}}, nil, nil, stxs)
+
+	WriteBlock(db, block)
+	WriteTxLookupEntries(db, block)
+
+	if recTx, _, _, _ := ReadStakingTransaction(db, tx.Hash()); recTx != nil {
+		t.Fatal("got staking transactions with plain tx hash")
+	}
+	if recTx, _, _, _ := ReadTransaction(db, stx.Hash()); recTx != nil {
+		t.Fatal("got plain transactions with staking tx hash")
+	}
+}
+
+func sampleCreateValidatorStakingTxn() *staking.StakingTransaction {
 	key, _ := crypto.GenerateKey()
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
 		p := &bls.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
-		pub := shard.BlsPublicKey{}
+		pub := shard.BLSPublicKey{}
 		pub.FromLibBLSPublicKey(p)
-		messageBytes := []byte(staking.BlsVerificationStr)
+		messageBytes := []byte(staking.BLSVerificationStr)
 		privateKey := &bls.SecretKey{}
 		privateKey.DeserializeHexStr(testBLSPrvKey)
 		msgHash := hash.Keccak256(messageBytes)
@@ -117,23 +169,11 @@ func TestMixedLookupStorage(t *testing.T) {
 			MinSelfDelegation:  big.NewInt(1e18),
 			MaxTotalDelegation: big.NewInt(3e18),
 			ValidatorAddress:   crypto.PubkeyToAddress(key.PublicKey),
-			SlotPubKeys:        []shard.BlsPublicKey{pub},
+			SlotPubKeys:        []shard.BLSPublicKey{pub},
 			SlotKeySigs:        []shard.BLSSignature{sig},
 			Amount:             big.NewInt(1e18),
 		}
 	}
 	stx, _ := staking.NewStakingTransaction(0, 1e10, big.NewInt(10000), stakePayloadMaker)
-	txs := []*types.Transaction{tx}
-	stxs := []*staking.StakingTransaction{stx}
-	header := blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header()
-	block := types.NewBlock(header, txs, types.Receipts{&types.Receipt{}, &types.Receipt{}}, nil, nil, stxs)
-	WriteBlock(db, block)
-	WriteTxLookupEntries(db, block)
-
-	if recTx, _, _, _ := ReadStakingTransaction(db, tx.Hash()); recTx != nil {
-		t.Fatal("got staking transactions with plain tx hash")
-	}
-	if recTx, _, _, _ := ReadTransaction(db, stx.Hash()); recTx != nil {
-		t.Fatal("got plain transactions with staking tx hash")
-	}
+	return stx
 }

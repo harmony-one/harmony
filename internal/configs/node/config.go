@@ -6,6 +6,7 @@ package nodeconfig
 import (
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -14,7 +15,7 @@ import (
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
-	p2p_crypto "github.com/libp2p/go-libp2p-crypto"
+	p2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/pkg/errors"
 )
 
@@ -25,25 +26,18 @@ type Role byte
 const (
 	Unknown Role = iota
 	Validator
-	ClientNode
-	WalletNode
 	ExplorerNode
 )
 
 func (role Role) String() string {
 	switch role {
-	case Unknown:
-		return "Unknown"
 	case Validator:
 		return "Validator"
-	case ClientNode:
-		return "ClientNode"
-	case WalletNode:
-		return "WalletNode"
 	case ExplorerNode:
 		return "ExplorerNode"
+	default:
+		return "Unknown"
 	}
-	return "Unknown"
 }
 
 // NetworkType describes the type of Harmony network
@@ -76,26 +70,23 @@ type ConfigType struct {
 	group           GroupID // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
 	client          GroupID // the client group ID of the shard
 	isClient        bool    // whether this node is a client node, such as wallet
-	isBeacon        bool    // whether this node is beacon node doing consensus or not
 	ShardID         uint32  // ShardID of this node; TODO ek – revisit when resharding
 	role            Role    // Role of the node
 	Port            string  // Port of the node.
 	IP              string  // IP of the node.
-	MetricsFlag     bool    // collect and upload metrics flag
-	PushgatewayIP   string  // metrics pushgateway prometheus ip
-	PushgatewayPort string  // metrics pushgateway prometheus port
 	StringRole      string
-	P2pPriKey       p2p_crypto.PrivKey
+	P2PPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey *multibls.PrivateKey
 	ConsensusPubKey *multibls.PublicKey
 	// Database directory
 	DBDir            string
 	networkType      NetworkType
 	shardingSchedule shardingconfig.Schedule
+	DNSZone          string
+	isArchival       bool
 	WebHooks         struct {
 		Hooks *webhooks.Hooks
 	}
-	DNSZone string
 }
 
 // configs is a list of node configuration.
@@ -167,36 +158,6 @@ func (conf *ConfigType) SetRole(r Role) {
 	conf.role = r
 }
 
-// SetPushgatewayIP set the pushgateway ip
-func (conf *ConfigType) SetPushgatewayIP(ip string) {
-	conf.PushgatewayIP = ip
-}
-
-// SetPushgatewayPort set the pushgateway port
-func (conf *ConfigType) SetPushgatewayPort(port string) {
-	conf.PushgatewayPort = port
-}
-
-// SetMetricsFlag set the metrics flag
-func (conf *ConfigType) SetMetricsFlag(flag bool) {
-	conf.MetricsFlag = flag
-}
-
-// GetMetricsFlag get the metrics flag
-func (conf *ConfigType) GetMetricsFlag() bool {
-	return conf.MetricsFlag
-}
-
-// GetPushgatewayIP get the pushgateway ip
-func (conf *ConfigType) GetPushgatewayIP() string {
-	return conf.PushgatewayIP
-}
-
-// GetPushgatewayPort get the pushgateway port
-func (conf *ConfigType) GetPushgatewayPort() string {
-	return conf.PushgatewayPort
-}
-
 // GetBeaconGroupID returns the groupID for beacon group
 func (conf *ConfigType) GetBeaconGroupID() GroupID {
 	return conf.beacon
@@ -217,6 +178,11 @@ func (conf *ConfigType) GetClientGroupID() GroupID {
 	return conf.client
 }
 
+// GetArchival returns archival mode
+func (conf *ConfigType) GetArchival() bool {
+	return conf.isArchival
+}
+
 // IsClient returns the isClient configuration
 func (conf *ConfigType) IsClient() bool {
 	return conf.isClient
@@ -234,6 +200,11 @@ func SetNetworkType(networkType NetworkType) {
 	for i := range shardConfigs {
 		shardConfigs[i].networkType = networkType
 	}
+}
+
+// SetArchival set archival mode
+func (conf *ConfigType) SetArchival(archival bool) {
+	defaultConfig.isArchival = archival
 }
 
 // GetNetworkType gets the networkType
@@ -280,15 +251,13 @@ func SetShardingSchedule(schedule shardingconfig.Schedule) {
 	}
 }
 
-// ShardIDFromConsensusKey returns the shard ID statically determined from the
-// consensus key.
-func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
-	var pubKey shard.BlsPublicKey
-	// all keys belong to same shard
-	if err := pubKey.FromLibBLSPublicKey(conf.ConsensusPubKey.PublicKey[0]); err != nil {
+// ShardIDFromKey returns the shard ID statically determined from the input key
+func (conf *ConfigType) ShardIDFromKey(key *bls.PublicKey) (uint32, error) {
+	var pubKey shard.BLSPublicKey
+	if err := pubKey.FromLibBLSPublicKey(key); err != nil {
 		return 0, errors.Wrapf(err,
 			"cannot convert libbls public key %s to internal form",
-			conf.ConsensusPubKey.SerializeToHexStr())
+			key.SerializeToHexStr())
 	}
 	epoch := conf.networkType.ChainConfig().StakingEpoch
 	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
@@ -296,21 +265,31 @@ func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
 	return uint32(shardID.Uint64()), nil
 }
 
+// ShardIDFromConsensusKey returns the shard ID statically determined from the
+// consensus key.
+func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
+	return conf.ShardIDFromKey(conf.ConsensusPubKey.PublicKey[0])
+}
+
 // ValidateConsensusKeysForSameShard checks if all consensus public keys belong to the same shard
 func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys []*bls.PublicKey, sID uint32) error {
-	var pubKey shard.BlsPublicKey
+	keyShardStrs := []string{}
+	isSameShard := true
 	for _, key := range pubkeys {
-		if err := pubKey.FromLibBLSPublicKey(key); err != nil {
-			return errors.Wrapf(err,
-				"cannot convert libbls public key %s to internal form",
-				key.SerializeToHexStr())
+		shardID, err := conf.ShardIDFromKey(key)
+		if err != nil {
+			return err
 		}
-		epoch := conf.networkType.ChainConfig().StakingEpoch
-		numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
-		shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
-		if uint32(shardID.Uint64()) != sID {
-			return errors.New("bls keys do not belong to the same shard")
+		if shardID != sID {
+			isSameShard = false
 		}
+		keyShardStrs = append(
+			keyShardStrs,
+			fmt.Sprintf("key: %s, shard id: %d", key.SerializeToHexStr(), shardID),
+		)
+	}
+	if !isSameShard {
+		return errors.Errorf("bls keys do not belong to same shard\n%s", strings.Join(keyShardStrs, "\n"))
 	}
 	return nil
 }

@@ -6,10 +6,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 // ReadShardState retrieves shard state of a specific epoch.
@@ -18,55 +18,34 @@ func ReadShardState(
 ) (*shard.State, error) {
 	data, err := db.Get(shardStateKey(epoch))
 	if err != nil {
-		return nil, ctxerror.New(MsgNoShardStateFromDB,
-			"epoch", epoch,
-		).WithCause(err)
+		return nil, errors.New(MsgNoShardStateFromDB)
 	}
 	ss, err2 := shard.DecodeWrapper(data)
 	if err2 != nil {
-		return nil, ctxerror.New("cannot decode sharding state",
-			"epoch", epoch,
-		).WithCause(err2)
+		return nil, errors.Wrapf(
+			err2, "cannot decode sharding state",
+		)
 	}
 	return ss, nil
 }
 
 // WriteShardStateBytes stores sharding state into database.
-func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) (err error) {
-	if err = db.Put(shardStateKey(epoch), data); err != nil {
-		return ctxerror.New("cannot write sharding state",
-			"epoch", epoch,
-		).WithCause(err)
-	}
-	utils.Logger().Info().Str("epoch", epoch.String()).Int("size", len(data)).Msg("wrote sharding state")
-	return nil
-}
-
-// ReadLastCommits retrieves the commit signatures on the current block of blockchain.
-func ReadLastCommits(db DatabaseReader) ([]byte, error) {
-	var data []byte
-	data, err := db.Get(lastCommitsKey)
-	if err != nil {
-		return nil, ctxerror.New("cannot read last commits from rawdb").WithCause(err)
-	}
-	return data, nil
-}
-
-// WriteLastCommits stores the commit signatures collected on the newly confirmed block into database.
-func WriteLastCommits(
-	db DatabaseWriter, data []byte,
-) (err error) {
-	if err = db.Put(lastCommitsKey, data); err != nil {
-		return ctxerror.New("cannot write last commits").WithCause(err)
+func WriteShardStateBytes(db DatabaseWriter, epoch *big.Int, data []byte) error {
+	if err := db.Put(shardStateKey(epoch), data); err != nil {
+		return errors.Wrapf(
+			err, "cannot write sharding state",
+		)
 	}
 	utils.Logger().Info().
-		Int("size", len(data)).
-		Msg("wrote last commits")
+		Str("epoch", epoch.String()).
+		Int("size", len(data)).Msg("wrote sharding state")
 	return nil
 }
 
 // ReadCrossLinkShardBlock retrieves the blockHash given shardID and blockNum
-func ReadCrossLinkShardBlock(db DatabaseReader, shardID uint32, blockNum uint64) ([]byte, error) {
+func ReadCrossLinkShardBlock(
+	db DatabaseReader, shardID uint32, blockNum uint64,
+) ([]byte, error) {
 	return db.Get(crosslinkKey(shardID, blockNum))
 }
 
@@ -147,7 +126,7 @@ func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash comm
 func ReadCXReceiptsProofSpent(db DatabaseReader, shardID uint32, number uint64) (byte, error) {
 	data, err := db.Get(cxReceiptSpentKey(shardID, number))
 	if err != nil || len(data) == 0 {
-		return NAByte, ctxerror.New("[ReadCXReceiptsProofSpent] Cannot find the key", "shardID", shardID, "number", number).WithCause(err)
+		return NAByte, errors.New("[ReadCXReceiptsProofSpent] Cannot find the key")
 	}
 	return data[0], nil
 }
@@ -169,7 +148,7 @@ func DeleteCXReceiptsProofSpent(db DatabaseDeleter, shardID uint32, number uint6
 // ReadValidatorSnapshot retrieves validator's snapshot by its address
 func ReadValidatorSnapshot(
 	db DatabaseReader, addr common.Address, epoch *big.Int,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	data, err := db.Get(validatorSnapshotKey(addr, epoch))
 	if err != nil || len(data) == 0 {
 		utils.Logger().Info().Err(err).Msg("ReadValidatorSnapshot")
@@ -182,7 +161,8 @@ func ReadValidatorSnapshot(
 			Msg("Unable to decode validator snapshot from database")
 		return nil, err
 	}
-	return &v, nil
+	s := staking.ValidatorSnapshot{&v, epoch}
+	return &s, nil
 }
 
 // WriteValidatorSnapshot stores validator's snapshot by its address
@@ -206,20 +186,23 @@ func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address, epoch *big
 	}
 }
 
-// ReadValidatorStats retrieves validator's stats by its address
+// DeleteValidatorStats ..
+func DeleteValidatorStats(db DatabaseDeleter, addr common.Address) {
+	if err := db.Delete(validatorStatsKey(addr)); err != nil {
+		utils.Logger().Error().Msg("Failed to delete stats of a validator")
+	}
+}
+
+// ReadValidatorStats retrieves validator's stats by its address,
 func ReadValidatorStats(
 	db DatabaseReader, addr common.Address,
 ) (*staking.ValidatorStats, error) {
 	data, err := db.Get(validatorStatsKey(addr))
-	if err != nil || len(data) == 0 {
-		utils.Logger().Info().Err(err).Msg("ReadValidatorStats")
+	if err != nil {
 		return nil, err
 	}
 	stats := staking.ValidatorStats{}
 	if err := rlp.DecodeBytes(data, &stats); err != nil {
-		utils.Logger().Error().Err(err).
-			Str("address", addr.Hex()).
-			Msg("Unable to decode validator stats from database")
 		return nil, err
 	}
 	return &stats, nil
@@ -241,13 +224,9 @@ func WriteValidatorStats(
 	return err
 }
 
-// ReadValidatorList retrieves staking validator by its address
-// Return only elected validators if electedOnly==true, otherwise, return all validators
-func ReadValidatorList(db DatabaseReader, electedOnly bool) ([]common.Address, error) {
+// ReadValidatorList retrieves all staking validators by its address
+func ReadValidatorList(db DatabaseReader) ([]common.Address, error) {
 	key := validatorListKey
-	if electedOnly {
-		key = electedValidatorListKey
-	}
 	data, err := db.Get(key)
 	if err != nil || len(data) == 0 {
 		return []common.Address{}, nil
@@ -260,16 +239,11 @@ func ReadValidatorList(db DatabaseReader, electedOnly bool) ([]common.Address, e
 	return addrs, nil
 }
 
-// WriteValidatorList stores staking validator's information by its address
-// Writes only for elected validators
-// if electedOnly==true, otherwise, writes for all validators
+// WriteValidatorList stores all staking validators by its address
 func WriteValidatorList(
-	db DatabaseWriter, addrs []common.Address, electedOnly bool,
+	db DatabaseWriter, addrs []common.Address,
 ) error {
 	key := validatorListKey
-	if electedOnly {
-		key = electedValidatorListKey
-	}
 
 	bytes, err := rlp.EncodeToBytes(addrs)
 	if err != nil {
@@ -316,6 +290,26 @@ func ReadBlockRewardAccumulator(db DatabaseReader, number uint64) (*big.Int, err
 // WriteBlockRewardAccumulator ..
 func WriteBlockRewardAccumulator(db DatabaseWriter, newAccum *big.Int, number uint64) error {
 	return db.Put(blockRewardAccumKey(number), newAccum.Bytes())
+}
+
+// ReadBlockCommitSig retrieves the signature signed on a block.
+func ReadBlockCommitSig(db DatabaseReader, blockNum uint64) ([]byte, error) {
+	var data []byte
+	data, err := db.Get(blockCommitSigKey(blockNum))
+	if err != nil {
+		// TODO: remove this extra seeking of sig after the mainnet is fully upgraded.
+		//       this is only needed for the compatibility in the migration moment.
+		data, err = db.Get(lastCommitsKey)
+		if err != nil {
+			return nil, errors.New("cannot read commit sig for block " + string(blockNum))
+		}
+	}
+	return data, nil
+}
+
+// WriteBlockCommitSig ..
+func WriteBlockCommitSig(db DatabaseWriter, blockNum uint64, sigAndBitmap []byte) error {
+	return db.Put(blockCommitSigKey(blockNum), sigAndBitmap)
 }
 
 //// Resharding ////

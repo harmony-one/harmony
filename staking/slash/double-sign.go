@@ -1,7 +1,6 @@
 package slash
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
@@ -9,25 +8,19 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/block"
+	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
-)
-
-const (
-	haveEnoughToPayOff               = 1
-	paidOffExact                     = 0
-	debtCollectionsRepoUndelegations = -1
-	validatorsOwnDel                 = 0
 )
 
 // invariant assumes snapshot, current can be rlp.EncodeToBytes
@@ -68,7 +61,6 @@ type Moment struct {
 type Evidence struct {
 	Moment
 	ConflictingBallots
-	ProposalHeader *block.Header `json:"header"`
 }
 
 // ConflictingBallots ..
@@ -87,7 +79,7 @@ type Record struct {
 
 // Application tracks the slash application to state
 type Application struct {
-	TotalSlashed      *big.Int `json:'total-slashed`
+	TotalSlashed      *big.Int `json:"total-slashed"`
 	TotalSnitchReward *big.Int `json:"total-snitch-reward"`
 }
 
@@ -101,8 +93,7 @@ func (e Evidence) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Moment
 		ConflictingBallots
-		ProposalHeader string `json:"header"`
-	}{e.Moment, e.ConflictingBallots, e.ProposalHeader.String()})
+	}{e.Moment, e.ConflictingBallots})
 }
 
 // Records ..
@@ -119,6 +110,7 @@ var (
 	errAlreadyBannedValidator  = errors.New("cannot slash on already banned validator")
 	errSignerKeyNotRightSize   = errors.New("bls keys from slash candidate not right side")
 	errSlashFromFutureEpoch    = errors.New("cannot have slash from future epoch")
+	errSlashBlockNoConflict    = errors.New("cannot slash for signing on non-conflicting blocks")
 )
 
 // MarshalJSON ..
@@ -145,6 +137,7 @@ func (r Record) String() string {
 
 // CommitteeReader ..
 type CommitteeReader interface {
+	Config() *params.ChainConfig
 	ReadShardState(epoch *big.Int) (*shard.State, error)
 	CurrentBlock() *types.Block
 }
@@ -160,7 +153,7 @@ func Verify(
 		return err
 	}
 
-	if wrapper.EPOSStatus == effective.Banned {
+	if wrapper.Status == effective.Banned {
 		return errAlreadyBannedValidator
 	}
 
@@ -179,7 +172,13 @@ func Verify(
 		)
 	}
 
-	if shard.CompareBlsPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
+	if first.ViewID != second.ViewID ||
+		first.Height != second.Height ||
+		first.BlockHeaderHash == second.BlockHeaderHash {
+		return errors.Wrapf(errSlashBlockNoConflict, "first %v+ second %v+", first, second)
+	}
+
+	if shard.CompareBLSPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
 		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
 		return errors.Wrapf(
 			errBallotSignerKeysNotSame, "%s %s", k1, k2,
@@ -215,6 +214,20 @@ func Verify(
 		return err
 	}
 
+	// last ditch check
+	if hash.FromRLPNew256(
+		candidate.Evidence.AlreadyCastBallot,
+	) == hash.FromRLPNew256(
+		candidate.Evidence.DoubleSignedBallot,
+	) {
+		return errors.Wrapf(
+			errBallotsNotDiff,
+			"%s %s",
+			candidate.Evidence.AlreadyCastBallot.SignerPubKey.Hex(),
+			candidate.Evidence.DoubleSignedBallot.SignerPubKey.Hex(),
+		)
+	}
+
 	for _, ballot := range [...]votepower.Ballot{
 		candidate.Evidence.AlreadyCastBallot,
 		candidate.Evidence.DoubleSignedBallot,
@@ -226,14 +239,19 @@ func Verify(
 		if err := signature.Deserialize(ballot.Signature); err != nil {
 			return err
 		}
-		if err := first.SignerPubKey.ToLibBLSPublicKey(publicKey); err != nil {
+		if err := ballot.SignerPubKey.ToLibBLSPublicKey(publicKey); err != nil {
 			return err
 		}
 
-		blockNumBytes := make([]byte, 8)
-		// TODO(audit): add view ID into signature payload
-		binary.LittleEndian.PutUint64(blockNumBytes, ballot.Height)
-		commitPayload := append(blockNumBytes, ballot.BlockHeaderHash[:]...)
+		// slash verification only happens in staking era, therefore want commit payload for staking epoch
+		commitPayload := consensus_sig.ConstructCommitPayload(chain,
+			chain.Config().StakingEpoch, ballot.BlockHeaderHash, ballot.Height, ballot.ViewID)
+		utils.Logger().Debug().
+			Uint64("epoch", chain.Config().StakingEpoch.Uint64()).
+			Uint64("block-number", ballot.Height).
+			Uint64("view-id", ballot.ViewID).
+			Msgf("[COMMIT-PAYLOAD] doubleSignVerify %v", hex.EncodeToString(commitPayload))
+
 		if !signature.VerifyHash(publicKey, commitPayload) {
 			return errFailVerifySlash
 		}
@@ -243,13 +261,10 @@ func Verify(
 }
 
 var (
-	errBLSKeysNotEqual = errors.New(
-		"bls keys in ballots accompanying slash evidence not equal ",
-	)
 	errSlashDebtCannotBeNegative    = errors.New("slash debt cannot be negative")
 	errValidatorNotFoundDuringSlash = errors.New("validator not found")
 	errFailVerifySlash              = errors.New("could not verify bls key signature on slash")
-	zero                            = numeric.ZeroDec()
+	errBallotsNotDiff               = errors.New("ballots submitted must be different")
 	oneDoubleSignerRate             = numeric.MustNewDecFromStr("0.02")
 )
 
@@ -267,18 +282,18 @@ func (r Record) Hash() common.Hash {
 
 // SetDifference returns all the records that are in ys but not in r
 func (r Records) SetDifference(ys Records) Records {
-	diff := Records{}
-	xsHashed, ysHashed :=
-		make([]common.Hash, len(r)), make([]common.Hash, len(ys))
+	diff, set := Records{}, map[common.Hash]struct{}{}
 	for i := range r {
-		xsHashed[i] = r[i].Hash()
+		h := r[i].Hash()
+		if _, ok := set[h]; !ok {
+			set[h] = struct{}{}
+		}
 	}
+
 	for i := range ys {
-		ysHashed[i] = ys[i].Hash()
-		for j := range xsHashed {
-			if ysHashed[i] != xsHashed[j] {
-				diff = append(diff, ys[i])
-			}
+		h := ys[i].Hash()
+		if _, ok := set[h]; !ok {
+			diff = append(diff, ys[i])
 		}
 	}
 
@@ -326,7 +341,8 @@ func delegatorSlashApply(
 		slashDebt := applySlashRate(delegationSnapshot.Amount, rate)
 		slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 		snapshotAddr := delegationSnapshot.DelegatorAddress
-		for _, delegationNow := range current.Delegations {
+		for i := range current.Delegations {
+			delegationNow := current.Delegations[i]
 			if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
 				utils.Logger().Info().
 					RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
@@ -343,7 +359,8 @@ func delegatorSlashApply(
 				}
 
 				// NOTE Assume did as much as could above, now check the undelegations
-				for _, undelegate := range delegationNow.Undelegations {
+				for i := range delegationNow.Undelegations {
+					undelegate := delegationNow.Undelegations[i]
 					// the epoch matters, only those undelegation
 					// such that epoch>= doubleSignEpoch should be slashable
 					if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
@@ -362,7 +379,6 @@ func delegatorSlashApply(
 						}
 
 						if nowAmt.Cmp(common.Big0) == 0 {
-							// TODO(audit): need to remove the undelegate
 							utils.Logger().Info().
 								RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
 								RawJSON("delegation-current", []byte(delegationNow.String())).
@@ -452,39 +468,50 @@ func Apply(
 		// stake, rest are external delegations.
 		// Bottom line: everyone will be slashed under the same rule.
 		if err := delegatorSlashApply(
-			snapshot, current, rate, state,
+			snapshot.Validator, current, rate, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,
 		); err != nil {
 			return nil, err
 		}
 
 		// finally, kick them off forever
-		current.EPOSStatus = effective.Banned
+		current.Status = effective.Banned
 		utils.Logger().Info().
 			RawJSON("delegation-current", []byte(current.String())).
 			RawJSON("slash", []byte(slash.String())).
 			Msg("about to update staking info for a validator after a slash")
 
-		if err := state.UpdateValidatorWrapper(
-			snapshot.Address, current,
-		); err != nil {
+		if err := current.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {
 			return nil, err
 		}
 	}
 	return slashDiff, nil
 }
 
+// IsBanned ..
+func IsBanned(wrapper *staking.ValidatorWrapper) bool {
+	return wrapper.Status == effective.Banned
+}
+
 // Rate is the slashing % rate
-func Rate(doubleSignerCount, committeeSize int) numeric.Dec {
-	if doubleSignerCount == 0 || committeeSize == 0 {
-		return zero
+func Rate(votingPower *votepower.Roster, records Records) numeric.Dec {
+	rate := numeric.ZeroDec()
+
+	for i := range records {
+		key := records[i].Evidence.DoubleSignedBallot.SignerPubKey
+		if card, exists := votingPower.Voters[key]; exists {
+			rate = rate.Add(card.GroupPercent)
+		} else {
+			utils.Logger().Debug().
+				RawJSON("roster", []byte(votingPower.String())).
+				RawJSON("double-sign-record", []byte(records[i].String())).
+				Msg("did not have offenders voter card in roster as expected")
+		}
 	}
-	switch doubleSignerCount {
-	case 1:
-		return oneDoubleSignerRate
-	default:
-		return numeric.NewDec(
-			int64(doubleSignerCount),
-		).Quo(numeric.NewDec(int64(committeeSize)))
+
+	if rate.LT(oneDoubleSignerRate) {
+		rate = oneDoubleSignerRate
 	}
+
+	return rate
 }

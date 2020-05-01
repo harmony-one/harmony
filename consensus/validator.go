@@ -2,16 +2,17 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/p2p/host"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
@@ -69,15 +70,17 @@ func (consensus *Consensus) prepare() {
 		}
 
 		// TODO: this will not return immediatey, may block
-		if err := consensus.msgSender.SendWithoutRetry(
-			groupID,
-			host.ConstructP2pMessage(byte(17), networkMessage.Bytes),
-		); err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
-		} else {
-			consensus.getLogger().Info().
-				Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
-				Msg("[OnAnnounce] Sent Prepare Message!!")
+		if consensus.current.Mode() != Listening {
+			if err := consensus.msgSender.SendWithoutRetry(
+				groupID,
+				p2p.ConstructMessage(networkMessage.Bytes),
+			); err != nil {
+				consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
+			} else {
+				consensus.getLogger().Info().
+					Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
+					Msg("[OnAnnounce] Sent Prepare Message!!")
+			}
 		}
 	}
 	consensus.getLogger().Debug().
@@ -182,41 +185,47 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
+	// TODO: genesis account node delay for 1 second,
+	// this is a temp fix for allows FN nodes to earning reward
+	if consensus.delayCommit > 0 {
+		time.Sleep(consensus.delayCommit)
+	}
+
 	// add preparedSig field
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
 
 	// Optimistically add blockhash field of prepare message
 	emptyHash := [32]byte{}
-	if bytes.Compare(consensus.blockHash[:], emptyHash[:]) == 0 {
+	if bytes.Equal(consensus.blockHash[:], emptyHash[:]) {
 		copy(consensus.blockHash[:], blockHash[:])
 	}
-	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, consensus.blockNum)
-	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+
+	// local viewID may not be constant with other, so use received msg viewID.
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, recvMsg.ViewID)
+	groupID := []nodeconfig.GroupID{
+		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+	}
 	for i, key := range consensus.PubKey.PublicKey {
 		networkMessage, _ := consensus.construct(
-			// TODO(audit): sign signature on hash+blockNum+viewID (add a hard fork)
 			msg_pb.MessageType_COMMIT,
-			append(blockNumBytes, consensus.blockHash[:]...),
+			commitPayload,
 			key, consensus.priKey.PrivateKey[i],
 		)
-		// TODO: genesis account node delay for 1 second,
-		// this is a temp fix for allows FN nodes to earning reward
-		if consensus.delayCommit > 0 {
-			time.Sleep(consensus.delayCommit)
-		}
 
-		if err := consensus.msgSender.SendWithoutRetry(
-			groupID,
-			host.ConstructP2pMessage(byte(17), networkMessage.Bytes),
-		); err != nil {
-			consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
-		} else {
-			consensus.getLogger().Info().
-				Uint64("blockNum", consensus.blockNum).
-				Hex("blockHash", consensus.blockHash[:]).
-				Msg("[OnPrepared] Sent Commit Message!!")
+		if consensus.current.Mode() != Listening {
+			if err := consensus.msgSender.SendWithoutRetry(
+				groupID,
+				p2p.ConstructMessage(networkMessage.Bytes),
+			); err != nil {
+				consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
+			} else {
+				consensus.getLogger().Info().
+					Uint64("blockNum", consensus.blockNum).
+					Hex("blockHash", consensus.blockHash[:]).
+					Msg("[OnPrepared] Sent Commit Message!!")
+			}
 		}
 	}
 	consensus.getLogger().Debug().
@@ -249,10 +258,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	// TODO(audit): verify signature on hash+blockNum+viewID (add a hard fork)
-	blockNumBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(blockNumBytes, recvMsg.BlockNum)
-	commitPayload := append(blockNumBytes, recvMsg.BlockHash[:]...)
+	// Received msg must be about same epoch, otherwise it's invalid anyways.
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash, recvMsg.BlockNum, recvMsg.ViewID)
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		consensus.getLogger().Error().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -261,11 +269,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
-	consensus.ChainReader.WriteLastCommits(recvMsg.Payload)
-	consensus.getLogger().Debug().
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Msg("[OnCommitted] Committed message added")
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
@@ -274,10 +277,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.commitBitmap = mask
 
 	if recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
-		consensus.getLogger().Debug().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] out of sync")
+		consensus.getLogger().Debug().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")
 		go func() {
 			select {
-			case consensus.blockNumLowChan <- struct{}{}:
+			case consensus.BlockNumLowChan <- struct{}{}:
 				consensus.current.SetMode(Syncing)
 				for _, v := range consensus.consensusTimeout {
 					v.Stop()

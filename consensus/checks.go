@@ -11,6 +11,15 @@ import (
 const MaxBlockNumDiff = 100
 
 func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
+	if msg.GetConsensus() == nil {
+		consensus.getLogger().Warn().Msg("[validatorSanityChecks] malformed message")
+		return false
+	}
+	consensus.getLogger().Debug().
+		Uint64("blockNum", msg.GetConsensus().BlockNum).
+		Uint64("viewID", msg.GetConsensus().ViewId).
+		Str("msgType", msg.Type.String()).
+		Msg("[validatorSanityChecks] Checking new message")
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
@@ -42,6 +51,15 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 }
 
 func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
+	if msg.GetConsensus() == nil {
+		consensus.getLogger().Warn().Msg("[leaderSanityChecks] malformed message")
+		return false
+	}
+	consensus.getLogger().Debug().
+		Uint64("blockNum", msg.GetConsensus().BlockNum).
+		Uint64("viewID", msg.GetConsensus().ViewId).
+		Str("msgType", msg.Type.String()).
+		Msg("[leaderSanityChecks] Checking new message")
 	senderKey, err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
@@ -80,22 +98,6 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 		return false
 	}
 	return true
-}
-
-func (consensus *Consensus) couldThisBeADoubleSigner(
-	recvMsg *FBFTMessage,
-) bool {
-	num, hash, now := consensus.blockNum, recvMsg.BlockHash, consensus.blockNum
-	suspicious := !consensus.FBFTLog.HasMatchingAnnounce(num, hash) ||
-		!consensus.FBFTLog.HasMatchingPrepared(num, hash)
-	if suspicious {
-		consensus.getLogger().Debug().
-			Str("message", recvMsg.String()).
-			Uint64("block-on-consensus", now).
-			Msg("possible double signer")
-		return true
-	}
-	return false
 }
 
 func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
@@ -164,7 +166,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			Msg("[OnPrepared] BlockHash not match")
 		return false
 	}
-	if consensus.current.Mode() == Normal || consensus.current.Mode() == Syncing {
+	if consensus.current.Mode() == Normal {
 		err := chain.Engine.VerifyHeader(consensus.ChainReader, blockObj.Header(), true)
 		if err != nil {
 			consensus.getLogger().Error().
@@ -186,12 +188,25 @@ func (consensus *Consensus) onPreparedSanityChecks(
 }
 
 func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
+	if msg.GetViewchange() == nil {
+		consensus.getLogger().Warn().Msg("[viewChangeSanityCheck] malformed message")
+		return false
+	}
+	consensus.getLogger().Debug().
+		Msg("[viewChangeSanityCheck] Checking new message")
 	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
-		consensus.getLogger().Error().Err(err).Msgf(
-			"[%s] VerifySenderKey Failed",
-			msg.GetType().String(),
-		)
+		if err == shard.ErrValidNotInCommittee {
+			consensus.getLogger().Info().Msgf(
+				"[%s] sender key not in this slot's subcommittee",
+				msg.GetType().String(),
+			)
+		} else {
+			consensus.getLogger().Error().Err(err).Msgf(
+				"[%s] VerifySenderKey Failed",
+				msg.GetType().String(),
+			)
+		}
 		return false
 	}
 	if err := verifyMessageSig(senderKey, msg); err != nil {
@@ -230,8 +245,8 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 	if recvMsg.ViewID-consensus.current.ViewID() > MaxViewIDDiff {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
-			Uint64("MaxViewIDDiff", MaxViewIDDiff).
-			Msg("Received viewID that is MaxViewIDDiff further from the current viewID!")
+			Uint64("CurrentViewID", consensus.current.ViewID()).
+			Msg("Received viewID that is MaxViewIDDiff (100) further from the current viewID!")
 		return false
 	}
 	return true

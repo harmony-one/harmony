@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -39,6 +40,14 @@ var (
 		SecurityContact: "someoneD",
 		Details:         "someoneE",
 	}
+
+	fiveKOnes            = new(big.Int).Mul(big.NewInt(5000), big.NewInt(1e18))
+	tenKOnes             = new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18))
+	onePointNineSixKOnes = new(big.Int).Mul(big.NewInt(19600), big.NewInt(1e18))
+	twentyKOnes          = new(big.Int).Mul(big.NewInt(20000), big.NewInt(1e18))
+	twentyfiveKOnes      = new(big.Int).Mul(big.NewInt(25000), big.NewInt(1e18))
+	thirtyKOnes          = new(big.Int).Mul(big.NewInt(30000), big.NewInt(1e18))
+	hundredKOnes         = new(big.Int).Mul(big.NewInt(1000000), big.NewInt(1e18))
 )
 
 const (
@@ -142,37 +151,6 @@ func defaultFundingScenario() *scenario {
 	}
 }
 
-func scenarioRealWorldSample1() *scenario {
-	const (
-		snapshotBytes = "f90108f8be94110dde181c2434f6d8eaa869154a4d07a910ce19f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a06880de0b6b3a764000088b469471f8014000001e0dec9880254cc1f20ad395cc988027c97536ea18970c988021cc4b33cdff1601df83e945f546573745f6b65795f76616c696461746f72308c746573745f6163636f756e748b6861726d6f6e792e6f6e658a44616e69656c2d56444d846e6f6e651d80f842e094110dde181c2434f6d8eaa869154a4d07a910ce19880f43fc2c04ee000080c0e0949832c677128929f5f3297d364ac30e251dc02f3c8814d1120d7b16000080c0c3060180"
-
-		currentBytes = "f90118f8be94110dde181c2434f6d8eaa869154a4d07a910ce19f1b0be23bc3c93fe14a25f3533feee1cff1c60706845a4907c5df58bc19f5d1760bfff06fe7c9d1f596b18fdf529e0508e0a06880de0b6b3a764000088b469471f8014000001e0dec9880254cc1f20ad395cc988027c97536ea18970c988021cc4b33cdff1601df83e945f546573745f6b65795f76616c696461746f72308c746573745f6163636f756e748b6861726d6f6e792e6f6e658a44616e69656c2d56444d846e6f6e651d80f852e894110dde181c2434f6d8eaa869154a4d07a910ce19880f43fc2c04ee000088e6ec131ed55ec404c0e8949832c677128929f5f3297d364ac30e251dc02f3c8814d1120d7b16000088d52ac35139f06a2cc0c3070280"
-	)
-
-	snapshotData, _ := hex.DecodeString(snapshotBytes)
-	currentData, _ := hex.DecodeString(currentBytes)
-
-	var snapshot, current staking.ValidatorWrapper
-
-	if err := rlp.DecodeBytes(snapshotData, &snapshot); err != nil {
-		panic("test case has bad input")
-	}
-
-	if err := rlp.DecodeBytes(currentData, &current); err != nil {
-		panic("test case has bad input")
-	}
-
-	return &scenario{
-		slashRate: 0.02,
-		result: &Application{
-			TotalSlashed:      big.NewInt(0.052 * denominations.One),
-			TotalSnitchReward: big.NewInt(0.026 * denominations.One),
-		},
-		snapshot: &snapshot,
-		current:  &current,
-	}
-}
-
 var (
 	scenarioTwoPercent    = defaultFundingScenario()
 	scenarioEightyPercent = defaultFundingScenario()
@@ -180,11 +158,17 @@ var (
 )
 
 func totalSlashedExpected(slashRate float64) *big.Int {
-	return big.NewInt(int64(slashRate * 5.0 * denominations.One))
+	t := int64(50000 * slashRate)
+	res := new(big.Int).Mul(big.NewInt(t), big.NewInt(denominations.One))
+	return res
+	//return big.NewInt(int64(slashRate * 50000 * denominations.One)) // 5.0 * denominations.One
 }
 
 func totalSnitchRewardExpected(slashRate float64) *big.Int {
-	return big.NewInt(int64(slashRate * 2.5 * denominations.One))
+	t := int64(25000 * slashRate)
+	res := new(big.Int).Mul(big.NewInt(t), big.NewInt(denominations.One))
+	return res
+	//return big.NewInt(int64(slashRate * 2.5 * denominations.One))
 }
 
 func init() {
@@ -236,7 +220,7 @@ var (
 	reporterAddr, offenderAddr = common.Address{}, common.Address{}
 	randoDel                   = common.Address{}
 	header                     = block.Header{}
-	subCommittee               = []shard.BlsPublicKey{}
+	subCommittee               = []shard.BLSPublicKey{}
 	doubleSignEpochBig         = big.NewInt(doubleSignEpoch)
 
 	unit = func() interface{} {
@@ -282,11 +266,11 @@ func (s *scenario) defaultValidatorPair(
 	validatorSnapshot := &staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
-			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
+			SlotPubKeys:          []shard.BLSPublicKey{blsWrapA},
 			LastEpochInCommittee: big.NewInt(lastEpochInComm),
-			MinSelfDelegation:    new(big.Int).SetUint64(1 * denominations.One),
-			MaxTotalDelegation:   new(big.Int).SetUint64(10 * denominations.One),
-			EPOSStatus:           effective.Active,
+			MinSelfDelegation:    tenKOnes,     //new(big.Int).SetUint64(1 * denominations.One),
+			MaxTotalDelegation:   hundredKOnes, //new(big.Int).SetUint64(10 * denominations.One),
+			Status:               effective.Active,
 			Commission:           commonCommission,
 			Description:          commonDescr,
 			CreationHeight:       big.NewInt(creationHeight),
@@ -297,11 +281,11 @@ func (s *scenario) defaultValidatorPair(
 	validatorCurrent := &staking.ValidatorWrapper{
 		Validator: staking.Validator{
 			Address:              offenderAddr,
-			SlotPubKeys:          []shard.BlsPublicKey{blsWrapA},
+			SlotPubKeys:          []shard.BLSPublicKey{blsWrapA},
 			LastEpochInCommittee: big.NewInt(lastEpochInComm + 1),
-			MinSelfDelegation:    new(big.Int).SetUint64(1 * denominations.One),
-			MaxTotalDelegation:   new(big.Int).SetUint64(10 * denominations.One),
-			EPOSStatus:           effective.Active,
+			MinSelfDelegation:    tenKOnes,     // new(big.Int).SetUint64(1 * denominations.One),
+			MaxTotalDelegation:   hundredKOnes, // new(big.Int).SetUint64(10 * denominations.One),
+			Status:               effective.Active,
 			Commission:           commonCommission,
 			Description:          commonDescr,
 			CreationHeight:       big.NewInt(creationHeight),
@@ -318,13 +302,13 @@ func (s *scenario) defaultDelegationPair() (
 		// NOTE  delegation is the validator themselves
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           new(big.Int).SetUint64(2 * denominations.One),
+			Amount:           twentyKOnes, // new(big.Int).SetUint64(2 * denominations.One),
 			Reward:           common.Big0,
 			Undelegations:    staking.Undelegations{},
 		},
 		staking.Delegation{
 			DelegatorAddress: randoDel,
-			Amount:           new(big.Int).SetUint64(3 * denominations.One),
+			Amount:           thirtyKOnes, //new(big.Int).SetUint64(3 * denominations.One),
 			Reward:           common.Big0,
 			Undelegations:    staking.Undelegations{},
 		},
@@ -333,11 +317,11 @@ func (s *scenario) defaultDelegationPair() (
 	delegationsCurrent := staking.Delegations{
 		staking.Delegation{
 			DelegatorAddress: offenderAddr,
-			Amount:           new(big.Int).SetUint64(1.96 * denominations.One),
+			Amount:           onePointNineSixKOnes, //new(big.Int).SetUint64(1.96 * denominations.One),
 			Reward:           common.Big0,
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
-					Amount: new(big.Int).SetUint64(1 * denominations.One),
+					Amount: tenKOnes, //new(big.Int).SetUint64(1 * denominations.One),
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
@@ -345,11 +329,11 @@ func (s *scenario) defaultDelegationPair() (
 		// some external delegator
 		staking.Delegation{
 			DelegatorAddress: randoDel,
-			Amount:           new(big.Int).SetUint64(0.5 * denominations.One),
+			Amount:           fiveKOnes, //new(big.Int).SetUint64(0.5 * denominations.One),
 			Reward:           common.Big0,
 			Undelegations: staking.Undelegations{
 				staking.Undelegation{
-					Amount: new(big.Int).SetUint64(2.5 * denominations.One),
+					Amount: twentyfiveKOnes, //new(big.Int).SetUint64(2.5 * denominations.One),
 					Epoch:  big.NewInt(doubleSignEpoch + 2),
 				},
 			},
@@ -383,7 +367,6 @@ func defaultSlashRecord() Record {
 				TimeUnixNano: big.NewInt(doubleSignUnixNano),
 				ShardID:      doubleSignShardID,
 			},
-			ProposalHeader: &header,
 		},
 		Reporter: reporterAddr,
 		Offender: offenderAddr,
@@ -395,13 +378,13 @@ func exampleSlashRecords() Records {
 }
 
 type mockOutSnapshotReader struct {
-	snapshot staking.ValidatorWrapper
+	snapshot staking.ValidatorSnapshot
 }
 
 func (m mockOutSnapshotReader) ReadValidatorSnapshotAtEpoch(
 	epoch *big.Int,
 	addr common.Address,
-) (*staking.ValidatorWrapper, error) {
+) (*staking.ValidatorSnapshot, error) {
 	return &m.snapshot, nil
 }
 
@@ -417,18 +400,22 @@ func (mockOutChainReader) ReadShardState(epoch *big.Int) (*shard.State, error) {
 	return &shard.State{
 		Epoch: doubleSignEpochBig,
 		Shards: []shard.Committee{
-			shard.Committee{
+			{
 				ShardID: doubleSignShardID,
 				Slots: shard.SlotList{
 					shard.Slot{
 						EcdsaAddress:   offenderAddr,
-						BlsPublicKey:   blsWrapA,
+						BLSPublicKey:   blsWrapA,
 						EffectiveStake: nil,
 					},
 				},
 			},
 		},
 	}, nil
+}
+
+func (mockOutChainReader) Config() *params.ChainConfig {
+	return params.TestChainConfig
 }
 
 func TestVerify(t *testing.T) {
@@ -466,7 +453,7 @@ func testScenario(
 	// state looks like as of this point
 
 	slashResult, err := Apply(
-		mockOutSnapshotReader{*s.snapshot},
+		mockOutSnapshotReader{staking.ValidatorSnapshot{s.snapshot, big.NewInt(0)}},
 		stateHandle,
 		slashes,
 		numeric.MustNewDecFromStr(
@@ -516,11 +503,11 @@ func TestTwoPercentSlashed(t *testing.T) {
 	testScenario(t, stateHandle, slashes, scenarioTwoPercent)
 }
 
-func TestEightyPercentSlashed(t *testing.T) {
-	slashes := exampleSlashRecords()
-	stateHandle := defaultStateWithAccountsApplied()
-	testScenario(t, stateHandle, slashes, scenarioEightyPercent)
-}
+// func TestEightyPercentSlashed(t *testing.T) {
+// 	slashes := exampleSlashRecords()
+// 	stateHandle := defaultStateWithAccountsApplied()
+// 	testScenario(t, stateHandle, slashes, scenarioEightyPercent)
+// }
 
 func TestDoubleSignSlashRates(t *testing.T) {
 	for _, scenario := range doubleSignScenarios {

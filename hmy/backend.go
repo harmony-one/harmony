@@ -8,23 +8,21 @@ import (
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/params"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // Harmony implements the Harmony full node service.
 type Harmony struct {
 	// Channel for shutting down the service
-	shutdownChan   chan bool                      // Channel for shutting down the Harmony
-	bloomRequests  chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	blockchain     *core.BlockChain
-	txPool         *core.TxPool
-	cxPool         *core.CxPool
-	accountManager *accounts.Manager
-	eventMux       *event.TypeMux
+	shutdownChan  chan bool                      // Channel for shutting down the Harmony
+	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
+	blockchain    *core.BlockChain
+	beaconchain   *core.BlockChain
+	txPool        *core.TxPool
+	cxPool        *core.CxPool
+	eventMux      *event.TypeMux
 	// DB interfaces
 	chainDb      ethdb.Database     // Block chain database
 	bloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
@@ -32,8 +30,6 @@ type Harmony struct {
 	nodeAPI      NodeAPI
 	// aka network version, which is used to identify which network we are using
 	networkID uint64
-	// TODO(ricl): put this into config object
-	// TODO(ricl): this is never set. Will result in nil pointer bug
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap *big.Int `toml:",omitempty"`
 	shardID   uint32
@@ -44,14 +40,18 @@ type NodeAPI interface {
 	AddPendingStakingTransaction(*staking.StakingTransaction) error
 	AddPendingTransaction(newTx *types.Transaction) error
 	Blockchain() *core.BlockChain
-	AccountManager() *accounts.Manager
+	Beaconchain() *core.BlockChain
 	GetBalanceOfAddress(address common.Address) (*big.Int, error)
 	GetNonceOfAddress(address common.Address) uint64
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
+	GetTransactionsCount(address, txType string) (uint64, error)
+	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
 	ErroredStakingTransactionSink() []staking.RPCTransactionError
 	ErroredTransactionSink() []types.RPCTransactionError
 	PendingCXReceipts() []*types.CXReceiptsProof
+	GetNodeBootTime() int64
 }
 
 // New creates a new Harmony object (including the
@@ -62,18 +62,17 @@ func New(
 ) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	hmy := &Harmony{
-		shutdownChan:   make(chan bool),
-		bloomRequests:  make(chan chan *bloombits.Retrieval),
-		blockchain:     nodeAPI.Blockchain(),
-		txPool:         txPool,
-		cxPool:         cxPool,
-		accountManager: nodeAPI.AccountManager(),
-		eventMux:       eventMux,
-		chainDb:        chainDb,
-		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
-		nodeAPI:        nodeAPI,
-		networkID:      1, // TODO(ricl): this should be from config
-		shardID:        shardID,
+		shutdownChan:  make(chan bool),
+		bloomRequests: make(chan chan *bloombits.Retrieval),
+		blockchain:    nodeAPI.Blockchain(),
+		beaconchain:   nodeAPI.Beaconchain(),
+		txPool:        txPool,
+		cxPool:        cxPool,
+		eventMux:      eventMux,
+		chainDb:       chainDb,
+		nodeAPI:       nodeAPI,
+		networkID:     1, // TODO(ricl): this should be from config
+		shardID:       shardID,
 	}
 	hmy.APIBackend = &APIBackend{hmy: hmy,
 		TotalStakingCache: struct {
@@ -96,6 +95,9 @@ func (s *Harmony) CxPool() *core.CxPool { return s.cxPool }
 
 // BlockChain ...
 func (s *Harmony) BlockChain() *core.BlockChain { return s.blockchain }
+
+//BeaconChain ...
+func (s *Harmony) BeaconChain() *core.BlockChain { return s.beaconchain }
 
 // NetVersion returns the network version, i.e. network ID identifying which network we are using
 func (s *Harmony) NetVersion() uint64 { return s.networkID }

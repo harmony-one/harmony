@@ -1,17 +1,20 @@
 package committee
 
 import (
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -23,9 +26,6 @@ type ValidatorListProvider interface {
 		epoch *big.Int, reader DataProvider,
 	) (*shard.State, error)
 	ReadFromDB(epoch *big.Int, reader DataProvider) (*shard.State, error)
-	GetCommitteePublicKeys(
-		committee *shard.Committee,
-	) ([]*bls.PublicKey, error)
 }
 
 // Reader is committee.Reader and it is the API that committee membership assignment needs
@@ -35,9 +35,180 @@ type Reader interface {
 
 // StakingCandidatesReader ..
 type StakingCandidatesReader interface {
+	CurrentBlock() *types.Block
 	ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error)
-	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorWrapper, error)
+	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error)
 	ValidatorCandidates() []common.Address
+}
+
+// CandidatesForEPoS ..
+type CandidatesForEPoS struct {
+	Orders                             map[common.Address]effective.SlotOrder
+	OpenSlotCountForExternalValidators int
+}
+
+// CompletedEPoSRound ..
+type CompletedEPoSRound struct {
+	MedianStake         numeric.Dec              `json:"epos-median-stake"`
+	MaximumExternalSlot int                      `json:"max-external-slots"`
+	AuctionWinners      []effective.SlotPurchase `json:"epos-slot-winners"`
+	AuctionCandidates   []*CandidateOrder        `json:"epos-slot-candidates"`
+}
+
+// CandidateOrder ..
+type CandidateOrder struct {
+	*effective.SlotOrder
+	StakePerKey *big.Int
+	Validator   common.Address
+}
+
+// MarshalJSON ..
+func (p CandidateOrder) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		*effective.SlotOrder
+		StakePerKey *big.Int `json:"stake-per-key"`
+		Validator   string   `json:"validator"`
+	}{
+		p.SlotOrder,
+		p.StakePerKey,
+		common2.MustAddressToBech32(p.Validator),
+	})
+}
+
+// NewEPoSRound runs a fresh computation of EPoS using
+// latest data always
+func NewEPoSRound(stakedReader StakingCandidatesReader) (
+	*CompletedEPoSRound, error,
+) {
+	eligibleCandidate, err := prepareOrders(stakedReader)
+	if err != nil {
+		return nil, err
+	}
+	maxExternalSlots := shard.ExternalSlotsAvailableForEpoch(
+		stakedReader.CurrentBlock().Epoch(),
+	)
+	median, winners := effective.Apply(
+		eligibleCandidate, maxExternalSlots,
+	)
+	auctionCandidates := make([]*CandidateOrder, len(eligibleCandidate))
+
+	i := 0
+	for key := range eligibleCandidate {
+		// NOTE in principle, a div-by-zero should not
+		// happen by this point but the risk of not being explicit about
+		// checking is a panic, so the check is worth it
+		perKey := big.NewInt(0)
+		if l := len(eligibleCandidate[key].SpreadAmong); l > 0 {
+			perKey.Set(
+				new(big.Int).Div(
+					eligibleCandidate[key].Stake, big.NewInt(int64(l)),
+				),
+			)
+		}
+		auctionCandidates[i] = &CandidateOrder{
+			SlotOrder:   eligibleCandidate[key],
+			StakePerKey: perKey,
+			Validator:   key,
+		}
+		i++
+	}
+
+	return &CompletedEPoSRound{
+		MedianStake:         median,
+		MaximumExternalSlot: maxExternalSlots,
+		AuctionWinners:      winners,
+		AuctionCandidates:   auctionCandidates,
+	}, nil
+}
+
+func prepareOrders(
+	stakedReader StakingCandidatesReader,
+) (map[common.Address]*effective.SlotOrder, error) {
+	candidates := stakedReader.ValidatorCandidates()
+	blsKeys := map[shard.BLSPublicKey]struct{}{}
+	essentials := map[common.Address]*effective.SlotOrder{}
+	totalStaked, tempZero := big.NewInt(0), numeric.ZeroDec()
+
+	for i := range candidates {
+		validator, err := stakedReader.ReadValidatorInformation(
+			candidates[i],
+		)
+		if err != nil {
+			return nil, err
+		}
+		snapshot, err := stakedReader.ReadValidatorSnapshot(
+			candidates[i],
+		)
+		if err != nil {
+			return nil, err
+		}
+		if !IsEligibleForEPoSAuction(snapshot, validator) {
+			continue
+		}
+
+		validatorStake := big.NewInt(0)
+		for i := range validator.Delegations {
+			validatorStake.Add(
+				validatorStake, validator.Delegations[i].Amount,
+			)
+		}
+
+		totalStaked.Add(totalStaked, validatorStake)
+
+		found := false
+		for _, key := range validator.SlotPubKeys {
+			if _, ok := blsKeys[key]; ok {
+				found = true
+			} else {
+				blsKeys[key] = struct{}{}
+			}
+		}
+
+		if found {
+			continue
+		}
+
+		essentials[validator.Address] = &effective.SlotOrder{
+			validatorStake,
+			validator.SlotPubKeys,
+			tempZero,
+		}
+	}
+	totalStakedDec := numeric.NewDecFromBigInt(totalStaked)
+
+	for _, value := range essentials {
+		value.Percentage = numeric.NewDecFromBigInt(value.Stake).Quo(totalStakedDec)
+	}
+
+	return essentials, nil
+}
+
+// IsEligibleForEPoSAuction ..
+func IsEligibleForEPoSAuction(snapshot *staking.ValidatorSnapshot, validator *staking.ValidatorWrapper) bool {
+	// This original condition to check whether a validator is in last committee is not stable
+	// because cross-links may arrive after the epoch ends and it still got counted into the
+	// NumBlocksToSign, making this condition to be true when the validator is actually not in committee
+	//if snapshot.Counters.NumBlocksToSign.Cmp(validator.Counters.NumBlocksToSign) != 0 {
+
+	// Check whether the validator is in current committee
+	if validator.LastEpochInCommittee.Cmp(snapshot.Epoch) == 0 {
+		// validator was in last epoch's committee
+		// validator with below-threshold signing activity won't be considered for next epoch
+		// and their status will be turned to inactive in FinalizeNewBlock
+		computed := availability.ComputeCurrentSigning(snapshot.Validator, validator)
+		if computed.IsBelowThreshold {
+			return false
+		}
+	}
+	// For validators who were not in last epoch's committee
+	// or for those who were and signed enough blocks,
+	// the decision is based on the status
+	switch validator.Status {
+	case effective.Active:
+		return true
+	default:
+		return false
+	}
 }
 
 // ChainReader is a subset of Engine.ChainReader, just enough to do assignment
@@ -82,8 +253,8 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardNum // The initial account to use for genesis nodes
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(hmyAccounts[index].BlsPublicKey)
-			pubKey := shard.BlsPublicKey{}
+			pub.DeserializeHexStr(hmyAccounts[index].BLSPublicKey)
+			pubKey := shard.BLSPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
 			curNodeID := shard.Slot{
@@ -97,8 +268,8 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 		for j := shardHarmonyNodes; j < shardSize; j++ {
 			index := i + (j-shardHarmonyNodes)*shardNum
 			pub := &bls.PublicKey{}
-			pub.DeserializeHexStr(fnAccounts[index].BlsPublicKey)
-			pubKey := shard.BlsPublicKey{}
+			pub.DeserializeHexStr(fnAccounts[index].BLSPublicKey)
+			pubKey := shard.BLSPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
 			curNodeID := shard.Slot{
@@ -114,17 +285,8 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 }
 
 func eposStakedCommittee(
-	s shardingconfig.Instance, stakerReader DataProvider, stakedSlotsCount int,
+	s shardingconfig.Instance, stakerReader DataProvider,
 ) (*shard.State, error) {
-	// TODO Nervous about this because overtime the list will become quite large
-	candidates := stakerReader.ValidatorCandidates()
-	essentials, blsKeys :=
-		map[common.Address]effective.SlotOrder{}, map[shard.BlsPublicKey]struct{}{}
-
-	utils.Logger().Info().
-		Int("staked-candidates", len(candidates)).
-		Msg("preparing epos staked committee")
-
 	shardCount := int(s.NumShards())
 	shardState := &shard.State{}
 	shardState.Shards = make([]shard.Committee, shardCount)
@@ -136,10 +298,10 @@ func eposStakedCommittee(
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardCount
 			pub := &bls.PublicKey{}
-			if err := pub.DeserializeHexStr(hAccounts[index].BlsPublicKey); err != nil {
+			if err := pub.DeserializeHexStr(hAccounts[index].BLSPublicKey); err != nil {
 				return nil, err
 			}
-			pubKey := shard.BlsPublicKey{}
+			pubKey := shard.BLSPublicKey{}
 			if err := pubKey.FromLibBLSPublicKey(pub); err != nil {
 				return nil, err
 			}
@@ -151,105 +313,27 @@ func eposStakedCommittee(
 		}
 	}
 
-	if stakedSlotsCount == 0 {
-		utils.Logger().Info().
-			Int("staked-candidates", len(candidates)).
-			Int("slots-for-epos", stakedSlotsCount).
-			Msg("committe composed only of harmony node")
-		return shardState, nil
+	// TODO(audit): make sure external validator BLS key are also not duplicate to Harmony's keys
+	completedEPoSRound, err := NewEPoSRound(stakerReader)
+
+	if err != nil {
+		return nil, err
 	}
 
-	maxBLSKey := stakedSlotsCount / 3
-
-	// TODO benchmark difference if went with data structure that sorts on insert
-	for i := range candidates {
-		validator, err := stakerReader.ReadValidatorInformation(candidates[i])
-		if err != nil {
-			return nil, err
-		}
-
-		if validator.EPOSStatus != effective.Active {
-			continue
-		}
-		// TODO(audit): remove the sanity check here; do the sanity check with maxBLSKey before validator change
-		if err := validator.SanityCheck(maxBLSKey); err != nil {
-			utils.Logger().Info().
-				Int("staked-candidates", len(candidates)).
-				Err(err).
-				Msg("validator sanity check failed")
-			continue
-		}
-		totalStake := validator.TotalDelegation()
-
-		found := false
-		dupKey := shard.BlsPublicKey{}
-		for _, key := range validator.SlotPubKeys {
-			if _, ok := blsKeys[key]; ok {
-				found = true
-				dupKey = key
-			} else {
-				blsKeys[key] = struct{}{}
-			}
-		}
-		if found {
-			const m = "Duplicate bls key found %x, in validator %+v. Ignoring"
-			utils.Logger().Info().
-				Int("staked-candidates", len(candidates)).
-				Msgf(m, dupKey, validator)
-			continue
-		}
-
-		essentials[validator.Address] = effective.SlotOrder{
-			totalStake,
-			validator.SlotPubKeys,
-		}
-	}
-
-	electedSlots := effective.Apply(essentials, stakedSlotsCount)
 	shardBig := big.NewInt(int64(shardCount))
-
-	totalEffectiveStake := numeric.ZeroDec()
-
-	for i := 0; i < len(electedSlots); i++ {
-		slot := electedSlots[i]
-		shardID := int(new(big.Int).Mod(slot.BlsPublicKey.Big(), shardBig).Int64())
-		totalEffectiveStake = totalEffectiveStake.Add(slot.Dec)
-		shardState.Shards[shardID].Slots = append(shardState.Shards[shardID].Slots, shard.Slot{
-			slot.Address,
-			slot.BlsPublicKey,
-			&slot.Dec,
-		})
-	}
-
-	if c := len(candidates); c != 0 {
-		utils.Logger().Info().
-			Int("staked-candidates", c).
-			Str("sum-all-effective-stake-by-validators", totalEffectiveStake.String()).
-			Msg("epos based super-committe")
+	for i := range completedEPoSRound.AuctionWinners {
+		purchasedSlot := completedEPoSRound.AuctionWinners[i]
+		shardID := int(new(big.Int).Mod(purchasedSlot.Key.Big(), shardBig).Int64())
+		shardState.Shards[shardID].Slots = append(
+			shardState.Shards[shardID].Slots, shard.Slot{
+				purchasedSlot.Addr,
+				purchasedSlot.Key,
+				&purchasedSlot.EPoSStake,
+			},
+		)
 	}
 
 	return shardState, nil
-}
-
-// GetCommitteePublicKeys returns the public keys of a shard
-func (def partialStakingEnabled) GetCommitteePublicKeys(
-	committee *shard.Committee,
-) ([]*bls.PublicKey, error) {
-	if committee == nil {
-		return []*bls.PublicKey{}, nil
-	}
-	allIdentities := make([]*bls.PublicKey, len(committee.Slots))
-	for i := range committee.Slots {
-		identity := &bls.PublicKey{}
-		if err := committee.Slots[i].BlsPublicKey.ToLibBLSPublicKey(
-			identity,
-		); err != nil {
-			return nil, err
-		}
-		allIdentities[i] = identity
-	}
-
-	return allIdentities, nil
 }
 
 // ReadFromDB is a wrapper on ReadShardState
@@ -284,21 +368,17 @@ func (def partialStakingEnabled) Compute(
 			Msg("Tried to compute committee for epoch in past")
 		return nil, ErrComputeForEpochInPast
 	}
-	stakedSlots :=
-		(instance.NumNodesPerShard() - instance.NumHarmonyOperatedNodesPerShard()) *
-			int(instance.NumShards())
-	shardState, err := eposStakedCommittee(instance, stakerReader, stakedSlots)
+	utils.AnalysisStart("computeEPoSStakedCommittee")
+	shardState, err := eposStakedCommittee(instance, stakerReader)
+	utils.AnalysisEnd("computeEPoSStakedCommittee")
 
 	if err != nil {
 		return nil, err
 	}
+
 	// Set the epoch of shard state
 	shardState.Epoch = big.NewInt(0).Set(epoch)
-	staked := shardState.StakedValidators()
 	utils.Logger().Info().
-		Int("bls-key-count", staked.CountStakedBLSKey).
-		Int("validator-one-addr-count", staked.CountStakedValidator).
-		Int("max-staked-slots-count", stakedSlots).
 		Uint64("computed-for-epoch", epoch.Uint64()).
 		Msg("computed new super committee")
 	return shardState, nil

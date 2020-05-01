@@ -3,6 +3,8 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/params"
 )
@@ -13,8 +15,8 @@ var PangaeaSchedule pangaeaSchedule
 type pangaeaSchedule struct{}
 
 const (
-	// 10 minutes per epoch (at 8s/block)
-	pangaeaBlocksPerEpoch = 75
+	// 8*450=3600 sec epochs for P3 of open staking
+	pangaeaBlocksPerEpoch = 450
 
 	pangaeaVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
@@ -78,5 +80,5 @@ var pangaeaReshardingEpoch = []*big.Int{
 	params.PangaeaChainConfig.StakingEpoch,
 }
 
-var pangaeaV0 = MustNewInstance(4, 27, 27, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())
-var pangaeaV1 = MustNewInstance(4, 50, 27, genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())
+var pangaeaV0 = MustNewInstance(4, 30, 30, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())
+var pangaeaV1 = MustNewInstance(4, 110, 30, numeric.MustNewDecFromStr("0.68"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())

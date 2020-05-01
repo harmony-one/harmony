@@ -2,8 +2,6 @@ package node
 
 import (
 	"bytes"
-	"context"
-	"math/big"
 	"math/rand"
 	"time"
 
@@ -13,59 +11,30 @@ import (
 	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/ctxerror"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/msgq"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/p2p/host"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/pkg/errors"
 )
 
 const p2pMsgPrefixSize = 5
 
-// receiveGroupMessage use libp2p pubsub mechanism to receive broadcast messages
-func (node *Node) receiveGroupMessage(
-	receiver p2p.GroupReceiver, rxQueue msgq.MessageAdder,
-) {
-	ctx := context.Background()
-	// TODO ek – infinite loop; add shutdown/cleanup logic
-	for {
-		msg, sender, err := receiver.Receive(ctx)
-		if err != nil {
-			utils.Logger().Warn().Err(err).
-				Msg("cannot receive from group")
-			continue
-		}
-		if sender == node.host.GetID() {
-			continue
-		}
-		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
-		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
-		if len(msg) < p2pMsgPrefixSize {
-			utils.Logger().Warn().Err(err).Int("msg size", len(msg)).
-				Msg("invalid p2p message size")
-			continue
-		}
-		if err := rxQueue.AddMessage(msg[p2pMsgPrefixSize:], sender); err != nil {
-			utils.Logger().Warn().Err(err).
-				Str("sender", sender.Pretty()).
-				Msg("cannot enqueue incoming message for processing")
-		}
-	}
-}
-
 // some messages have uninteresting fields in header, slash, receipt and crosslink are
 // such messages. This function assumes that input bytes are a slice which already
 // past those not relevant header bytes.
-func (node *Node) processSkippedMsgTypeByteValue(cat proto_node.BlockMessageType, content []byte) {
+func (node *Node) processSkippedMsgTypeByteValue(
+	cat proto_node.BlockMessageType, content []byte,
+) {
 	switch cat {
 	case proto_node.SlashCandidate:
 		node.processSlashCandidateMessage(content)
@@ -121,15 +90,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 		} else {
 			node.ConsensusMessageHandler(msgPayload)
 		}
-	case proto.DRand:
-		msgPayload, _ := proto.GetDRandMessagePayload(content)
-		if node.DRand != nil {
-			if node.DRand.IsLeader {
-				node.DRand.ProcessMessageLeader(msgPayload)
-			} else {
-				node.DRand.ProcessMessageValidator(msgPayload)
-			}
-		}
 	case proto.Node:
 		actionType := proto_node.MessageType(msgType)
 		switch actionType {
@@ -149,9 +109,8 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 			switch blockMsgType := proto_node.BlockMessageType(msgPayload[0]); blockMsgType {
 			case proto_node.Sync:
 				utils.Logger().Debug().Msg("NET: received message: Node/Sync")
-				var blocks []*types.Block
-				err := rlp.DecodeBytes(msgPayload[1:], &blocks)
-				if err != nil {
+				blocks := []*types.Block{}
+				if err := rlp.DecodeBytes(msgPayload[1:], &blocks); err != nil {
 					utils.Logger().Error().
 						Err(err).
 						Msg("block sync")
@@ -164,7 +123,9 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 								utils.Logger().Info().
 									Uint64("block", blocks[0].NumberU64()).
 									Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
-								node.BeaconBlockChannel <- block
+								go func(blk *types.Block) {
+									node.BeaconBlockChannel <- blk
+								}(block)
 							}
 						}
 					}
@@ -248,7 +209,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 		Msgf(
 			"broadcasting new block %d, group %s", newBlock.NumberU64(), groups[0],
 		)
-	msg := host.ConstructP2pMessage(byte(0),
+	msg := p2p.ConstructMessage(
 		proto_node.ConstructBlocksSyncMessage([]*types.Block{newBlock}),
 	)
 	if err := node.host.SendMessageToGroups(groups, msg); err != nil {
@@ -260,8 +221,7 @@ func (node *Node) BroadcastNewBlock(newBlock *types.Block) {
 func (node *Node) BroadcastSlash(witness *slash.Record) {
 	if err := node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-		host.ConstructP2pMessage(
-			byte(0),
+		p2p.ConstructMessage(
 			proto_node.ConstructSlashMessage(slash.Records{*witness})),
 	); err != nil {
 		utils.Logger().Err(err).
@@ -324,8 +284,7 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 	}
 	node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
-		host.ConstructP2pMessage(
-			byte(0),
+		p2p.ConstructMessage(
 			proto_node.ConstructCrossLinkMessage(node.Consensus.ChainReader, headers)),
 	)
 }
@@ -338,11 +297,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot validate header for the new block")
-		return ctxerror.New(
-			"[VerifyNewBlock] Cannot validate header for the new block",
-			"blockHash",
-			newBlock.Hash(),
-		).WithCause(err)
+		return err
 	}
 
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
@@ -350,10 +305,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Uint32("my shard ID", node.Blockchain().ShardID()).
 			Uint32("new block's shard ID", newBlock.ShardID()).
 			Msg("[VerifyNewBlock] Wrong shard ID of the new block")
-		return ctxerror.New("[VerifyNewBlock] Wrong shard ID of the new block",
-			"my shard ID", node.Blockchain().ShardID(),
-			"new block's shard ID", newBlock.ShardID(),
-		)
+		return errors.New("[VerifyNewBlock] Wrong shard ID of the new block")
 	}
 
 	if err := node.Blockchain().Engine().VerifyShardState(
@@ -363,10 +315,9 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot verify shard state for the new block")
-		return ctxerror.New(
-			"[VerifyNewBlock] Cannot verify shard state for the new block", "blockHash",
-			newBlock.Hash(),
-		).WithCause(err)
+		return errors.New(
+			"[VerifyNewBlock] Cannot verify shard state for the new block",
+		)
 	}
 
 	if err := node.Blockchain().ValidateNewBlock(newBlock); err != nil {
@@ -375,7 +326,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 				url := p.OnCannotCommit
 				go func() {
 					webhooks.DoPost(url, map[string]interface{}{
-						"bad-header": newBlock.Header().String(),
+						"bad-header": newBlock.Header(),
 						"reason":     err.Error(),
 					})
 				}()
@@ -387,10 +338,11 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Int("numStakingTx", len(newBlock.StakingTransactions())).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot Verify New Block!!!")
-		return ctxerror.New("[VerifyNewBlock] Cannot Verify New Block!!!",
-			"blockHash", newBlock.Hash(),
-			"numTx", len(newBlock.Transactions()),
-		).WithCause(err)
+		return errors.Errorf(
+			"[VerifyNewBlock] Cannot Verify New Block!!! block-hash %s txn-count %d",
+			newBlock.Hash().Hex(),
+			len(newBlock.Transactions()),
+		)
 	}
 
 	// Verify cross links
@@ -410,23 +362,38 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Int("numIncomingReceipts", len(newBlock.IncomingReceipts())).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot ValidateNewBlock")
-		return ctxerror.New("[VerifyNewBlock] Cannot ValidateNewBlock", "blockHash", newBlock.Hash(),
-			"numIncomingReceipts", len(newBlock.IncomingReceipts())).WithCause(err)
+		return errors.Wrapf(
+			err, "[VerifyNewBlock] Cannot ValidateNewBlock",
+		)
 	}
 	return nil
 }
 
-// BigMaxUint64 is maximum possible uint64 value, that is, (1**64)-1.
-var BigMaxUint64 = new(big.Int).SetBytes([]byte{
-	255, 255, 255, 255, 255, 255, 255, 255,
-})
+func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
+	count := uint32(0)
+	pubkeys := node.Consensus.Decider.Participants()
+	mask, err := internal_bls.NewMask(pubkeys, nil)
+	if err != nil {
+		return count
+	}
+	err = mask.SetMask(block.Header().LastCommitBitmap())
+	if err != nil {
+		return count
+	}
+	for _, key := range node.Consensus.PubKey.PublicKey {
+		if ok, err := mask.KeyEnabled(key); err == nil && ok {
+			count++
+		}
+	}
+	return count
+}
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(
-	newBlock *types.Block, commitSigAndBitmap []byte,
+	newBlock *types.Block,
 ) {
 	if _, err := node.Blockchain().InsertChain([]*types.Block{newBlock}, true); err != nil {
 		utils.Logger().Error().
@@ -445,7 +412,6 @@ func (node *Node) PostConsensusProcessing(
 	// Update last consensus time for metrics
 	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
 	// TODO: refactor the asynchronous calls to separate go routine.
-	node.lastConsensusTime = time.Now().Unix()
 	if node.Consensus.IsLeader() {
 		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)
@@ -454,25 +420,28 @@ func (node *Node) PostConsensusProcessing(
 			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
 			node.BroadcastCrossLink(newBlock)
 		}
-		node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
+		node.BroadcastCXReceipts(newBlock)
 	} else {
-		utils.Logger().Info().
-			Uint64("blockNum", newBlock.NumberU64()).
-			Uint64("epochNum", newBlock.Epoch().Uint64()).
-			Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
-			Str("blockHash", newBlock.Hash().String()).
-			Int("numTxns", len(newBlock.Transactions())).
-			Int("numStakingTxns", len(newBlock.StakingTransactions())).
-			Msg("BINGO !!! Reached Consensus")
-		// 1% of the validator also need to do broadcasting
-		rand.Seed(time.Now().UTC().UnixNano())
-		rnd := rand.Intn(100)
-		if rnd < 1 {
-			// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
-			if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-				node.BroadcastNewBlock(newBlock)
+		if node.Consensus.Mode() != consensus.Listening {
+			utils.Logger().Info().
+				Uint64("blockNum", newBlock.NumberU64()).
+				Uint64("epochNum", newBlock.Epoch().Uint64()).
+				Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
+				Str("blockHash", newBlock.Hash().String()).
+				Int("numTxns", len(newBlock.Transactions())).
+				Int("numStakingTxns", len(newBlock.StakingTransactions())).
+				Uint32("numSignatures", node.numSignaturesIncludedInBlock(newBlock)).
+				Msg("BINGO !!! Reached Consensus")
+			// 1% of the validator also need to do broadcasting
+			rand.Seed(time.Now().UTC().UnixNano())
+			rnd := rand.Intn(100)
+			if rnd < 1 {
+				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
+				if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+					node.BroadcastNewBlock(newBlock)
+				}
+				node.BroadcastCXReceipts(newBlock)
 			}
-			node.BroadcastCXReceipts(newBlock, commitSigAndBitmap)
 		}
 	}
 
@@ -481,11 +450,11 @@ func (node *Node) PostConsensusProcessing(
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
-		node.Consensus.UpdateConsensusInformation()
+		node.Consensus.SetMode(node.Consensus.UpdateConsensusInformation())
 	}
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
 		if h.Availability != nil {
-			for _, addr := range node.Consensus.SelfAddresses {
+			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
 					return
@@ -494,12 +463,17 @@ func (node *Node) PostConsensusProcessing(
 				if err != nil {
 					return
 				}
-				signed, toSign, quotient, err :=
-					availability.ComputeCurrentSigning(snapshot, wrapper)
-				if err != nil && availability.IsBelowSigningThreshold(quotient) {
+				computed := availability.ComputeCurrentSigning(
+					snapshot.Validator, wrapper,
+				)
+				beaconChainBlocks := uint64(node.Beaconchain().CurrentBlock().Header().Number().Int64()) %
+					shard.Schedule.BlocksPerEpoch()
+				computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
+
+				if err != nil && computed.IsBelowThreshold {
 					url := h.Availability.OnDroppedBelowThreshold
 					go func() {
-						webhooks.DoPost(url, staking.Computed{signed, toSign, quotient})
+						webhooks.DoPost(url, computed)
 					}()
 				}
 			}
@@ -507,20 +481,20 @@ func (node *Node) PostConsensusProcessing(
 	}
 }
 
-func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) int {
+func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) {
 	ping, err := proto_discovery.GetPingMessage(msgPayload)
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msg("Can't get Ping Message")
-		return -1
 	}
 
-	peer := new(p2p.Peer)
-	peer.IP = ping.Node.IP
-	peer.Port = ping.Node.Port
-	peer.PeerID = ping.Node.PeerID
-	peer.ConsensusPubKey = nil
+	peer := p2p.Peer{
+		IP:              ping.Node.IP,
+		Port:            ping.Node.Port,
+		PeerID:          ping.Node.PeerID,
+		ConsensusPubKey: nil,
+	}
 
 	if ping.Node.PubKey != nil {
 		peer.ConsensusPubKey = &bls.PublicKey{}
@@ -528,72 +502,54 @@ func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) i
 			utils.Logger().Error().
 				Err(err).
 				Msg("UnmarshalBinary Failed")
-			return -1
 		}
 	}
 
 	utils.Logger().Debug().
 		Str("Version", ping.NodeVer).
-		Str("BlsKey", peer.ConsensusPubKey.SerializeToHexStr()).
 		Str("IP", peer.IP).
 		Str("Port", peer.Port).
 		Interface("PeerID", peer.PeerID).
 		Msg("[PING] PeerInfo")
 
-	senderStr := string(sender)
-	if senderStr != "" {
+	if senderStr := string(sender); senderStr != "" {
 		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
 		if ok {
-			// duplicated ping message return
-			return 0
+			return
 		}
 	}
 
-	// add to incoming peer list
-	//node.host.AddIncomingPeer(*peer)
-	node.host.ConnectHostPeer(*peer)
-
-	if ping.Node.Role != proto_node.ClientRole {
-		node.AddPeers([]*p2p.Peer{peer})
-		utils.Logger().Info().
-			Str("Peer", peer.String()).
-			Int("# Peers", node.numPeers).
-			Msg("Add Peer to Node")
+	if err := node.host.ConnectHostPeer(peer); err != nil {
+		utils.Logger().Info().Err(err).
+			Str("peer", peer.String()).
+			Msg("could not direct connect to this peer")
 	}
 
-	return 1
+	if ping.Node.Role != proto_node.ClientRole {
+		node.AddPeers([]*p2p.Peer{&peer})
+		utils.Logger().Info().
+			Str("Peer", peer.String()).
+			Int("# Peers", node.host.GetPeerCount()).
+			Msg("Add Peer to Node")
+	}
 }
 
 // bootstrapConsensus is the a goroutine to check number of peers and start the consensus
 func (node *Node) bootstrapConsensus() {
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
-	lastPeerNum := node.numPeers
-	for {
-		select {
-		case <-tick.C:
-			numPeersNow := node.numPeers
-			// no peers, wait for another tick
-			if numPeersNow == 0 {
-				utils.Logger().Info().
-					Int("numPeersNow", numPeersNow).
-					Msg("No peers, continue")
-				continue
-			} else if numPeersNow > lastPeerNum {
-				utils.Logger().Info().
-					Int("previousNumPeers", lastPeerNum).
-					Int("numPeersNow", numPeersNow).
-					Int("targetNumPeers", node.Consensus.MinPeers).
-					Msg("New peers increased")
-				lastPeerNum = numPeersNow
-			}
-
-			if numPeersNow >= node.Consensus.MinPeers {
-				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
-				node.startConsensus <- struct{}{}
-				return
-			}
+	for range tick.C {
+		numPeersNow := node.host.GetPeerCount()
+		if numPeersNow >= node.Consensus.MinPeers {
+			utils.Logger().Info().Msg("[bootstrap] StartConsensus")
+			node.startConsensus <- struct{}{}
+			return
 		}
+		utils.Logger().Info().
+			Int("numPeersNow", numPeersNow).
+			Int("targetNumPeers", node.Consensus.MinPeers).
+			Int("next-peer-count-check-in-seconds", 5).
+			Msg("do not have enough min peers yet in bootstrap of consensus")
 	}
 }
 

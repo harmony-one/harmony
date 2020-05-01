@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -13,18 +12,15 @@ import (
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
-	"github.com/harmony-one/harmony/internal/ctxerror"
-	"github.com/harmony-one/harmony/internal/profiler"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	libp2p_peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
@@ -251,7 +247,7 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 // verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
 func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
 	consensusMsg := msg.GetConsensus()
-	senderKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	senderKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +260,7 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey
 
 func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
 	vcMsg := msg.GetViewchange()
-	senderKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.SenderPubkey)
+	senderKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
 	if err != nil {
 		return nil, err
 	}
@@ -278,6 +274,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 // SetViewID set the viewID to the height of the blockchain
 func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID = height
+	consensus.current.viewID = height
 }
 
 // SetMode sets the mode of consensus
@@ -356,42 +353,6 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 	)
 }
 
-func (consensus *Consensus) reportMetrics(block types.Block) {
-	endTime := time.Now()
-	timeElapsed := endTime.Sub(startTime)
-	numOfTxs := len(block.Transactions())
-	tps := float64(numOfTxs) / timeElapsed.Seconds()
-	consensus.getLogger().Info().
-		Int("numOfTXs", numOfTxs).
-		Time("startTime", startTime).
-		Time("endTime", endTime).
-		Dur("timeElapsed", endTime.Sub(startTime)).
-		Float64("TPS", tps).
-		Msg("TPS Report")
-
-	// Post metrics
-	profiler := profiler.GetProfiler()
-	if profiler.MetricsReportURL == "" {
-		return
-	}
-
-	txHashes := []string{}
-	for i, end := 0, len(block.Transactions()); i < 3 && i < end; i++ {
-		txHash := block.Transactions()[end-1-i].Hash()
-		txHashes = append(txHashes, hex.EncodeToString(txHash[:]))
-	}
-	metrics := map[string]interface{}{
-		"key":             hex.EncodeToString(consensus.LeaderPubKey.Serialize()),
-		"tps":             tps,
-		"txCount":         numOfTxs,
-		"nodeCount":       consensus.Decider.ParticipantsCount() + 1,
-		"latestBlockHash": hex.EncodeToString(consensus.blockHash[:]),
-		"latestTxHashes":  txHashes,
-		"blockLatency":    int(timeElapsed / time.Millisecond),
-	}
-	profiler.LogMetrics(metrics)
-}
-
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
@@ -405,50 +366,46 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 }
 
 // retrieve corresponding blsPublicKey from Coinbase Address
-func (consensus *Consensus) getLeaderPubKeyFromCoinbase(header *block.Header) (*bls.PublicKey, error) {
+func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
+	header *block.Header,
+) (*bls.PublicKey, error) {
 	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch())
 	if err != nil {
-		return nil, ctxerror.New("cannot read shard state",
-			"epoch", header.Epoch(),
-			"coinbaseAddr", header.Coinbase(),
-		).WithCause(err)
+		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
+			header.Epoch(),
+			header.Coinbase().Hash().Hex(),
+		)
 	}
 
 	committee, err := shardState.FindCommitteeByID(header.ShardID())
 	if err != nil {
-		return nil, ctxerror.New("cannot find shard in the shard state",
-			"blockNum", header.Number(),
-			"shardID", header.ShardID(),
-			"coinbaseAddr", header.Coinbase(),
-		)
+		return nil, err
 	}
+
 	committerKey := new(bls.PublicKey)
 	isStaking := consensus.ChainReader.Config().IsStaking(header.Epoch())
 	for _, member := range committee.Slots {
 		if isStaking {
 			// After staking the coinbase address will be the address of bls public key
-			if utils.GetAddressFromBlsPubKeyBytes(member.BlsPublicKey[:]) == header.Coinbase() {
-				err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-				if err != nil {
-					return nil, ctxerror.New("cannot convert BLS public key",
-						"blsPublicKey", member.BlsPublicKey,
-						"coinbaseAddr", header.Coinbase()).WithCause(err)
+			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == header.Coinbase() {
+				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
+					return nil, err
 				}
 				return committerKey, nil
 			}
 		} else {
 			if member.EcdsaAddress == header.Coinbase() {
-				err := member.BlsPublicKey.ToLibBLSPublicKey(committerKey)
-				if err != nil {
-					return nil, ctxerror.New("cannot convert BLS public key",
-						"blsPublicKey", member.BlsPublicKey,
-						"coinbaseAddr", header.Coinbase()).WithCause(err)
+				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
+					return nil, err
 				}
 				return committerKey, nil
 			}
 		}
 	}
-	return nil, ctxerror.New("cannot find corresponding BLS Public Key", "coinbaseAddr", header.Coinbase().Hex())
+	return nil, errors.Errorf(
+		"cannot find corresponding BLS Public Key coinbase %s",
+		header.Coinbase().Hex(),
+	)
 }
 
 // UpdateConsensusInformation will update shard information (epoch, publicKeys, blockNum, viewID)
@@ -465,18 +422,15 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	curHeader := consensus.ChainReader.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
-	prevSubCommitteeDump := consensus.Decider.String()
-
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
 		len(curHeader.ShardState()) > 0 &&
 		!consensus.ChainReader.Config().IsStaking(curEpoch)
-
 	haventUpdatedDecider := consensus.ChainReader.Config().IsStaking(curEpoch) &&
 		consensus.Decider.Policy() != quorum.SuperMajorityStake
 
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
-		decider := quorum.NewDecider(quorum.SuperMajorityStake)
+		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
 		decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 			return consensus.PubKey, nil
 		})
@@ -484,8 +438,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	committeeToSet := &shard.Committee{}
+	epochToSet := curEpoch
 	hasError := false
-
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
 		curEpoch, consensus.ChainReader,
 	)
@@ -526,7 +480,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 
 		committeeToSet = subComm
-
+		epochToSet = nextEpoch
 	} else {
 		consensus.SetEpochNum(curEpoch.Uint64())
 		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
@@ -549,9 +503,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// update public keys in the committee
 	oldLeader := consensus.LeaderPubKey
-	pubKeys, _ := committee.WithStakingEnabled.GetCommitteePublicKeys(
-		committeeToSet,
-	)
+	pubKeys, _ := committeeToSet.BLSPublicKeys()
+
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
@@ -559,7 +512,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// Update voters in the committee
 	if _, err := consensus.Decider.SetVoters(
-		committeeToSet.Slots,
+		committeeToSet, epochToSet,
 	); err != nil {
 		utils.Logger().Error().
 			Err(err).
@@ -572,8 +525,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		Uint64("block-number", curHeader.Number().Uint64()).
 		Uint64("curEpoch", curHeader.Epoch().Uint64()).
 		Uint32("shard-id", consensus.ShardID).
-		RawJSON("prev-subcommittee", []byte(prevSubCommitteeDump)).
-		RawJSON("current-subcommittee", []byte(consensus.Decider.String())).
 		Msg("[UpdateConsensusInformation] changing committee")
 
 	// take care of possible leader change during the curEpoch

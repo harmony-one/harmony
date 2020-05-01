@@ -5,14 +5,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 )
 
 // Collection is a collection of per-shard blockchains.
@@ -78,15 +77,14 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		// NewChainDB may return incompletely initialized DB;
 		// avoid closing it.
 		db = nil
-		return nil, ctxerror.New("cannot open chain database").WithCause(err)
+		return nil, errors.New("cannot open chain database")
 	}
 	if rawdb.ReadCanonicalHash(db, 0) == (common.Hash{}) {
 		utils.Logger().Info().
 			Uint32("shardID", shardID).
 			Msg("initializing a new chain database")
 		if err := sc.dbInit.InitChainDB(db, shardID); err != nil {
-			return nil, ctxerror.New("cannot initialize a new chain database").
-				WithCause(err)
+			return nil, errors.Wrapf(err, "cannot initialize a new chain database")
 		}
 	}
 	var cacheConfig *core.CacheConfig
@@ -98,7 +96,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		db, cacheConfig, sc.chainConfig, sc.engine, vm.Config{}, nil,
 	)
 	if err != nil {
-		return nil, ctxerror.New("cannot create blockchain").WithCause(err)
+		return nil, errors.Wrapf(err, "cannot create blockchain")
 	}
 	db = nil // don't close
 	sc.pool[shardID] = bc
@@ -118,7 +116,7 @@ func (sc *CollectionImpl) CloseShardChain(shardID uint32) error {
 	defer sc.mtx.Unlock()
 	bc, ok := sc.pool[shardID]
 	if !ok {
-		return ctxerror.New("shard chain not found", "shardID", shardID)
+		return errors.Errorf("shard chain not found %d", shardID)
 	}
 	utils.Logger().Info().
 		Uint32("shardID", shardID).

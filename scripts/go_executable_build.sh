@@ -4,10 +4,7 @@ export GO111MODULE=on
 
 declare -A SRC
 SRC[harmony]=cmd/harmony/main.go
-# SRC[txgen]=cmd/client/txgen/main.go
 SRC[bootnode]=cmd/bootnode/main.go
-SRC[wallet]="cmd/client/wallet/main.go cmd/client/wallet/generated_wallet.ini.go"
-# SRC[wallet_stress_test]="cmd/client/wallet_stress_test/main.go cmd/client/wallet_stress_test/generated_wallet.ini.go"
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
@@ -15,12 +12,12 @@ PUBBUCKET=pub.harmony.one
 REL=
 GOOS=linux
 GOARCH=amd64
-FOLDER=/${WHOAMI:-$USER}
+FOLDER=${WHOAMI:-$USER}
 RACE=
+TRACEPTR=
 VERBOSE=
 GO_GCFLAGS="all=-c 2"
 DEBUG=false
-NETWORK=main
 STATIC=false
 
 unset -v progdir
@@ -62,6 +59,7 @@ OPTIONS:
    -b bucket      set the upload bucket name (default: $BUCKET)
    -f folder      set the upload folder name in the bucket (default: $FOLDER)
    -r             enable -race build option (default: $RACE)
+   -t             full analysis on {pointer} build option (default: $TRACEPTR)
    -v             verbose build process (default: $VERBOSE)
    -s             build static linux executable (default: $STATIC)
 
@@ -69,10 +67,9 @@ OPTIONS:
 ACTION:
    build       build binaries only (default action)
    upload      upload binaries to s3
-   pubwallet   upload wallet to public bucket (bucket: $PUBBUCKET)
    release     upload binaries to release bucket
 
-   harmony|txgen|bootnode|wallet
+   harmony|bootnode|
                only build the specified binary
 
 EXAMPLES:
@@ -111,12 +108,12 @@ function build_only
          rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
          if [ "$DEBUG" == "true" ]; then
-            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
          else
             if [ "$STATIC" == "true" ]; then
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
             else
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE ${SRC[$bin]}
+               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
             fi
          fi
          if [ "$(uname -s)" == "Linux" ]; then
@@ -173,7 +170,7 @@ function upload
    if [ "$STATIC" != "true" ]; then
       for lib in "${!LIB[@]}"; do
          if [ -e ${LIB[$lib]} ]; then
-            $AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}$FOLDER/$lib --acl public-read
+            $AWSCLI s3 cp ${LIB[$lib]} s3://${BUCKET}/$FOLDER/$lib --acl public-read
          else
             echo "!! MISSING ${LIB[$lib]} !!"
          fi
@@ -183,11 +180,13 @@ function upload
    fi
 
    for bin in "${!SRC[@]}"; do
-      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}$FOLDER/$bin --acl public-read
+      [ -e $BINDIR/$bin ] && $AWSCLI s3 cp $BINDIR/$bin s3://${BUCKET}/$FOLDER/$bin --acl public-read
    done
 
+   # copy node.sh
+   $AWSCLI s3 cp scripts/node.sh s3://${BUCKET}/$FOLDER/node.sh --acl public-read
 
-   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}$FOLDER/md5sum.txt --acl public-read
+   [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${BUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
 
 function release
@@ -199,6 +198,11 @@ function release
    fi
 
    OS=$(uname -s)
+   REL=$FOLDER
+   if [ "$REL" = "mainnet" ]; then
+      echo "DO NOT release mainnet binary"
+      exit 1
+   fi
 
    case "$OS" in
       "Linux")
@@ -209,14 +213,6 @@ function release
          echo "Unsupported OS: $OS"
          return ;;
    esac
-
-   for bin in "${!SRC[@]}"; do
-      if [ -e $BINDIR/$bin ]; then
-         $AWSCLI s3 cp $BINDIR/$bin s3://${PUBBUCKET}/$FOLDER/$bin --acl public-read
-      else
-         echo "!! MISSGING $bin !!"
-      fi
-   done
 
    if [ "$STATIC" != "true" ]; then
       for lib in "${!LIB[@]}"; do
@@ -226,47 +222,27 @@ function release
             echo "!! MISSING ${LIB[$lib]} !!"
          fi
       done
+   else
+      FOLDER+='/static'
    fi
+
+   for bin in "${!SRC[@]}"; do
+      if [ -e $BINDIR/$bin ]; then
+         $AWSCLI s3 cp $BINDIR/$bin s3://${PUBBUCKET}/$FOLDER/$bin --acl public-read
+      else
+         echo "!! MISSGING $bin !!"
+      fi
+   done
+
+   # copy node.sh
+   $AWSCLI s3 cp scripts/node.sh s3://${PUBBUCKET}/$FOLDER/node.sh --acl public-read
 
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${PUBBUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
 
-function upload_wallet
-{
-   AWSCLI=aws
-
-   if [ -n "$PROFILE" ]; then
-      AWSCLI+=" --profile $PROFILE"
-   fi
-
-
-   OS=$(uname -s)
-
-   case "$OS" in
-      "Linux")
-         FOLDER=release/linux-x86_64/$REL ;;
-      "Darwin")
-         FOLDER=release/darwin-x86_64/$REL ;;
-      *)
-         echo "Unsupported OS: $OS"
-         return ;;
-   esac
-
-   $AWSCLI s3 cp $BINDIR/wallet s3://$PUBBUCKET/$FOLDER/wallet --acl public-read
-
-   for lib in "${!LIB[@]}"; do
-      if [ -e ${LIB[$lib]} ]; then
-         $AWSCLI s3 cp ${LIB[$lib]} s3://${PUBBUCKET}/$FOLDER/$lib --acl public-read
-      else
-         echo "!! MISSING ${LIB[$lib]} !!"
-      fi
-   done
-
-
-}
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:rvsdN:" option; do
+while getopts "hp:a:o:b:f:rtvsd" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;
@@ -275,10 +251,10 @@ while getopts "hp:a:o:b:f:rvsdN:" option; do
       b) BUCKET=$OPTARG/ ;;
       f) FOLDER=$OPTARG ;;
       r) RACE=-race ;;
+      t) TRACEPTR='-gcflags=all=-d=checkptr' ;;
       v) VERBOSE='-v -x' ;;
       d) DEBUG=true ;;
       s) STATIC=true ;;
-      N) NETWORK=$OPTARG ;;
    esac
 done
 
@@ -288,27 +264,10 @@ shift $(($OPTIND-1))
 
 ACTION=${1:-build}
 
-case "${NETWORK}" in
-main)
-  REL=mainnet
-  ;;
-beta)
-  REL=testnet
-  ;;
-pangaea)
-  REL=pangaea
-  ;;
-*)
-  echo "${NETWORK}: invalid network"
-  exit
-  ;;
-esac
-
 case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
    "release") release ;;
-   "pubwallet") upload_wallet ;;
-   "harmony"|"wallet"|"txgen"|"bootnode") build_only $ACTION ;;
+   "harmony"|"bootnode") build_only $ACTION ;;
    *) usage ;;
 esac

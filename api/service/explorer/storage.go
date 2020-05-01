@@ -2,11 +2,14 @@ package explorer
 
 import (
 	"fmt"
+	"math/big"
 	"os"
+	"path"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
@@ -16,8 +19,9 @@ import (
 
 // Constants for storage.
 const (
-	AddressPrefix = "ad"
-	PrefixLen     = 3
+	AddressPrefix    = "ad"
+	CheckpointPrefix = "dc"
+	PrefixLen        = 3
 )
 
 // GetAddressKey ...
@@ -25,12 +29,18 @@ func GetAddressKey(address string) string {
 	return fmt.Sprintf("%s_%s", AddressPrefix, address)
 }
 
+// GetCheckpointKey ...
+func GetCheckpointKey(blockNum *big.Int) string {
+	return fmt.Sprintf("%s_%x", CheckpointPrefix, blockNum)
+}
+
 var storage *Storage
 var once sync.Once
 
 // Storage dump the block info into leveldb.
 type Storage struct {
-	db *leveldb.DB
+	db   *leveldb.DB
+	lock sync.Mutex
 }
 
 // GetStorageInstance returns attack model by using singleton pattern.
@@ -44,7 +54,8 @@ func GetStorageInstance(ip, port string, remove bool) *Storage {
 
 // Init initializes the block update.
 func (storage *Storage) Init(ip, port string, remove bool) {
-	dbFileName := "/tmp/explorer_storage_" + ip + "_" + port
+	dbFileName := path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
+	utils.Logger().Info().Msg("explorer storage folder: " + dbFileName)
 	var err error
 	if remove {
 		var err = os.RemoveAll(dbFileName)
@@ -72,47 +83,54 @@ func (storage *Storage) GetDB() *leveldb.DB {
 
 // Dump extracts information from block and index them into lvdb for explorer.
 func (storage *Storage) Dump(block *types.Block, height uint64) {
+	storage.lock.Lock()
+	defer storage.lock.Unlock()
 	if block == nil {
 		return
 	}
 
-	batch := new(leveldb.Batch)
-	// Store txs
-	for _, tx := range block.Transactions() {
-		explorerTransaction := GetTransaction(tx, block)
-		storage.UpdateAddress(batch, explorerTransaction, tx)
+	// Skip dump for redundant blocks with lower block number than the checkpoint block number
+	blockCheckpoint := GetCheckpointKey(block.Header().Number())
+	if _, err := storage.GetDB().Get([]byte(blockCheckpoint), nil); err == nil {
+		return
 	}
-	if err := storage.db.Write(batch, nil); err != nil {
-		utils.Logger().Warn().Err(err).Msg("cannot write batch")
+
+	acntsTxns, acntsStakingTxns := computeAccountsTransactionsMapForBlock(block)
+
+	for address, txRecords := range acntsTxns {
+		storage.UpdateTxAddressStorage(address, txRecords, false /* isStaking */)
 	}
+	for address, txRecords := range acntsStakingTxns {
+		storage.UpdateTxAddressStorage(address, txRecords, true /* isStaking */)
+	}
+
+	// save checkpoint of block dumped
+	storage.GetDB().Put([]byte(blockCheckpoint), []byte{}, nil)
 }
 
-// UpdateAddress ...
-func (storage *Storage) UpdateAddress(batch *leveldb.Batch, explorerTransaction *Transaction, tx *types.Transaction) {
-	explorerTransaction.Type = Received
-	if explorerTransaction.To != "" {
-		storage.UpdateAddressStorage(batch, explorerTransaction.To, explorerTransaction, tx)
-	}
-	explorerTransaction.Type = Sent
-	storage.UpdateAddressStorage(batch, explorerTransaction.From, explorerTransaction, tx)
-}
-
-// UpdateAddressStorage updates specific addr Address.
-func (storage *Storage) UpdateAddressStorage(batch *leveldb.Batch, addr string, explorerTransaction *Transaction, tx *types.Transaction) {
+// UpdateTxAddressStorage updates specific addr tx Address.
+func (storage *Storage) UpdateTxAddressStorage(addr string, txRecords TxRecords, isStaking bool) {
 	var address Address
 	key := GetAddressKey(addr)
-	if data, err := storage.db.Get([]byte(key), nil); err == nil {
+	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
 		if err = rlp.DecodeBytes(data, &address); err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed due to error")
+			utils.Logger().Error().
+				Bool("isStaking", isStaking).Err(err).Msg("Failed due to error")
 		}
 	}
+
 	address.ID = addr
-	address.TXs = append(address.TXs, explorerTransaction)
+	if isStaking {
+		address.StakingTXs = append(address.StakingTXs, txRecords...)
+	} else {
+		address.TXs = append(address.TXs, txRecords...)
+	}
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
-		batch.Put([]byte(key), encoded)
+		storage.GetDB().Put([]byte(key), encoded, nil)
 	} else {
-		utils.Logger().Error().Err(err).Msg("cannot encode address")
+		utils.Logger().Error().
+			Bool("isStaking", isStaking).Err(err).Msg("cannot encode address")
 	}
 }
 
@@ -138,4 +156,87 @@ func (storage *Storage) GetAddresses(size int, prefix string) ([]string, error) 
 		return nil, err
 	}
 	return addresses, nil
+}
+
+func computeAccountsTransactionsMapForBlock(
+	block *types.Block,
+) (map[string]TxRecords, map[string]TxRecords) {
+	// mapping from account address to TxRecords for txns in the block
+	var acntsTxns map[string]TxRecords = make(map[string]TxRecords)
+	// mapping from account address to TxRecords for staking txns in the block
+	var acntsStakingTxns map[string]TxRecords = make(map[string]TxRecords)
+
+	// Store txs
+	for _, tx := range block.Transactions() {
+		explorerTransaction, err := GetTransaction(tx, block)
+		if err != nil {
+			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
+				Msg("[Explorer Storage] Failed to get GetTransaction mapping")
+			continue
+		}
+
+		// store as sent transaction with from address
+		txRecord := &TxRecord{
+			Hash:      explorerTransaction.ID,
+			Type:      Sent,
+			Timestamp: explorerTransaction.Timestamp,
+		}
+		acntTxns, ok := acntsTxns[explorerTransaction.From]
+		if !ok {
+			acntTxns = make(TxRecords, 0)
+		}
+		acntTxns = append(acntTxns, txRecord)
+		acntsTxns[explorerTransaction.From] = acntTxns
+
+		// store as received transaction with to address
+		txRecord = &TxRecord{
+			Hash:      explorerTransaction.ID,
+			Type:      Received,
+			Timestamp: explorerTransaction.Timestamp,
+		}
+		acntTxns, ok = acntsTxns[explorerTransaction.To]
+		if !ok {
+			acntTxns = make(TxRecords, 0)
+		}
+		acntTxns = append(acntTxns, txRecord)
+		acntsTxns[explorerTransaction.To] = acntTxns
+	}
+
+	// Store staking txns
+	for _, tx := range block.StakingTransactions() {
+		explorerTransaction, err := GetStakingTransaction(tx, block)
+		if err != nil {
+			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
+				Msg("[Explorer Storage] Failed to get StakingTransaction mapping")
+			continue
+		}
+
+		// store as sent staking transaction with from address
+		txRecord := &TxRecord{
+			Hash:      explorerTransaction.ID,
+			Type:      Sent,
+			Timestamp: explorerTransaction.Timestamp,
+		}
+		acntStakingTxns, ok := acntsStakingTxns[explorerTransaction.From]
+		if !ok {
+			acntStakingTxns = make(TxRecords, 0)
+		}
+		acntStakingTxns = append(acntStakingTxns, txRecord)
+		acntsStakingTxns[explorerTransaction.From] = acntStakingTxns
+
+		// For delegate/undelegate, also store as received staking transaction with to address
+		txRecord = &TxRecord{
+			Hash:      explorerTransaction.ID,
+			Type:      Received,
+			Timestamp: explorerTransaction.Timestamp,
+		}
+		acntStakingTxns, ok = acntsStakingTxns[explorerTransaction.To]
+		if !ok {
+			acntStakingTxns = make(TxRecords, 0)
+		}
+		acntStakingTxns = append(acntStakingTxns, txRecord)
+		acntsStakingTxns[explorerTransaction.To] = acntStakingTxns
+	}
+
+	return acntsTxns, acntsStakingTxns
 }

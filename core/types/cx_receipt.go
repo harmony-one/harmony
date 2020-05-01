@@ -5,13 +5,11 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/internal/ctxerror"
+	"github.com/pkg/errors"
 )
 
 // CXReceipt represents a receipt for cross-shard transaction
@@ -203,7 +201,7 @@ func (cs CXReceiptsProofs) MaxToShardID() uint32 {
 func (cxp *CXReceiptsProof) GetToShardID() (uint32, error) {
 	var shardID uint32
 	if cxp == nil || len(cxp.Receipts) == 0 {
-		return uint32(0), ctxerror.New("[GetShardID] CXReceiptsProof or its receipts is NIL")
+		return uint32(0), errors.New("[GetShardID] CXReceiptsProof or its receipts is NIL")
 	}
 	for i, cx := range cxp.Receipts {
 		if i == 0 {
@@ -211,7 +209,7 @@ func (cxp *CXReceiptsProof) GetToShardID() (uint32, error) {
 		} else if shardID == cx.ToShardID {
 			continue
 		} else {
-			return shardID, ctxerror.New("[GetShardID] CXReceiptsProof contains distinct ToShardID")
+			return shardID, errors.New("[GetShardID] CXReceiptsProof contains distinct ToShardID")
 		}
 	}
 	return shardID, nil

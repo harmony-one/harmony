@@ -7,34 +7,32 @@ import (
 	"sync"
 	"time"
 
-	manet "github.com/multiformats/go-multiaddr-net"
-	"github.com/pkg/errors"
-
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	p2putils "github.com/harmony-one/harmony/p2p/utils"
 	badger "github.com/ipfs/go-ds-badger"
 	coredis "github.com/libp2p/go-libp2p-core/discovery"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2pdhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	manet "github.com/multiformats/go-multiaddr-net"
+	"github.com/pkg/errors"
 )
 
 // Service is the network info service.
 type Service struct {
 	Host        p2p.Host
 	Rendezvous  nodeconfig.GroupID
-	bootnodes   p2putils.AddrList
+	bootnodes   p2p.AddrList
 	dht         *libp2pdht.IpfsDHT
 	cancel      context.CancelFunc
 	stopChan    chan struct{}
 	stoppedChan chan struct{}
 	peerChan    chan p2p.Peer
-	peerInfo    <-chan peerstore.PeerInfo
+	peerInfo    <-chan libp2p_peer.AddrInfo
 	discovery   *libp2pdis.RoutingDiscovery
 	messageChan chan *msg_pb.Message
 	started     bool
@@ -61,7 +59,7 @@ const (
 // points to a persistent database directory to use.
 func New(
 	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
-	bootnodes p2putils.AddrList, dataStorePath string,
+	bootnodes p2p.AddrList, dataStorePath string,
 ) (*Service, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var dhtOpts []libp2pdhtopts.Option
@@ -99,7 +97,7 @@ func New(
 // MustNew is a panic-on-error version of New.
 func MustNew(
 	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
-	bootnodes p2putils.AddrList, dataStorePath string,
+	bootnodes p2p.AddrList, dataStorePath string,
 ) *Service {
 	service, err := New(h, rendezvous, peerChan, bootnodes, dataStorePath)
 	if err != nil {
@@ -135,12 +133,12 @@ func (s *Service) Init() error {
 	var wg sync.WaitGroup
 	if s.bootnodes == nil {
 		// TODO: should've passed in bootnodes through constructor.
-		s.bootnodes = p2putils.BootNodes
+		s.bootnodes = p2p.BootNodes
 	}
 
 	connected := false
 	for _, peerAddr := range s.bootnodes {
-		peerinfo, _ := peerstore.InfoFromP2pAddr(peerAddr)
+		peerinfo, _ := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -201,10 +199,14 @@ func (s *Service) DoService() {
 			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
 			// 0 is beacon chain FIXME: use a constant
 			libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
-			utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Successfully announced!")
+			utils.Logger().Info().
+				Str("Rendezvous", string(s.Rendezvous)).
+				Msg("Successfully announced!")
 		default:
 			var err error
-			s.peerInfo, err = s.discovery.FindPeers(ctx, string(s.Rendezvous), coredis.Limit(discoveryLimit))
+			s.peerInfo, err = s.discovery.FindPeers(
+				ctx, string(s.Rendezvous), coredis.Limit(discoveryLimit),
+			)
 			if err != nil {
 				utils.Logger().Error().Err(err).Msg("FindPeers")
 				return
@@ -224,11 +226,6 @@ func (s *Service) findPeers(ctx context.Context) {
 	}
 	for peer := range s.peerInfo {
 		if peer.ID != s.Host.GetP2PHost().ID() && len(peer.ID) > 0 {
-			// utils.Logger().Info().
-			// 	Interface("peer", peer.ID).
-			// 	Interface("addr", peer.Addrs).
-			// 	Interface("my ID", s.Host.GetP2PHost().ID()).
-			// 	Msg("Found Peer")
 			if err := s.Host.GetP2PHost().Connect(ctx, peer); err != nil {
 				utils.Logger().Warn().Err(err).Interface("peer", peer).Msg("can't connect to peer node")
 				// break if the node can't connect to peers, waiting for another peer
@@ -260,7 +257,6 @@ func (s *Service) findPeers(ctx context.Context) {
 	}
 
 	utils.Logger().Info().Msg("PeerInfo Channel Closed")
-	return
 }
 
 // StopService stops network info service.
@@ -279,9 +275,7 @@ func (s *Service) StopService() {
 }
 
 // NotifyService notify service
-func (s *Service) NotifyService(params map[string]interface{}) {
-	return
-}
+func (s *Service) NotifyService(params map[string]interface{}) {}
 
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {

@@ -77,7 +77,6 @@ func (b *BodyV1) SetTransactions(newTransactions []*Transaction) {
 // list. (not supported by Body V1)
 func (b *BodyV1) SetStakingTransactions(newTransactions []*staking.StakingTransaction) {
 	// not supported
-	return
 }
 
 // StakingTransactionAt returns the staking transaction at the given index in this block.

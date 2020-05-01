@@ -1,7 +1,10 @@
 package shard
 
 import (
+	"math/big"
+
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 const (
@@ -17,3 +20,18 @@ var (
 	// Depends on the type of the network.  Defaults to the mainnet schedule.
 	Schedule shardingconfig.Schedule = shardingconfig.MainnetSchedule
 )
+
+// ExternalSlotsAvailableForEpoch ..
+func ExternalSlotsAvailableForEpoch(epoch *big.Int) int {
+	instance := Schedule.InstanceForEpoch(epoch)
+	stakedSlots :=
+		(instance.NumNodesPerShard() -
+			instance.NumHarmonyOperatedNodesPerShard()) *
+			int(instance.NumShards())
+	if stakedSlots == 0 {
+		utils.Logger().Debug().
+			Uint64("epoch", epoch.Uint64()).
+			Msg("have 0 external slots for in this epoch - perhaps bad config")
+	}
+	return stakedSlots
+}

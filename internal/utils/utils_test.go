@@ -5,44 +5,8 @@ import (
 	"os"
 	"testing"
 
-	crypto "github.com/libp2p/go-libp2p-crypto"
-	"github.com/stretchr/testify/assert"
+	crypto "github.com/libp2p/go-libp2p-core/crypto"
 )
-
-// Tests for TestConvertFixedDataIntoByteArray.
-func TestConvertFixedDataIntoByteArray(t *testing.T) {
-	res := ConvertFixedDataIntoByteArray(int16(3))
-	if len(res) != 2 {
-		t.Errorf("Conversion incorrect.")
-	}
-	res = ConvertFixedDataIntoByteArray(int32(3))
-	if len(res) != 4 {
-		t.Errorf("Conversion incorrect.")
-	}
-}
-
-// Tests for TestAllocateShard.
-func TestAllocateShard(t *testing.T) {
-	num, success := AllocateShard(1, 1)
-	assert.Equal(t, num, 1, "error")
-	assert.True(t, success, "error")
-
-	num, success = AllocateShard(2, 1)
-	assert.False(t, success, "error")
-	assert.Equal(t, num, 1, "error")
-
-	num, success = AllocateShard(1, 2)
-	assert.True(t, success, "error")
-	assert.Equal(t, num, 1, "error")
-
-	num, success = AllocateShard(5, 3)
-	assert.False(t, success, "error")
-	assert.Equal(t, num, 2, "error")
-
-	num, success = AllocateShard(6, 3)
-	assert.False(t, success, "error")
-	assert.Equal(t, num, 3, "error")
-}
 
 // Test for GenKeyP2P, noted the length of private key can be random
 // thus we don't test it here.

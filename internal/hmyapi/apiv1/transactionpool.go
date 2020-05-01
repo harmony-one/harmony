@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
@@ -61,7 +60,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 	if err != nil {
 		return nil, err
 	}
-	result = ReturnWithPagination(hashes, args)
+	result = ReturnWithPagination(hashes, args.PageIndex, args.PageSize)
 	if !args.FullTx {
 		return map[string]interface{}{"transactions": result}, nil
 	}
@@ -153,7 +152,9 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockHashAndIndex(ctx 
 	return nil
 }
 
-// GetTransactionCount returns the number of transactions the given address has sent for the given block number
+// GetTransactionCount returns the number of transactions the given address has sent for the given block number.
+// Legacy for apiv1. For apiv2, please use getAccountNonce/getPoolNonce/getTransactionsCount/getStakingTransactionsCount apis for
+// more granular transaction counts queries
 func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr string, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
 	address := internal_common.ParseAddr(addr)
 	// Ask transaction pool for the nonce which includes pending transactions
@@ -173,36 +174,30 @@ func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr
 	return (*hexutil.Uint64)(&nonce), state.Error()
 }
 
-// SendTransaction creates a transaction for the given argument, sign it and submit it to the
-// transaction pool.
-func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args SendTxArgs) (common.Hash, error) {
-	// Look up the wallet containing the requested signer
-	account := accounts.Account{Address: args.From}
-
-	wallet, err := s.b.AccountManager().Find(account)
-	if err != nil {
-		return common.Hash{}, err
+// GetTransactionsCount returns the number of regular transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
+func (s *PublicTransactionPoolAPI) GetTransactionsCount(ctx context.Context, address, txType string) (uint64, error) {
+	var err error
+	if !strings.HasPrefix(address, "one1") {
+		addr := internal_common.ParseAddr(address)
+		address, err = internal_common.AddressToBech32(addr)
+		if err != nil {
+			return 0, err
+		}
 	}
+	return s.b.GetTransactionsCount(address, txType)
+}
 
-	if args.Nonce == nil {
-		// Hold the addresse's mutex around signing to prevent concurrent assignment of
-		// the same nonce to multiple accounts.
-		s.nonceLock.LockAddr(args.From)
-		defer s.nonceLock.UnlockAddr(args.From)
+// GetStakingTransactionsCount returns the number of staking transactions from genesis of input type ("SENT", "RECEIVED", "ALL")
+func (s *PublicTransactionPoolAPI) GetStakingTransactionsCount(ctx context.Context, address, txType string) (uint64, error) {
+	var err error
+	if !strings.HasPrefix(address, "one1") {
+		addr := internal_common.ParseAddr(address)
+		address, err = internal_common.AddressToBech32(addr)
+		if err != nil {
+			return 0, err
+		}
 	}
-
-	// Set some sanity defaults and terminate on failure
-	if err := args.setDefaults(ctx, s.b); err != nil {
-		return common.Hash{}, err
-	}
-	// Assemble the transaction and sign with the wallet
-	tx := args.toTransaction()
-
-	signed, err := wallet.SignTx(account, tx, s.b.ChainConfig().ChainID)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	return SubmitTransaction(ctx, s.b, signed)
+	return s.b.GetStakingTransactionsCount(address, txType)
 }
 
 // SendRawStakingTransaction will add the signed transaction to the transaction pool.
@@ -229,7 +224,9 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 
 // SendRawTransaction will add the signed transaction to the transaction pool.
 // The sender is responsible for signing the transaction and using the correct nonce.
-func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error) {
+func (s *PublicTransactionPoolAPI) SendRawTransaction(
+	ctx context.Context, encodedTx hexutil.Bytes,
+) (common.Hash, error) {
 	if len(encodedTx) >= types.MaxEncodedPoolTransactionSize {
 		err := errors.Wrapf(core.ErrOversizedData, "encoded tx size: %d", len(encodedTx))
 		return common.Hash{}, err
@@ -389,7 +386,9 @@ func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() []staking.RPCTra
 }
 
 // GetCXReceiptByHash returns the transaction for the given hash
-func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(ctx context.Context, hash common.Hash) *RPCCXReceipt {
+func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(
+	ctx context.Context, hash common.Hash,
+) *RPCCXReceipt {
 	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.b.ChainDb(), hash); cx != nil {
 		return newRPCCXReceipt(cx, blockHash, blockNumber)
 	}

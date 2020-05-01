@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"fmt"
-	"sync"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,7 +17,6 @@ type FBFTLog struct {
 	blocks     mapset.Set //store blocks received in FBFT
 	messages   mapset.Set // store messages received in FBFT
 	maxLogSize uint32
-	mutex      sync.Mutex
 }
 
 // FBFTMessage is the record of pbft messages received by a node during FBFT process
@@ -244,7 +242,7 @@ func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	copy(pbftMsg.Payload[:], consensusMsg.Payload[:])
 	pbftMsg.Block = make([]byte, len(consensusMsg.Block))
 	copy(pbftMsg.Block[:], consensusMsg.Block[:])
-	pubKey, err := bls_cosi.BytesToBlsPublicKey(consensusMsg.SenderPubkey)
+	pubKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
 	if err != nil {
 		return nil, err
 	}
@@ -266,12 +264,12 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	pbftMsg.Payload = make([]byte, len(vcMsg.Payload))
 	copy(pbftMsg.Payload[:], vcMsg.Payload[:])
 
-	pubKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.SenderPubkey)
+	pubKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to parse senderpubkey")
 		return nil, err
 	}
-	leaderKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.LeaderPubkey)
+	leaderKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.LeaderPubkey)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to parse leaderpubkey")
 		return nil, err
@@ -312,7 +310,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 	FBFTMsg.Payload = make([]byte, len(vcMsg.Payload))
 	copy(FBFTMsg.Payload[:], vcMsg.Payload[:])
 
-	pubKey, err := bls_cosi.BytesToBlsPublicKey(vcMsg.SenderPubkey)
+	pubKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to parse senderpubkey")
 		return nil, err

@@ -23,7 +23,7 @@ func (multiKey *PublicKey) SerializeToHexStr() string {
 	}
 	var builder strings.Builder
 	for _, pubKey := range multiKey.PublicKey {
-		builder.WriteString(pubKey.SerializeToHexStr())
+		builder.WriteString(pubKey.SerializeToHexStr() + ";")
 	}
 	return builder.String()
 }

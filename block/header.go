@@ -1,22 +1,22 @@
 package block
 
 import (
-	"fmt"
+	"encoding/json"
 	"io"
+	"math/big"
 	"reflect"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/taggedrlp"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
-
 	blockif "github.com/harmony-one/harmony/block/interface"
 	v0 "github.com/harmony-one/harmony/block/v0"
 	v1 "github.com/harmony-one/harmony/block/v1"
 	v2 "github.com/harmony-one/harmony/block/v2"
 	v3 "github.com/harmony-one/harmony/block/v3"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/taggedrlp"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 // Header represents a block header in the Harmony blockchain.
@@ -24,13 +24,53 @@ type Header struct {
 	blockif.Header
 }
 
+// HeaderPair ..
+type HeaderPair struct {
+	BeaconHeader *Header `json:"beacon-chain-header"`
+	ShardHeader  *Header `json:"shard-chain-header"`
+}
+
+var (
+	// ErrHeaderIsNil ..
+	ErrHeaderIsNil = errors.New("cannot encode nil header receiver")
+)
+
+// MarshalJSON ..
+func (h Header) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		S uint32   `json:"shard-id"`
+		H string   `json:"block-header-hash"`
+		N *big.Int `json:"block-number"`
+		V *big.Int `json:"view-id"`
+		E *big.Int `json:"epoch"`
+	}{
+		h.Header.ShardID(),
+		h.Header.Hash().Hex(),
+		h.Header.Number(),
+		h.Header.ViewID(),
+		h.Header.Epoch(),
+	})
+}
+
+// String ..
+func (h Header) String() string {
+	s, _ := json.Marshal(h)
+	return string(s)
+}
+
 // EncodeRLP encodes the header using tagged RLP representation.
 func (h *Header) EncodeRLP(w io.Writer) error {
+	if h == nil {
+		return ErrHeaderIsNil
+	}
 	return HeaderRegistry.Encode(w, h.Header)
 }
 
 // DecodeRLP decodes the header using tagged RLP representation.
 func (h *Header) DecodeRLP(s *rlp.Stream) error {
+	if h == nil {
+		return ErrHeaderIsNil
+	}
 	decoded, err := HeaderRegistry.Decode(s)
 	if err != nil {
 		return err
@@ -49,14 +89,6 @@ func (h *Header) DecodeRLP(s *rlp.Stream) error {
 // choose and return the right tagged RLP form of the header.
 func (h *Header) Hash() ethcommon.Hash {
 	return hash.FromRLP(h)
-}
-
-// String ..
-func (h *Header) String() string {
-	return fmt.Sprintf(
-		"[ShardID:%v Hash:%s Num:%v View:%v Epoch:%v]",
-		h.ShardID(), h.Hash().Hex(), h.Number(), h.ViewID(), h.Epoch(),
-	)
 }
 
 // Logger returns a sub-logger with block contexts added.

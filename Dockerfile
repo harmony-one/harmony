@@ -13,7 +13,7 @@ ENV BLS_DIR=${HMY_PATH}/bls
 ENV CGO_CFLAGS="-I${BLS_DIR}/include -I${MCL_DIR}/include"
 ENV CGO_LDFLAGS="-L${BLS_DIR}/lib"
 ENV LD_LIBRARY_PATH=${BLS_DIR}/lib:${MCL_DIR}/lib
-ENV GIMME_GO_VERSION="1.13.6"
+ENV GIMME_GO_VERSION="1.14.1"
 ENV PATH="/root/bin:${PATH}"
 
 RUN apt install libgmp-dev libssl-dev curl git \
@@ -64,6 +64,10 @@ go get -u github.com/go-delve/delve/cmd/dlv; \
 go get -u github.com/golang/mock/mockgen; \
 go get -u github.com/stamblerre/gocode; \
 go get -u golang.org/x/tools/...
+
+
+RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; . ~/.bash_profile; \
+go get -u honnef.co/go/tools/cmd/staticcheck/...
 
 WORKDIR ${HMY_PATH}/harmony
 

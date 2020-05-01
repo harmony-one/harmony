@@ -15,7 +15,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-	peer "github.com/libp2p/go-libp2p-peer"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -84,7 +84,7 @@ type Info struct {
 	Port   string
 	PubKey []byte
 	Role   RoleType
-	PeerID peer.ID // Peerstore ID
+	PeerID libp2p_peer.ID // Peerstore ID
 }
 
 func (info Info) String() string {
@@ -96,11 +96,10 @@ type BlockMessageType int
 
 // Block sync message subtype
 const (
-	Sync BlockMessageType = iota
-
-	CrossLink      // used for crosslink from beacon chain to shard chain
-	Receipt        // cross-shard transaction receipts
-	SlashCandidate // A report of a double-signing event
+	Sync           BlockMessageType = iota
+	CrossLink                       // used for crosslink from beacon chain to shard chain
+	Receipt                         // cross-shard transaction receipts
+	SlashCandidate                  // A report of a double-signing event
 )
 
 var (
@@ -190,7 +189,7 @@ func ConstructSlashMessage(witnesses slash.Records) []byte {
 // ConstructCrossLinkMessage constructs cross link message to send to beacon chain
 func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
 	byteBuffer := bytes.NewBuffer(crossLinkH)
-	crosslinks := []types.CrossLink{}
+	crosslinks := []*types.CrossLink{}
 	for _, header := range headers {
 		if header.Number().Uint64() <= 1 || !bc.Config().IsCrossLink(header.Epoch()) {
 			continue
@@ -199,8 +198,7 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 		if parentHeader == nil {
 			continue
 		}
-		epoch := parentHeader.Epoch()
-		crosslinks = append(crosslinks, types.NewCrossLink(header, epoch))
+		crosslinks = append(crosslinks, types.NewCrossLink(header, parentHeader))
 	}
 	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
 	byteBuffer.Write(crosslinksData)

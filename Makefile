@@ -12,8 +12,8 @@ all: libs
 	./scripts/go_executable_build.sh
 
 libs:
-	make -C $(TOP)/mcl
-	make -C $(TOP)/bls BLS_SWAP_G=1
+	make -C $(TOP)/mcl -j8
+	make -C $(TOP)/bls BLS_SWAP_G=1 -j8
 
 exe:
 	./scripts/go_executable_build.sh
@@ -21,10 +21,13 @@ exe:
 race:
 	./scripts/go_executable_build.sh -r
 
+trace-pointer:
+	./scripts/go_executable_build.sh -t
+
 test:
 	./test/debug.sh
 
 linux_static:
-	make -C $(TOP)/mcl
-	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1
+	make -C $(TOP)/mcl -j8
+	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
 	./scripts/go_executable_build.sh -s
