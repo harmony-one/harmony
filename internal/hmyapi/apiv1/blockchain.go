@@ -765,7 +765,7 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, add
 	for i := range delegations {
 		delegation := delegations[i]
 
-		undelegations := []RPCUndelegation{}
+		undelegations := make([]RPCUndelegation, len(delegation.Undelegations))
 
 		for j := range delegation.Undelegations {
 			undelegations = append(undelegations, RPCUndelegation{
@@ -806,7 +806,7 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegatorByBlockNumber(
 	for i := range delegations {
 		delegation := delegations[i]
 
-		undelegations := []RPCUndelegation{}
+		undelegations := make([]RPCUndelegation, len(delegation.Undelegations))
 
 		for j := range delegation.Undelegations {
 			undelegations = append(undelegations, RPCUndelegation{
