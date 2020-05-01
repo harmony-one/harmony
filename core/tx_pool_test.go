@@ -53,6 +53,9 @@ var (
 	gasPrice = big.NewInt(1e9)
 	gasLimit = big.NewInt(int64(params.TxGasValidatorCreation))
 	cost     = big.NewInt(1).Mul(gasPrice, gasLimit)
+
+	tenK    = new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18))
+	twelveK = new(big.Int).Mul(big.NewInt(12000), big.NewInt(1e18))
 )
 
 func init() {
