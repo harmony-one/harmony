@@ -7,16 +7,12 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"io"
 	"math/big"
 	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"encoding/binary"
-	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -40,7 +36,6 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
-	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -309,7 +304,8 @@ func (node *Node) BootstrapConsensus() error {
 		min := node.Consensus.MinPeers
 
 		for {
-
+			current := 0
+			time.Sleep(2 * time.Second)
 			conns, err := node.host.CoreAPI.Swarm().Peers(context.Background())
 
 			if err != nil {
@@ -317,48 +313,36 @@ func (node *Node) BootstrapConsensus() error {
 				return
 			}
 
-			if c := len(conns); c >= min {
-				utils.Logger().Info().
-					Int("have", c).
-					Int("needed", min).
-					Msg("got enough peers for consensus")
-				haveEnoughPeers <- struct{}{}
-				return
+			for _, conn := range conns {
+				protocols, err := node.host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
+					conn.ID(), p2p.Protocol,
+				)
+
+				if err != nil {
+					errored <- err
+					return
+				}
+
+				for _, protocol := range protocols {
+					if protocol == p2p.Protocol {
+						utils.Logger().Info().
+							Str("peer-id", conn.ID().Pretty()).
+							Msg("peer supports hmy protocol")
+
+						current++
+						break
+					}
+				}
+
+				if current >= min-2 {
+					utils.Logger().Info().
+						Int("have", current).
+						Int("needed", min).
+						Msg("got enough peers for consensus")
+					haveEnoughPeers <- struct{}{}
+					return
+				}
 			}
-
-			time.Sleep(2 * time.Second)
-
-			utils.Logger().Info().
-				Int("have", len(conns)).
-				Int("need", min).
-				Msg("not enough peers for consensus")
-
-			// for _, conn := range conns {
-			// protocols, err := node.host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
-			// 	conn.ID(), p2p.Protocol,
-			// )
-
-			// if err != nil {
-			// 	errored <- err
-			// 	return
-			// }
-
-			// for _, protocol := range protocols {
-			// 	if protocol == p2p.Protocol {
-			// 		current++
-			// 		break
-			// 	}
-			// }
-
-			// if current >= min-2 {
-			// 	utils.Logger().Info().
-			// 		Int("have", current).
-			// 		Int("needed", min).
-			// 		Msg("got enough peers for consensus")
-			// 	haveEnoughPeers <- struct{}{}
-			// 	return
-			// }
-			// }
 
 		}
 	}()
@@ -367,8 +351,12 @@ func (node *Node) BootstrapConsensus() error {
 	case err := <-errored:
 		return err
 	case <-haveEnoughPeers:
-		node.Consensus.ProposalNewBlock <- struct{}{}
+		go func() {
+			node.Consensus.ProposalNewBlock <- struct{}{}
+		}()
+
 		node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+
 		utils.Logger().Info().
 			Time("next-block-due", node.Consensus.NextBlockDue()).
 			Msg("this node is leader, kicked off consensus")
@@ -740,64 +728,6 @@ func (node *Node) StartStateSyncStreams() error {
 
 	var g errgroup.Group
 
-	node.host.IPFSNode.PeerHost.SetStreamHandler(
-		p2p.Protocol, func(stream libp2p_network.Stream) {
-			s := stream
-
-			g.Go(func() error {
-				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-
-				for {
-
-					time.Sleep(time.Second * 2)
-					// this must be our message
-					buf, err := rw.Peek(1)
-					if err != nil {
-						return err
-					}
-
-					if buf[0] == 0x11 {
-
-						_, err := rw.ReadByte()
-						if err != nil {
-							return err
-						}
-
-						var msgBuf msg_pb.Message
-						contentSizeBuf := make([]byte, 4)
-
-						if _, err := io.ReadFull(rw, contentSizeBuf); err != nil {
-							return err
-						}
-
-						sized := binary.BigEndian.Uint32(contentSizeBuf)
-						fmt.Println("sized", sized)
-
-						payload := make([]byte, sized)
-
-						if _, err := io.ReadFull(rw, payload); err != nil {
-							return err
-						}
-
-						fmt.Println("what does the payload look like", hex.EncodeToString(payload))
-						// 0x1100000005020803100e
-						// 0x          020803100e
-
-						if err := protobuf.Unmarshal(payload[1:], &msgBuf); err != nil {
-							fmt.Println(err.Error())
-						}
-						// Green console colour: 	\x1b[32m
-						// Reset console colour: 	\x1b[0m
-						fmt.Printf("\x1b[32m%s\x1b[0m> ", msgBuf.String())
-
-					}
-				}
-
-				return nil
-			})
-
-		})
-
 	g.Go(func() error {
 		time.Sleep(time.Second * 2)
 		conns, err := node.host.CoreAPI.Swarm().Peers(context.TODO())
@@ -839,15 +769,15 @@ func (node *Node) StartStateSyncStreams() error {
 				byteBuffer.Write(msg)
 				syncingMessage := p2p.ConstructMessage(byteBuffer.Bytes())
 
-				fmt.Println(
-					"sync message len is ",
-					len(syncingMessage),
-					syncingMessage,
-					hex.EncodeToString(syncingMessage),
-					message.String(),
-					"just protbuf",
-					hex.EncodeToString(msg),
-				)
+				// fmt.Println(
+				// 	"sync message len is ",
+				// 	len(syncingMessage),
+				// 	syncingMessage,
+				// 	hex.EncodeToString(syncingMessage),
+				// 	message.String(),
+				// 	"just protbuf",
+				// 	hex.EncodeToString(msg),
+				// )
 
 				if _, err := rw.Write(syncingMessage); err != nil {
 					fmt.Println("some problem -> ", err.Error())

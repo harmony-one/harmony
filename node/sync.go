@@ -1,12 +1,18 @@
 package node
 
 import (
+	"bufio"
 	"context"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"time"
 
+	protobuf "github.com/golang/protobuf/proto"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
 	"github.com/harmony-one/harmony/core/types"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
@@ -244,3 +250,73 @@ func offSetSyncingPort(nodePort string) string {
 const (
 	syncingPortDifference = 3000
 )
+
+// HandleIncomingHMYProtocolStreams ..
+func (node *Node) HandleIncomingHMYProtocolStreams() error {
+
+	var g errgroup.Group
+
+	for stream := range node.host.IncomingStream {
+		s := stream
+
+		g.Go(func() error {
+			//
+			stat := s.Stat()
+			fmt.Println("stats coming in->",
+				stat.Direction, stat.Extra, stream.Conn().RemotePeer().Pretty(),
+			)
+			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+			fmt.Println("something incoming->", rw)
+			for {
+
+				time.Sleep(time.Second * 2)
+				// this must be our message
+				buf, err := rw.Peek(1)
+				if err != nil {
+					return err
+				}
+
+				if buf[0] == 0x11 {
+
+					_, err := rw.ReadByte()
+					if err != nil {
+						return err
+					}
+
+					var msgBuf msg_pb.Message
+					contentSizeBuf := make([]byte, 4)
+
+					if _, err := io.ReadFull(rw, contentSizeBuf); err != nil {
+						return err
+					}
+
+					sized := binary.BigEndian.Uint32(contentSizeBuf)
+					fmt.Println("sized", sized)
+
+					payload := make([]byte, sized)
+
+					if _, err := io.ReadFull(rw, payload); err != nil {
+						return err
+					}
+
+					fmt.Println("what does the payload look like", hex.EncodeToString(payload))
+					// 0x1100000005020803100e
+					// 0x          020803100e
+
+					if err := protobuf.Unmarshal(payload[1:], &msgBuf); err != nil {
+						fmt.Println(err.Error())
+					}
+					// Green console colour: 	\x1b[32m
+					// Reset console colour: 	\x1b[0m
+					fmt.Printf("\x1b[32m%s\x1b[0m> ", msgBuf.String())
+
+				}
+			}
+
+			return nil
+		})
+
+	}
+
+	return g.Wait()
+}

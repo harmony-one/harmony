@@ -14,6 +14,7 @@ import (
 	ipfs_core "github.com/ipfs/go-ipfs/core"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/juju/fslock"
+	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -29,7 +30,6 @@ type Peer struct {
 	IP              string         // IP address of the peer
 	Port            string         // Port number of the peer
 	ConsensusPubKey *bls.PublicKey // Public key of the peer, used for consensus signing
-	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
 }
 
 // Opts ..
@@ -43,13 +43,14 @@ type Opts struct {
 
 // Host ..
 type Host struct {
-	CoreAPI    ipfs_interface.CoreAPI
-	IPFSNode   *ipfs_core.IpfsNode
-	log        *zerolog.Logger
-	OwnPeer    *Peer
-	lock       sync.Mutex
-	joined     map[string]ipfs_interface.PubSubSubscription
-	swarmAddrs []string
+	CoreAPI        ipfs_interface.CoreAPI
+	IPFSNode       *ipfs_core.IpfsNode
+	log            *zerolog.Logger
+	OwnPeer        *Peer
+	lock           sync.Mutex
+	joined         map[string]ipfs_interface.PubSubSubscription
+	swarmAddrs     []string
+	IncomingStream chan libp2p_network.Stream
 }
 
 func unlockFS(l *fslock.Lock) {
@@ -138,8 +139,8 @@ const DefaultLocal = "127.0.0.1"
 // NewHost ..
 func NewHost(opts *Opts, own *Peer) (*Host, error) {
 	swarmAddresses := []string{
-		fmt.Sprintf("/ip4/%s/tcp/%d", DefaultLocal, opts.Port),
-		fmt.Sprintf("/ip6/%s/tcp/%d", DefaultLocal, opts.Port),
+		fmt.Sprintf("/ip4/%s/tcp/%s", own.IP, own.Port),
+		fmt.Sprintf("/ip6/%s/tcp/%s", own.IP, own.Port),
 	}
 
 	mardv, err := multiaddr.NewMultiaddr(opts.RendezVousServerMAddr)
@@ -196,17 +197,26 @@ func NewHost(opts *Opts, own *Peer) (*Host, error) {
 		}
 	}
 
-	own.PeerID = node.PeerHost.ID()
+	in := make(chan libp2p_network.Stream)
+
+	node.PeerHost.SetStreamHandler(Protocol, func(stream libp2p_network.Stream) {
+		go passOn(in, stream)
+	})
 
 	return &Host{
-		CoreAPI:    api,
-		IPFSNode:   node,
-		log:        opts.Logger,
-		OwnPeer:    own,
-		lock:       sync.Mutex{},
-		joined:     map[string]ipfs_interface.PubSubSubscription{},
-		swarmAddrs: swarmAddresses,
+		CoreAPI:        api,
+		IPFSNode:       node,
+		log:            opts.Logger,
+		OwnPeer:        own,
+		lock:           sync.Mutex{},
+		joined:         map[string]ipfs_interface.PubSubSubscription{},
+		swarmAddrs:     swarmAddresses,
+		IncomingStream: in,
 	}, nil
+}
+
+func passOn(in chan libp2p_network.Stream, stream libp2p_network.Stream) {
+	in <- stream
 }
 
 // ConstructMessage constructs the p2p message as [messageType, contentSize, content]

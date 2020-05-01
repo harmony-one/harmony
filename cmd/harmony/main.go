@@ -781,22 +781,17 @@ func main() {
 
 	g.Go(currentNode.HandleIncomingBlock)
 	g.Go(currentNode.StartP2PMessageHandling)
+	g.Go(currentNode.HandleIncomingHMYProtocolStreams)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		g.Go(currentNode.HandleConsensusBlockProcessing)
 		g.Go(currentNode.HandleConsensusMessageProcessing)
 		g.Go(currentNode.StartLeaderWork)
 		g.Go(currentNode.EnsureConsensusLiviness)
-		// g.Go(currentNode.EnsureConsensusInSync)
-	}
-
-	// if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID &&
-	// 	currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
-	// g.Go(currentNode.StartStateSyncStreams)
-
-	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		g.Go(currentNode.BootstrapConsensus)
 	}
+
+	g.Go(currentNode.StartStateSyncStreams)
 
 	if err := g.Wait(); err != nil {
 		fatal(err)
