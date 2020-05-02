@@ -512,8 +512,6 @@ func setupConsensusAndNode(
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.ChainReader = currentNode.Blockchain()
-	currentNode.NodeConfig.DNSZone = *dnsZone
-
 	currentNode.NodeConfig.SetBeaconGroupID(
 		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 	)
@@ -708,7 +706,8 @@ func main() {
 		fmt.Printf("%s mode; node key %s -> shard %d\n",
 			map[bool]string{false: "Legacy", true: "Staking"}[*stakingFlag],
 			nodeconfig.GetDefaultConfig().ConsensusPubKey.SerializeToHexStr(),
-			initialAccounts[0].ShardID)
+			initialAccounts[0].ShardID,
+		)
 	}
 	if *nodeType != "validator" && *shardID >= 0 {
 		for _, initialAccount := range initialAccounts {
@@ -779,16 +778,15 @@ func main() {
 
 	var g errgroup.Group
 
-	// g.Go(currentNode.HandleIncomingBlock)
-	// g.Go(currentNode.StartP2PMessageHandling)
+	g.Go(currentNode.HandleIncomingBlock)
+	g.Go(currentNode.StartP2PMessageHandling)
 	g.Go(currentNode.HandleIncomingHMYProtocolStreams)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
-		// g.Go(currentNode.HandleConsensusBlockProcessing)
-		// g.Go(currentNode.HandleConsensusMessageProcessing)
-		// g.Go(currentNode.StartLeaderWork)
-		// g.Go(currentNode.EnsureConsensusLiviness)
-		// g.Go(currentNode.BootstrapConsensus)
+		g.Go(currentNode.HandleConsensusBlockProcessing)
+		g.Go(currentNode.HandleConsensusMessageProcessing)
+		g.Go(currentNode.StartLeaderWork)
+		g.Go(currentNode.BootstrapConsensus)
 	}
 
 	g.Go(currentNode.HandleBlockSyncing)

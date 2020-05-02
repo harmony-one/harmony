@@ -346,15 +346,8 @@ func (node *Node) BootstrapConsensus() error {
 	case err := <-errored:
 		return err
 	case <-haveEnoughPeers:
-		go func() {
-			node.Consensus.ProposalNewBlock <- struct{}{}
-		}()
-
-		node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-
-		utils.Logger().Info().
-			Time("next-block-due", node.Consensus.NextBlockDue()).
-			Msg("this node is leader, kicked off consensus")
+		node.Consensus.ProposalNewBlock <- struct{}{}
+		utils.Logger().Info().Msg("have enough peers to kick off consensus")
 		return nil
 	case <-t.C:
 		return errors.New("exceeded 60 seconds waiting for enough min peers")

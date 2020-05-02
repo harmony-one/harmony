@@ -20,7 +20,6 @@ import (
 
 // Constants of proposing a new block
 const (
-	SleepPeriod           = 20 * time.Millisecond
 	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
 )
 
@@ -56,10 +55,11 @@ func (node *Node) StartLeaderWork() error {
 					Msg("=========Successfully Proposed New Block==========")
 				// Send the new block to Consensus so it can be confirmed.
 
+				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+
 				if err := node.Consensus.Announce(newBlock); err != nil {
 					return err
 				}
-				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 
 			}
 		}
@@ -70,88 +70,32 @@ func (node *Node) StartLeaderWork() error {
 
 	g.Go(func() error {
 		for quorumReached := range node.Consensus.CommitFinishChan {
-			if node.Consensus.IsLeader() {
+
+			if quorumReached.ViewID == node.Consensus.ViewID() {
 				viewID, shardID := quorumReached.ViewID, quorumReached.ShardID
 				key := fmt.Sprintf("%d-%d", viewID, shardID)
-
-				_, err, shared := roundDone.Do(key,
-					func() (interface{}, error) {
-
-						// NOTE always give 2 second buffer time
-						time.Sleep(time.Second * 2)
-
-						if bufferTime := time.Until(
-							node.Consensus.NextBlockDue(),
-						); bufferTime > 0 {
-
-							// fmt.Println(
-							// 	"got the block done faster",
-							// 	node.Consensus.ShardID,
-							// 	bufferTime.Round(time.Second),
-							// )
-
-							// On local net, this is the block time basically
-							if b := bufferTime - time.Second; b > 0 {
-								// fmt.Println("will sleep for", b.Round(time.Second))
-								time.Sleep(b)
-							}
-						}
-
-						return key, nil
-					})
-
-				if err != nil {
-					return err
-				}
-
-				if !shared {
-					// fmt.Println("hello finished on", key, result, err, shared)
+				readyChan := roundDone.DoChan(key, func() (interface{}, error) {
+					time.Sleep(time.Until(node.Consensus.NextBlockDue()))
 					if err := node.Consensus.FinalizeCommits(); err != nil {
-						return err
+						return nil, err
 					}
+					return key, nil
+				})
 
-					// NOTE comment this out to cause a view change
+				go func() {
+					r := <-readyChan
 					node.Consensus.ProposalNewBlock <- struct{}{}
-					node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+					utils.Logger().Info().
+						Str("key", r.Val.(string)).
+						Msg("finalized commits and sent out new proposal signal")
+				}()
 
-					// fmt.Println("finished finalize")
-				}
 			}
+
 		}
 
 		return nil
 	})
-
-	return g.Wait()
-}
-
-// func (node *Node) EnsureConsensusInSync() error {
-// 	select {}
-// 	return nil
-// }
-
-// EnsureConsensusLiviness ..
-func (node *Node) EnsureConsensusLiviness() error {
-	var g errgroup.Group
-
-	// node.Consensus.Timeouts.Consensus.Start(node.Consensus.BlockNum())
-
-	// g.Go(func() error {
-	// 	for {
-	// 		n := node.Consensus.Timeouts.Consensus.Notify()
-	// 		select {
-	// 		case issue := <-n:
-	// 			fmt.Println("we got the timeout ->", issue)
-
-	// 		}
-	// 	}
-
-	// 	return nil
-	// })
-
-	// g.Go(func() error {
-	// 	return nil
-	// })
 
 	return g.Wait()
 }

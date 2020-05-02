@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"time"
 
@@ -134,9 +133,9 @@ func syncFromHMYPeersIfNeeded(
 		return err
 	}
 
-	for _, c := range collect {
-		fmt.Println("collected info from ->", c)
-	}
+	utils.Logger().Info().
+		Int("protocol-peers", len(collect)).
+		Msg("hmy protocol neighborse")
 
 	return nil
 }
@@ -255,9 +254,7 @@ func (sync *syncingHandler) sendBytesWithFlush(data []byte) error {
 }
 
 func (sync *syncingHandler) replyWithCurrentBlockHeight() error {
-
 	heights := <-sync.current
-
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
 		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
@@ -285,7 +282,6 @@ func (sync *syncingHandler) handleMessage(msg *msg_pb.Message) error {
 	}
 
 	if msg.GetType() == msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT {
-		fmt.Printf("\x1b[32m%s\x1b[0m> ", msg.String())
 		return sync.replyWithCurrentBlockHeight()
 	}
 
@@ -351,7 +347,7 @@ type chainHeights struct {
 
 // HandleBlockSyncing ..
 func (node *Node) HandleBlockSyncing() error {
-	t := time.NewTicker(time.Second * 10)
+	t := time.NewTicker(time.Second * 45)
 	defer t.Stop()
 
 	for {
@@ -383,7 +379,6 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 	var g errgroup.Group
 
 	info := make(chan chainHeights)
-	incoming := 0
 
 	g.Go(func() error {
 
@@ -414,13 +409,15 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 				currentBeacon = e.Block
 				height.beacon.blockNum = currentBeacon.Number().Uint64()
 				height.beacon.blockHash = currentBeacon.Hash()
+				info <- height
 			case e := <-shardEvent:
 				currentShard = e.Block
 				height.shard.blockNum = currentShard.Number().Uint64()
 				height.shard.blockHash = currentShard.Hash()
+				info <- height
 			default:
 				info <- height
-				fmt.Println("this case?")
+				time.Sleep(800 * time.Millisecond)
 			}
 		}
 		return nil
@@ -436,18 +433,10 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 				return err
 			}
 
-			incoming++
-			fmt.Println(
-				"incoming so far",
-				incoming,
-				node.host.OwnPeer.ConsensusPubKey.SerializeToHexStr(),
-			)
-
-			fmt.Println("before process incoming")
 			if err := handler.processIncoming(); err != nil {
 				return err
 			}
-			fmt.Println("after process incoming")
+
 			if err := handler.rawStream.Close(); err != nil {
 				return err
 			}

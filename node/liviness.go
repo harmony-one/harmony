@@ -22,13 +22,14 @@ func (node *Node) HandleConsensusMessageProcessing() error {
 	g.Go(func() error {
 		for due := range node.Consensus.Timeouts.Consensus.TimedOut {
 			blkNow := node.Blockchain().CurrentHeader().Number().Uint64()
-
+			_ = due
+			_ = blkNow
 			// fmt.Println("PLAIN CONSENSUS TIMEOUT", due, blkNow)
 
-			if blkNow <= due {
-				fmt.Println("starting a view change ->", node.Consensus.ViewID())
-				node.Consensus.StartViewChange(node.Consensus.ViewID() + 1)
-			}
+			// if blkNow <= due {
+			// 	fmt.Println("starting a view change ->", node.Consensus.ViewID())
+			// 	node.Consensus.StartViewChange(node.Consensus.ViewID() + 1)
+			// }
 		}
 		return nil
 	})
@@ -36,13 +37,14 @@ func (node *Node) HandleConsensusMessageProcessing() error {
 	g.Go(func() error {
 		for due := range node.Consensus.Timeouts.ViewChange.TimedOut {
 			viewIDNow := node.Consensus.Current.ViewID()
-
+			_ = due
+			_ = viewIDNow
 			// fmt.Println("VIEWCHANGE TIMEOUT", due, viewIDNow)
 
-			if viewIDNow <= due {
-				fmt.Println("starting a view change ->", node.Consensus.Current.ViewID())
-				node.Consensus.StartViewChange(viewIDNow + 1)
-			}
+			// if viewIDNow <= due {
+			// 	fmt.Println("starting a view change ->", node.Consensus.Current.ViewID())
+			// 	node.Consensus.StartViewChange(viewIDNow + 1)
+			// }
 		}
 		return nil
 	})

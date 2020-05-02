@@ -1,7 +1,6 @@
 package shard
 
 import (
-	"fmt"
 	"math/big"
 
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
@@ -25,13 +24,10 @@ var (
 // ExternalSlotsAvailableForEpoch ..
 func ExternalSlotsAvailableForEpoch(epoch *big.Int) int {
 	instance := Schedule.InstanceForEpoch(epoch)
-	fmt.Println("this this", instance)
 	stakedSlots :=
 		(instance.NumNodesPerShard() -
 			instance.NumHarmonyOperatedNodesPerShard()) *
 			int(instance.NumShards())
-	// fmt.Println(instance)
-	// panic("when")
 	if stakedSlots == 0 {
 		utils.Logger().Debug().
 			Uint64("epoch", epoch.Uint64()).

@@ -292,13 +292,12 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.Commit) {
-		go func() {
-			consensus.CommitFinishChan <- Finished{
-				consensus.ViewID(),
-				consensus.ShardID,
-				consensus.BlockHash(),
-			}
-		}()
+		consensus.CommitFinishChan <- Finished{
+			consensus.ViewID(),
+			consensus.ShardID,
+			consensus.BlockHash(),
+		}
+
 	}
 
 	return nil
