@@ -13,6 +13,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
@@ -222,15 +223,17 @@ func (sync *syncingHandler) sendBytesWithFlush(data []byte) error {
 
 func (sync *syncingHandler) replyWithCurrentBlockHeight() error {
 
+	heights := <-sync.current
+
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
 		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
 		Request: &msg_pb.Message_SyncBlockHeight{
 			SyncBlockHeight: &msg_pb.SyncBlockHeight{
-				BeaconHeight: 1,
-				BeaconHash:   []byte{},
-				ShardHeight:  2,
-				ShardHash:    []byte{},
+				BeaconHeight: heights.beacon.blockNum,
+				BeaconHash:   heights.beacon.blockHash.Bytes(),
+				ShardHeight:  heights.shard.blockNum,
+				ShardHash:    heights.shard.blockHash.Bytes(),
 			},
 		},
 	}
@@ -347,6 +350,44 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 	errs := make(chan error)
 	info := make(chan chainHeights)
 	incoming := 0
+
+	go func() {
+		beaconEvent := make(chan core.ChainHeadEvent)
+		shardEvent := make(chan core.ChainHeadEvent)
+		subBeacon := node.Blockchain().SubscribeChainHeadEvent(beaconEvent)
+		subShard := node.Blockchain().SubscribeChainHeadEvent(shardEvent)
+		defer subBeacon.Unsubscribe()
+		defer subShard.Unsubscribe()
+
+		currentBeacon := node.Blockchain().CurrentBlock()
+		currentShard := node.Beaconchain().CurrentBlock()
+
+		height := chainHeights{
+			beacon: height{
+				blockNum:  currentBeacon.Number().Uint64(),
+				blockHash: currentBeacon.Hash(),
+			},
+			shard: height{
+				blockNum:  currentBeacon.Number().Uint64(),
+				blockHash: currentShard.Hash(),
+			},
+		}
+
+		for {
+			select {
+			case e := <-beaconEvent:
+				currentBeacon = e.Block
+				height.beacon.blockNum = currentBeacon.Number().Uint64()
+				height.beacon.blockHash = currentBeacon.Hash()
+			case e := <-shardEvent:
+				currentShard = e.Block
+				height.shard.blockNum = currentShard.Number().Uint64()
+				height.shard.blockHash = currentShard.Hash()
+			case info <- height:
+			}
+		}
+
+	}()
 
 	for stream := range node.host.IncomingStream {
 		handler, err := newSyncerForIncoming(
