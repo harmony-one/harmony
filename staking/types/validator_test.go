@@ -132,6 +132,48 @@ func createNewValidatorWrapper(v Validator) ValidatorWrapper {
 	}
 }
 
+func TestComputed_String(t *testing.T) {
+	tests := []struct {
+		computed Computed
+		expStr   string
+	}{
+		{
+			computed: Computed{
+				Signed:            big.NewInt(100),
+				ToSign:            big.NewInt(100),
+				BlocksLeftInEpoch: 1000,
+				Percentage:        numeric.NewDecWithPrec(10, 2),
+				IsBelowThreshold:  false,
+			},
+			expStr: `{"current-epoch-signed":100,"current-epoch-to-sign":100,"current-epoch-signing-percentage":"0.100000000000000000"}`,
+		},
+		{
+			computed: Computed{
+				Percentage: numeric.NewDec(1),
+			},
+			expStr: `{"current-epoch-signed":null,"current-epoch-to-sign":null,"current-epoch-signing-percentage":"1.000000000000000000"}`,
+		},
+		{
+			computed: Computed{},
+			expStr:   "",
+		},
+		{
+			computed: Computed{
+				BlocksLeftInEpoch: 100,
+				IsBelowThreshold:  true,
+			},
+			expStr: "",
+		},
+	}
+	for _, test := range tests {
+		s := test.computed.String()
+		fmt.Println(s)
+		if s != test.expStr {
+			t.Errorf("unexpected string: \n\t[%s]\n\t[%s]", s, test.expStr)
+		}
+	}
+}
+
 // Test MarshalValidator
 func TestMarshalValidator(t *testing.T) {
 	_, err := MarshalValidator(validator)
