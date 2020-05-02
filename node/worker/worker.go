@@ -388,6 +388,14 @@ func (w *Worker) verifySlashes(
 			failures = append(failures, d[i])
 		} else {
 			seenEvidences[evidenceHash] = struct{}{}
+
+			// In addition, need to count the same evidence with first and second vote swapped as seen
+			swapVote := d[i].Evidence
+			tmp := swapVote.ConflictingVotes.FirstVote
+			swapVote.ConflictingVotes.FirstVote = swapVote.ConflictingVotes.SecondVote
+			swapVote.ConflictingVotes.SecondVote = tmp
+			swapHash := hash.FromRLPNew256(swapVote)
+			seenEvidences[swapHash] = struct{}{}
 		}
 
 		if err := slash.Verify(
