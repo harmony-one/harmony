@@ -23,7 +23,7 @@ import (
 func newSyncerForIncoming(
 	stream libp2p_network.Stream,
 	host *p2p.Host,
-	current chan latestInfo,
+	current chan chainHeights,
 ) (*syncingHandler, error) {
 	rw := bufio.NewReadWriter(
 		bufio.NewReader(stream), bufio.NewWriter(stream),
@@ -37,7 +37,7 @@ func newSyncerForIncoming(
 func newSyncerToPeerID(
 	peerID libp2p_peer.ID,
 	host *p2p.Host,
-	current chan latestInfo,
+	current chan chainHeights,
 ) (*syncingHandler, error) {
 
 	stream, err := host.IPFSNode.PeerHost.NewStream(
@@ -94,29 +94,24 @@ func syncFromHMYPeersIfNeeded(
 			return err
 		}
 
-		beaconC, shardC, err := handler.askHeight()
+		heights, err := handler.askHeight()
 
 		if err != nil {
 			return err
 		}
 
-		fmt.Println(beaconC, shardC, err)
+		fmt.Println("received this as reply->", heights)
 	}
 	// everyonesHeaderHashs := askEveryoneInHMYProtocolTheirHeight(conns)
 
 	return nil
 }
 
-type latestInfo struct {
-	beacon *height
-	shard  *height
-}
-
 type syncingHandler struct {
 	rawStream libp2p_network.Stream
 	host      *p2p.Host
 	rw        *bufio.ReadWriter
-	current   chan latestInfo
+	current   chan chainHeights
 }
 
 var (
@@ -137,13 +132,11 @@ func init() {
 			ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
 			Type:        m,
 		}
-		msg, err := protobuf.Marshal(message)
+		data, err := constructHarmonyP2PMsgForClientRoles(message)
 		if err != nil {
 			panic("die ->" + err.Error())
 		}
-		byteBuffer := bytes.NewBuffer([]byte{byte(proto_node.Client)})
-		byteBuffer.Write(msg)
-		allMessage[i] = p2p.ConstructMessage(byteBuffer.Bytes())
+		allMessage[i] = data
 	}
 
 	requestBlockHeight = allMessage[0]
@@ -151,16 +144,56 @@ func init() {
 	requestBlock = allMessage[2]
 }
 
-func (sync *syncingHandler) receiveHeightResponse() (*height, *height, error) {
-	return nil, nil, nil
+func constructHarmonyP2PMsgForClientRoles(
+	message *msg_pb.Message,
+) ([]byte, error) {
+	msg, err := protobuf.Marshal(message)
+	if err != nil {
+		return nil, err
+	}
+	byteBuffer := bytes.NewBuffer([]byte{byte(proto_node.Client)})
+	byteBuffer.Write(msg)
+	return p2p.ConstructMessage(byteBuffer.Bytes()), nil
 }
 
-func (sync *syncingHandler) askHeight() (*height, *height, error) {
+func (sync *syncingHandler) receiveHeightResponse() (*chainHeights, error) {
+	resp, err := sync.readHarmonyMessage()
+	if err != nil {
+		return nil, err
+	}
+
+	if r := resp.GetServiceType(); r != msg_pb.ServiceType_CLIENT_SUPPORT {
+		return nil, errors.Wrapf(
+			errNotClientSupport, "wrongly received %v", r,
+		)
+	}
+
+	if r := resp.GetType(); r != msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT {
+		return nil, errors.Wrapf(
+			errWrongReply, "wrongly received %v", r,
+		)
+	}
+
+	peerHeights := resp.GetSyncBlockHeight()
+	return &chainHeights{
+		beacon: height{
+			blockNum:  peerHeights.GetBeaconHeight(),
+			blockHash: common.BytesToHash(peerHeights.GetBeaconHash()),
+		},
+		shard: height{
+			blockNum:  peerHeights.GetShardHeight(),
+			blockHash: common.BytesToHash(peerHeights.GetShardHash()),
+		},
+	}, nil
+
+}
+
+func (sync *syncingHandler) askHeight() (*chainHeights, error) {
 	if _, err := sync.rw.Write(requestBlockHeight); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if err := sync.rw.Flush(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	return sync.receiveHeightResponse()
@@ -171,11 +204,43 @@ var (
 	errNotAHarmonyMessage = errors.New(
 		"incoming message from stream did not begin with 0x11",
 	)
+	errWrongReply = errors.New("wrong reply from other side of stream connection")
 )
 
-func (sync *syncingHandler) replyWithCurrentBlockHeight() error {
-	fmt.Println("need to give reply")
+func (sync *syncingHandler) sendBytesWithFlush(data []byte) error {
+	if _, err := sync.rw.Write(data); err != nil {
+		return err
+	}
+
+	if err := sync.rw.Flush(); err != nil {
+		return err
+	}
+
 	return nil
+
+}
+
+func (sync *syncingHandler) replyWithCurrentBlockHeight() error {
+
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
+		Request: &msg_pb.Message_SyncBlockHeight{
+			SyncBlockHeight: &msg_pb.SyncBlockHeight{
+				BeaconHeight: 1,
+				BeaconHash:   []byte{},
+				ShardHeight:  2,
+				ShardHash:    []byte{},
+			},
+		},
+	}
+
+	data, err := constructHarmonyP2PMsgForClientRoles(message)
+	if err != nil {
+		return err
+	}
+
+	return sync.sendBytesWithFlush(data)
 }
 
 func (sync *syncingHandler) handleMessage(msg *msg_pb.Message) error {
@@ -185,49 +250,58 @@ func (sync *syncingHandler) handleMessage(msg *msg_pb.Message) error {
 
 	if msg.GetType() == msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT {
 		fmt.Printf("\x1b[32m%s\x1b[0m> ", msg.String())
-
 		return sync.replyWithCurrentBlockHeight()
 	}
 
 	return nil
 }
 
-func (sync *syncingHandler) processIncoming() error {
-	// this must be our message
+func (sync *syncingHandler) readHarmonyMessage() (*msg_pb.Message, error) {
 	buf, err := sync.rw.Peek(1)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if buf[0] == 0x11 {
 		_, err := sync.rw.ReadByte()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		var msgBuf msg_pb.Message
 		contentSizeBuf := make([]byte, 4)
 
 		if _, err := io.ReadFull(sync.rw, contentSizeBuf); err != nil {
-			return err
+			return nil, err
 		}
 
 		sized := binary.BigEndian.Uint32(contentSizeBuf)
 		payload := make([]byte, sized)
 
 		if _, err := io.ReadFull(sync.rw, payload); err != nil {
-			return err
+			return nil, err
 		}
 
+		// TODO double check that that one byte is indeed "client"
 		// That one extra middle offset byte --
 		if err := protobuf.Unmarshal(payload[1:], &msgBuf); err != nil {
-			return err
+			return nil, err
 		}
-
-		return sync.handleMessage(&msgBuf)
+		return &msgBuf, nil
 	}
 
-	return errNotAHarmonyMessage
+	return nil, errNotAHarmonyMessage
+}
+
+func (sync *syncingHandler) processIncoming() error {
+	// this must be our message
+	msg, err := sync.readHarmonyMessage()
+	if err != nil {
+		return err
+	}
+
+	return sync.handleMessage(msg)
+
 }
 
 type height struct {
@@ -235,9 +309,14 @@ type height struct {
 	blockHash common.Hash
 }
 
+type chainHeights struct {
+	beacon height
+	shard  height
+}
+
 // HandleBlockSyncing ..
 func (node *Node) HandleBlockSyncing() error {
-	t := time.NewTicker(time.Second * 30)
+	t := time.NewTicker(time.Second * 10)
 	defer t.Stop()
 
 	select {
@@ -266,7 +345,7 @@ func (node *Node) HandleBlockSyncing() error {
 // HandleIncomingHMYProtocolStreams ..
 func (node *Node) HandleIncomingHMYProtocolStreams() error {
 	errs := make(chan error)
-	info := make(chan latestInfo)
+	info := make(chan chainHeights)
 	incoming := 0
 
 	for stream := range node.host.IncomingStream {
