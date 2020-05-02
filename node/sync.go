@@ -16,9 +16,11 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 func newSyncerForIncoming(
@@ -60,9 +62,61 @@ func newSyncerToPeerID(
 
 }
 
-func askEveryoneInHMYProtocolTheirHeight(host *p2p.Host) error {
-	//
-	return nil
+func protocolPeerHeights(
+	conns []ipfs_interface.ConnectionInfo, host *p2p.Host,
+) ([]*chainHeights, error) {
+	var collect []*chainHeights
+
+	for _, neighbor := range conns {
+		protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
+			neighbor.ID(), p2p.Protocol,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+		seen := false
+		for _, protocol := range protocols {
+			if seen = protocol == p2p.Protocol; seen {
+				break
+			}
+		}
+		if !seen {
+			continue
+		}
+
+		handler, err := newSyncerToPeerID(neighbor.ID(), host, nil)
+
+		if err != nil {
+			return nil, err
+		}
+
+		utils.Logger().Info().
+			Str("peer-addr", neighbor.Address().String()).
+			Msg("connected to a harmony protocol supporting neighbor")
+		heights, err := handler.askHeight()
+		if err != nil {
+			return nil, err
+		}
+
+		collect = append(collect, heights)
+
+		if err := handler.rw.Flush(); err != nil {
+			return nil, err
+		}
+
+		if err := handler.rawStream.Close(); err != nil {
+			return nil, err
+		}
+
+	}
+
+	utils.Logger().Info().
+		Int("harmony-protocol-peers", len(collect)).
+		Msg("finished asking heights for state syncing")
+
+	return collect, nil
+
 }
 
 func syncFromHMYPeersIfNeeded(
@@ -75,35 +129,14 @@ func syncFromHMYPeersIfNeeded(
 		return err
 	}
 
-	for _, neighbor := range conns {
-		id := neighbor.ID()
-		protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
-			id, p2p.Protocol,
-		)
-
-		if err != nil {
-			return err
-		}
-
-		if len(protocols) == 0 {
-			continue
-		}
-
-		handler, err := newSyncerToPeerID(id, host, nil)
-
-		if err != nil {
-			return err
-		}
-
-		heights, err := handler.askHeight()
-
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("received this as reply->", heights)
+	collect, err := protocolPeerHeights(conns, host)
+	if err != nil {
+		return err
 	}
-	// everyonesHeaderHashs := askEveryoneInHMYProtocolTheirHeight(conns)
+
+	for _, c := range collect {
+		fmt.Println("collected info from ->", c)
+	}
 
 	return nil
 }
@@ -322,24 +355,25 @@ func (node *Node) HandleBlockSyncing() error {
 	t := time.NewTicker(time.Second * 10)
 	defer t.Stop()
 
-	select {
-	case blockRange := <-node.Consensus.SyncNeeded:
-		_ = blockRange
-	case <-t.C:
-		if err := syncFromHMYPeersIfNeeded(
-			node.host,
-			height{
-				node.Beaconchain().CurrentHeader().Number().Uint64(),
-				node.Beaconchain().CurrentHeader().Hash(),
-			},
-			height{
-				node.Blockchain().CurrentHeader().Number().Uint64(),
-				node.Blockchain().CurrentHeader().Hash(),
-			},
-		); err != nil {
-			return err
+	for {
+		select {
+		case blockRange := <-node.Consensus.SyncNeeded:
+			_ = blockRange
+		case <-t.C:
+			if err := syncFromHMYPeersIfNeeded(
+				node.host,
+				height{
+					node.Beaconchain().CurrentHeader().Number().Uint64(),
+					node.Beaconchain().CurrentHeader().Hash(),
+				},
+				height{
+					node.Blockchain().CurrentHeader().Number().Uint64(),
+					node.Blockchain().CurrentHeader().Hash(),
+				},
+			); err != nil {
+				return err
+			}
 		}
-
 	}
 
 	return nil
@@ -347,11 +381,13 @@ func (node *Node) HandleBlockSyncing() error {
 
 // HandleIncomingHMYProtocolStreams ..
 func (node *Node) HandleIncomingHMYProtocolStreams() error {
-	errs := make(chan error)
+	var g errgroup.Group
+
 	info := make(chan chainHeights)
 	incoming := 0
 
-	go func() {
+	g.Go(func() error {
+
 		beaconEvent := make(chan core.ChainHeadEvent)
 		shardEvent := make(chan core.ChainHeadEvent)
 		subBeacon := node.Blockchain().SubscribeChainHeadEvent(beaconEvent)
@@ -383,34 +419,38 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 				currentShard = e.Block
 				height.shard.blockNum = currentShard.Number().Uint64()
 				height.shard.blockHash = currentShard.Hash()
-			case info <- height:
+			default:
+				info <- height
+				fmt.Println("this case?")
 			}
 		}
+		return nil
+	})
 
-	}()
+	g.Go(func() error {
+		for stream := range node.host.IncomingStream {
+			handler, err := newSyncerForIncoming(
+				stream, node.host, info,
+			)
+			if err != nil {
+				return err
+			}
 
-	for stream := range node.host.IncomingStream {
-		handler, err := newSyncerForIncoming(
-			stream, node.host, info,
-		)
-		if err != nil {
-			return err
+			incoming++
+			fmt.Println(
+				"incoming so far",
+				incoming,
+				node.host.OwnPeer.ConsensusPubKey.SerializeToHexStr(),
+			)
+
+			fmt.Println("before process incoming")
+			if err := handler.processIncoming(); err != nil {
+				return err
+			}
+			fmt.Println("after process incoming")
 		}
+		return nil
+	})
 
-		incoming++
-		fmt.Println(
-			"incoming so far",
-			incoming,
-			node.host.OwnPeer.ConsensusPubKey.SerializeToHexStr(),
-		)
-		errs <- handler.processIncoming()
-
-	}
-
-	for err := range errs {
-		utils.Logger().Info().Err(err).
-			Msg("incoming stream handling had some problem")
-	}
-
-	return nil
+	return g.Wait()
 }
