@@ -191,9 +191,6 @@ func TestValidatorSanityCheck(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		if i != 5 {
-			continue
-		}
 		v := createNewValidator()
 		test.editValidator(&v)
 		err := v.SanityCheck(DoNotEnforceMaxBLS)
