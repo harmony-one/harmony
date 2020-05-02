@@ -26,7 +26,7 @@ const (
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
 	BLSVerificationStr       = "harmony-one"
-	TenThousand              = 10
+	TenThousand              = 10000
 	APRHistoryLength         = 100
 )
 
