@@ -3,10 +3,11 @@ package worker
 import (
 	"bytes"
 	"fmt"
-	"github.com/harmony-one/harmony/crypto/hash"
 	"math/big"
 	"sort"
 	"time"
+
+	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
