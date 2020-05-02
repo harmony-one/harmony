@@ -348,6 +348,9 @@ func TestDescription_EnsureLength(t *testing.T) {
 		if (err == nil) != (test.expErr == nil) {
 			t.Errorf("unexpected error: [%v] / [%v]", err, test.expErr)
 		}
+		if err != nil {
+			continue
+		}
 		if err := assertDescriptionEqual(test.desc, d); err != nil {
 			t.Errorf("assert equal: %v", err)
 		}
@@ -355,26 +358,96 @@ func TestDescription_EnsureLength(t *testing.T) {
 }
 
 func TestUpdateDescription(t *testing.T) {
-	// create two description
-	d1 := Description{
-		Name:            "Wayne",
-		Identity:        "wen",
-		Website:         "harmony.one.wen",
-		SecurityContact: "wenSecurity",
-		Details:         "wenDetails",
+	tests := []struct {
+		raw    Description
+		update Description
+		expect Description
+		expErr error
+	}{
+		{
+			raw: Description{
+				Name:            "Wayne",
+				Identity:        "wen",
+				Website:         "harmony.one.wen",
+				SecurityContact: "wenSecurity",
+				Details:         "wenDetails",
+			},
+			update: Description{
+				Name:            "Jacky",
+				Identity:        "jw",
+				Website:         "harmony.one/jacky",
+				SecurityContact: "jacky@harmony.one",
+				Details:         "Details of Jacky",
+			},
+			expect: Description{
+				Name:            "Jacky",
+				Identity:        "jw",
+				Website:         "harmony.one/jacky",
+				SecurityContact: "jacky@harmony.one",
+				Details:         "Details of Jacky",
+			},
+		},
+		{
+			raw: Description{
+				Name:            "Wayne",
+				Identity:        "wen",
+				Website:         "harmony.one.wen",
+				SecurityContact: "wenSecurity",
+				Details:         "wenDetails",
+			},
+			update: Description{},
+			expect: Description{
+				Name:            "Wayne",
+				Identity:        "wen",
+				Website:         "harmony.one.wen",
+				SecurityContact: "wenSecurity",
+				Details:         "wenDetails",
+			},
+		},
+		{
+			raw: Description{
+				Name:            "Wayne",
+				Identity:        "wen",
+				Website:         "harmony.one.wen",
+				SecurityContact: "wenSecurity",
+				Details:         "wenDetails",
+			},
+			update: Description{
+				Details: "new details",
+			},
+			expect: Description{
+				Name:            "Wayne",
+				Identity:        "wen",
+				Website:         "harmony.one.wen",
+				SecurityContact: "wenSecurity",
+				Details:         "new details",
+			},
+		},
+		{
+			raw: Description{
+				Name:            "Wayne",
+				Identity:        "wen",
+				Website:         "harmony.one.wen",
+				SecurityContact: "wenSecurity",
+				Details:         "wenDetails",
+			},
+			update: Description{
+				Website: "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongwebsite",
+			},
+			expErr: errors.New("website too long"),
+		},
 	}
-	d2 := Description{
-		Name:            "John",
-		Identity:        "jw",
-		Website:         "harmony.one.john",
-		SecurityContact: "johnSecurity",
-		Details:         "johnDetails",
-	}
-	d1, _ = UpdateDescription(d1, d2)
-
-	// check whether update description function work?
-	if err := assertDescriptionEqual(d1, d2); err != nil {
-		t.Errorf("UpdateDescription failed")
+	for i, test := range tests {
+		d, err := UpdateDescription(test.raw, test.update)
+		if (err == nil) != (test.expErr == nil) {
+			t.Errorf("Test %v: unexpected error: %v / %v", i, err, test.expErr)
+		}
+		if err != nil {
+			continue
+		}
+		if err := assertDescriptionEqual(d, test.expect); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
 	}
 }
 
