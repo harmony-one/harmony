@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
-	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -346,30 +345,27 @@ func (s *scenario) defaultDelegationPair() (
 func defaultSlashRecord() Record {
 	return Record{
 		Evidence: Evidence{
-			ConflictingBallots: ConflictingBallots{
-				AlreadyCastBallot: votepower.Ballot{
+			ConflictingVotes: ConflictingVotes{
+				FirstVote: Vote{
 					SignerPubKey:    blsWrapA,
 					BlockHeaderHash: hashA,
 					Signature:       common.Hex2Bytes(signerABLSSignature),
-					Height:          doubleSignBlockNumber,
-					ViewID:          doubleSignViewID,
 				},
-				DoubleSignedBallot: votepower.Ballot{
+				SecondVote: Vote{
 					SignerPubKey:    blsWrapB,
 					BlockHeaderHash: hashB,
 					Signature:       common.Hex2Bytes(signerBBLSSignature),
-					Height:          doubleSignBlockNumber,
-					ViewID:          doubleSignViewID,
 				},
 			},
 			Moment: Moment{
-				Epoch:        big.NewInt(doubleSignEpoch),
-				TimeUnixNano: big.NewInt(doubleSignUnixNano),
-				ShardID:      doubleSignShardID,
+				Epoch:   big.NewInt(doubleSignEpoch),
+				ShardID: doubleSignShardID,
+				Height:  doubleSignBlockNumber,
+				ViewID:  doubleSignViewID,
 			},
+			Offender: offenderAddr,
 		},
 		Reporter: reporterAddr,
-		Offender: offenderAddr,
 	}
 }
 

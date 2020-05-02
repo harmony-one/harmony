@@ -381,8 +381,8 @@ func applySlashes(
 	// First group slashes by same signed blocks
 	for i := range doubleSigners {
 		thisKey := keyStruct{
-			height:  doubleSigners[i].Evidence.AlreadyCastBallot.Height,
-			viewID:  doubleSigners[i].Evidence.AlreadyCastBallot.ViewID,
+			height:  doubleSigners[i].Evidence.Height,
+			viewID:  doubleSigners[i].Evidence.ViewID,
 			shardID: doubleSigners[i].Evidence.Moment.ShardID,
 			epoch:   doubleSigners[i].Evidence.Moment.Epoch.Uint64(),
 		}
