@@ -36,44 +36,25 @@ var (
 
 	delegationAmt1 = big.NewInt(1e18)
 	delegation1    = NewDelegation(delegatorAddr, delegationAmt1)
+)
 
-	longNameDesc = Description{
-		Name:            "WayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayneWayne1",
-		Identity:        "wen",
-		Website:         "harmony.one.wen",
-		SecurityContact: "wenSecurity",
-		Details:         "wenDetails",
-	}
-	longIdentityDesc = Description{
-		Name:            "Wayne",
-		Identity:        "wenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwenwe1",
-		Website:         "harmony.one.wen",
-		SecurityContact: "wenSecurity",
-		Details:         "wenDetails",
-	}
-	longWebsiteDesc = Description{
-		Name:            "Wayne",
-		Identity:        "wen",
-		Website:         "harmony.one.wenharmony.one.wenharmony.one.wenharmony.one.wenharmony.one.wenharmony.one.wenharmony.one.wenharmony.one.wenharmony.one.wenharmo1",
-		SecurityContact: "wenSecurity",
-		Details:         "wenDetails",
-	}
-	longSecurityContactDesc = Description{
-		Name:            "Wayne",
-		Identity:        "wen",
-		Website:         "harmony.one.wen",
-		SecurityContact: "wenSecuritywenSecuritywenSecuritywenSecuritywenSecuritywenSecuritywenSecuritywenSecuritywenSecuritywenSecuritywenSecuritywenSecuritywenSecuri",
-		Details:         "wenDetails",
-	}
-	longDetailsDesc = Description{
-		Name:            "Wayne",
-		Identity:        "wen",
-		Website:         "harmony.one.wen",
-		SecurityContact: "wenSecurity",
-		Details:         "wenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswwenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetailswenDetails",
-	}
+var (
+	nineK   = new(big.Int).Mul(big.NewInt(9000), big.NewInt(1e18))
 	tenK    = new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18))
 	twelveK = new(big.Int).Mul(big.NewInt(12000), big.NewInt(1e18))
+
+	negativeRate = numeric.NewDec(-1)
+	invalidRate  = numeric.NewDec(2)
+)
+
+var (
+	invalidDescription = Description{
+		Name:            "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongname",
+		Identity:        "jacky@harmony.one",
+		Website:         "harmony.one/jacky",
+		SecurityContact: "jacky@harmony.one",
+		Details:         "Details of jacky",
+	}
 )
 
 // Using public keys to create slot for validator
@@ -132,45 +113,19 @@ func createNewValidatorWrapper(v Validator) ValidatorWrapper {
 	}
 }
 
-func TestComputed_String(t *testing.T) {
-	tests := []struct {
-		computed Computed
-		expStr   string
-	}{
-		{
-			computed: Computed{
-				Signed:            big.NewInt(100),
-				ToSign:            big.NewInt(100),
-				BlocksLeftInEpoch: 1000,
-				Percentage:        numeric.NewDecWithPrec(10, 2),
-				IsBelowThreshold:  false,
-			},
-			expStr: `{"current-epoch-signed":100,"current-epoch-to-sign":100,"current-epoch-signing-percentage":"0.100000000000000000"}`,
-		},
-		{
-			computed: Computed{
-				Percentage: numeric.NewDec(1),
-			},
-			expStr: `{"current-epoch-signed":null,"current-epoch-to-sign":null,"current-epoch-signing-percentage":"1.000000000000000000"}`,
-		},
-		{
-			computed: Computed{},
-			expStr:   "",
-		},
-		{
-			computed: Computed{
-				BlocksLeftInEpoch: 100,
-				IsBelowThreshold:  true,
-			},
-			expStr: "",
-		},
+func TestNewEmptyStats(t *testing.T) {
+	stats := NewEmptyStats()
+	if len(stats.APRs) != 0 {
+		t.Errorf("empty stats not empty ARPs")
 	}
-	for _, test := range tests {
-		s := test.computed.String()
-		fmt.Println(s)
-		if s != test.expStr {
-			t.Errorf("unexpected string: \n\t[%s]\n\t[%s]", s, test.expStr)
-		}
+	if !stats.TotalEffectiveStake.Equal(numeric.ZeroDec()) {
+		t.Errorf("empty stats not zero total effective stake")
+	}
+	if len(stats.MetricsPerShard) != 0 {
+		t.Errorf("empty stats not empty metris per shard")
+	}
+	if stats.BootedStatus != effective.Booted {
+		t.Errorf("empty stats not booted statsu")
 	}
 }
 
@@ -205,117 +160,46 @@ func TestTotalDelegation(t *testing.T) {
 
 // check the validator wrapper's sanity
 func TestValidatorSanityCheck(t *testing.T) {
-	err := validator.SanityCheck(DoNotEnforceMaxBLS)
-	if err != nil {
-		t.Error("expected", nil, "got", err)
+	tests := []struct {
+		editValidator func(*Validator)
+		expErr        error
+	}{
+		{func(v *Validator) {}, nil},
+		{func(v *Validator) { v.Description = invalidDescription }, errors.New("invalid description")},
+		{func(v *Validator) { v.SlotPubKeys = v.SlotPubKeys[:0] }, errNeedAtLeastOneSlotKey},
+		{func(v *Validator) { v.MinSelfDelegation = nil }, errNilMinSelfDelegation},
+		{func(v *Validator) { v.MaxTotalDelegation = nil }, errNilMaxTotalDelegation},
+		{func(v *Validator) { v.MinSelfDelegation = nineK }, errMinSelfDelegationTooSmall},
+		{func(v *Validator) { v.MaxTotalDelegation = nineK }, errInvalidMaxTotalDelegation},
+		{func(v *Validator) { v.Rate = negativeRate }, errInvalidCommissionRate},
+		{func(v *Validator) { v.Rate = invalidRate }, errInvalidCommissionRate},
+		{func(v *Validator) { v.MaxRate = negativeRate }, errInvalidCommissionRate},
+		{func(v *Validator) { v.MaxRate = invalidRate }, errInvalidCommissionRate},
+		{func(v *Validator) { v.MaxChangeRate = negativeRate }, errInvalidCommissionRate},
+		{func(v *Validator) { v.MaxChangeRate = invalidRate }, errInvalidCommissionRate},
+		{
+			func(v *Validator) { v.Rate, v.MaxRate = numeric.OneDec(), numeric.NewDecWithPrec(5, 1) },
+			errCommissionRateTooLarge,
+		},
+		{
+			func(v *Validator) { v.MaxChangeRate, v.MaxRate = numeric.OneDec(), numeric.NewDecWithPrec(5, 1) },
+			errCommissionRateTooLarge,
+		},
+		{
+			func(v *Validator) { v.SlotPubKeys = []shard.BLSPublicKey{slotPubKeys[0], slotPubKeys[0]} },
+			errDuplicateSlotKeys,
+		},
 	}
-
-	v := Validator{
-		Address: validatorAddr,
-	}
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errNeedAtLeastOneSlotKey {
-		t.Error("expected", errNeedAtLeastOneSlotKey, "got", err)
-	}
-
-	v.SlotPubKeys = setSlotPubKeys()
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errNilMinSelfDelegation {
-		t.Error("expected", errNilMinSelfDelegation, "got", err)
-	}
-	v.MinSelfDelegation = tenK
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errNilMaxTotalDelegation {
-		t.Error("expected", errNilMaxTotalDelegation, "got", err)
-	}
-	v.MinSelfDelegation = big.NewInt(1e18)
-	v.MaxTotalDelegation = twelveK
-	e := errors.Wrapf(
-		errMinSelfDelegationTooSmall,
-		"delegation-given %s", v.MinSelfDelegation.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-
-	v.MinSelfDelegation = twelveK
-	v.MaxTotalDelegation = tenK
-	e = errors.Wrapf(
-		errInvalidMaxTotalDelegation,
-		"max-total-delegation %s min-self-delegation %s",
-		v.MaxTotalDelegation.String(),
-		v.MinSelfDelegation.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-	v.MinSelfDelegation = tenK
-	v.MaxTotalDelegation = twelveK
-	minusOneDec, _ := numeric.NewDecFromStr("-1")
-	plusTwoDec, _ := numeric.NewDecFromStr("2")
-	cr := CommissionRates{Rate: minusOneDec, MaxRate: numeric.OneDec(), MaxChangeRate: numeric.ZeroDec()}
-	c := Commission{cr, big.NewInt(300)}
-	v.Commission = c
-	e = errors.Wrapf(
-		errInvalidCommissionRate, "rate:%s", v.Rate.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-	v.Commission.Rate = plusTwoDec
-	e = errors.Wrapf(
-		errInvalidCommissionRate, "rate:%s", v.Rate.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-	v.Commission.Rate = numeric.MustNewDecFromStr("0.5")
-	v.Commission.MaxRate = minusOneDec
-	e = errors.Wrapf(
-		errInvalidCommissionRate, "rate:%s", v.MaxRate.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-	v.Commission.MaxRate = plusTwoDec
-	e = errors.Wrapf(
-		errInvalidCommissionRate, "rate:%s", v.MaxRate.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-	v.Commission.MaxRate = numeric.MustNewDecFromStr("0.9")
-	v.Commission.MaxChangeRate = minusOneDec
-	e = errors.Wrapf(
-		errInvalidCommissionRate, "rate:%s", v.MaxChangeRate.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-	v.Commission.MaxChangeRate = plusTwoDec
-	e = errors.Wrapf(
-		errInvalidCommissionRate, "rate:%s", v.MaxChangeRate.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-	v.Commission.MaxChangeRate = numeric.MustNewDecFromStr("0.05")
-	v.Commission.MaxRate = numeric.MustNewDecFromStr("0.41")
-	e = errors.Wrapf(
-		errCommissionRateTooLarge, "rate:%s", v.MaxRate.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-	v.Commission.MaxRate = numeric.MustNewDecFromStr("0.51")
-	v.Commission.MaxChangeRate = numeric.MustNewDecFromStr("0.95")
-	e = errors.Wrapf(
-		errCommissionRateTooLarge, "rate:%s", v.MaxChangeRate.String(),
-	)
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err.Error() != e.Error() {
-		t.Error("expected", e, "got", err)
-	}
-	v.Commission.MaxChangeRate = numeric.MustNewDecFromStr("0.05")
-	v.SlotPubKeys = append(v.SlotPubKeys, v.SlotPubKeys[0])
-	if err := v.SanityCheck(DoNotEnforceMaxBLS); err != errDuplicateSlotKeys {
-		t.Error("expected", errDuplicateSlotKeys, "got", err)
+	for i, test := range tests {
+		if i != 5 {
+			continue
+		}
+		v := createNewValidator()
+		test.editValidator(&v)
+		err := v.SanityCheck(DoNotEnforceMaxBLS)
+		if (err == nil) != (test.expErr == nil) {
+			t.Errorf("Test %v: unexpected error [%v] / [%v]", i, err, test.expErr)
+		}
 	}
 }
 
@@ -335,13 +219,7 @@ func TestDescription_EnsureLength(t *testing.T) {
 			expErr: nil,
 		},
 		{
-			desc: Description{
-				Name:            "",
-				Identity:        "",
-				Website:         "",
-				SecurityContact: "",
-				Details:         "",
-			},
+			desc:   Description{},
 			expErr: nil,
 		},
 		{
