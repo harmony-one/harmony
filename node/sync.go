@@ -337,7 +337,6 @@ func (sync *syncingHandler) processIncoming() error {
 	}
 
 	return sync.handleMessage(msg)
-
 }
 
 type height struct {
@@ -428,6 +427,7 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 	})
 
 	g.Go(func() error {
+
 		for stream := range node.host.IncomingStream {
 			handler, err := newSyncerForIncoming(
 				stream, node.host, info,
@@ -448,7 +448,11 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 				return err
 			}
 			fmt.Println("after process incoming")
+			if err := handler.rawStream.Close(); err != nil {
+				return err
+			}
 		}
+
 		return nil
 	})
 
