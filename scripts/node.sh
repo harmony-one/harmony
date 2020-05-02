@@ -126,7 +126,7 @@ function setup_env
    sysctl -w net.ipv4.tcp_tw_reuse=1
    sysctl -w net.ipv4.tcp_fastopen=3
    sysctl -w net.ipv4.tcp_window_scaling=1
-   
+
    add_env /etc/security/limits.conf "* soft     nproc          65535"
    add_env /etc/security/limits.conf "* hard     nproc          65535"
    add_env /etc/security/limits.conf "* soft     nofile         65535"
@@ -212,7 +212,7 @@ examples:
 
 # multi-bls: place all keys/passphrases under .hmy/blskeys
 # e.g. <blskey>.key and <blskey>.pass
-   ${progname} -S -M 
+   ${progname} -S -M
 
 # multi-bls: specify folder that contains bls keys
    ${progname} -S -M -f /home/xyz/myfolder
@@ -340,7 +340,7 @@ partner)
   dns_zone=ps.hmny.io
   syncdir=pstn
   ;;
-stress)
+stn|stress|stressnet)
   REL=stressnet
   network_type=stressnet
   dns_zone=stn.hmny.io
@@ -414,7 +414,7 @@ verify_checksum() {
 }
 
 verify_signature() {
-   local dir file 
+   local dir file
    dir="${1}"
    file="${dir}/${2}"
    sigfile="${dir}/${2}.sig"
