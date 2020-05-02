@@ -90,9 +90,6 @@ func protocolPeerHeights(
 			return nil, err
 		}
 
-		utils.Logger().Info().
-			Str("peer-addr", neighbor.Address().String()).
-			Msg("connected to a harmony protocol supporting neighbor")
 		heights, err := handler.askHeight()
 		if err != nil {
 			return nil, err
@@ -111,7 +108,7 @@ func protocolPeerHeights(
 	}
 
 	utils.Logger().Info().
-		Int("harmony-protocol-peers", len(collect)).
+		Int("connected-harmony-protocol-peers", len(collect)).
 		Msg("finished asking heights for state syncing")
 
 	return collect, nil

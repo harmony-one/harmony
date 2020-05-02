@@ -295,6 +295,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 		consensus.CommitFinishChan <- Finished{
 			consensus.ViewID(),
 			consensus.ShardID,
+			consensus.BlockNum(),
 			consensus.BlockHash(),
 		}
 

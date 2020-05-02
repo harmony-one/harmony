@@ -70,10 +70,18 @@ func (node *Node) StartLeaderWork() error {
 
 	g.Go(func() error {
 		for quorumReached := range node.Consensus.CommitFinishChan {
+			viewID, shardID, blockNum :=
+				quorumReached.ViewID, quorumReached.ShardID, quorumReached.BlockNum
 
-			if quorumReached.ViewID == node.Consensus.ViewID() {
-				viewID, shardID := quorumReached.ViewID, quorumReached.ShardID
-				key := fmt.Sprintf("%d-%d", viewID, shardID)
+			utils.Logger().Info().
+				Uint64("block-num", blockNum).
+				Uint64("view-id", viewID).
+				Uint32("shard-id", shardID).
+				Msg("received on commit finish")
+
+			if viewID == node.Consensus.ViewID() &&
+				blockNum == node.Consensus.BlockNum() {
+				key := fmt.Sprintf("%d-%d-%d", viewID, shardID, blockNum)
 				readyChan := roundDone.DoChan(key, func() (interface{}, error) {
 					time.Sleep(time.Until(node.Consensus.NextBlockDue()))
 					if err := node.Consensus.FinalizeCommits(); err != nil {

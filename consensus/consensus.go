@@ -107,6 +107,7 @@ func (consensus *Consensus) ViewID() uint64 {
 type Finished struct {
 	ViewID    uint64
 	ShardID   uint32
+	BlockNum  uint64
 	BlockHash common.Hash
 }
 
