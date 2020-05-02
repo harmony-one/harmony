@@ -52,9 +52,8 @@ func payDebt(
 
 // Moment ..
 type Moment struct {
-	Epoch        *big.Int `json:"epoch"`
-	TimeUnixNano *big.Int `json:"time-unix-nano"`
-	ShardID      uint32   `json:"shard-id"`
+	Epoch   *big.Int `json:"epoch"`
+	ShardID uint32   `json:"shard-id"`
 }
 
 // Evidence ..

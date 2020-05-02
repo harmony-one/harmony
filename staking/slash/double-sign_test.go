@@ -363,9 +363,8 @@ func defaultSlashRecord() Record {
 				},
 			},
 			Moment: Moment{
-				Epoch:        big.NewInt(doubleSignEpoch),
-				TimeUnixNano: big.NewInt(doubleSignUnixNano),
-				ShardID:      doubleSignShardID,
+				Epoch:   big.NewInt(doubleSignEpoch),
+				ShardID: doubleSignShardID,
 			},
 		},
 		Reporter: reporterAddr,

@@ -101,9 +101,8 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 										ViewID:          recvMsg.ViewID,
 									}},
 								Moment: slash.Moment{
-									Epoch:        curHeader.Epoch(),
-									ShardID:      consensus.ShardID,
-									TimeUnixNano: now,
+									Epoch:   curHeader.Epoch(),
+									ShardID: consensus.ShardID,
 								},
 							}
 							proof := slash.Record{
