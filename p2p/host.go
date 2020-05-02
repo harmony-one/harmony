@@ -139,8 +139,8 @@ const DefaultLocal = "127.0.0.1"
 // NewHost ..
 func NewHost(opts *Opts, own *Peer) (*Host, error) {
 	swarmAddresses := []string{
-		fmt.Sprintf("/ip4/%s/tcp/%s", own.IP, own.Port),
-		fmt.Sprintf("/ip6/%s/tcp/%s", own.IP, own.Port),
+		fmt.Sprintf("/ip4/%s/tcp/%s", DefaultLocal, own.Port),
+		fmt.Sprintf("/ip6/%s/tcp/%s", DefaultLocal, own.Port),
 	}
 
 	mardv, err := multiaddr.NewMultiaddr(opts.RendezVousServerMAddr)
