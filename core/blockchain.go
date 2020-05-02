@@ -2365,8 +2365,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 					QuoInt64(int64(len(wrapper.SlotPubKeys)))
 			}
 			for i := range stats.MetricsPerShard {
-				metric := stats.MetricsPerShard[i]
-				metric.Vote.RawStake = spread
+				stats.MetricsPerShard[i].Vote.RawStake = spread
 			}
 		}
 
