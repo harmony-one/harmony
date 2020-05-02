@@ -3,6 +3,7 @@ package worker
 import (
 	"bytes"
 	"fmt"
+	"github.com/harmony-one/harmony/crypto/hash"
 	"math/big"
 	"sort"
 	"time"
@@ -374,10 +375,26 @@ func (w *Worker) verifySlashes(
 		return successes, failures
 	}
 
+	seenEvidences := map[common.Hash]struct{}{}
+
 	for i := range d {
+		evidenceHash := hash.FromRLPNew256(d[i].Evidence)
+		if existing, ok := seenEvidences[evidenceHash]; ok {
+			utils.Logger().Warn().
+				Interface("slashRecord1", existing).
+				Interface("slashRecord2", d[i]).
+				Msg("Duplicate slash records with different reporters")
+			failures = append(failures, d[i])
+		} else {
+			seenEvidences[evidenceHash] = struct{}{}
+		}
+
 		if err := slash.Verify(
 			w.chain, workingState, &d[i],
 		); err != nil {
+			utils.Logger().Warn().Err(err).
+				Interface("slashRecord", d[i]).
+				Msg("Slash failed verification")
 			failures = append(failures, d[i])
 		}
 		successes = append(successes, d[i])
