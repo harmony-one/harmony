@@ -277,10 +277,80 @@ func TestValidatorSanityCheck(t *testing.T) {
 	}
 }
 
-func TestEnsureLength(t *testing.T) {
-	_, err := validator.Description.EnsureLength()
-	if err != nil {
-		t.Error("expected", "nil", "got", err)
+func TestDescription_EnsureLength(t *testing.T) {
+	tests := []struct {
+		desc   Description
+		expErr error
+	}{
+		{
+			desc: Description{
+				Name:            "Jacky Wang",
+				Identity:        "jacky@harmony.one",
+				Website:         "harmony.one/jacky",
+				SecurityContact: "jacky@harmony.one",
+				Details:         "Details of jacky",
+			},
+			expErr: nil,
+		},
+		{
+			desc: Description{
+				Name:            "",
+				Identity:        "",
+				Website:         "",
+				SecurityContact: "",
+				Details:         "",
+			},
+			expErr: nil,
+		},
+		{
+			desc: Description{
+				Name:            "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongname",
+				Identity:        "jacky@harmony.one",
+				Website:         "harmony.one/jacky",
+				SecurityContact: "jacky@harmony.one",
+				Details:         "Details of jacky",
+			},
+			expErr: errors.New("name too long"),
+		},
+		{
+			desc: Description{
+				Name:            "Jacky Wang",
+				Identity:        "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongidentity",
+				Website:         "harmony.one/jacky",
+				SecurityContact: "jacky@harmony.one",
+				Details:         "Details of jacky",
+			},
+			expErr: errors.New("identity too long"),
+		},
+		{
+			desc: Description{
+				Name:            "Jacky Wang",
+				Identity:        "jacky@harmony.one",
+				Website:         "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongwebsite",
+				SecurityContact: "jacky@harmony.one",
+				Details:         "Details of jacky",
+			},
+			expErr: errors.New("website too long"),
+		},
+		{
+			desc: Description{
+				Name:            "Jacky Wang",
+				Identity:        "jacky@harmony.one",
+				Website:         "harmony.one/jacky",
+				SecurityContact: "jacky@harmony.one",
+				Details:         "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongdetail",
+			},
+			expErr: errors.New("details too long"),
+		},
+	}
+	for _, test := range tests {
+		d, err := test.desc.EnsureLength()
+		if (err == nil) != (test.expErr == nil) {
+			t.Errorf("unexpected error: [%v] / [%v]", err, test.expErr)
+		}
+		if err := assertDescriptionEqual(test.desc, d); err != nil {
+			t.Errorf("assert equal: %v", err)
+		}
 	}
 }
 
@@ -303,18 +373,22 @@ func TestUpdateDescription(t *testing.T) {
 	d1, _ = UpdateDescription(d1, d2)
 
 	// check whether update description function work?
-	if compareTwoDescription(d1, d2) {
+	if err := assertDescriptionEqual(d1, d2); err != nil {
 		t.Errorf("UpdateDescription failed")
 	}
 }
 
 // compare two descriptions' items
-func compareTwoDescription(d1, d2 Description) bool {
-	return (strings.Compare(d1.Name, d2.Name) != 0 &&
-		strings.Compare(d1.Identity, d2.Identity) != 0 &&
-		strings.Compare(d1.Website, d2.Website) != 0 &&
-		strings.Compare(d1.SecurityContact, d2.SecurityContact) != 0 &&
-		strings.Compare(d1.Details, d2.Details) != 0)
+func assertDescriptionEqual(d1, d2 Description) error {
+	if strings.Compare(d1.Name, d2.Name) != 0 ||
+		strings.Compare(d1.Identity, d2.Identity) != 0 ||
+		strings.Compare(d1.Website, d2.Website) != 0 ||
+		strings.Compare(d1.SecurityContact, d2.SecurityContact) != 0 ||
+		strings.Compare(d1.Details, d2.Details) != 0 {
+
+		return errors.New("description not equal")
+	}
+	return nil
 }
 
 func TestVerifyBLSKeys(t *testing.T) {
