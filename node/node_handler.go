@@ -56,6 +56,9 @@ func (node *Node) receiveGroupMessage(
 		}
 		//utils.Logger().Info("[PUBSUB]", "received group msg", len(msg), "sender", sender)
 		// skip the first 5 bytes, 1 byte is p2p type, 4 bytes are message size
+		if len(msg) < 5 {
+			continue
+		}
 		if err := rxQueue.AddMessage(msg[5:], sender); err != nil {
 			utils.Logger().Warn().Err(err).
 				Str("sender", sender.Pretty()).
