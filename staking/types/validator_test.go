@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	common "github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
@@ -25,13 +25,8 @@ var (
 		SecurityContact: "wenSecurity",
 		Details:         "wenDetails",
 	}
-	blsPubKey   = "ba41f49d70d40434110e32b269dc9b52879ca5fb2aee01c49311c45e008a4b6494c3bd9e6ef7954e39d25d023243b898"
-	blsPriKey   = "0a8c69c12020a762e7087f52bacbe835b8a91728f7310a191e026001f753a00e"
-	slotPubKeys = setSlotPubKeys()
-	slotKeySigs = setSlotKeySigs()
 
-	validator = createNewValidator()
-	wrapper   = createNewValidatorWrapper()
+	blsPubSigPairs []blsPubSigPair
 
 	delegationAmt1 = big.NewInt(1e18)
 	delegation1    = NewDelegation(delegatorAddr, delegationAmt1)
@@ -57,6 +52,10 @@ var (
 	}
 )
 
+func init() {
+	blsPubSigPairs = makeBLSPubSigPairs(5)
+}
+
 func TestNewEmptyStats(t *testing.T) {
 	stats := NewEmptyStats()
 	if len(stats.APRs) != 0 {
@@ -73,19 +72,11 @@ func TestNewEmptyStats(t *testing.T) {
 	}
 }
 
-// Test MarshalValidator
-func TestMarshalValidator(t *testing.T) {
-	_, err := MarshalValidator(validator)
-	if err != nil {
-		t.Errorf("MarshalValidator failed")
-	}
-}
-
 // Test UnmarshalValidator
 func TestMarshalUnmarshalValidator(t *testing.T) {
 	raw := createNewValidator()
 
-	b, err := MarshalValidator(validator)
+	b, err := MarshalValidator(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,6 +86,152 @@ func TestMarshalUnmarshalValidator(t *testing.T) {
 	}
 	if err := assertValidatorEqual(raw, val); err != nil {
 		t.Error(err)
+	}
+}
+
+// check the validator wrapper's sanity
+func TestValidator_SanityCheck(t *testing.T) {
+	tests := []struct {
+		editValidator func(*Validator)
+		expErr        error
+	}{
+		{
+			func(v *Validator) {},
+			nil,
+		},
+		{
+			func(v *Validator) { v.Description = invalidDescription },
+			errors.New("invalid description"),
+		},
+		{
+			func(v *Validator) { v.SlotPubKeys = v.SlotPubKeys[:0] },
+			errNeedAtLeastOneSlotKey,
+		},
+		{
+			func(v *Validator) { v.MinSelfDelegation = nil },
+			errNilMinSelfDelegation,
+		},
+		{
+			func(v *Validator) { v.MaxTotalDelegation = nil },
+			errNilMaxTotalDelegation,
+		},
+		{
+			func(v *Validator) { v.MinSelfDelegation = nineK },
+			errMinSelfDelegationTooSmall,
+		},
+		{
+			func(v *Validator) { v.MaxTotalDelegation = nineK },
+			errInvalidMaxTotalDelegation,
+		},
+		{
+			func(v *Validator) { v.Rate = negativeRate },
+			errInvalidCommissionRate,
+		},
+		{
+			func(v *Validator) { v.Rate = invalidRate },
+			errInvalidCommissionRate,
+		},
+		{
+			func(v *Validator) { v.MaxRate = negativeRate },
+			errInvalidCommissionRate,
+		},
+		{
+			func(v *Validator) { v.MaxRate = invalidRate },
+			errInvalidCommissionRate,
+		},
+		{
+			func(v *Validator) { v.MaxChangeRate = negativeRate },
+			errInvalidCommissionRate,
+		},
+		{
+			func(v *Validator) { v.MaxChangeRate = invalidRate },
+			errInvalidCommissionRate,
+		},
+		{
+			func(v *Validator) { v.Rate, v.MaxRate = numeric.OneDec(), numeric.NewDecWithPrec(5, 1) },
+			errCommissionRateTooLarge,
+		},
+		{
+			func(v *Validator) { v.MaxChangeRate, v.MaxRate = numeric.OneDec(), numeric.NewDecWithPrec(5, 1) },
+			errCommissionRateTooLarge,
+		},
+		{
+			func(v *Validator) { v.SlotPubKeys = []shard.BLSPublicKey{blsPubSigPairs[0].pub, blsPubSigPairs[0].pub} },
+			errDuplicateSlotKeys,
+		},
+	}
+	for i, test := range tests {
+		v := createNewValidator()
+		test.editValidator(&v)
+		err := v.SanityCheck(DoNotEnforceMaxBLS)
+		if (err == nil) != (test.expErr == nil) {
+			t.Errorf("Test %v: unexpected error [%v] / [%v]", i, err, test.expErr)
+		}
+	}
+}
+
+func TestTotalDelegation(t *testing.T) {
+	// add a delegation to validator
+	// delegation.Amount = 10000
+	wrapper := createNewValidatorWrapper()
+	wrapper.Delegations = append(wrapper.Delegations, delegation1)
+	totalNum := wrapper.TotalDelegation()
+
+	// check if the number is 10000
+	if totalNum.Cmp(big.NewInt(1e18)) != 0 {
+		t.Errorf("TotalDelegation number is not right")
+	}
+}
+
+func TestValidatorWrapper_SanityCheck(t *testing.T) {
+	tests := []struct {
+		editValidatorWrapper func(*ValidatorWrapper)
+		expErr               error
+	}{
+		{
+			func(*ValidatorWrapper) {},
+			nil,
+		},
+		{
+			func(vw *ValidatorWrapper) { vw.Validator.Description = invalidDescription },
+			errors.New("invalid validator"),
+		},
+		{
+			func(vw *ValidatorWrapper) { vw.Delegations = nil },
+			errors.New("empty delegations"),
+		},
+		{
+			func(vw *ValidatorWrapper) { vw.Delegations[0].Amount = nineK },
+			errors.New("small self delegation"),
+		},
+		{
+			func(vw *ValidatorWrapper) { vw.Delegations[1].Amount = twentyK },
+			errors.New("large total delegation"),
+		},
+		{
+			// banned node does not check minDelegation
+			func(vw *ValidatorWrapper) {
+				vw.Status = effective.Banned
+				vw.Delegations[0].Amount = nineK
+			},
+			nil,
+		},
+		{
+			// Banned node also checks total delegation
+			func(vw *ValidatorWrapper) {
+				vw.Status = effective.Banned
+				vw.Delegations[1].Amount = twentyK
+			},
+			errors.New("banned node with large total delegation"),
+		},
+	}
+	for i, test := range tests {
+		vw := createNewValidatorWrapper()
+		test.editValidatorWrapper(&vw)
+		err := vw.SanityCheck(DoNotEnforceMaxBLS)
+		if (err == nil) != (test.expErr == nil) {
+			t.Errorf("Test %v: [%v] / [%v]", i, err, test.expErr)
+		}
 	}
 }
 
@@ -266,148 +403,136 @@ func TestDescription_EnsureLength(t *testing.T) {
 	}
 }
 
-func TestTotalDelegation(t *testing.T) {
-	// add a delegation to validator
-	// delegation.Amount = 10000
-	wrapper.Delegations = append(wrapper.Delegations, delegation1)
-	totalNum := wrapper.TotalDelegation()
-
-	// check if the numebr is 10000
-	if totalNum.Cmp(big.NewInt(1e18)) != 0 {
-		t.Errorf("TotalDelegation number is not right")
-	}
-}
-
-// check the validator wrapper's sanity
-func TestValidator_SanityCheck(t *testing.T) {
+func TestVerifyBLSKeys(t *testing.T) {
+	pairs := makeBLSPubSigPairs(5)
 	tests := []struct {
-		editValidator func(*Validator)
-		expErr        error
+		pubIndexes []int
+		sigIndexes []int
+		expErr     error
 	}{
-		{
-			func(v *Validator) {},
-			nil,
-		},
-		{
-			func(v *Validator) { v.Description = invalidDescription },
-			errors.New("invalid description"),
-		},
-		{
-			func(v *Validator) { v.SlotPubKeys = v.SlotPubKeys[:0] },
-			errNeedAtLeastOneSlotKey,
-		},
-		{
-			func(v *Validator) { v.MinSelfDelegation = nil },
-			errNilMinSelfDelegation,
-		},
-		{
-			func(v *Validator) { v.MaxTotalDelegation = nil },
-			errNilMaxTotalDelegation,
-		},
-		{
-			func(v *Validator) { v.MinSelfDelegation = nineK },
-			errMinSelfDelegationTooSmall,
-		},
-		{
-			func(v *Validator) { v.MaxTotalDelegation = nineK },
-			errInvalidMaxTotalDelegation,
-		},
-		{
-			func(v *Validator) { v.Rate = negativeRate },
-			errInvalidCommissionRate,
-		},
-		{
-			func(v *Validator) { v.Rate = invalidRate },
-			errInvalidCommissionRate,
-		},
-		{
-			func(v *Validator) { v.MaxRate = negativeRate },
-			errInvalidCommissionRate,
-		},
-		{
-			func(v *Validator) { v.MaxRate = invalidRate },
-			errInvalidCommissionRate,
-		},
-		{
-			func(v *Validator) { v.MaxChangeRate = negativeRate },
-			errInvalidCommissionRate,
-		},
-		{
-			func(v *Validator) { v.MaxChangeRate = invalidRate },
-			errInvalidCommissionRate,
-		},
-		{
-			func(v *Validator) { v.Rate, v.MaxRate = numeric.OneDec(), numeric.NewDecWithPrec(5, 1) },
-			errCommissionRateTooLarge,
-		},
-		{
-			func(v *Validator) { v.MaxChangeRate, v.MaxRate = numeric.OneDec(), numeric.NewDecWithPrec(5, 1) },
-			errCommissionRateTooLarge,
-		},
-		{
-			func(v *Validator) { v.SlotPubKeys = []shard.BLSPublicKey{slotPubKeys[0], slotPubKeys[0]} },
-			errDuplicateSlotKeys,
-		},
+		{[]int{0, 1, 2, 3, 4}, []int{0, 1, 2, 3, 4}, nil},
+		{[]int{}, []int{}, nil},
+		{[]int{0}, []int{}, errBLSKeysNotMatchSigs},
+		{[]int{}, []int{1}, errBLSKeysNotMatchSigs},
+		{[]int{0, 1, 2, 3}, []int{0, 0, 2, 3}, errors.New("bls not match")},
+		{[]int{3, 2, 1, 0}, []int{0, 1, 2, 3}, errors.New("bls order not match")},
 	}
 	for i, test := range tests {
-		v := createNewValidator()
-		test.editValidator(&v)
-		err := v.SanityCheck(DoNotEnforceMaxBLS)
-		if (err == nil) != (test.expErr == nil) {
-			t.Errorf("Test %v: unexpected error [%v] / [%v]", i, err, test.expErr)
+		pubs := make([]shard.BLSPublicKey, 0, len(test.pubIndexes))
+		for _, index := range test.pubIndexes {
+			pubs = append(pubs, pairs[index].pub)
 		}
-	}
-}
+		sigs := make([]shard.BLSSignature, 0, len(test.sigIndexes))
+		for _, index := range test.sigIndexes {
+			sigs = append(sigs, pairs[index].sig)
+		}
 
-func TestValidatorWrapper_SanityCheck(t *testing.T) {
-	tests := []struct {
-		editValidatorWrapper func(*ValidatorWrapper)
-		expErr               error
-	}{
-		{
-			func(*ValidatorWrapper) {},
-			nil,
-		},
-		{
-			func(vw *ValidatorWrapper) { vw.Validator.Description = invalidDescription },
-			errors.New("invalid validator"),
-		},
-		{
-			func(vw *ValidatorWrapper) { vw.Delegations = nil },
-			errors.New("empty delegations"),
-		},
-		{
-			func(vw *ValidatorWrapper) { vw.Delegations[0].Amount = nineK },
-			errors.New("small self delegation"),
-		},
-		{
-			func(vw *ValidatorWrapper) { vw.Delegations[1].Amount = twentyK },
-			errors.New("large total delegation"),
-		},
-		{
-			// banned node does not check minDelegation
-			func(vw *ValidatorWrapper) {
-				vw.Status = effective.Banned
-				vw.Delegations[0].Amount = nineK
-			},
-			nil,
-		},
-		{
-			// Banned node also checks total delegation
-			func(vw *ValidatorWrapper) {
-				vw.Status = effective.Banned
-				vw.Delegations[1].Amount = twentyK
-			},
-			errors.New("banned node with large total delegation"),
-		},
-	}
-	for i, test := range tests {
-		vw := createNewValidatorWrapper()
-		test.editValidatorWrapper(&vw)
-		err := vw.SanityCheck(DoNotEnforceMaxBLS)
+		err := VerifyBLSKeys(pubs, sigs)
 		if (err == nil) != (test.expErr == nil) {
 			t.Errorf("Test %v: [%v] / [%v]", i, err, test.expErr)
 		}
+	}
+}
+
+func TestCreateValidatorFromNewMsg(t *testing.T) {
+	v := CreateValidator{
+		ValidatorAddress: validatorAddr,
+		Description:      desc,
+		Amount:           big.NewInt(1e18),
+	}
+	blockNum := big.NewInt(1000)
+	_, err := CreateValidatorFromNewMsg(&v, blockNum, new(big.Int))
+	if err != nil {
+		t.Errorf("CreateValidatorFromNewMsg failed")
+	}
+}
+
+func TestUpdateValidatorFromEditMsg(t *testing.T) {
+	ev := EditValidator{
+		ValidatorAddress:   validatorAddr,
+		Description:        desc,
+		MinSelfDelegation:  tenK,
+		MaxTotalDelegation: twelveK,
+	}
+	validator := createNewValidator()
+	UpdateValidatorFromEditMsg(&validator, &ev, new(big.Int))
+
+	if validator.MinSelfDelegation.Cmp(tenK) != 0 {
+		t.Errorf("UpdateValidatorFromEditMsg failed")
+	}
+}
+
+type blsPubSigPair struct {
+	pub shard.BLSPublicKey
+	sig shard.BLSSignature
+}
+
+func makeBLSPubSigPairs(size int) []blsPubSigPair {
+	pairs := make([]blsPubSigPair, 0, size)
+	for i := 0; i != size; i++ {
+		pairs = append(pairs, makeBLSPubSigPair())
+	}
+	return pairs
+}
+
+func makeBLSPubSigPair() blsPubSigPair {
+	blsPriv := bls.RandPrivateKey()
+	blsPub := blsPriv.GetPublicKey()
+	msgHash := hash.Keccak256([]byte(BLSVerificationStr))
+	sig := blsPriv.SignHash(msgHash)
+
+	var shardPub shard.BLSPublicKey
+	copy(shardPub[:], blsPub.Serialize())
+
+	var shardSig shard.BLSSignature
+	copy(shardSig[:], sig.Serialize())
+
+	return blsPubSigPair{shardPub, shardSig}
+}
+
+func TestString(t *testing.T) {
+	// print out the string
+	//fmt.Println(validator.String())
+}
+
+// create a new validator
+func createNewValidator() Validator {
+	cr := CommissionRates{
+		Rate:          numeric.OneDec(),
+		MaxRate:       numeric.OneDec(),
+		MaxChangeRate: numeric.ZeroDec(),
+	}
+	c := Commission{cr, big.NewInt(300)}
+	d := Description{
+		Name:     "Wayne",
+		Identity: "wen",
+		Website:  "harmony.one.wen",
+		Details:  "best",
+	}
+	v := Validator{
+		Address:              validatorAddr,
+		SlotPubKeys:          []shard.BLSPublicKey{blsPubSigPairs[0].pub},
+		LastEpochInCommittee: big.NewInt(20),
+		MinSelfDelegation:    tenK,
+		MaxTotalDelegation:   twelveK,
+		Status:               effective.Active,
+		Commission:           c,
+		Description:          d,
+		CreationHeight:       big.NewInt(12306),
+	}
+	return v
+}
+
+// create a new validator wrapper
+func createNewValidatorWrapper() ValidatorWrapper {
+	v := createNewValidator()
+	ds := Delegations{
+		NewDelegation(v.Address, new(big.Int).Set(v.MinSelfDelegation)),
+		NewDelegation(common.BigToAddress(common.Big1), new(big.Int).Sub(v.MaxTotalDelegation, v.MinSelfDelegation)),
+	}
+	return ValidatorWrapper{
+		Validator:   v,
+		Delegations: ds,
 	}
 }
 
@@ -482,126 +607,4 @@ func assertDescriptionEqual(d1, d2 Description) error {
 		return fmt.Errorf("details not equal: [%v] / [%v]", d1.Details, d2.Details)
 	}
 	return nil
-}
-
-func TestVerifyBLSKeys(t *testing.T) {
-	// test verify bls for valid single key/sig pair
-	val := CreateValidator{
-		ValidatorAddress: validatorAddr,
-		Description:      desc,
-		SlotPubKeys:      slotPubKeys,
-		SlotKeySigs:      slotKeySigs,
-		Amount:           big.NewInt(1e18),
-	}
-	if err := VerifyBLSKeys(val.SlotPubKeys, val.SlotKeySigs); err != nil {
-		t.Errorf("VerifyBLSKeys failed")
-	}
-
-	// test verify bls for not matching single key/sig pair
-
-	// test verify bls for not length matching multiple key/sig pairs
-
-	// test verify bls for not order matching multiple key/sig pairs
-
-	// test verify bls for empty key/sig pairs
-}
-
-func TestCreateValidatorFromNewMsg(t *testing.T) {
-	v := CreateValidator{
-		ValidatorAddress: validatorAddr,
-		Description:      desc,
-		Amount:           big.NewInt(1e18),
-	}
-	blockNum := big.NewInt(1000)
-	_, err := CreateValidatorFromNewMsg(&v, blockNum, new(big.Int))
-	if err != nil {
-		t.Errorf("CreateValidatorFromNewMsg failed")
-	}
-}
-
-func TestUpdateValidatorFromEditMsg(t *testing.T) {
-	ev := EditValidator{
-		ValidatorAddress:   validatorAddr,
-		Description:        desc,
-		MinSelfDelegation:  tenK,
-		MaxTotalDelegation: twelveK,
-	}
-	UpdateValidatorFromEditMsg(&validator, &ev, new(big.Int))
-
-	if validator.MinSelfDelegation.Cmp(tenK) != 0 {
-		t.Errorf("UpdateValidatorFromEditMsg failed")
-	}
-}
-
-func TestString(t *testing.T) {
-	// print out the string
-	//fmt.Println(validator.String())
-}
-
-// Using public keys to create slot for validator
-func setSlotPubKeys() []shard.BLSPublicKey {
-	p := &bls.PublicKey{}
-	p.DeserializeHexStr(blsPubKey)
-	pub := shard.BLSPublicKey{}
-	pub.FromLibBLSPublicKey(p)
-	return []shard.BLSPublicKey{pub}
-}
-
-// Using private keys to create sign slot for message.CreateValidator
-func setSlotKeySigs() []shard.BLSSignature {
-	messageBytes := []byte(BLSVerificationStr)
-	privateKey := &bls.SecretKey{}
-	privateKey.DeserializeHexStr(blsPriKey)
-	msgHash := hash.Keccak256(messageBytes)
-	signature := privateKey.SignHash(msgHash[:])
-	var sig shard.BLSSignature
-	copy(sig[:], signature.Serialize())
-	return []shard.BLSSignature{sig}
-}
-
-// create a new validator
-func createNewValidator() Validator {
-	cr := CommissionRates{
-		Rate:          numeric.OneDec(),
-		MaxRate:       numeric.OneDec(),
-		MaxChangeRate: numeric.ZeroDec(),
-	}
-	c := Commission{cr, big.NewInt(300)}
-	d := Description{
-		Name:     "Wayne",
-		Identity: "wen",
-		Website:  "harmony.one.wen",
-		Details:  "best",
-	}
-	v := Validator{
-		Address:              validatorAddr,
-		SlotPubKeys:          slotPubKeys,
-		LastEpochInCommittee: big.NewInt(20),
-		MinSelfDelegation:    tenK,
-		MaxTotalDelegation:   twelveK,
-		Status:               effective.Active,
-		Commission:           c,
-		Description:          d,
-		CreationHeight:       big.NewInt(12306),
-	}
-	return v
-}
-
-// create a new validator wrapper
-func createNewValidatorWrapper() ValidatorWrapper {
-	v := createNewValidator()
-	ds := Delegations{
-		{
-			DelegatorAddress: v.Address,
-			Amount:           new(big.Int).Set(v.MinSelfDelegation),
-		},
-		{
-			DelegatorAddress: common.BigToAddress(common.Big1),
-			Amount:           new(big.Int).Sub(v.MaxTotalDelegation, v.MinSelfDelegation),
-		},
-	}
-	return ValidatorWrapper{
-		Validator:   v,
-		Delegations: ds,
-	}
 }
