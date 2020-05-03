@@ -385,9 +385,9 @@ func MarshalValidator(validator Validator) ([]byte, error) {
 }
 
 // UnmarshalValidator unmarshal binary into Validator object
-func UnmarshalValidator(by []byte) (*Validator, error) {
-	decoded := &Validator{}
-	err := rlp.DecodeBytes(by, decoded)
+func UnmarshalValidator(by []byte) (Validator, error) {
+	decoded := Validator{}
+	err := rlp.DecodeBytes(by, &decoded)
 	return decoded, err
 }
 
