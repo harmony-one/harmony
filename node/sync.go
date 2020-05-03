@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -103,7 +104,6 @@ func protocolPeerHeights(
 		if err := handler.finished(); err != nil {
 			return nil, err
 		}
-
 	}
 
 	utils.Logger().Info().
@@ -169,6 +169,21 @@ func constructHarmonyP2PMsgForClientRoles(
 	return p2p.ConstructMessage(byteBuffer.Bytes()), nil
 }
 
+func checkValidSyncResp(resp *msg_pb.Message) error {
+	if r := resp.GetServiceType(); r != msg_pb.ServiceType_CLIENT_SUPPORT {
+		return errors.Wrapf(
+			errNotClientSupport, "wrongly received %v", r,
+		)
+	}
+
+	if r := resp.GetType(); r != msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT &&
+		r != msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEADER &&
+		r != msg_pb.MessageType_SYNC_RESPONSE_BLOCK {
+		return errors.Wrapf(errWrongReply, "wrongly received %v", r)
+	}
+	return nil
+}
+
 func (sync *syncingHandler) receiveResponse(
 	heightReply chan chainHeights,
 	headersReply chan []*block.Header,
@@ -180,16 +195,8 @@ func (sync *syncingHandler) receiveResponse(
 		return err
 	}
 
-	if r := resp.GetServiceType(); r != msg_pb.ServiceType_CLIENT_SUPPORT {
-		return errors.Wrapf(
-			errNotClientSupport, "wrongly received %v", r,
-		)
-	}
-
-	if r := resp.GetType(); r != msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT {
-		return errors.Wrapf(
-			errWrongReply, "wrongly received %v", r,
-		)
+	if err := checkValidSyncResp(resp); err != nil {
+		return err
 	}
 
 	switch resp.GetType() {
@@ -207,9 +214,20 @@ func (sync *syncingHandler) receiveResponse(
 		}
 
 	case msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEADER:
+		data := resp.GetSyncBlockHeader().GetHeaderRlp()
+		var replyHeaders []*block.Header
+		if err := rlp.DecodeBytes(data, replyHeaders); err != nil {
+			return err
+		}
+		headersReply <- replyHeaders
 
 	case msg_pb.MessageType_SYNC_RESPONSE_BLOCK:
-
+		data := resp.GetSyncBlock().GetBlockRlp()
+		var replyBlocks []*types.Block
+		if err := rlp.DecodeBytes(data, replyBlocks); err != nil {
+			return err
+		}
+		blocksReply <- replyBlocks
 	}
 
 	return nil
@@ -511,7 +529,6 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 				info <- height
 			default:
 				info <- height
-				time.Sleep(800 * time.Millisecond)
 			}
 		}
 		return nil
