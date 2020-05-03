@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/harmony-one/harmony/internal/genesis"
+
 	common "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -27,9 +29,6 @@ var (
 	}
 
 	blsPubSigPairs []blsPubSigPair
-
-	delegationAmt1 = big.NewInt(1e18)
-	delegation1    = NewDelegation(delegatorAddr, delegationAmt1)
 )
 
 var (
@@ -174,11 +173,9 @@ func TestTotalDelegation(t *testing.T) {
 	// add a delegation to validator
 	// delegation.Amount = 10000
 	wrapper := createNewValidatorWrapper()
-	wrapper.Delegations = append(wrapper.Delegations, delegation1)
 	totalNum := wrapper.TotalDelegation()
 
-	// check if the number is 10000
-	if totalNum.Cmp(big.NewInt(1e18)) != 0 {
+	if totalNum.Cmp(twelveK) != 0 {
 		t.Errorf("TotalDelegation number is not right")
 	}
 }
@@ -418,20 +415,52 @@ func TestVerifyBLSKeys(t *testing.T) {
 		{[]int{3, 2, 1, 0}, []int{0, 1, 2, 3}, errors.New("bls order not match")},
 	}
 	for i, test := range tests {
-		pubs := make([]shard.BLSPublicKey, 0, len(test.pubIndexes))
-		for _, index := range test.pubIndexes {
-			pubs = append(pubs, pairs[index].pub)
-		}
-		sigs := make([]shard.BLSSignature, 0, len(test.sigIndexes))
-		for _, index := range test.sigIndexes {
-			sigs = append(sigs, pairs[index].sig)
-		}
+		pubs := getPubsFromPairs(pairs, test.pubIndexes)
+		sigs := getSigsFromPairs(pairs, test.sigIndexes)
 
 		err := VerifyBLSKeys(pubs, sigs)
 		if (err == nil) != (test.expErr == nil) {
 			t.Errorf("Test %v: [%v] / [%v]", i, err, test.expErr)
 		}
 	}
+}
+
+func TestContainsHarmonyBLSKeys(t *testing.T) {
+	pairs := makeBLSPubSigPairs(10)
+	tests := []struct {
+		pubIndexes    []int
+		deployIndexes []int
+		expErr        error
+	}{
+		{[]int{0}, []int{}, nil},
+		{[]int{}, []int{0}, nil},
+		{[]int{0, 1, 2, 3, 4, 5, 6, 7, 8}, []int{9}, nil},
+		{[]int{0}, []int{1, 2, 3, 4, 5, 6, 7, 8, 9}, nil},
+		{[]int{0, 1, 2, 3, 4}, []int{5, 6, 7, 8, 9}, nil},
+		{[]int{0}, []int{0}, errors.New("duplicate bls pub")},
+		{[]int{0, 1, 2, 3, 4, 5}, []int{5, 6, 7, 8, 9}, errors.New("duplicate bls pub")},
+	}
+	for i, test := range tests {
+		pubs := getPubsFromPairs(pairs, test.pubIndexes)
+		dPubs := getPubsFromPairs(pairs, test.deployIndexes)
+		das := makeDeployAccountsFromBLSPubs(dPubs)
+
+		err := containsHarmonyBLSKeys(pubs, das, big.NewInt(0))
+		if (err == nil) != (test.expErr == nil) {
+			t.Errorf("Test %v: [%v] / [%v]", i, err, test.expErr)
+		}
+	}
+}
+
+func makeDeployAccountsFromBLSPubs(pubs []shard.BLSPublicKey) []genesis.DeployAccount {
+	das := make([]genesis.DeployAccount, 0, len(pubs))
+	for i, pub := range pubs {
+		das = append(das, genesis.DeployAccount{
+			Address:      common.BigToAddress(big.NewInt(int64(i))).Hex(),
+			BLSPublicKey: pub.Hex(),
+		})
+	}
+	return das
 }
 
 func TestCreateValidatorFromNewMsg(t *testing.T) {
@@ -488,6 +517,22 @@ func makeBLSPubSigPair() blsPubSigPair {
 	copy(shardSig[:], sig.Serialize())
 
 	return blsPubSigPair{shardPub, shardSig}
+}
+
+func getPubsFromPairs(pairs []blsPubSigPair, indexes []int) []shard.BLSPublicKey {
+	pubs := make([]shard.BLSPublicKey, 0, len(indexes))
+	for _, index := range indexes {
+		pubs = append(pubs, pairs[index].pub)
+	}
+	return pubs
+}
+
+func getSigsFromPairs(pairs []blsPubSigPair, indexes []int) []shard.BLSSignature {
+	sigs := make([]shard.BLSSignature, 0, len(indexes))
+	for _, index := range indexes {
+		sigs = append(sigs, pairs[index].sig)
+	}
+	return sigs
 }
 
 func TestString(t *testing.T) {
