@@ -71,9 +71,10 @@ var (
 	freshDB     = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 	pprof       = flag.String("pprof", "", "what address and port the pprof profiling server should listen on")
 	versionFlag = flag.Bool("version", false, "Output version info")
-	onlyLogTps  = flag.Bool("only_log_tps", false, "Only log TPS if true")
-	dnsZone     = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
-	dnsFlag     = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
+	// note deprecated
+	onlyLogTps = flag.Bool("only_log_tps", false, "Only log TPS if true")
+	dnsZone    = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
+	dnsFlag    = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers = flag.Int("min_peers", 32, "Minimal number of Peers in shard")
 	// Key file to store the private key
@@ -127,8 +128,12 @@ var (
 func initSetup() {
 
 	// Setup pprof
-	if addr := *pprof; addr != "" {
-		go func() { http.ListenAndServe(addr, nil) }()
+	if *port == "9000" {
+		go func() { http.ListenAndServe("localhost:6060", nil) }()
+	}
+
+	if *port == "9001" {
+		go func() { http.ListenAndServe("localhost:6061", nil) }()
 	}
 
 	// maybe request passphrase for bls key.
@@ -143,11 +148,6 @@ func initSetup() {
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
 	utils.AddLogFile(fmt.Sprintf("%v/validator-%v-%v.log", *logFolder, *ip, *port), *logMaxSize)
-
-	if *onlyLogTps {
-		matchFilterHandler := log.MatchFilterHandler("msg", "TPS Report", utils.GetLogInstance().GetHandler())
-		utils.GetLogInstance().SetHandler(matchFilterHandler)
-	}
 
 	// Add GOMAXPROCS to achieve max performance.
 	runtime.GOMAXPROCS(runtime.NumCPU() * 4)
@@ -288,7 +288,7 @@ func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMul
 		os.Exit(100)
 	}
 
-	keyFiles := []os.FileInfo{}
+	var keyFiles []os.FileInfo
 	legacyBLSFile := true
 
 	if len(awsEncryptedBLSKeyFiles) > 0 {

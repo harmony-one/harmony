@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -67,6 +68,11 @@ func (node *Node) StartLeaderWork() error {
 	})
 
 	var roundDone singleflight.Group
+	type oneTime struct {
+		key    string
+		viewID uint64
+		once   sync.Once
+	}
 
 	g.Go(func() error {
 		for quorumReached := range node.Consensus.CommitFinishChan {
@@ -83,16 +89,28 @@ func (node *Node) StartLeaderWork() error {
 				blockNum == node.Consensus.BlockNum() {
 				key := fmt.Sprintf("%d-%d-%d", viewID, shardID, blockNum)
 				readyChan := roundDone.DoChan(key, func() (interface{}, error) {
-					time.Sleep(time.Until(node.Consensus.NextBlockDue()))
+					t := time.NewTimer(time.Until(node.Consensus.NextBlockDue()))
+					for range t.C {
+						t.Stop()
+					}
+
 					if err := node.Consensus.FinalizeCommits(); err != nil {
 						return nil, err
 					}
-					return key, nil
+
+					var once sync.Once
+					return &oneTime{key, viewID, once}, nil
 				})
 
 				go func() {
 					r := <-readyChan
-					node.Consensus.ProposalNewBlock <- struct{}{}
+					result := r.Val.(*oneTime)
+
+					result.once.Do(func() {
+						fmt.Println("kicked off just once for ", result.key)
+						node.Consensus.ProposalNewBlock <- struct{}{}
+					})
+
 					utils.Logger().Info().
 						Str("key", r.Val.(string)).
 						Msg("finalized commits and sent out new proposal signal")

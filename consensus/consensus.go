@@ -273,7 +273,7 @@ func New(
 		RndChannel:               make(chan [vdfAndSeedSize]byte),
 		ShardID:                  shard,
 		IncomingConsensusMessage: make(chan []byte),
-		SyncNeeded:               make(chan Range),
+		SyncNeeded:               make(chan Range, 1),
 		delayCommit:              commitDelay,
 		MinPeers:                 minPeer,
 	}

@@ -74,7 +74,7 @@ func fatal(err error) {
 	panic("end")
 }
 
-// SendMessagesToGroups ..
+// SendMessageToGroups ..
 func (h *Host) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
 	ctx := context.Background()
 	var g errgroup.Group

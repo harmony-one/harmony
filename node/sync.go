@@ -5,7 +5,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
+	"fmt"
 	"io"
+	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,7 +18,6 @@ import (
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -29,13 +31,13 @@ import (
 func newSyncerForIncoming(
 	stream libp2p_network.Stream,
 	host *p2p.Host,
-	current chan chainHeights,
+	current chainHeights,
 ) (*syncingHandler, error) {
 	rw := bufio.NewReadWriter(
 		bufio.NewReader(stream), bufio.NewWriter(stream),
 	)
 	return &syncingHandler{
-		stream, host, rw, current,
+		stream, host, rw, &current,
 	}, nil
 
 }
@@ -43,7 +45,6 @@ func newSyncerForIncoming(
 func newSyncerToPeerID(
 	peerID libp2p_peer.ID,
 	host *p2p.Host,
-	current chan chainHeights,
 ) (*syncingHandler, error) {
 
 	stream, err := host.IPFSNode.PeerHost.NewStream(
@@ -60,17 +61,19 @@ func newSyncerToPeerID(
 		bufio.NewReader(stream), bufio.NewWriter(stream),
 	)
 
-	return &syncingHandler{stream, host, rw, current}, nil
+	return &syncingHandler{stream, host, rw, nil}, nil
 }
 
 func protocolPeerHeights(
 	conns []ipfs_interface.ConnectionInfo, host *p2p.Host,
-) ([]*chainHeights, error) {
-	var collect []*chainHeights
+) ([]*whoHasIt, error) {
+	var collect []*whoHasIt
 
 	for _, neighbor := range conns {
+
+		id := neighbor.ID()
 		protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
-			neighbor.ID(), p2p.Protocol,
+			id, p2p.Protocol,
 		)
 
 		if err != nil {
@@ -88,7 +91,20 @@ func protocolPeerHeights(
 			continue
 		}
 
-		handler, err := newSyncerToPeerID(neighbor.ID(), host, nil)
+		open, err := neighbor.Streams()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, already := range open {
+			if already == p2p.Protocol {
+				continue
+			} else {
+				fmt.Println("never connected so continuing")
+			}
+		}
+
+		handler, err := newSyncerToPeerID(id, host)
 
 		if err != nil {
 			return nil, err
@@ -99,11 +115,14 @@ func protocolPeerHeights(
 			return nil, err
 		}
 
-		collect = append(collect, heights)
+		collect = append(collect, &whoHasIt{
+			chainHeights: heights, peerID: id,
+		})
 
 		if err := handler.finished(); err != nil {
 			return nil, err
 		}
+
 	}
 
 	utils.Logger().Info().
@@ -114,11 +133,88 @@ func protocolPeerHeights(
 
 }
 
-func syncFromHMYPeersIfNeeded(
-	host *p2p.Host,
-	currentBeacon, currentShard height,
-) error {
+type t struct {
+	count  int
+	haveIt []libp2p_peer.ID
+}
 
+type hashCount struct {
+	count int
+	hash  common.Hash
+}
+
+type mostCommonHash struct {
+	beacon hashCount
+	shard  hashCount
+}
+
+func (m *mostCommonHash) MarshalJSON() ([]byte, error) {
+	type c struct {
+		Count int    `json:"count"`
+		Hash  string `json:"hash"`
+	}
+	return json.Marshal(struct {
+		Beacon c `json:"beacon-chain"`
+		Shard  c `json:"shard-chain"`
+	}{
+		c{m.beacon.count, m.beacon.hash.Hex()},
+		c{m.shard.count, m.shard.hash.Hex()},
+	})
+}
+
+func (m *mostCommonHash) String() string {
+	s, _ := json.Marshal(m)
+	return string(s)
+}
+
+func commonHash(collect []*whoHasIt) mostCommonHash {
+	beaconCounters, shardCounters :=
+		map[common.Hash]t{}, map[common.Hash]t{}
+
+	for _, c := range collect {
+
+		currentS := shardCounters[c.shard.blockHash]
+		currentS.count++
+		currentS.haveIt = append(currentS.haveIt, c.peerID)
+		shardCounters[c.shard.blockHash] = currentS
+
+		currentB := beaconCounters[c.beacon.blockHash]
+		currentB.count++
+		currentB.haveIt = append(currentB.haveIt, c.peerID)
+		beaconCounters[c.beacon.blockHash] = currentB
+
+	}
+
+	type withHash struct {
+		t
+		hash common.Hash
+	}
+
+	b, s := []withHash{}, []withHash{}
+
+	for h, value := range beaconCounters {
+		b = append(b, withHash{t: value, hash: h})
+	}
+
+	for h, value := range shardCounters {
+		s = append(s, withHash{t: value, hash: h})
+	}
+
+	sort.SliceStable(b, func(i, j int) bool {
+		return b[i].count > s[j].count
+	})
+
+	sort.SliceStable(s, func(i, j int) bool {
+		return s[i].count > s[j].count
+	})
+
+	return mostCommonHash{
+		beacon: hashCount{b[0].count, b[0].hash},
+		shard:  hashCount{s[0].count, s[0].hash},
+	}
+}
+
+func syncFromHMYPeersIfNeeded(host *p2p.Host, current chainHeights) error {
 	conns, err := host.CoreAPI.Swarm().Peers(context.Background())
 	if err != nil {
 		return err
@@ -128,6 +224,10 @@ func syncFromHMYPeersIfNeeded(
 	if err != nil {
 		return err
 	}
+
+	most := commonHash(collect)
+
+	fmt.Println("most common", most.String())
 
 	utils.Logger().Info().
 		Int("protocol-peers", len(collect)).
@@ -140,7 +240,7 @@ type syncingHandler struct {
 	rawStream libp2p_network.Stream
 	host      *p2p.Host
 	rw        *bufio.ReadWriter
-	current   chan chainHeights
+	current   *chainHeights
 }
 
 var requestBlockHeight []byte
@@ -182,6 +282,14 @@ func checkValidSyncResp(resp *msg_pb.Message) error {
 		return errors.Wrapf(errWrongReply, "wrongly received %v", r)
 	}
 	return nil
+}
+
+func (sync *syncingHandler) finished() error {
+	if err := sync.rw.Flush(); err != nil {
+		return err
+	}
+
+	return sync.rawStream.Close()
 }
 
 func (sync *syncingHandler) receiveResponse(
@@ -298,14 +406,6 @@ func (sync *syncingHandler) askBlockHeader(
 
 }
 
-func (sync *syncingHandler) finished() error {
-	if err := sync.rw.Flush(); err != nil {
-		return err
-	}
-
-	return sync.rawStream.Close()
-}
-
 func newReplyChannels() (
 	chan chainHeights, chan []*block.Header, chan []*types.Block,
 ) {
@@ -366,26 +466,20 @@ func (sync *syncingHandler) sendBytesWithFlush(data []byte) error {
 }
 
 func (sync *syncingHandler) replyWithCurrentBlockHeight() error {
-	heights := <-sync.current
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
 		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
 		Request: &msg_pb.Message_SyncBlockHeight{
 			SyncBlockHeight: &msg_pb.SyncBlockHeight{
-				BeaconHeight: heights.beacon.blockNum,
-				BeaconHash:   heights.beacon.blockHash.Bytes(),
-				ShardHeight:  heights.shard.blockNum,
-				ShardHash:    heights.shard.blockHash.Bytes(),
+				BeaconHeight: sync.current.beacon.blockNum,
+				BeaconHash:   sync.current.beacon.blockHash.Bytes(),
+				ShardHeight:  sync.current.shard.blockNum,
+				ShardHash:    sync.current.shard.blockHash.Bytes(),
 			},
 		},
 	}
 
-	data, err := constructHarmonyP2PMsgForClientRoles(message)
-	if err != nil {
-		return err
-	}
-
-	return sync.sendBytesWithFlush(data)
+	return sync.sendHarmonyMessageAsBytes(message)
 }
 
 func (sync *syncingHandler) handleMessage(msg *msg_pb.Message) error {
@@ -401,6 +495,7 @@ func (sync *syncingHandler) handleMessage(msg *msg_pb.Message) error {
 }
 
 func (sync *syncingHandler) readHarmonyMessage() (*msg_pb.Message, error) {
+
 	buf, err := sync.rw.Peek(1)
 	if err != nil {
 		return nil, err
@@ -457,89 +552,67 @@ type chainHeights struct {
 	shard  height
 }
 
+type whoHasIt struct {
+	*chainHeights
+	peerID libp2p_peer.ID
+}
+
 // HandleBlockSyncing ..
 func (node *Node) HandleBlockSyncing() error {
+	var g errgroup.Group
 	t := time.NewTicker(time.Second * 10)
 	defer t.Stop()
 
-	for {
-		select {
-		case blockRange := <-node.Consensus.SyncNeeded:
-			_ = blockRange
-		case <-t.C:
-			if err := syncFromHMYPeersIfNeeded(
-				node.host,
-				height{
-					node.Beaconchain().CurrentHeader().Number().Uint64(),
-					node.Beaconchain().CurrentHeader().Hash(),
-				},
-				height{
-					node.Blockchain().CurrentHeader().Number().Uint64(),
-					node.Blockchain().CurrentHeader().Hash(),
-				},
-			); err != nil {
-				return err
+	g.Go(func() error {
+		i := 0
+
+		for {
+			select {
+			case blockRange := <-node.Consensus.SyncNeeded:
+				_ = blockRange
+			case <-t.C:
+				fmt.Println("tick went off", i)
+				i++
+				if err := syncFromHMYPeersIfNeeded(
+					node.host, node.heightNow(),
+				); err != nil {
+					return err
+				}
 			}
 		}
-	}
 
-	return nil
+	})
+
+	return g.Wait()
+}
+
+func (node *Node) heightNow() chainHeights {
+	currentBeacon := node.Blockchain().CurrentBlock()
+	currentShard := node.Beaconchain().CurrentBlock()
+
+	return chainHeights{
+		beacon: height{
+			blockNum:  currentBeacon.Number().Uint64(),
+			blockHash: currentBeacon.Hash(),
+		},
+		shard: height{
+			blockNum:  currentShard.Number().Uint64(),
+			blockHash: currentShard.Hash(),
+		},
+	}
 }
 
 // HandleIncomingHMYProtocolStreams ..
 func (node *Node) HandleIncomingHMYProtocolStreams() error {
 	var g errgroup.Group
+	for stream := range node.host.IncomingStream {
+		s := stream
+		g.Go(func() error {
 
-	info := make(chan chainHeights, 1)
-
-	g.Go(func() error {
-
-		beaconEvent := make(chan core.ChainHeadEvent)
-		shardEvent := make(chan core.ChainHeadEvent)
-		subBeacon := node.Blockchain().SubscribeChainHeadEvent(beaconEvent)
-		subShard := node.Blockchain().SubscribeChainHeadEvent(shardEvent)
-		defer subBeacon.Unsubscribe()
-		defer subShard.Unsubscribe()
-
-		currentBeacon := node.Blockchain().CurrentBlock()
-		currentShard := node.Beaconchain().CurrentBlock()
-
-		height := chainHeights{
-			beacon: height{
-				blockNum:  currentBeacon.Number().Uint64(),
-				blockHash: currentBeacon.Hash(),
-			},
-			shard: height{
-				blockNum:  currentBeacon.Number().Uint64(),
-				blockHash: currentShard.Hash(),
-			},
-		}
-
-		for {
-			select {
-			case e := <-beaconEvent:
-				currentBeacon = e.Block
-				height.beacon.blockNum = currentBeacon.Number().Uint64()
-				height.beacon.blockHash = currentBeacon.Hash()
-				info <- height
-			case e := <-shardEvent:
-				currentShard = e.Block
-				height.shard.blockNum = currentShard.Number().Uint64()
-				height.shard.blockHash = currentShard.Hash()
-				info <- height
-			default:
-				info <- height
-			}
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-
-		for stream := range node.host.IncomingStream {
 			handler, err := newSyncerForIncoming(
-				stream, node.host, info,
+				s, node.host, node.heightNow(),
 			)
+
 			if err != nil {
 				return err
 			}
@@ -548,13 +621,13 @@ func (node *Node) HandleIncomingHMYProtocolStreams() error {
 				return err
 			}
 
-			if err := handler.rawStream.Close(); err != nil {
-				return err
-			}
-		}
+			// if err := handler.finished(); err != nil {
+			// 	return err
+			// }
 
-		return nil
-	})
+			return nil
+		})
+	}
 
 	return g.Wait()
 }
