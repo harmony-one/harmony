@@ -1,4 +1,5 @@
 syntax = "proto3";
+
 package message;
 
 
@@ -117,11 +118,15 @@ message SyncBlockHeight {
 }
 
 message SyncBlockHeader {
-  bytes header_rlp = 1;
+  uint64 height_start = 1;
+  uint64 height_end = 2;
+  bytes header_rlp = 3;
 }
 
 message SyncBlock {
-  bytes block_rlp = 1;
+  uint64 height_start = 1;
+  uint64 height_end = 2;
+  bytes block_rlp = 3;
 }
 
 message DrandRequest {
@@ -147,5 +152,4 @@ message ViewChangeRequest {
   bytes m2_bitmap = 10;
   bytes m3_aggsigs = 11; // m3: |viewID|
   bytes m3_bitmap= 12;
-
 }

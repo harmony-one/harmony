@@ -12,7 +12,10 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
@@ -56,9 +59,7 @@ func newSyncerToPeerID(
 		bufio.NewReader(stream), bufio.NewWriter(stream),
 	)
 
-	// TODO probably need to expose the raw stream as well
 	return &syncingHandler{stream, host, rw, current}, nil
-
 }
 
 func protocolPeerHeights(
@@ -74,12 +75,14 @@ func protocolPeerHeights(
 		if err != nil {
 			return nil, err
 		}
+
 		seen := false
 		for _, protocol := range protocols {
 			if seen = protocol == p2p.Protocol; seen {
 				break
 			}
 		}
+
 		if !seen {
 			continue
 		}
@@ -97,11 +100,7 @@ func protocolPeerHeights(
 
 		collect = append(collect, heights)
 
-		if err := handler.rw.Flush(); err != nil {
-			return nil, err
-		}
-
-		if err := handler.rawStream.Close(); err != nil {
+		if err := handler.finished(); err != nil {
 			return nil, err
 		}
 
@@ -144,34 +143,18 @@ type syncingHandler struct {
 	current   chan chainHeights
 }
 
-var (
-	requestBlockHeight []byte
-	requestBlockHeader []byte
-	requestBlock       []byte
-)
+var requestBlockHeight []byte
 
 func init() {
-	allMessage := make([][]byte, 3)
-
-	for i, m := range [...]msg_pb.MessageType{
-		msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT,
-		msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEADER,
-		msg_pb.MessageType_SYNC_REQUEST_BLOCK,
-	} {
-		message := &msg_pb.Message{
-			ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-			Type:        m,
-		}
-		data, err := constructHarmonyP2PMsgForClientRoles(message)
-		if err != nil {
-			panic("die ->" + err.Error())
-		}
-		allMessage[i] = data
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+		Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT,
 	}
-
-	requestBlockHeight = allMessage[0]
-	requestBlockHeader = allMessage[1]
-	requestBlock = allMessage[2]
+	data, err := constructHarmonyP2PMsgForClientRoles(message)
+	if err != nil {
+		panic("die ->" + err.Error())
+	}
+	requestBlockHeight = data
 }
 
 func constructHarmonyP2PMsgForClientRoles(
@@ -186,47 +169,167 @@ func constructHarmonyP2PMsgForClientRoles(
 	return p2p.ConstructMessage(byteBuffer.Bytes()), nil
 }
 
-func (sync *syncingHandler) receiveHeightResponse() (*chainHeights, error) {
+func (sync *syncingHandler) receiveResponse(
+	heightReply chan chainHeights,
+	headersReply chan []*block.Header,
+	blocksReply chan []*types.Block,
+) error {
+
 	resp, err := sync.readHarmonyMessage()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if r := resp.GetServiceType(); r != msg_pb.ServiceType_CLIENT_SUPPORT {
-		return nil, errors.Wrapf(
+		return errors.Wrapf(
 			errNotClientSupport, "wrongly received %v", r,
 		)
 	}
 
 	if r := resp.GetType(); r != msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT {
-		return nil, errors.Wrapf(
+		return errors.Wrapf(
 			errWrongReply, "wrongly received %v", r,
 		)
 	}
 
-	peerHeights := resp.GetSyncBlockHeight()
-	return &chainHeights{
-		beacon: height{
-			blockNum:  peerHeights.GetBeaconHeight(),
-			blockHash: common.BytesToHash(peerHeights.GetBeaconHash()),
-		},
-		shard: height{
-			blockNum:  peerHeights.GetShardHeight(),
-			blockHash: common.BytesToHash(peerHeights.GetShardHash()),
-		},
-	}, nil
+	switch resp.GetType() {
+	case msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT:
+		peerHeights := resp.GetSyncBlockHeight()
+		heightReply <- chainHeights{
+			beacon: height{
+				blockNum:  peerHeights.GetBeaconHeight(),
+				blockHash: common.BytesToHash(peerHeights.GetBeaconHash()),
+			},
+			shard: height{
+				blockNum:  peerHeights.GetShardHeight(),
+				blockHash: common.BytesToHash(peerHeights.GetShardHash()),
+			},
+		}
+
+	case msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEADER:
+
+	case msg_pb.MessageType_SYNC_RESPONSE_BLOCK:
+
+	}
+
+	return nil
 
 }
 
 func (sync *syncingHandler) askHeight() (*chainHeights, error) {
-	if _, err := sync.rw.Write(requestBlockHeight); err != nil {
-		return nil, err
-	}
-	if err := sync.rw.Flush(); err != nil {
+
+	if err := sync.sendBytesWithFlush(
+		requestBlockHeight,
+	); err != nil {
 		return nil, err
 	}
 
-	return sync.receiveHeightResponse()
+	heightReply, headersReply, blocksReply := newReplyChannels()
+
+	if err := sync.receiveResponse(
+		heightReply, headersReply, blocksReply,
+	); err != nil {
+		return nil, err
+	}
+
+	c := <-heightReply
+	return &c, nil
+}
+
+func (sync *syncingHandler) sendHarmonyMessageAsBytes(message *msg_pb.Message) error {
+	msg, err := constructHarmonyP2PMsgForClientRoles(message)
+	if err != nil {
+		return err
+	}
+	return sync.sendBytesWithFlush(msg)
+}
+
+func (sync *syncingHandler) askBlockHeader(
+	r consensus.Range,
+) ([]*block.Header, error) {
+
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+		Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEADER,
+		Request: &msg_pb.Message_SyncBlockHeader{
+			SyncBlockHeader: &msg_pb.SyncBlockHeader{
+				HeightStart: r.Start,
+				HeightEnd:   r.End,
+			},
+		},
+	}
+
+	if err := sync.sendHarmonyMessageAsBytes(message); err != nil {
+		return nil, err
+	}
+
+	heightReply, headersReply, blocksReply := newReplyChannels()
+
+	if err := sync.receiveResponse(
+		heightReply, headersReply, blocksReply,
+	); err != nil {
+		return nil, err
+	}
+
+	select {
+	case r := <-headersReply:
+		return r, nil
+	default:
+		return nil, errors.New("did not receive headers reply")
+	}
+
+}
+
+func (sync *syncingHandler) finished() error {
+	if err := sync.rw.Flush(); err != nil {
+		return err
+	}
+
+	return sync.rawStream.Close()
+}
+
+func newReplyChannels() (
+	chan chainHeights, chan []*block.Header, chan []*types.Block,
+) {
+	return make(chan chainHeights, 1),
+		make(chan []*block.Header, 1),
+		make(chan []*types.Block, 1)
+}
+
+func (sync *syncingHandler) askBlock(
+	r consensus.Range,
+) ([]*types.Block, error) {
+
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+		Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK,
+		Request: &msg_pb.Message_SyncBlock{
+			SyncBlock: &msg_pb.SyncBlock{
+				HeightStart: r.Start,
+				HeightEnd:   r.End,
+			},
+		},
+	}
+
+	if err := sync.sendHarmonyMessageAsBytes(message); err != nil {
+		return nil, err
+	}
+
+	heightReply, headersReply, blocksReply := newReplyChannels()
+
+	if err := sync.receiveResponse(
+		heightReply, headersReply, blocksReply,
+	); err != nil {
+		return nil, err
+	}
+
+	select {
+	case blocks := <-blocksReply:
+		return blocks, nil
+	default:
+		return nil, errors.New("did not receive blocks reply")
+	}
+
 }
 
 var (
@@ -241,13 +344,7 @@ func (sync *syncingHandler) sendBytesWithFlush(data []byte) error {
 	if _, err := sync.rw.Write(data); err != nil {
 		return err
 	}
-
-	if err := sync.rw.Flush(); err != nil {
-		return err
-	}
-
-	return nil
-
+	return sync.rw.Flush()
 }
 
 func (sync *syncingHandler) replyWithCurrentBlockHeight() error {
@@ -344,7 +441,7 @@ type chainHeights struct {
 
 // HandleBlockSyncing ..
 func (node *Node) HandleBlockSyncing() error {
-	t := time.NewTicker(time.Second * 45)
+	t := time.NewTicker(time.Second * 10)
 	defer t.Stop()
 
 	for {
@@ -375,7 +472,7 @@ func (node *Node) HandleBlockSyncing() error {
 func (node *Node) HandleIncomingHMYProtocolStreams() error {
 	var g errgroup.Group
 
-	info := make(chan chainHeights)
+	info := make(chan chainHeights, 1)
 
 	g.Go(func() error {
 
