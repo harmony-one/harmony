@@ -5,12 +5,11 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/harmony-one/harmony/internal/genesis"
-
 	common "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -18,17 +17,11 @@ import (
 )
 
 var (
-	testAddr1, _  = common2.Bech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy")
-	validatorAddr = common.Address(testAddr1)
-	desc          = Description{
-		Name:            "john",
-		Identity:        "john",
-		Website:         "harmony.one.wen",
-		SecurityContact: "wenSecurity",
-		Details:         "wenDetails",
-	}
-
 	blsPubSigPairs []blsPubSigPair
+	hmyBLSPub      shard.BLSPublicKey
+
+	hmyBLSPubStr     = "9e70e8d76851f6e8dc648255acdd57bb5c49cdae7571aed43f86e9f140a6343caed2ffa860919d03e0912411fee4850a"
+	validatorAddr, _ = common2.Bech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy")
 )
 
 var (
@@ -42,6 +35,14 @@ var (
 )
 
 var (
+	validDescription = Description{
+		Name:            "Jacky Wang",
+		Identity:        "jacky@harmony.one",
+		Website:         "harmony.one/jacky",
+		SecurityContact: "jacky@harmony.one",
+		Details:         "Details of jacky",
+	}
+
 	invalidDescription = Description{
 		Name:            "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongname",
 		Identity:        "jacky@harmony.one",
@@ -49,10 +50,19 @@ var (
 		SecurityContact: "jacky@harmony.one",
 		Details:         "Details of jacky",
 	}
+
+	validCommissionRates = CommissionRates{
+		Rate:          numeric.ZeroDec(),
+		MaxRate:       numeric.ZeroDec(),
+		MaxChangeRate: numeric.ZeroDec(),
+	}
 )
 
 func init() {
+	// set bls pub and sig pairs for testing
 	blsPubSigPairs = makeBLSPubSigPairs(5)
+	// set bls pub keys for hmy
+	copy(hmyBLSPub[:], common.Hex2Bytes(hmyBLSPubStr))
 }
 
 func TestNewEmptyStats(t *testing.T) {
@@ -73,7 +83,7 @@ func TestNewEmptyStats(t *testing.T) {
 
 // Test UnmarshalValidator
 func TestMarshalUnmarshalValidator(t *testing.T) {
-	raw := createNewValidator()
+	raw := makeValidValidator()
 
 	b, err := MarshalValidator(raw)
 	if err != nil {
@@ -160,7 +170,7 @@ func TestValidator_SanityCheck(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		v := createNewValidator()
+		v := makeValidValidator()
 		test.editValidator(&v)
 		err := v.SanityCheck(DoNotEnforceMaxBLS)
 		if (err == nil) != (test.expErr == nil) {
@@ -172,7 +182,7 @@ func TestValidator_SanityCheck(t *testing.T) {
 func TestTotalDelegation(t *testing.T) {
 	// add a delegation to validator
 	// delegation.Amount = 10000
-	wrapper := createNewValidatorWrapper()
+	wrapper := makeValidValidatorWrapper()
 	totalNum := wrapper.TotalDelegation()
 
 	if totalNum.Cmp(twelveK) != 0 {
@@ -223,7 +233,7 @@ func TestValidatorWrapper_SanityCheck(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		vw := createNewValidatorWrapper()
+		vw := makeValidValidatorWrapper()
 		test.editValidatorWrapper(&vw)
 		err := vw.SanityCheck(DoNotEnforceMaxBLS)
 		if (err == nil) != (test.expErr == nil) {
@@ -463,31 +473,45 @@ func makeDeployAccountsFromBLSPubs(pubs []shard.BLSPublicKey) []genesis.DeployAc
 	return das
 }
 
-func TestCreateValidatorFromNewMsg(t *testing.T) {
-	v := CreateValidator{
-		ValidatorAddress: validatorAddr,
-		Description:      desc,
-		Amount:           big.NewInt(1e18),
-	}
-	blockNum := big.NewInt(1000)
-	_, err := CreateValidatorFromNewMsg(&v, blockNum, new(big.Int))
-	if err != nil {
-		t.Errorf("CreateValidatorFromNewMsg failed")
-	}
-}
-
 func TestUpdateValidatorFromEditMsg(t *testing.T) {
 	ev := EditValidator{
 		ValidatorAddress:   validatorAddr,
-		Description:        desc,
+		Description:        validDescription,
 		MinSelfDelegation:  tenK,
 		MaxTotalDelegation: twelveK,
 	}
-	validator := createNewValidator()
+	validator := makeValidValidator()
 	UpdateValidatorFromEditMsg(&validator, &ev, new(big.Int))
 
 	if validator.MinSelfDelegation.Cmp(tenK) != 0 {
 		t.Errorf("UpdateValidatorFromEditMsg failed")
+	}
+}
+
+func TestCreateValidatorFromNewMsg(t *testing.T) {
+	tests := []struct {
+		editCreateValidator func(*CreateValidator)
+		expErr              error
+	}{
+		{func(cv *CreateValidator) {}, nil},
+		{func(cv *CreateValidator) { cv.Description = invalidDescription }, errors.New("invalid description")},
+		{func(cv *CreateValidator) { cv.SlotPubKeys[0] = hmyBLSPub }, errors.New("hmy node")},
+		{func(cv *CreateValidator) { cv.SlotKeySigs[0] = blsPubSigPairs[2].sig }, errors.New("wrong bls signature")},
+	}
+	for i, test := range tests {
+		cv := makeCreateValidator()
+		test.editCreateValidator(&cv)
+
+		v, err := CreateValidatorFromNewMsg(&cv, common.Big1, common.Big1)
+		if (err == nil) != (test.expErr == nil) {
+			t.Errorf("Test %v: error [%v] / [%v]", i, err, test.expErr)
+		}
+		if err != nil {
+			continue
+		}
+		if err := assertValidatorAlignCreateValidator(*v, cv); err != nil {
+			t.Error(err)
+		}
 	}
 }
 
@@ -540,13 +564,9 @@ func TestString(t *testing.T) {
 	//fmt.Println(validator.String())
 }
 
-// create a new validator
-func createNewValidator() Validator {
-	cr := CommissionRates{
-		Rate:          numeric.OneDec(),
-		MaxRate:       numeric.OneDec(),
-		MaxChangeRate: numeric.ZeroDec(),
-	}
+// makeValidValidator makes a valid Validator data structure
+func makeValidValidator() Validator {
+	cr := validCommissionRates
 	c := Commission{cr, big.NewInt(300)}
 	d := Description{
 		Name:     "Wayne",
@@ -568,9 +588,9 @@ func createNewValidator() Validator {
 	return v
 }
 
-// create a new validator wrapper
-func createNewValidatorWrapper() ValidatorWrapper {
-	v := createNewValidator()
+// makeValidValidatorWrapper makes a valid validator wrapper
+func makeValidValidatorWrapper() ValidatorWrapper {
+	v := makeValidValidator()
 	ds := Delegations{
 		NewDelegation(v.Address, new(big.Int).Set(v.MinSelfDelegation)),
 		NewDelegation(common.BigToAddress(common.Big1), new(big.Int).Sub(v.MaxTotalDelegation, v.MinSelfDelegation)),
@@ -578,6 +598,25 @@ func createNewValidatorWrapper() ValidatorWrapper {
 	return ValidatorWrapper{
 		Validator:   v,
 		Delegations: ds,
+	}
+}
+
+// makeCreateValidator makes a structure of CreateValidator
+func makeCreateValidator() CreateValidator {
+	addr := validatorAddr
+	desc := validDescription
+	cr := validCommissionRates
+	pubs := getPubsFromPairs(blsPubSigPairs, []int{0, 1})
+	sigs := getSigsFromPairs(blsPubSigPairs, []int{0, 1})
+	return CreateValidator{
+		ValidatorAddress:   addr,
+		Description:        desc,
+		CommissionRates:    cr,
+		MinSelfDelegation:  tenK,
+		MaxTotalDelegation: twelveK,
+		SlotPubKeys:        pubs,
+		SlotKeySigs:        sigs,
+		Amount:             twelveK,
 	}
 }
 
@@ -606,7 +645,7 @@ func assertValidatorEqual(v1, v2 Validator) error {
 	if v1.Status != v2.Status {
 		return fmt.Errorf("status not equal: %v / %v", v1.Status, v2.Status)
 	}
-	if err := assertCommissionEqual(v1.Commission, v2.Commission); err != nil {
+	if err := assertCommissionRatesEqual(v1.CommissionRates, v2.CommissionRates); err != nil {
 		return fmt.Errorf("validator.Commission: %v", err)
 	}
 	if err := assertDescriptionEqual(v1.Description, v2.Description); err != nil {
@@ -618,10 +657,43 @@ func assertValidatorEqual(v1, v2 Validator) error {
 	return nil
 }
 
-func assertCommissionEqual(c1, c2 Commission) error {
-	if c1.UpdateHeight.Cmp(c2.UpdateHeight) != 0 {
-		return fmt.Errorf("update height not equal: %v / %v", c1.UpdateHeight, c2.UpdateHeight)
+func assertValidatorAlignCreateValidator(v Validator, cv CreateValidator) error {
+	if v.Address != cv.ValidatorAddress {
+		return fmt.Errorf("addressed not equal")
 	}
+	if len(v.SlotPubKeys) != len(cv.SlotPubKeys) {
+		return fmt.Errorf("len(SlotPubKeys) not equal")
+	}
+	for i := range v.SlotPubKeys {
+		if v.SlotPubKeys[i] != cv.SlotPubKeys[i] {
+			return fmt.Errorf("SlotPubKeys[%v] not equal", i)
+		}
+	}
+	if v.LastEpochInCommittee.Cmp(new(big.Int)) != 0 {
+		return fmt.Errorf("LastEpochInCommittee not zero")
+	}
+	if v.MinSelfDelegation.Cmp(cv.MinSelfDelegation) != 0 {
+		return fmt.Errorf("MinSelfDelegation not equal")
+	}
+	if v.MaxTotalDelegation.Cmp(cv.MaxTotalDelegation) != 0 {
+		return fmt.Errorf("MaxTotalDelegation not equal")
+	}
+	if v.Status != effective.Active {
+		return fmt.Errorf("status not active")
+	}
+	if err := assertCommissionRatesEqual(v.CommissionRates, cv.CommissionRates); err != nil {
+		return fmt.Errorf("commissionRate not expected: %v", err)
+	}
+	if v.UpdateHeight.Cmp(v.CreationHeight) != 0 {
+		return fmt.Errorf("validator's update height not equal to creation height")
+	}
+	if err := assertDescriptionEqual(v.Description, cv.Description); err != nil {
+		return fmt.Errorf("description not expected: %v", err)
+	}
+	return nil
+}
+
+func assertCommissionRatesEqual(c1, c2 CommissionRates) error {
 	if !c1.Rate.Equal(c2.Rate) {
 		return fmt.Errorf("rate not equal: %v / %v", c1.Rate, c2.Rate)
 	}

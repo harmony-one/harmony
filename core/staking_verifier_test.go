@@ -301,15 +301,15 @@ func makeTestStateDB() (*state.DB, error) {
 }
 
 type blsKeyPool struct {
-	keys []blsKeyPair
+	keys []blsPubSigPair
 }
 
 func newBLSKeyPool() blsKeyPool {
-	keys := make([]blsKeyPair, 0, 16)
+	keys := make([]blsPubSigPair, 0, 16)
 	return blsKeyPool{keys}
 }
 
-func (kp *blsKeyPool) get(index int) blsKeyPair {
+func (kp *blsKeyPool) get(index int) blsPubSigPair {
 	if index < len(kp.keys) {
 		return kp.keys[index]
 	}
@@ -319,12 +319,12 @@ func (kp *blsKeyPool) get(index int) blsKeyPair {
 	return kp.keys[index]
 }
 
-type blsKeyPair struct {
+type blsPubSigPair struct {
 	pub shard.BLSPublicKey
 	sig shard.BLSSignature
 }
 
-func makeBLSKeyPair() blsKeyPair {
+func makeBLSKeyPair() blsPubSigPair {
 	blsPriv := bls.RandPrivateKey()
 	blsPub := blsPriv.GetPublicKey()
 	msgHash := hash.Keccak256([]byte(staking.BLSVerificationStr))
@@ -336,5 +336,5 @@ func makeBLSKeyPair() blsKeyPair {
 	var shardSig shard.BLSSignature
 	copy(shardSig[:], sig.Serialize())
 
-	return blsKeyPair{shardPub, shardSig}
+	return blsPubSigPair{shardPub, shardSig}
 }
