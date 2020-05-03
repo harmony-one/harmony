@@ -20,7 +20,7 @@ var (
 	blsPubSigPairs []blsPubSigPair
 	hmyBLSPub      shard.BLSPublicKey
 
-	hmyBLSPubStr     = "9e70e8d76851f6e8dc648255acdd57bb5c49cdae7571aed43f86e9f140a6343caed2ffa860919d03e0912411fee4850a"
+	hmyBLSPubStr     = "c2962419d9999a87daa134f6d177f9ccabfe168a470587b13dd02ce91d1690a92170e5949d3dbdfc1b13fd7327dbef8c"
 	validatorAddr, _ = common2.Bech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy")
 )
 
@@ -384,6 +384,16 @@ func TestDescription_EnsureLength(t *testing.T) {
 				Details:         "Details of jacky",
 			},
 			expErr: errors.New("website too long"),
+		},
+		{
+			desc: Description{
+				Name:            "Jacky Wang",
+				Identity:        "jacky@harmony.one",
+				Website:         "harmony.one/jacky",
+				SecurityContact: "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongcontact",
+				Details:         "Details of jacky",
+			},
+			expErr: errors.New("contact too long"),
 		},
 		{
 			desc: Description{
