@@ -105,7 +105,7 @@ usage: ${progname} [-1ch] [-k KEYFILE]
    -p passfile    use the given BLS passphrase file
    -d             just download the Harmony binaries (default: off)
    -D             do not download Harmony binaries (default: download when start)
-   -m             collect and upload node metrics to harmony prometheus + grafana
+   -m minpeer     set the minpeer of the network (default: $minpeer)
    -N network     join the given network (main, beta, pangaea; default: main)
    -t             equivalent to -N pangaea (deprecated)
    -T nodetype    specify the node type (validator, explorer; default: validator)
@@ -155,14 +155,13 @@ usage() {
 BUCKET=pub.harmony.one
 OS=$(uname -s)
 
-unset start_clean loop run_as_root blspass do_not_download download_only metrics network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc blacklist multi_key archival verify TRACEFILE
+unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id download_harmony_db db_file_to_dl
+unset upgrade_rel public_rpc blacklist multi_key archival verify TRACEFILE minpeer
 start_clean=false
 loop=true
 run_as_root=true
 do_not_download=false
 download_only=false
-metrics=false
 network=main
 node_type=validator
 shard_id=1
@@ -174,6 +173,7 @@ static=false
 multi_key=false
 archival=false
 verify=false
+minpeer=7
 ${BLSKEYFILE=}
 ${TRACEFILE=}
 
@@ -195,7 +195,7 @@ do
    d) download_only=true;;
    M) multi_key=true;;
    D) do_not_download=true;;
-   m) metrics=true;;
+   m) minpeer="${OPTARG}";;
    N) network="${OPTARG}";;
    t) network=pangaea;;
    T) node_type="${OPTARG}";;
@@ -512,7 +512,6 @@ fi
 
 NODE_PORT=9000
 PUB_IP=
-METRICS=
 PUSHGATEWAY_IP=
 PUSHGATEWAY_PORT=
 
@@ -673,6 +672,7 @@ do
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
       -blacklist="${blacklist}"
+      -min_peers="${minpeer}"
    )
    args+=(
       -is_archival="${archival}"
@@ -698,15 +698,6 @@ do
       args+=(
       -node_type="${node_type}"
       -shard_id="${shard_id}"
-      )
-      ;;
-   esac
-   case "${metrics}" in
-   true)
-      args+=(
-         -metrics "${metrics}"
-         -pushgateway_ip "${PUSHGATEWAY_IP}"
-         -pushgateway_port "${PUSHGATEWAY_PORT}"
       )
       ;;
    esac
