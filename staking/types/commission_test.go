@@ -20,6 +20,7 @@ func TestCommissionRates_Copy(t *testing.T) {
 	tests := []struct {
 		cr CommissionRates
 	}{
+		{},
 		{CommissionRates{zeroDec, halfDec, oneDec}},
 		{CommissionRates{zeroDec, oneThirdDec, twoThirdDec}},
 		{CommissionRates{oneThirdDec, twoThirdDec, oneDec}},
@@ -47,6 +48,12 @@ func assertCommissionRatesDeepCopy(cr1, cr2 CommissionRates) error {
 }
 
 func assertDecCopy(d1, d2 numeric.Dec) error {
+	if d1.IsNil() != d2.IsNil() {
+		return errors.New("IsNil not equal")
+	}
+	if d1.IsNil() {
+		return nil
+	}
 	if !d1.Equal(d2) {
 		return errors.New("value not equal")
 	}
