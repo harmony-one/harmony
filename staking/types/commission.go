@@ -24,3 +24,7 @@ type (
 		MaxChangeRate numeric.Dec `json:"max-change-rate"`
 	}
 )
+
+func (cr CommissionRates) Copy() CommissionRates {
+
+}

@@ -189,6 +189,13 @@ func MustNewDecFromStr(s string) Dec {
 	return dec
 }
 
+// Copy makes a deep copy of the dec
+func (d Dec) Copy() Dec {
+	return Dec{
+		new(big.Int).Set(d.Int),
+	}
+}
+
 // IsNil ...
 func (d Dec) IsNil() bool { return d.Int == nil } // is decimal nil
 // IsZero ...
