@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
 	common "github.com/ethereum/go-ethereum/common"
@@ -27,10 +28,14 @@ var (
 var (
 	nineK   = new(big.Int).Mul(big.NewInt(9000), big.NewInt(1e18))
 	tenK    = new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18))
+	elevenK = new(big.Int).Mul(big.NewInt(11000), big.NewInt(1e18))
 	twelveK = new(big.Int).Mul(big.NewInt(12000), big.NewInt(1e18))
 	twentyK = new(big.Int).Mul(big.NewInt(20000), big.NewInt(1e18))
 
 	negativeRate = numeric.NewDec(-1)
+	zeroRate     = numeric.ZeroDec()
+	halfRate     = numeric.NewDecWithPrec(5, 1)
+	oneRate      = numeric.NewDec(1)
 	invalidRate  = numeric.NewDec(2)
 )
 
@@ -52,9 +57,9 @@ var (
 	}
 
 	validCommissionRates = CommissionRates{
-		Rate:          numeric.ZeroDec(),
-		MaxRate:       numeric.ZeroDec(),
-		MaxChangeRate: numeric.ZeroDec(),
+		Rate:          zeroRate,
+		MaxRate:       zeroRate,
+		MaxChangeRate: zeroRate,
 	}
 )
 
@@ -70,7 +75,7 @@ func TestNewEmptyStats(t *testing.T) {
 	if len(stats.APRs) != 0 {
 		t.Errorf("empty stats not empty ARPs")
 	}
-	if !stats.TotalEffectiveStake.Equal(numeric.ZeroDec()) {
+	if !stats.TotalEffectiveStake.Equal(zeroRate) {
 		t.Errorf("empty stats not zero total effective stake")
 	}
 	if len(stats.MetricsPerShard) != 0 {
@@ -110,7 +115,7 @@ func TestValidator_SanityCheck(t *testing.T) {
 		},
 		{
 			func(v *Validator) { v.Description = invalidDescription },
-			errors.New("invalid description"),
+			errors.New("exceed maximum name length"),
 		},
 		{
 			func(v *Validator) { v.SlotPubKeys = v.SlotPubKeys[:0] },
@@ -157,11 +162,11 @@ func TestValidator_SanityCheck(t *testing.T) {
 			errInvalidCommissionRate,
 		},
 		{
-			func(v *Validator) { v.Rate, v.MaxRate = numeric.OneDec(), numeric.NewDecWithPrec(5, 1) },
+			func(v *Validator) { v.Rate, v.MaxRate = oneRate, halfRate },
 			errCommissionRateTooLarge,
 		},
 		{
-			func(v *Validator) { v.MaxChangeRate, v.MaxRate = numeric.OneDec(), numeric.NewDecWithPrec(5, 1) },
+			func(v *Validator) { v.MaxChangeRate, v.MaxRate = oneRate, halfRate },
 			errCommissionRateTooLarge,
 		},
 		{
@@ -173,8 +178,8 @@ func TestValidator_SanityCheck(t *testing.T) {
 		v := makeValidValidator()
 		test.editValidator(&v)
 		err := v.SanityCheck(DoNotEnforceMaxBLS)
-		if (err == nil) != (test.expErr == nil) {
-			t.Errorf("Test %v: unexpected error [%v] / [%v]", i, err, test.expErr)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
 		}
 	}
 }
@@ -201,19 +206,19 @@ func TestValidatorWrapper_SanityCheck(t *testing.T) {
 		},
 		{
 			func(vw *ValidatorWrapper) { vw.Validator.Description = invalidDescription },
-			errors.New("invalid validator"),
+			errors.New("exceed maximum name length"),
 		},
 		{
 			func(vw *ValidatorWrapper) { vw.Delegations = nil },
-			errors.New("empty delegations"),
+			errors.New("no self delegation given at all"),
 		},
 		{
 			func(vw *ValidatorWrapper) { vw.Delegations[0].Amount = nineK },
-			errors.New("small self delegation"),
+			errors.New("self delegation can not be less than min_self_delegation"),
 		},
 		{
 			func(vw *ValidatorWrapper) { vw.Delegations[1].Amount = twentyK },
-			errors.New("large total delegation"),
+			errors.New("total delegation can not be bigger than max_total_delegation"),
 		},
 		{
 			// banned node does not check minDelegation
@@ -229,15 +234,15 @@ func TestValidatorWrapper_SanityCheck(t *testing.T) {
 				vw.Status = effective.Banned
 				vw.Delegations[1].Amount = twentyK
 			},
-			errors.New("banned node with large total delegation"),
+			errors.New("total delegation can not be bigger than max_total_delegation"),
 		},
 	}
 	for i, test := range tests {
 		vw := makeValidValidatorWrapper()
 		test.editValidatorWrapper(&vw)
 		err := vw.SanityCheck(DoNotEnforceMaxBLS)
-		if (err == nil) != (test.expErr == nil) {
-			t.Errorf("Test %v: [%v] / [%v]", i, err, test.expErr)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
 		}
 	}
 }
@@ -319,15 +324,15 @@ func TestUpdateDescription(t *testing.T) {
 			update: Description{
 				Website: "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongwebsite",
 			},
-			expErr: errors.New("website too long"),
+			expErr: errors.New("exceed Maximum Length website"),
 		},
 	}
 	for i, test := range tests {
 		d, err := UpdateDescription(test.raw, test.update)
-		if (err == nil) != (test.expErr == nil) {
-			t.Errorf("Test %v: unexpected error: %v / %v", i, err, test.expErr)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
 		}
-		if err != nil {
+		if err != nil || test.expErr != nil {
 			continue
 		}
 		if err := assertDescriptionEqual(d, test.expect); err != nil {
@@ -363,7 +368,7 @@ func TestDescription_EnsureLength(t *testing.T) {
 				SecurityContact: "jacky@harmony.one",
 				Details:         "Details of jacky",
 			},
-			expErr: errors.New("name too long"),
+			expErr: errors.New("exceed maximum name length"),
 		},
 		{
 			desc: Description{
@@ -373,7 +378,7 @@ func TestDescription_EnsureLength(t *testing.T) {
 				SecurityContact: "jacky@harmony.one",
 				Details:         "Details of jacky",
 			},
-			expErr: errors.New("identity too long"),
+			expErr: errors.New("exceed Maximum Length identity"),
 		},
 		{
 			desc: Description{
@@ -383,7 +388,7 @@ func TestDescription_EnsureLength(t *testing.T) {
 				SecurityContact: "jacky@harmony.one",
 				Details:         "Details of jacky",
 			},
-			expErr: errors.New("website too long"),
+			expErr: errors.New("exceed Maximum Length website"),
 		},
 		{
 			desc: Description{
@@ -393,7 +398,7 @@ func TestDescription_EnsureLength(t *testing.T) {
 				SecurityContact: "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongcontact",
 				Details:         "Details of jacky",
 			},
-			expErr: errors.New("contact too long"),
+			expErr: errors.New("exceed Maximum Length"),
 		},
 		{
 			desc: Description{
@@ -403,15 +408,15 @@ func TestDescription_EnsureLength(t *testing.T) {
 				SecurityContact: "jacky@harmony.one",
 				Details:         "thisisaverylonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglonglongdetail",
 			},
-			expErr: errors.New("details too long"),
+			expErr: errors.New("exceed Maximum Length for details"),
 		},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		d, err := test.desc.EnsureLength()
-		if (err == nil) != (test.expErr == nil) {
-			t.Errorf("unexpected error: [%v] / [%v]", err, test.expErr)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
 		}
-		if err != nil {
+		if err != nil || test.expErr != nil {
 			continue
 		}
 		if err := assertDescriptionEqual(test.desc, d); err != nil {
@@ -431,16 +436,16 @@ func TestVerifyBLSKeys(t *testing.T) {
 		{[]int{}, []int{}, nil},
 		{[]int{0}, []int{}, errBLSKeysNotMatchSigs},
 		{[]int{}, []int{1}, errBLSKeysNotMatchSigs},
-		{[]int{0, 1, 2, 3}, []int{0, 0, 2, 3}, errors.New("bls not match")},
-		{[]int{3, 2, 1, 0}, []int{0, 1, 2, 3}, errors.New("bls order not match")},
+		{[]int{0, 1, 2, 3}, []int{0, 0, 2, 3}, errBLSKeysNotMatchSigs},
+		{[]int{3, 2, 1, 0}, []int{0, 1, 2, 3}, errBLSKeysNotMatchSigs},
 	}
 	for i, test := range tests {
 		pubs := getPubsFromPairs(pairs, test.pubIndexes)
 		sigs := getSigsFromPairs(pairs, test.sigIndexes)
 
 		err := VerifyBLSKeys(pubs, sigs)
-		if (err == nil) != (test.expErr == nil) {
-			t.Errorf("Test %v: [%v] / [%v]", i, err, test.expErr)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
 		}
 	}
 }
@@ -457,8 +462,8 @@ func TestContainsHarmonyBLSKeys(t *testing.T) {
 		{[]int{0, 1, 2, 3, 4, 5, 6, 7, 8}, []int{9}, nil},
 		{[]int{0}, []int{1, 2, 3, 4, 5, 6, 7, 8, 9}, nil},
 		{[]int{0, 1, 2, 3, 4}, []int{5, 6, 7, 8, 9}, nil},
-		{[]int{0}, []int{0}, errors.New("duplicate bls pub")},
-		{[]int{0, 1, 2, 3, 4, 5}, []int{5, 6, 7, 8, 9}, errors.New("duplicate bls pub")},
+		{[]int{0}, []int{0}, errDuplicateSlotKeys},
+		{[]int{0, 1, 2, 3, 4, 5}, []int{5, 6, 7, 8, 9}, errDuplicateSlotKeys},
 	}
 	for i, test := range tests {
 		pubs := getPubsFromPairs(pairs, test.pubIndexes)
@@ -466,8 +471,8 @@ func TestContainsHarmonyBLSKeys(t *testing.T) {
 		das := makeDeployAccountsFromBLSPubs(dPubs)
 
 		err := containsHarmonyBLSKeys(pubs, das, big.NewInt(0))
-		if (err == nil) != (test.expErr == nil) {
-			t.Errorf("Test %v: [%v] / [%v]", i, err, test.expErr)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
 		}
 	}
 }
@@ -483,44 +488,200 @@ func makeDeployAccountsFromBLSPubs(pubs []shard.BLSPublicKey) []genesis.DeployAc
 	return das
 }
 
-func TestUpdateValidatorFromEditMsg(t *testing.T) {
-	ev := EditValidator{
-		ValidatorAddress:   validatorAddr,
-		Description:        validDescription,
-		MinSelfDelegation:  tenK,
-		MaxTotalDelegation: twelveK,
-	}
-	validator := makeValidValidator()
-	UpdateValidatorFromEditMsg(&validator, &ev, new(big.Int))
-
-	if validator.MinSelfDelegation.Cmp(tenK) != 0 {
-		t.Errorf("UpdateValidatorFromEditMsg failed")
-	}
-}
-
 func TestCreateValidatorFromNewMsg(t *testing.T) {
 	tests := []struct {
 		editCreateValidator func(*CreateValidator)
 		expErr              error
 	}{
 		{func(cv *CreateValidator) {}, nil},
-		{func(cv *CreateValidator) { cv.Description = invalidDescription }, errors.New("invalid description")},
-		{func(cv *CreateValidator) { cv.SlotPubKeys[0] = hmyBLSPub }, errors.New("hmy node")},
-		{func(cv *CreateValidator) { cv.SlotKeySigs[0] = blsPubSigPairs[2].sig }, errors.New("wrong bls signature")},
+		{func(cv *CreateValidator) { cv.Description = invalidDescription }, errors.New("exceed maximum name length")},
+		{func(cv *CreateValidator) { cv.SlotPubKeys[0] = hmyBLSPub }, errDuplicateSlotKeys},
+		{func(cv *CreateValidator) { cv.SlotKeySigs[0] = blsPubSigPairs[2].sig }, errBLSKeysNotMatchSigs},
 	}
 	for i, test := range tests {
 		cv := makeCreateValidator()
 		test.editCreateValidator(&cv)
 
 		v, err := CreateValidatorFromNewMsg(&cv, common.Big1, common.Big1)
-		if (err == nil) != (test.expErr == nil) {
-			t.Errorf("Test %v: error [%v] / [%v]", i, err, test.expErr)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
 		}
-		if err != nil {
+		if err != nil || test.expErr != nil {
 			continue
 		}
 		if err := assertValidatorAlignCreateValidator(*v, cv); err != nil {
 			t.Error(err)
+		}
+	}
+}
+
+func TestUpdateValidatorFromEditMsg(t *testing.T) {
+	tests := []struct {
+		editValidator    EditValidator
+		editExpValidator func(*Validator)
+		expErr           error
+	}{
+		{
+			editValidator:    EditValidator{ValidatorAddress: validatorAddr},
+			editExpValidator: func(*Validator) {},
+		},
+		{
+			// update Description.Name
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				Description:      Description{Name: "jacky@harmony.one"},
+			},
+			editExpValidator: func(v *Validator) { v.Name = "jacky@harmony.one" },
+		},
+		{
+			// Update CommissionRate
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				CommissionRate:   &halfRate,
+			},
+			editExpValidator: func(v *Validator) { v.Rate = halfRate },
+		},
+		{
+			// Update MinSelfDelegation
+			editValidator: EditValidator{
+				ValidatorAddress:  validatorAddr,
+				MinSelfDelegation: elevenK,
+			},
+			editExpValidator: func(v *Validator) { v.MinSelfDelegation = elevenK },
+		},
+		{
+			// Update MinSelfDelegation to zero remains unchanged
+			editValidator: EditValidator{
+				ValidatorAddress:  validatorAddr,
+				MinSelfDelegation: common.Big0,
+			},
+			editExpValidator: func(v *Validator) {},
+		},
+		{
+			// Update MaxTotalDelegation
+			editValidator: EditValidator{
+				ValidatorAddress:   validatorAddr,
+				MaxTotalDelegation: elevenK,
+			},
+			editExpValidator: func(v *Validator) { v.MaxTotalDelegation = elevenK },
+		},
+		{
+			// Update MaxTotalDelegation to zero remain unchanged
+			editValidator: EditValidator{
+				ValidatorAddress:   validatorAddr,
+				MaxTotalDelegation: common.Big0,
+			},
+			editExpValidator: func(v *Validator) {},
+		},
+		{
+			// Remove a bls pub key
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				SlotKeyToRemove:  &blsPubSigPairs[0].pub,
+			},
+			editExpValidator: func(v *Validator) { v.SlotPubKeys = nil },
+		},
+		{
+			// Add a bls pub key with signature
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				SlotKeyToAdd:     &blsPubSigPairs[4].pub,
+				SlotKeyToAddSig:  &blsPubSigPairs[4].sig,
+			},
+			editExpValidator: func(v *Validator) {
+				v.SlotPubKeys = append(v.SlotPubKeys, blsPubSigPairs[4].pub)
+			},
+		},
+		{
+			// EditValidator having signature without pub will not be a update
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				SlotKeyToAddSig:  &blsPubSigPairs[4].sig,
+			},
+			editExpValidator: func(v *Validator) {},
+		},
+		{
+			// update status
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				EPOSStatus:       effective.Inactive,
+			},
+			editExpValidator: func(v *Validator) { v.Status = effective.Inactive },
+		},
+		{
+			// status to banned - not changed
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				EPOSStatus:       effective.Banned,
+			},
+			editExpValidator: func(v *Validator) {},
+		},
+		{
+			// invalid address
+			editValidator: EditValidator{
+				ValidatorAddress: common.BigToAddress(common.Big1),
+			},
+			expErr: errAddressNotMatch,
+		},
+		{
+			// invalid description
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				Description:      invalidDescription,
+			},
+			expErr: errors.New("exceed maximum name length"),
+		},
+		{
+			// invalid removing bls key
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				SlotKeyToRemove:  &blsPubSigPairs[4].pub,
+			},
+			expErr: errSlotKeyToRemoveNotFound,
+		},
+		{
+			// add pub collide with hmy bls account
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				SlotKeyToAdd:     &hmyBLSPub,
+			},
+			expErr: errDuplicateSlotKeys,
+		},
+		{
+			// add pub not having valid signature
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				SlotKeyToAdd:     &blsPubSigPairs[4].pub,
+				SlotKeyToAddSig:  &blsPubSigPairs[3].sig,
+			},
+			expErr: errBLSKeysNotMatchSigs,
+		},
+		{
+			// add pub key already exist in validator
+			editValidator: EditValidator{
+				ValidatorAddress: validatorAddr,
+				SlotKeyToAdd:     &blsPubSigPairs[0].pub,
+				SlotKeyToAddSig:  &blsPubSigPairs[0].sig,
+			},
+			expErr: errSlotKeyToAddExists,
+		},
+	}
+	for i, test := range tests {
+		val := makeValidValidator()
+
+		err := UpdateValidatorFromEditMsg(&val, &test.editValidator, common.Big0)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+		}
+		if (err != nil) || (test.expErr != nil) {
+			continue
+		}
+
+		expVal := makeValidValidator()
+		test.editExpValidator(&expVal)
+
+		if err := assertValidatorEqual(val, expVal); err != nil {
+			t.Errorf("Test %v: %v", i, err)
 		}
 	}
 }
@@ -567,11 +728,6 @@ func getSigsFromPairs(pairs []blsPubSigPair, indexes []int) []shard.BLSSignature
 		sigs = append(sigs, pairs[index].sig)
 	}
 	return sigs
-}
-
-func TestString(t *testing.T) {
-	// print out the string
-	//fmt.Println(validator.String())
 }
 
 // makeValidValidator makes a valid Validator data structure
@@ -732,6 +888,19 @@ func assertDescriptionEqual(d1, d2 Description) error {
 	}
 	if d1.Details != d2.Details {
 		return fmt.Errorf("details not equal: [%v] / [%v]", d1.Details, d2.Details)
+	}
+	return nil
+}
+
+func assertError(gotErr, expErr error) error {
+	if (gotErr == nil) != (expErr == nil) {
+		return fmt.Errorf("error unexpected [%v] / [%v]", gotErr, expErr)
+	}
+	if gotErr == nil {
+		return nil
+	}
+	if !strings.Contains(gotErr.Error(), expErr.Error()) {
+		return fmt.Errorf("error unexpected [%v] / [%v]", gotErr, expErr)
 	}
 	return nil
 }
