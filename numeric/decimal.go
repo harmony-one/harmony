@@ -191,6 +191,9 @@ func MustNewDecFromStr(s string) Dec {
 
 // Copy makes a deep copy of the dec
 func (d Dec) Copy() Dec {
+	if d.IsNil() {
+		return Dec{}
+	}
 	return Dec{
 		new(big.Int).Set(d.Int),
 	}
