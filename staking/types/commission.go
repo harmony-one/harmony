@@ -25,6 +25,11 @@ type (
 	}
 )
 
+// Copy makes a deep copy of the CommissionRates
 func (cr CommissionRates) Copy() CommissionRates {
-
+	return CommissionRates{
+		Rate:          cr.Rate.Copy(),
+		MaxRate:       cr.MaxRate.Copy(),
+		MaxChangeRate: cr.MaxChangeRate.Copy(),
+	}
 }
