@@ -388,6 +388,15 @@ devnet)
   dns_zone=pga.hmny.io
   syncdir=devnet
   ;;
+dryrun)
+  bootnodes=(
+    /ip4/54.86.126.90/tcp/9909/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/52.40.84.2/tcp/9909/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
+  )
+  REL=DRY
+  network_type=mainnet
+  dns_zone=dry.hmny.io
+  ;;
 *)
   err 64 "${network}: invalid network"
   ;;
