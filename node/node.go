@@ -32,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking/types"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 )
@@ -56,6 +57,7 @@ const (
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus          *consensus.Consensus
+	sender             *senderWrapper
 	BeaconBlockChannel chan *types.Block // The channel to send beacon blocks for non-beaconchain nodes
 	IncomingBlocks     chan *types.Block
 	Gossiper           relay.BroadCaster
@@ -435,6 +437,11 @@ func New(
 	chainConfig := nodeconfig.ChainConfig(networkType)
 
 	node := &Node{
+		sender: &senderWrapper{
+			peerHost: host,
+			ctx:      context.TODO(),
+			strmap:   map[libp2p_peer.ID]*messageSender{},
+		},
 		host:                host,
 		Consensus:           consensusObj,
 		Gossiper:            relay.NewBroadCaster(configUsed, host),

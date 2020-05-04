@@ -22,15 +22,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Protocol ..
-const Protocol = "/hmy/0.0.1"
-
 // Peer is the object for a p2p peer (node)
 type Peer struct {
 	IP              string         // IP address of the peer
 	Port            string         // Port number of the peer
 	ConsensusPubKey *bls.PublicKey // Public key of the peer, used for consensus signing
 }
+
+const Protocol = ipfsutil.Protocol
 
 // Opts ..
 type Opts struct {
@@ -164,8 +163,9 @@ func NewHost(opts *Opts, own *Peer) (*Host, error) {
 	}
 
 	routingOpt, crouting := ipfsutil.NewTinderRouting(
-		opts.Logger, rdvpeer, false,
+		opts.Logger, rdvpeer,
 	)
+
 	cfg.Routing = routingOpt
 
 	ipfsConfig, err := cfg.Repo.Config()
@@ -187,7 +187,9 @@ func NewHost(opts *Opts, own *Peer) (*Host, error) {
 	}
 
 	// block till have network connectivity
-	<-crouting
+	routing := <-crouting
+
+	node.DHT = routing.IpfsDHT
 
 	for {
 		if err := node.PeerHost.Connect(ctx, *rdvpeer); err != nil {
@@ -197,26 +199,19 @@ func NewHost(opts *Opts, own *Peer) (*Host, error) {
 		}
 	}
 
-	in := make(chan libp2p_network.Stream)
-
-	node.PeerHost.SetStreamHandler(Protocol, func(stream libp2p_network.Stream) {
-		go passOn(in, stream)
-	})
+	if node.DHT == nil {
+		panic("how can this be")
+	}
 
 	return &Host{
-		CoreAPI:        api,
-		IPFSNode:       node,
-		log:            opts.Logger,
-		OwnPeer:        own,
-		lock:           sync.Mutex{},
-		joined:         map[string]ipfs_interface.PubSubSubscription{},
-		swarmAddrs:     swarmAddresses,
-		IncomingStream: in,
+		CoreAPI:    api,
+		IPFSNode:   node,
+		log:        opts.Logger,
+		OwnPeer:    own,
+		lock:       sync.Mutex{},
+		joined:     map[string]ipfs_interface.PubSubSubscription{},
+		swarmAddrs: swarmAddresses,
 	}, nil
-}
-
-func passOn(in chan libp2p_network.Stream, stream libp2p_network.Stream) {
-	in <- stream
 }
 
 // ConstructMessage constructs the p2p message as [messageType, contentSize, content]

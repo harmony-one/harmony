@@ -776,11 +776,12 @@ func main() {
 		fatal(err)
 	}
 
+	currentNode.HandleIncomingHMYProtocolStreams()
+
 	var g errgroup.Group
 
 	// g.Go(currentNode.HandleIncomingBlock)
 	// g.Go(currentNode.StartP2PMessageHandling)
-	g.Go(currentNode.HandleIncomingHMYProtocolStreams)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		// g.Go(currentNode.HandleConsensusBlockProcessing)

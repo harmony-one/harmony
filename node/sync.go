@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,9 +24,10 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-msgio"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
 )
 
 func newSyncerForIncoming(
@@ -64,10 +66,14 @@ func newSyncerToPeerID(
 	return &syncingHandler{stream, host, rw, nil}, nil
 }
 
+// func onlyHarmony()
+
 func protocolPeerHeights(
-	conns []ipfs_interface.ConnectionInfo, host *p2p.Host,
+	conns []ipfs_interface.ConnectionInfo, host *p2p.Host, node *Node,
 ) ([]*whoHasIt, error) {
+
 	var collect []*whoHasIt
+	wg := sync.WaitGroup{}
 
 	for _, neighbor := range conns {
 
@@ -91,39 +97,41 @@ func protocolPeerHeights(
 			continue
 		}
 
-		open, err := neighbor.Streams()
-		if err != nil {
-			return nil, err
-		}
+		fmt.Println("sending out query for Peer->", id.Pretty())
 
-		for _, already := range open {
-			if already == p2p.Protocol {
-				continue
-			} else {
-				fmt.Println("never connected so continuing")
+		const DefaultTimeout = time.Second * 10
+		wg.Add(1)
+		go func(p peer.ID) {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+			defer cancel()
+			msgSender, err := node.messageSenderForPeer(ctx, id)
+			if err != nil {
+				fmt.Println("hello issue?", err.Error())
+				// return nil, err
 			}
-		}
+			rpmes, err := msgSender.SendRequest(ctx, &msg_pb.Message{
+				ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+				Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT,
+			})
 
-		handler, err := newSyncerToPeerID(id, host)
+			if err != nil {
+				// Here is context deadline, whatever
+				// why would get empty reply, whatever
+				return
+				// fmt.Println("hello someting else?", err.Error())
+				// return nil, err
+			}
 
-		if err != nil {
-			return nil, err
-		}
-
-		heights, err := handler.askHeight()
-		if err != nil {
-			return nil, err
-		}
-
-		collect = append(collect, &whoHasIt{
-			chainHeights: heights, peerID: id,
-		})
-
-		if err := handler.finished(); err != nil {
-			return nil, err
-		}
-
+			fmt.Println("got back reply", rpmes.String())
+			if rpmes == nil {
+				// fmt.Println("empty reply whatever")
+				// return nil, errors.Errorf("no response from %s", id)
+			}
+		}(id)
 	}
+
+	wg.Wait()
 
 	utils.Logger().Info().
 		Int("connected-harmony-protocol-peers", len(collect)).
@@ -214,20 +222,24 @@ func commonHash(collect []*whoHasIt) mostCommonHash {
 	}
 }
 
-func syncFromHMYPeersIfNeeded(host *p2p.Host, current chainHeights) error {
+func syncFromHMYPeersIfNeeded(
+	host *p2p.Host, current chainHeights, node *Node,
+) error {
 	conns, err := host.CoreAPI.Swarm().Peers(context.Background())
+
 	if err != nil {
 		return err
 	}
 
-	collect, err := protocolPeerHeights(conns, host)
+	collect, err := protocolPeerHeights(conns, host, node)
 	if err != nil {
 		return err
 	}
 
-	most := commonHash(collect)
+	fmt.Println("finsihed getting from peers", len(collect), collect)
+	// most := commonHash(collect)
 
-	fmt.Println("most common", most.String())
+	// fmt.Println("most common", most.String())
 
 	utils.Logger().Info().
 		Int("protocol-peers", len(collect)).
@@ -559,31 +571,28 @@ type whoHasIt struct {
 
 // HandleBlockSyncing ..
 func (node *Node) HandleBlockSyncing() error {
-	var g errgroup.Group
 	t := time.NewTicker(time.Second * 10)
 	defer t.Stop()
 
-	g.Go(func() error {
-		i := 0
+	i := 0
 
-		for {
-			select {
-			case blockRange := <-node.Consensus.SyncNeeded:
-				_ = blockRange
-			case <-t.C:
-				fmt.Println("tick went off", i)
-				i++
-				if err := syncFromHMYPeersIfNeeded(
-					node.host, node.heightNow(),
-				); err != nil {
-					return err
-				}
+	for {
+		select {
+		case blockRange := <-node.Consensus.SyncNeeded:
+			_ = blockRange
+		case <-t.C:
+
+			fmt.Println("tick went off", i)
+			i++
+			if err := syncFromHMYPeersIfNeeded(
+				node.host, node.heightNow(), node,
+			); err != nil {
+				return err
 			}
 		}
+	}
 
-	})
-
-	return g.Wait()
+	return nil
 }
 
 func (node *Node) heightNow() chainHeights {
@@ -602,32 +611,123 @@ func (node *Node) heightNow() chainHeights {
 	}
 }
 
-// HandleIncomingHMYProtocolStreams ..
-func (node *Node) HandleIncomingHMYProtocolStreams() error {
-	var g errgroup.Group
-	for stream := range node.host.IncomingStream {
-		s := stream
-		g.Go(func() error {
+func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
+	r := msgio.NewVarintReaderSize(s, libp2p_network.MessageSizeMax)
+	mPeer := s.Conn().RemotePeer()
+	fmt.Println("incoming", mPeer)
+	timer := time.AfterFunc(dhtStreamIdleTimeout, func() { s.Reset() })
+	defer timer.Stop()
 
-			handler, err := newSyncerForIncoming(
-				s, node.host, node.heightNow(),
-			)
+	for {
 
-			if err != nil {
-				return err
+		var req msg_pb.Message
+		msgbytes, err := r.ReadMsg()
+
+		if err != nil {
+			defer r.ReleaseMsg(msgbytes)
+			if err == io.EOF {
+				return nil
+			}
+			// This string test is necessary because there isn't a single stream reset error
+			// instance	in use.
+			if err.Error() != "stream reset" {
+				utils.Logger().Info().Err(err).Msgf("error reading message")
 			}
 
-			if err := handler.processIncoming(); err != nil {
-				return err
-			}
+			return err
+		}
+		if err := protobuf.Unmarshal(msgbytes, &req); err != nil {
+			return err
+		}
 
-			// if err := handler.finished(); err != nil {
-			// 	return err
-			// }
+		r.ReleaseMsg(msgbytes)
 
-			return nil
-		})
+		timer.Reset(dhtStreamIdleTimeout)
+
+		fmt.Printf("received %s from %s\n", req.String(), mPeer.Pretty())
+
+		// release buffer
+
+		rpmes := &msg_pb.Message{
+			ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+			Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
+			Request: &msg_pb.Message_SyncBlockHeight{
+				SyncBlockHeight: &msg_pb.SyncBlockHeight{
+					BeaconHeight: 1,
+					BeaconHash:   []byte{},
+					ShardHeight:  2,
+					ShardHash:    []byte{},
+				},
+			},
+		}
+
+		// rpmes, err := srv.handle(&req, mPeer)
+		// if err != nil {
+		// 	//log.Warningf("error handling message %s: %s", req.Message.Type.String(), err)
+		// 	return err
+		// }
+
+		// send out response msg
+		if err := writeMsg(s, rpmes); err != nil {
+			return err
+		}
+
 	}
 
-	return g.Wait()
+	return nil
+
+}
+
+func (node *Node) handleNewStream(s libp2p_network.Stream) {
+	defer s.Reset()
+
+	if err := node.handleNewMessage(s); err != nil {
+		fmt.Println("why had an issue", err.Error())
+		return
+	}
+
+	_ = s.Close()
+}
+
+// HandleIncomingHMYProtocolStreams ..
+func (node *Node) HandleIncomingHMYProtocolStreams() {
+	node.host.IPFSNode.PeerHost.SetStreamHandler(
+		p2p.Protocol, node.handleNewStream,
+	)
+}
+
+func (node *Node) messageSenderForPeer(
+	ctx context.Context, p peer.ID,
+) (*messageSender, error) {
+
+	node.sender.Lock()
+	ms, ok := node.sender.strmap[p]
+	if ok {
+		node.sender.Unlock()
+		return ms, nil
+	}
+	ms = &messageSender{p: p, host: node.host}
+	node.sender.strmap[p] = ms
+	node.sender.Unlock()
+
+	if err := ms.prepOrInvalidate(ctx); err != nil {
+		node.sender.Lock()
+		defer node.sender.Unlock()
+
+		if msCur, ok := node.sender.strmap[p]; ok {
+			// Changed. Use the new one, old one is invalid and
+			// not in the map so we can just throw it away.
+			if ms != msCur {
+				return msCur, nil
+			}
+			// Not changed, remove the now invalid stream from the
+			// map.
+			delete(node.sender.strmap, p)
+		}
+		// Invalid but not in map. Must have been removed by a disconnect.
+		return nil, err
+	}
+	// All ready to go.
+	return ms, nil
+
 }

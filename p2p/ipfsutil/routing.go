@@ -3,6 +3,7 @@ package ipfsutil
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/harmony-one/harmony/p2p/tinder"
 	datastore "github.com/ipfs/go-datastore"
@@ -21,11 +22,13 @@ type RoutingOut struct {
 	tinder.Service
 }
 
+// Protocol ..
+const Protocol = "/hmy/0.0.1"
+
 // NewTinderRouting ..
 func NewTinderRouting(
 	log *zerolog.Logger,
 	rdvpeer *peer.AddrInfo,
-	dhtclient bool,
 ) (ipfs_p2p.RoutingOption, <-chan *RoutingOut) {
 	crout := make(chan *RoutingOut, 1)
 
@@ -42,6 +45,20 @@ func NewTinderRouting(
 			dht.Datastore(dstore),
 			dht.Validator(validator),
 			dht.Mode(dht.ModeAuto),
+			// NOTE not sure the practial effect yet
+			// dht.ProtocolExtension(Protocol),
+			dht.MaxRecordAge(time.Hour*12),
+			// NOTE next two are both using default of 3, but
+			// doing it explicitly so we know what is configurableo
+
+			// Resiliency configures the number of
+			// peers closest to a target that must
+			// have responded in order for a given query
+			// path to complete.
+			dht.Resiliency(3),
+			// Concurrency configures the number of concurrent
+			// requests (alpha in the Kademlia paper) for a given query path.
+			dht.Concurrency(3),
 		)
 
 		if err != nil {
