@@ -619,7 +619,6 @@ func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 	defer timer.Stop()
 
 	for {
-
 		var req msg_pb.Message
 		msgbytes, err := r.ReadMsg()
 
@@ -641,37 +640,24 @@ func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 		}
 
 		r.ReleaseMsg(msgbytes)
-
 		timer.Reset(dhtStreamIdleTimeout)
+		handler := node.syncHandlerForMsgType(req.GetType())
 
-		fmt.Printf("received %s from %s\n", req.String(), mPeer.Pretty())
-
-		// release buffer
-
-		rpmes := &msg_pb.Message{
-			ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-			Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
-			Request: &msg_pb.Message_SyncBlockHeight{
-				SyncBlockHeight: &msg_pb.SyncBlockHeight{
-					BeaconHeight: 1,
-					BeaconHash:   []byte{},
-					ShardHeight:  2,
-					ShardHash:    []byte{},
-				},
-			},
+		if handler == nil {
+			utils.Logger().Warn().Msgf("can't handle received message", "from", mPeer, "type", req.GetType())
+			return errors.New("cant receive this message")
 		}
 
-		// rpmes, err := srv.handle(&req, mPeer)
-		// if err != nil {
-		// 	//log.Warningf("error handling message %s: %s", req.Message.Type.String(), err)
-		// 	return err
-		// }
-
-		// send out response msg
-		if err := writeMsg(s, rpmes); err != nil {
+		resp, err := handler(context.Background(), mPeer, &req)
+		if err != nil {
 			return err
 		}
-
+		if resp == nil {
+			continue
+		}
+		if err := writeMsg(s, resp); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -679,14 +665,18 @@ func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 }
 
 func (node *Node) handleNewStream(s libp2p_network.Stream) {
-	defer s.Reset()
 
-	if err := node.handleNewMessage(s); err != nil {
-		fmt.Println("why had an issue", err.Error())
-		return
-	}
+	go func() {
+		defer s.Reset()
 
-	_ = s.Close()
+		if err := node.handleNewMessage(s); err != nil {
+			fmt.Println("why had an issue", err.Error())
+			return
+		}
+
+		_ = s.Close()
+	}()
+
 }
 
 // HandleIncomingHMYProtocolStreams ..
@@ -730,4 +720,35 @@ func (node *Node) messageSenderForPeer(
 	// All ready to go.
 	return ms, nil
 
+}
+
+type syncHandler func(context.Context, libp2p_peer.ID, *msg_pb.Message) (*msg_pb.Message, error)
+
+func (node *Node) syncBlockHeightHandler(
+	context.Context, libp2p_peer.ID, *msg_pb.Message,
+) (*msg_pb.Message, error) {
+
+	return &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
+		Request: &msg_pb.Message_SyncBlockHeight{
+			SyncBlockHeight: &msg_pb.SyncBlockHeight{
+				BeaconHeight: 1,
+				BeaconHash:   []byte{},
+				ShardHeight:  2,
+				ShardHash:    []byte{},
+			},
+		},
+	}, nil
+
+}
+
+func (node *Node) syncHandlerForMsgType(t msg_pb.MessageType) syncHandler {
+	switch t {
+
+	case msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT:
+		return node.syncBlockHeightHandler
+	}
+
+	return nil
 }
