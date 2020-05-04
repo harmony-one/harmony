@@ -149,7 +149,7 @@ func reportErrorsFromLruCache(lruCache *lru.Cache) TransactionErrors {
 			utils.Logger().Warn().
 				Str("tag", logTag).
 				Interface("tx-hash-id", txHash).
-				Msgf("Error not found in staking sink")
+				Msgf("Error not found in sink")
 			continue
 		}
 		rpcError, ok := rpcErrorFetch.(*TransactionError)
@@ -157,7 +157,7 @@ func reportErrorsFromLruCache(lruCache *lru.Cache) TransactionErrors {
 			utils.Logger().Error().
 				Str("tag", logTag).
 				Interface("tx-hash-id", txHash).
-				Msgf("Invalid type in staking sink")
+				Msgf("Invalid type of value in sink")
 			continue
 		}
 		rpcErrors = append(rpcErrors, rpcError)
