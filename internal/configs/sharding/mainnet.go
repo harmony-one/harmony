@@ -33,9 +33,9 @@ const (
 	mainnetV2_2Epoch = 300 // open slots increase from 480 - 640  (TODO): update the epoch
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
-	MainNetHTTPPattern = "https://api.s%d.t.hmny.io"
+	MainNetHTTPPattern = "https://api.s%d.dry.hmny.io"
 	// MainNetWSPattern is the websocket pattern for mainnet.
-	MainNetWSPattern = "wss://ws.s%d.t.hmny.io"
+	MainNetWSPattern = "wss://ws.s%d.dry.hmny.io"
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
