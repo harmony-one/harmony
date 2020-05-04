@@ -1,5 +1,145 @@
 package types
 
+import (
+	"errors"
+	"fmt"
+	"math/big"
+	"reflect"
+	"testing"
+
+	"github.com/harmony-one/harmony/shard"
+)
+
+var (
+	cpTestCreateValidator CreateValidator
+	cpTestEditValidator   EditValidator
+	cpTestDelegate        Delegate
+	cpTestUndelegate      Undelegate
+	cpTestCollectReward   CollectRewards
+)
+
+func init() {
+	cpTestDataSetup()
+}
+
+func TestCreateValidator_Copy(t *testing.T) {
+	tests := []struct {
+		cv CreateValidator
+	}{
+		{cpTestCreateValidator},
+		{CreateValidator{}}, // empty values
+	}
+	for i, test := range tests {
+		cp := test.cv.Copy().(CreateValidator)
+
+		if err := assertCreateValidatorDeepCopy(test.cv, cp); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
+func cpTestDataSetup() {
+	cpTestCreateValidator = CreateValidator{
+		ValidatorAddress: validatorAddr,
+		Description: Description{
+			Name:            "Wayne",
+			Identity:        "wen",
+			Website:         "harmony.one.wen",
+			SecurityContact: "wenSecurity",
+			Details:         "wenDetails",
+		},
+		CommissionRates: CommissionRates{
+			Rate:          zeroDec,
+			MaxRate:       oneDec,
+			MaxChangeRate: zeroDec,
+		},
+		MinSelfDelegation:  tenK,
+		MaxTotalDelegation: twelveK,
+		SlotPubKeys:        slotPubKeys,
+		SlotKeySigs:        slotKeySigs,
+		Amount:             twelveK,
+	}
+}
+
+func assertCreateValidatorDeepCopy(cv1, cv2 CreateValidator) error {
+	if cv1.ValidatorAddress != cv2.ValidatorAddress {
+		return fmt.Errorf("validator address not equal")
+	}
+	if !reflect.DeepEqual(cv1.Description, cv2.Description) {
+		return fmt.Errorf("description value not equal")
+	}
+	if &cv1.Description == &cv2.Description {
+		return fmt.Errorf("description not copy")
+	}
+	if err := assertCommissionRatesDeepCopy(cv1.CommissionRates, cv2.CommissionRates); err != nil {
+		return fmt.Errorf("commissionRate %v", err)
+	}
+	if err := assertBigIntDeepCopy(cv1.MinSelfDelegation, cv2.MinSelfDelegation); err != nil {
+		return fmt.Errorf("MinSelfDelegation %v", err)
+	}
+	if err := assertBigIntDeepCopy(cv1.MaxTotalDelegation, cv2.MaxTotalDelegation); err != nil {
+		return fmt.Errorf("MaxTotalDelegation %v", err)
+	}
+	if err := assertPubsDeepCopy(cv1.SlotPubKeys, cv2.SlotPubKeys); err != nil {
+		return fmt.Errorf("SlotPubKeys %v", err)
+	}
+	if err := assertSigsDeepCopy(cv1.SlotKeySigs, cv2.SlotKeySigs); err != nil {
+		return fmt.Errorf("SlotKeySigs %v", err)
+	}
+	if err := assertBigIntDeepCopy(cv1.Amount, cv2.Amount); err != nil {
+		return fmt.Errorf("amount %v", err)
+	}
+	return nil
+}
+
+func assertBigIntDeepCopy(i1, i2 *big.Int) error {
+	if (i1 == nil) != (i2 == nil) {
+		return errors.New("is nil not equal")
+	}
+	if i1 == nil {
+		return nil
+	}
+	if i1.Cmp(i2) != 0 {
+		return errors.New("value not equal")
+	}
+	if i1 == i2 {
+		return errors.New("not copy")
+	}
+	return nil
+}
+
+func assertPubsDeepCopy(s1, s2 []shard.BLSPublicKey) error {
+	if len(s1) != len(s2) {
+		return fmt.Errorf("size not equal")
+	}
+	for i := range s1 {
+		pub1, pub2 := s1[i], s2[i]
+		if pub1 != pub2 {
+			return fmt.Errorf("[%v] value not equal", i)
+		}
+		if &pub1 == &pub2 {
+			return fmt.Errorf("[%v] same address", i)
+		}
+	}
+	return nil
+}
+
+func assertSigsDeepCopy(s1, s2 []shard.BLSSignature) error {
+	if len(s1) != len(s2) {
+		return fmt.Errorf("size not equal")
+	}
+	for i := range s1 {
+		pub1, pub2 := s1[i], s2[i]
+		if pub1 != pub2 {
+			return fmt.Errorf("[%v] value not equal", i)
+		}
+		if &pub1 == &pub2 {
+			return fmt.Errorf("[%v] same address", i)
+		}
+	}
+	return nil
+}
+
 // var (
 // 	minSelfDelegation = big.NewInt(1000)
 // 	stakeAmount       = big.NewInt(2000)
