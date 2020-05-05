@@ -18,10 +18,9 @@ import (
 
 // Constants for storage.
 const (
-	AddressPrefix        = "ad"
-	CheckpointPrefix     = "dc"
-	PrefixLen            = 3
-	AdddressTxnsInitSize = 10
+	AddressPrefix    = "ad"
+	CheckpointPrefix = "dc"
+	PrefixLen        = 3
 )
 
 // GetAddressKey ...
@@ -111,7 +110,7 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 }
 
 // UpdateTxAddressStorage updates specific addr tx Address.
-func (storage *Storage) UpdateTxAddressStorage(addr string, txRecords []*TxRecord, isStaking bool) {
+func (storage *Storage) UpdateTxAddressStorage(addr string, txRecords TxRecords, isStaking bool) {
 	var address Address
 	key := GetAddressKey(addr)
 	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
@@ -120,6 +119,7 @@ func (storage *Storage) UpdateTxAddressStorage(addr string, txRecords []*TxRecor
 				Bool("isStaking", isStaking).Err(err).Msg("Failed due to error")
 		}
 	}
+
 	address.ID = addr
 	if isStaking {
 		address.StakingTXs = append(address.StakingTXs, txRecords...)
@@ -161,11 +161,11 @@ func (storage *Storage) GetAddresses(size int, prefix string) ([]string, error) 
 
 func computeAccountsTransactionsMapForBlock(
 	block *types.Block,
-) (map[string][]*TxRecord, map[string][]*TxRecord) {
+) (map[string]TxRecords, map[string]TxRecords) {
 	// mapping from account address to TxRecords for txns in the block
-	var acntsTxns map[string][]*TxRecord
+	var acntsTxns map[string]TxRecords = make(map[string]TxRecords)
 	// mapping from account address to TxRecords for staking txns in the block
-	var acntsStakingTxns map[string][]*TxRecord
+	var acntsStakingTxns map[string]TxRecords = make(map[string]TxRecords)
 
 	// Store txs
 	for _, tx := range block.Transactions() {
@@ -184,9 +184,10 @@ func computeAccountsTransactionsMapForBlock(
 		}
 		acntTxns, ok := acntsTxns[explorerTransaction.From]
 		if !ok {
-			acntTxns = make([]*TxRecord, AdddressTxnsInitSize)
+			acntTxns = make(TxRecords, 0)
 		}
 		acntTxns = append(acntTxns, txRecord)
+		acntsTxns[explorerTransaction.From] = acntTxns
 
 		// store as received transaction with to address
 		txRecord = &TxRecord{
@@ -196,9 +197,10 @@ func computeAccountsTransactionsMapForBlock(
 		}
 		acntTxns, ok = acntsTxns[explorerTransaction.To]
 		if !ok {
-			acntTxns = make([]*TxRecord, AdddressTxnsInitSize)
+			acntTxns = make(TxRecords, 0)
 		}
 		acntTxns = append(acntTxns, txRecord)
+		acntsTxns[explorerTransaction.To] = acntTxns
 	}
 
 	// Store staking txns
@@ -218,9 +220,10 @@ func computeAccountsTransactionsMapForBlock(
 		}
 		acntStakingTxns, ok := acntsStakingTxns[explorerTransaction.From]
 		if !ok {
-			acntStakingTxns = make([]*TxRecord, AdddressTxnsInitSize)
+			acntStakingTxns = make(TxRecords, 0)
 		}
 		acntStakingTxns = append(acntStakingTxns, txRecord)
+		acntsStakingTxns[explorerTransaction.From] = acntStakingTxns
 
 		// For delegate/undelegate, also store as received staking transaction with to address
 		txRecord = &TxRecord{
@@ -230,9 +233,10 @@ func computeAccountsTransactionsMapForBlock(
 		}
 		acntStakingTxns, ok = acntsStakingTxns[explorerTransaction.To]
 		if !ok {
-			acntStakingTxns = make([]*TxRecord, AdddressTxnsInitSize)
+			acntStakingTxns = make(TxRecords, 0)
 		}
 		acntStakingTxns = append(acntStakingTxns, txRecord)
+		acntsStakingTxns[explorerTransaction.To] = acntStakingTxns
 	}
 
 	return acntsTxns, acntsStakingTxns

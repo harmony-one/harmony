@@ -437,7 +437,47 @@ func (b *APIBackend) GetValidatorInformation(
 		return defaultReply, nil
 	}
 
-	defaultReply.Lifetime.APR = stats.APR
+	// average apr cache keys
+	key := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64())
+	prevKey := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64()-1)
+
+	// delete entry for previous epoch
+	b.apiCache.Forget(prevKey)
+
+	// calculate last APRHistoryLength epochs for averaging APR
+	epochFrom := bc.Config().StakingEpoch
+	nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength))
+	if nowMinus100.Cmp(epochFrom) > 0 {
+		epochFrom = nowMinus100
+	}
+
+	// compute average apr over history
+	if avgAPR, err := b.SingleFlightRequest(
+		key, func() (interface{}, error) {
+			total := numeric.ZeroDec()
+			count := 0
+			activated := false
+			for i := nowMinus100.Int64(); i < now.Int64(); i++ {
+				if apr, ok := stats.APRs[i]; ok {
+					total = total.Add(apr)
+					activated = true
+				}
+				if activated {
+					count = count + 1
+				}
+			}
+			if count == 0 {
+				return nil, errors.New("no apr snapshots available")
+			}
+			return total.QuoInt64(int64(count)), nil
+		},
+	); err != nil {
+		// could not compute average apr from snapshot
+		// assign the latest apr available from stats
+		defaultReply.Lifetime.APR = numeric.ZeroDec()
+	} else {
+		defaultReply.Lifetime.APR = avgAPR.(numeric.Dec)
+	}
 
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.Performance = &staking.CurrentEpochPerformance{
@@ -602,7 +642,7 @@ func (b *APIBackend) readAndUpdateRawStakes(
 	comm shard.Committee,
 	rawStakes []effective.SlotPurchase,
 	validatorSpreads map[common.Address]numeric.Dec,
-) {
+) []effective.SlotPurchase {
 	for i := range comm.Slots {
 		slot := comm.Slots[i]
 		slotAddr := slot.EcdsaAddress
@@ -628,6 +668,7 @@ func (b *APIBackend) readAndUpdateRawStakes(
 			spread,
 		})
 	}
+	return rawStakes
 }
 
 func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
@@ -662,7 +703,7 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 		if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
 			return nil, err
 		}
-		b.readAndUpdateRawStakes(thenE, decider, comm, rawStakes, validatorSpreads)
+		rawStakes = b.readAndUpdateRawStakes(thenE, decider, comm, rawStakes, validatorSpreads)
 		then.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
 	then.MedianStake = effective.Median(rawStakes)
@@ -674,10 +715,10 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch); err != nil {
 			return nil, err
 		}
-		b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
+		rawStakes = b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
 		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
-	then.MedianStake = effective.Median(rawStakes)
+	now.MedianStake = effective.Median(rawStakes)
 
 	return &quorum.Transition{then, now}, nil
 }

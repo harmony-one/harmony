@@ -274,7 +274,6 @@ func ApplyStakingTransaction(
 	receipt.TxHash = tx.Hash()
 	receipt.GasUsed = gas
 
-	// TODO(audit): add more log to staking txns; expose them in block explorer.
 	if config.IsReceiptLog(header.Epoch()) {
 		receipt.Logs = statedb.GetLogs(tx.Hash())
 		utils.Logger().Info().Interface("CollectReward", receipt.Logs)

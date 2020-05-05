@@ -1890,7 +1890,7 @@ func (bc *BlockChain) DeleteFromPendingSlashingCandidates(
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
 	current := bc.ReadPendingSlashingCandidates()
-	bc.pendingSlashes = current.SetDifference(processed)
+	bc.pendingSlashes = processed.SetDifference(current)
 	return bc.writeSlashes(bc.pendingSlashes)
 }
 
@@ -2269,6 +2269,21 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		}
 		stats.MetricsPerShard = earningWrapping
 
+		// fetch raw-stake from snapshot and update per-key metrics
+		if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
+			newEpochSuperCommittee.Epoch, key,
+		); err == nil {
+			wrapper := snapshot.Validator
+			spread := numeric.ZeroDec()
+			if len(wrapper.SlotPubKeys) > 0 {
+				spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
+					QuoInt64(int64(len(wrapper.SlotPubKeys)))
+			}
+			for i := range stats.MetricsPerShard {
+				stats.MetricsPerShard[i].Vote.RawStake = spread
+			}
+		}
+
 		// This means it's already in staking epoch
 		if currentEpochSuperCommittee.Epoch != nil {
 			wrapper, err := state.ValidatorWrapper(key)
@@ -2276,7 +2291,6 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				return nil, err
 			}
 
-			stats.APR = numeric.ZeroDec()
 			if wrapper.Delegations[0].Amount.Cmp(common.Big0) > 0 {
 				if aprComputed, err := apr.ComputeForValidator(
 					bc, block, wrapper,
@@ -2287,7 +2301,22 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 						return nil, err
 					}
 				} else {
-					stats.APR = *aprComputed
+					now := currentEpochSuperCommittee.Epoch
+					// only insert if APR for current epoch does not exists
+					if _, ok := stats.APRs[now.Int64()]; !ok {
+						stats.APRs[now.Int64()] = *aprComputed
+						// check and clean aprs for epochs prior to current minus APRHistoryLength
+						nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength)).Int64()
+						keysToRemove := []int64{}
+						for i := range stats.APRs {
+							if i < nowMinus100 {
+								keysToRemove = append(keysToRemove, i)
+							}
+						}
+						for i := range keysToRemove {
+							delete(stats.APRs, keysToRemove[i])
+						}
+					}
 				}
 			} else {
 				utils.Logger().Info().Msg("zero total delegation, skipping apr computation")

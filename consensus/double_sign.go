@@ -1,13 +1,9 @@
 package consensus
 
 import (
-	"math/big"
-	"time"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -74,8 +70,6 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 							return true
 						}
 
-						now := big.NewInt(time.Now().UnixNano())
-
 						leaderShardKey := shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey())
 						if leaderShardKey == nil {
 							utils.Logger().Error().
@@ -92,25 +86,26 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 
 						go func(reporter common.Address) {
 							evid := slash.Evidence{
-								ConflictingBallots: slash.ConflictingBallots{
-									AlreadyCastBallot: *alreadyCastBallot,
-									DoubleSignedBallot: votepower.Ballot{
-										SignerPubKey:    *offender,
-										BlockHeaderHash: recvMsg.BlockHash,
-										Signature:       common.Hex2Bytes(doubleSign.SerializeToHexStr()),
-										Height:          recvMsg.BlockNum,
-										ViewID:          recvMsg.ViewID,
+								ConflictingVotes: slash.ConflictingVotes{
+									FirstVote: slash.Vote{
+										alreadyCastBallot.SignerPubKey,
+										alreadyCastBallot.BlockHeaderHash,
+										alreadyCastBallot.Signature,
+									},
+									SecondVote: slash.Vote{
+										*offender,
+										recvMsg.BlockHash,
+										common.Hex2Bytes(doubleSign.SerializeToHexStr()),
 									}},
 								Moment: slash.Moment{
-									Epoch:        curHeader.Epoch(),
-									ShardID:      consensus.ShardID,
-									TimeUnixNano: now,
+									Epoch:   curHeader.Epoch(),
+									ShardID: consensus.ShardID,
 								},
+								Offender: *addr,
 							}
 							proof := slash.Record{
 								Evidence: evid,
 								Reporter: reporter,
-								Offender: *addr,
 							}
 							consensus.SlashChan <- proof
 						}(*leaderAddr)

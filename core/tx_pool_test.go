@@ -35,7 +35,9 @@ import (
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/hash"
+	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -134,6 +136,26 @@ func transaction(shardID uint32, nonce uint64, gaslimit uint64, key *ecdsa.Priva
 func pricedTransaction(shardID uint32, nonce uint64, gaslimit uint64, gasprice *big.Int, key *ecdsa.PrivateKey) types.PoolTransaction {
 	signedTx, _ := types.SignTx(types.NewTransaction(nonce, common.Address{}, shardID, big.NewInt(100), gaslimit, gasprice, nil), types.HomesteadSigner{}, key)
 	return signedTx
+}
+
+func createBlockChain() *BlockChain {
+	key, _ := crypto.GenerateKey()
+	gspec := Genesis{
+		Config:  params.TestChainConfig,
+		Factory: blockfactory.ForTest,
+		Alloc: GenesisAlloc{
+			crypto.PubkeyToAddress(key.PublicKey): {
+				Balance: big.NewInt(8e18),
+			},
+		},
+		GasLimit: 1e18,
+		ShardID:  0,
+	}
+	database := ethdb.NewMemDatabase()
+	genesis := gspec.MustCommit(database)
+	_ = genesis
+	blockchain, _ := NewBlockChain(database, nil, gspec.Config, chain2.Engine, vm.Config{}, nil)
+	return blockchain
 }
 
 func setupTxPool() (*TxPool, *ecdsa.PrivateKey) {
@@ -301,6 +323,7 @@ func TestCreateValidatorTransaction(t *testing.T) {
 	t.Parallel()
 
 	pool, _ := setupTxPool()
+	pool.chain = createBlockChain()
 	defer pool.Stop()
 
 	fromKey, _ := crypto.GenerateKey()
@@ -328,6 +351,7 @@ func TestMixedTransactions(t *testing.T) {
 	t.Parallel()
 
 	pool, _ := setupTxPool()
+	pool.chain = createBlockChain()
 	defer pool.Stop()
 
 	fromKey, _ := crypto.GenerateKey()
