@@ -28,15 +28,15 @@ require (
 	github.com/ipfs/interface-go-ipfs-core v0.2.7
 	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b
 	github.com/libp2p/go-libp2p v0.8.3
-	github.com/libp2p/go-libp2p-core v0.5.2
+	github.com/libp2p/go-libp2p-core v0.5.3
 	github.com/libp2p/go-libp2p-discovery v0.4.0
-	github.com/libp2p/go-libp2p-kad-dht v0.7.10
+	github.com/libp2p/go-libp2p-kad-dht v0.7.11
 	github.com/libp2p/go-libp2p-peerstore v0.2.3
-	github.com/libp2p/go-libp2p-record v0.1.2
+	github.com/libp2p/go-libp2p-record v0.1.3
 	github.com/libp2p/go-libp2p-rendezvous v0.0.0-20190708065449-737144165c9e
 	github.com/libp2p/go-msgio v0.0.4
 	github.com/multiformats/go-multiaddr v0.2.1
-	github.com/multiformats/go-multiaddr-net v0.1.4
+	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
