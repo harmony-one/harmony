@@ -58,7 +58,7 @@ type Node struct {
 	sender             *senderWrapper
 	BeaconBlockChannel chan *types.Block // The channel to send beacon blocks for non-beaconchain nodes
 	IncomingBlocks     chan *types.Block
-	Gossiper           relay.BroadCaster
+	Gossiper           *relay.BroadCaster
 	// All the receipts received but not yet processed for Consensus
 	pendingCXReceipts map[string]*types.CXReceiptsProof
 	pendingCXMutex    sync.Mutex

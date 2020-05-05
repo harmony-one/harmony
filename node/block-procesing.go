@@ -20,7 +20,7 @@ func (node *Node) postConsensusProcessing(
 
 	if node.Consensus.IsLeader() {
 
-		if err := node.Gossiper.AcceptedBlock(
+		if err := node.Gossiper.AcceptedBlockForShardGroup(
 			node.Consensus.ShardID, newBlock,
 		); err != nil {
 			return err
@@ -41,7 +41,7 @@ func (node *Node) postConsensusProcessing(
 			if rnd < 1 {
 				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
 				if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-					node.Gossiper.NewBeaconChainBlock(newBlock)
+					node.Gossiper.NewBeaconChainBlockForClient(newBlock)
 				}
 				node.BroadcastCXReceipts(newBlock)
 			}
