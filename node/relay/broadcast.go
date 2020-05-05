@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core/types"
@@ -15,9 +16,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-
-	// protobuf "google.golang.org/protobuf/proto"
-	"github.com/harmony-one/harmony/api/proto"
 )
 
 // TxnCaster ..
@@ -144,11 +142,7 @@ var (
 )
 
 func (c *caster) AcceptedBlock(shardID uint32, blk *types.Block) error {
-	grps := []nodeconfig.GroupID{
-		c.config.GetShardGroupID(),
-		// c.config.GetClientGroupID(),
-	}
-	// fmt.Println("accepted block sent to", grps)
+	grps := []nodeconfig.GroupID{c.config.GetShardGroupID()}
 	return c.newBlock(blk, grps)
 }
 
@@ -160,10 +154,7 @@ func (c *caster) NewBeaconChainBlock(newBlock *types.Block) error {
 
 	groups := []nodeconfig.GroupID{
 		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
-		// c.config.GetClientGroupID(),
 	}
-
-	fmt.Println("beaconchain broadcast", groups, newBlock.String())
 
 	return c.newBlock(newBlock, groups)
 }

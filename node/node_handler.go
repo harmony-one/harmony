@@ -2,7 +2,6 @@ package node
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
@@ -62,7 +61,6 @@ func (node *Node) HandleMessage(
 			var msg msg_pb.Message
 
 			if err := protobuf.Unmarshal(msgPayload, &msg); err != nil {
-				fmt.Println("could not deserialize on ", err.Error(), topic)
 				return
 			}
 
@@ -71,16 +69,9 @@ func (node *Node) HandleMessage(
 				if err := rlp.DecodeBytes(
 					msg.GetNewBlock().GetBlock(), &block,
 				); err != nil {
-					fmt.Println("issue here?", err.Error())
 					return
 				}
-
-				// fmt.Println("before sent")
-				// go func() {
-				// node.IncomingBlocks <- &block
-				// }()
-				// fmt.Println("after", block.String())
-
+				node.IncomingBlocks <- &block
 			} else {
 				node.Consensus.IncomingConsensusMessage <- msgPayload
 			}

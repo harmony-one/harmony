@@ -108,7 +108,6 @@ func (node *Node) StartLeaderWork() error {
 						utils.Logger().Info().
 							Str("key", result.key).
 							Msg("finalized commits and sent out new proposal signal")
-						fmt.Println("kicked off just once for ", result.key)
 						node.Consensus.ProposalNewBlock <- struct{}{}
 					})
 

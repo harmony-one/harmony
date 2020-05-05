@@ -1,7 +1,6 @@
 package node
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -27,16 +26,6 @@ func (node *Node) postConsensusProcessing(
 			return err
 		}
 
-		// node.Gossiper.NewBeaconChainBlock(newBlock)
-
-		// if node.Consensus.ShardID == shard.BeaconChainShardID {
-		// 	// node.Gossiper.NewBeaconChainBlock(newBlock)
-		// }
-
-		// if node.Consensus.ShardID != shard.BeaconChainShardID {
-		// 	node.Gossiper.NewShardChainBlock(newBlock)
-		// }
-
 		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
 			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
 			node.BroadcastCrossLink(newBlock)
@@ -51,10 +40,9 @@ func (node *Node) postConsensusProcessing(
 			rnd := rand.Intn(100)
 			if rnd < 1 {
 				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
-				// if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-				// 	node.Gossiper.NewBeaconChainBlock(newBlock)
-				// }
-
+				if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+					node.Gossiper.NewBeaconChainBlock(newBlock)
+				}
 				node.BroadcastCXReceipts(newBlock)
 			}
 		}
@@ -88,21 +76,10 @@ func (node *Node) HandleConsensusBlockProcessing() error {
 					continue
 				}
 
-				if len(accepted.Blk.Header().ShardState()) > 0 {
-					// fmt.Println("before post consensus on new shard state header")
-				}
-				// fmt.Println("WHAT is leader public key now?",
-				// 	node.Consensus.LeaderPubKey().SerializeToHexStr(),
-				// 	"should be SOMETHING",
-				// )
 				accepted.Err <- node.postConsensusProcessing(
 					accepted.Blk, node.Consensus.LeaderPubKey().SerializeToHexStr(),
 				)
 
-				if len(accepted.Blk.Header().ShardState()) > 0 {
-					// fmt.Println("after post consensus on new shard state header")
-
-				}
 			} else {
 				accepted.Err <- nil
 			}
@@ -140,7 +117,7 @@ func (node *Node) HandleIncomingBlock() error {
 					return err
 				}
 			}
-			fmt.Println("beaconchain chan wrote", node.Consensus.ShardID, acceptedBlock.String())
+
 		}
 		return nil
 	})
@@ -153,7 +130,7 @@ func (node *Node) HandleIncomingBlock() error {
 				); err != nil {
 					return err
 				}
-				fmt.Println("blockchain chan wrote", node.Consensus.ShardID, acceptedBlock.String())
+
 			}
 		}
 		return nil
@@ -162,23 +139,15 @@ func (node *Node) HandleIncomingBlock() error {
 	g.Go(func() error {
 		for blk := range node.IncomingBlocks {
 			if b := blk; b != nil {
-				if blk.ParentHash() == node.Blockchain().CurrentHeader().Hash() {
+				// if blk.ParentHash() == node.Blockchain().CurrentHeader().Hash() {
 
-					fmt.Println(
-						node.Consensus.ShardID,
-						"GOT IT!->",
-						b.String(),
-						b.Number(),
-					)
+				// if _, err := node.Blockchain().InsertChain(
+				// 	types.Blocks{b}, true,
+				// ); err != nil {
+				// 	return err
+				// }
 
-					if _, err := node.Blockchain().InsertChain(
-						types.Blocks{b}, true,
-					); err != nil {
-						fmt.Println("why couldnt insert", err.Error())
-						return err
-					}
-
-				}
+				// }
 
 			}
 		}
