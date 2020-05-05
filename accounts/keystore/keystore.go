@@ -54,22 +54,15 @@ var KeyStoreType = reflect.TypeOf(&KeyStore{})
 // KeyStoreScheme is the protocol scheme prefixing account and wallet URLs.
 const KeyStoreScheme = "keystore"
 
-// Maximum time between wallet refreshes (if filesystem notifications don't work).
-const walletRefreshCycle = 3 * time.Second
-
 // KeyStore manages a key storage directory on disk.
 type KeyStore struct {
-	storage  keyStore                     // Storage backend, might be cleartext or encrypted
-	cache    *accountCache                // In-memory account cache over the filesystem storage
-	changes  chan struct{}                // Channel receiving change notifications from the cache
-	unlocked map[common.Address]*unlocked // Currently unlocked account (decrypted private keys)
-
-	wallets     []accounts.Wallet       // Wallet wrappers around the individual key files
-	updateFeed  event.Feed              // Event feed to notify wallet additions/removals
-	updateScope event.SubscriptionScope // Subscription scope tracking current live listeners
-	updating    bool                    // Whether the event notification loop is running
-
-	mu sync.RWMutex
+	storage    keyStore                     // Storage backend, might be cleartext or encrypted
+	cache      *accountCache                // In-memory account cache over the filesystem storage
+	changes    chan struct{}                // Channel receiving change notifications from the cache
+	unlocked   map[common.Address]*unlocked // Currently unlocked account (decrypted private keys)
+	wallets    []accounts.Wallet            // Wallet wrappers around the individual key files
+	updateFeed event.Feed                   // Event feed to notify wallet additions/removals
+	mu         sync.RWMutex
 }
 
 type unlocked struct {
