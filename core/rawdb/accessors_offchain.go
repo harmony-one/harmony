@@ -79,17 +79,6 @@ func WritePendingCrossLinks(db DatabaseWriter, bytes []byte) error {
 	return db.Put(pendingCrosslinkKey, bytes)
 }
 
-// DeletePendingCrossLinks stores last pending crosslinks into database.
-func DeletePendingCrossLinks(db DatabaseDeleter) error {
-	return db.Delete(pendingCrosslinkKey)
-}
-
-// ReadPendingSlashingCandidates retrieves last pending slashing candidates
-// TODO(audit): the pending slashes written in DB is never used.
-func ReadPendingSlashingCandidates(db DatabaseReader) ([]byte, error) {
-	return db.Get(pendingSlashingKey)
-}
-
 // WritePendingSlashingCandidates stores last pending slashing candidates into database.
 func WritePendingSlashingCandidates(db DatabaseWriter, bytes []byte) error {
 	return db.Put(pendingSlashingKey, bytes)
