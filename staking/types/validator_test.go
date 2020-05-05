@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	blsPubSigPairs []blsPubSigPair
+	blsPubSigPairs = makeBLSPubSigPairs(5)
 	hmyBLSPub      shard.BLSPublicKey
 
 	hmyBLSPubStr     = "c2962419d9999a87daa134f6d177f9ccabfe168a470587b13dd02ce91d1690a92170e5949d3dbdfc1b13fd7327dbef8c"
@@ -64,8 +64,6 @@ var (
 )
 
 func init() {
-	// set bls pub and sig pairs for testing
-	blsPubSigPairs = makeBLSPubSigPairs(5)
 	// set bls pub keys for hmy
 	copy(hmyBLSPub[:], common.Hex2Bytes(hmyBLSPubStr))
 }
