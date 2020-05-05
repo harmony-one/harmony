@@ -35,7 +35,7 @@ func TestCreateValidator_Copy(t *testing.T) {
 	for i, test := range tests {
 		cp := test.cv.Copy().(CreateValidator)
 
-		if err := assertCreateValidatorDeepCopy(test.cv, cp); err != nil {
+		if err := assertCreateValidatorDeepCopy(cp, test.cv); err != nil {
 			t.Errorf("Test %v: %v", i, err)
 		}
 	}
@@ -52,7 +52,7 @@ func TestEditValidator_Copy(t *testing.T) {
 	for i, test := range tests {
 		cp := test.ev.Copy().(EditValidator)
 
-		if err := assertEditValidatorDeepCopy(test.ev, cp); err != nil {
+		if err := assertEditValidatorDeepCopy(cp, test.ev); err != nil {
 			t.Errorf("Test %v: %v", i, err)
 		}
 	}
@@ -69,7 +69,40 @@ func TestDelegate_Copy(t *testing.T) {
 	for i, test := range tests {
 		cp := test.d.Copy().(Delegate)
 
-		if err := assertDelegateDeepEqual(test.d, cp); err != nil {
+		if err := assertDelegateDeepEqual(cp, test.d); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
+func TestUndelegate_Copy(t *testing.T) {
+	tests := []struct {
+		u Undelegate
+	}{
+		{testUndelegate}, // non-zero values
+		{zeroUndelegate}, // zero values
+		{Undelegate{}},   // empty values
+	}
+	for i, test := range tests {
+		cp := test.u.Copy().(Undelegate)
+
+		if err := assertUndelegateDeepEqual(cp, test.u); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
+func TestCollectRewards_Copy(t *testing.T) {
+	tests := []struct {
+		cr CollectRewards
+	}{
+		{testCollectReward}, // non-zero values
+		{zeroCollectReward}, // zero values
+	}
+	for i, test := range tests {
+		cp := test.cr.Copy().(CollectRewards)
+
+		if err := assertCollectRewardDeepEqual(cp, test.cr); err != nil {
 			t.Errorf("Test %v: %v", i, err)
 		}
 	}
@@ -146,6 +179,32 @@ func assertDelegateDeepEqual(d1, d2 Delegate) error {
 	}
 	if d1.Amount != nil && d1.Amount == d2.Amount {
 		return fmt.Errorf("amount same pointer")
+	}
+	return nil
+}
+
+func assertUndelegateDeepEqual(u1, u2 Undelegate) error {
+	if !reflect.DeepEqual(u1, u2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if &u1.DelegatorAddress == &u2.DelegatorAddress {
+		return fmt.Errorf("DelegatorAddress same pointer")
+	}
+	if &u1.ValidatorAddress == &u2.ValidatorAddress {
+		return fmt.Errorf("ValidatorAddress same pointer")
+	}
+	if u1.Amount != nil && u1.Amount == u2.Amount {
+		return fmt.Errorf("amount same pointer")
+	}
+	return nil
+}
+
+func assertCollectRewardDeepEqual(cr1, cr2 CollectRewards) error {
+	if !reflect.DeepEqual(cr1, cr2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if &cr1.DelegatorAddress == &cr2.DelegatorAddress {
+		return fmt.Errorf("DelegatorAddress same pointer")
 	}
 	return nil
 }

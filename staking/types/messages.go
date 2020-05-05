@@ -185,8 +185,14 @@ func (v Undelegate) Type() Directive {
 
 // Copy deep copy of the interface
 func (v Undelegate) Copy() StakeMsg {
-	v1 := v
-	return v1
+	cp := Undelegate{
+		DelegatorAddress: v.DelegatorAddress,
+		ValidatorAddress: v.ValidatorAddress,
+	}
+	if v.Amount != nil {
+		cp.Amount = new(big.Int).Set(v.Amount)
+	}
+	return cp
 }
 
 // CollectRewards - type for collecting token rewards
@@ -201,6 +207,7 @@ func (v CollectRewards) Type() Directive {
 
 // Copy deep copy of the interface
 func (v CollectRewards) Copy() StakeMsg {
-	v1 := v
-	return v1
+	return CollectRewards{
+		DelegatorAddress: v.DelegatorAddress,
+	}
 }
