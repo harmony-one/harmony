@@ -617,13 +617,13 @@ func (b *APIBackend) GetShardState() (*shard.State, error) {
 }
 
 // GetCurrentStakingErrorSink ..
-func (b *APIBackend) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
+func (b *APIBackend) GetCurrentStakingErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportStakingErrorSink()
 }
 
 // GetCurrentTransactionErrorSink ..
-func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredTransactionSink()
+func (b *APIBackend) GetCurrentTransactionErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportPlainErrorSink()
 }
 
 // GetPendingCXReceipts ..
