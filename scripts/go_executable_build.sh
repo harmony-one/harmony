@@ -106,14 +106,10 @@ function build_only
       if [[ -z "$build" || "$bin" == "$build" ]]; then
          rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
-         if [ "$DEBUG" == "true" ]; then
-            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
+         if [ "$STATIC" == "true" ]; then
+            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
          else
-            if [ "$STATIC" == "true" ]; then
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
-            else
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
-            fi
+            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
          fi
          if [ "$(uname -s)" == "Linux" ]; then
             $BINDIR/$bin -version || $BINDIR/$bin version
@@ -234,7 +230,7 @@ function release
    done
 
    # copy node.sh
-   $AWSCLI s3 cp scripts/node.sh s3://${BUCKET}/$FOLDER/node.sh --acl public-read
+   $AWSCLI s3 cp scripts/node.sh s3://${PUBBUCKET}/$FOLDER/node.sh --acl public-read
 
    [ -e $BINDIR/md5sum.txt ] && $AWSCLI s3 cp $BINDIR/md5sum.txt s3://${PUBBUCKET}/$FOLDER/md5sum.txt --acl public-read
 }
