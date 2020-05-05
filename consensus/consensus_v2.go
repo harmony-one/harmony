@@ -223,8 +223,7 @@ func (consensus *Consensus) tryCatchup() error {
 			utils.Logger().Error().
 				Int("numMsgs", len(msgs)).
 				Msg("DANGER!!! we should only get one committed message for a given blockNum")
-			// break
-			// return errors.New("we should only get one committed message for a given blockNum")
+			return errors.New("we should only get one committed message for a given blockNum")
 		}
 
 		var committedMsg *FBFTMessage
@@ -251,9 +250,6 @@ func (consensus *Consensus) tryCatchup() error {
 			consensus.Verify.Request <- blkComeback{tmpBlock, resp}
 			if err := <-resp; err != nil {
 				return err
-				// utils.Logger().Error().Err(err).
-				// 	Msg("block verification failed in try catchup")
-				// continue
 			}
 
 			committedMsg = msgs[i]
@@ -321,8 +317,8 @@ func (consensus *Consensus) tryCatchup() error {
 	}
 
 	// clean up old log
-	// consensus.FBFTLog.DeleteBlocksLessThan(now - 1)
-	// consensus.FBFTLog.DeleteMessagesLessThan(now - 1)
+	consensus.FBFTLog.DeleteBlocksLessThan(now - 1)
+	consensus.FBFTLog.DeleteMessagesLessThan(now - 1)
 	return nil
 }
 
