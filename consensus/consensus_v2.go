@@ -25,66 +25,6 @@ const (
 	BlockTime time.Duration = 8 * time.Second
 )
 
-// Start just ensures that consensus is happening via timeouts.
-// func (consensus *Consensus) Start() error {
-
-// 	consensus.timeouts.Consensus.Start(consensus.BlockNum())
-// 	consensus.timeouts.ViewChange.Start(consensus.ViewID())
-// 	// notify := consensus.timeouts.Consensus.
-
-// 	select {}
-
-// g.Go()
-
-// Set up next block due time. // TODO make 8 second duration
-// notifer := consensus.timeouts.Notify()
-
-// go consensus.leaderHandleFinish()
-
-// for {
-
-// 	select {
-// case kind := <-notifer:
-// 	fmt.Println("hit this case", kind)
-// 	continue
-
-// if kind.Name == timeouts.Consensus {
-// 	fmt.Println(
-// 		"consensus timeout went off, block then",
-// 		kind.Value,
-// 		"blck now",
-// 		consensus.BlockNum(),
-// 	)
-// }
-
-// fmt.Println("actually wow I got it", kind)
-// case <-ticker.C:
-// 	utils.Logger().Debug().Msg("[ConsensusMainLoop] Ticker")
-// 	if !consensus.IsLeader() {
-// 		continue
-// 	}
-// 	// TODO think about this some more
-// 	if m := consensus.current.Mode(); m == Syncing || m == Listening {
-// 		if !consensus.timeouts.consensus.WithinLimit() {
-// 			utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
-// 			consensus.startViewChange(consensus.viewID + 1)
-// 		} else if !consensus.timeouts.viewChange.WithinLimit() {
-// 			utils.Logger().Debug().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
-// 			viewID := consensus.current.ViewID()
-// 			consensus.startViewChange(viewID + 1)
-// 		}
-// 	}
-
-// 	case newBlock := <-blockChannel:
-// 		utils.Logger().Debug().Msg("new block came in, starting consensus")
-// 		consensus.SetNextBlockDue(time.Now().Add(BlockTime))
-// 		consensus.announce(newBlock)
-
-// 	}
-// }
-// return nil
-// }
-
 var (
 	// ErrEmptyMessage ..
 	ErrEmptyMessage = errors.New("empty consensus message")

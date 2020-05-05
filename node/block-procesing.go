@@ -90,9 +90,7 @@ func (node *Node) HandleConsensusBlockProcessing() error {
 
 	g.Go(func() error {
 		for verify := range node.Consensus.Verify.Request {
-			// fmt.Println("received block verify process", verify.Blk.String())
 			verify.Err <- node.verifyBlock(verify.Blk)
-			// fmt.Println("received block verify process", verify.Blk.String())
 		}
 		return nil
 	})
