@@ -386,22 +386,39 @@ func (node *Node) syncRespBlockHeightHandler(
 func (node *Node) syncRespBlockHeaderHandler(
 	ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message,
 ) (*msg_pb.Message, error) {
-	shardHeader := node.Blockchain().CurrentHeader()
-	headerData, err := rlp.EncodeToBytes(block.Header{shardHeader})
+	start, end :=
+		msg.GetSyncBlockHeader().GetHeightStart(),
+		msg.GetSyncBlockHeader().GetHeightEnd()
+	latest := node.Blockchain().CurrentHeader().Number().Uint64()
+
+	if start > latest {
+		return nil, nil
+	}
+
+	if end > latest {
+		end = latest
+	}
+
+	headers := make([]*block.Header, start-end)
+
+	for i := start; i < end; i++ {
+		headers[i] = node.Blockchain().GetHeaderByNumber(i)
+	}
+
+	headersData, err := rlp.EncodeToBytes(headers)
+
 	if err != nil {
 		return nil, err
 	}
-
-	single := shardHeader.Number().Uint64()
 
 	return &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
 		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEADER,
 		Request: &msg_pb.Message_SyncBlockHeader{
 			SyncBlockHeader: &msg_pb.SyncBlockHeader{
-				HeightStart: single,
-				HeightEnd:   single,
-				HeaderRlp:   headerData,
+				HeightStart: start,
+				HeightEnd:   end,
+				HeaderRlp:   headersData,
 			},
 		},
 	}, nil
@@ -413,6 +430,10 @@ func (node *Node) syncRespBlockHandler(
 	start, end :=
 		msg.GetSyncBlock().GetHeightStart(), msg.GetSyncBlock().GetHeightEnd()
 	latest := node.Blockchain().CurrentHeader().Number().Uint64()
+
+	if start > latest {
+		return nil, nil
+	}
 
 	if end > latest {
 		end = latest
