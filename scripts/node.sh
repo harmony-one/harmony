@@ -167,7 +167,7 @@ options:
    -p passfile    use the given BLS passphrase file
    -d             just download the Harmony binaries (default: off)
    -D             do not download Harmony binaries (default: download when start)
-   -N network     join the given network (mainnet, testnet, staking, partner, stress, devnet; default: mainnet)
+   -N network     join the given network (mainnet, testnet, staking, partner, stress, devnet, tnet; default: mainnet)
    -n port        specify the public base port of the node (default: 9000)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
@@ -337,6 +337,16 @@ testnet)  # TODO: update Testnet configs once LRTN is upgraded
   network_type=testnet
   dns_zone=p.hmny.io
   syncdir=lrtn
+  ;;
+tnet)
+  bootnodes=(
+    /ip4/54.86.126.90/tcp/9889/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/52.40.84.2/tcp/9889/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
+  )
+  REL=tnet
+  network_type=testnet
+  dns_zone=tn.hmny.io
+  syncdir=tnet
   ;;
 staking)
   bootnodes=(

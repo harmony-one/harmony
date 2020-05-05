@@ -52,21 +52,30 @@ func payDebt(
 
 // Moment ..
 type Moment struct {
-	Epoch        *big.Int `json:"epoch"`
-	TimeUnixNano *big.Int `json:"time-unix-nano"`
-	ShardID      uint32   `json:"shard-id"`
+	Epoch   *big.Int `json:"epoch"`
+	ShardID uint32   `json:"shard-id"`
+	Height  uint64   `json:"height"`
+	ViewID  uint64   `json:"view-id"`
 }
 
 // Evidence ..
 type Evidence struct {
 	Moment
-	ConflictingBallots
+	ConflictingVotes
+	Offender common.Address `json:"offender"`
 }
 
-// ConflictingBallots ..
-type ConflictingBallots struct {
-	AlreadyCastBallot  votepower.Ballot `json:"already-cast-vote"`
-	DoubleSignedBallot votepower.Ballot `json:"double-signed-vote"`
+// ConflictingVotes ..
+type ConflictingVotes struct {
+	FirstVote  Vote `json:"first-vote"`
+	SecondVote Vote `json:"second-vote"`
+}
+
+// Vote is the vote of the double signer
+type Vote struct {
+	SignerPubKey    shard.BLSPublicKey `json:"bls-public-key"`
+	BlockHeaderHash common.Hash        `json:"block-header-hash"`
+	Signature       []byte             `json:"bls-signature"`
 }
 
 // Record is an proof of a slashing made by a witness of a double-signing event
@@ -74,7 +83,6 @@ type Record struct {
 	// the reporter who will get rewarded
 	Evidence Evidence       `json:"evidence"`
 	Reporter common.Address `json:"reporter"`
-	Offender common.Address `json:"offender"`
 }
 
 // Application tracks the slash application to state
@@ -92,8 +100,8 @@ func (a *Application) String() string {
 func (e Evidence) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Moment
-		ConflictingBallots
-	}{e.Moment, e.ConflictingBallots})
+		ConflictingVotes
+	}{e.Moment, e.ConflictingVotes})
 }
 
 // Records ..
@@ -117,7 +125,7 @@ var (
 func (r Record) MarshalJSON() ([]byte, error) {
 	reporter, offender :=
 		common2.MustAddressToBech32(r.Reporter),
-		common2.MustAddressToBech32(r.Offender)
+		common2.MustAddressToBech32(r.Evidence.Offender)
 	return json.Marshal(struct {
 		Evidence         Evidence `json:"evidence"`
 		Beneficiary      string   `json:"beneficiary"`
@@ -148,7 +156,7 @@ func Verify(
 	state *state.DB,
 	candidate *Record,
 ) error {
-	wrapper, err := state.ValidatorWrapper(candidate.Offender)
+	wrapper, err := state.ValidatorWrapper(candidate.Evidence.Offender)
 	if err != nil {
 		return err
 	}
@@ -157,13 +165,13 @@ func Verify(
 		return errAlreadyBannedValidator
 	}
 
-	if candidate.Offender == candidate.Reporter {
+	if candidate.Evidence.Offender == candidate.Reporter {
 		return errReporterAndOffenderSame
 	}
 
 	first, second :=
-		candidate.Evidence.AlreadyCastBallot,
-		candidate.Evidence.DoubleSignedBallot
+		candidate.Evidence.FirstVote,
+		candidate.Evidence.SecondVote
 	k1, k2 := len(first.SignerPubKey), len(second.SignerPubKey)
 	if k1 != shard.PublicKeySizeInBytes ||
 		k2 != shard.PublicKeySizeInBytes {
@@ -172,9 +180,7 @@ func Verify(
 		)
 	}
 
-	if first.ViewID != second.ViewID ||
-		first.Height != second.Height ||
-		first.BlockHeaderHash == second.BlockHeaderHash {
+	if first.BlockHeaderHash == second.BlockHeaderHash {
 		return errors.Wrapf(errSlashBlockNoConflict, "first %v+ second %v+", first, second)
 	}
 
@@ -210,27 +216,29 @@ func Verify(
 
 	if addr, err := subCommittee.AddressForBLSKey(
 		second.SignerPubKey,
-	); err != nil || *addr != candidate.Offender {
+	); err != nil {
 		return err
+	} else if *addr != candidate.Evidence.Offender {
+		return errors.Errorf("offender address (%x) does not match the signer's address (%x)", candidate.Evidence.Offender, addr)
 	}
 
 	// last ditch check
 	if hash.FromRLPNew256(
-		candidate.Evidence.AlreadyCastBallot,
+		candidate.Evidence.FirstVote,
 	) == hash.FromRLPNew256(
-		candidate.Evidence.DoubleSignedBallot,
+		candidate.Evidence.SecondVote,
 	) {
 		return errors.Wrapf(
 			errBallotsNotDiff,
 			"%s %s",
-			candidate.Evidence.AlreadyCastBallot.SignerPubKey.Hex(),
-			candidate.Evidence.DoubleSignedBallot.SignerPubKey.Hex(),
+			candidate.Evidence.FirstVote.SignerPubKey.Hex(),
+			candidate.Evidence.SecondVote.SignerPubKey.Hex(),
 		)
 	}
 
-	for _, ballot := range [...]votepower.Ballot{
-		candidate.Evidence.AlreadyCastBallot,
-		candidate.Evidence.DoubleSignedBallot,
+	for _, ballot := range [...]Vote{
+		candidate.Evidence.FirstVote,
+		candidate.Evidence.SecondVote,
 	} {
 		// now the only real assurance, cryptography
 		signature := &bls.Sign{}
@@ -245,11 +253,11 @@ func Verify(
 
 		// slash verification only happens in staking era, therefore want commit payload for staking epoch
 		commitPayload := consensus_sig.ConstructCommitPayload(chain,
-			chain.Config().StakingEpoch, ballot.BlockHeaderHash, ballot.Height, ballot.ViewID)
+			chain.Config().StakingEpoch, ballot.BlockHeaderHash, candidate.Evidence.Height, candidate.Evidence.ViewID)
 		utils.Logger().Debug().
 			Uint64("epoch", chain.Config().StakingEpoch.Uint64()).
-			Uint64("block-number", ballot.Height).
-			Uint64("view-id", ballot.ViewID).
+			Uint64("block-number", candidate.Evidence.Height).
+			Uint64("view-id", candidate.Evidence.ViewID).
 			Msgf("[COMMIT-PAYLOAD] doubleSignVerify %v", hex.EncodeToString(commitPayload))
 
 		if !signature.VerifyHash(publicKey, commitPayload) {
@@ -448,17 +456,17 @@ func Apply(
 	for _, slash := range slashes {
 		snapshot, err := chain.ReadValidatorSnapshotAtEpoch(
 			slash.Evidence.Epoch,
-			slash.Offender,
+			slash.Evidence.Offender,
 		)
 
 		if err != nil {
 			return nil, errors.Errorf(
 				"could not find validator %s",
-				common2.MustAddressToBech32(slash.Offender),
+				common2.MustAddressToBech32(slash.Evidence.Offender),
 			)
 		}
 
-		current, err := state.ValidatorWrapper(slash.Offender)
+		current, err := state.ValidatorWrapper(slash.Evidence.Offender)
 		if err != nil {
 			return nil, errors.Wrapf(
 				errValidatorNotFoundDuringSlash, " %s ", err.Error(),
@@ -498,7 +506,7 @@ func Rate(votingPower *votepower.Roster, records Records) numeric.Dec {
 	rate := numeric.ZeroDec()
 
 	for i := range records {
-		key := records[i].Evidence.DoubleSignedBallot.SignerPubKey
+		key := records[i].Evidence.SecondVote.SignerPubKey
 		if card, exists := votingPower.Voters[key]; exists {
 			rate = rate.Add(card.GroupPercent)
 		} else {
