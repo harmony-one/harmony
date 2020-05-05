@@ -58,7 +58,7 @@ func (d *ComeDue) Start(value uint64) {
 
 		t = time.AfterFunc(time.Until(n.Add(d.limit.Load().(time.Duration))), func() {
 			d.TimedOut <- value
-			// t.Stop()
+			t.Stop()
 		})
 
 	}()
