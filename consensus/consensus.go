@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/timeouts"
 	"github.com/harmony-one/harmony/core"
@@ -205,7 +206,7 @@ type Consensus struct {
 	SlashChan chan slash.Record
 	// The time due for next block proposal
 	nextBlockDue             atomic.Value
-	IncomingConsensusMessage chan []byte
+	IncomingConsensusMessage chan msg_pb.Message
 	SyncNeeded               chan Range
 }
 
@@ -272,7 +273,7 @@ func New(
 		// channel for receiving newly generated VDF
 		RndChannel:               make(chan [vdfAndSeedSize]byte),
 		ShardID:                  shard,
-		IncomingConsensusMessage: make(chan []byte),
+		IncomingConsensusMessage: make(chan msg_pb.Message),
 		SyncNeeded:               make(chan Range, 1),
 		delayCommit:              commitDelay,
 		MinPeers:                 minPeer,

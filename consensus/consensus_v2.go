@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -31,14 +30,7 @@ var (
 )
 
 // HandleMessageUpdate will update the consensus state according to received message
-func (consensus *Consensus) HandleMessageUpdate(payload []byte) error {
-	if len(payload) == 0 {
-		return ErrEmptyMessage
-	}
-	msg := &msg_pb.Message{}
-	if err := protobuf.Unmarshal(payload, msg); err != nil {
-		return err
-	}
+func (consensus *Consensus) HandleMessageUpdate(msg *msg_pb.Message) error {
 
 	if b := msg.GetNewBlock(); b != nil {
 		fmt.Println("got my new block from leader")

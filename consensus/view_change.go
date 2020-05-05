@@ -96,7 +96,6 @@ func (consensus *Consensus) ResetViewChangeState() {
 
 // StartViewChange ..
 func (consensus *Consensus) StartViewChange(viewID uint64) {
-
 	if consensus.disableViewChange {
 		return
 	}
@@ -133,11 +132,13 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 		utils.Logger().Warn().Msg("[onViewChange] Unable To Parse Viewchange Message")
 		return err
 	}
+
 	// if not leader, noop
 	newLeaderKey := recvMsg.LeaderPubkey
 	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey)
+
 	if err != nil {
-		return err
+		return nil
 	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.ViewChange) {

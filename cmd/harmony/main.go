@@ -767,9 +767,7 @@ func main() {
 
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
-		utils.Logger().Warn().
-			Err(err).
-			Msg("StartRPC failed")
+		fatal(err)
 	}
 
 	if err := currentNode.ForceJoiningTopics(); err != nil {

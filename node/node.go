@@ -370,11 +370,6 @@ func (node *Node) StartP2PMessageHandling() error {
 
 	for i, named := range allTopics {
 		topicName, sub := named.Topic, named.Sub
-
-		// if node.Consensus.ShardID == 1 {
-		// 	fmt.Println("listneing on topic named", topicName)
-		// }
-
 		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
 		msgChan := make(chan ipfs_interface.PubSubMessage)
 

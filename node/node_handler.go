@@ -73,7 +73,14 @@ func (node *Node) HandleMessage(
 				}
 				node.IncomingBlocks <- &block
 			} else {
-				node.Consensus.IncomingConsensusMessage <- msgPayload
+
+				var msg msg_pb.Message
+				if err := protobuf.Unmarshal(msgPayload, &msg); err != nil {
+					utils.Logger().Err(err).Msg("problem decoding message for consensus")
+					return
+				}
+
+				node.Consensus.IncomingConsensusMessage <- msg
 			}
 		}
 
