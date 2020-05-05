@@ -13,6 +13,7 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
@@ -362,7 +363,7 @@ type syncHandler func(
 ) (*msg_pb.Message, error)
 
 func (node *Node) syncRespBlockHeightHandler(
-	context.Context, libp2p_peer.ID, *msg_pb.Message,
+	ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message,
 ) (*msg_pb.Message, error) {
 
 	beaconHeader := node.Beaconchain().CurrentHeader()
@@ -383,13 +384,14 @@ func (node *Node) syncRespBlockHeightHandler(
 }
 
 func (node *Node) syncRespBlockHeaderHandler(
-	context.Context, libp2p_peer.ID, *msg_pb.Message,
+	ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message,
 ) (*msg_pb.Message, error) {
 	shardHeader := node.Blockchain().CurrentHeader()
 	headerData, err := rlp.EncodeToBytes(block.Header{shardHeader})
 	if err != nil {
 		return nil, err
 	}
+
 	single := shardHeader.Number().Uint64()
 
 	return &msg_pb.Message{
@@ -406,21 +408,36 @@ func (node *Node) syncRespBlockHeaderHandler(
 }
 
 func (node *Node) syncRespBlockHandler(
-	context.Context, libp2p_peer.ID, *msg_pb.Message,
+	ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message,
 ) (*msg_pb.Message, error) {
+	start, end :=
+		msg.GetSyncBlock().GetHeightStart(), msg.GetSyncBlock().GetHeightEnd()
+	latest := node.Blockchain().CurrentHeader().Number().Uint64()
 
-	beaconHeader := node.Beaconchain().CurrentHeader()
-	shardHeader := node.Blockchain().CurrentHeader()
+	if end > latest {
+		end = latest
+	}
+
+	blocks := make([]*types.Block, start-end)
+
+	for i := start; i < end; i++ {
+		blocks[i] = node.Blockchain().GetBlockByNumber(i)
+	}
+
+	blocksData, err := rlp.EncodeToBytes(blocks)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
-		Request: &msg_pb.Message_SyncBlockHeight{
-			SyncBlockHeight: &msg_pb.SyncBlockHeight{
-				BeaconHeight: beaconHeader.Number().Uint64(),
-				BeaconHash:   beaconHeader.Hash().Bytes(),
-				ShardHeight:  shardHeader.Number().Uint64(),
-				ShardHash:    shardHeader.Hash().Bytes(),
+		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK,
+		Request: &msg_pb.Message_SyncBlock{
+			SyncBlock: &msg_pb.SyncBlock{
+				HeightStart: start,
+				HeightEnd:   end,
+				BlockRlp:    blocksData,
 			},
 		},
 	}, nil
