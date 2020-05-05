@@ -35,7 +35,7 @@ func (node *Node) HandleConsensusMessageProcessing() error {
 	g.Go(func() error {
 		for due := range node.Consensus.Timeouts.ViewChange.TimedOut {
 			viewIDNow := node.Consensus.Current.ViewID()
-			if viewIDNow <= due {
+			if viewIDNow < due {
 				node.Consensus.StartViewChange(viewIDNow + 1)
 			}
 		}
