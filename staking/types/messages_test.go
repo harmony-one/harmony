@@ -7,16 +7,17 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 )
 
 var (
-	cpTestCreateValidator CreateValidator
-	cpTestEditValidator   EditValidator
-	cpTestDelegate        Delegate
-	cpTestUndelegate      Undelegate
-	cpTestCollectReward   CollectRewards
+	testCreateValidator, zeroCreateValidator CreateValidator
+	testEditValidator, zeroEditValidator     EditValidator
+	testDelegate, zeroDelegate               Delegate
+	testUndelegate, zeroUndelegate           Undelegate
+	testCollectReward, zeroCollectReward     CollectRewards
 )
 
 func init() {
@@ -27,8 +28,9 @@ func TestCreateValidator_Copy(t *testing.T) {
 	tests := []struct {
 		cv CreateValidator
 	}{
-		{cpTestCreateValidator},
-		{CreateValidator{}}, // empty values
+		{testCreateValidator}, // normal values
+		{zeroCreateValidator}, // zero values
+		{CreateValidator{}},   // empty values
 	}
 	for i, test := range tests {
 		cp := test.cv.Copy().(CreateValidator)
@@ -43,8 +45,9 @@ func TestEditValidator_Copy(t *testing.T) {
 	tests := []struct {
 		ev EditValidator
 	}{
-		{cpTestEditValidator},
-		{EditValidator{}}, // empty values
+		{testEditValidator}, // normal values
+		{zeroEditValidator}, // zero values
+		{EditValidator{}},   // empty values
 	}
 	for i, test := range tests {
 		cp := test.ev.Copy().(EditValidator)
@@ -64,12 +67,19 @@ func cpTestDataSetup() {
 		Details:         "wenDetails",
 	}
 	cr := CommissionRates{
-		Rate:          zeroDec,
+		Rate:          oneDec,
 		MaxRate:       oneDec,
+		MaxChangeRate: oneDec,
+	}
+	zeroCr := CommissionRates{
+		Rate:          zeroDec,
+		MaxRate:       zeroDec,
 		MaxChangeRate: zeroDec,
 	}
+	var zeroBLSPub shard.BLSPublicKey
+	var zeroBLSSig shard.BLSSignature
 
-	cpTestCreateValidator = CreateValidator{
+	testCreateValidator = CreateValidator{
 		ValidatorAddress:   validatorAddr,
 		Description:        description,
 		CommissionRates:    cr,
@@ -79,7 +89,16 @@ func cpTestDataSetup() {
 		SlotKeySigs:        slotKeySigs,
 		Amount:             twelveK,
 	}
-	cpTestEditValidator = EditValidator{
+	zeroCreateValidator = CreateValidator{
+		CommissionRates:    zeroCr,
+		MinSelfDelegation:  common.Big0,
+		MaxTotalDelegation: common.Big0,
+		SlotPubKeys:        make([]shard.BLSPublicKey, 0),
+		SlotKeySigs:        make([]shard.BLSSignature, 0),
+		Amount:             common.Big0,
+	}
+
+	testEditValidator = EditValidator{
 		ValidatorAddress:   validatorAddr,
 		Description:        description,
 		CommissionRate:     &oneDec,
@@ -90,7 +109,37 @@ func cpTestDataSetup() {
 		SlotKeyToAddSig:    &slotKeySigs[0],
 		EPOSStatus:         effective.Active,
 	}
+	zeroEditValidator = EditValidator{
+		CommissionRate:     &zeroDec,
+		MinSelfDelegation:  common.Big0,
+		MaxTotalDelegation: common.Big0,
+		SlotKeyToRemove:    &zeroBLSPub,
+		SlotKeyToAdd:       &zeroBLSPub,
+		SlotKeyToAddSig:    &zeroBLSSig,
+	}
 
+	testDelegate = Delegate{
+		DelegatorAddress: common.BigToAddress(common.Big1),
+		ValidatorAddress: validatorAddr,
+		Amount:           twelveK,
+	}
+	zeroDelegate = Delegate{
+		Amount: common.Big0,
+	}
+
+	testUndelegate = Undelegate{
+		DelegatorAddress: common.BigToAddress(common.Big1),
+		ValidatorAddress: validatorAddr,
+		Amount:           twelveK,
+	}
+	zeroUndelegate = Undelegate{
+		Amount: common.Big0,
+	}
+
+	testCollectReward = CollectRewards{
+		DelegatorAddress: common.BigToAddress(common.Big1),
+	}
+	zeroCollectReward = CollectRewards{}
 }
 
 func assertCreateValidatorDeepCopy(cv1, cv2 CreateValidator) error {
@@ -149,6 +198,10 @@ func assertEditValidatorDeepCopy(ev1, ev2 EditValidator) error {
 	if ev1.SlotKeyToAddSig != nil && ev1.SlotKeyToAddSig == ev2.SlotKeyToAddSig {
 		return fmt.Errorf("SlotKeyToAddSig same pointer")
 	}
+	return nil
+}
+
+func assertDelegateDeepEqual(d1, d2 Delegate) error {
 	return nil
 }
 

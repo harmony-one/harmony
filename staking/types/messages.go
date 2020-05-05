@@ -77,11 +77,11 @@ func (v CreateValidator) Copy() StakeMsg {
 		CommissionRates:  v.CommissionRates.Copy(),
 	}
 
-	if len(v.SlotPubKeys) != 0 {
+	if v.SlotPubKeys != nil {
 		cp.SlotPubKeys = make([]shard.BLSPublicKey, len(v.SlotPubKeys))
 		copy(cp.SlotPubKeys, v.SlotPubKeys)
 	}
-	if len(v.SlotKeySigs) != 0 {
+	if v.SlotKeySigs != nil {
 		cp.SlotKeySigs = make([]shard.BLSSignature, len(v.SlotKeySigs))
 		copy(cp.SlotKeySigs, v.SlotKeySigs)
 	}
@@ -161,8 +161,14 @@ func (v Delegate) Type() Directive {
 
 // Copy deep copy of the interface
 func (v Delegate) Copy() StakeMsg {
-	v1 := v
-	return v1
+	cp := Delegate{
+		DelegatorAddress: v.DelegatorAddress,
+		ValidatorAddress: v.ValidatorAddress,
+	}
+	if v.Amount != nil {
+		cp.Amount = new(big.Int).Set(v.Amount)
+	}
+	return cp
 }
 
 // Undelegate - type for removing delegation responsibility
