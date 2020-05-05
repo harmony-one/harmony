@@ -86,13 +86,11 @@ func (node *Node) StartLeaderWork() error {
 				Msg("received on commit finish")
 
 			if viewID == node.Consensus.ViewID() &&
+				shardID == node.Consensus.ShardID &&
 				blockNum == node.Consensus.BlockNum() {
 				key := fmt.Sprintf("%d-%d-%d", viewID, shardID, blockNum)
 				readyChan := roundDone.DoChan(key, func() (interface{}, error) {
-					t := time.NewTimer(time.Until(node.Consensus.NextBlockDue()))
-					for range t.C {
-						t.Stop()
-					}
+					time.Sleep(time.Until(node.Consensus.NextBlockDue()))
 
 					if err := node.Consensus.FinalizeCommits(); err != nil {
 						return nil, err
@@ -107,13 +105,13 @@ func (node *Node) StartLeaderWork() error {
 					result := r.Val.(*oneTime)
 
 					result.once.Do(func() {
+						utils.Logger().Info().
+							Str("key", result.key).
+							Msg("finalized commits and sent out new proposal signal")
 						fmt.Println("kicked off just once for ", result.key)
 						node.Consensus.ProposalNewBlock <- struct{}{}
 					})
 
-					utils.Logger().Info().
-						Str("key", r.Val.(string)).
-						Msg("finalized commits and sent out new proposal signal")
 				}()
 
 			}

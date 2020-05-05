@@ -3,7 +3,6 @@ package node
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"sort"
 	"sync/atomic"
@@ -207,14 +206,17 @@ func syncFromHMYPeersIfNeeded(
 		return err
 	}
 
-	collect, err := protocolPeerHeights(ctx, conns, host, node)
+	// NOTE keeping it below 5 because checking all conns can eat lots of resources
+	collect, err := protocolPeerHeights(ctx, conns[:5], host, node)
 	if err != nil {
 		return err
 	}
 
-	most := commonHash(collect)
+	if len(collect) == 0 {
+		return nil
+	}
 
-	fmt.Println("most common", most.String())
+	_ = commonHash(collect)
 
 	utils.Logger().Info().
 		Int("protocol-peers", len(collect)).
