@@ -50,8 +50,6 @@ const (
 const (
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
-	//SyncIDLength is the length of bytes for syncID
-	SyncIDLength = 20
 )
 
 // Node represents a protocol-participating node in the network
@@ -523,18 +521,6 @@ func New(
 			}
 		}
 	}
-
-	// TODO mutating these fields after literal construction is code smell
-	// TODO Move the IP/ADDr creation to this thing, actually pass the creation
-	// of this syncing client, server to the node as input
-
-	// node.stateSync = syncing.CreateStateSync(
-	// 	node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID,
-	// )
-
-	// node.beaconSync = syncing.CreateStateSync(
-	// 	node.SelfPeer.IP, node.SelfPeer.Port, node.SyncID,
-	// )
 
 	utils.Logger().Info().
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
