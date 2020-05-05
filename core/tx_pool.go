@@ -863,6 +863,10 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 // the pool due to pricing constraints.
 func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 	logger := utils.Logger().With().Stack().Logger()
+	// If the transaction is in the error sink, remove it as it may succeed
+	if pool.txErrorSink.Contains(tx.Hash().String()) {
+		pool.txErrorSink.Remove(tx)
+	}
 	// If the transaction is already known, discard it
 	hash := tx.Hash()
 	if pool.all.Get(hash) != nil {
