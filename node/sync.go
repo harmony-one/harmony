@@ -1,144 +1,116 @@
 package node
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
-	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-msgio"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
-
-func newSyncerForIncoming(
-	stream libp2p_network.Stream,
-	host *p2p.Host,
-	current chainHeights,
-) (*syncingHandler, error) {
-	rw := bufio.NewReadWriter(
-		bufio.NewReader(stream), bufio.NewWriter(stream),
-	)
-	return &syncingHandler{
-		stream, host, rw, &current,
-	}, nil
-
-}
-
-func newSyncerToPeerID(
-	peerID libp2p_peer.ID,
-	host *p2p.Host,
-) (*syncingHandler, error) {
-
-	stream, err := host.IPFSNode.PeerHost.NewStream(
-		context.Background(),
-		peerID,
-		p2p.Protocol,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	rw := bufio.NewReadWriter(
-		bufio.NewReader(stream), bufio.NewWriter(stream),
-	)
-
-	return &syncingHandler{stream, host, rw, nil}, nil
-}
-
-// func onlyHarmony()
 
 func protocolPeerHeights(
 	conns []ipfs_interface.ConnectionInfo, host *p2p.Host, node *Node,
-) ([]*whoHasIt, error) {
+) (map[libp2p_peer.ID]*msg_pb.Message, error) {
+	hmyPeers := make(chan libp2p_peer.ID)
+	const DefaultTimeout = time.Second * 30
+	rootCtx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancel()
+	g, ctx := errgroup.WithContext(rootCtx)
 
-	var collect []*whoHasIt
-	wg := sync.WaitGroup{}
+	g.Go(func() error {
+		defer close(hmyPeers)
 
-	for _, neighbor := range conns {
-
-		id := neighbor.ID()
-		protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
-			id, p2p.Protocol,
-		)
-
-		if err != nil {
-			return nil, err
-		}
-
-		seen := false
-		for _, protocol := range protocols {
-			if seen = protocol == p2p.Protocol; seen {
-				break
-			}
-		}
-
-		if !seen {
-			continue
-		}
-
-		fmt.Println("sending out query for Peer->", id.Pretty())
-
-		const DefaultTimeout = time.Second * 10
-		wg.Add(1)
-		go func(p peer.ID) {
-			defer wg.Done()
-			ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-			defer cancel()
-			msgSender, err := node.messageSenderForPeer(ctx, id)
+		for _, neighbor := range conns {
+			id := neighbor.ID()
+			protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
+				id, p2p.Protocol,
+			)
 			if err != nil {
-				fmt.Println("hello issue?", err.Error())
-				// return nil, err
+				return err
 			}
-			rpmes, err := msgSender.SendRequest(ctx, &msg_pb.Message{
-				ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-				Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT,
-			})
+			seen := false
+			for _, protocol := range protocols {
+				if seen = protocol == p2p.Protocol; seen {
+					break
+				}
+			}
+			if !seen {
+				continue
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case hmyPeers <- id:
+			}
+		}
 
-			if err != nil {
-				// Here is context deadline, whatever
-				// why would get empty reply, whatever
-				return
-				// fmt.Println("hello someting else?", err.Error())
-				// return nil, err
-			}
+		return nil
+	})
 
-			fmt.Println("got back reply", rpmes.String())
-			if rpmes == nil {
-				// fmt.Println("empty reply whatever")
-				// return nil, errors.Errorf("no response from %s", id)
-			}
-		}(id)
+	type peerResp struct {
+		id  libp2p_peer.ID
+		msg *msg_pb.Message
 	}
 
-	wg.Wait()
+	collect := make(chan *peerResp)
+	const nWorkers = 10
+	workers := int32(nWorkers)
+	for i := 0; i < nWorkers; i++ {
+		g.Go(func() error {
+			defer func() {
+				// Last one out closes shop
+				if atomic.AddInt32(&workers, -1) == 0 {
+					close(collect)
+				}
+			}()
 
-	utils.Logger().Info().
-		Int("connected-harmony-protocol-peers", len(collect)).
-		Msg("finished asking heights for state syncing")
+			for id := range hmyPeers {
+				msgSender, err := node.messageSenderForPeer(ctx, id)
+				if err != nil {
+					return err
+				}
+				if rpmes, err := msgSender.SendRequest(ctx, &msg_pb.Message{
+					ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+					Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT,
+				}); err != nil {
+					return err
+				} else {
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case collect <- &peerResp{id, rpmes}:
+					}
+				}
+			}
+			return nil
+		})
+	}
 
-	return collect, nil
+	reduce := map[libp2p_peer.ID]*msg_pb.Message{}
+	g.Go(func() error {
+		for resp := range collect {
+			reduce[resp.id] = resp.msg
+		}
+		return nil
+	})
 
+	return reduce, g.Wait()
 }
 
 type t struct {
@@ -147,8 +119,9 @@ type t struct {
 }
 
 type hashCount struct {
-	count int
-	hash  common.Hash
+	count       int
+	hash        common.Hash
+	peersWithIt []libp2p_peer.ID
 }
 
 type mostCommonHash struct {
@@ -175,22 +148,25 @@ func (m *mostCommonHash) String() string {
 	return string(s)
 }
 
-func commonHash(collect []*whoHasIt) mostCommonHash {
+func commonHash(collect map[libp2p_peer.ID]*msg_pb.Message) mostCommonHash {
+
 	beaconCounters, shardCounters :=
 		map[common.Hash]t{}, map[common.Hash]t{}
 
-	for _, c := range collect {
+	for peerID, c := range collect {
+		height := c.GetSyncBlockHeight()
+		shardHash := common.BytesToHash(height.GetShardHash())
+		beaconHash := common.BytesToHash(height.GetBeaconHash())
 
-		currentS := shardCounters[c.shard.blockHash]
+		currentS := shardCounters[shardHash]
 		currentS.count++
-		currentS.haveIt = append(currentS.haveIt, c.peerID)
-		shardCounters[c.shard.blockHash] = currentS
+		currentS.haveIt = append(currentS.haveIt, peerID)
+		shardCounters[shardHash] = currentS
 
-		currentB := beaconCounters[c.beacon.blockHash]
+		currentB := beaconCounters[beaconHash]
 		currentB.count++
-		currentB.haveIt = append(currentB.haveIt, c.peerID)
-		beaconCounters[c.beacon.blockHash] = currentB
-
+		currentB.haveIt = append(currentB.haveIt, peerID)
+		beaconCounters[beaconHash] = currentB
 	}
 
 	type withHash struct {
@@ -217,13 +193,13 @@ func commonHash(collect []*whoHasIt) mostCommonHash {
 	})
 
 	return mostCommonHash{
-		beacon: hashCount{b[0].count, b[0].hash},
-		shard:  hashCount{s[0].count, s[0].hash},
+		beacon: hashCount{b[0].count, b[0].hash, b[0].haveIt},
+		shard:  hashCount{s[0].count, s[0].hash, s[0].haveIt},
 	}
 }
 
 func syncFromHMYPeersIfNeeded(
-	host *p2p.Host, current chainHeights, node *Node,
+	host *p2p.Host, node *Node,
 ) error {
 	conns, err := host.CoreAPI.Swarm().Peers(context.Background())
 
@@ -236,10 +212,9 @@ func syncFromHMYPeersIfNeeded(
 		return err
 	}
 
-	fmt.Println("finsihed getting from peers", len(collect), collect)
-	// most := commonHash(collect)
+	most := commonHash(collect)
 
-	// fmt.Println("most common", most.String())
+	fmt.Println("most common", most.String())
 
 	utils.Logger().Info().
 		Int("protocol-peers", len(collect)).
@@ -248,345 +223,22 @@ func syncFromHMYPeersIfNeeded(
 	return nil
 }
 
-type syncingHandler struct {
-	rawStream libp2p_network.Stream
-	host      *p2p.Host
-	rw        *bufio.ReadWriter
-	current   *chainHeights
-}
-
-var requestBlockHeight []byte
-
-func init() {
-	message := &msg_pb.Message{
-		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-		Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT,
-	}
-	data, err := constructHarmonyP2PMsgForClientRoles(message)
-	if err != nil {
-		panic("die ->" + err.Error())
-	}
-	requestBlockHeight = data
-}
-
-func constructHarmonyP2PMsgForClientRoles(
-	message *msg_pb.Message,
-) ([]byte, error) {
-	msg, err := protobuf.Marshal(message)
-	if err != nil {
-		return nil, err
-	}
-	byteBuffer := bytes.NewBuffer([]byte{byte(proto_node.Client)})
-	byteBuffer.Write(msg)
-	return p2p.ConstructMessage(byteBuffer.Bytes()), nil
-}
-
-func checkValidSyncResp(resp *msg_pb.Message) error {
-	if r := resp.GetServiceType(); r != msg_pb.ServiceType_CLIENT_SUPPORT {
-		return errors.Wrapf(
-			errNotClientSupport, "wrongly received %v", r,
-		)
-	}
-
-	if r := resp.GetType(); r != msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT &&
-		r != msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEADER &&
-		r != msg_pb.MessageType_SYNC_RESPONSE_BLOCK {
-		return errors.Wrapf(errWrongReply, "wrongly received %v", r)
-	}
-	return nil
-}
-
-func (sync *syncingHandler) finished() error {
-	if err := sync.rw.Flush(); err != nil {
-		return err
-	}
-
-	return sync.rawStream.Close()
-}
-
-func (sync *syncingHandler) receiveResponse(
-	heightReply chan chainHeights,
-	headersReply chan []*block.Header,
-	blocksReply chan []*types.Block,
-) error {
-
-	resp, err := sync.readHarmonyMessage()
-	if err != nil {
-		return err
-	}
-
-	if err := checkValidSyncResp(resp); err != nil {
-		return err
-	}
-
-	switch resp.GetType() {
-	case msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT:
-		peerHeights := resp.GetSyncBlockHeight()
-		heightReply <- chainHeights{
-			beacon: height{
-				blockNum:  peerHeights.GetBeaconHeight(),
-				blockHash: common.BytesToHash(peerHeights.GetBeaconHash()),
-			},
-			shard: height{
-				blockNum:  peerHeights.GetShardHeight(),
-				blockHash: common.BytesToHash(peerHeights.GetShardHash()),
-			},
-		}
-
-	case msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEADER:
-		data := resp.GetSyncBlockHeader().GetHeaderRlp()
-		var replyHeaders []*block.Header
-		if err := rlp.DecodeBytes(data, replyHeaders); err != nil {
-			return err
-		}
-		headersReply <- replyHeaders
-
-	case msg_pb.MessageType_SYNC_RESPONSE_BLOCK:
-		data := resp.GetSyncBlock().GetBlockRlp()
-		var replyBlocks []*types.Block
-		if err := rlp.DecodeBytes(data, replyBlocks); err != nil {
-			return err
-		}
-		blocksReply <- replyBlocks
-	}
-
-	return nil
-
-}
-
-func (sync *syncingHandler) askHeight() (*chainHeights, error) {
-
-	if err := sync.sendBytesWithFlush(
-		requestBlockHeight,
-	); err != nil {
-		return nil, err
-	}
-
-	heightReply, headersReply, blocksReply := newReplyChannels()
-
-	if err := sync.receiveResponse(
-		heightReply, headersReply, blocksReply,
-	); err != nil {
-		return nil, err
-	}
-
-	c := <-heightReply
-	return &c, nil
-}
-
-func (sync *syncingHandler) sendHarmonyMessageAsBytes(message *msg_pb.Message) error {
-	msg, err := constructHarmonyP2PMsgForClientRoles(message)
-	if err != nil {
-		return err
-	}
-	return sync.sendBytesWithFlush(msg)
-}
-
-func (sync *syncingHandler) askBlockHeader(
-	r consensus.Range,
-) ([]*block.Header, error) {
-
-	message := &msg_pb.Message{
-		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-		Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEADER,
-		Request: &msg_pb.Message_SyncBlockHeader{
-			SyncBlockHeader: &msg_pb.SyncBlockHeader{
-				HeightStart: r.Start,
-				HeightEnd:   r.End,
-			},
-		},
-	}
-
-	if err := sync.sendHarmonyMessageAsBytes(message); err != nil {
-		return nil, err
-	}
-
-	heightReply, headersReply, blocksReply := newReplyChannels()
-
-	if err := sync.receiveResponse(
-		heightReply, headersReply, blocksReply,
-	); err != nil {
-		return nil, err
-	}
-
-	select {
-	case r := <-headersReply:
-		return r, nil
-	default:
-		return nil, errors.New("did not receive headers reply")
-	}
-
-}
-
-func newReplyChannels() (
-	chan chainHeights, chan []*block.Header, chan []*types.Block,
-) {
-	return make(chan chainHeights, 1),
-		make(chan []*block.Header, 1),
-		make(chan []*types.Block, 1)
-}
-
-func (sync *syncingHandler) askBlock(
-	r consensus.Range,
-) ([]*types.Block, error) {
-
-	message := &msg_pb.Message{
-		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-		Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK,
-		Request: &msg_pb.Message_SyncBlock{
-			SyncBlock: &msg_pb.SyncBlock{
-				HeightStart: r.Start,
-				HeightEnd:   r.End,
-			},
-		},
-	}
-
-	if err := sync.sendHarmonyMessageAsBytes(message); err != nil {
-		return nil, err
-	}
-
-	heightReply, headersReply, blocksReply := newReplyChannels()
-
-	if err := sync.receiveResponse(
-		heightReply, headersReply, blocksReply,
-	); err != nil {
-		return nil, err
-	}
-
-	select {
-	case blocks := <-blocksReply:
-		return blocks, nil
-	default:
-		return nil, errors.New("did not receive blocks reply")
-	}
-
-}
-
-var (
-	errNotClientSupport   = errors.New("not a client support message")
-	errNotAHarmonyMessage = errors.New(
-		"incoming message from stream did not begin with 0x11",
-	)
-	errWrongReply = errors.New("wrong reply from other side of stream connection")
-)
-
-func (sync *syncingHandler) sendBytesWithFlush(data []byte) error {
-	if _, err := sync.rw.Write(data); err != nil {
-		return err
-	}
-	return sync.rw.Flush()
-}
-
-func (sync *syncingHandler) replyWithCurrentBlockHeight() error {
-	message := &msg_pb.Message{
-		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
-		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
-		Request: &msg_pb.Message_SyncBlockHeight{
-			SyncBlockHeight: &msg_pb.SyncBlockHeight{
-				BeaconHeight: sync.current.beacon.blockNum,
-				BeaconHash:   sync.current.beacon.blockHash.Bytes(),
-				ShardHeight:  sync.current.shard.blockNum,
-				ShardHash:    sync.current.shard.blockHash.Bytes(),
-			},
-		},
-	}
-
-	return sync.sendHarmonyMessageAsBytes(message)
-}
-
-func (sync *syncingHandler) handleMessage(msg *msg_pb.Message) error {
-	if msg.GetServiceType() != msg_pb.ServiceType_CLIENT_SUPPORT {
-		return errNotClientSupport
-	}
-
-	if msg.GetType() == msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT {
-		return sync.replyWithCurrentBlockHeight()
-	}
-
-	return nil
-}
-
-func (sync *syncingHandler) readHarmonyMessage() (*msg_pb.Message, error) {
-
-	buf, err := sync.rw.Peek(1)
-	if err != nil {
-		return nil, err
-	}
-
-	if buf[0] == 0x11 {
-		_, err := sync.rw.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-
-		var msgBuf msg_pb.Message
-		contentSizeBuf := make([]byte, 4)
-
-		if _, err := io.ReadFull(sync.rw, contentSizeBuf); err != nil {
-			return nil, err
-		}
-
-		sized := binary.BigEndian.Uint32(contentSizeBuf)
-		payload := make([]byte, sized)
-
-		if _, err := io.ReadFull(sync.rw, payload); err != nil {
-			return nil, err
-		}
-
-		// TODO double check that that one byte is indeed "client"
-		// That one extra middle offset byte --
-		if err := protobuf.Unmarshal(payload[1:], &msgBuf); err != nil {
-			return nil, err
-		}
-		return &msgBuf, nil
-	}
-
-	return nil, errNotAHarmonyMessage
-}
-
-func (sync *syncingHandler) processIncoming() error {
-	// this must be our message
-	msg, err := sync.readHarmonyMessage()
-	if err != nil {
-		return err
-	}
-
-	return sync.handleMessage(msg)
-}
-
-type height struct {
-	blockNum  uint64
-	blockHash common.Hash
-}
-
-type chainHeights struct {
-	beacon height
-	shard  height
-}
-
-type whoHasIt struct {
-	*chainHeights
-	peerID libp2p_peer.ID
-}
-
 // HandleBlockSyncing ..
 func (node *Node) HandleBlockSyncing() error {
 	t := time.NewTicker(time.Second * 10)
 	defer t.Stop()
-
-	i := 0
 
 	for {
 		select {
 		case blockRange := <-node.Consensus.SyncNeeded:
 			_ = blockRange
 		case <-t.C:
-
-			fmt.Println("tick went off", i)
-			i++
 			if err := syncFromHMYPeersIfNeeded(
-				node.host, node.heightNow(), node,
+				node.host, node,
 			); err != nil {
+				if err == context.DeadlineExceeded {
+					continue
+				}
 				return err
 			}
 		}
@@ -595,26 +247,9 @@ func (node *Node) HandleBlockSyncing() error {
 	return nil
 }
 
-func (node *Node) heightNow() chainHeights {
-	currentBeacon := node.Blockchain().CurrentBlock()
-	currentShard := node.Beaconchain().CurrentBlock()
-
-	return chainHeights{
-		beacon: height{
-			blockNum:  currentBeacon.Number().Uint64(),
-			blockHash: currentBeacon.Hash(),
-		},
-		shard: height{
-			blockNum:  currentShard.Number().Uint64(),
-			blockHash: currentShard.Hash(),
-		},
-	}
-}
-
 func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 	r := msgio.NewVarintReaderSize(s, libp2p_network.MessageSizeMax)
 	mPeer := s.Conn().RemotePeer()
-	fmt.Println("incoming", mPeer)
 	timer := time.AfterFunc(dhtStreamIdleTimeout, func() { s.Reset() })
 	defer timer.Stop()
 
@@ -630,7 +265,9 @@ func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 			// This string test is necessary because there isn't a single stream reset error
 			// instance	in use.
 			if err.Error() != "stream reset" {
+				// fmt.Println("not an error I think?")
 				utils.Logger().Info().Err(err).Msgf("error reading message")
+				// return nil
 			}
 
 			return err
@@ -641,10 +278,12 @@ func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 
 		r.ReleaseMsg(msgbytes)
 		timer.Reset(dhtStreamIdleTimeout)
+
 		handler := node.syncHandlerForMsgType(req.GetType())
 
 		if handler == nil {
-			utils.Logger().Warn().Msgf("can't handle received message", "from", mPeer, "type", req.GetType())
+			utils.Logger().Warn().
+				Msgf("can't handle received message", "from", mPeer, "type", req.GetType())
 			return errors.New("cant receive this message")
 		}
 
@@ -665,18 +304,12 @@ func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 }
 
 func (node *Node) handleNewStream(s libp2p_network.Stream) {
-
-	go func() {
-		defer s.Reset()
-
-		if err := node.handleNewMessage(s); err != nil {
-			fmt.Println("why had an issue", err.Error())
-			return
-		}
-
-		_ = s.Close()
-	}()
-
+	defer s.Reset()
+	if err := node.handleNewMessage(s); err != nil {
+		utils.Logger().Warn().Err(err).Msg("stream had possible issue")
+		return
+	}
+	_ = s.Close()
 }
 
 // HandleIncomingHMYProtocolStreams ..
@@ -687,7 +320,7 @@ func (node *Node) HandleIncomingHMYProtocolStreams() {
 }
 
 func (node *Node) messageSenderForPeer(
-	ctx context.Context, p peer.ID,
+	ctx context.Context, p libp2p_peer.ID,
 ) (*messageSender, error) {
 
 	node.sender.Lock()
@@ -722,32 +355,84 @@ func (node *Node) messageSenderForPeer(
 
 }
 
-type syncHandler func(context.Context, libp2p_peer.ID, *msg_pb.Message) (*msg_pb.Message, error)
+type syncHandler func(
+	context.Context, libp2p_peer.ID, *msg_pb.Message,
+) (*msg_pb.Message, error)
 
-func (node *Node) syncBlockHeightHandler(
+func (node *Node) syncRespBlockHeightHandler(
 	context.Context, libp2p_peer.ID, *msg_pb.Message,
 ) (*msg_pb.Message, error) {
+
+	beaconHeader := node.Beaconchain().CurrentHeader()
+	shardHeader := node.Blockchain().CurrentHeader()
 
 	return &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
 		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
 		Request: &msg_pb.Message_SyncBlockHeight{
 			SyncBlockHeight: &msg_pb.SyncBlockHeight{
-				BeaconHeight: 1,
-				BeaconHash:   []byte{},
-				ShardHeight:  2,
-				ShardHash:    []byte{},
+				BeaconHeight: beaconHeader.Number().Uint64(),
+				BeaconHash:   beaconHeader.Hash().Bytes(),
+				ShardHeight:  shardHeader.Number().Uint64(),
+				ShardHash:    shardHeader.Hash().Bytes(),
 			},
 		},
 	}, nil
+}
 
+func (node *Node) syncRespBlockHeaderHandler(
+	context.Context, libp2p_peer.ID, *msg_pb.Message,
+) (*msg_pb.Message, error) {
+	shardHeader := node.Blockchain().CurrentHeader()
+	headerData, err := rlp.EncodeToBytes(block.Header{shardHeader})
+	if err != nil {
+		return nil, err
+	}
+	single := shardHeader.Number().Uint64()
+
+	return &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEADER,
+		Request: &msg_pb.Message_SyncBlockHeader{
+			SyncBlockHeader: &msg_pb.SyncBlockHeader{
+				HeightStart: single,
+				HeightEnd:   single,
+				HeaderRlp:   headerData,
+			},
+		},
+	}, nil
+}
+
+func (node *Node) syncRespBlockHandler(
+	context.Context, libp2p_peer.ID, *msg_pb.Message,
+) (*msg_pb.Message, error) {
+
+	beaconHeader := node.Beaconchain().CurrentHeader()
+	shardHeader := node.Blockchain().CurrentHeader()
+
+	return &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
+		Request: &msg_pb.Message_SyncBlockHeight{
+			SyncBlockHeight: &msg_pb.SyncBlockHeight{
+				BeaconHeight: beaconHeader.Number().Uint64(),
+				BeaconHash:   beaconHeader.Hash().Bytes(),
+				ShardHeight:  shardHeader.Number().Uint64(),
+				ShardHash:    shardHeader.Hash().Bytes(),
+			},
+		},
+	}, nil
 }
 
 func (node *Node) syncHandlerForMsgType(t msg_pb.MessageType) syncHandler {
 	switch t {
 
 	case msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEIGHT:
-		return node.syncBlockHeightHandler
+		return node.syncRespBlockHeightHandler
+	case msg_pb.MessageType_SYNC_REQUEST_BLOCK_HEADER:
+		return node.syncRespBlockHeaderHandler
+	case msg_pb.MessageType_SYNC_REQUEST_BLOCK:
+		return node.syncRespBlockHandler
 	}
 
 	return nil
