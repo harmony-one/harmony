@@ -25,13 +25,13 @@ import (
 )
 
 func protocolPeerHeights(
-	conns []ipfs_interface.ConnectionInfo, host *p2p.Host, node *Node,
+	ctx context.Context,
+	conns []ipfs_interface.ConnectionInfo,
+	host *p2p.Host,
+	node *Node,
 ) (map[libp2p_peer.ID]*msg_pb.Message, error) {
 	hmyPeers := make(chan libp2p_peer.ID)
-	const DefaultTimeout = time.Second * 30
-	rootCtx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
-	g, ctx := errgroup.WithContext(rootCtx)
+	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		defer close(hmyPeers)
@@ -199,7 +199,7 @@ func commonHash(collect map[libp2p_peer.ID]*msg_pb.Message) mostCommonHash {
 }
 
 func syncFromHMYPeersIfNeeded(
-	host *p2p.Host, node *Node,
+	ctx context.Context, host *p2p.Host, node *Node,
 ) error {
 	conns, err := host.CoreAPI.Swarm().Peers(context.Background())
 
@@ -207,7 +207,7 @@ func syncFromHMYPeersIfNeeded(
 		return err
 	}
 
-	collect, err := protocolPeerHeights(conns, host, node)
+	collect, err := protocolPeerHeights(ctx, conns, host, node)
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func syncFromHMYPeersIfNeeded(
 
 // HandleBlockSyncing ..
 func (node *Node) HandleBlockSyncing() error {
-	t := time.NewTicker(time.Second * 10)
+	t := time.NewTicker(15 * time.Second)
 	defer t.Stop()
 
 	for {
@@ -233,9 +233,11 @@ func (node *Node) HandleBlockSyncing() error {
 		case blockRange := <-node.Consensus.SyncNeeded:
 			_ = blockRange
 		case <-t.C:
-			if err := syncFromHMYPeersIfNeeded(
-				node.host, node,
-			); err != nil {
+			if err := func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				return syncFromHMYPeersIfNeeded(ctx, node.host, node)
+			}(); err != nil {
 				if err == context.DeadlineExceeded {
 					continue
 				}
@@ -265,9 +267,7 @@ func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 			// This string test is necessary because there isn't a single stream reset error
 			// instance	in use.
 			if err.Error() != "stream reset" {
-				// fmt.Println("not an error I think?")
 				utils.Logger().Info().Err(err).Msgf("error reading message")
-				// return nil
 			}
 
 			return err
