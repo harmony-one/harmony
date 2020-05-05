@@ -318,6 +318,78 @@ func TestInvalidTransactions(t *testing.T) {
 	}
 }
 
+func TestErrorSink(t *testing.T) {
+	t.Parallel()
+
+	pool, key := setupTxPool()
+	pool.chain = createBlockChain()
+	defer pool.Stop()
+
+	testTxErrorSink := types.NewTransactionErrorSink()
+	pool.txErrorSink = testTxErrorSink
+
+	tx := transaction(0, 0, 100, key)
+	from, _ := deriveSender(tx)
+
+	stxKey, _ := crypto.GenerateKey()
+	stx, err := stakingCreateValidatorTransaction(stxKey)
+	if err != nil {
+		t.Errorf("cannot create new staking transaction, %v\n", err)
+	}
+	fromStx, _ := stx.SenderAddress()
+
+	pool.currentState.SetNonce(from, 1)
+	pool.currentState.AddBalance(from, big.NewInt(0xffffffffffffff))
+	tx = transaction(0, 0, 100000, key)
+	if err := pool.AddRemote(tx); err != ErrNonceTooLow {
+		t.Error("expected", ErrNonceTooLow)
+	}
+	if !testTxErrorSink.Contains(tx.Hash().String()) {
+		t.Error("expected errored transaction in tx pool")
+	}
+
+	pool.currentState.SetNonce(from, 0)
+	tx = transaction(0, 0, 100000, key)
+	if err := pool.AddRemote(tx); err != nil {
+		t.Error("expected successful transaction got", err)
+	}
+	if testTxErrorSink.Contains(tx.Hash().String()) {
+		t.Error("expected successful transaction to not be in error sink")
+	}
+
+	pool.currentState.SetNonce(from, 2)
+	tx = transaction(0, 2, 100000, key)
+	pool.currentState.SetBalance(from, big.NewInt(0x0))
+	pool.currentState.SetBalance(fromStx, big.NewInt(0x0))
+	if err := pool.AddRemote(tx); err != ErrInsufficientFunds {
+		t.Error("expected", ErrInsufficientFunds)
+	}
+	if err := pool.AddRemote(stx); err != ErrInsufficientFunds {
+		t.Error("expected", ErrInsufficientFunds)
+	}
+	if !testTxErrorSink.Contains(tx.Hash().String()) {
+		t.Error("expected errored transaction in tx pool")
+	}
+	if !testTxErrorSink.Contains(stx.Hash().String()) {
+		t.Error("expected errored transaction in tx pool")
+	}
+
+	pool.currentState.SetBalance(from, twelveK)
+	pool.currentState.SetBalance(fromStx, twelveK)
+	if err := pool.AddRemote(tx); err != nil {
+		t.Error("expected successful transaction got", err)
+	}
+	if err := pool.AddRemote(stx); err != nil {
+		t.Error("expected successful transaction got", err)
+	}
+	if testTxErrorSink.Contains(tx.Hash().String()) {
+		t.Error("expected successful transaction to not be in error sink")
+	}
+	if testTxErrorSink.Contains(stx.Hash().String()) {
+		t.Error("expected successful transaction to not be in error sink")
+	}
+}
+
 func TestCreateValidatorTransaction(t *testing.T) {
 	t.Parallel()
 
@@ -335,15 +407,13 @@ func TestCreateValidatorTransaction(t *testing.T) {
 	// Add additional create validator tx cost
 	pool.currentState.AddBalance(senderAddr, cost)
 
-	// TODO remove the exception on more slot keys than allowed
-	if err = pool.AddRemote(stx); err != nil && err != staking.ErrExcessiveBLSKeys {
+	if err = pool.AddRemote(stx); err != nil {
 		t.Error(err.Error())
 	}
 
-	// TODO Comment back in after the fix of previous TODO
-	// if pool.pending[senderAddr] == nil || pool.pending[senderAddr].Len() != 1 {
-	// 	t.Error("Expected 1 pending transaction")
-	// }
+	if pool.pending[senderAddr] == nil || pool.pending[senderAddr].Len() != 1 {
+		t.Error("Expected 1 pending transaction")
+	}
 }
 
 func TestMixedTransactions(t *testing.T) {
@@ -370,15 +440,14 @@ func TestMixedTransactions(t *testing.T) {
 
 	errs := pool.AddRemotes(types.PoolTransactions{stx, tx})
 	for _, err := range errs {
-		// TODO remove the exception on more slot keys than allowed
-		if err != nil && err != staking.ErrExcessiveBLSKeys {
+		if err != nil {
 			t.Error(err)
 		}
 	}
-	// TODO Comment back in after the fix of previous TODO
-	// if pool.pending[stxAddr] == nil || pool.pending[stxAddr].Len() != 0 {
-	// 	t.Error("Expected 1 pending transaction")
-	// }
+
+	if pool.pending[stxAddr] == nil || pool.pending[stxAddr].Len() != 1 {
+		t.Error("Expected 1 pending transaction")
+	}
 }
 
 func TestBlacklistedTransactions(t *testing.T) {
