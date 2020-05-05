@@ -405,6 +405,7 @@ func (w *Worker) verifySlashes(
 				Interface("slashRecord", d[i]).
 				Msg("Slash failed verification")
 			failures = append(failures, d[i])
+			continue
 		}
 		successes = append(successes, d[i])
 	}
