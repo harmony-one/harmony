@@ -25,6 +25,7 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -451,15 +452,20 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus.SetCommitDelay(commitDelay)
 	currentConsensus.MinPeers = *minPeers
 
+	// Current node.
+	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	blacklist, err := setupBlacklist()
 	if err != nil {
 		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
 	}
-
-	// Current node.
-	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
-
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
+	transactionErrorSink, err := types.NewTransactionErrorSink()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Error when setting up TransactionErrorSink: %v \n", err)
+		os.Exit(1)
+	}
+	currentNode := node.New(
+		myHost, currentConsensus, chainDBFactory, blacklist, transactionErrorSink, *isArchival,
+	)
 
 	switch {
 	case *networkType == nodeconfig.Localnet:

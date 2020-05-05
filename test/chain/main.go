@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/params"
 	pkgworker "github.com/harmony-one/harmony/node/worker"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -198,8 +197,8 @@ func main() {
 	genesis := gspec.MustCommit(database)
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine(), vm.Config{}, nil)
 
-	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain,
-		func([]types.RPCTransactionError) {}, func([]staking.RPCTransactionError) {})
+	txErrorSink, _ := types.NewTransactionErrorSink()
+	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain, txErrorSink)
 
 	backend := &testWorkerBackend{
 		db:     database,
