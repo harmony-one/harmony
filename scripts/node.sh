@@ -179,7 +179,7 @@ ${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDmN:tT:i:ba:U:PvVIMB:AYR:r: opt
+while getopts :1chk:sSp:dDm:N:tT:i:ba:U:PvVIMB:AYR:r: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
