@@ -50,10 +50,10 @@ var (
 	testBLSPubKey    = "30b2c38b1316da91e068ac3bd8751c0901ef6c02a1d58bc712104918302c6ed03d5894671d0c816dad2b4d303320f202"
 	testBLSPrvKey    = "c6d7603520311f7a4e6aac0b26701fc433b75b38df504cd416ef2b900cd66205"
 
-	gasPrice          = big.NewInt(1e9)
-	gasLimit          = big.NewInt(int64(params.TxGasValidatorCreation))
-	cost              = big.NewInt(1).Mul(gasPrice, gasLimit)
-	dummyErrorSink, _ = types.NewTransactionErrorSink()
+	gasPrice       = big.NewInt(1e9)
+	gasLimit       = big.NewInt(int64(params.TxGasValidatorCreation))
+	cost           = big.NewInt(1).Mul(gasPrice, gasLimit)
+	dummyErrorSink = types.NewTransactionErrorSink()
 )
 
 func init() {

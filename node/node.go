@@ -423,12 +423,11 @@ func New(
 	consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
-	transactionErrorSink *types.TransactionErrorSink,
 	isArchival bool,
 ) *Node {
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
-	node.TransactionErrorSink = transactionErrorSink
+	node.TransactionErrorSink = types.NewTransactionErrorSink()
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -480,7 +479,7 @@ func New(
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 		txPoolConfig.Blacklist = blacklist
-		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, transactionErrorSink)
+		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 

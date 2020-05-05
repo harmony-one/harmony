@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	maxPlainSinkCapacity   = 1024
-	maxStakingSinkCapacity = 1024
-	logTag                 = "[TransactionErrorSink]"
+	plainTxSinkLimit   = 1024
+	stakingTxSinkLimit = 1024
+	logTag             = "[TransactionErrorSink]"
 )
 
 // TransactionErrorReport ..
@@ -23,7 +23,7 @@ type TransactionErrorReport struct {
 	ErrMessage           string `json:"error-message"`
 }
 
-// TransactionErrorReports
+// TransactionErrorReports ..
 type TransactionErrorReports []*TransactionErrorReport
 
 // TransactionErrorSink is where all failed transactions get reported.
@@ -34,19 +34,13 @@ type TransactionErrorSink struct {
 }
 
 // NewTransactionErrorSink ..
-func NewTransactionErrorSink() (*TransactionErrorSink, error) {
-	failedPlainTx, err := lru.New(maxPlainSinkCapacity)
-	if err != nil {
-		return nil, err
-	}
-	failedStakingTx, err := lru.New(maxStakingSinkCapacity)
-	if err != nil {
-		return nil, err
-	}
+func NewTransactionErrorSink() *TransactionErrorSink {
+	failedPlainTx, _ := lru.New(plainTxSinkLimit)
+	failedStakingTx, _ := lru.New(stakingTxSinkLimit)
 	return &TransactionErrorSink{
 		failedPlainTxs:   failedPlainTx,
 		failedStakingTxs: failedStakingTx,
-	}, nil
+	}
 }
 
 // Add a transaction to the error sink with the given error
