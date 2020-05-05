@@ -337,6 +337,15 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	return fields, nil
 }
 
+// GetPoolStats returns stats for the tx-pool
+func (s *PublicTransactionPoolAPI) GetPoolStats() map[string]interface{} {
+	pendingCount, queuedCount := s.b.GetPoolStats()
+	return map[string]interface{}{
+		"executable-count":     pendingCount,
+		"non-executable-count": queuedCount,
+	}
+}
+
 // PendingTransactions returns the plain transactions that are in the transaction pool
 func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
 	pending, err := s.b.GetPoolTransactions()

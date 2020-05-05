@@ -51,10 +51,10 @@ type Backend interface {
 	// GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
 	GetPoolTransactions() (types.PoolTransactions, error)
 	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
+	GetPoolStats() (pendingCount, queuedCount int)
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	// Get account nonce
 	GetAccountNonce(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error)
-	// Stats() (pending int, queued int)
 	// TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 	ChainConfig() *params.ChainConfig

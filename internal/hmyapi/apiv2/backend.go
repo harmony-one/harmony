@@ -51,6 +51,7 @@ type Backend interface {
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
 	GetPoolTransactions() (types.PoolTransactions, error)
 	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
+	GetPoolStats() (pendingCount, queuedCount int)
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	GetAccountNonce(ctx context.Context, addr common.Address, blockNr rpc.BlockNumber) (uint64, error)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
