@@ -76,8 +76,9 @@ func (node *Node) StartLeaderWork() error {
 
 	g.Go(func() error {
 		for quorumReached := range node.Consensus.CommitFinishChan {
-			viewID, shardID, blockNum :=
-				quorumReached.ViewID, quorumReached.ShardID, quorumReached.BlockNum
+			viewID, shardID, blockNum, due :=
+				quorumReached.ViewID, quorumReached.ShardID,
+				quorumReached.BlockNum, quorumReached.Due
 
 			utils.Logger().Info().
 				Uint64("block-num", blockNum).
@@ -90,7 +91,7 @@ func (node *Node) StartLeaderWork() error {
 				blockNum == node.Consensus.BlockNum() {
 				key := fmt.Sprintf("%d-%d-%d", viewID, shardID, blockNum)
 				readyChan := roundDone.DoChan(key, func() (interface{}, error) {
-					time.Sleep(time.Until(node.Consensus.NextBlockDue()))
+					time.Sleep(time.Until(due))
 
 					if err := node.Consensus.FinalizeCommits(); err != nil {
 						return nil, err

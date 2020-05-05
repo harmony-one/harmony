@@ -110,6 +110,7 @@ type Finished struct {
 	ShardID   uint32
 	BlockNum  uint64
 	BlockHash common.Hash
+	Due       time.Time
 }
 
 type Range struct {

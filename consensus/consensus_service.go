@@ -455,7 +455,7 @@ func (consensus *Consensus) IsLeader() bool {
 	defer consensus.Locks.PubKey.Unlock()
 
 	for i := range consensus.PubKey.PublicKey {
-		if consensus.PubKey.PublicKey[i].IsEqual(
+		if consensus.priKey.PrivateKey[i].GetPublicKey().IsEqual(
 			consensus.LeaderPubKey(),
 		) {
 			return true

@@ -297,6 +297,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 			consensus.ShardID,
 			consensus.BlockNum(),
 			consensus.BlockHash(),
+			consensus.NextBlockDue(),
 		}
 
 	}
