@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/harmony-one/harmony/numeric"
@@ -35,6 +36,13 @@ func TestCommissionRates_Copy(t *testing.T) {
 }
 
 func assertCommissionRatesDeepCopy(cr1, cr2 CommissionRates) error {
+	if !reflect.DeepEqual(cr1, cr2) {
+		return errors.New("not deep equal")
+	}
+	return assertCommissionRatesCopy(cr1, cr2)
+}
+
+func assertCommissionRatesCopy(cr1, cr2 CommissionRates) error {
 	if err := assertDecCopy(cr1.Rate, cr2.Rate); err != nil {
 		return fmt.Errorf("rate: %v", err)
 	}
@@ -53,9 +61,6 @@ func assertDecCopy(d1, d2 numeric.Dec) error {
 	}
 	if d1.IsNil() {
 		return nil
-	}
-	if !d1.Equal(d2) {
-		return errors.New("value not equal")
 	}
 	if d1 == d2 {
 		return errors.New("same address")

@@ -75,12 +75,16 @@ func (v CreateValidator) Copy() StakeMsg {
 		ValidatorAddress: v.ValidatorAddress,
 		Description:      v.Description,
 		CommissionRates:  v.CommissionRates.Copy(),
-		SlotPubKeys:      make([]shard.BLSPublicKey, len(v.SlotPubKeys)),
-		SlotKeySigs:      make([]shard.BLSSignature, len(v.SlotKeySigs)),
 	}
-	copy(cp.SlotPubKeys, v.SlotPubKeys)
-	copy(cp.SlotKeySigs, v.SlotKeySigs)
 
+	if len(v.SlotPubKeys) != 0 {
+		cp.SlotPubKeys = make([]shard.BLSPublicKey, len(v.SlotPubKeys))
+		copy(cp.SlotPubKeys, v.SlotPubKeys)
+	}
+	if len(v.SlotKeySigs) != 0 {
+		cp.SlotKeySigs = make([]shard.BLSSignature, len(v.SlotKeySigs))
+		copy(cp.SlotKeySigs, v.SlotKeySigs)
+	}
 	if v.MinSelfDelegation != nil {
 		cp.MinSelfDelegation = new(big.Int).Set(v.MinSelfDelegation)
 	}
@@ -113,9 +117,34 @@ func (v EditValidator) Type() Directive {
 
 // Copy deep copy of the interface
 func (v EditValidator) Copy() StakeMsg {
-	v1 := v
-	v1.Description = v.Description
-	return v1
+	cp := EditValidator{
+		ValidatorAddress: v.ValidatorAddress,
+		Description:      v.Description,
+		EPOSStatus:       v.EPOSStatus,
+	}
+	if v.CommissionRate != nil {
+		cr := v.CommissionRate.Copy()
+		cp.CommissionRate = &cr
+	}
+	if v.MinSelfDelegation != nil {
+		cp.MinSelfDelegation = new(big.Int).Set(v.MinSelfDelegation)
+	}
+	if v.MaxTotalDelegation != nil {
+		cp.MaxTotalDelegation = new(big.Int).Set(v.MaxTotalDelegation)
+	}
+	if v.SlotKeyToRemove != nil {
+		keyRem := *v.SlotKeyToRemove
+		cp.SlotKeyToRemove = &keyRem
+	}
+	if v.SlotKeyToAdd != nil {
+		keyAdd := *v.SlotKeyToAdd
+		cp.SlotKeyToAdd = &keyAdd
+	}
+	if v.SlotKeyToAddSig != nil {
+		sigAdd := *v.SlotKeyToAddSig
+		cp.SlotKeyToAddSig = &sigAdd
+	}
+	return cp
 }
 
 // Delegate - type for delegating to a validator

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 )
 
 var (
@@ -38,102 +39,147 @@ func TestCreateValidator_Copy(t *testing.T) {
 	}
 }
 
+func TestEditValidator_Copy(t *testing.T) {
+	tests := []struct {
+		ev EditValidator
+	}{
+		{cpTestEditValidator},
+		{EditValidator{}}, // empty values
+	}
+	for i, test := range tests {
+		cp := test.ev.Copy().(EditValidator)
+
+		if err := assertEditValidatorDeepCopy(test.ev, cp); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
 func cpTestDataSetup() {
+	description := Description{
+		Name:            "Wayne",
+		Identity:        "wen",
+		Website:         "harmony.one.wen",
+		SecurityContact: "wenSecurity",
+		Details:         "wenDetails",
+	}
+	cr := CommissionRates{
+		Rate:          zeroDec,
+		MaxRate:       oneDec,
+		MaxChangeRate: zeroDec,
+	}
+
 	cpTestCreateValidator = CreateValidator{
-		ValidatorAddress: validatorAddr,
-		Description: Description{
-			Name:            "Wayne",
-			Identity:        "wen",
-			Website:         "harmony.one.wen",
-			SecurityContact: "wenSecurity",
-			Details:         "wenDetails",
-		},
-		CommissionRates: CommissionRates{
-			Rate:          zeroDec,
-			MaxRate:       oneDec,
-			MaxChangeRate: zeroDec,
-		},
+		ValidatorAddress:   validatorAddr,
+		Description:        description,
+		CommissionRates:    cr,
 		MinSelfDelegation:  tenK,
 		MaxTotalDelegation: twelveK,
 		SlotPubKeys:        slotPubKeys,
 		SlotKeySigs:        slotKeySigs,
 		Amount:             twelveK,
 	}
+	cpTestEditValidator = EditValidator{
+		ValidatorAddress:   validatorAddr,
+		Description:        description,
+		CommissionRate:     &oneDec,
+		MinSelfDelegation:  tenK,
+		MaxTotalDelegation: twelveK,
+		SlotKeyToRemove:    &slotPubKeys[0],
+		SlotKeyToAdd:       &slotPubKeys[0],
+		SlotKeyToAddSig:    &slotKeySigs[0],
+		EPOSStatus:         effective.Active,
+	}
+
 }
 
 func assertCreateValidatorDeepCopy(cv1, cv2 CreateValidator) error {
-	if cv1.ValidatorAddress != cv2.ValidatorAddress {
-		return fmt.Errorf("validator address not equal")
-	}
-	if !reflect.DeepEqual(cv1.Description, cv2.Description) {
-		return fmt.Errorf("description value not equal")
+	if !reflect.DeepEqual(cv1, cv2) {
+		return fmt.Errorf("not deep equal")
 	}
 	if &cv1.Description == &cv2.Description {
 		return fmt.Errorf("description not copy")
 	}
-	if err := assertCommissionRatesDeepCopy(cv1.CommissionRates, cv2.CommissionRates); err != nil {
+	if err := assertCommissionRatesCopy(cv1.CommissionRates, cv2.CommissionRates); err != nil {
 		return fmt.Errorf("commissionRate %v", err)
 	}
-	if err := assertBigIntDeepCopy(cv1.MinSelfDelegation, cv2.MinSelfDelegation); err != nil {
+	if err := assertBigIntCopy(cv1.MinSelfDelegation, cv2.MinSelfDelegation); err != nil {
 		return fmt.Errorf("MinSelfDelegation %v", err)
 	}
-	if err := assertBigIntDeepCopy(cv1.MaxTotalDelegation, cv2.MaxTotalDelegation); err != nil {
+	if err := assertBigIntCopy(cv1.MaxTotalDelegation, cv2.MaxTotalDelegation); err != nil {
 		return fmt.Errorf("MaxTotalDelegation %v", err)
 	}
-	if err := assertPubsDeepCopy(cv1.SlotPubKeys, cv2.SlotPubKeys); err != nil {
+	if err := assertPubsCopy(cv1.SlotPubKeys, cv2.SlotPubKeys); err != nil {
 		return fmt.Errorf("SlotPubKeys %v", err)
 	}
-	if err := assertSigsDeepCopy(cv1.SlotKeySigs, cv2.SlotKeySigs); err != nil {
+	if err := assertSigsCopy(cv1.SlotKeySigs, cv2.SlotKeySigs); err != nil {
 		return fmt.Errorf("SlotKeySigs %v", err)
 	}
-	if err := assertBigIntDeepCopy(cv1.Amount, cv2.Amount); err != nil {
+	if err := assertBigIntCopy(cv1.Amount, cv2.Amount); err != nil {
 		return fmt.Errorf("amount %v", err)
 	}
 	return nil
 }
 
-func assertBigIntDeepCopy(i1, i2 *big.Int) error {
+func assertEditValidatorDeepCopy(ev1, ev2 EditValidator) error {
+	if !reflect.DeepEqual(ev1, ev2) {
+		return errors.New("not deep equal")
+	}
+	if &ev1.ValidatorAddress == &ev2.ValidatorAddress {
+		return fmt.Errorf("validator address same pointer")
+	}
+	if &ev1.Description == &ev2.Description {
+		return fmt.Errorf("description same pointer")
+	}
+	if ev1.CommissionRate != nil && ev1.CommissionRate == ev2.CommissionRate {
+		return fmt.Errorf("CommissionRate same pointer")
+	}
+	if err := assertBigIntCopy(ev1.MinSelfDelegation, ev2.MinSelfDelegation); err != nil {
+		return fmt.Errorf("MinSelfDelegation %v", err)
+	}
+	if err := assertBigIntCopy(ev1.MaxTotalDelegation, ev2.MaxTotalDelegation); err != nil {
+		return fmt.Errorf("MaxTotalDelegation %v", err)
+	}
+	if ev1.SlotKeyToRemove != nil && ev1.SlotKeyToRemove == ev2.SlotKeyToRemove {
+		return fmt.Errorf("SlotKeyToRemove same pointer")
+	}
+	if ev1.SlotKeyToAdd != nil && ev1.SlotKeyToAdd == ev2.SlotKeyToAdd {
+		return fmt.Errorf("SlotKeyToAdd same pointer")
+	}
+	if ev1.SlotKeyToAddSig != nil && ev1.SlotKeyToAddSig == ev2.SlotKeyToAddSig {
+		return fmt.Errorf("SlotKeyToAddSig same pointer")
+	}
+	return nil
+}
+
+func assertBigIntCopy(i1, i2 *big.Int) error {
 	if (i1 == nil) != (i2 == nil) {
 		return errors.New("is nil not equal")
 	}
-	if i1 == nil {
-		return nil
-	}
-	if i1.Cmp(i2) != 0 {
-		return errors.New("value not equal")
-	}
-	if i1 == i2 {
+	if i1 != nil && i1 == i2 {
 		return errors.New("not copy")
 	}
 	return nil
 }
 
-func assertPubsDeepCopy(s1, s2 []shard.BLSPublicKey) error {
+func assertPubsCopy(s1, s2 []shard.BLSPublicKey) error {
 	if len(s1) != len(s2) {
 		return fmt.Errorf("size not equal")
 	}
 	for i := range s1 {
-		pub1, pub2 := s1[i], s2[i]
-		if pub1 != pub2 {
-			return fmt.Errorf("[%v] value not equal", i)
-		}
-		if &pub1 == &pub2 {
+		if &s1[i] == &s2[i] {
 			return fmt.Errorf("[%v] same address", i)
 		}
 	}
 	return nil
 }
 
-func assertSigsDeepCopy(s1, s2 []shard.BLSSignature) error {
+func assertSigsCopy(s1, s2 []shard.BLSSignature) error {
 	if len(s1) != len(s2) {
 		return fmt.Errorf("size not equal")
 	}
 	for i := range s1 {
-		pub1, pub2 := s1[i], s2[i]
-		if pub1 != pub2 {
-			return fmt.Errorf("[%v] value not equal", i)
-		}
-		if &pub1 == &pub2 {
+		if &s1[i] == &s2[i] {
 			return fmt.Errorf("[%v] same address", i)
 		}
 	}
