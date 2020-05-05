@@ -15,16 +15,16 @@ const (
 	logTag                 = "[TransactionErrorSink]"
 )
 
-// TransactionError ..
-type TransactionError struct {
+// TransactionErrorReport ..
+type TransactionErrorReport struct {
 	TxHashID             string `json:"tx-hash-id"`
 	StakingDirective     string `json:"directive-kind,omitempty"`
 	TimestampOfRejection int64  `json:"time-at-rejection"`
 	ErrMessage           string `json:"error-message"`
 }
 
-// TransactionErrors
-type TransactionErrors []*TransactionError
+// TransactionErrorReports
+type TransactionErrorReports []*TransactionErrorReport
 
 // TransactionErrorSink is where all failed transactions get reported.
 // Note that the keys of the lru caches are tx-hash strings.
@@ -57,7 +57,7 @@ func (sink *TransactionErrorSink) Add(tx PoolTransaction, err error) {
 	}
 	if plainTx, ok := tx.(*Transaction); ok {
 		hash := plainTx.Hash().String()
-		sink.failedPlainTxs.Add(hash, &TransactionError{
+		sink.failedPlainTxs.Add(hash, &TransactionErrorReport{
 			TxHashID:             hash,
 			TimestampOfRejection: time.Now().Unix(),
 			ErrMessage:           err.Error(),
@@ -68,7 +68,7 @@ func (sink *TransactionErrorSink) Add(tx PoolTransaction, err error) {
 			Msgf("Added plain transaction error message")
 	} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
 		hash := stakingTx.Hash().String()
-		sink.failedStakingTxs.Add(hash, &TransactionError{
+		sink.failedStakingTxs.Add(hash, &TransactionErrorReport{
 			TxHashID:             hash,
 			StakingDirective:     stakingTx.StakingType().String(),
 			TimestampOfRejection: time.Now().Unix(),
@@ -119,12 +119,12 @@ func (sink *TransactionErrorSink) Remove(tx PoolTransaction) {
 }
 
 // PlainReport ..
-func (sink *TransactionErrorSink) PlainReport() TransactionErrors {
+func (sink *TransactionErrorSink) PlainReport() TransactionErrorReports {
 	return reportErrorsFromLruCache(sink.failedPlainTxs)
 }
 
 // StakingReport ..
-func (sink *TransactionErrorSink) StakingReport() TransactionErrors {
+func (sink *TransactionErrorSink) StakingReport() TransactionErrorReports {
 	return reportErrorsFromLruCache(sink.failedStakingTxs)
 }
 
@@ -141,8 +141,8 @@ func (sink *TransactionErrorSink) StakingCount() int {
 // reportErrorsFromLruCache is a helper for reporting errors
 // from the TransactionErrorSink's lru cache. Do not use this function directly,
 // use the respective public methods of TransactionErrorSink.
-func reportErrorsFromLruCache(lruCache *lru.Cache) TransactionErrors {
-	rpcErrors := TransactionErrors{}
+func reportErrorsFromLruCache(lruCache *lru.Cache) TransactionErrorReports {
+	rpcErrors := TransactionErrorReports{}
 	for _, txHash := range lruCache.Keys() {
 		rpcErrorFetch, ok := lruCache.Get(txHash)
 		if !ok {
@@ -152,7 +152,7 @@ func reportErrorsFromLruCache(lruCache *lru.Cache) TransactionErrors {
 				Msgf("Error not found in sink")
 			continue
 		}
-		rpcError, ok := rpcErrorFetch.(*TransactionError)
+		rpcError, ok := rpcErrorFetch.(*TransactionErrorReport)
 		if !ok {
 			utils.Logger().Error().
 				Str("tag", logTag).
