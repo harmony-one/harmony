@@ -69,7 +69,7 @@ func (v CreateValidator) Type() Directive {
 	return DirectiveCreateValidator
 }
 
-// Copy deep copy of the interface
+// Copy returns a deep copy of the CreateValidator as a StakeMsg interface
 func (v CreateValidator) Copy() StakeMsg {
 	cp := CreateValidator{
 		ValidatorAddress: v.ValidatorAddress,
@@ -115,7 +115,7 @@ func (v EditValidator) Type() Directive {
 	return DirectiveEditValidator
 }
 
-// Copy deep copy of the interface
+// Copy returns a deep copy of the EditValidator as a StakeMsg interface
 func (v EditValidator) Copy() StakeMsg {
 	cp := EditValidator{
 		ValidatorAddress: v.ValidatorAddress,
@@ -159,7 +159,7 @@ func (v Delegate) Type() Directive {
 	return DirectiveDelegate
 }
 
-// Copy deep copy of the interface
+// Copy returns a deep copy of the Delegate as a StakeMsg interface
 func (v Delegate) Copy() StakeMsg {
 	cp := Delegate{
 		DelegatorAddress: v.DelegatorAddress,
@@ -183,7 +183,7 @@ func (v Undelegate) Type() Directive {
 	return DirectiveUndelegate
 }
 
-// Copy deep copy of the interface
+// Copy returns a deep copy of the Undelegate as a StakeMsg interface
 func (v Undelegate) Copy() StakeMsg {
 	cp := Undelegate{
 		DelegatorAddress: v.DelegatorAddress,
@@ -205,7 +205,7 @@ func (v CollectRewards) Type() Directive {
 	return DirectiveCollectRewards
 }
 
-// Copy deep copy of the interface
+// Copy returns a deep copy of the CollectRewards as a StakeMsg interface
 func (v CollectRewards) Copy() StakeMsg {
 	return CollectRewards{
 		DelegatorAddress: v.DelegatorAddress,

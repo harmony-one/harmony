@@ -24,6 +24,47 @@ func init() {
 	cpTestDataSetup()
 }
 
+func TestDirective_String(t *testing.T) {
+	tests := []struct {
+		dir Directive
+		exp string
+	}{
+		{DirectiveCreateValidator, "CreateValidator"},
+		{DirectiveEditValidator, "EditValidator"},
+		{DirectiveDelegate, "Delegate"},
+		{DirectiveUndelegate, "Undelegate"},
+		{DirectiveCollectRewards, "CollectRewards"},
+		{0xff, "Directive 255"},
+	}
+	for i, test := range tests {
+		s := test.dir.String()
+
+		if s != test.exp {
+			t.Errorf("Test %v: unexpected string: %v / %v", i, s, test.exp)
+		}
+	}
+}
+
+func TestStakeMsg_Type(t *testing.T) {
+	tests := []struct {
+		msg StakeMsg
+		exp Directive
+	}{
+		{testCreateValidator, DirectiveCreateValidator},
+		{testEditValidator, DirectiveEditValidator},
+		{testDelegate, DirectiveDelegate},
+		{testUndelegate, DirectiveUndelegate},
+		{testCollectReward, DirectiveCollectRewards},
+	}
+	for i, test := range tests {
+		dir := test.msg.Type()
+
+		if dir != test.exp {
+			t.Errorf("Test %v: unexpected directive %v / %v", i, dir, test.exp)
+		}
+	}
+}
+
 func TestCreateValidator_Copy(t *testing.T) {
 	tests := []struct {
 		cv CreateValidator
