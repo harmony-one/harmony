@@ -4,12 +4,8 @@
 package message
 
 import (
-	context "context"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
-	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -1216,84 +1212,4 @@ var fileDescriptor_33c57e4bae7b9afd = []byte{
 	0xc6, 0x2c, 0x20, 0x61, 0x9c, 0xdc, 0x3a, 0xfa, 0x12, 0xe4, 0x51, 0xb4, 0x18, 0x13, 0x4a, 0x91,
 	0xb6, 0xfb, 0x6b, 0x72, 0xb4, 0x9f, 0x21, 0xe9, 0x9f, 0x43, 0x6b, 0xef, 0xa6, 0xc2, 0x7f, 0xfb,
 	0xcf, 0xff, 0x0e, 0x00, 0x00, 0xff, 0xff, 0xc7, 0xca, 0x6a, 0x0d, 0x07, 0x0c, 0x00, 0x00,
-}
-
-// Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
-
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion6
-
-// ClientServiceClient is the client API for ClientService service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type ClientServiceClient interface {
-	Process(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Response, error)
-}
-
-type clientServiceClient struct {
-	cc grpc.ClientConnInterface
-}
-
-func NewClientServiceClient(cc grpc.ClientConnInterface) ClientServiceClient {
-	return &clientServiceClient{cc}
-}
-
-func (c *clientServiceClient) Process(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Response, error) {
-	out := new(Response)
-	err := c.cc.Invoke(ctx, "/message.ClientService/Process", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// ClientServiceServer is the server API for ClientService service.
-type ClientServiceServer interface {
-	Process(context.Context, *Message) (*Response, error)
-}
-
-// UnimplementedClientServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedClientServiceServer struct {
-}
-
-func (*UnimplementedClientServiceServer) Process(ctx context.Context, req *Message) (*Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Process not implemented")
-}
-
-func RegisterClientServiceServer(s *grpc.Server, srv ClientServiceServer) {
-	s.RegisterService(&_ClientService_serviceDesc, srv)
-}
-
-func _ClientService_Process_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Message)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ClientServiceServer).Process(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/message.ClientService/Process",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientServiceServer).Process(ctx, req.(*Message))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-var _ClientService_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "message.ClientService",
-	HandlerType: (*ClientServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "Process",
-			Handler:    _ClientService_Process_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "message.proto",
 }
