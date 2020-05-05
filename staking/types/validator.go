@@ -283,13 +283,13 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 
 	if v.MaxRate.LT(zeroPercent) || v.MaxRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidCommissionRate, "rate:%s", v.MaxRate.String(),
+			errInvalidCommissionRate, "max rate:%s", v.MaxRate.String(),
 		)
 	}
 
 	if v.MaxChangeRate.LT(zeroPercent) || v.MaxChangeRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidCommissionRate, "rate:%s", v.MaxChangeRate.String(),
+			errInvalidCommissionRate, "max change rate:%s", v.MaxChangeRate.String(),
 		)
 	}
 
@@ -385,9 +385,9 @@ func MarshalValidator(validator Validator) ([]byte, error) {
 }
 
 // UnmarshalValidator unmarshal binary into Validator object
-func UnmarshalValidator(by []byte) (*Validator, error) {
-	decoded := &Validator{}
-	err := rlp.DecodeBytes(by, decoded)
+func UnmarshalValidator(by []byte) (Validator, error) {
+	decoded := Validator{}
+	err := rlp.DecodeBytes(by, &decoded)
 	return decoded, err
 }
 

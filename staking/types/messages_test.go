@@ -311,8 +311,8 @@ func cpTestDataSetup() {
 		CommissionRates:    cr,
 		MinSelfDelegation:  tenK,
 		MaxTotalDelegation: twelveK,
-		SlotPubKeys:        slotPubKeys,
-		SlotKeySigs:        slotKeySigs,
+		SlotPubKeys:        []shard.BLSPublicKey{blsPubSigPairs[0].pub},
+		SlotKeySigs:        []shard.BLSSignature{blsPubSigPairs[0].sig},
 		Amount:             twelveK,
 	}
 	zeroCreateValidator = CreateValidator{
@@ -330,9 +330,9 @@ func cpTestDataSetup() {
 		CommissionRate:     &oneDec,
 		MinSelfDelegation:  tenK,
 		MaxTotalDelegation: twelveK,
-		SlotKeyToRemove:    &slotPubKeys[0],
-		SlotKeyToAdd:       &slotPubKeys[0],
-		SlotKeyToAddSig:    &slotKeySigs[0],
+		SlotKeyToRemove:    &blsPubSigPairs[0].pub,
+		SlotKeyToAdd:       &blsPubSigPairs[0].pub,
+		SlotKeyToAddSig:    &blsPubSigPairs[0].sig,
 		EPOSStatus:         effective.Active,
 	}
 	zeroEditValidator = EditValidator{
