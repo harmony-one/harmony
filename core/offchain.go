@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"github.com/harmony-one/harmony/block"
 	"math/big"
 	"sort"
 
@@ -94,25 +95,24 @@ func (bc *BlockChain) CommitOffChainData(
 	//	}
 	//}
 
-	newEpoch := new(big.Int).Add(header.Epoch(), common.Big1)
+	nextBlockEpoch, err := bc.getNextBlockEpoch(header)
+	if err != nil {
+		return NonStatTy, err
+	}
+
 	// Shard State and Validator Update
 	if isNewEpoch {
 		// Write shard state for the new epoch
-		newShardState, err := bc.WriteShardStateBytes(batch, newEpoch, header.ShardState())
+		_, err := bc.WriteShardStateBytes(batch, nextBlockEpoch, header.ShardState())
 		if err != nil {
 			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
 			return NonStatTy, err
-		}
-
-		if err == nil && newShardState.Epoch != nil && bc.chainConfig.IsStaking(newShardState.Epoch) {
-			// After staking, the epoch will be decided by the epoch in the shard state.
-			newEpoch = new(big.Int).Set(newShardState.Epoch)
 		}
 	}
 
 	// Do bookkeeping for new staking txns
 	newVals, err := bc.UpdateStakingMetaData(
-		batch, block, state, epoch, newEpoch,
+		batch, block, state, epoch, nextBlockEpoch,
 	)
 	if err != nil {
 		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")
@@ -123,6 +123,9 @@ func (bc *BlockChain) CommitOffChainData(
 	// This snapshot of the state is consistent with the state used for election
 	if isBeaconChain && shard.Schedule.IsLastBlock(header.Number().Uint64()+1) {
 		// Update snapshots for all validators
+		// Beacon chain always snapshot for the next epoch as cur_epoch + 1
+		// as beacon chain won't have gap in epochs.
+		newEpoch := big.NewInt(0).Add(header.Epoch(), big.NewInt(1))
 		if err := bc.UpdateValidatorSnapshots(batch, newEpoch, state, newVals); err != nil {
 			return NonStatTy, err
 		}
@@ -293,4 +296,20 @@ func (bc *BlockChain) CommitOffChainData(
 	}
 
 	return CanonStatTy, nil
+}
+
+func (bc *BlockChain) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
+	nextBlockEpoch := header.Epoch()
+	if len(header.ShardState()) > 0 {
+		nextBlockEpoch = new(big.Int).Add(header.Epoch(), common.Big1)
+		decodeShardState, err := shard.DecodeWrapper(header.ShardState())
+		if err != nil {
+			return nil, err
+		}
+		if decodeShardState.Epoch != nil && bc.chainConfig.IsStaking(decodeShardState.Epoch) {
+			// After staking, the epoch will be decided by the epoch in the shard state.
+			nextBlockEpoch = new(big.Int).Set(decodeShardState.Epoch)
+		}
+	}
+	return nextBlockEpoch, nil
 }
