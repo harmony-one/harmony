@@ -355,7 +355,9 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 	transactions := make([]*RPCTransaction, len(pending))
 	for i := range pending {
 		if plainTx, ok := pending[i].(*types.Transaction); ok {
-			transactions[i] = newRPCPendingTransaction(plainTx)
+			if tx := newRPCTransaction(plainTx, common.Hash{}, 0, 0, 0); tx != nil {
+				transactions[i] = tx
+			}
 		} else if _, ok := pending[i].(*staking.StakingTransaction); ok {
 			continue // Do not return staking transactions here.
 		} else {
@@ -376,7 +378,9 @@ func (s *PublicTransactionPoolAPI) PendingStakingTransactions() ([]*RPCStakingTr
 		if _, ok := pending[i].(*types.Transaction); ok {
 			continue // Do not return plain transactions here
 		} else if stakingTx, ok := pending[i].(*staking.StakingTransaction); ok {
-			transactions[i] = newRPCPendingStakingTransaction(stakingTx)
+			if tx := newRPCStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0); tx != nil {
+				transactions[i] = tx
+			}
 		} else {
 			return nil, types.ErrUnknownPoolTxType
 		}
