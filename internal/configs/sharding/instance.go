@@ -20,6 +20,7 @@ const (
 	Partner
 	StressNet
 	DevNet
+	Test
 )
 
 type instance struct {
