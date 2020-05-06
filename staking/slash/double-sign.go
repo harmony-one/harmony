@@ -58,6 +58,18 @@ type Moment struct {
 	ViewID  uint64   `json:"view-id"`
 }
 
+func (m Moment) Copy() Moment {
+	cp := Moment{
+		ShardID: m.ShardID,
+		Height:  m.Height,
+		ViewID:  m.ViewID,
+	}
+	if m.Epoch != nil {
+		cp.Epoch = new(big.Int).Set(m.Epoch)
+	}
+	return cp
+}
+
 // Evidence ..
 type Evidence struct {
 	Moment
@@ -65,10 +77,27 @@ type Evidence struct {
 	Offender common.Address `json:"offender"`
 }
 
+// Copy makes a deep copy of the Evidence structure
+func (e Evidence) Copy() Evidence {
+	return Evidence{
+		Moment:           e.Moment.Copy(),
+		ConflictingVotes: e.ConflictingVotes.Copy(),
+		Offender:         e.Offender,
+	}
+}
+
 // ConflictingVotes ..
 type ConflictingVotes struct {
 	FirstVote  Vote `json:"first-vote"`
 	SecondVote Vote `json:"second-vote"`
+}
+
+// Copy makes a deep copy of the ConflictingVotes structure
+func (cv ConflictingVotes) Copy() ConflictingVotes {
+	return ConflictingVotes{
+		FirstVote:  cv.FirstVote.Copy(),
+		SecondVote: cv.SecondVote.Copy(),
+	}
 }
 
 // Vote is the vote of the double signer
@@ -78,11 +107,32 @@ type Vote struct {
 	Signature       []byte             `json:"bls-signature"`
 }
 
+// Copy makes a deep copy of the Vote
+func (v Vote) Copy() Vote {
+	cp := Vote{
+		SignerPubKey:    v.SignerPubKey,
+		BlockHeaderHash: v.BlockHeaderHash,
+	}
+	if v.Signature != nil {
+		cp.Signature = make([]byte, len(v.Signature))
+		copy(cp.Signature, v.Signature)
+	}
+	return cp
+}
+
 // Record is an proof of a slashing made by a witness of a double-signing event
 type Record struct {
 	// the reporter who will get rewarded
 	Evidence Evidence       `json:"evidence"`
 	Reporter common.Address `json:"reporter"`
+}
+
+// Copy makes a deep copy of the Record structure
+func (r Record) Copy() Record {
+	return Record{
+		Evidence: r.Evidence.Copy(),
+		Reporter: r.Reporter,
+	}
 }
 
 // Application tracks the slash application to state

@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
+	"strings"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -40,11 +43,7 @@ const (
 
 	creationHeight  = 33
 	lastEpochInComm = 5
-)
-
-var (
-	doubleSignBlock1 = makeBlockForTest(doubleSignEpoch, 1)
-	doubleSignBlock2 = makeBlockForTest(doubleSignEpoch, 2)
+	currentEpoch    = 5
 )
 
 const (
@@ -58,24 +57,102 @@ const (
 var (
 	keyPairs = genKeyPairs(100)
 
-	blsPair1, blsPair2 = keyPairs[0], keyPairs[1]
-	blsPub1, blsPub2   = keyPairs[0].Pub(), keyPairs[0].Pub()
-
 	offIndex = offenderShard*numNodePerShard + offenderShardIndex
 	offAddr  = makeTestAddress(offIndex)
 	offKey   = keyPairs[offIndex]
 	offPub   = offKey.Pub()
 
+	otherDelIndex = 4
+	otherDelAddr  = makeTestAddress(otherDelIndex)
+
 	reporterAddr = makeTestAddress("reporter")
 	otherAddr    = makeTestAddress("somebody")
 )
 
-var (
-	testChain *fakeBlockChain
+func TestVerify(t *testing.T) {
+	tests := []struct {
+		editRecord func(*Record)
+		expErr     error
+	}{
+		{
+			editRecord: func(r *Record) { r.Evidence.Offender = otherAddr },
+			expErr:     errors.New("address not present in state"),
+		},
+	}
+	for i, test := range tests {
+		r := defaultSlashRecord()
+		sdb, bc, err := defaultStateAndBlockChain()
+		if err != nil {
+			t.Fatal(err)
+		}
+		test.editRecord(&r)
 
-	commonCommission  staking.Commission
-	commonDescription staking.Description
-)
+		err = Verify(bc, sdb, &r)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+		}
+
+	}
+}
+
+func TestRecord_Copy(t *testing.T) {
+	tests := []struct {
+		r Record
+	}{
+		{
+			r: defaultSlashRecord(),
+		},
+		{
+			// Zero values
+			r: Record{
+				Evidence: Evidence{
+					Moment: Moment{Epoch: common.Big0},
+					ConflictingVotes: ConflictingVotes{
+						FirstVote:  Vote{Signature: make([]byte, 0)},
+						SecondVote: Vote{Signature: make([]byte, 0)},
+					},
+				},
+			},
+		},
+		{
+			// Empty values
+			r: Record{},
+		},
+	}
+	for i, test := range tests {
+		cp := test.r.Copy()
+
+		if err := assertRecordDeepCopy(cp, test.r); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
+func assertRecordDeepCopy(r1, r2 Record) error {
+	if !reflect.DeepEqual(r1, r2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if r1.Evidence.Epoch != nil && r1.Evidence.Epoch == r2.Evidence.Epoch {
+		return fmt.Errorf("epoch not deep copy")
+	}
+	if err := assertVoteDeepCopy(r1.Evidence.FirstVote, r2.Evidence.FirstVote); err != nil {
+		return fmt.Errorf("FirstVote: %v", err)
+	}
+	if err := assertVoteDeepCopy(r1.Evidence.SecondVote, r2.Evidence.SecondVote); err != nil {
+		return fmt.Errorf("SecondVote: %v", err)
+	}
+	return nil
+}
+
+func assertVoteDeepCopy(v1, v2 Vote) error {
+	if !reflect.DeepEqual(v1, v2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if len(v1.Signature) != 0 && &v1.Signature[0] == &v2.Signature[0] {
+		return fmt.Errorf("signature same pointer")
+	}
+	return nil
+}
 
 func totalSlashedExpected(slashRate float64) *big.Int {
 	t := int64(50000 * slashRate)
@@ -89,16 +166,12 @@ func totalSnitchRewardExpected(slashRate float64) *big.Int {
 	return res
 }
 
-func init() {
-	commonDataSetup()
-}
-
 func defaultSlashRecord() Record {
 	return Record{
 		Evidence: Evidence{
 			ConflictingVotes: ConflictingVotes{
-				FirstVote:  makeVoteData(offKey, doubleSignBlock1),
-				SecondVote: makeVoteData(offKey, doubleSignBlock2),
+				FirstVote:  makeVoteData(offKey, makeBlockForTest(doubleSignEpoch, 0)),
+				SecondVote: makeVoteData(offKey, makeBlockForTest(doubleSignEpoch, 1)),
 			},
 			Moment: Moment{
 				Epoch:   big.NewInt(doubleSignEpoch),
@@ -127,18 +200,55 @@ func exampleSlashRecords() Records {
 func defaultStateWithAccountsApplied() *state.DB {
 	st := ethdb.NewMemDatabase()
 	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
-	for _, addr := range []common.Address{reporterAddr, offAddr, otherAddr} {
+	for _, addr := range []common.Address{reporterAddr, offAddr, otherDelAddr} {
 		stateHandle.CreateAccount(addr)
 	}
 	stateHandle.SetBalance(offAddr, big.NewInt(0).SetUint64(1994680320000000000))
-	stateHandle.SetBalance(otherAddr, big.NewInt(0).SetUint64(1999975592000000000))
+	stateHandle.SetBalance(otherDelAddr, big.NewInt(0).SetUint64(1999975592000000000))
 	return stateHandle
 }
 
 // ======== start of new test case codes ==========
 
-func commonDataSetup() {
-	commonCommission = staking.Commission{
+func makeTestAddress(item interface{}) common.Address {
+	s := fmt.Sprintf("harmony.one.%s", item)
+	return common.BytesToAddress([]byte(s))
+}
+
+func makeBlockForTest(epoch int64, index int) *types.Block {
+	h := blockfactory.NewTestHeader()
+
+	h.SetEpoch(big.NewInt(epoch))
+	h.SetNumber(big.NewInt(doubleSignBlockNumber))
+	h.SetViewID(big.NewInt(doubleSignViewID))
+	h.SetRoot(common.BigToHash(big.NewInt(int64(index))))
+
+	return types.NewBlockWithHeader(h)
+}
+
+func defaultValidatorWrapper(pubKeys []shard.BLSPublicKey) *staking.ValidatorWrapper {
+	v := defaultTestValidator(pubKeys)
+	ds := defaultTestDelegations()
+
+	return &staking.ValidatorWrapper{
+		Validator:   v,
+		Delegations: ds,
+	}
+}
+
+func defaultCurrentValidatorWrapper(pubKeys []shard.BLSPublicKey) *staking.ValidatorWrapper {
+	v := defaultTestValidator(pubKeys)
+	ds := defaultTestDelegationsWithUndelegates()
+
+	return &staking.ValidatorWrapper{
+		Validator:   v,
+		Delegations: ds,
+	}
+}
+
+// defaultTestValidator makes a valid Validator kps structure
+func defaultTestValidator(pubKeys []shard.BLSPublicKey) staking.Validator {
+	comm := staking.Commission{
 		CommissionRates: staking.CommissionRates{
 			Rate:          numeric.MustNewDecFromStr("0.167983520183826780"),
 			MaxRate:       numeric.MustNewDecFromStr("0.179184469782137200"),
@@ -147,26 +257,76 @@ func commonDataSetup() {
 		UpdateHeight: big.NewInt(10),
 	}
 
-	commonDescription = staking.Description{
+	desc := staking.Description{
 		Name:            "someoneA",
 		Identity:        "someoneB",
 		Website:         "someoneC",
 		SecurityContact: "someoneD",
 		Details:         "someoneE",
 	}
+	return staking.Validator{
+		Address:              offAddr,
+		SlotPubKeys:          pubKeys,
+		LastEpochInCommittee: big.NewInt(lastEpochInComm),
+		MinSelfDelegation:    tenKOnes,
+		MaxTotalDelegation:   hundredKOnes,
+		Status:               effective.Active,
+		Commission:           comm,
+		Description:          desc,
+		CreationHeight:       big.NewInt(creationHeight),
+	}
 }
 
-func makeTestAddress(item interface{}) common.Address {
-	s := fmt.Sprintf("harmony.one.%s", item)
-	return common.BytesToAddress([]byte(s))
+func defaultTestDelegations() staking.Delegations {
+	return staking.Delegations{
+		staking.Delegation{
+			DelegatorAddress: offAddr,
+			Amount:           twentyKOnes,
+			Reward:           common.Big0,
+			Undelegations:    staking.Undelegations{},
+		},
+		staking.Delegation{
+			DelegatorAddress: otherDelAddr,
+			Amount:           thirtyKOnes,
+			Reward:           common.Big0,
+			Undelegations:    staking.Undelegations{},
+		},
+	}
+}
+
+func defaultTestDelegationsWithUndelegates() staking.Delegations {
+	return staking.Delegations{
+		staking.Delegation{
+			DelegatorAddress: offAddr,
+			Amount:           nineteenKOnes,
+			Reward:           common.Big0,
+			Undelegations: staking.Undelegations{
+				staking.Undelegation{
+					Amount: tenKOnes,
+					Epoch:  big.NewInt(doubleSignEpoch + 2),
+				},
+			},
+		},
+		staking.Delegation{
+			DelegatorAddress: otherDelAddr,
+			Amount:           fiveKOnes,
+			Reward:           common.Big0,
+			Undelegations: staking.Undelegations{
+				staking.Undelegation{
+					Amount: twentyfiveKOnes,
+					Epoch:  big.NewInt(doubleSignEpoch + 2),
+				},
+			},
+		},
+	}
 }
 
 // makeCommitteeFromKeyPairs makes a shard state for testing.
 //  address is generated by makeTestAddress
-//  bls key is get from the input []blsKeyPair
-func makeDefaultCommitteeFromKeyPairs(kps []blsKeyPair) shard.State {
+//  bls key is get from the variable keyPairs []blsKeyPair
+func makeDefaultCommittee() shard.State {
 	epoch := big.NewInt(doubleSignEpoch)
-	maker := newShardSlotMaker(kps)
+	maker := newShardSlotMaker(keyPairs)
 	return makeCommitteeBySlotMaker(epoch, maker)
 }
 
@@ -237,101 +397,45 @@ func (kp blsKeyPair) Pub() shard.BLSPublicKey {
 }
 
 func (kp blsKeyPair) Sign(block *types.Block) []byte {
-	msg := consensus_sig.ConstructCommitPayload(testChain, testChain.Config().StakingEpoch,
-		block.Hash(), block.Number().Uint64(), block.Header().ViewID().Uint64())
+	chain := &fakeBlockChain{config: *params.LocalnetChainConfig}
+	msg := consensus_sig.ConstructCommitPayload(chain, block.Epoch(), block.Hash(),
+		block.Number().Uint64(), block.Header().ViewID().Uint64())
 
 	sig := kp.pri.SignHash(msg)
 
 	return sig.Serialize()
 }
 
-func makeBlockForTest(epoch int64, index int) *types.Block {
-	h := blockfactory.NewTestHeader()
-
-	h.SetEpoch(big.NewInt(epoch))
-	h.SetNumber(big.NewInt(doubleSignBlockNumber))
-	h.SetViewID(big.NewInt(doubleSignViewID))
-	h.SetRoot(common.BigToHash(big.NewInt(int64(index))))
-
-	return types.NewBlockWithHeader(h)
+func defaultStateAndBlockChain() (*state.DB, *fakeBlockChain, error) {
+	sdb, err := defaultStateDB()
+	fbc := defaultFakeBlockChain()
+	return sdb, fbc, err
 }
 
-func defaultTestValidatorWrapper(pubKeys []shard.BLSPublicKey) *staking.ValidatorWrapper {
-	v := defaultTestValidator(pubKeys)
-	ds := defaultTestDelegations()
-
-	return &staking.ValidatorWrapper{
-		Validator:   v,
-		Delegations: ds,
+func defaultStateDB() (*state.DB, error) {
+	db := state.NewDatabase(ethdb.NewMemDatabase())
+	sdb, err := state.New(common.Hash{}, db)
+	if err != nil {
+		return nil, err
 	}
-}
 
-func defaultTestCurrentValidatorWrapper(pubKeys []shard.BLSPublicKey) *staking.ValidatorWrapper {
-	v := defaultTestValidator(pubKeys)
-	ds := defaultTestDelegationsWithUndelegates()
-
-	return &staking.ValidatorWrapper{
-		Validator:   v,
-		Delegations: ds,
+	sdb.AddBalance(offAddr, twentyKOnes)
+	offWrapper := defaultCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
+	if err := sdb.UpdateValidatorWrapper(offAddr, offWrapper); err != nil {
+		return nil, err
 	}
-}
 
-// defaultTestValidator makes a valid Validator kps structure
-func defaultTestValidator(pubKeys []shard.BLSPublicKey) staking.Validator {
-	return staking.Validator{
-		Address:              offAddr,
-		SlotPubKeys:          pubKeys,
-		LastEpochInCommittee: big.NewInt(lastEpochInComm),
-		MinSelfDelegation:    tenKOnes,
-		MaxTotalDelegation:   hundredKOnes,
-		Status:               effective.Active,
-		Commission:           commonCommission,
-		Description:          commonDescription,
-		CreationHeight:       big.NewInt(creationHeight),
+	if _, err := sdb.Commit(true); err != nil {
+		return nil, err
 	}
+	return sdb, nil
 }
 
-func defaultTestDelegations() staking.Delegations {
-	return staking.Delegations{
-		staking.Delegation{
-			DelegatorAddress: offAddr,
-			Amount:           twentyKOnes,
-			Reward:           common.Big0,
-			Undelegations:    staking.Undelegations{},
-		},
-		staking.Delegation{
-			DelegatorAddress: otherAddr,
-			Amount:           thirtyKOnes,
-			Reward:           common.Big0,
-			Undelegations:    staking.Undelegations{},
-		},
-	}
-}
-
-func defaultTestDelegationsWithUndelegates() staking.Delegations {
-	return staking.Delegations{
-		staking.Delegation{
-			DelegatorAddress: offAddr,
-			Amount:           nineteenKOnes,
-			Reward:           common.Big0,
-			Undelegations: staking.Undelegations{
-				staking.Undelegation{
-					Amount: tenKOnes,
-					Epoch:  big.NewInt(doubleSignEpoch + 2),
-				},
-			},
-		},
-		staking.Delegation{
-			DelegatorAddress: otherAddr,
-			Amount:           fiveKOnes,
-			Reward:           common.Big0,
-			Undelegations: staking.Undelegations{
-				staking.Undelegation{
-					Amount: twentyfiveKOnes,
-					Epoch:  big.NewInt(doubleSignEpoch + 2),
-				},
-			},
-		},
+func defaultFakeBlockChain() *fakeBlockChain {
+	return &fakeBlockChain{
+		config:         *params.LocalnetChainConfig,
+		currentBlock:   *makeBlockForTest(currentEpoch, 0),
+		superCommittee: makeDefaultCommittee(),
 	}
 }
 
@@ -366,6 +470,19 @@ func (bc *fakeBlockChain) ReadValidatorSnapshotAtEpoch(epoch *big.Int, addr comm
 		Validator: &vw,
 		Epoch:     new(big.Int).Set(epoch),
 	}, nil
+}
+
+func assertError(got, exp error) error {
+	if (got == nil) != (exp == nil) {
+		return fmt.Errorf("unexpected error [%v] / [%v]", got, exp)
+	}
+	if got == nil {
+		return nil
+	}
+	if !strings.Contains(got.Error(), exp.Error()) {
+		return fmt.Errorf("unexpected error [%v] / [%v]", got, exp)
+	}
+	return nil
 }
 
 // Simply testing serialization / deserialization of slash records working correctly
@@ -425,8 +542,8 @@ func (bc *fakeBlockChain) ReadValidatorSnapshotAtEpoch(epoch *big.Int, addr comm
 //			TotalSlashed:      totalSlashedExpected(s.slashRate),      // big.NewInt(int64(s.slashRate * 5.0 * denominations.One)),
 //			TotalSnitchReward: totalSnitchRewardExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 2.5 * denominations.One)),
 //		}
-//		s.snapshot = defaultTestValidatorWrapper([]shard.BLSPublicKey{offPub})
-//		s.current = defaultTestCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
+//		s.snapshot = defaultValidatorWrapper([]shard.BLSPublicKey{offPub})
+//		s.current = defaultCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
 //	}
 //	{
 //		s := scenarioEightyPercent
@@ -435,8 +552,8 @@ func (bc *fakeBlockChain) ReadValidatorSnapshotAtEpoch(epoch *big.Int, addr comm
 //			TotalSlashed:      totalSlashedExpected(s.slashRate),      // big.NewInt(int64(s.slashRate * 5.0 * denominations.One)),
 //			TotalSnitchReward: totalSnitchRewardExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 2.5 * denominations.One)),
 //		}
-//		s.snapshot = defaultTestValidatorWrapper([]shard.BLSPublicKey{offPub})
-//		s.current = defaultTestCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
+//		s.snapshot = defaultValidatorWrapper([]shard.BLSPublicKey{offPub})
+//		s.current = defaultCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
 //	}
 //}
 //
