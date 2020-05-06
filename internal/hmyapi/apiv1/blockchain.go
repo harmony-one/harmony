@@ -813,27 +813,27 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegatorByBlockNumber(
 		return nil, errors.Wrapf(err, "could not retrieve the block information for block number: %d", blockNum)
 	}
 	validators, delegations := s.b.GetDelegationsByDelegatorByBlock(delegatorAddress, block)
-	result := []*RPCDelegation{}
+	result := make([]*RPCDelegation, len(delegations))
 	for i := range delegations {
 		delegation := delegations[i]
 
 		undelegations := make([]RPCUndelegation, len(delegation.Undelegations))
 
 		for j := range delegation.Undelegations {
-			undelegations = append(undelegations, RPCUndelegation{
+			undelegations[j] = RPCUndelegation{
 				delegation.Undelegations[j].Amount,
 				delegation.Undelegations[j].Epoch,
-			})
+			}
 		}
 		valAddr, _ := internal_common.AddressToBech32(validators[i])
 		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
-		result = append(result, &RPCDelegation{
+		result[i] = &RPCDelegation{
 			valAddr,
 			delAddr,
 			delegation.Amount,
 			delegation.Reward,
 			undelegations,
-		})
+		}
 	}
 	return result, nil
 }
