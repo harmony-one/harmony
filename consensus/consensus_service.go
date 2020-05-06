@@ -452,7 +452,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
-	if len(curHeader.ShardState()) > 0 {
+	// genesis block is a special case that will have shard state and needs to skip processing
+	isNotGenesisBlock := curHeader.Number().Cmp(big.NewInt(0)) > 0
+	if len(curHeader.ShardState()) > 0 && isNotGenesisBlock {
 		// increase curEpoch by one if it's the last block
 		consensus.SetEpochNum(curEpoch.Uint64() + 1)
 		consensus.getLogger().Info().
