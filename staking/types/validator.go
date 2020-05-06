@@ -40,7 +40,7 @@ var (
 		"total delegation can not be bigger than max_total_delegation",
 	)
 	errMinSelfDelegationTooSmall = errors.New(
-		"min_self_delegation has to be greater than 10,000 ONE",
+		"min_self_delegation must be greater than or equal to 10,000 ONE",
 	)
 	errInvalidMaxTotalDelegation = errors.New(
 		"max_total_delegation can not be less than min_self_delegation",
@@ -49,7 +49,7 @@ var (
 		"commission rate and change rate can not be larger than max commission rate",
 	)
 	errInvalidCommissionRate = errors.New(
-		"commission rate, change rate and max rate should be within 0-100 percent",
+		"commission rate, change rate and max rate should be a value ranging from 0.0 to 1.0",
 	)
 	errNeedAtLeastOneSlotKey = errors.New("need at least one slot key")
 	errBLSKeysNotMatchSigs   = errors.New(
@@ -257,7 +257,7 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 		return errNilMaxTotalDelegation
 	}
 
-	// MinSelfDelegation must be >= 1 ONE
+	// MinSelfDelegation must be >= 10000 ONE
 	if v.MinSelfDelegation.Cmp(minimumStake) < 0 {
 		return errors.Wrapf(
 			errMinSelfDelegationTooSmall,
@@ -295,13 +295,15 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 
 	if v.Rate.GT(v.MaxRate) {
 		return errors.Wrapf(
-			errCommissionRateTooLarge, "rate:%s", v.MaxRate.String(),
+			errCommissionRateTooLarge,
+			"rate:%s max rate:%s", v.Rate.String(), v.MaxRate.String(),
 		)
 	}
 
 	if v.MaxChangeRate.GT(v.MaxRate) {
 		return errors.Wrapf(
-			errCommissionRateTooLarge, "rate:%s", v.MaxChangeRate.String(),
+			errCommissionRateTooLarge,
+			"rate:%s max change rate:%s", v.Rate.String(), v.MaxChangeRate.String(),
 		)
 	}
 
