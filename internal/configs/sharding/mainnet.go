@@ -28,6 +28,7 @@ const (
 	mainnetV1_3Epoch = 36
 	mainnetV1_4Epoch = 46
 	mainnetV1_5Epoch = 54
+	mainnetV2Epoch   = 177
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "https://api.s%d.dry.hmny.io"
@@ -42,6 +43,9 @@ type mainnetSchedule struct{}
 
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case epoch.Cmp(big.NewInt(mainnetV2Epoch)) >= 0:
+		// 177 pre-staking epoch
+		return mainnetV2
 	case epoch.Cmp(big.NewInt(mainnetV1_5Epoch)) >= 0:
 		// 54 resharding epoch (for shard 0) around 23/10/2019 ~10:05 PDT
 		return mainnetV1_5
@@ -151,4 +155,5 @@ var (
 	mainnetV1_3 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_3, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 	mainnetV1_4 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_4, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 	mainnetV1_5 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV2   = MustNewInstance(4, 250, 170, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 )
