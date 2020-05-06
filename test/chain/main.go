@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/params"
 	pkgworker "github.com/harmony-one/harmony/node/worker"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -197,9 +196,7 @@ func playFaucetContract(chain *core.BlockChain) {
 func main() {
 	genesis := gspec.MustCommit(database)
 	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain.Engine(), vm.Config{}, nil)
-
-	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain,
-		func([]types.RPCTransactionError) {}, func([]staking.RPCTransactionError) {})
+	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain, types.NewTransactionErrorSink())
 
 	backend := &testWorkerBackend{
 		db:     database,

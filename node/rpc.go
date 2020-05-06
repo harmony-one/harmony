@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -55,17 +54,9 @@ func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
 	return cxReceipts
 }
 
-// ErroredStakingTransactionSink is the inmemory failed staking transactions this node has
-func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError {
-	node.errorSink.Lock()
-	defer node.errorSink.Unlock()
-	result := []staking.RPCTransactionError{}
-	node.errorSink.failedStakingTxns.Do(func(d interface{}) {
-		if d != nil {
-			result = append(result, d.(staking.RPCTransactionError))
-		}
-	})
-	return result
+// ReportStakingErrorSink is the report of failed staking transactions this node has (held inmemory only)
+func (node *Node) ReportStakingErrorSink() types.TransactionErrorReports {
+	return node.TransactionErrorSink.StakingReport()
 }
 
 // GetNodeBootTime ..
@@ -73,17 +64,9 @@ func (node *Node) GetNodeBootTime() int64 {
 	return node.unixTimeAtNodeStart
 }
 
-// ErroredTransactionSink is the inmemory failed transactions this node has
-func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
-	node.errorSink.Lock()
-	defer node.errorSink.Unlock()
-	result := []types.RPCTransactionError{}
-	node.errorSink.failedTxns.Do(func(d interface{}) {
-		if d != nil {
-			result = append(result, d.(types.RPCTransactionError))
-		}
-	})
-	return result
+// ReportPlainErrorSink is the report of failed transactions this node has (held inmemory only)
+func (node *Node) ReportPlainErrorSink() types.TransactionErrorReports {
+	return node.TransactionErrorSink.PlainReport()
 }
 
 // StartRPC start RPC service

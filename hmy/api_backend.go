@@ -229,7 +229,6 @@ func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscripti
 }
 
 // GetPoolTransactions returns pool transactions.
-// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	pending, err := b.hmy.txPool.Pending()
 	if err != nil {
@@ -240,6 +239,11 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 		txs = append(txs, batch...)
 	}
 	return txs, nil
+}
+
+// GetPoolStats returns the number of pending and queued transactions
+func (b *APIBackend) GetPoolStats() (pendingCount, queuedCount int) {
+	return b.hmy.txPool.Stats()
 }
 
 // GetAccountNonce returns the nonce value of the given address for the given block number
@@ -617,13 +621,13 @@ func (b *APIBackend) GetShardState() (*shard.State, error) {
 }
 
 // GetCurrentStakingErrorSink ..
-func (b *APIBackend) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
+func (b *APIBackend) GetCurrentStakingErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportStakingErrorSink()
 }
 
 // GetCurrentTransactionErrorSink ..
-func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredTransactionSink()
+func (b *APIBackend) GetCurrentTransactionErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportPlainErrorSink()
 }
 
 // GetPendingCXReceipts ..

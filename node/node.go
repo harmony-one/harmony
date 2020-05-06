@@ -1,7 +1,6 @@
 package node
 
 import (
-	"container/ring"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -148,19 +147,15 @@ type Node struct {
 	// Chain configuration.
 	chainConfig params.ChainConfig
 	// map of service type to its message channel.
-	serviceMessageChan map[service.Type]chan *msg_pb.Message
-	isFirstTime        bool // the node was started with a fresh database
-	// Last 1024 staking transaction error, only in memory
-	errorSink struct {
-		sync.Mutex
-		failedStakingTxns *ring.Ring
-		failedTxns        *ring.Ring
-	}
+	serviceMessageChan  map[service.Type]chan *msg_pb.Message
+	isFirstTime         bool // the node was started with a fresh database
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
 	KeysToAddrs      map[string]common.Address
 	keysToAddrsEpoch *big.Int
 	keysToAddrsMutex sync.Mutex
+	// TransactionErrorSink contains error messages for any failed transaction, in memory only
+	TransactionErrorSink *types.TransactionErrorSink
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -432,12 +427,7 @@ func New(
 ) *Node {
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
-	const sinkSize = 4096
-	node.errorSink = struct {
-		sync.Mutex
-		failedStakingTxns *ring.Ring
-		failedTxns        *ring.Ring
-	}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)}
+	node.TransactionErrorSink = types.NewTransactionErrorSink()
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -489,26 +479,7 @@ func New(
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 		txPoolConfig.Blacklist = blacklist
-		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain,
-			func(payload []types.RPCTransactionError) {
-				if len(payload) > 0 {
-					node.errorSink.Lock()
-					for i := range payload {
-						node.errorSink.failedTxns.Value = payload[i]
-						node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
-					}
-					node.errorSink.Unlock()
-				}
-			},
-			func(payload []staking.RPCTransactionError) {
-				node.errorSink.Lock()
-				for i := range payload {
-					node.errorSink.failedStakingTxns.Value = payload[i]
-					node.errorSink.failedStakingTxns = node.errorSink.failedStakingTxns.Next()
-				}
-				node.errorSink.Unlock()
-			},
-		)
+		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 

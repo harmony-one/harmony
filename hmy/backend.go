@@ -48,8 +48,8 @@ type NodeAPI interface {
 	GetTransactionsCount(address, txType string) (uint64, error)
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
-	ErroredStakingTransactionSink() []staking.RPCTransactionError
-	ErroredTransactionSink() []types.RPCTransactionError
+	ReportStakingErrorSink() types.TransactionErrorReports
+	ReportPlainErrorSink() types.TransactionErrorReports
 	PendingCXReceipts() []*types.CXReceiptsProof
 	GetNodeBootTime() int64
 }

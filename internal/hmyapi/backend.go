@@ -46,6 +46,7 @@ type Backend interface {
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
 	GetPoolTransactions() (types.PoolTransactions, error)
 	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
+	GetPoolStats() (pendingCount, queuedCount int)
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	GetAccountNonce(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
@@ -68,8 +69,8 @@ type Backend interface {
 	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)
 	GetValidatorSelfDelegation(addr common.Address) *big.Int
 	GetShardState() (*shard.State, error)
-	GetCurrentStakingErrorSink() []staking.RPCTransactionError
-	GetCurrentTransactionErrorSink() []types.RPCTransactionError
+	GetCurrentStakingErrorSink() types.TransactionErrorReports
+	GetCurrentTransactionErrorSink() types.TransactionErrorReports
 	GetMedianRawStakeSnapshot() (*committee.CompletedEPoSRound, error)
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)
