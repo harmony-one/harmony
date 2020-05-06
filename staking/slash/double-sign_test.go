@@ -31,11 +31,6 @@ var (
 	hundredKOnes    = new(big.Int).Mul(big.NewInt(1000000), big.NewInt(1e18))
 )
 
-var (
-	scenarioTwoPercent    = defaultFundingScenario()
-	scenarioEightyPercent = defaultFundingScenario()
-)
-
 const (
 	// validator creation parameters
 	doubleSignShardID     = 0
@@ -96,26 +91,6 @@ func totalSnitchRewardExpected(slashRate float64) *big.Int {
 
 func init() {
 	commonDataSetup()
-	{
-		s := scenarioTwoPercent
-		s.slashRate = 0.02
-		s.result = &Application{
-			TotalSlashed:      totalSlashedExpected(s.slashRate),      // big.NewInt(int64(s.slashRate * 5.0 * denominations.One)),
-			TotalSnitchReward: totalSnitchRewardExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 2.5 * denominations.One)),
-		}
-		s.snapshot = defaultTestValidatorWrapper([]shard.BLSPublicKey{offPub})
-		s.current = defaultTestCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
-	}
-	{
-		s := scenarioEightyPercent
-		s.slashRate = 0.80
-		s.result = &Application{
-			TotalSlashed:      totalSlashedExpected(s.slashRate),      // big.NewInt(int64(s.slashRate * 5.0 * denominations.One)),
-			TotalSnitchReward: totalSnitchRewardExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 2.5 * denominations.One)),
-		}
-		s.snapshot = defaultTestValidatorWrapper([]shard.BLSPublicKey{offPub})
-		s.current = defaultTestCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
-	}
 }
 
 func defaultSlashRecord() Record {
@@ -158,21 +133,6 @@ func defaultStateWithAccountsApplied() *state.DB {
 	stateHandle.SetBalance(offAddr, big.NewInt(0).SetUint64(1994680320000000000))
 	stateHandle.SetBalance(otherAddr, big.NewInt(0).SetUint64(1999975592000000000))
 	return stateHandle
-}
-
-type scenario struct {
-	snapshot, current *staking.ValidatorWrapper
-	slashRate         float64
-	result            *Application
-}
-
-func defaultFundingScenario() *scenario {
-	return &scenario{
-		snapshot:  nil,
-		current:   nil,
-		slashRate: 0.02,
-		result:    nil,
-	}
 }
 
 // ======== start of new test case codes ==========
@@ -457,6 +417,43 @@ func (bc *fakeBlockChain) ReadValidatorSnapshotAtEpoch(epoch *big.Int, addr comm
 //	testScenario(t, stateHandle, slashes, scenarioTwoPercent)
 //}
 //
+//func setupScenario(){
+//	{
+//		s := scenarioTwoPercent
+//		s.slashRate = 0.02
+//		s.result = &Application{
+//			TotalSlashed:      totalSlashedExpected(s.slashRate),      // big.NewInt(int64(s.slashRate * 5.0 * denominations.One)),
+//			TotalSnitchReward: totalSnitchRewardExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 2.5 * denominations.One)),
+//		}
+//		s.snapshot = defaultTestValidatorWrapper([]shard.BLSPublicKey{offPub})
+//		s.current = defaultTestCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
+//	}
+//	{
+//		s := scenarioEightyPercent
+//		s.slashRate = 0.80
+//		s.result = &Application{
+//			TotalSlashed:      totalSlashedExpected(s.slashRate),      // big.NewInt(int64(s.slashRate * 5.0 * denominations.One)),
+//			TotalSnitchReward: totalSnitchRewardExpected(s.slashRate), // big.NewInt(int64(s.slashRate * 2.5 * denominations.One)),
+//		}
+//		s.snapshot = defaultTestValidatorWrapper([]shard.BLSPublicKey{offPub})
+//		s.current = defaultTestCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
+//	}
+//}
+//
+//type scenario struct {
+//	snapshot, current *staking.ValidatorWrapper
+//	slashRate         float64
+//	result            *Application
+//}
+//
+//func defaultFundingScenario() *scenario {
+//	return &scenario{
+//		snapshot:  nil,
+//		current:   nil,
+//		slashRate: 0.02,
+//		result:    nil,
+//	}
+//}
 //// func TestEightyPercentSlashed(t *testing.T) {
 //// 	slashes := exampleSlashRecords()
 //// 	stateHandle := defaultStateWithAccountsApplied()
@@ -470,7 +467,10 @@ func (bc *fakeBlockChain) ReadValidatorSnapshotAtEpoch(epoch *big.Int, addr comm
 //		testScenario(t, stateHandle, slashes, scenario)
 //	}
 //}
-
+//var (
+//	scenarioTwoPercent    = defaultFundingScenario()
+//	scenarioEightyPercent = defaultFundingScenario()
+//)
 //func testScenario(
 //	t *testing.T, stateHandle *state.DB, slashes Records, s *scenario,
 //) {
