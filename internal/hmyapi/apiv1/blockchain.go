@@ -812,7 +812,7 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegatorByBlockNumber(
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not retrieve the block information for block number: %d", blockNum)
 	}
-	validators, delegations := s.b.GetDelegationsByDelegatorByBlockNumber(delegatorAddress, block)
+	validators, delegations := s.b.GetDelegationsByDelegatorByBlock(delegatorAddress, block)
 	result := []*RPCDelegation{}
 	for i := range delegations {
 		delegation := delegations[i]
