@@ -9,12 +9,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/params"
@@ -71,27 +69,33 @@ var (
 
 func TestVerify(t *testing.T) {
 	tests := []struct {
-		editRecord func(*Record)
-		expErr     error
+		editInput func(db *fakeStateDB, r *Record)
+		expErr    error
 	}{
 		{
-			editRecord: func(r *Record) { r.Evidence.Offender = otherAddr },
-			expErr:     errors.New("address not present in state"),
+			editInput: func(db *fakeStateDB, r *Record) { delete(db.vWrappers, offAddr) },
+			expErr:    errors.New("address vWrapper not exist"),
 		},
 	}
 	for i, test := range tests {
+		sdb, bc := defaultStateAndBlockChain()
 		r := defaultSlashRecord()
-		sdb, bc, err := defaultStateAndBlockChain()
-		if err != nil {
-			t.Fatal(err)
+		if test.editInput != nil {
+			test.editInput(sdb, &r)
 		}
-		test.editRecord(&r)
+		rawState, rawRecord := sdb.copy(), r.Copy()
 
-		err = Verify(bc, sdb, &r)
+		err := Verify(bc, sdb, &r)
+
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}
-
+		if !reflect.DeepEqual(r, rawRecord) {
+			t.Errorf("Test %v: record has value changed", i)
+		}
+		if err := sdb.assertEqual(rawState); err != nil {
+			t.Errorf("Test %v: state changed: %v", i, err)
+		}
 	}
 }
 
@@ -195,17 +199,6 @@ func makeVoteData(kp blsKeyPair, block *types.Block) Vote {
 
 func exampleSlashRecords() Records {
 	return Records{defaultSlashRecord()}
-}
-
-func defaultStateWithAccountsApplied() *state.DB {
-	st := ethdb.NewMemDatabase()
-	stateHandle, _ := state.New(common.Hash{}, state.NewDatabase(st))
-	for _, addr := range []common.Address{reporterAddr, offAddr, otherDelAddr} {
-		stateHandle.CreateAccount(addr)
-	}
-	stateHandle.SetBalance(offAddr, big.NewInt(0).SetUint64(1994680320000000000))
-	stateHandle.SetBalance(otherDelAddr, big.NewInt(0).SetUint64(1999975592000000000))
-	return stateHandle
 }
 
 // ======== start of new test case codes ==========
@@ -377,7 +370,9 @@ type blsKeyPair struct {
 
 func genKeyPairs(size int) []blsKeyPair {
 	kps := make([]blsKeyPair, 0, size)
-	kps = append(kps, genKeyPair())
+	for i := 0; i != size; i++ {
+		kps = append(kps, genKeyPair())
+	}
 	return kps
 }
 
@@ -406,29 +401,20 @@ func (kp blsKeyPair) Sign(block *types.Block) []byte {
 	return sig.Serialize()
 }
 
-func defaultStateAndBlockChain() (*state.DB, *fakeBlockChain, error) {
-	sdb, err := defaultStateDB()
+func defaultStateAndBlockChain() (*fakeStateDB, *fakeBlockChain) {
+	sdb := defaultFakeStateDB()
 	fbc := defaultFakeBlockChain()
-	return sdb, fbc, err
+	return sdb, fbc
 }
 
-func defaultStateDB() (*state.DB, error) {
-	db := state.NewDatabase(ethdb.NewMemDatabase())
-	sdb, err := state.New(common.Hash{}, db)
-	if err != nil {
-		return nil, err
+func defaultFakeStateDB() *fakeStateDB {
+	sdb := &fakeStateDB{
+		balances:  make(map[common.Address]*big.Int),
+		vWrappers: make(map[common.Address]*staking.ValidatorWrapper),
 	}
-
-	sdb.AddBalance(offAddr, twentyKOnes)
-	offWrapper := defaultCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
-	if err := sdb.UpdateValidatorWrapper(offAddr, offWrapper); err != nil {
-		return nil, err
-	}
-
-	if _, err := sdb.Commit(true); err != nil {
-		return nil, err
-	}
-	return sdb, nil
+	sdb.balances[offAddr] = twentyKOnes
+	sdb.vWrappers[offAddr] = defaultCurrentValidatorWrapper([]shard.BLSPublicKey{offPub})
+	return sdb
 }
 
 func defaultFakeBlockChain() *fakeBlockChain {
@@ -437,39 +423,6 @@ func defaultFakeBlockChain() *fakeBlockChain {
 		currentBlock:   *makeBlockForTest(currentEpoch, 0),
 		superCommittee: makeDefaultCommittee(),
 	}
-}
-
-type fakeBlockChain struct {
-	config         params.ChainConfig
-	currentBlock   types.Block
-	superCommittee shard.State
-	snapshots      map[common.Address]staking.ValidatorWrapper
-}
-
-func (bc *fakeBlockChain) Config() *params.ChainConfig {
-	return &bc.config
-}
-
-func (bc *fakeBlockChain) CurrentBlock() *types.Block {
-	return &bc.currentBlock
-}
-
-func (bc *fakeBlockChain) ReadShardState(epoch *big.Int) (*shard.State, error) {
-	if epoch.Cmp(big.NewInt(doubleSignEpoch)) != 0 {
-		return nil, fmt.Errorf("epoch not expected")
-	}
-	return &bc.superCommittee, nil
-}
-
-func (bc *fakeBlockChain) ReadValidatorSnapshotAtEpoch(epoch *big.Int, addr common.Address) (*staking.ValidatorSnapshot, error) {
-	vw, ok := bc.snapshots[addr]
-	if !ok {
-		return nil, errors.New("missing snapshot")
-	}
-	return &staking.ValidatorSnapshot{
-		Validator: &vw,
-		Epoch:     new(big.Int).Set(epoch),
-	}, nil
 }
 
 func assertError(got, exp error) error {

@@ -10,11 +10,8 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/consensus/votepower"
-	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -193,17 +190,10 @@ func (r Record) String() string {
 	return string(s)
 }
 
-// CommitteeReader ..
-type CommitteeReader interface {
-	Config() *params.ChainConfig
-	ReadShardState(epoch *big.Int) (*shard.State, error)
-	CurrentBlock() *types.Block
-}
-
 // Verify checks that the slash is valid
 func Verify(
 	chain CommitteeReader,
-	state *state.DB,
+	state stateDB,
 	candidate *Record,
 ) error {
 	wrapper, err := state.ValidatorWrapper(candidate.Evidence.Offender)
@@ -389,7 +379,7 @@ func payDownAsMuchAsCan(
 func delegatorSlashApply(
 	snapshot, current *staking.ValidatorWrapper,
 	rate numeric.Dec,
-	state *state.DB,
+	state stateDB,
 	reporter common.Address,
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
@@ -499,7 +489,7 @@ func delegatorSlashApply(
 
 // Apply ..
 func Apply(
-	chain staking.ValidatorSnapshotReader, state *state.DB,
+	chain staking.ValidatorSnapshotReader, state stateDB,
 	slashes Records, rate numeric.Dec,
 ) (*Application, error) {
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
