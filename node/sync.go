@@ -2,8 +2,9 @@ package node
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"io"
+	"math/rand"
 	"sort"
 	"sync/atomic"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
@@ -23,6 +25,34 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
+
+func harmonyProtocolPeers(
+	conns []ipfs_interface.ConnectionInfo,
+	host *p2p.Host,
+) ([]ipfs_interface.ConnectionInfo, error) {
+	var filtered []ipfs_interface.ConnectionInfo
+	for _, neighbor := range conns {
+		id := neighbor.ID()
+		protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
+			id, p2p.Protocol,
+		)
+		if err != nil {
+			return nil, err
+		}
+		seen := false
+		for _, protocol := range protocols {
+			if seen = protocol == p2p.Protocol; seen {
+				break
+			}
+		}
+		if !seen {
+			continue
+		}
+		filtered = append(filtered, neighbor)
+	}
+
+	return filtered, nil
+}
 
 func protocolPeerHeights(
 	ctx context.Context,
@@ -32,31 +62,13 @@ func protocolPeerHeights(
 ) (map[libp2p_peer.ID]*msg_pb.Message, error) {
 	hmyPeers := make(chan libp2p_peer.ID)
 	g, ctx := errgroup.WithContext(ctx)
-
 	g.Go(func() error {
 		defer close(hmyPeers)
-
 		for _, neighbor := range conns {
-			id := neighbor.ID()
-			protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
-				id, p2p.Protocol,
-			)
-			if err != nil {
-				return err
-			}
-			seen := false
-			for _, protocol := range protocols {
-				if seen = protocol == p2p.Protocol; seen {
-					break
-				}
-			}
-			if !seen {
-				continue
-			}
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case hmyPeers <- id:
+			case hmyPeers <- neighbor.ID():
 			}
 		}
 
@@ -113,102 +125,75 @@ func protocolPeerHeights(
 	return reduce, g.Wait()
 }
 
-type t struct {
-	count  int
-	haveIt []libp2p_peer.ID
-}
-
 type hashCount struct {
-	count       int
 	hash        common.Hash
 	peersWithIt []libp2p_peer.ID
 }
 
 type mostCommonHash struct {
-	beacon hashCount
-	shard  hashCount
+	beacon []hashCount
+	shard  []hashCount
 }
 
-func (m *mostCommonHash) MarshalJSON() ([]byte, error) {
-	type c struct {
-		Count int    `json:"count"`
-		Hash  string `json:"hash"`
-	}
-	return json.Marshal(struct {
-		Beacon c `json:"beacon-chain"`
-		Shard  c `json:"shard-chain"`
-	}{
-		c{m.beacon.count, m.beacon.hash.Hex()},
-		c{m.shard.count, m.shard.hash.Hex()},
-	})
-}
-
-func (m *mostCommonHash) String() string {
-	s, _ := json.Marshal(m)
-	return string(s)
-}
-
-func commonHash(collect map[libp2p_peer.ID]*msg_pb.Message) mostCommonHash {
+func commonHash(
+	collect map[libp2p_peer.ID]*msg_pb.Message,
+) *mostCommonHash {
 
 	beaconCounters, shardCounters :=
-		map[common.Hash]t{}, map[common.Hash]t{}
+		map[common.Hash]hashCount{}, map[common.Hash]hashCount{}
 
 	for peerID, c := range collect {
 		height := c.GetSyncBlockHeight()
 		shardHash := common.BytesToHash(height.GetShardHash())
 		beaconHash := common.BytesToHash(height.GetBeaconHash())
-
 		currentS := shardCounters[shardHash]
-		currentS.count++
-		currentS.haveIt = append(currentS.haveIt, peerID)
+		currentS.peersWithIt = append(currentS.peersWithIt, peerID)
 		shardCounters[shardHash] = currentS
-
 		currentB := beaconCounters[beaconHash]
-		currentB.count++
-		currentB.haveIt = append(currentB.haveIt, peerID)
+		currentB.peersWithIt = append(currentB.peersWithIt, peerID)
 		beaconCounters[beaconHash] = currentB
 	}
 
-	type withHash struct {
-		t
-		hash common.Hash
-	}
-
-	b, s := []withHash{}, []withHash{}
+	b, s :=
+		make([]hashCount, 0, len(beaconCounters)),
+		make([]hashCount, 0, len(shardCounters))
 
 	for h, value := range beaconCounters {
-		b = append(b, withHash{t: value, hash: h})
+		value.hash = h
+		b = append(b, value)
 	}
 
 	for h, value := range shardCounters {
-		s = append(s, withHash{t: value, hash: h})
+		value.hash = h
+		s = append(s, value)
 	}
 
 	sort.SliceStable(b, func(i, j int) bool {
-		return b[i].count > s[j].count
+		return len(b[i].peersWithIt) > len(b[j].peersWithIt)
 	})
 
 	sort.SliceStable(s, func(i, j int) bool {
-		return s[i].count > s[j].count
+		return len(s[i].peersWithIt) > len(s[j].peersWithIt)
 	})
 
-	return mostCommonHash{
-		beacon: hashCount{b[0].count, b[0].hash, b[0].haveIt},
-		shard:  hashCount{s[0].count, s[0].hash, s[0].haveIt},
-	}
+	return &mostCommonHash{b, s}
 }
 
 func syncFromHMYPeersIfNeeded(
 	ctx context.Context, host *p2p.Host, node *Node,
 ) error {
-	conns, err := host.CoreAPI.Swarm().Peers(context.Background())
+	conns, err := host.CoreAPI.Swarm().Peers(ctx)
+	if err != nil {
+		return err
+	}
 
+	hmyConns, err := harmonyProtocolPeers(conns, host)
 	if err != nil {
 		return err
 	}
 
 	// NOTE keeping it below 5 because checking all conns can eat lots of resources
-	collect, err := protocolPeerHeights(ctx, conns[:5], host, node)
+	collect, err := protocolPeerHeights(ctx, hmyConns[:7], host, node)
 	if err != nil {
 		return err
 	}
@@ -217,18 +202,90 @@ func syncFromHMYPeersIfNeeded(
 		return nil
 	}
 
-	_ = commonHash(collect)
+	// slices given back are already ordered in descending order
+	chainCommonHashes := commonHash(collect)
+	start := node.Blockchain().CurrentHeader().Number().Uint64()
 
-	utils.Logger().Info().
-		Int("protocol-peers", len(collect)).
-		Msg("hmy protocol neighborse")
+	for _, i := range chainCommonHashes.shard {
+		s := rand.NewSource(time.Now().Unix())
+		r := rand.New(s)
+		idx := r.Intn(len(i.peersWithIt))
+		chosen := i.peersWithIt[idx]
+		msgSender, err := node.messageSenderForPeer(ctx, chosen)
+
+		if err != nil {
+			return err
+		}
+
+		rpmes, err := msgSender.SendRequest(ctx, &msg_pb.Message{
+			ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+			Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK,
+			Request: &msg_pb.Message_SyncBlock{
+				SyncBlock: &msg_pb.SyncBlock{
+					ShardId: node.Consensus.ShardID,
+					Height:  start + 1,
+				},
+			},
+		})
+
+		if err != nil {
+			return err
+		}
+
+		data := rpmes.GetSyncBlock().GetBlockRlp()
+		var blocks []*types.Block
+		if err := rlp.DecodeBytes(data, &blocks); err != nil {
+			return err
+		}
+
+		if len(blocks) == 0 {
+			return nil
+		}
+
+		fmt.Println("now want to try to write?")
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case node.incomingSyncingBlocks <- blocks[0]:
+		}
+	}
 
 	return nil
 }
 
-// HandleBlockSyncing ..
-func (node *Node) HandleBlockSyncing() error {
-	t := time.NewTicker(15 * time.Second)
+const (
+	blockSyncInterval = 10 * time.Second
+)
+
+// HandleIncomingBlocksBySync ..
+func (node *Node) HandleIncomingBlocksBySync() error {
+	for blk := range node.incomingSyncingBlocks {
+		blks := []*types.Block{blk}
+		fmt.Println("will try to insert", node.Consensus.ShardID, blk)
+		if node.Consensus.ShardID == shard.BeaconChainShardID {
+			if _, err := node.Beaconchain().InsertChain(
+				blks, true,
+			); err != nil {
+				return err
+			}
+
+		} else {
+			if _, err := node.Blockchain().InsertChain(
+				blks, true,
+			); err != nil {
+				return err
+			}
+		}
+
+		fmt.Println("inserted just fine->", blk.String(), node.Consensus.ShardID)
+	}
+
+	return nil
+}
+
+// StartBlockSyncing ..
+func (node *Node) StartBlockSyncing() error {
+	t := time.NewTicker(blockSyncInterval)
 	defer t.Stop()
 
 	for {
@@ -236,16 +293,19 @@ func (node *Node) HandleBlockSyncing() error {
 		case blockRange := <-node.Consensus.SyncNeeded:
 			_ = blockRange
 		case <-t.C:
-			if err := func() error {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 				defer cancel()
-				return syncFromHMYPeersIfNeeded(ctx, node.host, node)
-			}(); err != nil {
-				if err == context.DeadlineExceeded {
-					continue
+
+				if err := syncFromHMYPeersIfNeeded(ctx, node.host, node); err != nil {
+					if err == context.DeadlineExceeded {
+						fmt.Println("context dead died exceeded")
+						return
+					}
+					fmt.Println("what is error->", err.Error())
 				}
-				return err
-			}
+			}()
+
 		}
 	}
 
@@ -374,6 +434,7 @@ func (node *Node) syncRespBlockHeightHandler(
 		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEIGHT,
 		Request: &msg_pb.Message_SyncBlockHeight{
 			SyncBlockHeight: &msg_pb.SyncBlockHeight{
+				ShardId:      node.Consensus.ShardID,
 				BeaconHeight: beaconHeader.Number().Uint64(),
 				BeaconHash:   beaconHeader.Hash().Bytes(),
 				ShardHeight:  shardHeader.Number().Uint64(),
@@ -383,29 +444,42 @@ func (node *Node) syncRespBlockHeightHandler(
 	}, nil
 }
 
+var (
+	errDoNotHaveDesiredBlockNum = errors.Errorf("do not have block num")
+)
+
 func (node *Node) syncRespBlockHeaderHandler(
 	ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message,
 ) (*msg_pb.Message, error) {
-	start, end :=
-		msg.GetSyncBlockHeader().GetHeightStart(),
-		msg.GetSyncBlockHeader().GetHeightEnd()
-	latest := node.Blockchain().CurrentHeader().Number().Uint64()
 
-	if start > latest {
-		return nil, nil
+	desiredBlockNum, shardID :=
+		msg.GetSyncBlockHeader().GetHeight(),
+		msg.GetSyncBlockHeader().GetShardId()
+
+	var header *block.Header
+
+	if shardID == shard.BeaconChainShardID {
+		header = node.Beaconchain().CurrentHeader()
+	} else {
+		header = node.Blockchain().CurrentHeader()
 	}
 
-	if end > latest {
-		end = latest
+	latest := header.Number().Uint64()
+
+	if desiredBlockNum > latest {
+		return nil, errors.Wrapf(
+			errDoNotHaveDesiredBlockNum,
+			"%d %d", desiredBlockNum, latest,
+		)
 	}
 
-	headers := make([]*block.Header, start-end)
-
-	for i := start; i < end; i++ {
-		headers[i] = node.Blockchain().GetHeaderByNumber(i)
+	if shardID == shard.BeaconChainShardID {
+		header = node.Beaconchain().GetHeaderByNumber(desiredBlockNum)
+	} else {
+		header = node.Blockchain().GetHeaderByNumber(desiredBlockNum)
 	}
 
-	headersData, err := rlp.EncodeToBytes(headers)
+	headersData, err := rlp.EncodeToBytes([]*block.Header{header})
 
 	if err != nil {
 		return nil, err
@@ -416,9 +490,7 @@ func (node *Node) syncRespBlockHeaderHandler(
 		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK_HEADER,
 		Request: &msg_pb.Message_SyncBlockHeader{
 			SyncBlockHeader: &msg_pb.SyncBlockHeader{
-				HeightStart: start,
-				HeightEnd:   end,
-				HeaderRlp:   headersData,
+				HeaderRlp: headersData,
 			},
 		},
 	}, nil
@@ -427,25 +499,35 @@ func (node *Node) syncRespBlockHeaderHandler(
 func (node *Node) syncRespBlockHandler(
 	ctx context.Context, peer libp2p_peer.ID, msg *msg_pb.Message,
 ) (*msg_pb.Message, error) {
-	start, end :=
-		msg.GetSyncBlock().GetHeightStart(), msg.GetSyncBlock().GetHeightEnd()
-	latest := node.Blockchain().CurrentHeader().Number().Uint64()
 
-	if start > latest {
-		return nil, nil
+	desiredBlockNum, shardID :=
+		msg.GetSyncBlock().GetHeight(),
+		msg.GetSyncBlock().GetShardId()
+
+	var block *types.Block
+
+	if shardID == shard.BeaconChainShardID {
+		block = node.Beaconchain().CurrentBlock()
+	} else {
+		block = node.Blockchain().CurrentBlock()
 	}
 
-	if end > latest {
-		end = latest
+	latest := block.Number().Uint64()
+
+	if desiredBlockNum > latest {
+		return nil, errors.Wrapf(
+			errDoNotHaveDesiredBlockNum,
+			"%d %d", desiredBlockNum, latest,
+		)
 	}
 
-	blocks := make([]*types.Block, start-end)
-
-	for i := start; i < end; i++ {
-		blocks[i] = node.Blockchain().GetBlockByNumber(i)
+	if shardID == shard.BeaconChainShardID {
+		block = node.Beaconchain().GetBlockByNumber(desiredBlockNum)
+	} else {
+		block = node.Blockchain().GetBlockByNumber(desiredBlockNum)
 	}
 
-	blocksData, err := rlp.EncodeToBytes(blocks)
+	blocksData, err := rlp.EncodeToBytes([]*types.Block{block})
 
 	if err != nil {
 		return nil, err
@@ -456,9 +538,7 @@ func (node *Node) syncRespBlockHandler(
 		Type:        msg_pb.MessageType_SYNC_RESPONSE_BLOCK,
 		Request: &msg_pb.Message_SyncBlock{
 			SyncBlock: &msg_pb.SyncBlock{
-				HeightStart: start,
-				HeightEnd:   end,
-				BlockRlp:    blocksData,
+				BlockRlp: blocksData,
 			},
 		},
 	}, nil

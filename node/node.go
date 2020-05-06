@@ -63,12 +63,13 @@ type Node struct {
 	pendingCXReceipts map[string]*types.CXReceiptsProof
 	pendingCXMutex    sync.Mutex
 	// Shard databases
-	shardChains          shardchain.Collection
-	Peer                 *p2p.Peer
-	State                atomic.Value // State of the Node
-	TxPool               *core.TxPool
-	CxPool               *core.CxPool // pool for missing cross shard receipts resend
-	Worker, BeaconWorker *worker.Worker
+	shardChains           shardchain.Collection
+	Peer                  *p2p.Peer
+	State                 atomic.Value // State of the Node
+	incomingSyncingBlocks chan *types.Block
+	TxPool                *core.TxPool
+	CxPool                *core.CxPool // pool for missing cross shard receipts resend
+	Worker, BeaconWorker  *worker.Worker
 	// The p2p host used to send/receive p2p messages
 	host *p2p.Host
 	// Service manager.
@@ -346,6 +347,7 @@ func (node *Node) BootstrapConsensus() error {
 	case err := <-errored:
 		return err
 	case <-haveEnoughPeers:
+		node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
 		node.Consensus.ProposalNewBlock <- struct{}{}
 		utils.Logger().Info().Msg("have enough peers to kick off consensus")
 		return nil
@@ -435,18 +437,19 @@ func New(
 			ctx:      context.TODO(),
 			strmap:   map[libp2p_peer.ID]*messageSender{},
 		},
-		host:                host,
-		Consensus:           consensusObj,
-		Gossiper:            relay.NewBroadCaster(configUsed, host),
-		NodeConfig:          configUsed,
-		chainConfig:         chainConfig,
-		Peer:                host.OwnPeer,
-		unixTimeAtNodeStart: time.Now().Unix(),
-		CxPool:              core.NewCxPool(core.CxPoolSize),
-		pendingCXReceipts:   map[string]*types.CXReceiptsProof{},
-		BeaconBlockChannel:  make(chan *types.Block),
-		IncomingBlocks:      make(chan *types.Block),
-		State:               state,
+		host:                  host,
+		Consensus:             consensusObj,
+		Gossiper:              relay.NewBroadCaster(configUsed, host),
+		incomingSyncingBlocks: make(chan *types.Block),
+		NodeConfig:            configUsed,
+		chainConfig:           chainConfig,
+		Peer:                  host.OwnPeer,
+		unixTimeAtNodeStart:   time.Now().Unix(),
+		CxPool:                core.NewCxPool(core.CxPoolSize),
+		pendingCXReceipts:     map[string]*types.CXReceiptsProof{},
+		BeaconBlockChannel:    make(chan *types.Block),
+		IncomingBlocks:        make(chan *types.Block),
+		State:                 state,
 		errorSink: struct {
 			sync.Mutex
 			failedStakingTxns *ring.Ring

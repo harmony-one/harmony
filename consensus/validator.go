@@ -274,7 +274,13 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 	consensus.commitBitmap = mask
 
 	if recvMsg.BlockNum-consensus.BlockNum() > consensusBlockNumBuffer {
-		fmt.Println("out of sync actually happened")
+
+		fmt.Println("out of sync actually happened",
+			recvMsg.BlockNum,
+			consensus.BlockNum(),
+		)
+
+		panic("who?")
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnCommitted] OUT OF SYNC")

@@ -111,21 +111,22 @@ message LeaderBroadCastedBlockRequest {
 }
 
 message SyncBlockHeight {
-  uint64 beacon_height = 1;
-  bytes beacon_hash = 2;
-  uint64 shard_height = 3;
-  bytes shard_hash = 4;
+  uint32 shard_id = 1;
+  uint64 beacon_height = 2;
+  bytes beacon_hash = 3;
+  uint64 shard_height = 4;
+  bytes shard_hash = 5;
 }
 
 message SyncBlockHeader {
-  uint64 height_start = 1;
-  uint64 height_end = 2;
+  uint32 shard_id = 1;
+  uint64 height = 2;
   bytes header_rlp = 3;
 }
 
 message SyncBlock {
-  uint64 height_start = 1;
-  uint64 height_end = 2;
+  uint32 shard_id = 1;
+  uint64 height = 2;
   bytes block_rlp = 3;
 }
 

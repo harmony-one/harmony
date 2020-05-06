@@ -2,6 +2,7 @@ package node
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
@@ -108,8 +109,7 @@ func (node *Node) HandleMessage(
 				if isValidatorNode {
 					for _, block := range blocks {
 						// for the closure
-						_ = block
-
+						fmt.Println("how got this block?", block.String())
 						go func() {
 							// node.IncomingBlocksClient <- blk
 							// fmt.Println("check myself-> is beaconchain node?", blk.String(), topic)

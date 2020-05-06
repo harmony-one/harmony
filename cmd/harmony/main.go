@@ -136,6 +136,10 @@ func initSetup() {
 		go func() { http.ListenAndServe("localhost:6061", nil) }()
 	}
 
+	if *port == "9099" {
+		go func() { http.ListenAndServe("localhost:6062", nil) }()
+	}
+
 	// maybe request passphrase for bls key.
 	if *cmkEncryptedBLSKey == "" {
 		passphraseForBLS()
@@ -788,7 +792,18 @@ func main() {
 		g.Go(currentNode.BootstrapConsensus)
 	}
 
-	g.Go(currentNode.HandleBlockSyncing)
+	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
+		fmt.Println("I am exploer and will sync", *port)
+		go func() {
+			var g errgroup.Group
+
+			g.Go(currentNode.HandleIncomingBlocksBySync)
+			g.Go(currentNode.StartBlockSyncing)
+			if err := g.Wait(); err != nil {
+				fatal(err)
+			}
+		}()
+	}
 
 	if err := g.Wait(); err != nil {
 		fatal(err)
