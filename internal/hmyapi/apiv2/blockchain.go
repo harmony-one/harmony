@@ -57,6 +57,20 @@ type BlockArgs struct {
 	InclStaking bool     `json:"inclStaking"`
 }
 
+func (s *PublicBlockChainAPI) isBeaconShard() error {
+	if s.b.GetShardID() != shard.BeaconChainShardID {
+		return ErrNotBeaconShard
+	}
+	return nil
+}
+
+func (s *PublicBlockChainAPI) isBlockGreaterThanLatest(blockNum uint64) error {
+	if blockNum > s.b.CurrentBlock().NumberU64() {
+		return ErrRequestedBlockTooHigh
+	}
+	return nil
+}
+
 // GetBlockByNumber returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full detail,
 // otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true it shows block signers for this block in list of one addresses.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr uint64, blockArgs BlockArgs) (map[string]interface{}, error) {

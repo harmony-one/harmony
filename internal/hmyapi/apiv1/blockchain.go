@@ -58,6 +58,20 @@ type BlockArgs struct {
 	InclStaking bool     `json:"inclStaking"`
 }
 
+func (s *PublicBlockChainAPI) isBeaconShard() error {
+	if s.b.GetShardID() != shard.BeaconChainShardID {
+		return ErrNotBeaconShard
+	}
+	return nil
+}
+
+func (s *PublicBlockChainAPI) isBlockGreaterThanLatest(blockNum rpc.BlockNumber) error {
+	if uint64(blockNum) > s.b.CurrentBlock().NumberU64() {
+		return ErrRequestedBlockTooHigh
+	}
+	return nil
+}
+
 // GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {

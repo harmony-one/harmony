@@ -2,8 +2,6 @@ package apiv2
 
 import (
 	"errors"
-
-	"github.com/harmony-one/harmony/shard"
 )
 
 var (
@@ -18,17 +16,3 @@ var (
 	// ErrRequestedBlockTooHigh when given block is greater than latest block number
 	ErrRequestedBlockTooHigh = errors.New("requested block number greater than current block number")
 )
-
-func (s *PublicBlockChainAPI) isBeaconShard() error {
-	if s.b.GetShardID() != shard.BeaconChainShardID {
-		return ErrNotBeaconShard
-	}
-	return nil
-}
-
-func (s *PublicBlockChainAPI) isBlockGreaterThanLatest(blockNum uint64) error {
-	if blockNum > s.b.CurrentBlock().NumberU64() {
-		return ErrRequestedBlockTooHigh
-	}
-	return nil
-}
