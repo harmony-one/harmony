@@ -2,9 +2,10 @@ package core
 
 import (
 	"bytes"
-	"github.com/harmony-one/harmony/block"
 	"math/big"
 	"sort"
+
+	"github.com/harmony-one/harmony/block"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
