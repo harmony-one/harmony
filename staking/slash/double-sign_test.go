@@ -53,7 +53,12 @@ const (
 )
 
 var (
-	keyPairs = genKeyPairs(100)
+	doubleSignBlock1 = makeBlockForTest(doubleSignEpoch, 0)
+	doubleSignBlock2 = makeBlockForTest(doubleSignEpoch, 1)
+)
+
+var (
+	keyPairs = genKeyPairs(25)
 
 	offIndex = offenderShard*numNodePerShard + offenderShardIndex
 	offAddr  = makeTestAddress(offIndex)
@@ -64,24 +69,110 @@ var (
 	otherDelAddr  = makeTestAddress(otherDelIndex)
 
 	reporterAddr = makeTestAddress("reporter")
-	otherAddr    = makeTestAddress("somebody")
 )
 
 func TestVerify(t *testing.T) {
 	tests := []struct {
-		editInput func(db *fakeStateDB, r *Record)
+		editInput func(chain *fakeBlockChain, db *fakeStateDB, r *Record)
 		expErr    error
 	}{
 		{
-			editInput: func(db *fakeStateDB, r *Record) { delete(db.vWrappers, offAddr) },
-			expErr:    errors.New("address vWrapper not exist"),
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {},
+			expErr:    nil,
+		},
+		{
+			// not vWrapper in state
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				delete(db.vWrappers, offAddr)
+			},
+			expErr: errors.New("address vWrapper not exist"),
+		},
+		{
+			// banned status
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				db.vWrappers[offAddr].Status = effective.Banned
+			},
+			expErr: errAlreadyBannedValidator,
+		},
+		{
+			// same offender and reporter
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				r.Reporter = offAddr
+			},
+			expErr: errReporterAndOffenderSame,
+		},
+		{
+			// same block in conflicting votes
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				r.Evidence.SecondVote = r.Evidence.FirstVote.Copy()
+			},
+			expErr: errSlashBlockNoConflict,
+		},
+		{
+			// second vote signed with a different bls key
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				secondVote := makeVoteData(keyPairs[24], doubleSignBlock2)
+				r.Evidence.SecondVote = secondVote
+			},
+			expErr: errBallotSignerKeysNotSame,
+		},
+		{
+			// block is in the future
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				chain.currentBlock = *makeBlockForTest(doubleSignEpoch-1, 0)
+			},
+			expErr: errSlashFromFutureEpoch,
+		},
+		{
+			// error from blockchain.ReadShardState (fakeChainErrEpoch)
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				r.Evidence.Epoch = big.NewInt(fakeChainErrEpoch)
+			},
+			expErr: errFakeChainUnexpectEpoch,
+		},
+		{
+			// Invalid shardID
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				r.Evidence.ShardID = 10
+			},
+			expErr: shard.ErrShardIDNotInSuperCommittee,
+		},
+		{
+			// Missing bls from committee
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				r.Evidence.FirstVote = makeVoteData(keyPairs[24], doubleSignBlock1)
+				r.Evidence.SecondVote = makeVoteData(keyPairs[24], doubleSignBlock2)
+			},
+			expErr: shard.ErrValidNotInCommittee,
+		},
+		{
+			// offender address not match vote
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				chain.superCommittee.Shards[offenderShard].Slots[offenderShardIndex].
+					EcdsaAddress = makeTestAddress("other")
+			},
+			expErr: errors.New("does not match the signer's address"),
+		},
+		{
+			// empty signature
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				r.Evidence.FirstVote.Signature = nil
+			},
+			expErr: errors.New("Empty buf"),
+		},
+		{
+			// false signature
+			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+				r.Evidence.FirstVote.Signature = r.Evidence.SecondVote.Signature
+			},
+			expErr: errors.New("could not verify bls key signature on slash"),
 		},
 	}
 	for i, test := range tests {
-		sdb, bc := defaultStateAndBlockChain()
+		bc, sdb := defaultBlockChainAndState()
 		r := defaultSlashRecord()
 		if test.editInput != nil {
-			test.editInput(sdb, &r)
+			test.editInput(bc, sdb, &r)
 		}
 		rawState, rawRecord := sdb.copy(), r.Copy()
 
@@ -174,8 +265,8 @@ func defaultSlashRecord() Record {
 	return Record{
 		Evidence: Evidence{
 			ConflictingVotes: ConflictingVotes{
-				FirstVote:  makeVoteData(offKey, makeBlockForTest(doubleSignEpoch, 0)),
-				SecondVote: makeVoteData(offKey, makeBlockForTest(doubleSignEpoch, 1)),
+				FirstVote:  makeVoteData(offKey, doubleSignBlock1),
+				SecondVote: makeVoteData(offKey, doubleSignBlock2),
 			},
 			Moment: Moment{
 				Epoch:   big.NewInt(doubleSignEpoch),
@@ -401,10 +492,10 @@ func (kp blsKeyPair) Sign(block *types.Block) []byte {
 	return sig.Serialize()
 }
 
-func defaultStateAndBlockChain() (*fakeStateDB, *fakeBlockChain) {
-	sdb := defaultFakeStateDB()
+func defaultBlockChainAndState() (*fakeBlockChain, *fakeStateDB) {
 	fbc := defaultFakeBlockChain()
-	return sdb, fbc
+	sdb := defaultFakeStateDB()
+	return fbc, sdb
 }
 
 func defaultFakeStateDB() *fakeStateDB {

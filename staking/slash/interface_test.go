@@ -13,6 +13,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	fakeChainErrEpoch = 1
+)
+
+var (
+	errFakeChainUnexpectEpoch = errors.New("epoch not expected")
+)
+
 type fakeBlockChain struct {
 	config         params.ChainConfig
 	currentBlock   types.Block
@@ -29,8 +37,8 @@ func (bc *fakeBlockChain) CurrentBlock() *types.Block {
 }
 
 func (bc *fakeBlockChain) ReadShardState(epoch *big.Int) (*shard.State, error) {
-	if epoch.Cmp(big.NewInt(doubleSignEpoch)) != 0 {
-		return nil, fmt.Errorf("epoch not expected")
+	if epoch.Cmp(big.NewInt(fakeChainErrEpoch)) == 0 {
+		return nil, errFakeChainUnexpectEpoch
 	}
 	return &bc.superCommittee, nil
 }
