@@ -59,6 +59,13 @@ type fakeStateDB struct {
 	vWrappers map[common.Address]*staking.ValidatorWrapper
 }
 
+func newFakeStateDB() *fakeStateDB {
+	return &fakeStateDB{
+		balances:  make(map[common.Address]*big.Int),
+		vWrappers: make(map[common.Address]*staking.ValidatorWrapper),
+	}
+}
+
 func (sdb *fakeStateDB) AddBalance(addr common.Address, amount *big.Int) {
 	if _, ok := sdb.balances[addr]; !ok {
 		sdb.balances[addr] = common.Big0
@@ -88,6 +95,17 @@ func (sdb *fakeStateDB) copy() *fakeStateDB {
 		cp.vWrappers[addr] = &vCpy
 	}
 	return cp
+}
+
+func (sdb *fakeStateDB) assertBalance(addr common.Address, balance *big.Int) error {
+	val, ok := sdb.balances[addr]
+	if !ok {
+		return fmt.Errorf("address %x not exist", addr)
+	}
+	if val.Cmp(balance) != 0 {
+		return fmt.Errorf("balance not expected %v / %v", val, balance)
+	}
+	return nil
 }
 
 func (sdb *fakeStateDB) assertEqual(exp *fakeStateDB) error {
