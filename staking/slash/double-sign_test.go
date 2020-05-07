@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
-	"github.com/harmony-one/harmony/common/denominations"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	bls2 "github.com/harmony-one/harmony/crypto/bls"
@@ -23,13 +22,14 @@ import (
 )
 
 var (
-	fiveKOnes       = new(big.Int).Mul(big.NewInt(5000), big.NewInt(1e18))
-	tenKOnes        = new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18))
-	nineteenKOnes   = new(big.Int).Mul(big.NewInt(19000), big.NewInt(1e18))
-	twentyKOnes     = new(big.Int).Mul(big.NewInt(20000), big.NewInt(1e18))
-	twentyfiveKOnes = new(big.Int).Mul(big.NewInt(25000), big.NewInt(1e18))
-	thirtyKOnes     = new(big.Int).Mul(big.NewInt(30000), big.NewInt(1e18))
-	hundredKOnes    = new(big.Int).Mul(big.NewInt(1000000), big.NewInt(1e18))
+	bigOne          = big.NewInt(1e18)
+	fiveKOnes       = new(big.Int).Mul(big.NewInt(5000), bigOne)
+	tenKOnes        = new(big.Int).Mul(big.NewInt(10000), bigOne)
+	nineteenKOnes   = new(big.Int).Mul(big.NewInt(19000), bigOne)
+	twentyKOnes     = new(big.Int).Mul(big.NewInt(20000), bigOne)
+	twentyfiveKOnes = new(big.Int).Mul(big.NewInt(25000), bigOne)
+	thirtyKOnes     = new(big.Int).Mul(big.NewInt(30000), bigOne)
+	hundredKOnes    = new(big.Int).Mul(big.NewInt(1000000), bigOne)
 )
 
 const (
@@ -190,6 +190,65 @@ func TestVerify(t *testing.T) {
 	}
 }
 
+func TestApplySlashRate(t *testing.T) {
+	tests := []struct {
+		amount *big.Int
+		rate   numeric.Dec
+		exp    *big.Int
+	}{
+		{twentyKOnes, numeric.NewDecWithPrec(5, 1), tenKOnes},
+		{bigOne, numeric.NewDecWithPrec(5, 1), big.NewInt(5e17)},
+		{new(big.Int).Mul(bigOne, big.NewInt(3)), numeric.NewDecWithPrec(5, 1), big.NewInt(15e17)},
+		{twentyKOnes, numeric.ZeroDec(), big.NewInt(0)},
+	}
+	for i, test := range tests {
+		res := applySlashRate(test.amount, test.rate)
+		if res.Cmp(test.exp) != 0 {
+			t.Errorf("Test %v: unexpected answer %v / %v", i, res, test.exp)
+		}
+	}
+}
+
+func TestSetDifference(t *testing.T) {
+	tests := []struct {
+		indexes1   []int
+		indexes2   []int
+		expIndexes []int
+	}{
+		{[]int{}, []int{}, []int{}},
+		{[]int{1}, []int{}, []int{}},
+		{[]int{}, []int{1}, []int{1}},
+		{[]int{1, 2, 3}, []int{3, 4, 5}, []int{4, 5}},
+	}
+	for ti, test := range tests {
+		rs1 := makeSimpleRecords(test.indexes1)
+		rs2 := makeSimpleRecords(test.indexes2)
+
+		diff := rs1.SetDifference(rs2)
+
+		if len(diff) != len(test.expIndexes) {
+			t.Errorf("Test %v: size not expected %v, %v", ti, len(diff), len(test.expIndexes))
+		}
+		for i, r := range diff {
+			if r.Reporter != common.BigToAddress(big.NewInt(int64(test.expIndexes[i]))) {
+				t.Errorf("Test %v: Records[i] unexpected", ti)
+			}
+		}
+	}
+}
+
+func makeSimpleRecords(indexes []int) Records {
+	rs := make(Records, 0, len(indexes))
+	for _, index := range indexes {
+		rs = append(rs, Record{
+			Reporter: common.BigToAddress(big.NewInt(int64(index))),
+		})
+	}
+	return rs
+}
+
+func TestPayDownAsMuchAsCan
+
 func TestRecord_Copy(t *testing.T) {
 	tests := []struct {
 		r Record
@@ -249,18 +308,6 @@ func assertVoteDeepCopy(v1, v2 Vote) error {
 	return nil
 }
 
-func totalSlashedExpected(slashRate float64) *big.Int {
-	t := int64(50000 * slashRate)
-	res := new(big.Int).Mul(big.NewInt(t), big.NewInt(denominations.One))
-	return res
-}
-
-func totalSnitchRewardExpected(slashRate float64) *big.Int {
-	t := int64(25000 * slashRate)
-	res := new(big.Int).Mul(big.NewInt(t), big.NewInt(denominations.One))
-	return res
-}
-
 func defaultSlashRecord() Record {
 	return Record{
 		Evidence: Evidence{
@@ -287,12 +334,6 @@ func makeVoteData(kp blsKeyPair, block *types.Block) Vote {
 		Signature:       kp.Sign(block),
 	}
 }
-
-func exampleSlashRecords() Records {
-	return Records{defaultSlashRecord()}
-}
-
-// ======== start of new test case codes ==========
 
 func makeTestAddress(item interface{}) common.Address {
 	s := fmt.Sprintf("harmony.one.%s", item)
@@ -448,7 +489,7 @@ func newShardSlotMaker(kps []blsKeyPair) shardSlotMaker {
 func (maker *shardSlotMaker) makeSlot() shard.Slot {
 	s := shard.Slot{
 		EcdsaAddress: makeTestAddress(maker.i),
-		BLSPublicKey: maker.kps[maker.i].Pub(), // Yes, panic when not enough kps
+		BLSPublicKey: maker.kps[maker.i].Pub(), // Yes, will panic when not enough kps
 	}
 	maker.i++
 	return s
