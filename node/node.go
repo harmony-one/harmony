@@ -433,9 +433,7 @@ func New(
 
 	node := &Node{
 		sender: &senderWrapper{
-			peerHost: host,
-			ctx:      context.TODO(),
-			strmap:   map[libp2p_peer.ID]*messageSender{},
+			strmap: map[libp2p_peer.ID]*messageSender{},
 		},
 		host:                  host,
 		Consensus:             consensusObj,

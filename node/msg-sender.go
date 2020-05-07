@@ -26,28 +26,7 @@ var (
 
 type senderWrapper struct {
 	sync.Mutex
-	ctx      context.Context
-	peerHost *p2p.Host
-	strmap   map[peer.ID]*messageSender
-}
-
-func (srv *senderWrapper) GetSender(p peer.ID) (*messageSender, bool) {
-	srv.Lock()
-	defer srv.Unlock()
-	ms, ok := srv.strmap[p]
-	return ms, ok
-}
-
-func (srv *senderWrapper) AddSender(ms *messageSender) {
-	srv.Lock()
-	defer srv.Unlock()
-	srv.strmap[ms.p] = ms
-}
-
-func (srv *senderWrapper) RemoveSender(p peer.ID) {
-	srv.Lock()
-	defer srv.Unlock()
-	delete(srv.strmap, p)
+	strmap map[peer.ID]*messageSender
 }
 
 type messageSender struct {
