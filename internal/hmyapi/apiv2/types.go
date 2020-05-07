@@ -162,7 +162,7 @@ func newRPCTransaction(
 	tx *types.Transaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
 ) *RPCTransaction {
-	from, err := types.PoolTransactionSender(types.NewEIP155Signer(tx.ChainID()), tx)
+	from, err := tx.SenderAddress()
 	if err != nil {
 		return nil
 	}
@@ -213,7 +213,7 @@ func newRPCStakingTransaction(
 	tx *types2.StakingTransaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
 ) *RPCStakingTransaction {
-	from, err := types.PoolTransactionSender(nil, tx)
+	from, err := tx.SenderAddress()
 	if err != nil {
 		return nil
 	}

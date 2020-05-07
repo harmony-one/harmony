@@ -199,7 +199,7 @@ func validateTxPoolInternals(pool *TxPool) error {
 }
 
 func deriveSender(tx types.PoolTransaction) (common.Address, error) {
-	return types.PoolTransactionSender(types.HomesteadSigner{}, tx)
+	return tx.SenderAddress()
 }
 
 type testChain struct {
