@@ -255,11 +255,11 @@ func TestPayDownAsMuchAsCan(t *testing.T) {
 		expErr          error
 	}{
 		{
-			debt: twentyFiveKOnes,
-			amt:  thirtyKOnes,
+			debt: new(big.Int).Set(twentyFiveKOnes),
+			amt:  new(big.Int).Set(thirtyKOnes),
 			diff: &Application{
-				TotalSlashed:      tenKOnes,
-				TotalSnitchReward: tenKOnes,
+				TotalSlashed:      new(big.Int).Set(tenKOnes),
+				TotalSnitchReward: new(big.Int).Set(tenKOnes),
 			},
 			expDebt: common.Big0,
 			expAmt:  fiveKOnes,
@@ -269,11 +269,11 @@ func TestPayDownAsMuchAsCan(t *testing.T) {
 			},
 		},
 		{
-			debt: thirtyKOnes,
-			amt:  twentyFiveKOnes,
+			debt: new(big.Int).Set(thirtyKOnes),
+			amt:  new(big.Int).Set(twentyFiveKOnes),
 			diff: &Application{
-				TotalSlashed:      tenKOnes,
-				TotalSnitchReward: tenKOnes,
+				TotalSlashed:      new(big.Int).Set(tenKOnes),
+				TotalSnitchReward: new(big.Int).Set(tenKOnes),
 			},
 			expDebt: fiveKOnes,
 			expAmt:  common.Big0,
@@ -426,7 +426,7 @@ type slashApplyTestCase struct {
 
 func (tc *slashApplyTestCase) makeData() {
 	tc.reporter = makeTestAddress("reporter")
-	tc.snapshot = defaultValidatorWrapper()
+	tc.snapshot = defaultSnapValidatorWrapper()
 	tc.current = defaultCurrentValidatorWrapper()
 	tc.state = newFakeStateDB()
 	tc.slashTrack = &Application{
@@ -642,8 +642,8 @@ func defaultTestValidator(pubKeys []shard.BLSPublicKey) staking.Validator {
 		Address:              offAddr,
 		SlotPubKeys:          pubKeys,
 		LastEpochInCommittee: big.NewInt(lastEpochInComm),
-		MinSelfDelegation:    tenKOnes,
-		MaxTotalDelegation:   hundredKOnes,
+		MinSelfDelegation:    new(big.Int).Set(tenKOnes),
+		MaxTotalDelegation:   new(big.Int).Set(hundredKOnes),
 		Status:               effective.Active,
 		Commission:           comm,
 		Description:          desc,
@@ -653,18 +653,18 @@ func defaultTestValidator(pubKeys []shard.BLSPublicKey) staking.Validator {
 
 func defaultTestDelegations() staking.Delegations {
 	return staking.Delegations{
-		makeDelegation(offAddr, fourtyKOnes),
-		makeDelegation(makeTestAddress("del1"), fourtyKOnes),
+		makeDelegation(offAddr, new(big.Int).Set(fourtyKOnes)),
+		makeDelegation(makeTestAddress("del1"), new(big.Int).Set(fourtyKOnes)),
 	}
 }
 
 func defaultDelegationsWithUndelegates() staking.Delegations {
-	d1 := makeDelegation(offAddr, twentyKOnes)
+	d1 := makeDelegation(offAddr, new(big.Int).Set(twentyKOnes))
 	d1.Undelegations = []staking.Undelegation{
 		makeHistoryUndelegation(),
 		makeDefaultUndelegation(),
 	}
-	d2 := makeDelegation(makeTestAddress("del2"), fourtyKOnes)
+	d2 := makeDelegation(makeTestAddress("del2"), new(big.Int).Set(fourtyKOnes))
 
 	return staking.Delegations{d1, d2}
 }
@@ -673,20 +673,20 @@ func makeDelegation(addr common.Address, amount *big.Int) staking.Delegation {
 	return staking.Delegation{
 		DelegatorAddress: addr,
 		Amount:           amount,
-		Reward:           tenKOnes,
+		Reward:           new(big.Int).Set(tenKOnes),
 	}
 }
 
 func makeDefaultUndelegation() staking.Undelegation {
 	return staking.Undelegation{
-		Amount: tenKOnes,
+		Amount: new(big.Int).Set(tenKOnes),
 		Epoch:  big.NewInt(doubleSignEpoch + 2),
 	}
 }
 
 func makeHistoryUndelegation() staking.Undelegation {
 	return staking.Undelegation{
-		Amount: tenKOnes,
+		Amount: new(big.Int).Set(tenKOnes),
 		Epoch:  big.NewInt(doubleSignEpoch - 1),
 	}
 }
