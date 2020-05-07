@@ -281,10 +281,10 @@ fi
 if [ "$OS" == "Linux" ]; then
    FOLDER=release/linux-x86_64/$REL
    if [ "$static" == "true" ]; then
-      BIN=( harmony md5sum.txt )
+      BIN=( harmony node.sh md5sum.txt )
       FOLDER=${FOLDER}/static
    else
-      BIN=( harmony libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
+      BIN=( harmony node.sh libbls384_256.so libcrypto.so.10 libgmp.so.10 libgmpxx.so.4 libmcl.so md5sum.txt )
    fi
 fi
 
