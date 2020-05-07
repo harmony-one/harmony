@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -30,6 +29,7 @@ type PoolTransaction interface {
 	ChainID() *big.Int
 	ShardID() uint32
 	To() *common.Address
+	SenderAddress() (common.Address, error)
 	Size() common.StorageSize
 	Data() []byte
 	GasPrice() *big.Int
@@ -39,26 +39,6 @@ type PoolTransaction interface {
 	EncodeRLP(w io.Writer) error
 	DecodeRLP(s *rlp.Stream) error
 	Protected() bool
-}
-
-// PoolTransactionSender returns the address derived from the signature (V, R, S) u
-// sing secp256k1 elliptic curve and an error if it failed deriving or upon an
-// incorrect signature.
-//
-// Sender may cache the address, allowing it to be used regardless of
-// signing method. The cache is invalidated if the cached signer does
-// not match the signer used in the current call.
-//
-// Note that the signer is an interface since different txs have different signers.
-func PoolTransactionSender(signer interface{}, tx PoolTransaction) (common.Address, error) {
-	if plainTx, ok := tx.(*Transaction); ok {
-		if sig, ok := signer.(Signer); ok {
-			return Sender(sig, plainTx)
-		}
-	} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
-		return stakingTx.SenderAddress()
-	}
-	return common.Address{}, errors.WithMessage(ErrUnknownPoolTxType, "when fetching transaction sender")
 }
 
 // PoolTransactions is a PoolTransactions slice type for basic sorting.
