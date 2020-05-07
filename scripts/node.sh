@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200427.0"
+version="v1 20200507.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -239,7 +239,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers max_bls_keys_per_node
 start_clean=false
 loop=true
 run_as_root=true
@@ -259,6 +259,7 @@ pprof=""
 static=true
 verify=false
 minpeers=6
+max_bls_keys_per_node=10
 ${BLSKEYFILE=}
 ${TRACEFILE=}
 
@@ -909,6 +910,7 @@ do
       -dns_zone="${dns_zone}"
       -blacklist="${blacklist}"
       -min_peers="${minpeers}"
+      -max_bls_keys_per_node="${max_bls_keys_per_node}"
    )
    args+=(
       -is_archival="${archival}"
