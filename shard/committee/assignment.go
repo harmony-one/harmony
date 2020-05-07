@@ -146,15 +146,6 @@ func prepareOrders(
 			continue
 		}
 
-		validatorStake := big.NewInt(0)
-		for i := range validator.Delegations {
-			validatorStake.Add(
-				validatorStake, validator.Delegations[i].Amount,
-			)
-		}
-
-		totalStaked.Add(totalStaked, validatorStake)
-
 		found := false
 		for _, key := range validator.SlotPubKeys {
 			if _, ok := blsKeys[key]; ok {
@@ -167,6 +158,15 @@ func prepareOrders(
 		if found {
 			continue
 		}
+
+		validatorStake := big.NewInt(0)
+		for i := range validator.Delegations {
+			validatorStake.Add(
+				validatorStake, validator.Delegations[i].Amount,
+			)
+		}
+
+		totalStaked.Add(totalStaked, validatorStake)
 
 		essentials[validator.Address] = &effective.SlotOrder{
 			validatorStake,
@@ -240,6 +240,7 @@ var (
 	ErrComputeForEpochInPast = errors.New("cannot compute for epoch in past")
 )
 
+// This is the shard state computation logic before staking epoch.
 func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 	shardNum := int(s.NumShards())
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
