@@ -18,16 +18,13 @@ package keystore
 
 import (
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"runtime"
-	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/accounts"
 )
 
@@ -213,165 +210,6 @@ func TestSignRace(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 	}
 	t.Errorf("Account did not lock within the timeout")
-}
-
-// Tests that the wallet notifier loop starts and stops correctly based on the
-// addition and removal of wallet event subscriptions.
-func TestWalletNotifierLifecycle(t *testing.T) {
-	// Create a temporary kesytore to test with
-	dir, ks := tmpKeyStore(t, false)
-	defer os.RemoveAll(dir)
-
-	// Ensure that the notification updater is not running yet
-	time.Sleep(250 * time.Millisecond)
-	ks.mu.RLock()
-	updating := ks.updating
-	ks.mu.RUnlock()
-
-	if updating {
-		t.Errorf("wallet notifier running without subscribers")
-	}
-	// Subscribe to the wallet feed and ensure the updater boots up
-	updates := make(chan accounts.WalletEvent)
-
-	subs := make([]event.Subscription, 2)
-	for i := 0; i < len(subs); i++ {
-		// Create a new subscription
-		subs[i] = ks.Subscribe(updates)
-
-		// Ensure the notifier comes online
-		time.Sleep(250 * time.Millisecond)
-		ks.mu.RLock()
-		updating = ks.updating
-		ks.mu.RUnlock()
-
-		if !updating {
-			t.Errorf("sub %d: wallet notifier not running after subscription", i)
-		}
-	}
-	// Unsubscribe and ensure the updater terminates eventually
-	for i := 0; i < len(subs); i++ {
-		// Close an existing subscription
-		subs[i].Unsubscribe()
-
-		// Ensure the notifier shuts down at and only at the last close
-		for k := 0; k < int(walletRefreshCycle/(250*time.Millisecond))+2; k++ {
-			ks.mu.RLock()
-			updating = ks.updating
-			ks.mu.RUnlock()
-
-			if i < len(subs)-1 && !updating {
-				t.Fatalf("sub %d: event notifier stopped prematurely", i)
-			}
-			if i == len(subs)-1 && !updating {
-				return
-			}
-			time.Sleep(250 * time.Millisecond)
-		}
-	}
-	t.Errorf("wallet notifier didn't terminate after unsubscribe")
-}
-
-type walletEvent struct {
-	accounts.WalletEvent
-	a accounts.Account
-}
-
-// Tests that wallet notifications and correctly fired when accounts are added
-// or deleted from the keystore.
-func TestWalletNotifications(t *testing.T) {
-	dir, ks := tmpKeyStore(t, false)
-	defer os.RemoveAll(dir)
-
-	// Subscribe to the wallet feed and collect events.
-	var (
-		events  []walletEvent
-		updates = make(chan accounts.WalletEvent)
-		sub     = ks.Subscribe(updates)
-	)
-	defer sub.Unsubscribe()
-	go func() {
-		for {
-			select {
-			case ev := <-updates:
-				events = append(events, walletEvent{ev, ev.Wallet.Accounts()[0]})
-			case <-sub.Err():
-				close(updates)
-				return
-			}
-		}
-	}()
-
-	// Randomly add and remove accounts.
-	var (
-		live       = make(map[common.Address]accounts.Account)
-		wantEvents []walletEvent
-	)
-	for i := 0; i < 1024; i++ {
-		if create := len(live) == 0 || rand.Int()%4 > 0; create {
-			// Add a new account and ensure wallet notifications arrives
-			account, err := ks.NewAccount("")
-			if err != nil {
-				t.Fatalf("failed to create test account: %v", err)
-			}
-			live[account.Address] = account
-			wantEvents = append(wantEvents, walletEvent{accounts.WalletEvent{Kind: accounts.WalletArrived}, account})
-		} else {
-			// Delete a random account.
-			var account accounts.Account
-			for _, a := range live {
-				account = a
-				break
-			}
-			if err := ks.Delete(account, ""); err != nil {
-				t.Fatalf("failed to delete test account: %v", err)
-			}
-			delete(live, account.Address)
-			wantEvents = append(wantEvents, walletEvent{accounts.WalletEvent{Kind: accounts.WalletDropped}, account})
-		}
-	}
-
-	// Shut down the event collector and check events.
-	sub.Unsubscribe()
-	<-updates
-	checkAccounts(t, live, ks.Wallets())
-	checkEvents(t, wantEvents, events)
-}
-
-// checkAccounts checks that all known live accounts are present in the wallet list.
-func checkAccounts(t *testing.T, live map[common.Address]accounts.Account, wallets []accounts.Wallet) {
-	if len(live) != len(wallets) {
-		t.Errorf("wallet list doesn't match required accounts: have %d, want %d", len(wallets), len(live))
-		return
-	}
-	liveList := make([]accounts.Account, 0, len(live))
-	for _, account := range live {
-		liveList = append(liveList, account)
-	}
-	sort.Sort(accountsByURL(liveList))
-	for j, wallet := range wallets {
-		if accs := wallet.Accounts(); len(accs) != 1 {
-			t.Errorf("wallet %d: contains invalid number of accounts: have %d, want 1", j, len(accs))
-		} else if accs[0] != liveList[j] {
-			t.Errorf("wallet %d: account mismatch: have %v, want %v", j, accs[0], liveList[j])
-		}
-	}
-}
-
-// checkEvents checks that all events in 'want' are present in 'have'. Events may be present multiple times.
-func checkEvents(t *testing.T, want []walletEvent, have []walletEvent) {
-	for _, wantEv := range want {
-		nmatch := 0
-		for ; len(have) > 0; nmatch++ {
-			if have[0].Kind != wantEv.Kind || have[0].a != wantEv.a {
-				break
-			}
-			have = have[1:]
-		}
-		if nmatch == 0 {
-			t.Fatalf("can't find event with Kind=%v for %x", wantEv.Kind, wantEv.a.Address)
-		}
-	}
 }
 
 func tmpKeyStore(t *testing.T, encrypted bool) (string, *KeyStore) {
