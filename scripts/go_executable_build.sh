@@ -128,6 +128,8 @@ function build_only
    pushd $BINDIR
    if [ "$STATIC" == "true" ]; then
       $MD5 "${!SRC[@]}" > md5sum.txt
+      cp -pf ../scripts/node.sh .
+      $MD5 node.sh >> md5sum.txt
    else
       for lib in "${!LIB[@]}"; do
          if [ -e ${LIB[$lib]} ]; then
