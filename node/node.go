@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/client"
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
@@ -132,22 +131,16 @@ type Node struct {
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
-	host p2p.Host
-	// Service manager.
-	serviceManager               *service.Manager
+	host                         p2p.Host
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-	// Duplicated Ping Message Received
-	duplicatedPing sync.Map
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.
-	chainConfig params.ChainConfig
-	// map of service type to its message channel.
-	serviceMessageChan  map[service.Type]chan *msg_pb.Message
+	chainConfig         params.ChainConfig
 	isFirstTime         bool // the node was started with a fresh database
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
@@ -661,11 +654,6 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, er
 	}
 
 	return nodeConfig, chanPeer, nil
-}
-
-// ServiceManager ...
-func (node *Node) ServiceManager() *service.Manager {
-	return node.serviceManager
 }
 
 // ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.

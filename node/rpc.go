@@ -77,11 +77,6 @@ func (node *Node) StartRPC(nodePort string) error {
 	)
 
 	apis := node.APIs()
-
-	for _, service := range node.serviceManager.GetServices() {
-		apis = append(apis, service.APIs()...)
-	}
-
 	port, _ := strconv.Atoi(nodePort)
 
 	ip := ""
