@@ -58,7 +58,7 @@ var (
 	myHost p2p.Host
 )
 
-// InitLDBDatabase initializes a LDBDatabase. isGenesis=true will return the beacon chain database for normal shard nodes
+// InitLDBDatabase initializes a LDBDatabase. will return the beacon chain database for normal shard nodes
 func InitLDBDatabase(ip string, port string, freshDB bool, isBeacon bool) (*ethdb.LDBDatabase, error) {
 	var dbFileName string
 	if isBeacon {
@@ -98,8 +98,6 @@ var (
 	minPeers = flag.Int("min_peers", 32, "Minimal number of Peers in shard")
 	// Key file to store the private key
 	keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
-	// isGenesis indicates this node is a genesis node
-	isGenesis = flag.Bool("is_genesis", true, "true means this node is a genesis node")
 	// isArchival indicates this node is an archival node that will save and archive current blockchain
 	isArchival = flag.Bool("is_archival", false, "false will enable cached state pruning")
 	// delayCommit is the commit-delay timer, used by Harmony nodes
