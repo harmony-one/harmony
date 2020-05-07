@@ -232,7 +232,6 @@ type TxPool struct {
 	scope        event.SubscriptionScope
 	chainHeadCh  chan ChainHeadEvent
 	chainHeadSub event.Subscription
-	signer       types.Signer
 	mu           sync.RWMutex
 
 	currentState  *state.DB           // Current state in the blockchain head
@@ -268,7 +267,6 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig,
 		config:      config,
 		chainconfig: chainconfig,
 		chain:       chain,
-		signer:      types.NewEIP155Signer(chainconfig.ChainID),
 		pending:     make(map[common.Address]*txList),
 		queue:       make(map[common.Address]*txList),
 		beats:       make(map[common.Address]time.Time),
@@ -277,7 +275,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig,
 		gasPrice:    new(big.Int).SetUint64(config.PriceLimit),
 		txErrorSink: txErrorSink,
 	}
-	pool.locals = newAccountSet(pool.signer)
+	pool.locals = newAccountSet(chainconfig.ChainID)
 	for _, addr := range config.Locals {
 		utils.Logger().Info().Interface("address", addr).Msg("Setting new local account")
 		pool.locals.add(addr)
@@ -669,7 +667,7 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 		return errors.WithMessagef(ErrGasLimit, "transaction gas is %d", tx.Gas())
 	}
 	// Make sure the transaction is signed properly
-	from, err := types.PoolTransactionSender(pool.signer, tx)
+	from, err := tx.SenderAddress()
 	if err != nil {
 		if b32, err := hmyCommon.AddressToBech32(from); err == nil {
 			return errors.WithMessagef(ErrInvalidSender, "transaction sender is %s", b32)
@@ -739,7 +737,7 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 // validateStakingTx checks the staking message based on the staking directive
 func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 	// from address already validated
-	from, _ := types.PoolTransactionSender(pool.signer, tx)
+	from, _ := tx.SenderAddress()
 	b32, _ := hmyCommon.AddressToBech32(from)
 
 	switch tx.StakingType() {
@@ -904,7 +902,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		}
 	}
 	// If the transaction is replacing an already pending one, do directly
-	from, _ := types.PoolTransactionSender(pool.signer, tx) // already validated
+	from, _ := tx.SenderAddress() // already validated
 	if list := pool.pending[from]; list != nil && list.Overlaps(tx) {
 		// Nonce already pending, check if required price bump is met
 		inserted, old := list.Add(tx, pool.config.PriceBump)
@@ -960,7 +958,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 // Note, this method assumes the pool lock is held!
 func (pool *TxPool) enqueueTx(hash common.Hash, tx types.PoolTransaction) (bool, error) {
 	// Try to insert the transaction into the future queue
-	from, _ := types.PoolTransactionSender(pool.signer, tx) // already validated
+	from, _ := tx.SenderAddress() // already validated
 	if pool.queue[from] == nil {
 		pool.queue[from] = newTxList(false)
 	}
@@ -1078,7 +1076,7 @@ func (pool *TxPool) addTx(tx types.PoolTransaction, local bool) error {
 	}
 	// If we added a new transaction, run promotion checks and return
 	if !replace {
-		from, _ := types.PoolTransactionSender(pool.signer, tx) // already validated
+		from, _ := tx.SenderAddress() // already validated
 		pool.promoteExecutables([]common.Address{from})
 	}
 	return nil
@@ -1102,7 +1100,7 @@ func (pool *TxPool) addTxsLocked(txs types.PoolTransactions, local bool) []error
 	for i, tx := range txs {
 		replace, err := pool.add(tx, local)
 		if err == nil && !replace {
-			from, _ := types.PoolTransactionSender(pool.signer, tx) // already validated
+			from, _ := tx.SenderAddress() // already validated
 			dirty[from] = struct{}{}
 		}
 		errCause := errors.Cause(err)
@@ -1133,7 +1131,7 @@ func (pool *TxPool) Status(hashes []common.Hash) []TxStatus {
 	status := make([]TxStatus, len(hashes))
 	for i, hash := range hashes {
 		if tx := pool.all.Get(hash); tx != nil {
-			from, _ := types.PoolTransactionSender(pool.signer, tx) // already validated
+			from, _ := tx.SenderAddress() // already validated
 			if pool.pending[from] != nil && pool.pending[from].txs.items[tx.Nonce()] != nil {
 				status[i] = TxStatusPending
 			} else {
@@ -1158,7 +1156,7 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 	if tx == nil {
 		return
 	}
-	addr, _ := types.PoolTransactionSender(pool.signer, tx) // already validated during insertion
+	addr, _ := tx.SenderAddress() // already validated during insertion
 
 	// Remove it from the list of known transactions
 	pool.all.Remove(hash)
@@ -1451,12 +1449,12 @@ type accountSet struct {
 	cache    *[]common.Address
 }
 
-// newAccountSet creates a new address set with an associated signer for sender
-// derivations.
-func newAccountSet(signer types.Signer) *accountSet {
+// newAccountSet creates a new address set with the associated signer.
+// Note that tx pool will never see an unprotected tx, therefore can use only EIP155 signer.
+func newAccountSet(chainID *big.Int) *accountSet {
 	return &accountSet{
 		accounts: make(map[common.Address]struct{}),
-		signer:   signer,
+		signer:   types.NewEIP155Signer(chainID),
 	}
 }
 
@@ -1469,7 +1467,7 @@ func (as *accountSet) contains(addr common.Address) bool {
 // containsTx checks if the sender of a given tx is within the set. If the sender
 // cannot be derived, this method returns false.
 func (as *accountSet) containsTx(tx types.PoolTransaction) bool {
-	if addr, err := types.PoolTransactionSender(as.signer, tx); err == nil {
+	if addr, err := tx.SenderAddress(); err == nil {
 		return as.contains(addr)
 	}
 	return false
