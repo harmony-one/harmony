@@ -1,7 +1,9 @@
 package block
 
 import (
+	"encoding/json"
 	"io"
+	"math/big"
 	"reflect"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -21,10 +23,33 @@ type Header struct {
 	blockif.Header
 }
 
+// HeaderPair ..
+type HeaderPair struct {
+	BeaconHeader *Header `json:"beacon-chain-header"`
+	ShardHeader  *Header `json:"shard-chain-header"`
+}
+
 var (
 	// ErrHeaderIsNil ..
 	ErrHeaderIsNil = errors.New("cannot encode nil header receiver")
 )
+
+// MarshalJSON ..
+func (h Header) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		S uint32   `json:"shard-id"`
+		H string   `json:"block-header-hash"`
+		N *big.Int `json:"block-number"`
+		V *big.Int `json:"view-id"`
+		E *big.Int `json:"epoch"`
+	}{
+		h.Header.ShardID(),
+		h.Header.Hash().Hex(),
+		h.Header.Number(),
+		h.Header.ViewID(),
+		h.Header.Epoch(),
+	})
+}
 
 // EncodeRLP encodes the header using tagged RLP representation.
 func (h *Header) EncodeRLP(w io.Writer) error {

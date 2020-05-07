@@ -320,3 +320,11 @@ func (b *APIBackend) GetPendingCrossLinks() []*block.Header {
 func (b *APIBackend) GetPendingCXReceipts() []*types.CXReceiptsProof {
 	return b.hmy.nodeAPI.PendingCXReceipts()
 }
+
+// GetLatestChainHeaders ..
+func (b *APIBackend) GetLatestChainHeaders() *block.HeaderPair {
+	return &block.HeaderPair{
+		BeaconHeader: b.hmy.BeaconChain().CurrentHeader(),
+		ShardHeader:  b.hmy.BlockChain().CurrentHeader(),
+	}
+}
