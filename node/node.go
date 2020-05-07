@@ -33,7 +33,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
-	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 )
@@ -113,7 +113,7 @@ type Node struct {
 	// Shard databases
 	shardChains shardchain.Collection
 	Client      *client.Client // The presence of a client object means this node will also act as a client
-	SelfPeer    p2p.Peer
+	SelfPeer    *p2p.Peer
 	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	State      State      // State of the Node
@@ -130,7 +130,7 @@ type Node struct {
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
-	host                         p2p.Host
+	host                         *p2p.Host
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
@@ -347,53 +347,47 @@ func (node *Node) Start() error {
 	if err := node.ForceJoiningTopics(); err != nil {
 		return err
 	}
-
-	allTopics := node.host.AllTopics()
+	allTopics := node.host.AllSubscriptions()
 	if len(allTopics) == 0 {
 		return errors.New("have no topics to listen to")
 	}
 	weighted := make([]*semaphore.Weighted, len(allTopics))
 	const maxMessageHandlers = 200
 	ctx := context.Background()
-	ownID := node.host.GetID()
+	ownID := node.host.IPFSNode.PeerHost.ID()
 	errChan := make(chan error)
 
-	for i, topic := range allTopics {
-		sub, err := topic.Subscribe()
-		if err != nil {
-			return err
-		}
+	for i, named := range allTopics {
+		topicName, sub := named.Topic, named.Sub
 		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
-		msgChan := make(chan *libp2p_pubsub.Message)
+		msgChan := make(chan ipfs_interface.PubSubMessage)
 
-		go func(msgChan chan *libp2p_pubsub.Message, sem *semaphore.Weighted) {
+		go func(msgChan chan ipfs_interface.PubSubMessage, sem *semaphore.Weighted) {
 			for msg := range msgChan {
-				payload := msg.GetData()
+				payload := msg.Data()
 				if len(payload) < p2pMsgPrefixSize {
 					continue
 				}
+				m := msg
 				if sem.TryAcquire(1) {
 					go func() {
 						node.HandleMessage(
-							payload[p2pMsgPrefixSize:], msg.GetFrom(),
+							payload[p2pMsgPrefixSize:], m.From(), topicName,
 						)
 						sem.Release(1)
 					}()
-				} else {
-					utils.Logger().Info().
-						Msg("could not acquire semaphore to process incoming message")
 				}
 			}
 		}(msgChan, weighted[i])
 
-		go func(msgChan chan *libp2p_pubsub.Message) {
+		go func(msgChan chan ipfs_interface.PubSubMessage) {
 			for {
 				nextMsg, err := sub.Next(ctx)
 				if err != nil {
 					errChan <- err
 					continue
 				}
-				if nextMsg.GetFrom() == ownID {
+				if nextMsg.From() == ownID {
 					continue
 				}
 				msgChan <- nextMsg
@@ -406,6 +400,7 @@ func (node *Node) Start() error {
 	}
 	// NOTE never gets here
 	return nil
+
 }
 
 // GetSyncID returns the syncID of this node
@@ -415,7 +410,7 @@ func (node *Node) GetSyncID() [SyncIDLength]byte {
 
 // New creates a new node.
 func New(
-	host p2p.Host,
+	host *p2p.Host,
 	consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
@@ -434,7 +429,7 @@ func New(
 	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
 	if host != nil {
 		node.host = host
-		node.SelfPeer = host.GetSelfPeer()
+		node.SelfPeer = host.OwnPeer
 	}
 
 	networkType := node.NodeConfig.GetNetworkType()

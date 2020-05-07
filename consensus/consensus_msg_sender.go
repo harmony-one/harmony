@@ -21,7 +21,7 @@ type MessageSender struct {
 	blockNumMutex   sync.Mutex
 	messagesToRetry sync.Map
 	// The p2p host used to send/receive p2p messages
-	host p2p.Host
+	host *p2p.Host
 	// RetryTimes is number of retry attempts
 	retryTimes int
 }
@@ -38,7 +38,7 @@ type MessageRetry struct {
 }
 
 // NewMessageSender initializes the consensus message sender.
-func NewMessageSender(host p2p.Host) *MessageSender {
+func NewMessageSender(host *p2p.Host) *MessageSender {
 	return &MessageSender{host: host, retryTimes: int(phaseDuration.Seconds()) / RetryIntervalInSec}
 }
 

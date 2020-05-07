@@ -119,6 +119,7 @@ func setZeroLoggerFileOutput(filepath string, maxSize int) error {
 }
 
 const (
+	p2pLayer         = "p2p"
 	dataScienceTopic = "ds"
 )
 
@@ -146,6 +147,15 @@ func lookupLogger(key string) (*zerolog.Logger, error) {
 
 func ds() *zerolog.Logger {
 	logger, err := lookupLogger(dataScienceTopic)
+	if err != nil {
+		return Logger()
+	}
+	return logger
+}
+
+// NetworkLogger ..
+func NetworkLogger() *zerolog.Logger {
+	logger, err := lookupLogger(p2pLayer)
 	if err != nil {
 		return Logger()
 	}

@@ -70,7 +70,6 @@ type Consensus struct {
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader *core.BlockChain
 	// map of nodeID to validator Peer object
-	validators sync.Map // key is the hex string of the blsKey, value is p2p.Peer
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers   int
@@ -114,7 +113,7 @@ type Consensus struct {
 	RndChannel  chan [vdfAndSeedSize]byte
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 	// The p2p host used to send/receive p2p messages
-	host p2p.Host
+	host *p2p.Host
 	// MessageSender takes are of sending consensus message and the corresponding retry logic.
 	msgSender *MessageSender
 	// Used to convey to the consensus main loop that block syncing has finished.
@@ -168,11 +167,11 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, erro
 	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey)
 }
 
-// TODO: put shardId into chain reader's chain config
-
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey *multibls.PrivateKey,
+	host *p2p.Host,
+	shard uint32,
+	multiBLSPriKey *multibls.PrivateKey,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 	consensus := Consensus{}
@@ -187,7 +186,6 @@ func New(
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
-	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey

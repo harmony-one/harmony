@@ -39,6 +39,8 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
+	"github.com/ipfs/go-datastore"
+	ipfs_cfg "github.com/ipfs/go-ipfs-config"
 	"github.com/pkg/errors"
 )
 
@@ -50,11 +52,7 @@ var (
 	commit  string
 )
 
-// Host
-var (
-	myHost          p2p.Host
-	initialAccounts = []*genesis.DeployAccount{}
-)
+var initialAccounts = []*genesis.DeployAccount{}
 
 func printVersion() {
 	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
@@ -116,6 +114,10 @@ var (
 	)
 	// aws credentials
 	awsSettingString = ""
+	// NOTE Deprecated - remove once removed from node.sh
+	bootNodes = flag.String(
+		"bootnodes", "", "a list of bootnode multiaddress (delimited by ,)",
+	)
 )
 
 func initSetup() {
@@ -156,14 +158,6 @@ func initSetup() {
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
 
-	if len(p2p.BootNodes) == 0 {
-		bootNodeAddrs, err := p2p.StringsToAddrs(p2p.DefaultBootNodeAddrStrings)
-		if err != nil {
-			utils.FatalErrMsg(err, "cannot parse default bootnode list %#v",
-				p2p.DefaultBootNodeAddrStrings)
-		}
-		p2p.BootNodes = bootNodeAddrs
-	}
 }
 
 func passphraseForBLS() {
@@ -371,7 +365,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 	return *consensusMultiPubKey
 }
 
-func createGlobalConfig() (*nodeconfig.ConfigType, error) {
+func createGlobalConfig() (*nodeconfig.ConfigType, *p2p.Host, error) {
 	var err error
 
 	if len(initialAccounts) == 0 {
@@ -395,19 +389,35 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	// P2P private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot load or create P2P key at %#v",
-			*keyFile)
+		return nil, nil, errors.Wrapf(
+			err, "cannot load or create P2P key at %#v", *keyFile,
+		)
 	}
 
-	selfPeer := p2p.Peer{
+	p, err := strconv.Atoi(*port)
+
+	var DefaultBootstrap = ipfs_cfg.DefaultBootstrapAddresses
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	baseDS := datastore.NewMapDatastore()
+
+	myHost, err := p2p.NewHost(&p2p.Opts{
+		Bootstrap:             DefaultBootstrap,
+		RendezVousServerMAddr: DefaultBootstrap[0],
+		Port:                  uint(p),
+		RootDS:                baseDS,
+		Logger:                utils.NetworkLogger(),
+	}, &p2p.Peer{
 		IP:              *ip,
 		Port:            *port,
 		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
-	}
+	})
 
-	myHost, err = p2p.NewHost(&selfPeer, nodeConfig.P2PPriKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot create P2P network host")
+		return nil, nil, errors.Wrap(err, "cannot create P2P network host")
 	}
 
 	nodeConfig.DBDir = *dbDir
@@ -423,29 +433,28 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 		nodeConfig.WebHooks.Hooks = config
 	}
 
-	return nodeConfig, nil
+	return nodeConfig, myHost, nil
 }
 
-func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
-	// Consensus object.
-	// TODO: consensus object shouldn't start here
-	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
+func setupConsensusAndNode(
+	nodeConfig *nodeconfig.ConfigType,
+	myHost *p2p.Host,
+) *node.Node {
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(*shardID))
-
 	currentConsensus, err := consensus.New(
-		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
+		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, decider,
 	)
 	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
 		return currentConsensus.PubKey, nil
 	})
 
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
 	commitDelay, err := time.ParseDuration(*delayCommit)
 	if err != nil || commitDelay < 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", *delayCommit)
+		fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", *delayCommit)
 		os.Exit(1)
 	}
 	currentConsensus.SetCommitDelay(commitDelay)
@@ -607,8 +616,6 @@ func main() {
 	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
 	// build time.
 	os.Setenv("GODEBUG", "netdns=go")
-
-	flag.Var(&p2p.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
 	switch *nodeType {
@@ -692,12 +699,12 @@ func main() {
 		}
 	}
 
-	nodeConfig, err := createGlobalConfig()
+	nodeConfig, myHost, err := createGlobalConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
 		os.Exit(1)
 	}
-	currentNode := setupConsensusAndNode(nodeConfig)
+	currentNode := setupConsensusAndNode(nodeConfig, myHost)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 
 	// Prepare for graceful shutdown from os signals
@@ -753,9 +760,6 @@ func main() {
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).
 		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
 		Str("Role", currentNode.NodeConfig.Role().String()).
-		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, myHost.GetID().Pretty()),
-		).
 		Msg(startMsg)
 
 	go currentNode.SupportSyncing()
