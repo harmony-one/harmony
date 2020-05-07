@@ -14,7 +14,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/client"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
-	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	"github.com/harmony-one/harmony/consensus"
@@ -345,6 +344,10 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 // Start kicks off the node message handling
 func (node *Node) Start() error {
+	if err := node.ForceJoiningTopics(); err != nil {
+		return err
+	}
+
 	allTopics := node.host.AllTopics()
 	if len(allTopics) == 0 {
 		return errors.New("have no topics to listen to")
@@ -602,60 +605,6 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	return nil
 }
 
-// AddPeers adds neighbors nodes
-func (node *Node) AddPeers(peers []*p2p.Peer) int {
-	for _, p := range peers {
-		key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-		_, ok := node.Neighbors.LoadOrStore(key, *p)
-		if !ok {
-			// !ok means new peer is stored
-			node.host.AddPeer(p)
-			continue
-		}
-	}
-
-	return node.host.GetPeerCount()
-}
-
-// AddBeaconPeer adds beacon chain neighbors nodes
-// Return false means new neighbor peer was added
-// Return true means redundant neighbor peer wasn't added
-func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
-	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
-	return ok
-}
-
-func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		IsClient:     node.NodeConfig.IsClient(),
-		Beacon:       nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
-		ShardGroupID: node.NodeConfig.GetShardGroupID(),
-		Actions:      map[nodeconfig.GroupID]nodeconfig.ActionType{},
-	}
-
-	if nodeConfig.IsClient {
-		nodeConfig.Actions[nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID)] =
-			nodeconfig.ActionStart
-	} else {
-		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = nodeconfig.ActionStart
-	}
-
-	groups := []nodeconfig.GroupID{
-		node.NodeConfig.GetShardGroupID(),
-		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
-		node.NodeConfig.GetClientGroupID(),
-	}
-
-	// force the side effect of topic join
-	if err := node.host.SendMessageToGroups(groups, []byte{}); err != nil {
-		return nodeConfig, nil, err
-	}
-
-	return nodeConfig, chanPeer, nil
-}
-
 // ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.
 func (node *Node) ShutDown() {
 	node.Blockchain().Stop()
@@ -746,4 +695,13 @@ func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 	}
 	// self addresses map can never be nil
 	return node.KeysToAddrs
+}
+
+// ForceJoiningTopics ..
+func (node *Node) ForceJoiningTopics() error {
+	groups := []nodeconfig.GroupID{
+		node.NodeConfig.GetShardGroupID(),
+		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
+	}
+	return node.host.SendMessageToGroups(groups, []byte{})
 }
