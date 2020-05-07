@@ -2651,11 +2651,15 @@ func (bc *BlockChain) prepareStakingMetaData(
 				blockNum,
 			}
 			delegations, ok := newDelegations[createValidator.ValidatorAddress]
-			if ok {
-				delegations = append(delegations, selfIndex)
-			} else {
-				delegations = staking.DelegationIndexes{selfIndex}
+			if !ok {
+				// If the cache doesn't have it, load it from DB for the first time.
+				delegations, err = bc.ReadDelegationsByDelegator(createValidator.ValidatorAddress)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
+
+			delegations = append(delegations, selfIndex)
 			newDelegations[createValidator.ValidatorAddress] = delegations
 		case staking.DirectiveEditValidator:
 		case staking.DirectiveDelegate:
