@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
-	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
@@ -148,8 +146,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 				// skip first byte which is blockMsgType
 				node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 			}
-		case proto_node.PING:
-			node.pingMessageHandler(msgPayload, sender)
 		}
 	default:
 		utils.Logger().Error().
@@ -489,59 +485,6 @@ func (node *Node) PostConsensusProcessing(
 				}
 			}
 		}
-	}
-}
-
-func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) {
-	ping, err := proto_discovery.GetPingMessage(msgPayload)
-	if err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("Can't get Ping Message")
-	}
-
-	peer := p2p.Peer{
-		IP:              ping.Node.IP,
-		Port:            ping.Node.Port,
-		PeerID:          ping.Node.PeerID,
-		ConsensusPubKey: nil,
-	}
-
-	if ping.Node.PubKey != nil {
-		peer.ConsensusPubKey = &bls.PublicKey{}
-		if err := peer.ConsensusPubKey.Deserialize(ping.Node.PubKey[:]); err != nil {
-			utils.Logger().Error().
-				Err(err).
-				Msg("UnmarshalBinary Failed")
-		}
-	}
-
-	utils.Logger().Debug().
-		Str("Version", ping.NodeVer).
-		Str("IP", peer.IP).
-		Str("Port", peer.Port).
-		Interface("PeerID", peer.PeerID).
-		Msg("[PING] PeerInfo")
-
-	if senderStr := string(sender); senderStr != "" {
-		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
-		if ok {
-			return
-		}
-	}
-
-	if err := node.host.ConnectHostPeer(peer); err != nil {
-		utils.Logger().Info().Err(err).
-			Str("peer", peer.String()).
-			Msg("could not direct connect to this peer")
-	}
-
-	if ping.Node.Role != proto_node.ClientRole {
-		node.AddPeers([]*p2p.Peer{&peer})
-		utils.Logger().Info().
-			Str("Peer", peer.String()).
-			Int("# Peers", node.host.GetPeerCount()).
-			Msg("Add Peer to Node")
 	}
 }
 
