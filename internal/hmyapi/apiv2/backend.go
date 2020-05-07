@@ -73,6 +73,7 @@ type Backend interface {
 	GetValidatorInformation(addr common.Address, block *types.Block) (*staking.ValidatorRPCEnchanced, error)
 	GetDelegationsByValidator(validator common.Address) []*staking.Delegation
 	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)
+	GetDelegationsByDelegatorByBlock(delegator common.Address, block *types.Block) ([]common.Address, []*staking.Delegation)
 	GetValidatorSelfDelegation(addr common.Address) *big.Int
 	GetShardState() (*shard.State, error)
 	GetCurrentStakingErrorSink() types.TransactionErrorReports
