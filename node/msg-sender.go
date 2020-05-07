@@ -16,6 +16,7 @@ import (
 	inet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-msgio"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -24,15 +25,9 @@ var (
 	errReadTimeout        = fmt.Errorf("timed out reading response")
 )
 
-type senderWrapper struct {
-	sync.Mutex
-	strmap map[peer.ID]*messageSender
-}
-
 type messageSender struct {
 	s         inet.Stream
 	r         msgio.ReadCloser
-	lk        sync.Mutex
 	p         peer.ID
 	host      *p2p.Host
 	invalid   bool
@@ -51,8 +46,6 @@ func (ms *messageSender) invalidate() {
 }
 
 func (ms *messageSender) prepOrInvalidate(ctx context.Context) error {
-	ms.lk.Lock()
-	defer ms.lk.Unlock()
 	if err := ms.prep(ctx); err != nil {
 		ms.invalidate()
 		return err
@@ -62,13 +55,17 @@ func (ms *messageSender) prepOrInvalidate(ctx context.Context) error {
 
 func (ms *messageSender) prep(ctx context.Context) error {
 	if ms.invalid {
-		return fmt.Errorf("message sender has been invalidated")
+		return errors.New("message sender has been invalidated")
 	}
+
 	if ms.s != nil {
 		return nil
 	}
 
 	nstr, err := ms.host.IPFSNode.PeerHost.NewStream(ctx, ms.p, p2p.Protocol)
+	if err := nstr.SetDeadline(time.Now().Add(15 * time.Second)); err != nil {
+		return err
+	}
 
 	if err != nil {
 		return err
@@ -88,8 +85,7 @@ const streamReuseTries = 3
 func (ms *messageSender) SendMessage(
 	ctx context.Context, pmes *msg_pb.Message,
 ) error {
-	ms.lk.Lock()
-	defer ms.lk.Unlock()
+
 	retry := false
 	for {
 		if err := ms.prep(ctx); err != nil {
@@ -123,8 +119,6 @@ func (ms *messageSender) SendMessage(
 func (ms *messageSender) SendRequest(
 	ctx context.Context, pmes *msg_pb.Message,
 ) (*msg_pb.Message, error) {
-	ms.lk.Lock()
-	defer ms.lk.Unlock()
 	retry := false
 	for {
 		if err := ms.prep(ctx); err != nil {
@@ -178,6 +172,7 @@ func (ms *messageSender) ctxReadMsg(
 ) error {
 	errc := make(chan error, 1)
 	go func(r msgio.ReadCloser) {
+		fmt.Println("about to try and read for", ms.p.Pretty())
 		bytes, err := r.ReadMsg()
 		defer r.ReleaseMsg(bytes)
 		if err != nil {

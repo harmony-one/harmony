@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Workiva/go-datastructures/trie/ctrie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
@@ -27,12 +28,31 @@ import (
 )
 
 func harmonyProtocolPeers(
+	ctx context.Context,
 	conns []ipfs_interface.ConnectionInfo,
 	host *p2p.Host,
 ) ([]ipfs_interface.ConnectionInfo, error) {
+
+	streamHandles, okTrie := ctx.Value(trieCtxKey).(*ctrie.Ctrie)
+
+	if !okTrie {
+		return nil, errors.New("could not cast from context value")
+	}
+
 	var filtered []ipfs_interface.ConnectionInfo
 	for _, neighbor := range conns {
 		id := neighbor.ID()
+		peerID, err := id.MarshalBinary()
+
+		if err != nil {
+			return nil, err
+		}
+
+		// only pull up things we don't have handles for yet
+		if _, exists := streamHandles.Lookup(peerID); exists {
+			continue
+		}
+
 		protocols, err := host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
 			id, p2p.Protocol,
 		)
@@ -48,6 +68,7 @@ func harmonyProtocolPeers(
 		if !seen {
 			continue
 		}
+
 		filtered = append(filtered, neighbor)
 	}
 
@@ -187,7 +208,7 @@ func syncFromHMYPeersIfNeeded(
 		return err
 	}
 
-	hmyConns, err := harmonyProtocolPeers(conns, host)
+	hmyConns, err := harmonyProtocolPeers(ctx, conns, host)
 	if err != nil {
 		return err
 	}
@@ -283,35 +304,6 @@ func (node *Node) HandleIncomingBlocksBySync() error {
 	return nil
 }
 
-// StartBlockSyncing ..
-func (node *Node) StartBlockSyncing() error {
-	t := time.NewTicker(blockSyncInterval)
-	defer t.Stop()
-
-	for {
-		select {
-		case blockRange := <-node.Consensus.SyncNeeded:
-			_ = blockRange
-		case <-t.C:
-			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-				defer cancel()
-
-				if err := syncFromHMYPeersIfNeeded(ctx, node.host, node); err != nil {
-					if err == context.DeadlineExceeded {
-						fmt.Println("context dead died exceeded")
-						return
-					}
-					fmt.Println("what is error->", err.Error())
-				}
-			}()
-
-		}
-	}
-
-	return nil
-}
-
 func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 	r := msgio.NewVarintReaderSize(s, libp2p_network.MessageSizeMax)
 	mPeer := s.Conn().RemotePeer()
@@ -382,40 +374,57 @@ func (node *Node) HandleIncomingHMYProtocolStreams() {
 	)
 }
 
+type msgCtxKey string
+
+var (
+	trieCtxKey = msgCtxKey("msgSendr-ctx-key")
+)
+
 func (node *Node) messageSenderForPeer(
 	ctx context.Context, p libp2p_peer.ID,
 ) (*messageSender, error) {
 
-	node.sender.Lock()
-	ms, ok := node.sender.strmap[p]
-	if ok {
-		node.sender.Unlock()
-		return ms, nil
+	peerID, err := p.MarshalBinary()
+	if err != nil {
+		return nil, err
 	}
-	ms = &messageSender{p: p, host: node.host}
-	node.sender.strmap[p] = ms
-	node.sender.Unlock()
+
+	streamHandles, okTrie := ctx.Value(trieCtxKey).(*ctrie.Ctrie)
+
+	if !okTrie {
+		return nil, errors.Errorf(
+			"cast for ctrie failed from context for peerID %s",
+			p.Pretty(),
+		)
+	}
+
+	existingMS, ok := streamHandles.Lookup(peerID)
+
+	if ok {
+		return existingMS.(*messageSender), nil
+	}
+
+	ms := &messageSender{p: p, host: node.host}
+
+	node.streamHandles.Insert(peerID, ms)
 
 	if err := ms.prepOrInvalidate(ctx); err != nil {
-		node.sender.Lock()
-		defer node.sender.Unlock()
 
-		if msCur, ok := node.sender.strmap[p]; ok {
+		if msCur, ok := streamHandles.Lookup(peerID); ok {
 			// Changed. Use the new one, old one is invalid and
 			// not in the map so we can just throw it away.
 			if ms != msCur {
-				return msCur, nil
+				return msCur.(*messageSender), nil
 			}
 			// Not changed, remove the now invalid stream from the
 			// map.
-			delete(node.sender.strmap, p)
+			streamHandles.Remove(peerID)
 		}
 		// Invalid but not in map. Must have been removed by a disconnect.
 		return nil, err
 	}
 	// All ready to go.
 	return ms, nil
-
 }
 
 type syncHandler func(
@@ -553,6 +562,150 @@ func (node *Node) syncHandlerForMsgType(t msg_pb.MessageType) syncHandler {
 		return node.syncRespBlockHeaderHandler
 	case msg_pb.MessageType_SYNC_REQUEST_BLOCK:
 		return node.syncRespBlockHandler
+	}
+
+	return nil
+}
+
+func (node *Node) downloadBlocksForSync(
+	ctx context.Context,
+	results chan *msg_pb.Message,
+) error {
+	conns, err := node.host.CoreAPI.Swarm().Peers(ctx)
+	if err != nil {
+		return err
+	}
+
+	hmyConns, err := harmonyProtocolPeers(ctx, conns, node.host)
+	if err != nil {
+		return err
+	}
+
+	g, ctx := errgroup.WithContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	var height uint64
+
+	if node.Consensus.ShardID == shard.BeaconChainShardID {
+		height = node.Beaconchain().CurrentHeader().Number().Uint64()
+	} else {
+		height = node.Blockchain().CurrentHeader().Number().Uint64()
+	}
+
+	for _, peerConn := range hmyConns {
+		peer := peerConn.ID()
+		g.Go(func() error {
+
+			fmt.Println("connected to", peer.Pretty(),
+				":I am ", node.host.IPFSNode.PeerHost.ID().Pretty(),
+			)
+
+			handle, err := node.messageSenderForPeer(ctx, peer)
+			if err != nil {
+				return err
+			}
+
+			// send over my height
+			reply, err := handle.SendRequest(ctx, &msg_pb.Message{
+				ServiceType: msg_pb.ServiceType_CLIENT_SUPPORT,
+				Type:        msg_pb.MessageType_SYNC_REQUEST_BLOCK,
+				Request: &msg_pb.Message_SyncBlock{
+					SyncBlock: &msg_pb.SyncBlock{
+						ShardId: node.Consensus.ShardID,
+						Height:  height,
+					},
+				},
+			})
+
+			if err != nil {
+				return err
+			}
+			results <- reply
+			return nil
+		})
+	}
+
+	return g.Wait()
+}
+
+// StartBlockSyncing ..
+func (node *Node) StartBlockSyncing() error {
+	round := 0
+
+	for {
+
+		ctx, cancel := context.WithTimeout(
+			context.WithValue(
+				context.Background(), trieCtxKey, node.streamHandles.ReadOnlySnapshot()),
+			time.Second*25,
+		)
+
+		var blocksPulled []*types.Block
+
+		const maxBlocksProcess = 50
+		replies := make(chan *msg_pb.Message)
+
+		go node.downloadBlocksForSync(ctx, replies)
+
+		go func() {
+			for rpmes := range replies {
+
+				if len(blocksPulled) == maxBlocksProcess {
+					cancel()
+					return
+				}
+				data := rpmes.GetSyncBlock().GetBlockRlp()
+				var blocks []*types.Block
+				if err := rlp.DecodeBytes(data, &blocks); err != nil {
+					fmt.Println("couldn't decode from this person, why")
+					panic("oops->" + err.Error())
+					// continue
+				}
+
+				blocksPulled = append(blocksPulled, blocks...)
+
+			}
+		}()
+
+		<-ctx.Done()
+
+		replies = nil
+		fmt.Println("downloaded->", len(blocksPulled), " blocks")
+
+		for _, blk := range blocksPulled {
+			fmt.Println("downloaded ->", blk.String())
+		}
+
+		// Now safe to drop all the handles
+
+		for iter := range node.streamHandles.Iterator(nil) {
+
+			handle, ok := iter.Value.(*messageSender)
+			if !ok {
+				return errors.New("can not cast")
+			}
+			fmt.Println("closing stream for peerID", handle.p.Pretty())
+		}
+
+		node.streamHandles.Clear()
+
+		round++
+
+		// 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		// 			defer cancel()
+
+		// 			if err := syncFromHMYPeersIfNeeded(ctx, node.host, node); err != nil {
+		// 				if err == context.DeadlineExceeded {
+		// 					fmt.Println("context dead died exceeded")
+		// 					return
+		// 				}
+		// 				fmt.Println("what is error->", err.Error())
+		// 			}
+		// 		}()
+
+		// 	}
 	}
 
 	return nil
