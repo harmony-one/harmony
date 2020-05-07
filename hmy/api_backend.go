@@ -229,7 +229,6 @@ func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscripti
 }
 
 // GetPoolTransactions returns pool transactions.
-// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	pending, err := b.hmy.txPool.Pending()
 	if err != nil {
@@ -240,6 +239,11 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 		txs = append(txs, batch...)
 	}
 	return txs, nil
+}
+
+// GetPoolStats returns the number of pending and queued transactions
+func (b *APIBackend) GetPoolStats() (pendingCount, queuedCount int) {
+	return b.hmy.txPool.Stats()
 }
 
 // GetAccountNonce returns the nonce value of the given address for the given block number
@@ -570,20 +574,21 @@ func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*stak
 	return delegations
 }
 
-// GetDelegationsByDelegator returns all delegation information of a delegator
-func (b *APIBackend) GetDelegationsByDelegator(
-	delegator common.Address,
+// GetDelegationsByDelegatorByBlock returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegatorByBlock(
+	delegator common.Address, block *types.Block,
 ) ([]common.Address, []*staking.Delegation) {
 	addresses := []common.Address{}
 	delegations := []*staking.Delegation{}
-	delegationIndexes, err := b.hmy.BlockChain().ReadDelegationsByDelegator(delegator)
+	delegationIndexes, err := b.hmy.BlockChain().
+		ReadDelegationsByDelegatorAt(delegator, block.Number())
 	if err != nil {
 		return nil, nil
 	}
 
 	for i := range delegationIndexes {
-		wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(
-			delegationIndexes[i].ValidatorAddress,
+		wrapper, err := b.hmy.BlockChain().ReadValidatorInformationAt(
+			delegationIndexes[i].ValidatorAddress, block.Root(),
 		)
 		if err != nil || wrapper == nil {
 			return nil, nil
@@ -597,6 +602,14 @@ func (b *APIBackend) GetDelegationsByDelegator(
 		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
 	}
 	return addresses, delegations
+}
+
+// GetDelegationsByDelegator returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegator(
+	delegator common.Address,
+) ([]common.Address, []*staking.Delegation) {
+	block := b.hmy.BlockChain().CurrentBlock()
+	return b.GetDelegationsByDelegatorByBlock(delegator, block)
 }
 
 // GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
@@ -617,13 +630,13 @@ func (b *APIBackend) GetShardState() (*shard.State, error) {
 }
 
 // GetCurrentStakingErrorSink ..
-func (b *APIBackend) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
+func (b *APIBackend) GetCurrentStakingErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportStakingErrorSink()
 }
 
 // GetCurrentTransactionErrorSink ..
-func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredTransactionSink()
+func (b *APIBackend) GetCurrentTransactionErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportPlainErrorSink()
 }
 
 // GetPendingCXReceipts ..

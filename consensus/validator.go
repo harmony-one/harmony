@@ -159,9 +159,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 	if err := consensus.tryCatchup(); err != nil {
 		return err
 	}
-	if consensus.Current.Mode() == ViewChanging {
-		utils.Logger().Debug().Msg("[OnPrepared] Still in ViewChanging mode, Exiting!!")
-		return nil
+
+	if m := consensus.Current.Mode(); m != Normal {
+		// don't sign the block that is not verified
+		utils.Logger().Debug().Msg("[OnPrepared] Not in normal mode, Exiting!!")
+		return errors.Errorf("not in normal mode current: %s", m.String())
 	}
 
 	if consensus.checkViewID(recvMsg) != nil {
@@ -178,7 +180,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", num).
 			Msg("[OnPrepared] Future Block Received, ignoring!!")
-		return nil
+		return errors.New("future Block Received, ignoring")
 	}
 
 	// TODO: genesis account node delay for 1 second,

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200427.0"
+version="v1 20200507.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -239,7 +239,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers max_bls_keys_per_node
 start_clean=false
 loop=true
 run_as_root=true
@@ -259,6 +259,7 @@ pprof=""
 static=true
 verify=false
 minpeers=6
+max_bls_keys_per_node=10
 ${BLSKEYFILE=}
 ${TRACEFILE=}
 
@@ -379,12 +380,12 @@ if [ -n "$upgrade_rel" ]; then
 fi
 
 if [ "$OS" == "Darwin" ]; then
-   FOLDER=release/darwin-x86_64/$REL/
+   FOLDER=release/darwin-x86_64/$REL
 fi
 if [ "$OS" == "Linux" ]; then
-   FOLDER=release/linux-x86_64/$REL/
+   FOLDER=release/linux-x86_64/$REL
    if [ "$static" == "true" ]; then
-      FOLDER=release/linux-x86_64/$REL/static/
+      FOLDER=${FOLDER}/static
    fi
 fi
 
@@ -444,7 +445,7 @@ download_binaries() {
    mkdir -p "${outdir}"
    for bin in $(cut -c35- "${outdir}/md5sum.txt"); do
       status=0
-      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin} -o "${outdir}/${bin}" || status=$?
+      curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/${bin} -o "${outdir}/${bin}" || status=$?
       case "${status}" in
       0) ;;
       *)
@@ -454,7 +455,7 @@ download_binaries() {
       esac
 
       if $verify; then
-         curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}${bin}.sig -o "${outdir}/${bin}.sig" || status=$?
+         curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/${bin}.sig -o "${outdir}/${bin}.sig" || status=$?
          case "${status}" in
          0) ;;
          *)
@@ -519,7 +520,7 @@ download_harmony_db_file() {
       err 70 "do not have enough free disk space to download db tarball"
    fi
 
-   url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/md5sum.txt"
+   url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/md5sum.txt"
    rm -f "${outdir}/md5sum.txt"
    if ! _curl_download $url "${outdir}" md5sum.txt; then
       err 70 "cannot download md5sum.txt"
@@ -527,7 +528,7 @@ download_harmony_db_file() {
 
    if [ -n "${file_to_dl}" ]; then
       if grep -q "${file_to_dl}" "${outdir}/md5sum.txt"; then
-         url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/${file_to_dl}"
+         url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/${file_to_dl}"
          if _curl_download $url "${outdir}" ${file_to_dl}; then
             verify_checksum "${outdir}" "${file_to_dl}" md5sum.txt || return $?
             msg "downloaded ${file_to_dl}, extracting ..."
@@ -548,7 +549,7 @@ download_harmony_db_file() {
          echo -n "Do you want to download ${file} (choose one only) [y/n]?"
          read yesno
          if [[ "$yesno" = "y" || "$yesno" = "Y" ]]; then
-            url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}db/$file"
+            url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/$file"
             if _curl_download $url "${outdir}" $file; then
                verify_checksum "${outdir}" "${file}" md5sum.txt || return $?
                msg "downloaded $file, extracting ..."
@@ -572,7 +573,7 @@ any_new_binaries() {
       msg "failed to downloaded harmony public signing key"
       return 1
    fi
-   curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
+   curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
    if diff $outdir/md5sum.txt.new md5sum.txt
    then
       rm "${outdir}/md5sum.txt.new"
@@ -877,6 +878,7 @@ do
       -dns_zone="${dns_zone}"
       -blacklist="${blacklist}"
       -min_peers="${minpeers}"
+      -max_bls_keys_per_node="${max_bls_keys_per_node}"
    )
    args+=(
       -is_archival="${archival}"

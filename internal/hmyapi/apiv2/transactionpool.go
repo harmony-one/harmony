@@ -16,11 +16,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	// ErrInvalidChainID when ChainID of signer does not match that of running node
-	errInvalidChainID = errors.New("invalid chain id for signer")
-)
-
 // TxHistoryArgs is struct to make GetTransactionsHistory request
 type TxHistoryArgs struct {
 	Address   string `json:"address"`
@@ -242,7 +237,7 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	c := s.b.ChainConfig().ChainID
 	if id := tx.ChainID(); id.Cmp(c) != 0 {
 		return common.Hash{}, errors.Wrapf(
-			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
 		)
 	}
 	return SubmitStakingTransaction(ctx, s.b, tx)
@@ -262,7 +257,7 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	c := s.b.ChainConfig().ChainID
 	if id := tx.ChainID(); id.Cmp(c) != 0 {
 		return common.Hash{}, errors.Wrapf(
-			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
 		)
 	}
 	return SubmitTransaction(ctx, s.b, tx)
@@ -361,69 +356,60 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	return fields, nil
 }
 
+// GetPoolStats returns stats for the tx-pool
+func (s *PublicTransactionPoolAPI) GetPoolStats() (pendingCount, queuedCount int) {
+	return s.b.GetPoolStats()
+}
+
 // PendingTransactions returns the plain transactions that are in the transaction pool
-// and have a from address that is one of the accounts this node manages.
 func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
 	pending, err := s.b.GetPoolTransactions()
 	if err != nil {
 		return nil, err
 	}
-	managedAccounts := make(map[common.Address]struct{})
-	transactions := make([]*RPCTransaction, 0, len(pending))
-	for _, tx := range pending {
-		var signer types.Signer = types.HomesteadSigner{}
-		if tx.Protected() {
-			signer = types.NewEIP155Signer(tx.ChainID())
-		}
-		from, _ := types.PoolTransactionSender(signer, tx)
-		if _, exists := managedAccounts[from]; exists {
-			if plainTx, ok := tx.(*types.Transaction); ok {
-				transactions = append(transactions, newRPCPendingTransaction(plainTx))
-			} else if _, ok := tx.(*staking.StakingTransaction); ok {
-				continue // Do not return staking transactions here
-			} else {
-				return nil, types.ErrUnknownPoolTxType
+	transactions := make([]*RPCTransaction, 0)
+	for i := range pending {
+		if plainTx, ok := pending[i].(*types.Transaction); ok {
+			if tx := newRPCTransaction(plainTx, common.Hash{}, 0, 0, 0); tx != nil {
+				transactions = append(transactions, tx)
 			}
+		} else if _, ok := pending[i].(*staking.StakingTransaction); ok {
+			continue // Do not return staking transactions here.
+		} else {
+			return nil, types.ErrUnknownPoolTxType
 		}
 	}
 	return transactions, nil
 }
 
 // PendingStakingTransactions returns the staking transactions that are in the transaction pool
-// and have a from address that is one of the accounts this node manages.
 func (s *PublicTransactionPoolAPI) PendingStakingTransactions() ([]*RPCStakingTransaction, error) {
 	pending, err := s.b.GetPoolTransactions()
 	if err != nil {
 		return nil, err
 	}
-	managedAccounts := make(map[common.Address]struct{})
-	transactions := make([]*RPCStakingTransaction, 0, len(pending))
-	for _, tx := range pending {
-		var signer types.Signer = types.HomesteadSigner{}
-		if tx.Protected() {
-			signer = types.NewEIP155Signer(tx.ChainID())
-		}
-		from, _ := types.PoolTransactionSender(signer, tx)
-		if _, exists := managedAccounts[from]; exists {
-			if _, ok := tx.(*types.Transaction); ok {
-				continue // Do not return plain transactions here
-			} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
-				transactions = append(transactions, newRPCPendingStakingTransaction(stakingTx))
-			} else {
-				return nil, types.ErrUnknownPoolTxType
+	transactions := make([]*RPCStakingTransaction, 0)
+	for i := range pending {
+		if _, ok := pending[i].(*types.Transaction); ok {
+			continue // Do not return plain transactions here
+		} else if stakingTx, ok := pending[i].(*staking.StakingTransaction); ok {
+			if tx := newRPCStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0); tx != nil {
+				transactions = append(transactions, tx)
 			}
+		} else {
+			return nil, types.ErrUnknownPoolTxType
 		}
 	}
 	return transactions, nil
 }
 
 // GetCurrentTransactionErrorSink ..
-func (s *PublicTransactionPoolAPI) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+func (s *PublicTransactionPoolAPI) GetCurrentTransactionErrorSink() types.TransactionErrorReports {
 	return s.b.GetCurrentTransactionErrorSink()
 }
 
 // GetCurrentStakingErrorSink ..
-func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
+func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() types.TransactionErrorReports {
 	return s.b.GetCurrentStakingErrorSink()
 }
 

@@ -65,6 +65,7 @@ type Node struct {
 	// Shard databases
 	shardChains           shardchain.Collection
 	Peer                  *p2p.Peer
+	TransactionErrorSink  *types.TransactionErrorSink
 	State                 atomic.Value // State of the Node
 	incomingSyncingBlocks chan *types.Block
 	TxPool                *core.TxPool
@@ -436,6 +437,7 @@ func New(
 			strmap: map[libp2p_peer.ID]*messageSender{},
 		},
 		host:                  host,
+		TransactionErrorSink:  types.NewTransactionErrorSink(),
 		Consensus:             consensusObj,
 		Gossiper:              relay.NewBroadCaster(configUsed, host),
 		incomingSyncingBlocks: make(chan *types.Block),
@@ -481,26 +483,10 @@ func New(
 
 		txPoolConfig := core.DefaultTxPoolConfig
 		txPoolConfig.Blacklist = blacklist
-		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain,
-			func(payload []types.RPCTransactionError) {
-				if len(payload) > 0 {
-					node.errorSink.Lock()
-					for i := range payload {
-						node.errorSink.failedTxns.Value = payload[i]
-						node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
-					}
-					node.errorSink.Unlock()
-				}
-			},
-			func(payload []staking.RPCTransactionError) {
-				node.errorSink.Lock()
-				for i := range payload {
-					node.errorSink.failedStakingTxns.Value = payload[i]
-					node.errorSink.failedStakingTxns = node.errorSink.failedStakingTxns.Next()
-				}
-				node.errorSink.Unlock()
-			},
+		node.TxPool = core.NewTxPool(
+			txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink,
 		)
+		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
 		if node.Blockchain().ShardID() != shard.BeaconChainShardID {

@@ -16,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -55,17 +54,9 @@ func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
 	return cxReceipts
 }
 
-// ErroredStakingTransactionSink is the inmemory failed staking transactions this node has
-func (node *Node) ErroredStakingTransactionSink() []staking.RPCTransactionError {
-	node.errorSink.Lock()
-	defer node.errorSink.Unlock()
-	result := []staking.RPCTransactionError{}
-	node.errorSink.failedStakingTxns.Do(func(d interface{}) {
-		if d != nil {
-			result = append(result, d.(staking.RPCTransactionError))
-		}
-	})
-	return result
+// ReportStakingErrorSink is the report of failed staking transactions this node has (held inmemory only)
+func (node *Node) ReportStakingErrorSink() types.TransactionErrorReports {
+	return node.TransactionErrorSink.StakingReport()
 }
 
 // GetNodeBootTime ..
@@ -73,51 +64,35 @@ func (node *Node) GetNodeBootTime() int64 {
 	return node.unixTimeAtNodeStart
 }
 
+// ReportPlainErrorSink is the report of failed transactions this node has (held inmemory only)
+func (node *Node) ReportPlainErrorSink() types.TransactionErrorReports {
+	return node.TransactionErrorSink.PlainReport()
+}
+
 // GetNodeConfig ..
 func (node *Node) GetNodeConfig() *nodeconfig.ConfigType {
 	return node.NodeConfig
-}
-
-// ErroredTransactionSink is the inmemory failed transactions this node has
-func (node *Node) ErroredTransactionSink() []types.RPCTransactionError {
-	node.errorSink.Lock()
-	defer node.errorSink.Unlock()
-	result := []types.RPCTransactionError{}
-	node.errorSink.failedTxns.Do(func(d interface{}) {
-		if d != nil {
-			result = append(result, d.(types.RPCTransactionError))
-		}
-	})
-	return result
 }
 
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
 	harmony, _ = hmy.New(
-		node, node.TxPool,
-		node.CxPool,
-		new(event.TypeMux),
-		node.Consensus.ShardID,
+		node, node.TxPool, node.CxPool, new(event.TypeMux), node.Consensus.ShardID,
 	)
 
-	// TODO put in explorer service that came via service manager
+	// TODO need to add explorer service
+
 	apis := node.APIs()
-
 	port, _ := strconv.Atoi(nodePort)
-	ip := ""
 
+	ip := ""
 	if !nodeconfig.GetPublicRPC() {
 		ip = "127.0.0.1"
 	}
-
 	httpEndpoint = fmt.Sprintf("%v:%v", ip, port+rpcHTTPPortOffset)
 
-	if err := node.startHTTP(
-		httpEndpoint, apis,
-		httpModules, httpOrigins,
-		httpVirtualHosts, httpTimeouts,
-	); err != nil {
+	if err := node.startHTTP(httpEndpoint, apis, httpModules, httpOrigins, httpVirtualHosts, httpTimeouts); err != nil {
 		return err
 	}
 	wsEndpoint = fmt.Sprintf("%v:%v", ip, port+rpcWSPortOffset)
