@@ -76,4 +76,5 @@ type Backend interface {
 	GetPendingCrossLinks() []*block.Header
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 	GetCrossShardTransactionsHistory(address string) ([]types.CrossShardTx, error)
+	GetLatestChainHeaders() *block.HeaderPair
 }
