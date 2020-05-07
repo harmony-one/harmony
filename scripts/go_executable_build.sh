@@ -4,7 +4,6 @@ export GO111MODULE=on
 
 declare -A SRC
 SRC[harmony]=cmd/harmony/main.go
-SRC[bootnode]=cmd/bootnode/main.go
 
 BINDIR=bin
 BUCKET=unique-bucket-bin
@@ -17,7 +16,7 @@ RACE=
 TRACEPTR=
 VERBOSE=
 GO_GCFLAGS="all=-c 2"
-DEBUG=false
+DEBUG=true
 STATIC=false
 
 unset -v progdir
@@ -69,7 +68,7 @@ ACTION:
    upload      upload binaries to s3
    release     upload binaries to release bucket
 
-   harmony|bootnode|
+   harmony
                only build the specified binary
 
 EXAMPLES:
@@ -107,14 +106,10 @@ function build_only
       if [[ -z "$build" || "$bin" == "$build" ]]; then
          rm -f $BINDIR/$bin
          echo "building ${SRC[$bin]}"
-         if [ "$DEBUG" == "true" ]; then
-            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
+         if [ "$STATIC" == "true" ]; then
+            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
          else
-            if [ "$STATIC" == "true" ]; then
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}  -w -extldflags \"-static -lm\"" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
-            else
-               env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
-            fi
+            env GOOS=$GOOS GOARCH=$GOARCH go build $VERBOSE -gcflags="${GO_GCFLAGS}" -ldflags="-X main.version=v${VERSION} -X main.commit=${COMMIT} -X main.builtAt=${BUILTAT} -X main.builtBy=${BUILTBY}" -o $BINDIR/$bin $RACE $TRACEPTR ${SRC[$bin]}
          fi
          if [ "$(uname -s)" == "Linux" ]; then
             $BINDIR/$bin -version || $BINDIR/$bin version
@@ -128,8 +123,6 @@ function build_only
    pushd $BINDIR
    if [ "$STATIC" == "true" ]; then
       $MD5 "${!SRC[@]}" > md5sum.txt
-      cp -pf ../scripts/node.sh .
-      $MD5 node.sh >> md5sum.txt
    else
       for lib in "${!LIB[@]}"; do
          if [ -e ${LIB[$lib]} ]; then
@@ -270,6 +263,6 @@ case "$ACTION" in
    "build") build_only ;;
    "upload") upload ;;
    "release") release ;;
-   "harmony"|"bootnode") build_only $ACTION ;;
+   "harmony") build_only $ACTION ;;
    *) usage ;;
 esac

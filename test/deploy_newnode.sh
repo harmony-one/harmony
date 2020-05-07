@@ -19,7 +19,7 @@ function check_result() {
 }
 
 function cleanup() {
-   for pid in `/bin/ps -fu $USER| grep "harmony\|soldier\|commander\|profiler\|beacon\|bootnode" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
+   for pid in `/bin/ps -fu $USER| grep "harmony\|soldier\|commander\|profiler\|beacon" | grep -v "grep" | grep -v "vi" | awk '{print $2}'`;
    do
        echo 'Killed process: '$pid
        $DRYRUN kill -9 $pid 2> /dev/null
@@ -100,24 +100,6 @@ HMY_OPT=
 HMY_OPT2=
 HMY_OPT3=
 
-unset -v latest_bootnode_log
-latest_bootnode_log=$(ls -tr "${ROOT}"/tmp_log/log-*/bootnode.log | tail -1)
-case "${latest_bootnode_log}" in
-"")
-	echo "cannot determine latest bootnode log"
-	exit 69
-	;;
-esac
-unset -v bn_ma
-bn_ma=$(sed -n 's:^.*BN_MA=::p' "${latest_bootnode_log}" | tail -1)
-case "${bn_ma}" in
-"")
-	echo "cannot determine boot node address from ${latest_bootnode_log}"
-	exit 69
-	;;
-esac
-echo "autodetected boot node multiaddr: ${bn_ma}"
-HMY_OPT2="-bootnodes ${bn_ma}"
 
 for i in 0{1..5} # {10..99}
 do
