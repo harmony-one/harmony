@@ -331,7 +331,7 @@ func (node *Node) BootstrapConsensus() error {
 					}
 				}
 
-				if current >= min-2 {
+				if current >= min {
 					utils.Logger().Info().
 						Int("have", current).
 						Int("needed", min).
