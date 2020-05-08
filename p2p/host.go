@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"sync"
 
+	"github.com/Workiva/go-datastructures/trie/ctrie"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p/ipfsutil"
@@ -14,7 +14,6 @@ import (
 	ipfs_core "github.com/ipfs/go-ipfs/core"
 	ipfs_interface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/juju/fslock"
-	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -42,14 +41,12 @@ type Opts struct {
 
 // Host ..
 type Host struct {
-	CoreAPI        ipfs_interface.CoreAPI
-	IPFSNode       *ipfs_core.IpfsNode
-	log            *zerolog.Logger
-	OwnPeer        *Peer
-	lock           sync.Mutex
-	joined         map[string]ipfs_interface.PubSubSubscription
-	swarmAddrs     []string
-	IncomingStream chan libp2p_network.Stream
+	CoreAPI    ipfs_interface.CoreAPI
+	IPFSNode   *ipfs_core.IpfsNode
+	log        *zerolog.Logger
+	OwnPeer    *Peer
+	joined     *ctrie.Ctrie
+	swarmAddrs []string
 }
 
 func unlockFS(l *fslock.Lock) {
@@ -73,6 +70,8 @@ func fatal(err error) {
 	panic("end")
 }
 
+// TODO this should take context as first arg
+
 // SendMessageToGroups ..
 func (h *Host) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
 	ctx := context.Background()
@@ -80,7 +79,7 @@ func (h *Host) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) erro
 
 	for _, group := range groups {
 		top := string(group)
-		_, err := h.getTopic(top)
+		_, err := h.getTopic(ctx, top)
 		if err != nil {
 			return err
 		}
@@ -92,20 +91,22 @@ func (h *Host) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) erro
 	return g.Wait()
 }
 
-func (h *Host) getTopic(topic string) (ipfs_interface.PubSubSubscription, error) {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-	if t, ok := h.joined[topic]; ok {
-		return t, nil
+func (h *Host) getTopic(
+	ctx context.Context, topic string,
+) (ipfs_interface.PubSubSubscription, error) {
+	key := []byte(topic)
+	pubsub, alreadyExisted := h.joined.Lookup(key)
+	if alreadyExisted {
+		return pubsub.(ipfs_interface.PubSubSubscription), nil
 	}
 
-	sub, err := h.CoreAPI.PubSub().Subscribe(context.Background(), topic)
+	sub, err := h.CoreAPI.PubSub().Subscribe(ctx, topic)
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot join pubsub topic %x", topic)
 	}
 
-	h.joined[topic] = sub
+	h.joined.Insert(key, sub)
 	return sub, nil
 }
 
@@ -118,10 +119,11 @@ type NamedSub struct {
 // AllSubscriptions ..
 func (h *Host) AllSubscriptions() []NamedSub {
 	subs := []NamedSub{}
-	h.lock.Lock()
-	defer h.lock.Unlock()
-	for name, g := range h.joined {
-		subs = append(subs, NamedSub{name, g})
+	for pair := range h.joined.Iterator(nil) {
+		subs = append(subs, NamedSub{
+			string(pair.Key),
+			pair.Value.(ipfs_interface.PubSubSubscription),
+		})
 	}
 	return subs
 }
@@ -208,8 +210,7 @@ func NewHost(opts *Opts, own *Peer) (*Host, error) {
 		IPFSNode:   node,
 		log:        opts.Logger,
 		OwnPeer:    own,
-		lock:       sync.Mutex{},
-		joined:     map[string]ipfs_interface.PubSubSubscription{},
+		joined:     ctrie.New(nil),
 		swarmAddrs: swarmAddresses,
 	}, nil
 }
