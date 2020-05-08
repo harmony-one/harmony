@@ -14,6 +14,7 @@ var (
 	PangaeaChainID            = big.NewInt(3)
 	PartnerChainID            = big.NewInt(4)
 	StressnetChainID          = big.NewInt(5)
+	P2PNetChainID             = big.NewInt(7)   // 6 is already reserved for devnet
 	TestChainID               = big.NewInt(99)  // not a real network
 	AllProtocolChangesChainID = big.NewInt(100) // not a real network
 )
@@ -77,6 +78,19 @@ var (
 	// All features except for CrossLink are enabled at launch.
 	StressnetChainConfig = &ChainConfig{
 		ChainID:         StressnetChainID,
+		CrossTxEpoch:    big.NewInt(0),
+		CrossLinkEpoch:  big.NewInt(2),
+		StakingEpoch:    big.NewInt(2),
+		PreStakingEpoch: big.NewInt(1),
+		EIP155Epoch:     big.NewInt(0),
+		S3Epoch:         big.NewInt(0),
+		ReceiptLogEpoch: big.NewInt(0),
+	}
+
+	// P2PNetChainConfig contains the chain parameters for the P2P test network.
+	// All features except for CrossLink are enabled at launch.
+	P2PNetChainConfig = &ChainConfig{
+		ChainID:         P2PNetChainID,
 		CrossTxEpoch:    big.NewInt(0),
 		CrossLinkEpoch:  big.NewInt(2),
 		StakingEpoch:    big.NewInt(2),

@@ -20,6 +20,7 @@ const (
 	Partner
 	StressNet
 	DevNet
+	P2PNet
 )
 
 type instance struct {

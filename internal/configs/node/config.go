@@ -52,6 +52,7 @@ const (
 	Stressnet = "stressnet"
 	Devnet    = "devnet"
 	Localnet  = "localnet"
+	P2PNet    = "p2p"
 )
 
 // Global is the index of the global node configuration
@@ -307,6 +308,8 @@ func (t NetworkType) ChainConfig() params.ChainConfig {
 		return *params.StressnetChainConfig
 	case Localnet:
 		return *params.LocalnetChainConfig
+	case P2PNet:
+		return *params.P2PNetChainConfig
 	default:
 		return *params.TestnetChainConfig
 	}
