@@ -508,9 +508,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 			"shardID", *shardID)
 	}
 
-	// Set the consensus ID to be the current block number
+	// Set the consensus ID to be the current block number.
 	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
-	currentConsensus.SetViewID(viewID)
+	currentConsensus.SetViewID(viewID + 1)
 	utils.Logger().Info().
 		Uint64("viewID", viewID).
 		Msg("Init Blockchain")
