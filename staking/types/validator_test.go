@@ -26,6 +26,14 @@ var (
 )
 
 var (
+	zeroDec     = numeric.ZeroDec()
+	oneThirdDec = numeric.NewDecWithPrec(33, 2)
+	halfDec     = numeric.NewDecWithPrec(5, 1)
+	twoThirdDec = numeric.NewDecWithPrec(66, 2)
+	oneDec      = numeric.OneDec()
+)
+
+var (
 	nineK   = new(big.Int).Mul(big.NewInt(9000), big.NewInt(1e18))
 	tenK    = new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18))
 	elevenK = new(big.Int).Mul(big.NewInt(11000), big.NewInt(1e18))
@@ -101,7 +109,6 @@ func TestMarshalUnmarshalValidator(t *testing.T) {
 	}
 }
 
-// check the validator wrapper's sanity
 func TestValidator_SanityCheck(t *testing.T) {
 	tests := []struct {
 		editValidator func(*Validator)

@@ -11,10 +11,8 @@ import (
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -141,13 +139,6 @@ func (e Evidence) String() string {
 func (r Record) String() string {
 	s, _ := json.Marshal(r)
 	return string(s)
-}
-
-// CommitteeReader ..
-type CommitteeReader interface {
-	Config() *params.ChainConfig
-	ReadShardState(epoch *big.Int) (*shard.State, error)
-	CurrentBlock() *types.Block
 }
 
 // Verify checks that the slash is valid
