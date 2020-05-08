@@ -791,6 +791,8 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 			blsKeys = append(blsKeys, key.SerializeToHexStr())
 		}
 	}
+	c := commonRPC.C{}
+	c.TotalKnownPeers, c.Connected, c.NotConnected = b.hmy.nodeAPI.PeerConnectivity()
 
 	return commonRPC.NodeMetadata{
 		blsKeys,
@@ -805,5 +807,6 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 		cfg.DNSZone,
 		cfg.GetArchival(),
 		b.hmy.nodeAPI.GetNodeBootTime(),
+		c,
 	}
 }
