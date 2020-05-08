@@ -113,5 +113,3 @@ func CopyUndelegation(ud staking.Undelegation) staking.Undelegation {
 	}
 	return cp
 }
-
-// TODO: copy counters
