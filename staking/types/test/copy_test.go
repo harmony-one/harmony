@@ -1,4 +1,4 @@
-package stake_testing
+package staketest
 
 import (
 	"errors"
