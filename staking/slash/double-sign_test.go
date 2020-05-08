@@ -315,7 +315,9 @@ func TestPayDownAsMuchAsCan(t *testing.T) {
 func TestDelegatorSlashApply(t *testing.T) {
 	tests := []slashApplyTestCase{
 		{
-			rate: numeric.ZeroDec(),
+			rate:     numeric.ZeroDec(),
+			snapshot: defaultSnapValidatorWrapper(),
+			current:  defaultCurrentValidatorWrapper(),
 			expDels: []expDelegation{
 				{
 					expAmt:      twentyKOnes,
@@ -332,7 +334,9 @@ func TestDelegatorSlashApply(t *testing.T) {
 			expSnitch:  common.Big0,
 		},
 		{
-			rate: numeric.NewDecWithPrec(25, 2),
+			rate:     numeric.NewDecWithPrec(25, 2),
+			snapshot: defaultSnapValidatorWrapper(),
+			current:  defaultCurrentValidatorWrapper(),
 			expDels: []expDelegation{
 				{
 					expAmt:      tenKOnes,
@@ -349,7 +353,9 @@ func TestDelegatorSlashApply(t *testing.T) {
 			expSnitch:  fiveKOnes,
 		},
 		{
-			rate: numeric.NewDecWithPrec(625, 3),
+			rate:     numeric.NewDecWithPrec(625, 3),
+			snapshot: defaultSnapValidatorWrapper(),
+			current:  defaultCurrentValidatorWrapper(),
 			expDels: []expDelegation{
 				{
 					expAmt:      common.Big0,
@@ -366,7 +372,9 @@ func TestDelegatorSlashApply(t *testing.T) {
 			expSnitch:  new(big.Int).Div(twentyFiveKOnes, common.Big2),
 		},
 		{
-			rate: numeric.NewDecWithPrec(875, 3),
+			rate:     numeric.NewDecWithPrec(875, 3),
+			snapshot: defaultSnapValidatorWrapper(),
+			current:  defaultCurrentValidatorWrapper(),
 			expDels: []expDelegation{
 				{
 					expAmt:      common.Big0,
@@ -383,7 +391,9 @@ func TestDelegatorSlashApply(t *testing.T) {
 			expSnitch:  new(big.Int).Div(thirtyFiveKOnes, common.Big2),
 		},
 		{
-			rate: numeric.NewDecWithPrec(150, 2),
+			rate:     numeric.NewDecWithPrec(150, 2),
+			snapshot: defaultSnapValidatorWrapper(),
+			current:  defaultCurrentValidatorWrapper(),
 			expDels: []expDelegation{
 				{
 					expAmt:      common.Big0,
@@ -411,23 +421,21 @@ func TestDelegatorSlashApply(t *testing.T) {
 }
 
 type slashApplyTestCase struct {
-	// input fields
-	rate                  numeric.Dec
+	snapshot, current *staking.ValidatorWrapper
+	rate              numeric.Dec
+
+	reporter   common.Address
+	state      *fakeStateDB
+	slashTrack *Application
+	gotErr     error
+
 	expDels               []expDelegation
 	expSlashed, expSnitch *big.Int
 	expErr                error
-
-	reporter          common.Address
-	snapshot, current *staking.ValidatorWrapper
-	state             *fakeStateDB
-	slashTrack        *Application
-	gotErr            error
 }
 
 func (tc *slashApplyTestCase) makeData() {
-	tc.reporter = makeTestAddress("reporter")
-	tc.snapshot = defaultSnapValidatorWrapper()
-	tc.current = defaultCurrentValidatorWrapper()
+	tc.reporter = reporterAddr
 	tc.state = newFakeStateDB()
 	tc.slashTrack = &Application{
 		TotalSlashed:      new(big.Int).Set(common.Big0),
@@ -488,6 +496,121 @@ func (ed expDelegation) checkDelegation(d staking.Delegation) error {
 			return fmt.Errorf("[%v]th undelegation unexpected amount %v / %v", i,
 				d.Undelegations[i].Amount, ed.expUndelAmt[i])
 		}
+	}
+	return nil
+}
+
+func TestApply(t *testing.T) {
+	tests := []applyTestCase{
+		{
+			// positive test case
+			snapshot: defaultSnapValidatorWrapper(),
+			current:  defaultCurrentValidatorWrapper(),
+			slashes:  Records{defaultSlashRecord()},
+			rate:     numeric.NewDecWithPrec(625, 3),
+
+			expSlashed: twentyFiveKOnes,
+			expSnitch:  new(big.Int).Div(twentyFiveKOnes, common.Big2),
+		},
+		{
+			// missing snapshot in chain
+			current: defaultCurrentValidatorWrapper(),
+			slashes: Records{defaultSlashRecord()},
+			rate:    numeric.NewDecWithPrec(625, 3),
+
+			expErr: errors.New("could not find validator"),
+		},
+		{
+			// missing vWrapper in state
+			snapshot: defaultSnapValidatorWrapper(),
+			slashes:  Records{defaultSlashRecord()},
+			rate:     numeric.NewDecWithPrec(625, 3),
+
+			expErr: errValidatorNotFoundDuringSlash,
+		},
+	}
+	for i, test := range tests {
+		test.makeData()
+
+		test.apply()
+
+		if err := test.checkResult(); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
+type applyTestCase struct {
+	snapshot, current *staking.ValidatorWrapper
+	slashes           Records
+	rate              numeric.Dec
+
+	chain            *fakeBlockChain
+	state, stateSnap *fakeStateDB
+	gotErr           error
+	gotDiff          *Application
+
+	expSlashed *big.Int
+	expSnitch  *big.Int
+	expErr     error
+}
+
+func (tc *applyTestCase) makeData() {
+	tc.chain = defaultFakeBlockChain()
+	if tc.snapshot != nil {
+		tc.chain.snapshots[tc.snapshot.Address] = *tc.snapshot
+	}
+
+	tc.state = newFakeStateDB()
+	if tc.current != nil {
+		tc.state.vWrappers[tc.current.Address] = tc.current
+	}
+	tc.stateSnap = tc.state.copy()
+	return
+}
+
+func (tc *applyTestCase) apply() {
+	tc.gotDiff, tc.gotErr = Apply(tc.chain, tc.state, tc.slashes, tc.rate)
+}
+
+func (tc *applyTestCase) checkResult() error {
+	if err := assertError(tc.gotErr, tc.expErr); err != nil {
+		return fmt.Errorf("unexpected error %v / %v", tc.gotErr, tc.expErr)
+	}
+	if (tc.gotErr != nil) || (tc.expErr != nil) {
+		return nil
+	}
+	if tc.gotDiff.TotalSnitchReward.Cmp(tc.expSnitch) != 0 {
+		return fmt.Errorf("unexpected snitch %v / %v", tc.gotDiff.TotalSnitchReward,
+			tc.expSnitch)
+	}
+	if tc.gotDiff.TotalSlashed.Cmp(tc.expSlashed) != 0 {
+		return fmt.Errorf("unexpected total slash %v / %v", tc.gotDiff.TotalSlashed,
+			tc.expSlashed)
+	}
+	if err := tc.checkState(); err != nil {
+		return fmt.Errorf("state check: %v", err)
+	}
+	return nil
+}
+
+// checkState checks whether the state has been banned and whether the delegations
+// are different from the original
+func (tc *applyTestCase) checkState() error {
+	vw, err := tc.state.ValidatorWrapper(offAddr)
+	if err != nil {
+		return err
+	}
+	if vw.Status != effective.Banned {
+		return fmt.Errorf("status not banned")
+	}
+
+	vwSnap, err := tc.stateSnap.ValidatorWrapper(offAddr)
+	if err != nil {
+		return err
+	}
+	if tc.rate != numeric.ZeroDec() && reflect.DeepEqual(vwSnap.Delegations, vw.Delegations) {
+		return fmt.Errorf("status still unchanged")
 	}
 	return nil
 }
@@ -798,6 +921,7 @@ func defaultFakeBlockChain() *fakeBlockChain {
 		config:         *params.LocalnetChainConfig,
 		currentBlock:   *makeBlockForTest(currentEpoch, 0),
 		superCommittee: makeDefaultCommittee(),
+		snapshots:      make(map[common.Address]staking.ValidatorWrapper),
 	}
 }
 

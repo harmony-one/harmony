@@ -91,7 +91,7 @@ func (sdb *fakeStateDB) copy() *fakeStateDB {
 		cp.balances[addr] = new(big.Int).Set(bal)
 	}
 	for addr, vw := range sdb.vWrappers {
-		vCpy := *vw
+		vCpy := vw.Copy()
 		cp.vWrappers[addr] = &vCpy
 	}
 	return cp
