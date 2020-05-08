@@ -214,7 +214,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.Current.SetViewID(msg.ViewID)
 		consensus.SetLeaderPubKey(msg.SenderPubkey)
 		consensus.ignoreViewIDCheck = false
-		consensus.Timeouts.Consensus.Start(consensus.BlockNum())
+		// consensus.Timeouts.Consensus.Start(consensus.BlockNum())
 		return nil
 	} else if msg.ViewID > consensus.ViewID() {
 		return consensus_engine.ErrViewIDNotMatch

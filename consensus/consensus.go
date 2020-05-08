@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/consensus/timeouts"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -116,6 +115,7 @@ type CommitedBlockProcesser interface {
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
+	CommitedBlock chan *types.Block
 	PostConsensus CommitedBlockProcesser
 	Decider       quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
@@ -193,8 +193,7 @@ type Consensus struct {
 	RndChannel  chan [vdfAndSeedSize]byte
 	pendingRnds [][vdfAndSeedSize]byte // A list of pending randomness
 	// The p2p host used to send/receive p2p messages
-	host     *p2p.Host
-	Timeouts *timeouts.Notifier
+	host *p2p.Host
 	// If true, this consensus will not propose view change.
 	// TODO remove these two bools
 	disableViewChange bool
@@ -253,6 +252,7 @@ func New(
 	leader.Store(&bls.PublicKey{})
 
 	consensus := Consensus{
+		CommitedBlock:    make(chan *types.Block),
 		Decider:          Decider,
 		FBFTLog:          NewFBFTLog(),
 		phase:            phase,
@@ -264,7 +264,6 @@ func New(
 		nextBlockDue:     nextBlock,
 		host:             host,
 		leaderPubKey:     leader,
-		Timeouts:         timeouts.NewNotifier(),
 		SlashChan:        make(chan slash.Record),
 		ProposalNewBlock: make(chan struct{}),
 		// channel for receiving newly generated VDF

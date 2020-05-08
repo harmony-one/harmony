@@ -12,7 +12,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/consensus/timeouts"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -103,7 +102,7 @@ func (consensus *Consensus) StartViewChange(viewID uint64) {
 	consensus.Current.SetViewID(viewID)
 	consensus.SetLeaderPubKey(consensus.GetNextLeaderKey())
 	diff := int64(viewID - consensus.ViewID())
-	duration := time.Duration(diff * diff * int64(timeouts.ViewChangeDuration))
+	duration := time.Duration(diff * diff * int64(1*time.Minute))
 	utils.Logger().Info().
 		Uint64("ViewChangingID", viewID).
 		Dur("timeoutDuration", duration).
@@ -118,8 +117,8 @@ func (consensus *Consensus) StartViewChange(viewID uint64) {
 		)
 	}
 
-	consensus.Timeouts.ViewChange.SetDuration(duration)
-	consensus.Timeouts.ViewChange.Start(consensus.ViewID())
+	// consensus.Timeouts.ViewChange.SetDuration(duration)
+	// consensus.Timeouts.ViewChange.Start(consensus.ViewID())
 
 	utils.Logger().Debug().
 		Uint64("ViewChangingID", consensus.Current.ViewID()).
@@ -388,7 +387,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 
 		consensus.SetViewID(recvMsg.ViewID)
 		consensus.ResetViewChangeState()
-		consensus.Timeouts.Consensus.Start(consensus.BlockNum())
+		// consensus.Timeouts.Consensus.Start(consensus.BlockNum())
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.ViewID()).
 			Uint64("block", consensus.BlockNum()).
@@ -548,6 +547,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) error {
 	}
 	utils.Logger().Debug().
 		Msg("validator start consensus timer and stop view change timer")
-	consensus.Timeouts.Consensus.Start(consensus.BlockNum())
+	// consensus.Timeouts.Consensus.Start(consensus.BlockNum())
 	return nil
 }

@@ -1,17 +1,33 @@
 package node
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
-// HandleConsensusMessageProcessing ..
-func (node *Node) HandleConsensusMessageProcessing() error {
+// HandleConsensus ..
+func (node *Node) HandleConsensus() error {
 
-	for msg := range node.Consensus.IncomingConsensusMessage {
-		if err := node.Consensus.HandleMessageUpdate(&msg); err != nil {
-			utils.Logger().Info().Err(err).Msg("some visibility into consensus messages")
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+		select {
+		case msg := <-node.Consensus.IncomingConsensusMessage:
+			if err := node.Consensus.HandleMessageUpdate(&msg); err != nil {
+				utils.Logger().Info().Err(err).Msg("some visibility into consensus messages")
+			}
+		case <-node.Consensus.CommitedBlock:
+			cancel()
+			//
+		case <-ctx.Done():
+			fmt.Println("something")
+			continue
+			// need to do a view change
 		}
 	}
+
 	return nil
 
 	// g.Go(func() error {
