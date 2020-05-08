@@ -43,6 +43,7 @@ import (
 	"github.com/harmony-one/taggedrlp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/singleflight"
 )
 
 // Constants for block.
@@ -294,12 +295,22 @@ type extblockV2 struct {
 	IncomingReceipts CXReceiptsProofs
 }
 
-var extblockReg = taggedrlp.NewRegistry()
+var extBlockReg singleflight.Group
 
-func init() {
-	extblockReg.MustRegister(taggedrlp.LegacyTag, &extblock{})
-	extblockReg.MustRegister("v1", &extblockV1{})
-	extblockReg.MustRegister("v2", &extblockV2{})
+func blockRegistry() (*taggedrlp.Registry, error) {
+	const blockReg = "block-reg"
+	handle, err, _ := extBlockReg.Do(blockReg, func() (interface{}, error) {
+		extblockReg := taggedrlp.NewRegistry()
+		extblockReg.MustRegister(taggedrlp.LegacyTag, &extblock{})
+		extblockReg.MustRegister("v1", &extblockV1{})
+		extblockReg.MustRegister("v2", &extblockV2{})
+		return extblockReg, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return handle.(*taggedrlp.Registry), nil
 }
 
 // NewBlock creates a new block. The input data is copied,
@@ -381,7 +392,11 @@ func CopyHeader(h *block.Header) *block.Header {
 // DecodeRLP decodes the Ethereum
 func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	_, size, _ := s.Kind()
-	eb, err := extblockReg.Decode(s)
+	registry, err := blockRegistry()
+	if err != nil {
+		return err
+	}
+	eb, err := registry.Decode(s)
 	if err != nil {
 		return err
 	}
@@ -415,6 +430,10 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	default:
 		return errors.Errorf("unsupported block header type %s",
 			taggedrlp.TypeName(reflect.TypeOf(h)))
+	}
+	extblockReg, err := blockRegistry()
+	if err != nil {
+		return err
 	}
 	return extblockReg.Encode(w, eb)
 }
