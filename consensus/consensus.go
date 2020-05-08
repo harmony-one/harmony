@@ -30,15 +30,6 @@ var errLeaderPriKeyNotFound = errors.New(
 	"getting leader private key from consensus public keys failed",
 )
 
-type blkComeback struct {
-	Blk *types.Block
-	Err chan error
-}
-
-type processBlock struct {
-	Request chan blkComeback
-}
-
 // BlockHash ..
 func (consensus *Consensus) BlockHash() common.Hash {
 	return consensus.blockHash.Load().(common.Hash)
@@ -118,9 +109,15 @@ type Range struct {
 	End   uint64
 }
 
+// CommitedBlockProcesser ..
+type CommitedBlockProcesser interface {
+	Process(newBlock *types.Block) error
+}
+
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	Decider quorum.Decider
+	PostConsensus CommitedBlockProcesser
+	Decider       quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -179,9 +176,7 @@ type Consensus struct {
 	blockHeader atomic.Value
 	// Shard Id which this node belongs to
 	ShardID uint32
-	// whether to ignore viewID check
-	ignoreViewIDCheck bool
-	Locks             struct {
+	Locks   struct {
 		VC     sync.Mutex // mutex for view change
 		Global sync.Mutex
 		Leader sync.Mutex
@@ -189,8 +184,7 @@ type Consensus struct {
 	}
 	// Signal channel for starting a new consensus process
 	ProposalNewBlock chan struct{}
-	RoundCompleted   processBlock
-	Verify           processBlock
+	ChainVerifier    core.Validator
 	// Channel for DRG protocol to send pRnd (preimage of randomness resulting from combined vrf
 	// randomnesses) to consensus. The first 32 bytes are randomness, the rest is for bitmap.
 	PRndChannel chan []byte
@@ -202,7 +196,9 @@ type Consensus struct {
 	host     *p2p.Host
 	Timeouts *timeouts.Notifier
 	// If true, this consensus will not propose view change.
+	// TODO remove these two bools
 	disableViewChange bool
+	ignoreViewIDCheck bool
 	// Have a dedicated reader thread pull from this chan, like in node
 	SlashChan chan slash.Record
 	// The time due for next block proposal
@@ -247,12 +243,13 @@ func New(
 	minPeer int,
 ) (*Consensus, error) {
 
-	var phase, blk, view, epoch, leader atomic.Value
+	var phase, blk, view, epoch, leader, nextBlock atomic.Value
 
 	phase.Store(FBFTAnnounce)
 	blk.Store(uint64(0))
 	view.Store(uint64(0))
 	epoch.Store(uint64(0))
+	nextBlock.Store(time.Now())
 	leader.Store(&bls.PublicKey{})
 
 	consensus := Consensus{
@@ -264,13 +261,12 @@ func New(
 		blockNum:         blk,
 		viewID:           view,
 		CommitFinishChan: make(chan Finished),
+		nextBlockDue:     nextBlock,
 		host:             host,
 		leaderPubKey:     leader,
 		Timeouts:         timeouts.NewNotifier(),
 		SlashChan:        make(chan slash.Record),
 		ProposalNewBlock: make(chan struct{}),
-		RoundCompleted:   processBlock{make(chan blkComeback)},
-		Verify:           processBlock{make(chan blkComeback)},
 		// channel for receiving newly generated VDF
 		RndChannel:               make(chan [vdfAndSeedSize]byte),
 		ShardID:                  shard,

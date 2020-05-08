@@ -565,9 +565,6 @@ func setupConsensusAndNode(
 		Msg("Init Blockchain")
 
 	// update consensus information based on the blockchain
-	currentNode.Consensus.SetMode(
-		currentNode.Consensus.UpdateConsensusInformation(""),
-	)
 
 	return currentNode
 }
@@ -780,29 +777,32 @@ func main() {
 
 	currentNode.HandleIncomingHMYProtocolStreams()
 
+	currentNode.Consensus.SetMode(
+		currentNode.Consensus.UpdateConsensusInformation(),
+	)
+
 	var g errgroup.Group
 
-	g.Go(currentNode.HandleIncomingBlock)
 	g.Go(currentNode.StartP2PMessageHandling)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
-		g.Go(currentNode.HandleConsensusBlockProcessing)
+		g.Go(currentNode.HandleBlockProcessing)
 		g.Go(currentNode.HandleConsensusMessageProcessing)
 		g.Go(currentNode.StartLeaderWork)
 		g.Go(currentNode.BootstrapConsensus)
 	}
 
 	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
-		fmt.Println("I am exploer and will sync", *port)
-		go func() {
-			var g errgroup.Group
+		// fmt.Println("I am exploer and will sync", *port)
+		// go func() {
+		// 	var g errgroup.Group
 
-			g.Go(currentNode.HandleIncomingBlocksBySync)
-			g.Go(currentNode.StartBlockSyncing)
-			if err := g.Wait(); err != nil {
-				fatal(err)
-			}
-		}()
+		// 	g.Go(currentNode.HandleIncomingBlocksBySync)
+		// 	g.Go(currentNode.StartBlockSyncing)
+		// 	if err := g.Wait(); err != nil {
+		// 		fatal(err)
+		// 	}
+		// }()
 	}
 
 	if err := g.Wait(); err != nil {

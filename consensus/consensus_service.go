@@ -54,10 +54,11 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.Locks.PubKey.Lock()
-	defer consensus.Locks.PubKey.Unlock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	consensus.SetLeaderPubKey(pubKeys[0])
+	consensus.Locks.PubKey.Unlock()
+
 	// reset states after update public keys
 	consensus.ResetState()
 	consensus.ResetViewChangeState()
@@ -151,7 +152,9 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 // verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
 func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
 	consensusMsg := msg.GetConsensus()
-	senderKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
+	senderKey, err := bls_cosi.BytesToBLSPublicKey(
+		consensusMsg.GetSenderPubkey(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -288,9 +291,7 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 // (a) node not in committed: Listening mode
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
-func (consensus *Consensus) UpdateConsensusInformation(
-	currentLeader string,
-) Mode {
+func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	curHeader := consensus.ChainReader.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
@@ -327,12 +328,8 @@ func (consensus *Consensus) UpdateConsensusInformation(
 	// genesis block is a special case that will have shard state and needs to skip processing
 	isNotGenesisBlock := curHeader.Number().Cmp(big.NewInt(0)) > 0
 	if len(curHeader.ShardState()) > 0 && isNotGenesisBlock {
-
 		// increase curEpoch by one if it's the last block
 		consensus.SetEpoch(curEpoch.Uint64() + 1)
-
-		// fmt.Println("changed consensu's epoch to next one", curEpoch.Uint64(), consensus.Epoch())
-
 		utils.Logger().Info().
 			Uint64("headerNum", curHeader.Number().Uint64()).
 			Msg("Epoch updated for nextEpoch curEpoch")
@@ -382,7 +379,7 @@ func (consensus *Consensus) UpdateConsensusInformation(
 	// update public keys in the committee
 	oldLeader := &bls.PublicKey{}
 	if err := oldLeader.DeserializeHexStr(
-		currentLeader,
+		consensus.LeaderPubKey().SerializeToHexStr(),
 	); err != nil {
 		return Syncing
 	}
@@ -447,6 +444,8 @@ func (consensus *Consensus) UpdateConsensusInformation(
 			return Normal
 		}
 	}
+
+	//
 	// not in committee
 	return Listening
 }

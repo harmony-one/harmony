@@ -156,7 +156,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 	validatorPubKey := recvMsg.SenderPubkey
 	prepareSig := recvMsg.Payload
 	logger := utils.Logger().With().Logger()
-
 	consensus.Locks.Global.Lock()
 	defer consensus.Locks.Global.Unlock()
 
@@ -176,8 +175,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 
 	// Check BLS signature for the multi-sig
 	var sign bls.Sign
-	err = sign.Deserialize(prepareSig)
-	if err != nil {
+	if err := sign.Deserialize(prepareSig); err != nil {
 		utils.Logger().Error().Err(err).
 			Msg("[OnPrepare] Failed to deserialize bls signature")
 		return err
@@ -234,6 +232,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 		return nil
 	}
 
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
+
 	// Check for potential double signing
 	if consensus.checkDoubleSign(recvMsg) {
 		return nil
@@ -251,9 +252,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return err
 	}
-
-	consensus.Locks.Global.Lock()
-	defer consensus.Locks.Global.Unlock()
 
 	commitPayload := signature.ConstructCommitPayload(
 		consensus.ChainReader,
@@ -292,14 +290,16 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.Commit) {
-		consensus.CommitFinishChan <- Finished{
+		f := Finished{
 			consensus.ViewID(),
 			consensus.ShardID,
 			consensus.BlockNum(),
 			consensus.BlockHash(),
 			consensus.NextBlockDue(),
 		}
-
+		go func() {
+			consensus.CommitFinishChan <- f
+		}()
 	}
 
 	return nil

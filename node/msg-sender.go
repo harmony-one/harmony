@@ -21,7 +21,6 @@ import (
 
 var (
 	dhtReadMessageTimeout = time.Minute
-	dhtStreamIdleTimeout  = 10 * time.Minute
 	errReadTimeout        = fmt.Errorf("timed out reading response")
 )
 
@@ -63,9 +62,6 @@ func (ms *messageSender) prep(ctx context.Context) error {
 	}
 
 	nstr, err := ms.host.IPFSNode.PeerHost.NewStream(ctx, ms.p, p2p.Protocol)
-	if err := nstr.SetDeadline(time.Now().Add(15 * time.Second)); err != nil {
-		return err
-	}
 
 	if err != nil {
 		return err
@@ -172,7 +168,6 @@ func (ms *messageSender) ctxReadMsg(
 ) error {
 	errc := make(chan error, 1)
 	go func(r msgio.ReadCloser) {
-		fmt.Println("about to try and read for", ms.p.Pretty())
 		bytes, err := r.ReadMsg()
 		defer r.ReleaseMsg(bytes)
 		if err != nil {

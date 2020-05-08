@@ -12,8 +12,6 @@ import (
 )
 
 func (consensus *Consensus) didReachPrepareQuorum() error {
-	// consensus.Locks.Leader.Lock()
-	// defer consensus.Locks.Leader.Unlock()
 
 	utils.Logger().Debug().Msg("[OnPrepare] Received Enough Prepare Signatures")
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()

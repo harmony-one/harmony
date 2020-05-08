@@ -411,6 +411,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) error {
 	}
 
 	senderKey := recvMsg.SenderPubkey
+
 	consensus.Locks.VC.Lock()
 	defer consensus.Locks.VC.Unlock()
 

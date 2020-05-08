@@ -61,28 +61,34 @@ func (node *Node) HandleMessage(
 			// TODO handle this higher up, give conesnsus a weight of 1, others a weight of 2
 			var msg msg_pb.Message
 
+			// if err := protobuf.Unmarshal(msgPayload, &msg); err != nil {
+			// 	return
+			// }
+
+			// if msg.Type == msg_pb.MessageType_BROADCASTED_NEW_BLOCK {
+			// 	fmt.Println("had it called")
+
+			// 	var block types.Block
+			// 	if err := rlp.DecodeBytes(
+			// 		msg.GetNewBlock().GetBlock(), &block,
+			// 	); err != nil {
+			// 		return
+			// 	}
+			// 	node.IncomingBlocks <- &block
+			// } else {
+
+			// var msg msg_pb.Message
 			if err := protobuf.Unmarshal(msgPayload, &msg); err != nil {
+				utils.Logger().Err(err).Msg("problem decoding message for consensus")
 				return
 			}
 
-			if msg.Type == msg_pb.MessageType_BROADCASTED_NEW_BLOCK {
-				var block types.Block
-				if err := rlp.DecodeBytes(
-					msg.GetNewBlock().GetBlock(), &block,
-				); err != nil {
-					return
-				}
-				node.IncomingBlocks <- &block
-			} else {
-
-				var msg msg_pb.Message
-				if err := protobuf.Unmarshal(msgPayload, &msg); err != nil {
-					utils.Logger().Err(err).Msg("problem decoding message for consensus")
-					return
-				}
-
-				node.Consensus.IncomingConsensusMessage <- msg
+			if msg.GetConsensus().GetShardId() != node.Consensus.ShardID {
+				return
 			}
+
+			node.Consensus.IncomingConsensusMessage <- msg
+			// }
 		}
 
 	case proto.Node:

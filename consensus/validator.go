@@ -73,12 +73,15 @@ func (consensus *Consensus) prepare() error {
 			return err
 		}
 
-		if err := consensus.host.SendMessageToGroups(
-			groupID,
-			p2p.ConstructMessage(networkMessage.Bytes),
-		); err != nil {
-			utils.Logger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
-			return err
+		if consensus.Current.Mode() != Listening {
+			if err := consensus.host.SendMessageToGroups(
+				groupID,
+				p2p.ConstructMessage(networkMessage.Bytes),
+			); err != nil {
+				utils.Logger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
+				return err
+			}
+
 		}
 
 		utils.Logger().Info().

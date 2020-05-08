@@ -177,10 +177,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			return false
 		}
 
-		resp := make(chan error)
-		consensus.Verify.Request <- blkComeback{blockObj, resp}
-
-		if err := <-resp; err != nil {
+		if err := consensus.ChainVerifier.ValidateBody(blockObj); err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("block verification failed in onprepared sanitychecks")
 			return false

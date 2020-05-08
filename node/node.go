@@ -54,11 +54,10 @@ const (
 
 // Node represents a protocol-participating node in the network
 type Node struct {
-	Consensus          *consensus.Consensus
-	streamHandles      *ctrie.Ctrie
-	BeaconBlockChannel chan *types.Block // The channel to send beacon blocks for non-beaconchain nodes
-	IncomingBlocks     chan *types.Block
-	Gossiper           *relay.BroadCaster
+	Consensus      *consensus.Consensus
+	streamHandles  *ctrie.Ctrie
+	IncomingBlocks chan *types.Block
+	Gossiper       *relay.BroadCaster
 	// All the receipts received but not yet processed for Consensus
 	pendingCXReceipts map[string]*types.CXReceiptsProof
 	pendingCXMutex    sync.Mutex
@@ -348,9 +347,11 @@ func (node *Node) BootstrapConsensus() error {
 	case err := <-errored:
 		return err
 	case <-haveEnoughPeers:
-		node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-		node.Consensus.ProposalNewBlock <- struct{}{}
-		utils.Logger().Info().Msg("have enough peers to kick off consensus")
+		if node.Consensus.IsLeader() {
+			node.Consensus.ProposalNewBlock <- struct{}{}
+			utils.Logger().Info().Msg("have enough peers to kick off consensus")
+		}
+
 		return nil
 	case <-t.C:
 		return errors.New("exceeded 60 seconds waiting for enough min peers")
@@ -383,10 +384,10 @@ func (node *Node) StartP2PMessageHandling() error {
 				m := msg
 				if sem.TryAcquire(1) {
 					go func() {
+						defer sem.Release(1)
 						node.HandleMessage(
 							payload[p2pMsgPrefixSize:], m.From(), topicName,
 						)
-						sem.Release(1)
 					}()
 				}
 			}
@@ -445,7 +446,6 @@ func New(
 		CxPool:                core.NewCxPool(core.CxPoolSize),
 		pendingCXReceipts:     map[string]*types.CXReceiptsProof{},
 		streamHandles:         ctrie.New(nil),
-		BeaconBlockChannel:    make(chan *types.Block),
 		IncomingBlocks:        make(chan *types.Block),
 		State:                 state,
 		errorSink: struct {
@@ -494,6 +494,9 @@ func New(
 		}
 
 		chain.Engine.SetBeaconchain(beaconChain)
+		// HACK
+		node.Consensus.ChainVerifier = node.Blockchain().Validator()
+		node.Consensus.PostConsensus = node
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)

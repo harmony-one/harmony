@@ -1,8 +1,6 @@
 package bls
 
 import (
-	"fmt"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
 )
@@ -21,7 +19,7 @@ func RandPrivateKey() *bls.SecretKey {
 // BytesToBLSPublicKey converts bytes into bls.PublicKey pointer.
 func BytesToBLSPublicKey(bytes []byte) (*bls.PublicKey, error) {
 	if len(bytes) == 0 {
-		return nil, fmt.Errorf("[BytesToBLSPublicKey] bytes is empty")
+		return nil, errors.Errorf("[BytesToBLSPublicKey] bytes is empty")
 	}
 	pubKey := &bls.PublicKey{}
 	err := pubKey.Deserialize(bytes)

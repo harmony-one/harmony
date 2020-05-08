@@ -54,10 +54,8 @@ func (node *Node) StartLeaderWork() error {
 					Int("numStakingTxs", newBlock.StakingTransactions().Len()).
 					Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
 					Msg("=========Successfully Proposed New Block==========")
-				// Send the new block to Consensus so it can be confirmed.
-
+					// Send the new block to Consensus so it can be confirmed.
 				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-
 				if err := node.Consensus.Announce(newBlock); err != nil {
 					return err
 				}
@@ -103,6 +101,11 @@ func (node *Node) StartLeaderWork() error {
 
 				go func() {
 					r := <-readyChan
+					if r.Err != nil {
+						utils.Logger().Debug().Err(r.Err).Msg("this finalize issue should not occur")
+						return
+					}
+
 					result := r.Val.(*oneTime)
 
 					result.once.Do(func() {

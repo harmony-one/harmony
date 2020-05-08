@@ -1,30 +1,41 @@
 package node
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"golang.org/x/sync/errgroup"
 )
 
-// postConsensusProcessing is called by consensus participants, after consensus is done, to:
+// Process is called by consensus participants, after consensus is done, to:
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
-func (node *Node) postConsensusProcessing(
-	newBlock *types.Block, leader string,
-) error {
+func (node *Node) Process(newBlock *types.Block) error {
+	if _, err := node.Blockchain().InsertChain(
+		[]*types.Block{newBlock}, true,
+	); err != nil {
+		utils.Logger().Error().
+			Err(err).
+			Uint64("blockNum", newBlock.NumberU64()).
+			Str("parentHash", newBlock.Header().ParentHash().Hex()).
+			Str("hash", newBlock.Header().Hash().Hex()).
+			Msg("Error Adding new block to blockchain")
+		return err
+	}
+	// grab lock for insertion of block?
 
 	if node.Consensus.IsLeader() {
 
-		if err := node.Gossiper.AcceptedBlockForShardGroup(
-			node.Consensus.ShardID, newBlock,
-		); err != nil {
-			return err
-		}
+		// if err := node.Gossiper.AcceptedBlockForShardGroup(
+		// 	node.Consensus.ShardID, newBlock,
+		// ); err != nil {
+		// 	return err
+		// }
 
 		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
 			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
@@ -41,7 +52,7 @@ func (node *Node) postConsensusProcessing(
 			if rnd < 1 {
 				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
 				if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-					node.Gossiper.NewBeaconChainBlockForClient(newBlock)
+					// node.Gossiper.NewBeaconChainBlockForClient(newBlock)
 				}
 				node.BroadcastCXReceipts(newBlock)
 			}
@@ -54,104 +65,25 @@ func (node *Node) postConsensusProcessing(
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
 		node.Consensus.SetMode(
-			node.Consensus.UpdateConsensusInformation(leader),
+			node.Consensus.UpdateConsensusInformation(),
 		)
 	}
 
 	return nil
 }
 
-// HandleConsensusBlockProcessing ..
-func (node *Node) HandleConsensusBlockProcessing() error {
-	var g errgroup.Group
+// HandleBlockProcessing ..
+func (node *Node) HandleBlockProcessing() error {
 
-	g.Go(func() error {
-		for accepted := range node.Consensus.RoundCompleted.Request {
+	for blk := range node.IncomingBlocks {
+		fmt.Println("before insert", blk.String())
+		_, err := node.Blockchain().InsertChain(
+			types.Blocks{blk}, true,
+		)
 
-			if accepted.Blk.ParentHash() == node.Blockchain().CurrentHeader().Hash() {
-				if _, err := node.Blockchain().InsertChain(
-					types.Blocks{accepted.Blk}, true,
-				); err != nil {
-					accepted.Err <- err
-					continue
-				}
+		fmt.Println("afer insert", blk.String(), err)
 
-				accepted.Err <- node.postConsensusProcessing(
-					accepted.Blk, node.Consensus.LeaderPubKey().SerializeToHexStr(),
-				)
-
-			} else {
-				accepted.Err <- nil
-			}
-
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		for verify := range node.Consensus.Verify.Request {
-			verify.Err <- node.verifyBlock(verify.Blk)
-		}
-		return nil
-	})
-
-	return g.Wait()
-
-}
-
-// HandleIncomingBlock ..
-func (node *Node) HandleIncomingBlock() error {
-	var g errgroup.Group
-	chans := []chan *types.Block{
-		make(chan *types.Block), make(chan *types.Block),
 	}
-
-	g.Go(func() error {
-		for acceptedBlock := range chans[0] {
-			if acceptedBlock != nil {
-				if _, err := node.Beaconchain().InsertChain(
-					types.Blocks{acceptedBlock}, true,
-				); err != nil {
-					return err
-				}
-			}
-
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		for acceptedBlock := range chans[1] {
-			if acceptedBlock != nil && node.Consensus.ShardID != shard.BeaconChainShardID {
-				if _, err := node.Blockchain().InsertChain(
-					types.Blocks{acceptedBlock}, true,
-				); err != nil {
-					return err
-				}
-
-			}
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		for blk := range node.IncomingBlocks {
-			if b := blk; b != nil {
-				// if blk.ParentHash() == node.Blockchain().CurrentHeader().Hash() {
-
-				// if _, err := node.Blockchain().InsertChain(
-				// 	types.Blocks{b}, true,
-				// ); err != nil {
-				// 	return err
-				// }
-
-				// }
-
-			}
-		}
-		return nil
-	})
-
-	return g.Wait()
+	return nil
 
 }

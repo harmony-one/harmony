@@ -3,7 +3,6 @@ package quorum
 import (
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -145,7 +144,6 @@ type Transition struct {
 // These maps represent the signatories (validators), keys are BLS public keys
 // and values are BLS private key signed signatures
 type cIdentities struct {
-	sync.Mutex
 	// Public keys of the committee including leader and validators
 	publicKeys []*bls.PublicKey
 	prepare    *votepower.Round
@@ -179,6 +177,7 @@ func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
 	for k, v := range s.publicKeys {
 		if v.IsEqual(pubKey) {
 			idx = k
+			break
 		}
 	}
 	return idx
@@ -201,9 +200,10 @@ func (s *cIdentities) Participants() []*bls.PublicKey {
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 	for i := range pubKeys {
 		k := shard.BLSPublicKey{}
+		// TODO still need to explictly handle the error
 		k.FromLibBLSPublicKey(pubKeys[i])
 	}
-	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
+	s.publicKeys = append(s.publicKeys[:0:0], pubKeys...)
 }
 
 func (s *cIdentities) ParticipantsCount() int64 {
@@ -229,10 +229,6 @@ func (s *cIdentities) SubmitVote(
 	sig *bls.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
-	// s.Lock()
-	// defer s.Unlock()
-	// Note safe to assume by this point because key has been
-	// checked earlier
 	key := *shard.FromLibBLSPublicKeyUnsafe(PubKey)
 	ballot := &votepower.Ballot{
 		SignerPubKey:    key,

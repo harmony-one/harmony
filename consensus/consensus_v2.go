@@ -246,10 +246,8 @@ func (consensus *Consensus) tryCatchup() error {
 				continue
 			}
 
-			resp := make(chan error)
-			consensus.Verify.Request <- blkComeback{tmpBlock, resp}
-			if err := <-resp; err != nil {
-				return err
+			if err := consensus.ChainVerifier.ValidateBody(tmpBlock); err != nil {
+				return errors.New("why could not validate body?")
 			}
 
 			committedMsg = msgs[i]
@@ -282,18 +280,20 @@ func (consensus *Consensus) tryCatchup() error {
 		consensus.SetBlockNum(consensus.BlockNum() + 1)
 		consensus.SetViewID(committedMsg.ViewID + 1)
 		// TODO Need to make this one atomic as well , the publock is bad, blocks updateconsensus
-		// consensus.LeaderPubKey = committedMsg.SenderPubkey
+		consensus.SetLeaderPubKey(committedMsg.SenderPubkey)
 
 		utils.Logger().Info().Msg("[TryCatchup] Adding block to chain")
 
 		// Fill in the commit signatures
 		block.SetCurrentCommitSig(committedMsg.Payload)
-		resp := make(chan error)
-		consensus.RoundCompleted.Request <- blkComeback{block, resp}
 
-		if err := <-resp; err != nil {
+		if err := consensus.ChainVerifier.ValidateBody(block); err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("block processing after finishing consensus failed")
+			return err
+		}
+
+		if err := consensus.PostConsensus.Process(block); err != nil {
 			return err
 		}
 

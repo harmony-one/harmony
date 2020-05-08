@@ -307,8 +307,9 @@ func (node *Node) HandleIncomingBlocksBySync() error {
 func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 	r := msgio.NewVarintReaderSize(s, libp2p_network.MessageSizeMax)
 	mPeer := s.Conn().RemotePeer()
-	timer := time.AfterFunc(dhtStreamIdleTimeout, func() { s.Reset() })
-	defer timer.Stop()
+	if err := s.SetDeadline(time.Now().Add(25 * time.Second)); err != nil {
+		return err
+	}
 
 	for {
 		var req msg_pb.Message
@@ -332,8 +333,6 @@ func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 		}
 
 		r.ReleaseMsg(msgbytes)
-		timer.Reset(dhtStreamIdleTimeout)
-
 		handler := node.syncHandlerForMsgType(req.GetType())
 
 		if handler == nil {
@@ -361,7 +360,6 @@ func (node *Node) handleNewMessage(s libp2p_network.Stream) error {
 func (node *Node) handleNewStream(s libp2p_network.Stream) {
 	defer s.Reset()
 	if err := node.handleNewMessage(s); err != nil {
-		utils.Logger().Warn().Err(err).Msg("stream had possible issue")
 		return
 	}
 	_ = s.Close()
@@ -598,9 +596,9 @@ func (node *Node) downloadBlocksForSync(
 		peer := peerConn.ID()
 		g.Go(func() error {
 
-			fmt.Println("connected to", peer.Pretty(),
-				":I am ", node.host.IPFSNode.PeerHost.ID().Pretty(),
-			)
+			// fmt.Println("connected to", peer.Pretty(),
+			// 	":I am ", node.host.IPFSNode.PeerHost.ID().Pretty(),
+			// )
 
 			handle, err := node.messageSenderForPeer(ctx, peer)
 			if err != nil {
@@ -635,27 +633,17 @@ func (node *Node) StartBlockSyncing() error {
 	round := 0
 
 	for {
-
-		ctx, cancel := context.WithTimeout(
-			context.WithValue(
-				context.Background(), trieCtxKey, node.streamHandles.ReadOnlySnapshot()),
-			time.Second*25,
-		)
-
+		replies := make(chan *msg_pb.Message)
 		var blocksPulled []*types.Block
 
 		const maxBlocksProcess = 50
-		replies := make(chan *msg_pb.Message)
-
-		go node.downloadBlocksForSync(ctx, replies)
 
 		go func() {
 			for rpmes := range replies {
-
 				if len(blocksPulled) == maxBlocksProcess {
-					cancel()
-					return
+					blocksPulled = []*types.Block{}
 				}
+
 				data := rpmes.GetSyncBlock().GetBlockRlp()
 				var blocks []*types.Block
 				if err := rlp.DecodeBytes(data, &blocks); err != nil {
@@ -663,49 +651,57 @@ func (node *Node) StartBlockSyncing() error {
 					panic("oops->" + err.Error())
 					// continue
 				}
-
 				blocksPulled = append(blocksPulled, blocks...)
-
 			}
 		}()
 
-		<-ctx.Done()
+		ctx, cancel := context.WithTimeout(
+			context.WithValue(
+				context.Background(), trieCtxKey, node.streamHandles.ReadOnlySnapshot()),
+			time.Second*25,
+		)
 
+		go node.downloadBlocksForSync(ctx, replies)
+
+		<-ctx.Done()
+		cancel()
 		replies = nil
+
 		fmt.Println("downloaded->", len(blocksPulled), " blocks")
 
 		for _, blk := range blocksPulled {
-			fmt.Println("downloaded ->", blk.String())
+			fmt.Println("via syncing - wanted to insert ->", blk.String())
+			// if blk.ShardID() == node.Consensus.ShardID {
+
+			// 	if blk.ParentHash() == node.Blockchain().CurrentHeader().Hash() {
+			// 		fmt.Println("trying to insert block")
+			// 		if _, err := node.Blockchain().InsertChain(
+			// 			[]*types.Block{blk}, true,
+			// 		); err != nil {
+			// 			fmt.Println(
+			// 				"couldn't add this block oh well",
+			// 				err.Error(),
+			// 				blk.String(),
+			// 			)
+			// 		}
+			// 	}
+
+			// }
+
 		}
 
 		// Now safe to drop all the handles
 
 		for iter := range node.streamHandles.Iterator(nil) {
-
 			handle, ok := iter.Value.(*messageSender)
 			if !ok {
 				return errors.New("can not cast")
 			}
-			fmt.Println("closing stream for peerID", handle.p.Pretty())
+			handle.invalidate()
 		}
 
 		node.streamHandles.Clear()
-
 		round++
-
-		// 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		// 			defer cancel()
-
-		// 			if err := syncFromHMYPeersIfNeeded(ctx, node.host, node); err != nil {
-		// 				if err == context.DeadlineExceeded {
-		// 					fmt.Println("context dead died exceeded")
-		// 					return
-		// 				}
-		// 				fmt.Println("what is error->", err.Error())
-		// 			}
-		// 		}()
-
-		// 	}
 	}
 
 	return nil
