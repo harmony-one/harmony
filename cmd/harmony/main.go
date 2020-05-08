@@ -83,7 +83,7 @@ var (
 	// nodeType indicates the type of the node: validator, explorer
 	nodeType = flag.String("node_type", "validator", "node type: validator, explorer")
 	// networkType indicates the type of the network
-	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, pangaea, partner, stressnet, devnet, localnet")
+	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, pangaea, partner, stressnet, p2pnet, devnet, localnet")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
 	blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
 	// staking indicates whether the node is operating in staking mode.
@@ -642,6 +642,8 @@ func main() {
 		shard.Schedule = shardingconfig.PartnerSchedule
 	case nodeconfig.Stressnet:
 		shard.Schedule = shardingconfig.StressNetSchedule
+	case nodeconfig.P2PNet:
+		shard.Schedule = shardingconfig.P2PNetSchedule
 	case nodeconfig.Devnet:
 		if *devnetHarmonySize < 0 {
 			*devnetHarmonySize = *devnetShardSize
