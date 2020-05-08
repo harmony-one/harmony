@@ -131,12 +131,12 @@ func (ud Undelegation) Copy() Undelegation {
 type Undelegations []Undelegation
 
 // Copy returns a deep copy of Undelegations
-func (uds Undelegations) Copy() Undelegations {
-	if uds == nil {
+func (u Undelegations) Copy() Undelegations {
+	if u == nil {
 		return nil
 	}
-	cp := make(Undelegations, 0, len(uds))
-	for _, ud := range uds {
+	cp := make(Undelegations, 0, len(u))
+	for _, ud := range u {
 		cp = append(cp, ud.Copy())
 	}
 	return cp

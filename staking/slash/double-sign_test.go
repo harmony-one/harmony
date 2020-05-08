@@ -603,7 +603,7 @@ func (tc *applyTestCase) checkState() error {
 	if err != nil {
 		return err
 	}
-	if vw.Status != effective.Banned {
+	if !IsBanned(vw) {
 		return fmt.Errorf("status not banned")
 	}
 

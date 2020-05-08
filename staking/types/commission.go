@@ -25,6 +25,7 @@ type (
 	}
 )
 
+// Copy makes a deep copy of the Commission structure
 func (c Commission) Copy() Commission {
 	cp := Commission{
 		CommissionRates: c.CommissionRates.Copy(),

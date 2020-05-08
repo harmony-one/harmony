@@ -55,6 +55,7 @@ type Moment struct {
 	ViewID  uint64   `json:"view-id"`
 }
 
+// Copy makes a deep copy of the Moment structure
 func (m Moment) Copy() Moment {
 	cp := Moment{
 		ShardID: m.ShardID,
