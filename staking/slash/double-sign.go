@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/harmony-one/harmony/core/state"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -194,7 +196,7 @@ func (r Record) String() string {
 // Verify checks that the slash is valid
 func Verify(
 	chain CommitteeReader,
-	state stateDB,
+	state *state.DB,
 	candidate *Record,
 ) error {
 	wrapper, err := state.ValidatorWrapper(candidate.Evidence.Offender)
@@ -380,7 +382,7 @@ func payDownAsMuchAsCan(
 func delegatorSlashApply(
 	snapshot, current *staking.ValidatorWrapper,
 	rate numeric.Dec,
-	state stateDB,
+	state *state.DB,
 	reporter common.Address,
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
@@ -490,7 +492,7 @@ func delegatorSlashApply(
 
 // Apply ..
 func Apply(
-	chain staking.ValidatorSnapshotReader, state stateDB,
+	chain staking.ValidatorSnapshotReader, state *state.DB,
 	slashes Records, rate numeric.Dec,
 ) (*Application, error) {
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}

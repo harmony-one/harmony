@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/core/state"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -72,119 +75,175 @@ var (
 
 func TestVerify(t *testing.T) {
 	tests := []struct {
-		editInput func(chain *fakeBlockChain, db *fakeStateDB, r *Record)
-		expErr    error
+		r      Record
+		sdb    *state.DB
+		chain  *fakeBlockChain
+		expErr error
 	}{
 		{
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {},
-			expErr:    nil,
+			r:     defaultSlashRecord(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
+			expErr: nil,
 		},
 		{
 			// not vWrapper in state
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
-				delete(db.vWrappers, offAddr)
-			},
-			expErr: errors.New("address vWrapper not exist"),
+			r:     defaultSlashRecord(),
+			sdb:   makeTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
+			expErr: errors.New("address not present in state"),
 		},
 		{
 			// banned status
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
-				db.vWrappers[offAddr].Status = effective.Banned
-			},
+			r: defaultSlashRecord(),
+			sdb: func() *state.DB {
+				sdb := makeTestStateDB()
+				w := defaultValidatorWrapper()
+				w.Status = effective.Banned
+				if err := sdb.UpdateValidatorWrapper(offAddr, w); err != nil {
+					panic(err)
+				}
+				return sdb
+			}(),
+			chain: defaultFakeBlockChain(),
+
 			expErr: errAlreadyBannedValidator,
 		},
 		{
 			// same offender and reporter
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+			r: func() Record {
+				r := defaultSlashRecord()
 				r.Reporter = offAddr
-			},
+				return r
+			}(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
 			expErr: errReporterAndOffenderSame,
 		},
 		{
 			// same block in conflicting votes
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+			r: func() Record {
+				r := defaultSlashRecord()
 				r.Evidence.SecondVote = r.Evidence.FirstVote.Copy()
-			},
+				return r
+			}(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
 			expErr: errSlashBlockNoConflict,
 		},
 		{
 			// second vote signed with a different bls key
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
-				secondVote := makeVoteData(keyPairs[24], doubleSignBlock2)
-				r.Evidence.SecondVote = secondVote
-			},
+			r: func() Record {
+				r := defaultSlashRecord()
+				r.Evidence.SecondVote = makeVoteData(keyPairs[24], doubleSignBlock2)
+				return r
+			}(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
 			expErr: errBallotSignerKeysNotSame,
 		},
 		{
 			// block is in the future
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
-				chain.currentBlock = *makeBlockForTest(doubleSignEpoch-1, 0)
-			},
+			r:   defaultSlashRecord(),
+			sdb: defaultTestStateDB(),
+			chain: func() *fakeBlockChain {
+				bc := defaultFakeBlockChain()
+				bc.currentBlock = *makeBlockForTest(doubleSignEpoch-1, 0)
+				return bc
+			}(),
+
 			expErr: errSlashFromFutureEpoch,
 		},
 		{
 			// error from blockchain.ReadShardState (fakeChainErrEpoch)
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+			r: func() Record {
+				r := defaultSlashRecord()
 				r.Evidence.Epoch = big.NewInt(fakeChainErrEpoch)
-			},
+				return r
+			}(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
 			expErr: errFakeChainUnexpectEpoch,
 		},
 		{
 			// Invalid shardID
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+			r: func() Record {
+				r := defaultSlashRecord()
 				r.Evidence.ShardID = 10
-			},
+				return r
+			}(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
 			expErr: shard.ErrShardIDNotInSuperCommittee,
 		},
 		{
 			// Missing bls from committee
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+			r: func() Record {
+				r := defaultSlashRecord()
 				r.Evidence.FirstVote = makeVoteData(keyPairs[24], doubleSignBlock1)
 				r.Evidence.SecondVote = makeVoteData(keyPairs[24], doubleSignBlock2)
-			},
+				return r
+			}(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
 			expErr: shard.ErrValidNotInCommittee,
 		},
 		{
 			// offender address not match vote
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
-				chain.superCommittee.Shards[offenderShard].Slots[offenderShardIndex].
+			r:   defaultSlashRecord(),
+			sdb: defaultTestStateDB(),
+			chain: func() *fakeBlockChain {
+				bc := defaultFakeBlockChain()
+				bc.superCommittee.Shards[offenderShard].Slots[offenderShardIndex].
 					EcdsaAddress = makeTestAddress("other")
-			},
+				return bc
+			}(),
+
 			expErr: errors.New("does not match the signer's address"),
 		},
 		{
 			// empty signature
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+			r: func() Record {
+				r := defaultSlashRecord()
 				r.Evidence.FirstVote.Signature = nil
-			},
+				return r
+			}(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
 			expErr: errors.New("Empty buf"),
 		},
 		{
 			// false signature
-			editInput: func(chain *fakeBlockChain, db *fakeStateDB, r *Record) {
+			r: func() Record {
+				r := defaultSlashRecord()
 				r.Evidence.FirstVote.Signature = r.Evidence.SecondVote.Signature
-			},
+				return r
+			}(),
+			sdb:   defaultTestStateDB(),
+			chain: defaultFakeBlockChain(),
+
 			expErr: errors.New("could not verify bls key signature on slash"),
 		},
 	}
 	for i, test := range tests {
-		bc, sdb := defaultBlockChainAndState()
-		r := defaultSlashRecord()
-		if test.editInput != nil {
-			test.editInput(bc, sdb, &r)
-		}
-		rawState, rawRecord := sdb.copy(), r.Copy()
+		rawRecord := test.r.Copy()
 
-		err := Verify(bc, sdb, &r)
+		err := Verify(test.chain, test.sdb, &test.r)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}
-		if !reflect.DeepEqual(r, rawRecord) {
+		if !reflect.DeepEqual(test.r, rawRecord) {
 			t.Errorf("Test %v: record has value changed", i)
-		}
-		if err := sdb.assertEqual(rawState); err != nil {
-			t.Errorf("Test %v: state changed: %v", i, err)
 		}
 	}
 }
@@ -426,7 +485,7 @@ type slashApplyTestCase struct {
 	rate              numeric.Dec
 
 	reporter   common.Address
-	state      *fakeStateDB
+	state      *state.DB
 	slashTrack *Application
 	gotErr     error
 
@@ -437,7 +496,7 @@ type slashApplyTestCase struct {
 
 func (tc *slashApplyTestCase) makeData() {
 	tc.reporter = reporterAddr
-	tc.state = newFakeStateDB()
+	tc.state = makeTestStateDB()
 	tc.slashTrack = &Application{
 		TotalSlashed:      new(big.Int).Set(common.Big0),
 		TotalSnitchReward: new(big.Int).Set(common.Big0),
@@ -470,8 +529,8 @@ func (tc *slashApplyTestCase) checkResult() error {
 		return fmt.Errorf("unexpected snitch reward %v / %v", tc.slashTrack.TotalSnitchReward,
 			tc.expSnitch)
 	}
-	if err := tc.state.assertBalance(tc.reporter, tc.expSnitch); err != nil {
-		return fmt.Errorf("state: %v", err)
+	if bal := tc.state.GetBalance(tc.reporter); bal.Cmp(tc.expSnitch) != 0 {
+		return fmt.Errorf("unexpected balance for reporter %v / %v", bal, tc.expSnitch)
 	}
 	return nil
 }
@@ -531,7 +590,7 @@ func TestApply(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		test.makeData()
+		test.makeData(t)
 
 		test.apply()
 
@@ -547,7 +606,7 @@ type applyTestCase struct {
 	rate              numeric.Dec
 
 	chain            *fakeBlockChain
-	state, stateSnap *fakeStateDB
+	state, stateSnap *state.DB
 	gotErr           error
 	gotDiff          *Application
 
@@ -556,17 +615,22 @@ type applyTestCase struct {
 	expErr     error
 }
 
-func (tc *applyTestCase) makeData() {
+func (tc *applyTestCase) makeData(t *testing.T) {
 	tc.chain = defaultFakeBlockChain()
 	if tc.snapshot != nil {
 		tc.chain.snapshots[tc.snapshot.Address] = *tc.snapshot
 	}
 
-	tc.state = newFakeStateDB()
+	tc.state = makeTestStateDB()
 	if tc.current != nil {
-		tc.state.vWrappers[tc.current.Address] = tc.current
+		if err := tc.state.UpdateValidatorWrapper(tc.current.Address, tc.current); err != nil {
+			t.Error(err)
+		}
+		if _, err := tc.state.Commit(true); err != nil {
+			t.Error(err)
+		}
 	}
-	tc.stateSnap = tc.state.copy()
+	tc.stateSnap = tc.state.Copy()
 	return
 }
 
@@ -606,7 +670,7 @@ func (tc *applyTestCase) checkState() error {
 		return fmt.Errorf("status not banned")
 	}
 
-	vwSnap, err := tc.stateSnap.ValidatorWrapper(offAddr)
+	vwSnap, err := tc.stateSnap.ValidatorWrapperCopy(offAddr)
 	if err != nil {
 		return err
 	}
@@ -976,18 +1040,21 @@ func (kp blsKeyPair) Sign(block *types.Block) []byte {
 	return sig.Serialize()
 }
 
-func defaultBlockChainAndState() (*fakeBlockChain, *fakeStateDB) {
-	fbc := defaultFakeBlockChain()
-	sdb := defaultFakeStateDB()
-	return fbc, sdb
+func defaultTestStateDB() *state.DB {
+	sdb := makeTestStateDB()
+	err := sdb.UpdateValidatorWrapper(offAddr, defaultCurrentValidatorWrapper())
+	if err != nil {
+		panic(err)
+	}
+	return sdb
 }
 
-func defaultFakeStateDB() *fakeStateDB {
-	sdb := &fakeStateDB{
-		balances:  make(map[common.Address]*big.Int),
-		vWrappers: make(map[common.Address]*staking.ValidatorWrapper),
+func makeTestStateDB() *state.DB {
+	db := state.NewDatabase(ethdb.NewMemDatabase())
+	sdb, err := state.New(common.Hash{}, db)
+	if err != nil {
+		panic(err)
 	}
-	sdb.vWrappers[offAddr] = defaultCurrentValidatorWrapper()
 	return sdb
 }
 

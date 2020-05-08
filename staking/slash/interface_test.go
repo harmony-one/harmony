@@ -1,9 +1,7 @@
 package slash
 
 import (
-	"fmt"
 	"math/big"
-	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
@@ -52,86 +50,4 @@ func (bc *fakeBlockChain) ReadValidatorSnapshotAtEpoch(epoch *big.Int, addr comm
 		Validator: &vw,
 		Epoch:     new(big.Int).Set(epoch),
 	}, nil
-}
-
-type fakeStateDB struct {
-	balances  map[common.Address]*big.Int
-	vWrappers map[common.Address]*staking.ValidatorWrapper
-}
-
-func newFakeStateDB() *fakeStateDB {
-	return &fakeStateDB{
-		balances:  make(map[common.Address]*big.Int),
-		vWrappers: make(map[common.Address]*staking.ValidatorWrapper),
-	}
-}
-
-func (sdb *fakeStateDB) AddBalance(addr common.Address, amount *big.Int) {
-	if _, ok := sdb.balances[addr]; !ok {
-		sdb.balances[addr] = common.Big0
-	}
-	prevBalance := sdb.balances[addr]
-	sdb.balances[addr] = new(big.Int).Add(prevBalance, amount)
-}
-
-func (sdb *fakeStateDB) ValidatorWrapper(addr common.Address) (*staking.ValidatorWrapper, error) {
-	vw, ok := sdb.vWrappers[addr]
-	if !ok {
-		return nil, fmt.Errorf("address vWrapper not exist")
-	}
-	return vw, nil
-}
-
-func (sdb *fakeStateDB) copy() *fakeStateDB {
-	cp := &fakeStateDB{
-		balances:  make(map[common.Address]*big.Int),
-		vWrappers: make(map[common.Address]*staking.ValidatorWrapper),
-	}
-	for addr, bal := range sdb.balances {
-		cp.balances[addr] = new(big.Int).Set(bal)
-	}
-	for addr, vw := range sdb.vWrappers {
-		vCpy := vw.Copy()
-		cp.vWrappers[addr] = &vCpy
-	}
-	return cp
-}
-
-func (sdb *fakeStateDB) assertBalance(addr common.Address, balance *big.Int) error {
-	val, ok := sdb.balances[addr]
-	if !ok {
-		return fmt.Errorf("address %x not exist", addr)
-	}
-	if val.Cmp(balance) != 0 {
-		return fmt.Errorf("balance not expected %v / %v", val, balance)
-	}
-	return nil
-}
-
-func (sdb *fakeStateDB) assertEqual(exp *fakeStateDB) error {
-	if len(sdb.balances) != len(exp.balances) {
-		return fmt.Errorf("balance map size not equal")
-	}
-	if len(sdb.vWrappers) != len(exp.vWrappers) {
-		return fmt.Errorf("vWrapper map size not equal")
-	}
-	for addr, b1 := range sdb.balances {
-		b2, ok := exp.balances[addr]
-		if !ok {
-			return fmt.Errorf("address %x balance not exist in exp", addr)
-		}
-		if b1.Cmp(b2) != 0 {
-			return fmt.Errorf("balance of %x not expected: %v / %v", addr, b1, b2)
-		}
-	}
-	for addr, vw1 := range sdb.vWrappers {
-		vw2, ok := exp.vWrappers[addr]
-		if !ok {
-			return fmt.Errorf("address %v vWrapper not exist in exp", addr)
-		}
-		if !reflect.DeepEqual(vw1, vw2) {
-			return fmt.Errorf("vWrapper of %x not expected", addr)
-		}
-	}
-	return nil
 }
