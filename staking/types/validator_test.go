@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"math/big"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -101,7 +102,22 @@ func TestMarshalUnmarshalValidator(t *testing.T) {
 	}
 }
 
-// check the validator wrapper's sanity
+func TestValidator_Copy(t *testing.T) {
+	tests := []struct {
+		v Validator
+	}{
+		{makeValidValidator()},
+		{makeZeroValidator()},
+		{Validator{}},
+	}
+	for i, test := range tests {
+		cp := test.v.Copy()
+		if err := assertValidatorDeepCopy(test.v, cp); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
 func TestValidator_SanityCheck(t *testing.T) {
 	tests := []struct {
 		editValidator func(*Validator)
@@ -191,6 +207,42 @@ func TestTotalDelegation(t *testing.T) {
 	if totalNum.Cmp(twelveK) != 0 {
 		t.Errorf("TotalDelegation number is not right")
 	}
+}
+
+func TestValidatorWrapper_Copy(t *testing.T) {
+	tests := []struct {
+		w ValidatorWrapper
+	}{
+		{makeNonZeroValidatorWrapper()},
+		{makeZeroValidatorWrapper()},
+		{ValidatorWrapper{}},
+	}
+	for i, test := range tests {
+		cp := test.w.Copy()
+
+		if err := assertValidatorWrapperDeepCopy(cp, test.w); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
+func makeNonZeroValidatorWrapper() ValidatorWrapper {
+	w := ValidatorWrapper{
+		Validator:   makeValidValidator(),
+		Delegations: Delegations{makeNonZeroDelegation(), makeZeroDelegation()},
+		Counters:    counters{common.Big1, common.Big1},
+		BlockReward: common.Big1,
+	}
+	return w
+}
+
+func makeZeroValidatorWrapper() ValidatorWrapper {
+	w := ValidatorWrapper{
+		Delegations: make(Delegations, 0),
+		Counters:    counters{common.Big0, common.Big0},
+		BlockReward: common.Big0,
+	}
+	return w
 }
 
 func TestValidatorWrapper_SanityCheck(t *testing.T) {
@@ -752,6 +804,25 @@ func makeValidValidator() Validator {
 	return v
 }
 
+func makeZeroValidator() Validator {
+	v := Validator{
+		SlotPubKeys:          make([]shard.BLSPublicKey, 0),
+		LastEpochInCommittee: common.Big0,
+		MinSelfDelegation:    common.Big0,
+		MaxTotalDelegation:   common.Big0,
+		Commission: Commission{
+			CommissionRates: CommissionRates{
+				Rate:          numeric.ZeroDec(),
+				MaxRate:       numeric.ZeroDec(),
+				MaxChangeRate: numeric.ZeroDec(),
+			},
+			UpdateHeight: common.Big0,
+		},
+		CreationHeight: common.Big0,
+	}
+	return v
+}
+
 // makeValidValidatorWrapper makes a valid validator wrapper
 func makeValidValidatorWrapper() ValidatorWrapper {
 	v := makeValidValidator()
@@ -782,6 +853,65 @@ func makeCreateValidator() CreateValidator {
 		SlotKeySigs:        sigs,
 		Amount:             twelveK,
 	}
+}
+
+func assertValidatorWrapperDeepCopy(w1, w2 ValidatorWrapper) error {
+	if err := assertValidatorEqual(w1.Validator, w2.Validator); err != nil {
+		return fmt.Errorf("validator %v", err)
+	}
+	if err := assertDelegationsDeepCopy(w1.Delegations, w2.Delegations); err != nil {
+		return fmt.Errorf("delegations %v", err)
+	}
+	if err := assertCountersDeepCopy(w1.Counters, w2.Counters); err != nil {
+		return fmt.Errorf("counters %v", err)
+	}
+	if w1.BlockReward != nil && w1.BlockReward == w2.BlockReward {
+		return fmt.Errorf("BlockReward same address")
+	}
+	return nil
+}
+
+func assertCountersDeepCopy(c1, c2 counters) error {
+	if !reflect.DeepEqual(c1, c2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if c1.NumBlocksToSign != nil && c1.NumBlocksToSign == c2.NumBlocksToSign {
+		return fmt.Errorf("NumBlocksToSign same address")
+	}
+	if c1.NumBlocksSigned != nil && c1.NumBlocksSigned == c2.NumBlocksSigned {
+		return fmt.Errorf("NumBlocksSigned same address")
+	}
+	return nil
+}
+
+func assertValidatorDeepCopy(v1, v2 Validator) error {
+	if !reflect.DeepEqual(v1, v2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if &v1.SlotPubKeys == &v2.SlotPubKeys {
+		return fmt.Errorf("SlotPubKeys same pointer")
+	}
+	for i := range v1.SlotPubKeys {
+		if &v1.SlotPubKeys[i] == &v2.SlotPubKeys[i] {
+			return fmt.Errorf("SlotPubKeys[%v] same address", i)
+		}
+	}
+	if v1.LastEpochInCommittee != nil && v1.LastEpochInCommittee == v2.LastEpochInCommittee {
+		return fmt.Errorf("LastEpochInCommittee same address")
+	}
+	if v1.MinSelfDelegation != nil && v1.MinSelfDelegation == v2.MinSelfDelegation {
+		return fmt.Errorf("MinSelfDelegation same address")
+	}
+	if v1.CreationHeight != nil && v1.CreationHeight == v2.CreationHeight {
+		return fmt.Errorf("CreationHeight same address")
+	}
+	if &v1.Description == &v2.Description {
+		return fmt.Errorf("same description")
+	}
+	if err := assertCommissionDeepCopy(v1.Commission, v2.Commission); err != nil {
+		return fmt.Errorf("CommissionRates: %v", err)
+	}
+	return nil
 }
 
 func assertValidatorEqual(v1, v2 Validator) error {

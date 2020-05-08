@@ -1,7 +1,9 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
+	"reflect"
 	"testing"
 
 	common "github.com/ethereum/go-ethereum/common"
@@ -137,4 +139,99 @@ func TestUnlockedPremature(t *testing.T) {
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("premature delegation shouldn't be unlocked")
 	}
+}
+
+func TestDelegation_Copy(t *testing.T) {
+	tests := []struct {
+		d Delegation
+	}{
+		{makeNonZeroDelegation()},
+		{makeZeroDelegation()},
+		{Delegation{}},
+	}
+	for i, test := range tests {
+		cp := test.d.Copy()
+		if err := assertDelegationDeepCopy(cp, test.d); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
+func makeNonZeroDelegation() Delegation {
+	return Delegation{
+		DelegatorAddress: common.BigToAddress(common.Big1),
+		Amount:           common.Big1,
+		Reward:           common.Big1,
+		Undelegations: Undelegations{
+			Undelegation{
+				Amount: common.Big1,
+				Epoch:  common.Big1,
+			},
+			Undelegation{
+				Amount: common.Big0,
+				Epoch:  common.Big0,
+			},
+		},
+	}
+}
+
+func makeZeroDelegation() Delegation {
+	return Delegation{
+		Amount:        common.Big0,
+		Reward:        common.Big0,
+		Undelegations: make(Undelegations, 0),
+	}
+}
+
+func assertDelegationsDeepCopy(ds1, ds2 Delegations) error {
+	if !reflect.DeepEqual(ds1, ds2) {
+		return fmt.Errorf("not deep equal")
+	}
+	for i := range ds1 {
+		if err := assertDelegationDeepCopy(ds1[i], ds2[i]); err != nil {
+			return fmt.Errorf("[%v]: %v", i, err)
+		}
+	}
+	return nil
+}
+
+func assertDelegationDeepCopy(d1, d2 Delegation) error {
+	if !reflect.DeepEqual(d1, d2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if d1.Amount != nil && d1.Amount == d2.Amount {
+		return fmt.Errorf("amount same address")
+	}
+	if d1.Reward != nil && d1.Reward == d2.Reward {
+		return fmt.Errorf("reward same address")
+	}
+	if err := assertUndelegationsDeepCopy(d1.Undelegations, d2.Undelegations); err != nil {
+		return fmt.Errorf("undelegations %v", err)
+	}
+	return nil
+}
+
+func assertUndelegationsDeepCopy(uds1, uds2 Undelegations) error {
+	if !reflect.DeepEqual(uds1, uds2) {
+		return fmt.Errorf("not deep equal")
+	}
+	for i := range uds1 {
+		if err := assertUndelegationDeepCopy(uds1[i], uds2[i]); err != nil {
+			return fmt.Errorf("[%v]: %v", i, err)
+		}
+	}
+	return nil
+}
+
+func assertUndelegationDeepCopy(ud1, ud2 Undelegation) error {
+	if !reflect.DeepEqual(ud1, ud2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if ud1.Amount != nil && ud1.Amount == ud2.Amount {
+		return fmt.Errorf("amount same address")
+	}
+	if ud1.Epoch != nil && ud1.Epoch == ud2.Epoch {
+		return fmt.Errorf("epoch same address")
+	}
+	return nil
 }

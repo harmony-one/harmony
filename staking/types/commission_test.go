@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/harmony-one/harmony/numeric"
 )
 
@@ -17,14 +19,36 @@ var (
 	oneDec      = numeric.OneDec()
 )
 
+func TestCommission_Copy(t *testing.T) {
+	tests := []struct {
+		c Commission
+	}{
+		{Commission{
+			CommissionRates: CommissionRates{oneDec, oneDec, oneDec},
+			UpdateHeight:    common.Big1,
+		}},
+		{Commission{
+			CommissionRates: CommissionRates{zeroDec, zeroDec, zeroDec},
+			UpdateHeight:    common.Big0,
+		}},
+		{Commission{}},
+	}
+	for i, test := range tests {
+		cp := test.c.Copy()
+
+		if err := assertCommissionDeepCopy(cp, test.c); err != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+	}
+}
+
 func TestCommissionRates_Copy(t *testing.T) {
 	tests := []struct {
 		cr CommissionRates
 	}{
-		{},
 		{CommissionRates{zeroDec, halfDec, oneDec}},
-		{CommissionRates{zeroDec, oneThirdDec, twoThirdDec}},
-		{CommissionRates{oneThirdDec, twoThirdDec, oneDec}},
+		{CommissionRates{zeroDec, zeroDec, zeroDec}},
+		{},
 	}
 	for i, test := range tests {
 		cp := test.cr.Copy()
@@ -33,6 +57,19 @@ func TestCommissionRates_Copy(t *testing.T) {
 			t.Errorf("Test %v: %v", i, err)
 		}
 	}
+}
+
+func assertCommissionDeepCopy(c1, c2 Commission) error {
+	if !reflect.DeepEqual(c1, c2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if err := assertCommissionRatesCopy(c1.CommissionRates, c2.CommissionRates); err != nil {
+		return fmt.Errorf("CommissionRates: %v", err)
+	}
+	if err := assertBigIntCopy(c1.UpdateHeight, c2.UpdateHeight); err != nil {
+		return fmt.Errorf("UpdateHeight: %v", err)
+	}
+	return nil
 }
 
 func assertCommissionRatesDeepCopy(cr1, cr2 CommissionRates) error {
