@@ -25,18 +25,7 @@ type (
 	}
 )
 
-// Copy makes a deep copy of the Commission structure
-func (c Commission) Copy() Commission {
-	cp := Commission{
-		CommissionRates: c.CommissionRates.Copy(),
-	}
-	if c.UpdateHeight != nil {
-		cp.UpdateHeight = new(big.Int).Set(c.UpdateHeight)
-	}
-	return cp
-}
-
-// Copy makes a deep copy of the CommissionRates
+// CopyCommissionRates copies the staking.CommissionRates
 func (cr CommissionRates) Copy() CommissionRates {
 	return CommissionRates{
 		Rate:          cr.Rate.Copy(),

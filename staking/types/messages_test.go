@@ -110,10 +110,26 @@ func TestDelegate_Copy(t *testing.T) {
 	for i, test := range tests {
 		cp := test.d.Copy().(Delegate)
 
-		if err := assertDelegateDeepEqual(cp, test.d); err != nil {
+		if err := assertDelegateDeepCopy(cp, test.d); err != nil {
 			t.Errorf("Test %v: %v", i, err)
 		}
 	}
+}
+
+func assertDelegateDeepCopy(d1, d2 Delegate) error {
+	if !reflect.DeepEqual(d1, d2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if &d1.DelegatorAddress == &d2.DelegatorAddress {
+		return fmt.Errorf("DelegatorAddress same pointer")
+	}
+	if &d1.ValidatorAddress == &d2.ValidatorAddress {
+		return fmt.Errorf("ValidatorAddress same pointer")
+	}
+	if d1.Amount != nil && d1.Amount == d2.Amount {
+		return fmt.Errorf("amount same pointer")
+	}
+	return nil
 }
 
 func TestUndelegate_Copy(t *testing.T) {
@@ -127,10 +143,26 @@ func TestUndelegate_Copy(t *testing.T) {
 	for i, test := range tests {
 		cp := test.u.Copy().(Undelegate)
 
-		if err := assertUndelegateDeepEqual(cp, test.u); err != nil {
+		if err := assertUndelegateDeepCopy(cp, test.u); err != nil {
 			t.Errorf("Test %v: %v", i, err)
 		}
 	}
+}
+
+func assertUndelegateDeepCopy(u1, u2 Undelegate) error {
+	if !reflect.DeepEqual(u1, u2) {
+		return fmt.Errorf("not deep equal")
+	}
+	if &u1.DelegatorAddress == &u2.DelegatorAddress {
+		return fmt.Errorf("DelegatorAddress same pointer")
+	}
+	if &u1.ValidatorAddress == &u2.ValidatorAddress {
+		return fmt.Errorf("ValidatorAddress same pointer")
+	}
+	if u1.Amount != nil && u1.Amount == u2.Amount {
+		return fmt.Errorf("amount same pointer")
+	}
+	return nil
 }
 
 func TestCollectRewards_Copy(t *testing.T) {
@@ -204,38 +236,6 @@ func assertEditValidatorDeepCopy(ev1, ev2 EditValidator) error {
 	}
 	if ev1.SlotKeyToAddSig != nil && ev1.SlotKeyToAddSig == ev2.SlotKeyToAddSig {
 		return fmt.Errorf("SlotKeyToAddSig same pointer")
-	}
-	return nil
-}
-
-func assertDelegateDeepEqual(d1, d2 Delegate) error {
-	if !reflect.DeepEqual(d1, d2) {
-		return fmt.Errorf("not deep equal")
-	}
-	if &d1.DelegatorAddress == &d2.DelegatorAddress {
-		return fmt.Errorf("DelegatorAddress same pointer")
-	}
-	if &d1.ValidatorAddress == &d2.ValidatorAddress {
-		return fmt.Errorf("ValidatorAddress same pointer")
-	}
-	if d1.Amount != nil && d1.Amount == d2.Amount {
-		return fmt.Errorf("amount same pointer")
-	}
-	return nil
-}
-
-func assertUndelegateDeepEqual(u1, u2 Undelegate) error {
-	if !reflect.DeepEqual(u1, u2) {
-		return fmt.Errorf("not deep equal")
-	}
-	if &u1.DelegatorAddress == &u2.DelegatorAddress {
-		return fmt.Errorf("DelegatorAddress same pointer")
-	}
-	if &u1.ValidatorAddress == &u2.ValidatorAddress {
-		return fmt.Errorf("ValidatorAddress same pointer")
-	}
-	if u1.Amount != nil && u1.Amount == u2.Amount {
-		return fmt.Errorf("amount same pointer")
 	}
 	return nil
 }
@@ -348,9 +348,6 @@ func cpTestDataSetup() {
 		DelegatorAddress: common.BigToAddress(common.Big1),
 		ValidatorAddress: validatorAddr,
 		Amount:           twelveK,
-	}
-	zeroDelegate = Delegate{
-		Amount: common.Big0,
 	}
 
 	testUndelegate = Undelegate{

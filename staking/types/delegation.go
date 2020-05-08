@@ -31,35 +31,8 @@ type Delegation struct {
 	Undelegations    Undelegations
 }
 
-// Copy returns a deep copy of Delegation
-func (d Delegation) Copy() Delegation {
-	cp := Delegation{
-		DelegatorAddress: d.DelegatorAddress,
-		Undelegations:    d.Undelegations.Copy(),
-	}
-	if d.Amount != nil {
-		cp.Amount = new(big.Int).Set(d.Amount)
-	}
-	if d.Reward != nil {
-		cp.Reward = new(big.Int).Set(d.Reward)
-	}
-	return cp
-}
-
 // Delegations ..
 type Delegations []Delegation
-
-// Copy returns a deep copy of Delegations
-func (d Delegations) Copy() Delegations {
-	if d == nil {
-		return nil
-	}
-	cp := make(Delegations, 0, len(d))
-	for _, del := range d {
-		cp = append(cp, del.Copy())
-	}
-	return cp
-}
 
 // String ..
 func (d Delegations) String() string {
@@ -115,32 +88,8 @@ type Undelegation struct {
 	Epoch  *big.Int `json:"epoch"`
 }
 
-// Copy returns a deep copy of Undelegation
-func (ud Undelegation) Copy() Undelegation {
-	cp := Undelegation{}
-	if ud.Amount != nil {
-		cp.Amount = new(big.Int).Set(ud.Amount)
-	}
-	if ud.Epoch != nil {
-		cp.Epoch = new(big.Int).Set(ud.Epoch)
-	}
-	return cp
-}
-
 // Undelegations ..
 type Undelegations []Undelegation
-
-// Copy returns a deep copy of Undelegations
-func (u Undelegations) Copy() Undelegations {
-	if u == nil {
-		return nil
-	}
-	cp := make(Undelegations, 0, len(u))
-	for _, ud := range u {
-		cp = append(cp, ud.Copy())
-	}
-	return cp
-}
 
 // String ..
 func (u Undelegations) String() string {
