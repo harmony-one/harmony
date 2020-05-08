@@ -52,7 +52,7 @@ const (
 	Stressnet = "stressnet"
 	Devnet    = "devnet"
 	Localnet  = "localnet"
-	P2PNet    = "p2p"
+	P2PNet    = "p2pnet"
 )
 
 // Global is the index of the global node configuration
