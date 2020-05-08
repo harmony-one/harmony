@@ -378,6 +378,15 @@ stn|stress|stressnet)
   dns_zone=stn.hmny.io
   syncdir=stn
   ;;
+p2p|p2pnet)
+  bootnodes=(
+    /ip4/52.40.84.2/tcp/9842/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
+  )
+  REL=p2p
+  network_type=p2pnet
+  dns_zone=p2p.hmny.io
+  syncdir=p2p
+  ;;
 devnet)
   bootnodes=(
     /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
