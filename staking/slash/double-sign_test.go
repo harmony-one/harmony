@@ -126,7 +126,7 @@ func TestVerify(t *testing.T) {
 			// same block in conflicting votes
 			r: func() Record {
 				r := defaultSlashRecord()
-				r.Evidence.SecondVote = r.Evidence.FirstVote.Copy()
+				r.Evidence.SecondVote = copyVote(r.Evidence.FirstVote)
 				return r
 			}(),
 			sdb:   defaultTestStateDB(),
@@ -234,7 +234,7 @@ func TestVerify(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		rawRecord := test.r.Copy()
+		rawRecord := copyRecord(test.r)
 
 		err := Verify(test.chain, test.sdb, &test.r)
 
@@ -679,65 +679,6 @@ func (tc *applyTestCase) checkState() error {
 	return nil
 }
 
-func TestRecord_Copy(t *testing.T) {
-	tests := []struct {
-		r Record
-	}{
-		{
-			r: defaultSlashRecord(),
-		},
-		{
-			// Zero values
-			r: Record{
-				Evidence: Evidence{
-					Moment: Moment{Epoch: common.Big0},
-					ConflictingVotes: ConflictingVotes{
-						FirstVote:  Vote{Signature: make([]byte, 0)},
-						SecondVote: Vote{Signature: make([]byte, 0)},
-					},
-				},
-			},
-		},
-		{
-			// Empty values
-			r: Record{},
-		},
-	}
-	for i, test := range tests {
-		cp := test.r.Copy()
-
-		if err := assertRecordDeepCopy(cp, test.r); err != nil {
-			t.Errorf("Test %v: %v", i, err)
-		}
-	}
-}
-
-func assertRecordDeepCopy(r1, r2 Record) error {
-	if !reflect.DeepEqual(r1, r2) {
-		return fmt.Errorf("not deep equal")
-	}
-	if r1.Evidence.Epoch != nil && r1.Evidence.Epoch == r2.Evidence.Epoch {
-		return fmt.Errorf("epoch not deep copy")
-	}
-	if err := assertVoteDeepCopy(r1.Evidence.FirstVote, r2.Evidence.FirstVote); err != nil {
-		return fmt.Errorf("FirstVote: %v", err)
-	}
-	if err := assertVoteDeepCopy(r1.Evidence.SecondVote, r2.Evidence.SecondVote); err != nil {
-		return fmt.Errorf("SecondVote: %v", err)
-	}
-	return nil
-}
-
-func assertVoteDeepCopy(v1, v2 Vote) error {
-	if !reflect.DeepEqual(v1, v2) {
-		return fmt.Errorf("not deep equal")
-	}
-	if len(v1.Signature) != 0 && &v1.Signature[0] == &v2.Signature[0] {
-		return fmt.Errorf("signature same pointer")
-	}
-	return nil
-}
-
 func TestRate(t *testing.T) {
 	tests := []struct {
 		votingPower *votepower.Roster
@@ -1077,4 +1018,55 @@ func assertError(got, exp error) error {
 		return fmt.Errorf("unexpected error [%v] / [%v]", got, exp)
 	}
 	return nil
+}
+
+// copyRecord makes a deep copy the slash Record
+func copyRecord(r Record) Record {
+	return Record{
+		Evidence: copyEvidence(r.Evidence),
+		Reporter: r.Reporter,
+	}
+}
+
+// copyEvidence makes a deep copy the slash evidence
+func copyEvidence(e Evidence) Evidence {
+	return Evidence{
+		Moment:           copyMoment(e.Moment),
+		ConflictingVotes: copyConflictingVotes(e.ConflictingVotes),
+		Offender:         e.Offender,
+	}
+}
+
+// copyMoment makes a deep copy of the Moment structure
+func copyMoment(m Moment) Moment {
+	cp := Moment{
+		ShardID: m.ShardID,
+		Height:  m.Height,
+		ViewID:  m.ViewID,
+	}
+	if m.Epoch != nil {
+		cp.Epoch = new(big.Int).Set(m.Epoch)
+	}
+	return cp
+}
+
+// copyConflictingVotes makes a deep copy of slash.ConflictingVotes
+func copyConflictingVotes(cv ConflictingVotes) ConflictingVotes {
+	return ConflictingVotes{
+		FirstVote:  copyVote(cv.FirstVote),
+		SecondVote: copyVote(cv.SecondVote),
+	}
+}
+
+// copyVote makes a deep copy of slash.Vote
+func copyVote(v Vote) Vote {
+	cp := Vote{
+		SignerPubKey:    v.SignerPubKey,
+		BlockHeaderHash: v.BlockHeaderHash,
+	}
+	if v.Signature != nil {
+		cp.Signature = make([]byte, len(v.Signature))
+		copy(cp.Signature, v.Signature)
+	}
+	return cp
 }
