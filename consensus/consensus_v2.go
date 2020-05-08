@@ -143,8 +143,6 @@ func (consensus *Consensus) FinalizeCommits() error {
 		Uint64("blockNum", consensus.BlockNum()).
 		Msg("[finalizeCommits] Sent Committed Message")
 
-	// consensus.Timeouts.Consensus.Start(consensus.BlockNum())
-
 	utils.Logger().Info().
 		Uint64("blockNum", block.NumberU64()).
 		Uint64("epochNum", block.Epoch().Uint64()).

@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"math/big"
 	"sync/atomic"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -98,15 +97,8 @@ func (consensus *Consensus) StartViewChange(viewID uint64) {
 	if consensus.disableViewChange {
 		return
 	}
-	consensus.Current.SetMode(ViewChanging)
-	consensus.Current.SetViewID(viewID)
+
 	consensus.SetLeaderPubKey(consensus.GetNextLeaderKey())
-	diff := int64(viewID - consensus.ViewID())
-	duration := time.Duration(diff * diff * int64(1*time.Minute))
-	utils.Logger().Info().
-		Uint64("ViewChangingID", viewID).
-		Dur("timeoutDuration", duration).
-		Msg("[startViewChange]")
 
 	for i, key := range consensus.PubKey.PublicKey {
 		msgToSend := consensus.constructViewChangeMessage(key, consensus.priKey.PrivateKey[i])
@@ -116,9 +108,6 @@ func (consensus *Consensus) StartViewChange(viewID uint64) {
 			p2p.ConstructMessage(msgToSend),
 		)
 	}
-
-	// consensus.Timeouts.ViewChange.SetDuration(duration)
-	// consensus.Timeouts.ViewChange.Start(consensus.ViewID())
 
 	utils.Logger().Debug().
 		Uint64("ViewChangingID", consensus.Current.ViewID()).
@@ -387,7 +376,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) error {
 
 		consensus.SetViewID(recvMsg.ViewID)
 		consensus.ResetViewChangeState()
-		// consensus.Timeouts.Consensus.Start(consensus.BlockNum())
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.ViewID()).
 			Uint64("block", consensus.BlockNum()).
@@ -547,6 +535,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) error {
 	}
 	utils.Logger().Debug().
 		Msg("validator start consensus timer and stop view change timer")
-	// consensus.Timeouts.Consensus.Start(consensus.BlockNum())
+	go func() {
+		consensus.ViewChangeSucceed <- struct{}{}
+	}()
+
 	return nil
 }

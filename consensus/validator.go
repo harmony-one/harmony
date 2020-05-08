@@ -309,6 +309,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 	}
 
 	utils.Logger().Debug().Msg("[OnCommitted] Start consensus timer")
-	// consensus.Timeouts.Consensus.Start(consensus.BlockNum())
+	go func() {
+		consensus.CommitedBlock <- struct{}{}
+	}()
 	return nil
 }

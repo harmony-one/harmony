@@ -5,54 +5,61 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // HandleConsensus ..
 func (node *Node) HandleConsensus() error {
 
-	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		select {
-		case msg := <-node.Consensus.IncomingConsensusMessage:
+	go func() {
+		for msg := range node.Consensus.IncomingConsensusMessage {
 			if err := node.Consensus.HandleMessageUpdate(&msg); err != nil {
 				utils.Logger().Info().Err(err).Msg("some visibility into consensus messages")
 			}
+		}
+	}()
+
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+		select {
 		case <-node.Consensus.CommitedBlock:
 			cancel()
-			//
-		case <-ctx.Done():
-			fmt.Println("something")
 			continue
-			// need to do a view change
+		case <-ctx.Done():
+			node.Consensus.Current.SetMode(consensus.ViewChanging)
+
+		ViewChangeLoop:
+			for {
+
+				newViewID := node.Consensus.Current.ViewID() + 1
+				node.Consensus.Current.SetViewID(newViewID)
+				diff := int64(newViewID - node.Consensus.ViewID())
+				duration := time.Duration(diff * diff * int64(1*time.Minute))
+
+				utils.Logger().Info().
+					Uint64("ViewChangingID", newViewID).
+					Dur("timeoutDuration", duration).
+					Msg("[startViewChange]")
+
+				ctx, cancel := context.WithTimeout(context.Background(), duration)
+				node.Consensus.StartViewChange(newViewID)
+
+				select {
+				case <-ctx.Done():
+					fmt.Println("view change timed out, try again")
+					// try again
+					continue
+				case <-node.Consensus.ViewChangeSucceed:
+					fmt.Println("view change worked, should be plain consensus now")
+					cancel()
+
+					break ViewChangeLoop
+				}
+			}
 		}
 	}
 
 	return nil
-
-	// g.Go(func() error {
-	// 	for due := range node.Consensus.Timeouts.Consensus.TimedOut {
-	// 		fmt.Println("consensus did a timeout?")
-	// 		// blkNow := node.Blockchain().CurrentHeader().Number().Uint64()
-	// 		// if blkNow < due {
-	// 		// 	viewIDNow := node.Consensus.ViewID()
-	// 		// 	utils.Logger().Info().
-	// 		// 		Uint64("viewID-now", viewIDNow).
-	// 		// 		Msg("beginning view change")
-	// 		// 	node.Consensus.StartViewChange(viewIDNow + 1)
-	// 		// }
-	// 	}
-	// 	return nil
-	// })
-
-	// g.Go(func() error {
-	// 	for due := range node.Consensus.Timeouts.ViewChange.TimedOut {
-	// 		viewIDNow := node.Consensus.Current.ViewID()
-	// 		if viewIDNow < due {
-	// 			node.Consensus.StartViewChange(viewIDNow + 1)
-	// 		}
-	// 	}
-	// 	return nil
-	// })
 
 }
