@@ -43,6 +43,11 @@ func (node *Node) IsCurrentlyLeader() bool {
 	return node.Consensus.IsLeader()
 }
 
+// PeerConnectivity ..
+func (node *Node) PeerConnectivity() (int, int, int) {
+	return node.host.C()
+}
+
 // PendingCXReceipts returns node.pendingCXReceiptsProof
 func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
 	cxReceipts := make([]*types.CXReceiptsProof, len(node.pendingCXReceipts))
