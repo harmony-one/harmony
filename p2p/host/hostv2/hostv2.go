@@ -234,6 +234,7 @@ func New(self *p2p.Peer, priKey libp2p_crypto.PrivKey) (*HostV2, error) {
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(listenAddr), libp2p.Identity(priKey),
+		libp2p.NATPortMap(),
 	)
 	if err != nil {
 		return nil, err
