@@ -81,6 +81,18 @@ type counters struct {
 	NumBlocksSigned *big.Int `json:"signed",rlp:"nil"`
 }
 
+// Copy returns a deep copy of counters
+func (c counters) Copy() counters {
+	cp := counters{}
+	if c.NumBlocksToSign != nil {
+		cp.NumBlocksToSign = new(big.Int).Set(c.NumBlocksToSign)
+	}
+	if c.NumBlocksSigned != nil {
+		cp.NumBlocksSigned = new(big.Int).Set(c.NumBlocksSigned)
+	}
+	return cp
+}
+
 // ValidatorWrapper contains validator,
 // its delegation information
 type ValidatorWrapper struct {
@@ -90,6 +102,19 @@ type ValidatorWrapper struct {
 	Counters counters `json:"-"`
 	// All the rewarded accumulated so far
 	BlockReward *big.Int `json:"-"`
+}
+
+// Copy returns a deep copy of ValidatorWrapper
+func (w ValidatorWrapper) Copy() ValidatorWrapper {
+	cp := ValidatorWrapper{
+		Validator:   w.Validator.Copy(),
+		Delegations: w.Delegations.Copy(),
+		Counters:    w.Counters.Copy(),
+	}
+	if w.BlockReward != nil {
+		cp.BlockReward = new(big.Int).Set(w.BlockReward)
+	}
+	return cp
 }
 
 // ValidatorSnapshot contains validator snapshot and the corresponding epoch
@@ -230,6 +255,33 @@ var (
 	oneAsBigInt  = big.NewInt(denominations.One)
 	minimumStake = new(big.Int).Mul(oneAsBigInt, big.NewInt(TenThousand))
 )
+
+// Copy returns a deep copy of Validator
+func (v Validator) Copy() Validator {
+	cp := Validator{
+		Address:     v.Address,
+		Status:      v.Status,
+		Commission:  v.Commission.Copy(),
+		Description: v.Description,
+	}
+	if v.SlotPubKeys != nil {
+		cp.SlotPubKeys = make([]shard.BLSPublicKey, len(v.SlotPubKeys))
+		copy(cp.SlotPubKeys, v.SlotPubKeys)
+	}
+	if v.LastEpochInCommittee != nil {
+		cp.LastEpochInCommittee = new(big.Int).Set(v.LastEpochInCommittee)
+	}
+	if v.MinSelfDelegation != nil {
+		cp.MinSelfDelegation = new(big.Int).Set(v.MinSelfDelegation)
+	}
+	if v.MaxTotalDelegation != nil {
+		cp.MaxTotalDelegation = new(big.Int).Set(v.MaxTotalDelegation)
+	}
+	if v.CreationHeight != nil {
+		cp.CreationHeight = new(big.Int).Set(v.CreationHeight)
+	}
+	return cp
+}
 
 // SanityCheck checks basic requirements of a validator
 func (v *Validator) SanityCheck(oneThirdExtrn int) error {

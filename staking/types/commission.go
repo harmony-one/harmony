@@ -25,6 +25,16 @@ type (
 	}
 )
 
+func (c Commission) Copy() Commission {
+	cp := Commission{
+		CommissionRates: c.CommissionRates.Copy(),
+	}
+	if c.UpdateHeight != nil {
+		cp.UpdateHeight = new(big.Int).Set(c.UpdateHeight)
+	}
+	return cp
+}
+
 // Copy makes a deep copy of the CommissionRates
 func (cr CommissionRates) Copy() CommissionRates {
 	return CommissionRates{
