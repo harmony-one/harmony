@@ -28,7 +28,7 @@ const (
 	mainnetV1_3Epoch = 36
 	mainnetV1_4Epoch = 46
 	mainnetV1_5Epoch = 54
-	mainnetV2Epoch   = 177
+	mainnetV2Epoch   = 178
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "https://api.s%d.dry.hmny.io"
