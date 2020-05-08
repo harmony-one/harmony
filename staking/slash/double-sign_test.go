@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/harmony-one/harmony/consensus/votepower"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -672,6 +674,80 @@ func assertVoteDeepCopy(v1, v2 Vote) error {
 		return fmt.Errorf("signature same pointer")
 	}
 	return nil
+}
+
+func TestRate(t *testing.T) {
+	tests := []struct {
+		votingPower *votepower.Roster
+		records     Records
+		expRate     numeric.Dec
+	}{
+		{
+			votingPower: makeVotingPower(map[shard.BLSPublicKey]numeric.Dec{
+				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
+				keyPairs[1].Pub(): numeric.NewDecWithPrec(2, 2),
+				keyPairs[2].Pub(): numeric.NewDecWithPrec(3, 2),
+			}),
+			records: Records{
+				makeEmptyRecordWithSecondSignerKey(keyPairs[0].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[1].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[2].Pub()),
+			},
+			expRate: numeric.NewDecWithPrec(6, 2),
+		},
+		{
+			votingPower: makeVotingPower(map[shard.BLSPublicKey]numeric.Dec{
+				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
+			}),
+			records: Records{
+				makeEmptyRecordWithSecondSignerKey(keyPairs[0].Pub()),
+			},
+			expRate: oneDoubleSignerRate,
+		},
+		{
+			votingPower: makeVotingPower(map[shard.BLSPublicKey]numeric.Dec{}),
+			records:     Records{},
+			expRate:     oneDoubleSignerRate,
+		},
+		{
+			votingPower: makeVotingPower(map[shard.BLSPublicKey]numeric.Dec{
+				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
+				keyPairs[1].Pub(): numeric.NewDecWithPrec(2, 2),
+				keyPairs[3].Pub(): numeric.NewDecWithPrec(3, 2),
+			}),
+			records: Records{
+				makeEmptyRecordWithSecondSignerKey(keyPairs[0].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[1].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[2].Pub()),
+			},
+			expRate: numeric.NewDecWithPrec(3, 2),
+		},
+	}
+	for i, test := range tests {
+		rate := Rate(test.votingPower, test.records)
+		if rate.IsNil() || !rate.Equal(test.expRate) {
+			t.Errorf("Test %v: unexpected rate %v / %v", i, rate, test.expRate)
+		}
+	}
+
+}
+
+func makeEmptyRecordWithSecondSignerKey(pub shard.BLSPublicKey) Record {
+	var r Record
+	r.Evidence.SecondVote.SignerPubKey = pub
+	return r
+}
+
+func makeVotingPower(m map[shard.BLSPublicKey]numeric.Dec) *votepower.Roster {
+	r := &votepower.Roster{
+		Voters: make(map[shard.BLSPublicKey]*votepower.AccommodateHarmonyVote),
+	}
+	for pub, pct := range m {
+		r.Voters[pub] = &votepower.AccommodateHarmonyVote{
+			PureStakedVote: votepower.PureStakedVote{GroupPercent: pct},
+		}
+	}
+	return r
 }
 
 func defaultSlashRecord() Record {
