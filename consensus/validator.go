@@ -25,15 +25,15 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) error {
 		return err
 	}
 
-	consensus.Locks.Global.Lock()
-	defer consensus.Locks.Global.Unlock()
-
 	// NOTE let it handle its own logs
 	if !consensus.onAnnounceSanityChecks(recvMsg) {
 		return nil
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
+
 	consensus.SetBlockHash(recvMsg.BlockHash)
 
 	// we have already added message and block, skip check viewID
@@ -111,9 +111,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 		return err
 	}
 
-	consensus.Locks.Global.Lock()
-	defer consensus.Locks.Global.Unlock()
-
 	// check validity of prepared signature
 	blockHash := recvMsg.BlockHash
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
@@ -149,6 +146,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) error {
 	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
 		return nil
 	}
+
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
 
 	consensus.FBFTLog.AddBlock(&blockObj)
 	consensus.SetBlock(recvMsg.Block)
@@ -238,9 +238,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 		return err
 	}
 
-	consensus.Locks.Global.Lock()
-	defer consensus.Locks.Global.Unlock()
-
 	// NOTE let it handle its own logs
 	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return nil
@@ -274,6 +271,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
+
+	consensus.Locks.Global.Lock()
+	defer consensus.Locks.Global.Unlock()
 
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask

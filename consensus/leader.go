@@ -291,6 +291,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 		go func() {
 			consensus.CommitFinishChan <- f
 		}()
+
 	}
 
 	return nil
