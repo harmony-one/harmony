@@ -27,28 +27,24 @@ var (
 )
 
 var (
-	vWrapperPrototype = makeVWrapperPrototype()
-)
-
-func makeVWrapperPrototype() staking.ValidatorWrapper {
-	w := staking.ValidatorWrapper{
-		Validator: validatorPrototype,
-		Delegations: staking.Delegations{
-			staking.Delegation{
-				DelegatorAddress: validatorPrototype.Address,
-				Amount:           DefaultDelAmount,
-				Reward:           common.Big0,
-				Undelegations:    nil,
+	vWrapperPrototype = func() staking.ValidatorWrapper {
+		w := staking.ValidatorWrapper{
+			Validator: validatorPrototype,
+			Delegations: staking.Delegations{
+				staking.Delegation{
+					DelegatorAddress: validatorPrototype.Address,
+					Amount:           DefaultDelAmount,
+					Reward:           common.Big0,
+					Undelegations:    nil,
+				},
 			},
-		},
-		BlockReward: common.Big0,
-	}
-	w.Counters.NumBlocksToSign = common.Big0
-	w.Counters.NumBlocksSigned = common.Big0
-	return w
-}
+			BlockReward: common.Big0,
+		}
+		w.Counters.NumBlocksToSign = common.Big0
+		w.Counters.NumBlocksSigned = common.Big0
+		return w
+	}()
 
-var (
 	validatorPrototype = staking.Validator{
 		Address:              common.Address{},
 		SlotPubKeys:          []shard.BLSPublicKey{shard.BLSPublicKey{}},
