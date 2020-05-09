@@ -26,10 +26,11 @@ func (node *Node) HandleConsensus() error {
 	needed := node.Consensus.MinPeers
 
 	go func() {
+		<-time.After(4 * time.Second)
 
 		for {
 
-			<-time.After(3 * time.Second)
+			<-time.After(2 * time.Second)
 			conns, err := node.host.CoreAPI.Swarm().Peers(context.Background())
 			if err != nil {
 				problem <- err
@@ -81,10 +82,10 @@ func (node *Node) HandleConsensus() error {
 			if node.Consensus.Current.Mode() == consensus.Normal {
 				since := time.Since(timeLast).Round(time.Second)
 
-				if since > 20*time.Second {
+				if since > 60*time.Second {
 
 					fmt.Println(
-						"was it more than 20 second",
+						"was it more than 60 second",
 						node.Consensus.PubKey.SerializeToHexStr(),
 						node.Consensus.IsLeader(),
 						node.Consensus.Current.Mode(),
