@@ -296,7 +296,7 @@ func (node *Node) StartP2PMessageHandling() error {
 		return errors.New("have no topics to listen to")
 	}
 	weighted := make([]*semaphore.Weighted, len(allTopics))
-	const maxMessageHandlers = 200
+	const maxMessageHandlers = 120
 	ctx := context.Background()
 	ownID := node.host.IPFSNode.PeerHost.ID()
 	errChan := make(chan error)
@@ -305,8 +305,9 @@ func (node *Node) StartP2PMessageHandling() error {
 		topicName, sub := named.Topic, named.Sub
 		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
 		msgChan := make(chan ipfs_interface.PubSubMessage)
+		sem := weighted[i]
 
-		go func(msgChan chan ipfs_interface.PubSubMessage, sem *semaphore.Weighted) {
+		go func() {
 			for msg := range msgChan {
 				payload := msg.Data()
 				if len(payload) < p2pMsgPrefixSize {
@@ -315,18 +316,18 @@ func (node *Node) StartP2PMessageHandling() error {
 				m := msg
 				if sem.TryAcquire(1) {
 					go func() {
-						defer sem.Release(1)
 						node.HandleMessage(
 							payload[p2pMsgPrefixSize:], m.From(), topicName,
 						)
+						sem.Release(1)
 					}()
 				}
 			}
-		}(msgChan, weighted[i])
+		}()
 
-		go func(msgChan chan ipfs_interface.PubSubMessage) {
+		go func() {
 			for {
-				<-time.After(time.Millisecond * 100)
+				<-time.After(time.Millisecond * 50)
 				nextMsg, err := sub.Next(ctx)
 				if err != nil {
 					errChan <- err
@@ -337,7 +338,7 @@ func (node *Node) StartP2PMessageHandling() error {
 				}
 				msgChan <- nextMsg
 			}
-		}(msgChan)
+		}()
 	}
 
 	for err := range errChan {
