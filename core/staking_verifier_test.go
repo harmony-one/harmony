@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -33,6 +34,11 @@ var (
 	blsKeys blsKeyPool
 )
 
+const (
+	defaultEpoch       = 5
+	defaultBlockNumber = 100
+)
+
 func init() {
 	testDataSetup()
 }
@@ -46,7 +52,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 		expErr          error
 	}{
 		{
-			// Nil error
+			// positive test case
 			stateValidators: []validatorWrapperParams{
 				{
 					address:  makeAddr(1),
@@ -114,6 +120,36 @@ func TestCheckDuplicateFields(t *testing.T) {
 	}
 }
 
+func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
+
+}
+
+type cvTestCase struct {
+	sdb   vm.StateDB
+	chain ChainContext
+	msg   *staking.CreateValidator
+
+	gotVW  *staking.ValidatorWrapper
+	gotErr error
+
+	expErr     error
+	expVW      *staking.ValidatorWrapper
+	expBalance *big.Int
+}
+
+func (tc *cvTestCase) apply() {
+	epoch := big.NewInt(defaultEpoch)
+	bn := big.NewInt(defaultBlockNumber)
+	tc.gotVW, tc.gotErr = VerifyAndCreateValidatorFromMsg(tc.sdb, tc.chain, epoch, bn, tc.msg)
+}
+
+func (tc *cvTestCase) checkResult() error {
+	if err := assertError(tc.gotErr, tc.expErr); err != nil {
+		return err
+	}
+
+}
+
 // testDataSetup setup the data for testing in init process.
 func testDataSetup() {
 	validatorAddress = common.Address(common2.MustBech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"))
@@ -126,9 +162,9 @@ func testDataSetup() {
 	blsKeys = newBLSKeyPool()
 }
 
-// makeCreateValidatorMsg makes a createValidator message for testing.
+// defaultCreateValidatorMsg makes a createValidator message for testing.
 // Returned message could be treated as a copy of a valid message prototype.
-func makeCreateValidatorMsg() *staking.CreateValidator {
+func defaultCreateValidatorMsg() *staking.CreateValidator {
 	desc := staking.Description{
 		Name:            "SuperHero",
 		Identity:        "YouWouldNotKnow",
@@ -250,6 +286,7 @@ type validatorWrapperParams struct {
 	selfDelegation     *big.Int
 	numBlocksToSign    *big.Int
 	numBlocksSigned    *big.Int
+	blockReward        *big.Int
 	rate               numeric.Dec
 	maxRate            numeric.Dec
 	maxChangeRate      numeric.Dec
@@ -273,6 +310,9 @@ func (params *validatorWrapperParams) applyDefaults() {
 	}
 	if params.numBlocksToSign == nil {
 		params.numBlocksToSign = common.Big0
+	}
+	if params.blockReward == nil {
+		params.blockReward = common.Big0
 	}
 	if params.rate.IsNil() {
 		params.rate = numeric.ZeroDec()
@@ -337,4 +377,17 @@ func makeBLSKeyPair() blsPubSigPair {
 	copy(shardSig[:], sig.Serialize())
 
 	return blsPubSigPair{shardPub, shardSig}
+}
+
+func assertError(got, expect error) error {
+	if (got == nil) != (expect == nil) {
+		return fmt.Errorf("unexpected error %v / %v", got, expect)
+	}
+	if (got == nil) || (expect == nil) {
+		return nil
+	}
+	if !strings.Contains(got.Error(), expect.Error()) {
+		return fmt.Errorf("unexpected error %v / %v", got, expect)
+	}
+	return nil
 }
