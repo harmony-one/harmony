@@ -18,7 +18,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"golang.org/x/sync/errgroup"
 )
 
 // Peer is the object for a p2p peer (node)
@@ -75,7 +74,6 @@ func fatal(err error) {
 // SendMessageToGroups ..
 func (h *Host) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error {
 	ctx := context.Background()
-	var g errgroup.Group
 
 	for _, group := range groups {
 		top := string(group)
@@ -83,12 +81,14 @@ func (h *Host) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) erro
 		if err != nil {
 			return err
 		}
-		g.Go(func() error {
-			return h.CoreAPI.PubSub().Publish(ctx, top, msg)
-		})
+
+		if err := h.CoreAPI.PubSub().Publish(ctx, top, msg); err != nil {
+			return err
+		}
+
 	}
 
-	return g.Wait()
+	return nil
 }
 
 func (h *Host) getTopic(

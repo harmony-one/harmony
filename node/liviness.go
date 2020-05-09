@@ -75,19 +75,14 @@ func (node *Node) HandleConsensus() error {
 		case <-node.Consensus.ResetConsensusTimeout:
 			timeLast = time.Now()
 		case <-tick.C:
-			if node.Consensus.IsLeader() {
-				break
-			}
 
 			if node.Consensus.Current.Mode() == consensus.Normal {
 				since := time.Since(timeLast).Round(time.Second)
 
 				if since > 60*time.Second {
-
 					fmt.Println(
 						"was it more than 60 second",
 						node.Consensus.PubKey.SerializeToHexStr(),
-						node.Consensus.IsLeader(),
 						node.Consensus.Current.Mode(),
 					)
 				}
