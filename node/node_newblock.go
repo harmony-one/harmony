@@ -86,7 +86,7 @@ func (node *Node) StartLeaderWork() error {
 				shardID == node.Consensus.ShardID {
 				key := fmt.Sprintf("%d-%d-%d", viewID, shardID, blockNum)
 				readyChan := roundDone.DoChan(key, func() (interface{}, error) {
-					<-time.After(time.Until(due))
+					time.Sleep(time.Until(due))
 					if err := node.Consensus.FinalizeCommits(); err != nil {
 						return nil, err
 					}
