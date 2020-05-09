@@ -89,10 +89,8 @@ func (node *Node) HandleConsensus() error {
 	}
 
 	go func() {
-		if node.Consensus.IsLeader() {
-			node.Consensus.ProposalNewBlock <- struct{}{}
-			utils.Logger().Info().Msg("kicked off consensus as leader")
-		}
+		node.Consensus.ProposalNewBlock <- struct{}{}
+		utils.Logger().Info().Msg("kicked off consensus as leader")
 	}()
 
 	timeLast := time.Now()

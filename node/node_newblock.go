@@ -34,31 +34,34 @@ func (node *Node) StartLeaderWork() error {
 
 	g.Go(func() error {
 		for range node.Consensus.ProposalNewBlock {
+			if node.Consensus.IsLeader() {
 
-			utils.Logger().Debug().
-				Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
-				Msg("PROPOSING NEW BLOCK ------------------------------------------------")
+				utils.Logger().Debug().
+					Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
+					Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
-			newBlock, err := node.proposeNewBlock()
+				newBlock, err := node.proposeNewBlock()
 
-			if err != nil {
-				return err
-			}
+				if err != nil {
+					return err
+				}
 
-			utils.Logger().Debug().
-				Uint64("blockNum", newBlock.NumberU64()).
-				Uint64("epoch", newBlock.Epoch().Uint64()).
-				Uint64("viewID", newBlock.Header().ViewID().Uint64()).
-				Int("numTxs", newBlock.Transactions().Len()).
-				Int("numStakingTxs", newBlock.StakingTransactions().Len()).
-				Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
-				Msg("=========Successfully Proposed New Block==========")
-				// Send the new block to Consensus so it can be confirmed.
-			node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
-			if err := node.Consensus.Announce(newBlock); err != nil {
-				return err
+				utils.Logger().Debug().
+					Uint64("blockNum", newBlock.NumberU64()).
+					Uint64("epoch", newBlock.Epoch().Uint64()).
+					Uint64("viewID", newBlock.Header().ViewID().Uint64()).
+					Int("numTxs", newBlock.Transactions().Len()).
+					Int("numStakingTxs", newBlock.StakingTransactions().Len()).
+					Int("crossShardReceipts", newBlock.IncomingReceipts().Len()).
+					Msg("=========Successfully Proposed New Block==========")
+					// Send the new block to Consensus so it can be confirmed.
+				node.Consensus.SetNextBlockDue(time.Now().Add(consensus.BlockTime))
+				if err := node.Consensus.Announce(newBlock); err != nil {
+					return err
+				}
 			}
 		}
+
 		return nil
 	})
 

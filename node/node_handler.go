@@ -83,10 +83,6 @@ func (node *Node) HandleMessage(
 				return
 			}
 
-			if msg.GetConsensus().GetShardId() != node.Consensus.ShardID {
-				return
-			}
-
 			node.Consensus.IncomingConsensusMessage <- msg
 			// }
 		}
