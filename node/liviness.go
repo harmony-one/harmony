@@ -1,16 +1,17 @@
 package node
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 )
 
 // HandleConsensus ..
 func (node *Node) HandleConsensus() error {
-	tick := time.NewTicker(2 * time.Second)
 
 	go func() {
 		for msg := range node.Consensus.IncomingConsensusMessage {
@@ -20,7 +21,52 @@ func (node *Node) HandleConsensus() error {
 		}
 	}()
 
+	sufficientPeers := make(chan int, 1)
+	problem := make(chan error, 1)
+	needed := node.Consensus.MinPeers
+
+	go func() {
+
+		for {
+
+			<-time.After(3 * time.Second)
+			conns, err := node.host.CoreAPI.Swarm().Peers(context.Background())
+			if err != nil {
+				problem <- err
+				return
+			}
+			if count := len(conns); count >= needed {
+				sufficientPeers <- count
+				return
+			}
+
+		}
+
+	}()
+
+	select {
+	case <-time.After(maxWaitBootstrap):
+		return errors.New("took too long")
+	case err := <-problem:
+		return err
+	case count := <-sufficientPeers:
+		utils.Logger().Info().
+			Int("have", count).
+			Int("needed", needed).
+			Msg("got enough peers for consensus")
+
+		break
+	}
+
+	go func() {
+		if node.Consensus.IsLeader() {
+			node.Consensus.ProposalNewBlock <- struct{}{}
+			utils.Logger().Info().Msg("kicked off consensus as leader")
+		}
+	}()
+
 	timeLast := time.Now()
+	tick := time.NewTicker(2 * time.Second)
 
 	for {
 

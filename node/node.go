@@ -289,75 +289,6 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 const maxWaitBootstrap = 90 * time.Second
 
-// BootstrapConsensus is the a goroutine to check number of peers and start the consensus
-func (node *Node) BootstrapConsensus() error {
-	haveEnoughPeers := make(chan struct{})
-	errored := make(chan error)
-	t := time.NewTimer(maxWaitBootstrap)
-	defer t.Stop()
-
-	go func() {
-		min := node.Consensus.MinPeers
-
-		for {
-			current := 0
-			time.Sleep(2 * time.Second)
-			conns, err := node.host.CoreAPI.Swarm().Peers(context.Background())
-
-			if err != nil {
-				errored <- err
-				return
-			}
-
-			for _, conn := range conns {
-				protocols, err := node.host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
-					conn.ID(), p2p.Protocol,
-				)
-
-				if err != nil {
-					errored <- err
-					return
-				}
-
-				for _, protocol := range protocols {
-					if protocol == p2p.Protocol {
-						utils.Logger().Info().
-							Str("peer-id", conn.ID().Pretty()).
-							Msg("peer supports hmy protocol")
-
-						current++
-						break
-					}
-				}
-
-				if current >= min {
-					utils.Logger().Info().
-						Int("have", current).
-						Int("needed", min).
-						Msg("got enough peers for consensus")
-					haveEnoughPeers <- struct{}{}
-					return
-				}
-			}
-
-		}
-	}()
-
-	select {
-	case err := <-errored:
-		return err
-	case <-haveEnoughPeers:
-		if node.Consensus.IsLeader() {
-			node.Consensus.ProposalNewBlock <- struct{}{}
-			utils.Logger().Info().Msg("have enough peers to kick off consensus")
-		}
-
-		return nil
-	case <-t.C:
-		return errors.New("exceeded 60 seconds waiting for enough min peers")
-	}
-}
-
 // StartP2PMessageHandling kicks off the node message handling
 func (node *Node) StartP2PMessageHandling() error {
 	allTopics := node.host.AllSubscriptions()
@@ -395,6 +326,7 @@ func (node *Node) StartP2PMessageHandling() error {
 
 		go func(msgChan chan ipfs_interface.PubSubMessage) {
 			for {
+				<-time.After(time.Millisecond * 100)
 				nextMsg, err := sub.Next(ctx)
 				if err != nil {
 					errChan <- err
