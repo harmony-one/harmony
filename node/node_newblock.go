@@ -50,7 +50,11 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					newBlock, err := node.proposeNewBlock()
+					if err != nil {
+						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
+					}
 
+					err = node.Blockchain().Validator().ValidateHeader(newBlock, true)
 					if err == nil {
 						utils.Logger().Debug().
 							Uint64("blockNum", newBlock.NumberU64()).
@@ -65,7 +69,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					} else {
-						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
+						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Verifying New Block Header!!!!!!!!!")
 					}
 				}
 			}
