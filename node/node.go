@@ -327,7 +327,6 @@ func (node *Node) StartP2PMessageHandling() error {
 
 		go func() {
 			for {
-				<-time.After(time.Millisecond * 50)
 				nextMsg, err := sub.Next(ctx)
 				if err != nil {
 					errChan <- err
