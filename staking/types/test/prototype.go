@@ -22,7 +22,7 @@ var (
 	// DefaultMinSelfDel is the default value of MinSelfDelegation
 	DefaultMinSelfDel = new(big.Int).Set(tenKOnes)
 
-	// DefaultMaxSelfDel is the default value of MaxTotalDelegation
+	// DefaultMaxTotalDel is the default value of MaxTotalDelegation
 	DefaultMaxTotalDel = new(big.Int).Set(hundredKOnes)
 )
 
@@ -100,7 +100,7 @@ func GetDefaultValidatorWithAddr(addr common.Address, pubs []shard.BLSPublicKey)
 	return v
 }
 
-// GetDefaultValidator return the default staking.ValidatorWrapper for testing
+// GetDefaultValidatorWrapper return the default staking.ValidatorWrapper for testing
 func GetDefaultValidatorWrapper() staking.ValidatorWrapper {
 	return CopyValidatorWrapper(vWrapperPrototype)
 }
