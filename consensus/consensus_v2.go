@@ -86,8 +86,6 @@ func (consensus *Consensus) HandleMessageUpdate(msg *msg_pb.Message) error {
 
 // FinalizeCommits ..
 func (consensus *Consensus) FinalizeCommits() error {
-	consensus.Locks.Global.Lock()
-	defer consensus.Locks.Global.Unlock()
 
 	utils.Logger().Info().
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).

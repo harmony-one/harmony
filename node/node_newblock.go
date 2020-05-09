@@ -1,10 +1,8 @@
 package node
 
 import (
-	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,7 +14,6 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/singleflight"
 )
 
 // Constants of proposing a new block
@@ -65,13 +62,6 @@ func (node *Node) StartLeaderWork() error {
 		return nil
 	})
 
-	var roundDone singleflight.Group
-	type oneTime struct {
-		key    string
-		viewID uint64
-		once   sync.Once
-	}
-
 	g.Go(func() error {
 		for quorumReached := range node.Consensus.CommitFinishChan {
 			viewID, shardID, blockNum, due :=
@@ -84,41 +74,19 @@ func (node *Node) StartLeaderWork() error {
 				Uint32("shard-id", shardID).
 				Msg("received on commit finish")
 
-			if viewID == node.Consensus.ViewID() &&
-				blockNum == node.Consensus.BlockNum() &&
-				shardID == node.Consensus.ShardID {
-				key := fmt.Sprintf("%d-%d-%d", viewID, shardID, blockNum)
-				readyChan := roundDone.DoChan(key, func() (interface{}, error) {
-					time.Sleep(time.Until(due))
-					if err := node.Consensus.FinalizeCommits(); err != nil {
-						return nil, err
-					}
+			if viewID == node.Consensus.ViewID() {
+				time.Sleep(time.Until(due))
+				node.Consensus.Locks.Global.Lock()
+				if err := node.Consensus.FinalizeCommits(); err != nil {
+					return err
+				}
+				node.Consensus.Locks.Global.Unlock()
 
-					var once sync.Once
-					return &oneTime{key, viewID, once}, nil
-				})
-
-				go func() {
-					r := <-readyChan
-					if r.Err != nil {
-						utils.Logger().Debug().Err(r.Err).Msg("this finalize issue should not occur")
-						return
-					}
-
-					result := r.Val.(*oneTime)
-
-					result.once.Do(func() {
-						utils.Logger().Info().
-							Str("key", result.key).
-							Msg("finalized commits and sent out new proposal signal")
-						node.Consensus.ProposalNewBlock <- struct{}{}
-						node.Consensus.ResetConsensusTimeout <- struct{}{}
-					})
-
-				}()
-
+				utils.Logger().Info().
+					Msg("finalized commits and sent out new proposal signal")
+				node.Consensus.ProposalNewBlock <- struct{}{}
+				node.Consensus.ResetConsensusTimeout <- struct{}{}
 			}
-
 		}
 
 		return nil

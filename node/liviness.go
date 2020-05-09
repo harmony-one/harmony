@@ -27,6 +27,9 @@ func (node *Node) HandleConsensus() error {
 	needed := node.Consensus.MinPeers
 
 	go func() {
+		defer close(sufficientPeers)
+		defer close(problem)
+
 		<-time.After(4 * time.Second)
 
 		for {
@@ -47,7 +50,6 @@ func (node *Node) HandleConsensus() error {
 				)
 
 				if err != nil {
-					sufficientPeers = nil
 					problem <- err
 				}
 
@@ -66,7 +68,6 @@ func (node *Node) HandleConsensus() error {
 
 			if count >= needed {
 				sufficientPeers <- count
-				problem = nil
 				return
 			}
 
