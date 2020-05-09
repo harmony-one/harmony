@@ -181,6 +181,7 @@ func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls
 // SetViewID set the viewID to the height of the blockchain
 func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID.Store(height)
+	consensus.Current.SetViewID(height)
 }
 
 // SetMode sets the mode of consensus
@@ -214,7 +215,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.Current.SetViewID(msg.ViewID)
 		consensus.SetLeaderPubKey(msg.SenderPubkey)
 		consensus.ignoreViewIDCheck = false
-		// consensus.Timeouts.Consensus.Start(consensus.BlockNum())
+		consensus.ResetConsensusTimeout <- struct{}{}
 		return nil
 	} else if msg.ViewID > consensus.ViewID() {
 		return consensus_engine.ErrViewIDNotMatch

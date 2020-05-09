@@ -115,10 +115,10 @@ type CommitedBlockProcesser interface {
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	CommitedBlock     chan struct{}
-	ViewChangeSucceed chan struct{}
-	PostConsensus     CommitedBlockProcesser
-	Decider           quorum.Decider
+	ResetConsensusTimeout chan struct{}
+	ViewChangeSucceed     chan struct{}
+	PostConsensus         CommitedBlockProcesser
+	Decider               quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -253,21 +253,21 @@ func New(
 	leader.Store(&bls.PublicKey{})
 
 	consensus := Consensus{
-		CommitedBlock:     make(chan struct{}),
-		ViewChangeSucceed: make(chan struct{}),
-		Decider:           Decider,
-		FBFTLog:           NewFBFTLog(),
-		phase:             phase,
-		Current:           NewState(),
-		epoch:             epoch,
-		blockNum:          blk,
-		viewID:            view,
-		CommitFinishChan:  make(chan Finished),
-		nextBlockDue:      nextBlock,
-		host:              host,
-		leaderPubKey:      leader,
-		SlashChan:         make(chan slash.Record),
-		ProposalNewBlock:  make(chan struct{}),
+		ResetConsensusTimeout: make(chan struct{}),
+		ViewChangeSucceed:     make(chan struct{}),
+		Decider:               Decider,
+		FBFTLog:               NewFBFTLog(),
+		phase:                 phase,
+		Current:               NewState(),
+		epoch:                 epoch,
+		blockNum:              blk,
+		viewID:                view,
+		CommitFinishChan:      make(chan Finished),
+		nextBlockDue:          nextBlock,
+		host:                  host,
+		leaderPubKey:          leader,
+		SlashChan:             make(chan slash.Record),
+		ProposalNewBlock:      make(chan struct{}),
 		// channel for receiving newly generated VDF
 		RndChannel:               make(chan [vdfAndSeedSize]byte),
 		ShardID:                  shard,

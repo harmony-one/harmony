@@ -310,7 +310,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 
 	utils.Logger().Debug().Msg("[OnCommitted] Start consensus timer")
 	go func() {
-		consensus.CommitedBlock <- struct{}{}
+		consensus.ResetConsensusTimeout <- struct{}{}
 	}()
 	return nil
 }

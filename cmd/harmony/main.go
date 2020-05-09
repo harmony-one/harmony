@@ -787,9 +787,9 @@ func main() {
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		g.Go(currentNode.HandleBlockProcessing)
-		g.Go(currentNode.HandleConsensus)
 		g.Go(currentNode.StartLeaderWork)
 		g.Go(currentNode.BootstrapConsensus)
+		g.Go(currentNode.HandleConsensus)
 	}
 
 	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {

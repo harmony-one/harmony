@@ -84,13 +84,10 @@ func (node *Node) StartLeaderWork() error {
 				Uint32("shard-id", shardID).
 				Msg("received on commit finish")
 
-			if viewID == node.Consensus.ViewID() &&
-				shardID == node.Consensus.ShardID &&
-				blockNum == node.Consensus.BlockNum() {
+			if viewID == node.Consensus.ViewID() {
 				key := fmt.Sprintf("%d-%d-%d", viewID, shardID, blockNum)
 				readyChan := roundDone.DoChan(key, func() (interface{}, error) {
-					time.Sleep(time.Until(due))
-
+					<-time.After(time.Until(due))
 					if err := node.Consensus.FinalizeCommits(); err != nil {
 						return nil, err
 					}

@@ -109,10 +109,6 @@ func (consensus *Consensus) Announce(block *types.Block) error {
 
 func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 
-	if !consensus.IsLeader() {
-		return nil
-	}
-
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[OnPrepare] Unparseable validator message")
@@ -149,7 +145,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnPrepare] No Matching Announce message")
-		fmt.Println("does this ever happen")
 		//return
 	}
 
@@ -216,10 +211,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 }
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
-
-	if !consensus.IsLeader() {
-		return nil
-	}
 
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {

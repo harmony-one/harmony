@@ -59,6 +59,8 @@ func (consensus *Consensus) HandleMessageUpdate(msg *msg_pb.Message) error {
 		}
 	}
 
+	isLeader := consensus.IsLeader()
+
 	switch t := msg.Type; true {
 	// Handle validator intended messages first
 	case t == msg_pb.MessageType_ANNOUNCE && consensus.validatorSanityChecks(msg):
@@ -68,9 +70,9 @@ func (consensus *Consensus) HandleMessageUpdate(msg *msg_pb.Message) error {
 	case t == msg_pb.MessageType_COMMITTED && consensus.validatorSanityChecks(msg):
 		return consensus.onCommitted(msg)
 	// Handle leader intended messages now
-	case t == msg_pb.MessageType_PREPARE && consensus.leaderSanityChecks(msg):
+	case t == msg_pb.MessageType_PREPARE && consensus.leaderSanityChecks(msg) && isLeader:
 		return consensus.onPrepare(msg)
-	case t == msg_pb.MessageType_COMMIT && consensus.leaderSanityChecks(msg):
+	case t == msg_pb.MessageType_COMMIT && consensus.leaderSanityChecks(msg) && isLeader:
 		return consensus.onCommit(msg)
 	case t == msg_pb.MessageType_VIEWCHANGE && consensus.viewChangeSanityCheck(msg):
 		return consensus.onViewChange(msg)
@@ -91,7 +93,7 @@ func (consensus *Consensus) FinalizeCommits() error {
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
 		Msg("[finalizeCommits] Finalizing Block")
 
-	// beforeCatchupNum := consensus.BlockNum()
+	beforeCatchupNum := consensus.BlockNum()
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[FinalizeCommits] leader not found")
@@ -124,12 +126,12 @@ func (consensus *Consensus) FinalizeCommits() error {
 		return err
 	}
 
-	// if consensus.BlockNum()-beforeCatchupNum != 1 {
-	// 	utils.Logger().Warn().
-	// 		Uint64("beforeCatchupBlockNum", beforeCatchupNum).
-	// 		Msg("[FinalizeCommits] Leader cannot provide the correct block for committed message")
-	// 	return errors.New("leader cannot provide the correct block for committed message")
-	// }
+	if consensus.BlockNum()-beforeCatchupNum != 1 {
+		utils.Logger().Warn().
+			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
+			Msg("[FinalizeCommits] Leader cannot provide the correct block for committed message")
+		return errors.New("leader cannot provide the correct block for committed message")
+	}
 
 	// if leader success finalize the block, send committed message to validators
 	if err := consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
@@ -158,6 +160,7 @@ func (consensus *Consensus) FinalizeCommits() error {
 	// 	utils.Logger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
 	// 	time.Sleep(consensus.NextBlockDue().Sub(n))
 	// }
+
 	return nil
 }
 
