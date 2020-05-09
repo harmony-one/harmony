@@ -766,6 +766,10 @@ func main() {
 		}
 	}
 
+	currentNode.Consensus.SetMode(
+		currentNode.Consensus.UpdateConsensusInformation(),
+	)
+
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
 		fatal(err)
@@ -777,18 +781,13 @@ func main() {
 
 	currentNode.HandleIncomingHMYProtocolStreams()
 
-	currentNode.Consensus.SetMode(
-		currentNode.Consensus.UpdateConsensusInformation(),
-	)
-
 	var g errgroup.Group
-
-	g.Go(currentNode.StartP2PMessageHandling)
 
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		g.Go(currentNode.HandleBlockProcessing)
 		g.Go(currentNode.StartLeaderWork)
 		g.Go(currentNode.HandleConsensus)
+		g.Go(currentNode.StartP2PMessageHandling)
 	}
 
 	if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {

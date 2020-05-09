@@ -84,13 +84,17 @@ func (node *Node) HandleConsensus() error {
 			Int("have", count).
 			Int("needed", needed).
 			Msg("got enough peers for consensus")
-
-		break
 	}
 
 	go func() {
-		node.Consensus.ProposalNewBlock <- struct{}{}
-		utils.Logger().Info().Msg("kicked off consensus as leader")
+		if node.Consensus.IsLeader() {
+			node.Consensus.ProposalNewBlock <- struct{}{}
+			utils.Logger().Info().Msg("kicked off consensus as leader")
+		} else {
+			node.Consensus.SetNextBlockDue(
+				time.Now().Add(consensus.BlockTime),
+			)
+		}
 	}()
 
 	timeLast := time.Now()
