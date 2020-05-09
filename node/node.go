@@ -305,9 +305,11 @@ func (node *Node) StartP2PMessageHandling() error {
 		topicName, sub := named.Topic, named.Sub
 		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
 		msgChan := make(chan ipfs_interface.PubSubMessage)
-		sem := weighted[i]
 
-		go func() {
+		go func(
+			msgChan chan ipfs_interface.PubSubMessage,
+			sem *semaphore.Weighted,
+		) {
 			for msg := range msgChan {
 				payload := msg.Data()
 				if len(payload) < p2pMsgPrefixSize {
@@ -323,9 +325,12 @@ func (node *Node) StartP2PMessageHandling() error {
 					}()
 				}
 			}
-		}()
+		}(msgChan, weighted[i])
 
-		go func() {
+		go func(
+			msgChan chan ipfs_interface.PubSubMessage,
+			sub ipfs_interface.PubSubSubscription,
+		) {
 			for {
 				nextMsg, err := sub.Next(ctx)
 				if err != nil {
@@ -337,7 +342,7 @@ func (node *Node) StartP2PMessageHandling() error {
 				}
 				msgChan <- nextMsg
 			}
-		}()
+		}(msgChan, sub)
 	}
 
 	for err := range errChan {
