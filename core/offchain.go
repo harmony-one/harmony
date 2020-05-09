@@ -95,7 +95,7 @@ func (bc *BlockChain) CommitOffChainData(
 	//}
 
 	newEpoch := new(big.Int).Add(header.Epoch(), common.Big1)
-	// Shard State and Validator Update
+	// Shard State and validator Update
 	if isNewEpoch {
 		// Write shard state for the new epoch
 		newShardState, err := bc.WriteShardStateBytes(batch, newEpoch, header.ShardState())

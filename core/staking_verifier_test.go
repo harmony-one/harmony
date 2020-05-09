@@ -1,7 +1,7 @@
 package core
 
 import (
-	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -12,26 +12,34 @@ import (
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/pkg/errors"
+	staketest "github.com/harmony-one/harmony/staking/types/test"
+)
+
+const (
+	defNumWrappersInState = 5
+	defNumPubPerAddr      = 2
 )
 
 var (
-	validatorAddress common.Address
-	validatorBalance *big.Int
+	blsKeys = makeKeyPairs(20)
 
-	defaultMaxTotalDelegation *big.Int
-	defaultMinSelfDelegation  *big.Int
-	defaultSelfDelegation     *big.Int
+	createValidatorAddr = makeTestAddr("validator")
+	editValidatorAddr   = makeTestAddr(0)
+)
 
-	blsKeys blsKeyPool
+var (
+	oneBig          = big.NewInt(1e18)
+	oneKOnes        = new(big.Int).Mul(big.NewInt(1000), oneBig)
+	fiveKOnes       = new(big.Int).Mul(big.NewInt(1000), oneBig)
+	tenKOnes        = new(big.Int).Mul(big.NewInt(1000), oneBig)
+	fifteenOnes     = new(big.Int).Mul(big.NewInt(1000), oneBig)
+	twentyKOnes     = new(big.Int).Mul(big.NewInt(1000), oneBig)
+	twentyFiveKOnes = new(big.Int).Mul(big.NewInt(1000), oneBig)
+	thirtyKOnes     = new(big.Int).Mul(big.NewInt(1000), oneBig)
 )
 
 const (
@@ -39,164 +47,264 @@ const (
 	defaultBlockNumber = 100
 )
 
-func init() {
-	testDataSetup()
-}
-
 func TestCheckDuplicateFields(t *testing.T) {
 	tests := []struct {
-		stateValidators []validatorWrapperParams
-		validator       common.Address
-		identity        string
-		blsKeys         []shard.BLSPublicKey
-		expErr          error
+		bc        ChainContext
+		sdb       *state.DB
+		validator common.Address
+		identity  string
+		pubs      []shard.BLSPublicKey
+
+		expErr error
 	}{
 		{
-			// positive test case
-			stateValidators: []validatorWrapperParams{
-				{
-					address:  makeAddr(1),
-					identity: makeIdentityStr(1),
-					blsKeys:  []shard.BLSPublicKey{blsKeys.get(1).pub},
-				},
-			},
-			validator: validatorAddress,
-			identity:  makeIdentityStr(0),
-			blsKeys:   []shard.BLSPublicKey{blsKeys.get(0).pub},
-			expErr:    nil,
+			// validator not exist on chain
+			bc:        makeDefaultFakeChainContext(),
+			sdb:       makeDefaultStateDB(t),
+			validator: createValidatorAddr,
+			identity:  makeIdentityStr("new validator"),
+			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+
+			expErr: nil,
 		},
 		{
-			// Nil error, check for self
-			stateValidators: []validatorWrapperParams{
-				{
-					address:  validatorAddress,
-					identity: makeIdentityStr(0),
-					blsKeys:  []shard.BLSPublicKey{blsKeys.get(0).pub},
-				},
-			},
-			validator: validatorAddress,
+			// validator skip self check
+			bc:        makeDefaultFakeChainContext(),
+			sdb:       makeDefaultStateDB(t),
+			validator: makeTestAddr(0),
 			identity:  makeIdentityStr(0),
-			blsKeys:   []shard.BLSPublicKey{blsKeys.get(0).pub},
-			expErr:    nil,
+			pubs:      []shard.BLSPublicKey{blsKeys[0].pub, blsKeys[1].pub},
+
+			expErr: nil,
+		},
+		{
+			// empty identity will not collide
+			bc: makeDefaultFakeChainContext(),
+			sdb: func(t *testing.T) *state.DB {
+				sdb := makeDefaultStateDB(t)
+				vw, err := sdb.ValidatorWrapper(makeTestAddr(0))
+				if err != nil {
+					t.Fatal(err)
+				}
+				vw.Identity = ""
+
+				err = sdb.UpdateValidatorWrapper(makeTestAddr(0), vw)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return sdb
+			}(t),
+			validator: createValidatorAddr,
+			identity:  makeIdentityStr("new validator"),
+			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+
+			expErr: nil,
+		},
+		{
+			// chain error
+			bc:        &fakeErrChainContext{},
+			sdb:       makeDefaultStateDB(t),
+			validator: createValidatorAddr,
+			identity:  makeIdentityStr("new validator"),
+			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+
+			expErr: errors.New("error intended"),
+		},
+		{
+			// validators read from chain not in state
+			bc: func() *fakeChainContext {
+				chain := makeDefaultFakeChainContext()
+				chain.validators = append(chain.validators, makeTestAddr("not exist in state"))
+				return chain
+			}(),
+			sdb:       makeDefaultStateDB(t),
+			validator: createValidatorAddr,
+			identity:  makeIdentityStr("new validator"),
+			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+
+			expErr: errors.New("address not present in state"),
 		},
 		{
 			// duplicate identity
-			stateValidators: []validatorWrapperParams{
-				{
-					address:  makeAddr(1),
-					identity: makeIdentityStr(0),
-					blsKeys:  []shard.BLSPublicKey{blsKeys.get(1).pub},
-				},
-			},
-			validator: validatorAddress,
+			bc:        makeDefaultFakeChainContext(),
+			sdb:       makeDefaultStateDB(t),
+			validator: createValidatorAddr,
 			identity:  makeIdentityStr(0),
-			blsKeys:   []shard.BLSPublicKey{blsKeys.get(0).pub},
-			expErr:    errors.New("duplicate identity"),
+			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+
+			expErr: errDupIdentity,
 		},
 		{
-			// duplicate bls keys
-			stateValidators: []validatorWrapperParams{
-				{
-					address:  makeAddr(1),
-					identity: makeIdentityStr(1),
-					blsKeys:  []shard.BLSPublicKey{blsKeys.get(0).pub},
-				},
-			},
-			validator: validatorAddress,
-			identity:  makeIdentityStr(0),
-			blsKeys:   []shard.BLSPublicKey{blsKeys.get(0).pub},
-			expErr:    errors.New("duplicate bls keys"),
+			// bls key duplication
+			bc:        makeDefaultFakeChainContext(),
+			sdb:       makeDefaultStateDB(t),
+			validator: createValidatorAddr,
+			identity:  makeIdentityStr("new validator"),
+			pubs:      []shard.BLSPublicKey{blsKeys[0].pub},
+
+			expErr: errDupBlsKey,
 		},
 	}
 	for i, test := range tests {
-		cc, sdb, err := makeTestChainContextAndStateDB(test.stateValidators)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = checkDuplicateFields(cc, sdb, test.validator, test.identity, test.blsKeys)
-		if (err == nil) != (test.expErr == nil) {
-			t.Errorf("Test %v: got error %v, expect error %v", i, err, test.expErr)
+		err := checkDuplicateFields(test.bc, test.sdb, test.validator, test.identity, test.pubs)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
 		}
 	}
 }
 
-func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
-
-}
-
-type cvTestCase struct {
-	sdb   vm.StateDB
-	chain ChainContext
-	msg   *staking.CreateValidator
-
-	gotVW  *staking.ValidatorWrapper
-	gotErr error
-
-	expErr     error
-	expVW      *staking.ValidatorWrapper
-	expBalance *big.Int
-}
-
-func (tc *cvTestCase) apply() {
-	epoch := big.NewInt(defaultEpoch)
-	bn := big.NewInt(defaultBlockNumber)
-	tc.gotVW, tc.gotErr = VerifyAndCreateValidatorFromMsg(tc.sdb, tc.chain, epoch, bn, tc.msg)
-}
-
-func (tc *cvTestCase) checkResult() error {
-	if err := assertError(tc.gotErr, tc.expErr); err != nil {
-		return err
+func makeDefaultFakeChainContext() *fakeChainContext {
+	vs := make([]common.Address, 0, defNumWrappersInState)
+	for i := 0; i != defNumWrappersInState; i++ {
+		vs = append(vs, makeTestAddr(i))
 	}
-
+	return makeFakeChainContext(vs)
 }
 
-// testDataSetup setup the data for testing in init process.
-func testDataSetup() {
-	validatorAddress = common.Address(common2.MustBech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"))
-	validatorBalance = big.NewInt(5e18)
+func makeDefaultStateDB(t *testing.T) *state.DB {
+	sdb, err := newTestStateDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws := makeDefaultStateVWrappers(defNumWrappersInState, defNumPubPerAddr)
 
-	defaultMaxTotalDelegation = new(big.Int).Mul(big.NewInt(90000), oneAsBigInt)
-	defaultMinSelfDelegation = new(big.Int).Mul(big.NewInt(10000), oneAsBigInt)
-	defaultSelfDelegation = new(big.Int).Mul(big.NewInt(50000), oneAsBigInt)
-
-	blsKeys = newBLSKeyPool()
+	if err := updateStateVWrappers(sdb, ws); err != nil {
+		t.Fatalf("make default state: %v", err)
+	}
+	return sdb
 }
 
-// defaultCreateValidatorMsg makes a createValidator message for testing.
-// Returned message could be treated as a copy of a valid message prototype.
-func defaultCreateValidatorMsg() *staking.CreateValidator {
-	desc := staking.Description{
-		Name:            "SuperHero",
-		Identity:        "YouWouldNotKnow",
-		Website:         "Secret Website",
-		SecurityContact: "LicenseToKill",
-		Details:         "blah blah blah",
+func updateStateVWrappers(sdb *state.DB, ws []staking.ValidatorWrapper) error {
+	for i, w := range ws {
+		if err := sdb.UpdateValidatorWrapper(w.Address, &w); err != nil {
+			return fmt.Errorf("update %v vw error: %v", i, err)
+		}
 	}
-	rate, _ := numeric.NewDecFromStr("0.1")
-	maxRate, _ := numeric.NewDecFromStr("0.5")
-	maxChangeRate, _ := numeric.NewDecFromStr("0.05")
-	commission := staking.CommissionRates{
-		Rate:          rate,
-		MaxRate:       maxRate,
-		MaxChangeRate: maxChangeRate,
-	}
-	minSelfDel := big.NewInt(1e18)
-	maxTotalDel := big.NewInt(9e18)
-	slotPubKeys := []shard.BLSPublicKey{blsKeys.get(0).pub}
-	slotKeySigs := []shard.BLSSignature{blsKeys.get(0).sig}
-	amount := validatorBalance
-	v := staking.CreateValidator{
-		ValidatorAddress:   validatorAddress,
-		Description:        desc,
-		CommissionRates:    commission,
-		MinSelfDelegation:  minSelfDel,
-		MaxTotalDelegation: maxTotalDel,
-		SlotPubKeys:        slotPubKeys,
-		SlotKeySigs:        slotKeySigs,
-		Amount:             amount,
-	}
-	return &v
+	return nil
 }
+
+func newTestStateDB() (*state.DB, error) {
+	return state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+}
+
+// makeDefaultStateVWrappers makes the default staking.ValidatorWrappers for
+// initialization of default state db
+func makeDefaultStateVWrappers(num, numPubsPerVal int) []staking.ValidatorWrapper {
+	ws := make([]staking.ValidatorWrapper, 0, num)
+	pubGetter := newBLSPubGetter(blsKeys)
+	for i := 0; i != num; i++ {
+		ws = append(ws, makeStateVWrapperFromGetter(i, numPubsPerVal, pubGetter))
+	}
+	return ws
+}
+
+func makeStateVWrapperFromGetter(index int, numPubs int, pubGetter *BLSPubGetter) staking.ValidatorWrapper {
+	addr := makeTestAddr(index)
+	pubs := make([]shard.BLSPublicKey, 0, numPubs)
+	for i := 0; i != numPubs; i++ {
+		pubs = append(pubs, pubGetter.getPub())
+	}
+	w := staketest.GetDefaultValidatorWrapperWithAddr(addr, pubs)
+	w.Identity = makeIdentityStr(index)
+	return w
+}
+
+type BLSPubGetter struct {
+	keys  []blsPubSigPair
+	index int
+}
+
+func newBLSPubGetter(keys []blsPubSigPair) *BLSPubGetter {
+	return &BLSPubGetter{
+		keys:  keys,
+		index: 0,
+	}
+}
+
+func (g *BLSPubGetter) getPub() shard.BLSPublicKey {
+	key := g.keys[g.index]
+	g.index++
+	return key.pub
+}
+
+//func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
+//
+//}
+//
+//type cvTestCase struct {
+//	sdb   vm.StateDB
+//	chain ChainContext
+//	msg   *staking.CreateValidator
+//
+//	gotVW  *staking.ValidatorWrapper
+//	gotErr error
+//
+//	expErr     error
+//	expVW      *staking.ValidatorWrapper
+//	expBalance *big.Int
+//}
+//
+//func (tc *cvTestCase) apply() {
+//	epoch := big.NewInt(defaultEpoch)
+//	bn := big.NewInt(defaultBlockNumber)
+//	tc.gotVW, tc.gotErr = VerifyAndCreateValidatorFromMsg(tc.sdb, tc.chain, epoch, bn, tc.msg)
+//}
+//
+//func (tc *cvTestCase) checkResult() error {
+//	if err := assertError(tc.gotErr, tc.expErr); err != nil {
+//		return err
+//	}
+//
+//}
+
+//// testDataSetup setup the data for testing in init process.
+//func testDataSetup() {
+//	validatorAddress = common.Address(common2.MustBech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"))
+//	validatorBalance = big.NewInt(5e18)
+//
+//	defaultMaxTotalDelegation = new(big.Int).Mul(big.NewInt(90000), oneAsBigInt)
+//	defaultMinSelfDelegation = new(big.Int).Mul(big.NewInt(10000), oneAsBigInt)
+//	defaultSelfDelegation = new(big.Int).Mul(big.NewInt(50000), oneAsBigInt)
+//
+//	blsKeys = newBLSKeyPool()
+//}
+//
+//// defaultCreateValidatorMsg makes a createValidator message for testing.
+//// Returned message could be treated as a copy of a valid message prototype.
+//func defaultCreateValidatorMsg() *staking.CreateValidator {
+//	desc := staking.Description{
+//		Name:            "SuperHero",
+//		Identity:        "YouWouldNotKnow",
+//		Website:         "Secret Website",
+//		SecurityContact: "LicenseToKill",
+//		Details:         "blah blah blah",
+//	}
+//	rate, _ := numeric.NewDecFromStr("0.1")
+//	maxRate, _ := numeric.NewDecFromStr("0.5")
+//	maxChangeRate, _ := numeric.NewDecFromStr("0.05")
+//	commission := staking.CommissionRates{
+//		Rate:          rate,
+//		MaxRate:       maxRate,
+//		MaxChangeRate: maxChangeRate,
+//	}
+//	minSelfDel := big.NewInt(1e18)
+//	maxTotalDel := big.NewInt(9e18)
+//	slotPubKeys := []shard.BLSPublicKey{blsKeys.get(0).pub}
+//	slotKeySigs := []shard.BLSSignature{blsKeys.get(0).sig}
+//	amount := validatorBalance
+//	v := staking.CreateValidator{
+//		ValidatorAddress:   validatorAddress,
+//		Description:        desc,
+//		CommissionRates:    commission,
+//		MinSelfDelegation:  minSelfDel,
+//		MaxTotalDelegation: maxTotalDel,
+//		SlotPubKeys:        slotPubKeys,
+//		SlotKeySigs:        slotKeySigs,
+//		Amount:             amount,
+//	}
+//	return &v
+//}
 
 // fakeChainContext is the fake structure of ChainContext for testing
 type fakeChainContext struct {
@@ -209,154 +317,65 @@ func makeFakeChainContext(validators []common.Address) *fakeChainContext {
 	}
 }
 
-func (fcc *fakeChainContext) ReadValidatorList() ([]common.Address, error) {
-	validators := make([]common.Address, len(fcc.validators))
-	copy(validators, fcc.validators)
+func (chain *fakeChainContext) ReadValidatorList() ([]common.Address, error) {
+	validators := make([]common.Address, len(chain.validators))
+	copy(validators, chain.validators)
 	return validators, nil
 }
 
-func (fcc *fakeChainContext) Engine() consensus_engine.Engine {
+func (chain *fakeChainContext) Engine() consensus_engine.Engine {
 	return nil
 }
 
-func (fcc *fakeChainContext) GetHeader(common.Hash, uint64) *block.Header {
+func (chain *fakeChainContext) GetHeader(common.Hash, uint64) *block.Header {
 	return nil
 }
 
-func (fcc *fakeChainContext) ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error) {
+func (chain *fakeChainContext) ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error) {
 	return nil, nil
 }
 
-func (fcc *fakeChainContext) ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error) {
+func (chain *fakeChainContext) ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error) {
 	return nil, nil
 }
 
-func makeTestChainContextAndStateDB(params []validatorWrapperParams) (ChainContext, vm.StateDB, error) {
-	validators := make([]common.Address, 0, len(params))
-	sdb, err := makeTestStateDB()
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, param := range params {
-		validators = append(validators, param.address)
-		wrapper := makeValidatorWrapper(param)
-		if err := sdb.UpdateValidatorWrapper(param.address, &wrapper); err != nil {
-			return nil, nil, err
-		}
-	}
-	cc := makeFakeChainContext(validators)
-	return cc, sdb, nil
+type fakeErrChainContext struct{}
+
+func (chain *fakeErrChainContext) ReadValidatorList() ([]common.Address, error) {
+	return nil, errors.New("error intended from chain")
 }
 
-func makeValidatorWrapper(params validatorWrapperParams) staking.ValidatorWrapper {
-	params.applyDefaults()
-
-	var wrapper staking.ValidatorWrapper
-	wrapper.Address = params.address
-	wrapper.Identity = params.identity
-	wrapper.SlotPubKeys = params.blsKeys
-	wrapper.Status = params.status
-	wrapper.MaxTotalDelegation = params.maxTotalDelegation
-	wrapper.MinSelfDelegation = params.minSelfDelegation
-	wrapper.Delegations = []staking.Delegation{
-		{
-			DelegatorAddress: params.address,
-			Amount:           params.selfDelegation,
-			Reward:           common.Big0,
-		},
-	}
-	wrapper.Counters.NumBlocksToSign = params.numBlocksToSign
-	wrapper.Counters.NumBlocksSigned = params.numBlocksSigned
-	wrapper.Rate = params.rate
-	wrapper.MaxRate = params.maxRate
-	wrapper.MaxChangeRate = params.maxChangeRate
-	return wrapper
+func (chain *fakeErrChainContext) Engine() consensus_engine.Engine {
+	return nil
 }
 
-type validatorWrapperParams struct {
-	// Required fields
-	address  common.Address
-	identity string
-	blsKeys  []shard.BLSPublicKey
-
-	// Optional fields. If not set, default to default values
-	status             effective.Eligibility
-	maxTotalDelegation *big.Int
-	minSelfDelegation  *big.Int
-	selfDelegation     *big.Int
-	numBlocksToSign    *big.Int
-	numBlocksSigned    *big.Int
-	blockReward        *big.Int
-	rate               numeric.Dec
-	maxRate            numeric.Dec
-	maxChangeRate      numeric.Dec
+func (chain *fakeErrChainContext) GetHeader(common.Hash, uint64) *block.Header {
+	return nil
 }
 
-func (params *validatorWrapperParams) applyDefaults() {
-	if params.status == effective.Nil {
-		params.status = effective.Active
-	}
-	if params.maxTotalDelegation == nil {
-		params.maxTotalDelegation = defaultMaxTotalDelegation
-	}
-	if params.minSelfDelegation == nil {
-		params.minSelfDelegation = defaultMinSelfDelegation
-	}
-	if params.selfDelegation == nil {
-		params.selfDelegation = defaultSelfDelegation
-	}
-	if params.numBlocksSigned == nil {
-		params.numBlocksSigned = common.Big0
-	}
-	if params.numBlocksToSign == nil {
-		params.numBlocksToSign = common.Big0
-	}
-	if params.blockReward == nil {
-		params.blockReward = common.Big0
-	}
-	if params.rate.IsNil() {
-		params.rate = numeric.ZeroDec()
-	}
-	if params.maxRate.IsNil() {
-		params.maxRate = numeric.ZeroDec()
-	}
-	if params.maxChangeRate.IsNil() {
-		params.maxChangeRate = numeric.ZeroDec()
-	}
+func (chain *fakeErrChainContext) ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error) {
+	return nil, nil
 }
 
-func makeIdentityStr(index uint64) string {
-	return fmt.Sprintf("harmony-one-%v", index)
+func (chain *fakeErrChainContext) ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error) {
+	return nil, nil
 }
 
-func makeAddr(index uint64) common.Address {
-	var addr common.Address
-	binary.LittleEndian.PutUint64(addr[:], uint64(index))
-	return addr
+func makeIdentityStr(item interface{}) string {
+	return fmt.Sprintf("harmony-one-%v", item)
 }
 
-// makeTestStateDB creates a new state db for testing
-func makeTestStateDB() (*state.DB, error) {
-	return state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+func makeTestAddr(item interface{}) common.Address {
+	s := fmt.Sprintf("harmony-one-%v", item)
+	return common.BytesToAddress([]byte(s))
 }
 
-type blsKeyPool struct {
-	keys []blsPubSigPair
-}
-
-func newBLSKeyPool() blsKeyPool {
-	keys := make([]blsPubSigPair, 0, 16)
-	return blsKeyPool{keys}
-}
-
-func (kp *blsKeyPool) get(index int) blsPubSigPair {
-	if index < len(kp.keys) {
-		return kp.keys[index]
+func makeKeyPairs(size int) []blsPubSigPair {
+	pairs := make([]blsPubSigPair, 0, size)
+	for i := 0; i != size; i++ {
+		pairs = append(pairs, makeBLSKeyPair())
 	}
-	for i := len(kp.keys); i <= index; i++ {
-		kp.keys = append(kp.keys, makeBLSKeyPair())
-	}
-	return kp.keys[index]
+	return pairs
 }
 
 type blsPubSigPair struct {

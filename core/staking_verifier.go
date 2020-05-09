@@ -167,7 +167,7 @@ func VerifyAndEditValidatorFromMsg(
 
 	snapshotValidator, err := chainContext.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
-		return nil, errors.WithMessage(err, "Validator snapshot not found.")
+		return nil, errors.WithMessage(err, "validator snapshot not found.")
 	}
 	rateAtBeginningOfEpoch := snapshotValidator.Validator.Rate
 
