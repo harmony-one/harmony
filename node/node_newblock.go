@@ -81,7 +81,9 @@ func (node *Node) StartLeaderWork() error {
 				Uint32("shard-id", shardID).
 				Msg("received on commit finish")
 
-			if viewID == node.Consensus.ViewID() {
+			if viewID == node.Consensus.ViewID() &&
+				blockNum == node.Consensus.BlockNum() &&
+				shardID == node.Consensus.ShardID {
 				key := fmt.Sprintf("%d-%d-%d", viewID, shardID, blockNum)
 				readyChan := roundDone.DoChan(key, func() (interface{}, error) {
 					<-time.After(time.Until(due))
@@ -107,6 +109,7 @@ func (node *Node) StartLeaderWork() error {
 							Str("key", result.key).
 							Msg("finalized commits and sent out new proposal signal")
 						node.Consensus.ProposalNewBlock <- struct{}{}
+						node.Consensus.ResetConsensusTimeout <- struct{}{}
 					})
 
 				}()

@@ -7,6 +7,7 @@ import (
 
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 	"github.com/pkg/errors"
 )
 
@@ -32,12 +33,40 @@ func (node *Node) HandleConsensus() error {
 
 			<-time.After(2 * time.Second)
 			conns, err := node.host.CoreAPI.Swarm().Peers(context.Background())
+
 			if err != nil {
+				sufficientPeers = nil
 				problem <- err
 				return
 			}
-			if count := len(conns); count >= needed {
+
+			count := 0
+			for _, conn := range conns {
+				protocols, err := node.host.IPFSNode.PeerHost.Peerstore().SupportsProtocols(
+					conn.ID(), p2p.Protocol,
+				)
+
+				if err != nil {
+					sufficientPeers = nil
+					problem <- err
+				}
+
+				seen := false
+				for _, protocol := range protocols {
+					if seen = protocol == p2p.Protocol; seen {
+						break
+					}
+				}
+
+				if !seen {
+					continue
+				}
+				count++
+			}
+
+			if count >= needed {
 				sufficientPeers <- count
+				problem = nil
 				return
 			}
 
@@ -80,6 +109,7 @@ func (node *Node) HandleConsensus() error {
 				since := time.Since(timeLast).Round(time.Second)
 
 				if since > 60*time.Second {
+
 					fmt.Println(
 						"was it more than 60 second",
 						node.Consensus.PubKey.SerializeToHexStr(),
