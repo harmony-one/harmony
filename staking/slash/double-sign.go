@@ -35,7 +35,7 @@ func payDebt(
 		RawJSON("slash-track", []byte(slashDiff.String())).
 		Msg("slash debt payment before application")
 	slashDiff.TotalSlashed = new(big.Int).Add(slashDiff.TotalSlashed, payment)
-	slashDebt = new(big.Int).Sub(slashDebt, payment)
+	slashDebt.Sub(slashDebt, payment)
 	if slashDebt.Cmp(common.Big0) == -1 {
 		x1, _ := rlp.EncodeToBytes(snapshot)
 		x2, _ := rlp.EncodeToBytes(current)
@@ -307,7 +307,7 @@ func payDownAsMuchAsCan(
 	if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
 		// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
 		if nowAmt.Cmp(slashDebt) >= 0 {
-			nowAmt = new(big.Int).Sub(nowAmt, slashDebt)
+			nowAmt.Sub(nowAmt, slashDebt)
 			if err := payDebt(
 				snapshot, current, slashDebt, slashDebt, slashDiff,
 			); err != nil {
@@ -320,7 +320,7 @@ func payDownAsMuchAsCan(
 			); err != nil {
 				return err
 			}
-			nowAmt = new(big.Int).Sub(nowAmt, nowAmt)
+			nowAmt.Sub(nowAmt, nowAmt)
 		}
 	}
 
