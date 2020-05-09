@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -356,42 +357,102 @@ func (node *Node) Start() error {
 	if len(allTopics) == 0 {
 		return errors.New("have no topics to listen to")
 	}
-	weighted := make([]*semaphore.Weighted, len(allTopics))
-	const maxMessageHandlers = 200
+
+	const (
+		maxMessageHandlers = 200
+		threshold          = maxMessageHandlers / 2
+		lastLine           = 20
+	)
+
 	ctx := context.Background()
 	ownID := node.host.GetID()
 	errChan := make(chan error)
 
-	for i, topic := range allTopics {
+	for _, topic := range allTopics {
 		sub, err := topic.Subscribe()
 		if err != nil {
 			return err
 		}
-		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
+		sem := semaphore.NewWeighted(maxMessageHandlers)
 		msgChan := make(chan *libp2p_pubsub.Message)
+		needThrottle, releaseThrottle :=
+			make(chan time.Duration), make(chan struct{})
 
-		go func(msgChan chan *libp2p_pubsub.Message, sem *semaphore.Weighted) {
+		go func() {
+			soFar := int32(maxMessageHandlers)
 			for msg := range msgChan {
-				payload := msg.GetData()
-				if len(payload) < p2pMsgPrefixSize {
-					continue
-				}
-				if sem.TryAcquire(1) {
-					go func() {
-						node.HandleMessage(
-							payload[p2pMsgPrefixSize:], msg.GetFrom(),
-						)
-						sem.Release(1)
-					}()
-				} else {
-					utils.Logger().Info().
-						Msg("could not acquire semaphore to process incoming message")
-				}
+
+				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+
+				go func(msg *libp2p_pubsub.Message) {
+					defer cancel()
+					defer atomic.AddInt32(&soFar, 1)
+					current := atomic.AddInt32(&soFar, -1)
+
+					if current == 0 {
+						utils.Logger().Info().Msg("no available semaphores to handle p2p messages")
+						return
+					}
+
+					var cost int64 = 1
+
+					if current <= threshold {
+						cost = 2
+						if current == threshold {
+							go func() {
+								needThrottle <- 100 * time.Millisecond
+							}()
+						} else if current == lastLine {
+							go func() {
+								needThrottle <- 400 * time.Millisecond
+							}()
+						}
+					} else {
+						if current == threshold+1 {
+							go func() {
+								releaseThrottle <- struct{}{}
+							}()
+						}
+					}
+
+					if sem.TryAcquire(cost) {
+						defer sem.Release(cost)
+						payload := msg.GetData()
+						if len(payload) < p2pMsgPrefixSize {
+							// TODO understand why this happens
+							return
+						}
+						select {
+						case <-ctx.Done():
+							errChan <- ctx.Err()
+						default:
+							node.HandleMessage(
+								payload[p2pMsgPrefixSize:], msg.GetFrom(),
+							)
+						}
+					}
+				}(msg)
+
 			}
-		}(msgChan, weighted[i])
+		}()
 
 		go func(msgChan chan *libp2p_pubsub.Message) {
+			slowDown, coolDown := false, 100*time.Millisecond
+
 			for {
+
+				select {
+				case s := <-needThrottle:
+					slowDown = true
+					coolDown = s
+				case <-releaseThrottle:
+					slowDown = false
+				default:
+					if slowDown {
+						<-time.After(coolDown)
+					}
+				}
+
 				nextMsg, err := sub.Next(ctx)
 				if err != nil {
 					errChan <- err
