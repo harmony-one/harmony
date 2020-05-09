@@ -224,7 +224,6 @@ func (consensus *Consensus) tryCatchup() error {
 			utils.Logger().Error().
 				Int("numMsgs", len(msgs)).
 				Msg("DANGER!!! we should only get one committed message for a given blockNum")
-			return errors.New("we should only get one committed message for a given blockNum")
 		}
 
 		var committedMsg *FBFTMessage
@@ -248,7 +247,8 @@ func (consensus *Consensus) tryCatchup() error {
 			}
 
 			if err := consensus.ChainVerifier.ValidateBody(tmpBlock); err != nil {
-				return errors.New("why could not validate body?")
+				utils.Logger().Debug().Err(err).Msg("[TryCatchup] block verification failed")
+				continue
 			}
 
 			committedMsg = msgs[i]
@@ -257,12 +257,12 @@ func (consensus *Consensus) tryCatchup() error {
 		}
 		if block == nil || committedMsg == nil {
 			utils.Logger().Error().Msg("[TryCatchup] Failed finding a valid committed message.")
-			return errors.New("[TryCatchup] Failed finding a valid committed message")
+			break
 		}
 
 		if block.ParentHash() != consensus.ChainReader.CurrentHeader().Hash() {
 			utils.Logger().Debug().Msg("[TryCatchup] parent block hash not match")
-			return errors.New("parent block hash not match")
+			break
 		}
 		utils.Logger().Info().Msg("[TryCatchup] block found to commit")
 
@@ -271,7 +271,6 @@ func (consensus *Consensus) tryCatchup() error {
 		)
 		msg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 		if msg == nil {
-			// return errors.New("could not find message by max viewid in fbftlog")
 			break
 		}
 		utils.Logger().Info().Msg("[TryCatchup] prepared message found to commit")
@@ -291,7 +290,7 @@ func (consensus *Consensus) tryCatchup() error {
 		if err := consensus.ChainVerifier.ValidateBody(block); err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("block processing after finishing consensus failed")
-			return err
+			continue
 		}
 
 		if err := consensus.PostConsensus.Process(block); err != nil {
