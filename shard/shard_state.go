@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"math/big"
 	"sort"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -418,11 +417,8 @@ func lookupBLSPublicKeys(
 				}
 				slice[j] = committerKey
 			}
-			// Only made once
-			go func() {
-				time.Sleep(25 * time.Minute)
-				blsKeyCache.Forget(key)
-			}()
+			// TODO need to forget the keys too
+
 			return slice, nil
 		},
 	)
