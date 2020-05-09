@@ -25,7 +25,7 @@ type (
 	}
 )
 
-// Copy makes a deep copy of the CommissionRates
+// Copy deep copies the staking.CommissionRates
 func (cr CommissionRates) Copy() CommissionRates {
 	return CommissionRates{
 		Rate:          cr.Rate.Copy(),

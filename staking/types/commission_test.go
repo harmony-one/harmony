@@ -10,21 +10,26 @@ import (
 )
 
 var (
-	zeroDec     = numeric.ZeroDec()
-	oneThirdDec = numeric.NewDecWithPrec(33, 2)
-	halfDec     = numeric.NewDecWithPrec(5, 1)
-	twoThirdDec = numeric.NewDecWithPrec(66, 2)
-	oneDec      = numeric.OneDec()
+	nonZeroCommissionRates = CommissionRates{
+		Rate:          numeric.NewDecWithPrec(1, 1),
+		MaxRate:       numeric.NewDecWithPrec(2, 1),
+		MaxChangeRate: numeric.NewDecWithPrec(3, 1),
+	}
+
+	zeroCommissionRates = CommissionRates{
+		Rate:          numeric.ZeroDec(),
+		MaxRate:       numeric.ZeroDec(),
+		MaxChangeRate: numeric.ZeroDec(),
+	}
 )
 
 func TestCommissionRates_Copy(t *testing.T) {
 	tests := []struct {
 		cr CommissionRates
 	}{
+		{nonZeroCommissionRates},
+		{zeroCommissionRates},
 		{},
-		{CommissionRates{zeroDec, halfDec, oneDec}},
-		{CommissionRates{zeroDec, oneThirdDec, twoThirdDec}},
-		{CommissionRates{oneThirdDec, twoThirdDec, oneDec}},
 	}
 	for i, test := range tests {
 		cp := test.cr.Copy()
