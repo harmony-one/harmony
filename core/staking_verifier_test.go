@@ -7,6 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/harmony-one/harmony/staking/effective"
+
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/block"
@@ -40,11 +44,33 @@ var (
 	twentyKOnes     = new(big.Int).Mul(big.NewInt(1000), oneBig)
 	twentyFiveKOnes = new(big.Int).Mul(big.NewInt(1000), oneBig)
 	thirtyKOnes     = new(big.Int).Mul(big.NewInt(1000), oneBig)
+
+	zeroDec      = numeric.ZeroDec()
+	pointOneDec  = numeric.NewDecWithPrec(1, 1)
+	pointFiveDec = numeric.NewDecWithPrec(5, 1)
+	pointNineDec = numeric.NewDecWithPrec(9, 1)
+	oneDec       = numeric.OneDec()
 )
 
 const (
 	defaultEpoch       = 5
 	defaultBlockNumber = 100
+)
+
+var (
+	defaultDesc = staking.Description{
+		Name:            "SuperHero",
+		Identity:        "YouWouldNotKnow",
+		Website:         "Secret Website",
+		SecurityContact: "LicenseToKill",
+		Details:         "blah blah blah",
+	}
+
+	defaultCommissionRates = staking.CommissionRates{
+		Rate:          pointOneDec,
+		MaxRate:       pointFiveDec,
+		MaxChangeRate: pointNineDec,
+	}
 )
 
 func TestCheckDuplicateFields(t *testing.T) {
@@ -58,7 +84,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 		expErr error
 	}{
 		{
-			// validator not exist on chain
+			// new validator
 			bc:        makeDefaultFakeChainContext(),
 			sdb:       makeDefaultStateDB(t),
 			validator: createValidatorAddr,
@@ -74,6 +100,16 @@ func TestCheckDuplicateFields(t *testing.T) {
 			validator: makeTestAddr(0),
 			identity:  makeIdentityStr(0),
 			pubs:      []shard.BLSPublicKey{blsKeys[0].pub, blsKeys[1].pub},
+
+			expErr: nil,
+		},
+		{
+			// empty bls keys
+			bc:        makeDefaultFakeChainContext(),
+			sdb:       makeDefaultStateDB(t),
+			validator: createValidatorAddr,
+			identity:  makeIdentityStr("new validator"),
+			pubs:      []shard.BLSPublicKey{},
 
 			expErr: nil,
 		},
@@ -152,6 +188,50 @@ func TestCheckDuplicateFields(t *testing.T) {
 			t.Errorf("Test %v: %v", i, assErr)
 		}
 	}
+}
+
+func defaultCreateValidatorMsg() staking.CreateValidator {
+	pub, sig := blsKeys[11].pub, blsKeys[11].sig
+	cv := staking.CreateValidator{
+		ValidatorAddress:   createValidatorAddr,
+		Description:        defaultDesc,
+		CommissionRates:    defaultCommissionRates,
+		MinSelfDelegation:  staketest.DefaultMinSelfDel,
+		MaxTotalDelegation: staketest.DefaultMaxTotalDel,
+		SlotPubKeys:        []shard.BLSPublicKey{pub},
+		SlotKeySigs:        []shard.BLSSignature{sig},
+		Amount:             staketest.DefaultDelAmount,
+	}
+	return cv
+}
+
+func defaultCreateValidatorExpWrapper() staking.ValidatorWrapper {
+	pub := blsKeys[11].pub
+	v := staking.Validator{
+		Address:              createValidatorAddr,
+		SlotPubKeys:          []shard.BLSPublicKey{pub},
+		LastEpochInCommittee: new(big.Int),
+		MinSelfDelegation:    staketest.DefaultMinSelfDel,
+		MaxTotalDelegation:   staketest.DefaultMaxTotalDel,
+		Status:               effective.Active,
+		Commission: staking.Commission{
+			CommissionRates: defaultCommissionRates,
+			UpdateHeight:    big.NewInt(defaultBlockNumber),
+		},
+		Description:    defaultDesc,
+		CreationHeight: big.NewInt(defaultBlockNumber),
+	}
+	ds := staking.Delegations{
+		staking.NewDelegation(createValidatorAddr, staketest.DefaultDelAmount),
+	}
+	w := staking.ValidatorWrapper{
+		Validator:   v,
+		Delegations: ds,
+		BlockReward: big.NewInt(0),
+	}
+	w.Counters.NumBlocksSigned = common.Big0
+	w.Counters.NumBlocksToSign = common.Big0
+	return w
 }
 
 func makeDefaultFakeChainContext() *fakeChainContext {
