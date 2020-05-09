@@ -285,7 +285,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) error {
 			consensus.BlockNum(),
 		)
 
-		panic("who?")
 		utils.Logger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnCommitted] OUT OF SYNC")
