@@ -8,8 +8,8 @@ import (
 )
 
 // CopyValidatorWrapper deep copies staking.ValidatorWrapper
-func CopyValidatorWrapper(w *staking.ValidatorWrapper) *staking.ValidatorWrapper {
-	cp := &staking.ValidatorWrapper{
+func CopyValidatorWrapper(w staking.ValidatorWrapper) staking.ValidatorWrapper {
+	cp := staking.ValidatorWrapper{
 		Validator:   CopyValidator(w.Validator),
 		Delegations: CopyDelegations(w.Delegations),
 	}
