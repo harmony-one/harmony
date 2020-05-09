@@ -111,9 +111,8 @@ func VerifyAndCreateValidatorFromMsg(
 	wrapper.Delegations = []staking.Delegation{
 		staking.NewDelegation(v.Address, msg.Amount),
 	}
-	zero := big.NewInt(0)
-	wrapper.Counters.NumBlocksSigned = zero
-	wrapper.Counters.NumBlocksToSign = zero
+	wrapper.Counters.NumBlocksSigned = big.NewInt(0)
+	wrapper.Counters.NumBlocksToSign = big.NewInt(0)
 	wrapper.BlockReward = big.NewInt(0)
 	maxBLSKeyAllowed := shard.ExternalSlotsAvailableForEpoch(epoch) / 3
 	if err := wrapper.SanityCheck(maxBLSKeyAllowed); err != nil {
@@ -232,7 +231,7 @@ func VerifyAndDelegateFromMsg(
 	for i := range wrapper.Delegations {
 		delegation := &wrapper.Delegations[i]
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
-			delegation.Amount.Add(delegation.Amount, msg.Amount)
+			delegation.Amount = new(big.Int).Add(delegation.Amount, msg.Amount)
 			if err := wrapper.SanityCheck(
 				staking.DoNotEnforceMaxBLS,
 			); err != nil {
@@ -327,7 +326,7 @@ func VerifyAndCollectRewardsFromDelegation(
 		if uint64(len(wrapper.Delegations)) > delegation.Index {
 			delegation := &wrapper.Delegations[delegation.Index]
 			if delegation.Reward.Cmp(common.Big0) > 0 {
-				totalRewards.Add(totalRewards, delegation.Reward)
+				totalRewards = new(big.Int).Add(totalRewards, delegation.Reward)
 				delegation.Reward.SetUint64(0)
 			}
 		} else {

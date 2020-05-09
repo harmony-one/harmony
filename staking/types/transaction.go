@@ -166,7 +166,7 @@ func (tx *StakingTransaction) Cost() (*big.Int, error) {
 		if !ok {
 			return nil, errStakingTransactionTypeCastErr
 		}
-		total.Add(total, stkMsg.Amount)
+		total = new(big.Int).Add(total, stkMsg.Amount)
 	case DirectiveDelegate:
 		msg, err := RLPDecodeStakeMsg(tx.Data(), DirectiveDelegate)
 		if err != nil {
@@ -176,7 +176,7 @@ func (tx *StakingTransaction) Cost() (*big.Int, error) {
 		if !ok {
 			return nil, errStakingTransactionTypeCastErr
 		}
-		total.Add(total, stkMsg.Amount)
+		total = new(big.Int).Add(total, stkMsg.Amount)
 	}
 	return total, nil
 }

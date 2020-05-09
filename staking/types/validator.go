@@ -322,7 +322,7 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 func (w *ValidatorWrapper) TotalDelegation() *big.Int {
 	total := big.NewInt(0)
 	for _, entry := range w.Delegations {
-		total.Add(total, entry.Amount)
+		total = new(big.Int).Add(total, entry.Amount)
 	}
 	return total
 }

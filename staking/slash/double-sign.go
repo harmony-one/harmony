@@ -34,8 +34,8 @@ func payDebt(
 		Uint64("payment", payment.Uint64()).
 		RawJSON("slash-track", []byte(slashDiff.String())).
 		Msg("slash debt payment before application")
-	slashDiff.TotalSlashed.Add(slashDiff.TotalSlashed, payment)
-	slashDebt.Sub(slashDebt, payment)
+	slashDiff.TotalSlashed = new(big.Int).Add(slashDiff.TotalSlashed, payment)
+	slashDebt = new(big.Int).Sub(slashDebt, payment)
 	if slashDebt.Cmp(common.Big0) == -1 {
 		x1, _ := rlp.EncodeToBytes(snapshot)
 		x2, _ := rlp.EncodeToBytes(current)
@@ -307,7 +307,7 @@ func payDownAsMuchAsCan(
 	if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
 		// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
 		if nowAmt.Cmp(slashDebt) >= 0 {
-			nowAmt.Sub(nowAmt, slashDebt)
+			nowAmt = new(big.Int).Sub(nowAmt, slashDebt)
 			if err := payDebt(
 				snapshot, current, slashDebt, slashDebt, slashDiff,
 			); err != nil {
@@ -320,7 +320,7 @@ func payDownAsMuchAsCan(
 			); err != nil {
 				return err
 			}
-			nowAmt.Sub(nowAmt, nowAmt)
+			nowAmt = new(big.Int).Sub(nowAmt, nowAmt)
 		}
 	}
 
@@ -408,7 +408,7 @@ func delegatorSlashApply(
 				// NOTE only need to pay snitch here,
 				// they only get half of what was actually dispersed
 				halfOfSlashDebt := new(big.Int).Div(slashDiff.TotalSlashed, common.Big2)
-				slashDiff.TotalSnitchReward.Add(slashDiff.TotalSnitchReward, halfOfSlashDebt)
+				slashDiff.TotalSnitchReward = new(big.Int).Add(slashDiff.TotalSnitchReward, halfOfSlashDebt)
 				utils.Logger().Info().
 					RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
 					RawJSON("delegation-current", []byte(delegationNow.String())).
@@ -416,10 +416,10 @@ func delegatorSlashApply(
 					RawJSON("application", []byte(slashDiff.String())).
 					Msg("completed an application of slashing")
 				state.AddBalance(reporter, halfOfSlashDebt)
-				slashTrack.TotalSnitchReward.Add(
+				slashTrack.TotalSnitchReward = new(big.Int).Add(
 					slashTrack.TotalSnitchReward, slashDiff.TotalSnitchReward,
 				)
-				slashTrack.TotalSlashed.Add(
+				slashTrack.TotalSlashed = new(big.Int).Add(
 					slashTrack.TotalSlashed, slashDiff.TotalSlashed,
 				)
 			}

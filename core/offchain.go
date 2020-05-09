@@ -243,7 +243,7 @@ func (bc *BlockChain) CommitOffChainData(
 					}
 					for j := range stats.MetricsPerShard {
 						if stats.MetricsPerShard[j].Vote.Identity == paid[i].EarningKey {
-							stats.MetricsPerShard[j].Earned.Add(
+							stats.MetricsPerShard[j].Earned = new(big.Int).Add(
 								stats.MetricsPerShard[j].Earned,
 								paid[i].NewlyEarned,
 							)

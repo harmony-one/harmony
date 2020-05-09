@@ -125,13 +125,13 @@ func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 	if d.Amount.Cmp(amt) < 0 {
 		return errInsufficientBalance
 	}
-	d.Amount.Sub(d.Amount, amt)
+	d.Amount = new(big.Int).Sub(d.Amount, amt)
 
 	exist := false
 	for _, entry := range d.Undelegations {
 		if entry.Epoch.Cmp(epoch) == 0 {
 			exist = true
-			entry.Amount.Add(entry.Amount, amt)
+			entry.Amount = new(big.Int).Add(entry.Amount, amt)
 			return nil
 		}
 	}
@@ -154,7 +154,7 @@ func (d *Delegation) Undelegate(epoch *big.Int, amt *big.Int) error {
 func (d *Delegation) TotalInUndelegation() *big.Int {
 	total := big.NewInt(0)
 	for i := range d.Undelegations {
-		total.Add(total, d.Undelegations[i].Amount)
+		total = new(big.Int).Add(total, d.Undelegations[i].Amount)
 	}
 	return total
 }
@@ -184,7 +184,7 @@ func (d *Delegation) RemoveUnlockedUndelegations(
 		if big.NewInt(0).Sub(curEpoch, d.Undelegations[j].Epoch).Int64() >= LockPeriodInEpoch ||
 			big.NewInt(0).Sub(curEpoch, lastEpochInCommittee).Int64() >= LockPeriodInEpoch {
 			// need to wait at least 7 epochs to withdraw; or the validator has been out of committee for 7 epochs
-			totalWithdraw.Add(totalWithdraw, d.Undelegations[j].Amount)
+			totalWithdraw = new(big.Int).Add(totalWithdraw, d.Undelegations[j].Amount)
 			count++
 		} else {
 			break

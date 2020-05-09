@@ -97,12 +97,12 @@ func bumpCount(
 				return err
 			}
 
-			wrapper.Counters.NumBlocksToSign.Add(
+			wrapper.Counters.NumBlocksToSign = new(big.Int).Add(
 				wrapper.Counters.NumBlocksToSign, common.Big1,
 			)
 
 			if subset.didSign {
-				wrapper.Counters.NumBlocksSigned.Add(
+				wrapper.Counters.NumBlocksSigned = new(big.Int).Add(
 					wrapper.Counters.NumBlocksSigned, common.Big1,
 				)
 			}
