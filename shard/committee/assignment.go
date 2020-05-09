@@ -129,6 +129,20 @@ func prepareOrders(
 	essentials := map[common.Address]*effective.SlotOrder{}
 	totalStaked, tempZero := big.NewInt(0), numeric.ZeroDec()
 
+	// Avoid duplicate BLS keys as harmony nodes
+	instance := shard.Schedule.InstanceForEpoch(stakedReader.CurrentBlock().Epoch())
+	for _, account := range instance.HmyAccounts() {
+		pub := &bls.PublicKey{}
+		if err := pub.DeserializeHexStr(account.BLSPublicKey); err != nil {
+			continue
+		}
+		pubKey := shard.BLSPublicKey{}
+		if err := pubKey.FromLibBLSPublicKey(pub); err != nil {
+			continue
+		}
+		blsKeys[pubKey] = struct{}{}
+	}
+
 	for i := range candidates {
 		validator, err := stakedReader.ReadValidatorInformation(
 			candidates[i],
