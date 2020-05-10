@@ -8,6 +8,8 @@ import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -836,7 +838,9 @@ func init() {
 	proto.RegisterType((*ViewChangeRequest)(nil), "message.ViewChangeRequest")
 }
 
-func init() { proto.RegisterFile("message.proto", fileDescriptor_33c57e4bae7b9afd) }
+func init() {
+	proto.RegisterFile("message.proto", fileDescriptor_33c57e4bae7b9afd)
+}
 
 var fileDescriptor_33c57e4bae7b9afd = []byte{
 	// 1014 bytes of a gzipped FileDescriptorProto
@@ -908,11 +912,11 @@ var fileDescriptor_33c57e4bae7b9afd = []byte{
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
-var _ grpc.ClientConn
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion4
+const _ = grpc.SupportPackageIsVersion6
 
 // ClientServiceClient is the client API for ClientService service.
 //
@@ -922,10 +926,10 @@ type ClientServiceClient interface {
 }
 
 type clientServiceClient struct {
-	cc *grpc.ClientConn
+	cc grpc.ClientConnInterface
 }
 
-func NewClientServiceClient(cc *grpc.ClientConn) ClientServiceClient {
+func NewClientServiceClient(cc grpc.ClientConnInterface) ClientServiceClient {
 	return &clientServiceClient{cc}
 }
 
@@ -941,6 +945,14 @@ func (c *clientServiceClient) Process(ctx context.Context, in *Message, opts ...
 // ClientServiceServer is the server API for ClientService service.
 type ClientServiceServer interface {
 	Process(context.Context, *Message) (*Response, error)
+}
+
+// UnimplementedClientServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedClientServiceServer struct {
+}
+
+func (*UnimplementedClientServiceServer) Process(ctx context.Context, req *Message) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Process not implemented")
 }
 
 func RegisterClientServiceServer(s *grpc.Server, srv ClientServiceServer) {
