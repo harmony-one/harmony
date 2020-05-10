@@ -112,5 +112,5 @@ message ViewChangeRequest {
   bytes m2_bitmap = 10;
   bytes m3_aggsigs = 11; // m3: |viewID|
   bytes m3_bitmap= 12;
-
+  bytes prepared_block = 13;
 }
