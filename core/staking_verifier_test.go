@@ -4,12 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/harmony-one/harmony/staking/effective"
-
-	"github.com/harmony-one/harmony/numeric"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -18,7 +15,9 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	staketest "github.com/harmony-one/harmony/staking/types/test"
 )
@@ -186,6 +185,44 @@ func TestCheckDuplicateFields(t *testing.T) {
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
+		}
+	}
+}
+
+func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
+	tests := []struct {
+		sdb      *state.DB
+		chain    ChainContext
+		epoch    *big.Int
+		blockNum *big.Int
+		msg      staking.CreateValidator
+
+		expWrapper staking.ValidatorWrapper
+		expErr     error
+	}{
+		{
+			sdb:      makeDefaultStateDB(t),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg:      defaultCreateValidatorMsg(),
+
+			expWrapper: defaultCreateValidatorExpWrapper(),
+		},
+	}
+	for i, test := range tests {
+		w, err := VerifyAndCreateValidatorFromMsg(test.sdb, test.chain, test.epoch,
+			test.blockNum, &test.msg)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, err)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+
+		if !reflect.DeepEqual(w, &test.expWrapper) {
+			t.Errorf("Test %v: vWrapper not deep equal", i)
 		}
 	}
 }
