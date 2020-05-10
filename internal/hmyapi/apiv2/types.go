@@ -205,8 +205,8 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
 		"number":           (*big.Int)(head.Number()),
-		"ViewID":           (*hexutil.Big)(head.ViewID().Uint64()),
-		"Epoch":            (*hexutil.Big)(header.Epoch().Uint64()),
+		"viewID":           (*hexutil.Big)(head.ViewID().Uint64()),
+		"epoch":            (*hexutil.Big)(head.Epoch().Uint64()),
 		"hash":             b.Hash(),
 		"parentHash":       head.ParentHash(),
 		"nonce":            0, // Remove this because we don't have it in our header
