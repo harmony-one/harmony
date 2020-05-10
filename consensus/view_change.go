@@ -516,7 +516,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		}
 
 		blockHash := recvMsg.Payload[:32]
-		if !bytes.Equal(preparedBlock.Hash()[:], blockHash) {
+		preparedBlockHash := preparedBlock.Hash()
+		if !bytes.Equal(preparedBlockHash[:], blockHash) {
 			consensus.getLogger().Warn().
 				Err(err).
 				Str("blockHash", preparedBlock.Hash().Hex()).
