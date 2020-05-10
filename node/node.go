@@ -38,6 +38,7 @@ import (
 	"github.com/harmony-one/harmony/webhooks"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -368,11 +369,12 @@ func (node *Node) Start() error {
 	ownID := node.host.GetID()
 	errChan := make(chan error)
 
-	for _, topic := range allTopics {
-		sub, err := topic.Subscribe()
+	for i := range allTopics {
+		sub, err := allTopics[i].Topic.Subscribe()
 		if err != nil {
 			return err
 		}
+		topicNamed := allTopics[i].Name
 		sem := semaphore.NewWeighted(maxMessageHandlers)
 		msgChan := make(chan *libp2p_pubsub.Message)
 		needThrottle, releaseThrottle :=
@@ -380,6 +382,17 @@ func (node *Node) Start() error {
 
 		go func() {
 			soFar := int32(maxMessageHandlers)
+
+			sampled := utils.Logger().Sample(
+				zerolog.LevelSampler{
+					DebugSampler: &zerolog.BurstSampler{
+						Burst:       2,
+						Period:      6 * time.Second,
+						NextSampler: &zerolog.BasicSampler{N: 100},
+					},
+				},
+			).With().Str("pubsub-topic", topicNamed).Logger()
+
 			for msg := range msgChan {
 
 				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -387,7 +400,11 @@ func (node *Node) Start() error {
 				go func(msg *libp2p_pubsub.Message) {
 					defer cancel()
 					defer atomic.AddInt32(&soFar, 1)
+
 					current := atomic.AddInt32(&soFar, -1)
+					sampled.Info().
+						Int32("currently-using", current).
+						Msg("sampling message handling")
 
 					if current == 0 {
 						utils.Logger().Info().Msg("no available semaphores to handle p2p messages")
@@ -426,6 +443,10 @@ func (node *Node) Start() error {
 						case <-ctx.Done():
 							errChan <- ctx.Err()
 						default:
+							sampled.Info().
+								Int32("currently-using", current).
+								Msg("handling message")
+
 							node.HandleMessage(
 								payload[p2pMsgPrefixSize:], msg.GetFrom(),
 							)
@@ -445,7 +466,11 @@ func (node *Node) Start() error {
 				case s := <-needThrottle:
 					slowDown = true
 					coolDown = s
+					utils.Logger().Info().
+						Dur("throttle-delay-miliseconds", s.Round(time.Millisecond)).
+						Msg("throttle needed on acceptance of messages")
 				case <-releaseThrottle:
+					utils.Logger().Info().Msg("p2p throttle released")
 					slowDown = false
 				default:
 					if slowDown {

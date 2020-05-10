@@ -35,7 +35,7 @@ type Host interface {
 	ConnectHostPeer(Peer) error
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-	AllTopics() []*libp2p_pubsub.Topic
+	AllTopics() []NamedTopic
 	C() (int, int, int)
 	// libp2p.metrics related
 	GetBandwidthTotals() libp2p_metrics.Stats
@@ -290,13 +290,19 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	return nil
 }
 
+// NamedTopic ..
+type NamedTopic struct {
+	Name  string
+	Topic *libp2p_pubsub.Topic
+}
+
 // AllTopics ..
-func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
+func (host *HostV2) AllTopics() []NamedTopic {
 	host.lock.Lock()
 	defer host.lock.Unlock()
-	topics := []*libp2p_pubsub.Topic{}
-	for _, g := range host.joined {
-		topics = append(topics, g)
+	var topics []NamedTopic
+	for k, g := range host.joined {
+		topics = append(topics, NamedTopic{k, g})
 	}
 	return topics
 }
