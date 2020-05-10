@@ -402,8 +402,10 @@ func (node *Node) Start() error {
 					defer atomic.AddInt32(&soFar, 1)
 
 					current := atomic.AddInt32(&soFar, -1)
+					using := maxMessageHandlers - current
+
 					sampled.Info().
-						Int32("currently-using", current).
+						Int32("currently-using", using).
 						Msg("sampling message handling")
 
 					if current == 0 {
@@ -441,10 +443,14 @@ func (node *Node) Start() error {
 						}
 						select {
 						case <-ctx.Done():
+							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+								utils.Logger().Info().
+									Str("topic", topicNamed).Msg("exceeded deadline")
+							}
 							errChan <- ctx.Err()
 						default:
 							sampled.Info().
-								Int32("currently-using", current).
+								Int32("currently-using", using).
 								Msg("handling message")
 
 							node.HandleMessage(
