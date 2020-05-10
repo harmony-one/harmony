@@ -70,9 +70,16 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		return nil, errors.Wrapf(err,
 			"cannot create listen multiaddr from port %#v", self.Port)
 	}
+
+	rep := libp2p_metrics.NewBandwidthCounter()
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
-		libp2p.ListenAddrs(listenAddr), libp2p.Identity(key),
+		libp2p.ListenAddrs(listenAddr),
+		libp2p.Identity(key),
+		libp2p.DisableRelay(),
+		libp2p.BandwidthReporter(rep),
+		libp2p.EnableNATService(),
+		libp2p.ForceReachabilityPublic(),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
@@ -96,8 +103,6 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	self.PeerID = p2pHost.ID()
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 
-	newMetrics := libp2p_metrics.NewBandwidthCounter()
-
 	// has to save the private key for host
 	h := &HostV2{
 		h:       p2pHost,
@@ -106,7 +111,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		self:    *self,
 		priKey:  key,
 		logger:  &subLogger,
-		metrics: newMetrics,
+		metrics: rep,
 	}
 
 	if err != nil {
