@@ -415,6 +415,22 @@ func (tx *Transaction) Copy() *Transaction {
 	return &tx2
 }
 
+// SenderAddress returns the address of transaction sender
+// Note that mainnet has unprotected transactions prior to Epoch 28
+func (tx *Transaction) SenderAddress() (common.Address, error) {
+	var signer Signer
+	if !tx.Protected() {
+		signer = HomesteadSigner{}
+	} else {
+		signer = NewEIP155Signer(tx.ChainID())
+	}
+	addr, err := Sender(signer, tx)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return addr, nil
+}
+
 // Transactions is a Transaction slice type for basic sorting.
 type Transactions []*Transaction
 

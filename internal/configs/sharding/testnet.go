@@ -3,10 +3,9 @@ package shardingconfig
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/numeric"
-
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/numeric"
 )
 
 // TestnetSchedule is the long-running public testnet sharding

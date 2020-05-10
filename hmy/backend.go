@@ -52,6 +52,7 @@ type NodeAPI interface {
 	ReportPlainErrorSink() types.TransactionErrorReports
 	PendingCXReceipts() []*types.CXReceiptsProof
 	GetNodeBootTime() int64
+	PeerConnectivity() (int, int, int)
 }
 
 // New creates a new Harmony object (including the

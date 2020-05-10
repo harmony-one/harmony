@@ -16,6 +16,7 @@ import (
 	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
 	libp2p_metrics "github.com/libp2p/go-libp2p-core/metrics"
+	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -35,7 +36,7 @@ type Host interface {
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 	AllTopics() []*libp2p_pubsub.Topic
-
+	C() (int, int, int)
 	// libp2p.metrics related
 	GetBandwidthTotals() libp2p_metrics.Stats
 	LogRecvMessage(msg []byte)
@@ -143,6 +144,21 @@ type HostV2 struct {
 	logger *zerolog.Logger
 	// metrics
 	metrics *libp2p_metrics.BandwidthCounter
+}
+
+// C .. -> (total known peers, connected, not connected)
+func (host *HostV2) C() (int, int, int) {
+	connected, not := 0, 0
+	peers := host.h.Peerstore().Peers()
+	for _, peer := range peers {
+		result := host.h.Network().Connectedness(peer)
+		if result == libp2p_network.Connected {
+			connected++
+		} else if result == libp2p_network.NotConnected {
+			not++
+		}
+	}
+	return len(peers), connected, not
 }
 
 func (host *HostV2) getTopic(topic string) (*libp2p_pubsub.Topic, error) {

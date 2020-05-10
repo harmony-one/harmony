@@ -16,11 +16,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	// ErrInvalidChainID when ChainID of signer does not match that of running node
-	errInvalidChainID = errors.New("invalid chain id for signer")
-)
-
 // TxHistoryArgs is struct to make GetTransactionsHistory request
 type TxHistoryArgs struct {
 	Address   string `json:"address"`
@@ -242,7 +237,7 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	c := s.b.ChainConfig().ChainID
 	if id := tx.ChainID(); id.Cmp(c) != 0 {
 		return common.Hash{}, errors.Wrapf(
-			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
 		)
 	}
 	return SubmitStakingTransaction(ctx, s.b, tx)
@@ -262,7 +257,7 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encod
 	c := s.b.ChainConfig().ChainID
 	if id := tx.ChainID(); id.Cmp(c) != 0 {
 		return common.Hash{}, errors.Wrapf(
-			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
 		)
 	}
 	return SubmitTransaction(ctx, s.b, tx)
@@ -372,11 +367,11 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 	if err != nil {
 		return nil, err
 	}
-	transactions := make([]*RPCTransaction, len(pending))
+	transactions := make([]*RPCTransaction, 0)
 	for i := range pending {
 		if plainTx, ok := pending[i].(*types.Transaction); ok {
 			if tx := newRPCTransaction(plainTx, common.Hash{}, 0, 0, 0); tx != nil {
-				transactions[i] = tx
+				transactions = append(transactions, tx)
 			}
 		} else if _, ok := pending[i].(*staking.StakingTransaction); ok {
 			continue // Do not return staking transactions here.
@@ -393,13 +388,13 @@ func (s *PublicTransactionPoolAPI) PendingStakingTransactions() ([]*RPCStakingTr
 	if err != nil {
 		return nil, err
 	}
-	transactions := make([]*RPCStakingTransaction, len(pending))
+	transactions := make([]*RPCStakingTransaction, 0)
 	for i := range pending {
 		if _, ok := pending[i].(*types.Transaction); ok {
 			continue // Do not return plain transactions here
 		} else if stakingTx, ok := pending[i].(*staking.StakingTransaction); ok {
 			if tx := newRPCStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0); tx != nil {
-				transactions[i] = tx
+				transactions = append(transactions, tx)
 			}
 		} else {
 			return nil, types.ErrUnknownPoolTxType

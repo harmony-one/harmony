@@ -110,6 +110,9 @@ func Compute(
 	// Expand
 	for _, staker := range shorter {
 		slotsCount := len(staker.slot.SpreadAmong)
+		if slotsCount == 0 {
+			continue
+		}
 		spread := numeric.NewDecFromBigInt(staker.slot.Stake).
 			QuoInt64(int64(slotsCount))
 		for i := 0; i < slotsCount; i++ {

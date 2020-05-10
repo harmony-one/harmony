@@ -574,20 +574,21 @@ func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*stak
 	return delegations
 }
 
-// GetDelegationsByDelegator returns all delegation information of a delegator
-func (b *APIBackend) GetDelegationsByDelegator(
-	delegator common.Address,
+// GetDelegationsByDelegatorByBlock returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegatorByBlock(
+	delegator common.Address, block *types.Block,
 ) ([]common.Address, []*staking.Delegation) {
 	addresses := []common.Address{}
 	delegations := []*staking.Delegation{}
-	delegationIndexes, err := b.hmy.BlockChain().ReadDelegationsByDelegator(delegator)
+	delegationIndexes, err := b.hmy.BlockChain().
+		ReadDelegationsByDelegatorAt(delegator, block.Number())
 	if err != nil {
 		return nil, nil
 	}
 
 	for i := range delegationIndexes {
-		wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(
-			delegationIndexes[i].ValidatorAddress,
+		wrapper, err := b.hmy.BlockChain().ReadValidatorInformationAt(
+			delegationIndexes[i].ValidatorAddress, block.Root(),
 		)
 		if err != nil || wrapper == nil {
 			return nil, nil
@@ -601,6 +602,14 @@ func (b *APIBackend) GetDelegationsByDelegator(
 		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
 	}
 	return addresses, delegations
+}
+
+// GetDelegationsByDelegator returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegator(
+	delegator common.Address,
+) ([]common.Address, []*staking.Delegation) {
+	block := b.hmy.BlockChain().CurrentBlock()
+	return b.GetDelegationsByDelegatorByBlock(delegator, block)
 }
 
 // GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
@@ -782,6 +791,8 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 			blsKeys = append(blsKeys, key.SerializeToHexStr())
 		}
 	}
+	c := commonRPC.C{}
+	c.TotalKnownPeers, c.Connected, c.NotConnected = b.hmy.nodeAPI.PeerConnectivity()
 
 	return commonRPC.NodeMetadata{
 		blsKeys,
@@ -796,5 +807,6 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 		cfg.DNSZone,
 		cfg.GetArchival(),
 		b.hmy.nodeAPI.GetNodeBootTime(),
+		c,
 	}
 }

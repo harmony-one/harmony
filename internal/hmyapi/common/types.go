@@ -2,6 +2,13 @@ package common
 
 import "github.com/harmony-one/harmony/internal/params"
 
+// C ..
+type C struct {
+	TotalKnownPeers int `json:"total-known-peers"`
+	Connected       int `json:"connected"`
+	NotConnected    int `json:"not-connected"`
+}
+
 // NodeMetadata captures select metadata of the RPC answering node
 type NodeMetadata struct {
 	BLSPublicKey   []string           `json:"blskey"`
@@ -16,4 +23,5 @@ type NodeMetadata struct {
 	DNSZone        string             `json:"dns-zone"`
 	Archival       bool               `json:"is-archival"`
 	NodeBootTime   int64              `json:"node-unix-start-time"`
+	C              C                  `json:"p2p-connectivity"`
 }
