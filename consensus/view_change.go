@@ -226,7 +226,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		}
 	}
 
-	var preparedBlock *types.Block
+	preparedBlock := &types.Block{}
 	if len(recvMsg.Payload) != 0 && len(recvMsg.Block) != 0 {
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
 			consensus.getLogger().Warn().
@@ -505,7 +505,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// check when M3 sigs > M2 sigs, then M1 (recvMsg.Payload) should not be empty
-	var preparedBlock *types.Block
+	preparedBlock := &types.Block{}
 	if len(recvMsg.Payload) != 0 && len(recvMsg.Block) != 0 {
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
 			consensus.getLogger().Warn().
@@ -522,7 +522,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 				Err(err).
 				Str("blockHash", preparedBlock.Hash().Hex()).
 				Str("payloadBlockHash", hex.EncodeToString(blockHash)).
-				Msg("[onNewView] Unparseable prepared block data")
+				Msg("[onNewView] Prepared block hash doesn't match msg block hash.")
 			return
 		}
 	}
