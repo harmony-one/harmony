@@ -37,14 +37,20 @@ func (consensus *Consensus) constructViewChangeMessage(pubKey *bls.PublicKey, pr
 	)
 	preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
-	block := consensus.FBFTLog.GetBlockByHash(preparedMsg.BlockHash)
-	var msgToSign []byte
-
-	encodedBlock, err := rlp.EncodeToBytes(block)
-	if err != nil {
-		consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed encoding block")
+	var encodedBlock []byte
+	if preparedMsg != nil {
+		block := consensus.FBFTLog.GetBlockByHash(preparedMsg.BlockHash)
+		if block != nil {
+			tmpEncoded, err := rlp.EncodeToBytes(block)
+			if err != nil {
+				consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed encoding block")
+			}
+			encodedBlock = tmpEncoded
+		}
 	}
-	if preparedMsg == nil || encodedBlock == nil {
+
+	var msgToSign []byte
+	if len(encodedBlock) == 0 {
 		msgToSign = NIL // m2 type message
 		vcMsg.Payload = []byte{}
 	} else {
@@ -102,12 +108,14 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, pubKey *bls.P
 	vcMsg.Payload = consensus.m1Payload
 	if len(consensus.m1Payload) != 0 {
 		block := consensus.FBFTLog.GetBlockByHash(consensus.blockHash)
-		encodedBlock, err := rlp.EncodeToBytes(block)
-		if err != nil {
-			consensus.getLogger().Err(err).Msg("[constructNewViewMessage] Failed encoding prepared block")
-		}
-		if encodedBlock != nil {
-			vcMsg.PreparedBlock = encodedBlock
+		if block != nil {
+			encodedBlock, err := rlp.EncodeToBytes(block)
+			if err != nil {
+				consensus.getLogger().Err(err).Msg("[constructNewViewMessage] Failed encoding prepared block")
+			}
+			if len(encodedBlock) != 0 {
+				vcMsg.PreparedBlock = encodedBlock
+			}
 		}
 	}
 

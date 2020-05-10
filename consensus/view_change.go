@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 	"sync"
 	"time"
@@ -226,7 +227,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 
 	var preparedBlock *types.Block
-	if len(recvMsg.Payload) != 0 {
+	if len(recvMsg.Payload) != 0 && len(recvMsg.Block) != 0 {
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
 			consensus.getLogger().Warn().
 				Err(err).
@@ -505,7 +506,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 	// check when M3 sigs > M2 sigs, then M1 (recvMsg.Payload) should not be empty
 	var preparedBlock *types.Block
-	if len(recvMsg.Payload) != 0 {
+	if len(recvMsg.Payload) != 0 && len(recvMsg.Block) != 0 {
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
 			consensus.getLogger().Warn().
 				Err(err).
@@ -513,7 +514,18 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 				Msg("[onNewView] Unparseable prepared block data")
 			return
 		}
+
+		blockHash := recvMsg.Payload[:32]
+		if !bytes.Equal(preparedBlock.Hash()[:], blockHash) {
+			consensus.getLogger().Warn().
+				Err(err).
+				Str("blockHash", preparedBlock.Hash().Hex()).
+				Str("payloadBlockHash", hex.EncodeToString(blockHash)).
+				Msg("[onNewView] Unparseable prepared block data")
+			return
+		}
 	}
+
 	if m2Mask == nil || m2Mask.Bitmap == nil ||
 		(m2Mask != nil && m2Mask.Bitmap != nil &&
 			utils.CountOneBits(m3Mask.Bitmap) > utils.CountOneBits(m2Mask.Bitmap)) {
@@ -572,7 +584,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	// NewView message is verified, change state to normal consensus
 	if preparedBlock != nil {
 		// Construct and send the commit message
-		if consensus.BlockVerifier(preparedBlock); err != nil || preparedBlock.Hash() != recvMsg.BlockHash {
+		if consensus.BlockVerifier(preparedBlock); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[onNewView] Prepared block verification failed")
 			return
 		}

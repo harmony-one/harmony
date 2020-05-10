@@ -65,7 +65,7 @@ type Consensus struct {
 	bhpBitmap    map[uint64]*bls_cosi.Mask
 	nilBitmap    map[uint64]*bls_cosi.Mask
 	viewIDBitmap map[uint64]*bls_cosi.Mask
-	m1Payload    []byte     // message payload for type m1 := |vcBlockHash|viewID|prepared_agg_sigs|prepared_bitmap|, new leader only need one
+	m1Payload    []byte     // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 	vcLock       sync.Mutex // mutex for view change
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader *core.BlockChain
