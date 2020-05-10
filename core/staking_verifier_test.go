@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/numeric"
@@ -31,18 +32,19 @@ var (
 	blsKeys = makeKeyPairs(20)
 
 	createValidatorAddr = makeTestAddr("validator")
-	editValidatorAddr   = makeTestAddr(0)
+	validatorAddr       = makeTestAddr(0)
 )
 
 var (
 	oneBig          = big.NewInt(1e18)
 	oneKOnes        = new(big.Int).Mul(big.NewInt(1000), oneBig)
-	fiveKOnes       = new(big.Int).Mul(big.NewInt(1000), oneBig)
-	tenKOnes        = new(big.Int).Mul(big.NewInt(1000), oneBig)
-	fifteenOnes     = new(big.Int).Mul(big.NewInt(1000), oneBig)
-	twentyKOnes     = new(big.Int).Mul(big.NewInt(1000), oneBig)
-	twentyFiveKOnes = new(big.Int).Mul(big.NewInt(1000), oneBig)
-	thirtyKOnes     = new(big.Int).Mul(big.NewInt(1000), oneBig)
+	fiveKOnes       = new(big.Int).Mul(big.NewInt(5000), oneBig)
+	tenKOnes        = new(big.Int).Mul(big.NewInt(10000), oneBig)
+	fifteenOnes     = new(big.Int).Mul(big.NewInt(15000), oneBig)
+	twentyKOnes     = new(big.Int).Mul(big.NewInt(20000), oneBig)
+	twentyFiveKOnes = new(big.Int).Mul(big.NewInt(25000), oneBig)
+	thirtyKOnes     = new(big.Int).Mul(big.NewInt(30000), oneBig)
+	hundredKOnes    = new(big.Int).Mul(big.NewInt(100000), oneBig)
 
 	zeroDec      = numeric.ZeroDec()
 	pointOneDec  = numeric.NewDecWithPrec(1, 1)
@@ -67,8 +69,8 @@ var (
 
 	defaultCommissionRates = staking.CommissionRates{
 		Rate:          pointOneDec,
-		MaxRate:       pointFiveDec,
-		MaxChangeRate: pointNineDec,
+		MaxRate:       pointNineDec,
+		MaxChangeRate: pointFiveDec,
 	}
 )
 
@@ -191,7 +193,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 
 func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 	tests := []struct {
-		sdb      *state.DB
+		sdb      vm.StateDB
 		chain    ChainContext
 		epoch    *big.Int
 		blockNum *big.Int
@@ -201,6 +203,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 		expErr     error
 	}{
 		{
+			// valid request
 			sdb:      makeDefaultStateDB(t),
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -208,6 +211,148 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			msg:      defaultCreateValidatorMsg(),
 
 			expWrapper: defaultCreateValidatorExpWrapper(),
+		},
+		{
+			// nil state db
+			sdb:      nil,
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg:      defaultCreateValidatorMsg(),
+
+			expErr: errStateDBIsMissing,
+		},
+		{
+			// nil chain context
+			sdb:      makeDefaultStateDB(t),
+			chain:    nil,
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg:      defaultCreateValidatorMsg(),
+
+			expErr: errChainContextMissing,
+		},
+		{
+			// nil epoch
+			sdb:      makeDefaultStateDB(t),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    nil,
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg:      defaultCreateValidatorMsg(),
+
+			expErr: errEpochMissing,
+		},
+		{
+			// nil block number
+			sdb:      makeDefaultStateDB(t),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: nil,
+			msg:      defaultCreateValidatorMsg(),
+
+			expErr: errBlockNumMissing,
+		},
+		{
+			// negative amount
+			sdb:      makeDefaultStateDB(t),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg: func() staking.CreateValidator {
+				m := defaultCreateValidatorMsg()
+				m.Amount = big.NewInt(-1)
+				return m
+			}(),
+			expErr: errNegativeAmount,
+		},
+		{
+			// the address isValidatorFlag is true
+			sdb: func() *state.DB {
+				sdb := makeDefaultStateDB(t)
+				sdb.SetValidatorFlag(createValidatorAddr)
+				return sdb
+			}(),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg:      defaultCreateValidatorMsg(),
+
+			expErr: errValidatorExist,
+		},
+		{
+			// bls collision (checkDuplicateFields)
+			sdb:      makeDefaultStateDB(t),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg: func() staking.CreateValidator {
+				m := defaultCreateValidatorMsg()
+				m.SlotPubKeys = []shard.BLSPublicKey{blsKeys[0].pub}
+				return m
+			}(),
+
+			expErr: errors.New("BLS key exists"),
+		},
+		{
+			// insufficient balance
+			sdb: func() *state.DB {
+				sdb := makeDefaultStateDB(t)
+				bal := new(big.Int).Sub(staketest.DefaultDelAmount, common.Big1)
+				sdb.SetBalance(createValidatorAddr, bal)
+				return sdb
+			}(),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg:      defaultCreateValidatorMsg(),
+
+			expErr: errInsufficientBalanceForStake,
+		},
+		{
+			// incorrect signature
+			sdb:      makeDefaultStateDB(t),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg: func() staking.CreateValidator {
+				m := defaultCreateValidatorMsg()
+				m.SlotKeySigs = []shard.BLSSignature{blsKeys[12].sig}
+				return m
+			}(),
+
+			expErr: errors.New("bls keys and corresponding signatures"),
+		},
+		{
+			// small self delegation amount (fail sanity check)
+			sdb:      makeDefaultStateDB(t),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg: func() staking.CreateValidator {
+				m := defaultCreateValidatorMsg()
+				m.Amount = new(big.Int).Sub(m.MinSelfDelegation, common.Big1)
+				return m
+			}(),
+
+			expErr: errors.New("self delegation can not be less than min_self_delegation"),
+		},
+		{
+			// amount exactly minSelfDelegation. Should not return error
+			sdb:      makeDefaultStateDB(t),
+			chain:    makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg: func() staking.CreateValidator {
+				m := defaultCreateValidatorMsg()
+				m.Amount = new(big.Int).Set(m.MinSelfDelegation)
+				return m
+			}(),
+
+			expWrapper: func() staking.ValidatorWrapper {
+				w := defaultCreateValidatorExpWrapper()
+				w.Delegations[0].Amount = new(big.Int).Set(w.MinSelfDelegation)
+				return w
+			}(),
 		},
 	}
 	for i, test := range tests {
@@ -221,7 +366,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(w, &test.expWrapper) {
+		if !reflect.DeepEqual(*w, test.expWrapper) {
 			t.Errorf("Test %v: vWrapper not deep equal", i)
 		}
 	}
@@ -289,11 +434,15 @@ func makeDefaultStateDB(t *testing.T) *state.DB {
 	if err := updateStateVWrappers(sdb, ws); err != nil {
 		t.Fatalf("make default state: %v", err)
 	}
+
+	sdb.AddBalance(createValidatorAddr, hundredKOnes)
+	sdb.AddBalance(validatorAddr, hundredKOnes)
 	return sdb
 }
 
 func updateStateVWrappers(sdb *state.DB, ws []staking.ValidatorWrapper) error {
 	for i, w := range ws {
+		sdb.SetValidatorFlag(w.Address)
 		if err := sdb.UpdateValidatorWrapper(w.Address, &w); err != nil {
 			return fmt.Errorf("update %v vw error: %v", i, err)
 		}
