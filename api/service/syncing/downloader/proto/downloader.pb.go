@@ -8,8 +8,6 @@ import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -250,9 +248,7 @@ func init() {
 	proto.RegisterType((*DownloaderResponse)(nil), "downloader.DownloaderResponse")
 }
 
-func init() {
-	proto.RegisterFile("downloader.proto", fileDescriptor_6a99ec95c7ab1ff1)
-}
+func init() { proto.RegisterFile("downloader.proto", fileDescriptor_6a99ec95c7ab1ff1) }
 
 var fileDescriptor_6a99ec95c7ab1ff1 = []byte{
 	// 410 bytes of a gzipped FileDescriptorProto
@@ -286,11 +282,11 @@ var fileDescriptor_6a99ec95c7ab1ff1 = []byte{
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
-var _ grpc.ClientConnInterface
+var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion6
+const _ = grpc.SupportPackageIsVersion4
 
 // DownloaderClient is the client API for Downloader service.
 //
@@ -300,10 +296,10 @@ type DownloaderClient interface {
 }
 
 type downloaderClient struct {
-	cc grpc.ClientConnInterface
+	cc *grpc.ClientConn
 }
 
-func NewDownloaderClient(cc grpc.ClientConnInterface) DownloaderClient {
+func NewDownloaderClient(cc *grpc.ClientConn) DownloaderClient {
 	return &downloaderClient{cc}
 }
 
@@ -319,14 +315,6 @@ func (c *downloaderClient) Query(ctx context.Context, in *DownloaderRequest, opt
 // DownloaderServer is the server API for Downloader service.
 type DownloaderServer interface {
 	Query(context.Context, *DownloaderRequest) (*DownloaderResponse, error)
-}
-
-// UnimplementedDownloaderServer can be embedded to have forward compatible implementations.
-type UnimplementedDownloaderServer struct {
-}
-
-func (*UnimplementedDownloaderServer) Query(ctx context.Context, req *DownloaderRequest) (*DownloaderResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Query not implemented")
 }
 
 func RegisterDownloaderServer(s *grpc.Server, srv DownloaderServer) {

@@ -8,8 +8,6 @@ import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -204,9 +202,7 @@ func init() {
 	proto.RegisterType((*GetFreeTokenResponse)(nil), "client.GetFreeTokenResponse")
 }
 
-func init() {
-	proto.RegisterFile("client.proto", fileDescriptor_014de31d7ac8c57c)
-}
+func init() { proto.RegisterFile("client.proto", fileDescriptor_014de31d7ac8c57c) }
 
 var fileDescriptor_014de31d7ac8c57c = []byte{
 	// 229 bytes of a gzipped FileDescriptorProto
@@ -229,11 +225,11 @@ var fileDescriptor_014de31d7ac8c57c = []byte{
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
-var _ grpc.ClientConnInterface
+var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion6
+const _ = grpc.SupportPackageIsVersion4
 
 // ClientServiceClient is the client API for ClientService service.
 //
@@ -244,10 +240,10 @@ type ClientServiceClient interface {
 }
 
 type clientServiceClient struct {
-	cc grpc.ClientConnInterface
+	cc *grpc.ClientConn
 }
 
-func NewClientServiceClient(cc grpc.ClientConnInterface) ClientServiceClient {
+func NewClientServiceClient(cc *grpc.ClientConn) ClientServiceClient {
 	return &clientServiceClient{cc}
 }
 
@@ -273,17 +269,6 @@ func (c *clientServiceClient) GetFreeToken(ctx context.Context, in *GetFreeToken
 type ClientServiceServer interface {
 	FetchAccountState(context.Context, *FetchAccountStateRequest) (*FetchAccountStateResponse, error)
 	GetFreeToken(context.Context, *GetFreeTokenRequest) (*GetFreeTokenResponse, error)
-}
-
-// UnimplementedClientServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedClientServiceServer struct {
-}
-
-func (*UnimplementedClientServiceServer) FetchAccountState(ctx context.Context, req *FetchAccountStateRequest) (*FetchAccountStateResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountState not implemented")
-}
-func (*UnimplementedClientServiceServer) GetFreeToken(ctx context.Context, req *GetFreeTokenRequest) (*GetFreeTokenResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetFreeToken not implemented")
 }
 
 func RegisterClientServiceServer(s *grpc.Server, srv ClientServiceServer) {

@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -192,7 +195,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			msg_pb.MessageType_PREPARED, recvMsg.BlockNum,
 		)
 		preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
-		if preparedMsg == nil {
+		block := consensus.FBFTLog.GetBlockByHash(preparedMsg.BlockHash)
+		if preparedMsg == nil || block == nil {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
@@ -221,8 +225,19 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		}
 	}
 
+	var preparedBlock *types.Block
+	if len(recvMsg.Payload) != 0 {
+		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
+			consensus.getLogger().Warn().
+				Err(err).
+				Uint64("MsgBlockNum", recvMsg.BlockNum).
+				Msg("[onViewChange] Unparseable prepared block data")
+			return
+		}
+	}
+
 	// m2 type message
-	if len(recvMsg.Payload) == 0 {
+	if preparedBlock == nil {
 		_, ok := consensus.nilSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()]
 		if ok {
 			consensus.getLogger().Debug().
@@ -242,6 +257,10 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.nilSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()] = recvMsg.ViewchangeSig
 		consensus.nilBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey, true) // Set the bitmap indicating that this validator signed.
 	} else { // m1 type message
+		if consensus.BlockVerifier(preparedBlock); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[onViewChange] Prepared block verification failed")
+			return
+		}
 		_, ok := consensus.bhpSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()]
 		if ok {
 			consensus.getLogger().Debug().
@@ -299,6 +318,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				preparedMsg.SenderPubkey = newLeaderKey
 				consensus.getLogger().Info().Msg("[onViewChange] New Leader Prepared Message Added")
 				consensus.FBFTLog.AddMessage(&preparedMsg)
+
+				consensus.FBFTLog.AddBlock(preparedBlock)
 			}
 		}
 		consensus.getLogger().Debug().
@@ -342,6 +363,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.ResetState()
 		if len(consensus.m1Payload) == 0 {
 			// TODO(Chao): explain why ReadySignal is sent only in this case but not the other case.
+			// Make sure the newly proposed block have the correct view ID
+			consensus.viewID = recvMsg.ViewID
 			go func() {
 				consensus.ReadySignal <- struct{}{}
 			}()
@@ -352,7 +375,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				Msg("[OnViewChange] Switching phase")
 			consensus.switchPhase(FBFTCommit, true)
 			copy(consensus.blockHash[:], consensus.m1Payload[:32])
-			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 32)
+			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(consensus.m1Payload, 32)
 
 			if err != nil {
 				consensus.getLogger().Error().Err(err).
@@ -363,8 +386,13 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.aggregatedPrepareSig = aggSig
 			consensus.prepareBitmap = mask
 			// Leader sign and add commit message
+			block := consensus.FBFTLog.GetBlockByHash(consensus.blockHash)
+			if block == nil {
+				consensus.getLogger().Debug().Msg("[onViewChange] failed to get prepared block for self commit")
+				return
+			}
 			commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-				new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, recvMsg.ViewID)
+				new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, block.Header().ViewID().Uint64())
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
 				if _, err := consensus.Decider.SubmitVote(
@@ -476,6 +504,16 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// check when M3 sigs > M2 sigs, then M1 (recvMsg.Payload) should not be empty
+	var preparedBlock *types.Block
+	if len(recvMsg.Payload) != 0 {
+		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
+			consensus.getLogger().Warn().
+				Err(err).
+				Uint64("MsgBlockNum", recvMsg.BlockNum).
+				Msg("[onNewView] Unparseable prepared block data")
+			return
+		}
+	}
 	if m2Mask == nil || m2Mask.Bitmap == nil ||
 		(m2Mask != nil && m2Mask.Bitmap != nil &&
 			utils.CountOneBits(m3Mask.Bitmap) > utils.CountOneBits(m2Mask.Bitmap)) {
@@ -512,6 +550,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 		preparedMsg.SenderPubkey = senderKey
 		consensus.FBFTLog.AddMessage(&preparedMsg)
+
+		consensus.FBFTLog.AddBlock(preparedBlock)
 	}
 
 	// newView message verified success, override my state
@@ -530,11 +570,14 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// NewView message is verified, change state to normal consensus
-	// TODO: check magic number 32
-	if len(recvMsg.Payload) > 32 {
+	if preparedBlock != nil {
 		// Construct and send the commit message
+		if consensus.BlockVerifier(preparedBlock); err != nil || preparedBlock.Hash() != recvMsg.BlockHash {
+			consensus.getLogger().Error().Err(err).Msg("[onNewView] Prepared block verification failed")
+			return
+		}
 		commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-			new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, consensus.viewID)
+			new(big.Int).SetUint64(consensus.epoch), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
 		groupID := []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 		for i, key := range consensus.PubKey.PublicKey {

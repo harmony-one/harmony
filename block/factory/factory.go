@@ -32,7 +32,7 @@ func (f *factory) NewHeader(epoch *big.Int) *block.Header {
 	switch {
 	case f.chainConfig.IsPreStaking(epoch) || f.chainConfig.IsStaking(epoch):
 		impl = v3.NewHeader()
-	case f.chainConfig.IsCrossLink(epoch):
+	case f.chainConfig.IsCrossLink(epoch): //Question
 		impl = v2.NewHeader()
 	case f.chainConfig.HasCrossTxFields(epoch):
 		impl = v1.NewHeader()
