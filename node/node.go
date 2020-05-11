@@ -365,7 +365,6 @@ func (node *Node) Start() error {
 		lastLine           = 20
 	)
 
-	ctx := context.Background()
 	ownID := node.host.GetID()
 	errChan := make(chan error)
 
@@ -394,7 +393,7 @@ func (node *Node) Start() error {
 			).With().Str("pubsub-topic", topicNamed).Logger()
 
 			for msg := range msgChan {
-				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 				msg := msg
 
 				go func() {
@@ -422,6 +421,8 @@ func (node *Node) Start() error {
 								needThrottle <- 100 * time.Millisecond
 							}()
 						} else if current == lastLine {
+							cancel()
+							return
 							go func() {
 								needThrottle <- 400 * time.Millisecond
 							}()
@@ -438,6 +439,7 @@ func (node *Node) Start() error {
 						defer sem.Release(cost)
 						payload := msg.GetData()
 						if len(payload) < p2pMsgPrefixSize {
+							cancel()
 							// TODO understand why this happens
 							return
 						}
@@ -484,7 +486,7 @@ func (node *Node) Start() error {
 					}
 				}
 
-				nextMsg, err := sub.Next(ctx)
+				nextMsg, err := sub.Next(context.Background())
 				if err != nil {
 					errChan <- err
 					continue
