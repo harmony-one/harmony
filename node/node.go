@@ -359,7 +359,7 @@ func (node *Node) Start() error {
 
 	const (
 		maxMessageHandlers = 200
-		threshold          = 30
+		threshold          = 180
 		lastLine           = 20
 		throttle           = 5 * time.Millisecond
 		emrgThrottle       = 250 * time.Millisecond
@@ -403,12 +403,14 @@ func (node *Node) Start() error {
 					current := atomic.AddInt32(&soFar, -1)
 					using := maxMessageHandlers - current
 
-					sampled.Info().
-						Int32("currently-using", using).
-						Msg("sampling message handling")
+					if using > 1 {
+						sampled.Info().
+							Int32("currently-using", using).
+							Msg("sampling message handling")
+					}
 
 					if current == 0 {
-						utils.Logger().Info().Msg("no available semaphores to handle p2p messages")
+						utils.Logger().Debug().Msg("no available semaphores to handle p2p messages")
 						return
 					}
 
