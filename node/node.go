@@ -387,7 +387,7 @@ func (node *Node) Start() error {
 				zerolog.LevelSampler{
 					DebugSampler: &zerolog.BurstSampler{
 						Burst:       2,
-						Period:      6 * time.Second,
+						Period:      24 * time.Second,
 						NextSampler: &zerolog.BasicSampler{N: 100},
 					},
 				},
