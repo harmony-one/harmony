@@ -176,6 +176,8 @@ func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
 // RPCBlock represents a block that will serialize to the RPC representation of a block
 type RPCBlock struct {
 	Number           *hexutil.Big     `json:"number"`
+	ViewID           *hexutil.Big     `json:"viewID"`
+	Epoch            *hexutil.Big     `json:"epoch"`
 	Hash             common.Hash      `json:"hash"`
 	ParentHash       common.Hash      `json:"parentHash"`
 	Nonce            types.BlockNonce `json:"nonce"`
@@ -203,6 +205,8 @@ func RPCMarshalBlock(b *types.Block, inclTx bool, fullTx bool) (map[string]inter
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
 		"number":           (*hexutil.Big)(head.Number()),
+		"viewID":           (*hexutil.Big)(head.ViewID()),
+		"epoch":            (*hexutil.Big)(head.Epoch()),
 		"hash":             b.Hash(),
 		"parentHash":       head.ParentHash(),
 		"nonce":            0, // Remove this because we don't have it in our header
