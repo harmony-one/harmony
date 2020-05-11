@@ -361,7 +361,7 @@ func (node *Node) Start() error {
 		maxMessageHandlers = 200
 		threshold          = 180
 		lastLine           = 20
-		throttle           = 5 * time.Millisecond
+		throttle           = 100 * time.Millisecond
 		emrgThrottle       = 250 * time.Millisecond
 	)
 
