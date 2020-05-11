@@ -521,7 +521,11 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 		},
 		{
 			// validatorWrapper not in state
-			sdb: makeDefaultStateDB(t),
+			sdb: func() *state.DB {
+				sdb := makeDefaultStateDB(t)
+				sdb.SetValidatorFlag(makeTestAddr("someone"))
+				return sdb
+			}(),
 			bc: func() *fakeChainContext {
 				chain := makeDefaultFakeChainContext()
 				addr := makeTestAddr("someone")
@@ -536,7 +540,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 				return msg
 			}(),
 
-			expErr: errors.New("staking validator does not exist"),
+			expErr: errors.New("address not present in state"),
 		},
 		{
 			// signature cannot be verified
@@ -622,9 +626,6 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		if i != 1 {
-			continue
-		}
 		w, err := VerifyAndEditValidatorFromMsg(test.sdb, test.bc, test.epoch, test.blockNum,
 			&test.msg)
 
