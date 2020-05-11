@@ -140,8 +140,6 @@ type Node struct {
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-	// Duplicated Ping Message Received
-	duplicatedPing sync.Map
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
 	// node configuration, including group ID, shard ID, etc
@@ -361,8 +359,10 @@ func (node *Node) Start() error {
 
 	const (
 		maxMessageHandlers = 200
-		threshold          = maxMessageHandlers / 2
+		threshold          = 30
 		lastLine           = 20
+		throttle           = 5 * time.Millisecond
+		emrgThrottle       = 250 * time.Millisecond
 	)
 
 	ownID := node.host.GetID()
@@ -387,7 +387,7 @@ func (node *Node) Start() error {
 					DebugSampler: &zerolog.BurstSampler{
 						Burst:       2,
 						Period:      24 * time.Second,
-						NextSampler: &zerolog.BasicSampler{N: 100},
+						NextSampler: &zerolog.BasicSampler{N: 1000},
 					},
 				},
 			).With().Str("pubsub-topic", topicNamed).Logger()
@@ -418,11 +418,11 @@ func (node *Node) Start() error {
 						cost = 2
 						if current == threshold {
 							go func() {
-								needThrottle <- 100 * time.Millisecond
+								needThrottle <- throttle
 							}()
 						} else if current == lastLine {
 							go func() {
-								needThrottle <- 400 * time.Millisecond
+								needThrottle <- emrgThrottle
 							}()
 						}
 					} else {
@@ -450,10 +450,6 @@ func (node *Node) Start() error {
 							}
 							errChan <- ctx.Err()
 						default:
-							sampled.Info().
-								Int32("currently-using", using).
-								Msg("handling message")
-
 							node.HandleMessage(
 								payload[p2pMsgPrefixSize:], msg.GetFrom(),
 							)
@@ -465,7 +461,7 @@ func (node *Node) Start() error {
 		}()
 
 		go func() {
-			slowDown, coolDown := false, 100*time.Millisecond
+			slowDown, coolDown := false, throttle
 
 			for {
 
