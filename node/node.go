@@ -421,14 +421,13 @@ func (node *Node) Start() error {
 								needThrottle <- 100 * time.Millisecond
 							}()
 						} else if current == lastLine {
-							cancel()
-							return
 							go func() {
 								needThrottle <- 400 * time.Millisecond
 							}()
 						}
 					} else {
 						if current == threshold+1 {
+							cost = 1
 							go func() {
 								releaseThrottle <- struct{}{}
 							}()
