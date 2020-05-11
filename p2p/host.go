@@ -37,10 +37,6 @@ type Host interface {
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 	AllTopics() []NamedTopic
 	C() (int, int, int)
-	// libp2p.metrics related
-	GetBandwidthTotals() libp2p_metrics.Stats
-	LogRecvMessage(msg []byte)
-	ResetMetrics()
 }
 
 // Peer is the object for a p2p peer (node)
@@ -71,13 +67,11 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 			"cannot create listen multiaddr from port %#v", self.Port)
 	}
 
-	rep := libp2p_metrics.NewBandwidthCounter()
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(listenAddr),
 		libp2p.Identity(key),
 		// libp2p.DisableRelay(),
-		libp2p.BandwidthReporter(rep),
 		// libp2p.EnableNATService(),
 		// libp2p.ForceReachabilityPublic(),
 	)
@@ -105,13 +99,12 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 
 	// has to save the private key for host
 	h := &HostV2{
-		h:       p2pHost,
-		joiner:  topicJoiner{pubsub},
-		joined:  map[string]*libp2p_pubsub.Topic{},
-		self:    *self,
-		priKey:  key,
-		logger:  &subLogger,
-		metrics: rep,
+		h:      p2pHost,
+		joiner: topicJoiner{pubsub},
+		joined: map[string]*libp2p_pubsub.Topic{},
+		self:   *self,
+		priKey: key,
+		logger: &subLogger,
 	}
 
 	if err != nil {
