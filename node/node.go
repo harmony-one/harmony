@@ -394,10 +394,10 @@ func (node *Node) Start() error {
 			).With().Str("pubsub-topic", topicNamed).Logger()
 
 			for msg := range msgChan {
-
 				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				msg := msg
 
-				go func(msg *libp2p_pubsub.Message) {
+				go func() {
 					defer cancel()
 					defer atomic.AddInt32(&soFar, 1)
 
@@ -458,7 +458,7 @@ func (node *Node) Start() error {
 							)
 						}
 					}
-				}(msg)
+				}()
 
 			}
 		}()
