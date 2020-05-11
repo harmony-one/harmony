@@ -463,7 +463,7 @@ func (node *Node) Start() error {
 			}
 		}()
 
-		go func(msgChan chan *libp2p_pubsub.Message) {
+		go func() {
 			slowDown, coolDown := false, 100*time.Millisecond
 
 			for {
@@ -494,7 +494,7 @@ func (node *Node) Start() error {
 				}
 				msgChan <- nextMsg
 			}
-		}(msgChan)
+		}()
 	}
 
 	for err := range errChan {
