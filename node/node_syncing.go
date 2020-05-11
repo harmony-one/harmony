@@ -410,6 +410,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 
 	// this is the out of sync node acts as grpc server side
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
+		node.stateMutex.Lock()
+		defer node.stateMutex.Unlock()
 		if node.State != NodeNotInSync {
 			utils.Logger().Debug().
 				Str("state", node.State.String()).
