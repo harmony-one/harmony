@@ -254,11 +254,12 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
+	viewID := consensus.viewID
+
 	quorumIsMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		next := consensus.NextBlockDue
-		viewID := consensus.viewID
 		time.AfterFunc(2*time.Second, func() {
 			<-time.After(time.Until(next))
 			consensus.commitFinishChan <- viewID
@@ -268,9 +269,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	if consensus.Decider.IsAllSigsCollected() {
-		go func(viewID uint64) {
+		go func() {
 			consensus.commitFinishChan <- viewID
 			logger.Info().Msg("[OnCommit] 100% Enough commits received")
-		}(consensus.viewID)
+		}()
 	}
 }
