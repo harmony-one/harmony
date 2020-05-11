@@ -48,6 +48,7 @@ var (
 
 	zeroDec      = numeric.ZeroDec()
 	pointOneDec  = numeric.NewDecWithPrec(1, 1)
+	pointTwoDec  = numeric.NewDecWithPrec(2, 1)
 	pointFiveDec = numeric.NewDecWithPrec(5, 1)
 	pointNineDec = numeric.NewDecWithPrec(9, 1)
 	oneDec       = numeric.OneDec()
@@ -151,7 +152,8 @@ func TestCheckDuplicateFields(t *testing.T) {
 			// validators read from chain not in state
 			bc: func() *fakeChainContext {
 				chain := makeDefaultFakeChainContext()
-				chain.validators = append(chain.validators, makeTestAddr("not exist in state"))
+				addr := makeTestAddr("not exist in state")
+				chain.vWrappers[addr] = staketest.GetDefaultValidatorWrapper()
 				return chain
 			}(),
 			sdb:       makeDefaultStateDB(t),
@@ -208,9 +210,9 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
-			msg:      defaultCreateValidatorMsg(),
+			msg:      defaultMsgCreateValidator(),
 
-			expWrapper: defaultCreateValidatorExpWrapper(),
+			expWrapper: defaultExpWrapperCreateValidator(),
 		},
 		{
 			// nil state db
@@ -218,7 +220,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
-			msg:      defaultCreateValidatorMsg(),
+			msg:      defaultMsgCreateValidator(),
 
 			expErr: errStateDBIsMissing,
 		},
@@ -228,7 +230,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			chain:    nil,
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
-			msg:      defaultCreateValidatorMsg(),
+			msg:      defaultMsgCreateValidator(),
 
 			expErr: errChainContextMissing,
 		},
@@ -238,7 +240,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    nil,
 			blockNum: big.NewInt(defaultBlockNumber),
-			msg:      defaultCreateValidatorMsg(),
+			msg:      defaultMsgCreateValidator(),
 
 			expErr: errEpochMissing,
 		},
@@ -248,7 +250,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: nil,
-			msg:      defaultCreateValidatorMsg(),
+			msg:      defaultMsgCreateValidator(),
 
 			expErr: errBlockNumMissing,
 		},
@@ -259,7 +261,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
 			msg: func() staking.CreateValidator {
-				m := defaultCreateValidatorMsg()
+				m := defaultMsgCreateValidator()
 				m.Amount = big.NewInt(-1)
 				return m
 			}(),
@@ -275,7 +277,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
-			msg:      defaultCreateValidatorMsg(),
+			msg:      defaultMsgCreateValidator(),
 
 			expErr: errValidatorExist,
 		},
@@ -286,7 +288,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
 			msg: func() staking.CreateValidator {
-				m := defaultCreateValidatorMsg()
+				m := defaultMsgCreateValidator()
 				m.SlotPubKeys = []shard.BLSPublicKey{blsKeys[0].pub}
 				return m
 			}(),
@@ -304,7 +306,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
-			msg:      defaultCreateValidatorMsg(),
+			msg:      defaultMsgCreateValidator(),
 
 			expErr: errInsufficientBalanceForStake,
 		},
@@ -315,7 +317,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
 			msg: func() staking.CreateValidator {
-				m := defaultCreateValidatorMsg()
+				m := defaultMsgCreateValidator()
 				m.SlotKeySigs = []shard.BLSSignature{blsKeys[12].sig}
 				return m
 			}(),
@@ -329,7 +331,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
 			msg: func() staking.CreateValidator {
-				m := defaultCreateValidatorMsg()
+				m := defaultMsgCreateValidator()
 				m.Amount = new(big.Int).Sub(m.MinSelfDelegation, common.Big1)
 				return m
 			}(),
@@ -343,13 +345,13 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			epoch:    big.NewInt(defaultEpoch),
 			blockNum: big.NewInt(defaultBlockNumber),
 			msg: func() staking.CreateValidator {
-				m := defaultCreateValidatorMsg()
+				m := defaultMsgCreateValidator()
 				m.Amount = new(big.Int).Set(m.MinSelfDelegation)
 				return m
 			}(),
 
 			expWrapper: func() staking.ValidatorWrapper {
-				w := defaultCreateValidatorExpWrapper()
+				w := defaultExpWrapperCreateValidator()
 				w.Delegations[0].Amount = new(big.Int).Set(w.MinSelfDelegation)
 				return w
 			}(),
@@ -372,7 +374,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 	}
 }
 
-func defaultCreateValidatorMsg() staking.CreateValidator {
+func defaultMsgCreateValidator() staking.CreateValidator {
 	pub, sig := blsKeys[11].pub, blsKeys[11].sig
 	cv := staking.CreateValidator{
 		ValidatorAddress:   createValidatorAddr,
@@ -387,7 +389,7 @@ func defaultCreateValidatorMsg() staking.CreateValidator {
 	return cv
 }
 
-func defaultCreateValidatorExpWrapper() staking.ValidatorWrapper {
+func defaultExpWrapperCreateValidator() staking.ValidatorWrapper {
 	pub := blsKeys[11].pub
 	v := staking.Validator{
 		Address:              createValidatorAddr,
@@ -416,12 +418,91 @@ func defaultCreateValidatorExpWrapper() staking.ValidatorWrapper {
 	return w
 }
 
-func makeDefaultFakeChainContext() *fakeChainContext {
-	vs := make([]common.Address, 0, defNumWrappersInState)
-	for i := 0; i != defNumWrappersInState; i++ {
-		vs = append(vs, makeTestAddr(i))
+func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
+	tests := []struct {
+		sdb             vm.StateDB
+		bc              ChainContext
+		epoch, blockNum *big.Int
+		msg             staking.EditValidator
+		expWrapper      staking.ValidatorWrapper
+		expErr          error
+	}{
+		{
+			sdb:      makeDefaultStateDB(t),
+			bc:       makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg:      defaultMsgEditValidator(),
+
+			expWrapper: defaultExpWrapperEditValidator(),
+		},
+		{},
 	}
-	return makeFakeChainContext(vs)
+	for i, test := range tests {
+		w, err := VerifyAndEditValidatorFromMsg(test.sdb, test.bc, test.epoch, test.blockNum,
+			&test.msg)
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: unexpected Error", i)
+		}
+
+		if !reflect.DeepEqual(w, &test.expWrapper) {
+			t.Errorf("Test %v: wrapper not expected", i)
+		}
+	}
+}
+
+var (
+	editDesc = staking.Description{
+		Name:            "batman",
+		Identity:        "batman",
+		Website:         "",
+		SecurityContact: "",
+		Details:         "",
+	}
+
+	editExpDesc = staking.Description{
+		Name:            "batman",
+		Identity:        "batman",
+		Website:         "Secret Website",
+		SecurityContact: "LicenseToKill",
+		Details:         "blah blah blah",
+	}
+)
+
+func defaultMsgEditValidator() staking.EditValidator {
+	var (
+		pub0Copy  shard.BLSPublicKey
+		pub12Copy shard.BLSPublicKey
+		sig12Copy shard.BLSSignature
+	)
+	copy(pub0Copy[:], blsKeys[0].pub[:])
+	copy(pub12Copy[:], blsKeys[12].pub[:])
+	copy(sig12Copy[:], blsKeys[12].sig[:])
+
+	return staking.EditValidator{
+		ValidatorAddress: validatorAddr,
+		Description:      editDesc,
+		CommissionRate:   &pointTwoDec,
+		SlotKeyToRemove:  &pub0Copy,
+		SlotKeyToAdd:     &pub12Copy,
+		SlotKeyToAddSig:  &sig12Copy,
+		EPOSStatus:       effective.Inactive,
+	}
+}
+
+func defaultExpWrapperEditValidator() staking.ValidatorWrapper {
+	newPubs := []shard.BLSPublicKey{blsKeys[1].pub, blsKeys[12].pub}
+	w := staketest.GetDefaultValidatorWrapperWithAddr(makeTestAddr(0), newPubs)
+	w.Description = editExpDesc
+	w.Rate = pointTwoDec
+	w.UpdateHeight = big.NewInt(defaultBlockNumber)
+	w.Status = effective.Inactive
+	return w
+}
+
+func makeDefaultFakeChainContext() *fakeChainContext {
+	ws := makeDefaultStateVWrappers(defNumWrappersInState, defNumPubPerAddr)
+	return makeFakeChainContext(ws)
 }
 
 func makeDefaultStateDB(t *testing.T) *state.DB {
@@ -437,6 +518,10 @@ func makeDefaultStateDB(t *testing.T) *state.DB {
 
 	sdb.AddBalance(createValidatorAddr, hundredKOnes)
 	sdb.AddBalance(validatorAddr, hundredKOnes)
+
+	if _, err := sdb.Commit(true); err != nil {
+		t.Fatalf("state db commit: %v", err)
+	}
 	return sdb
 }
 
@@ -536,9 +621,9 @@ func (g *BLSPubGetter) getPub() shard.BLSPublicKey {
 //	blsKeys = newBLSKeyPool()
 //}
 //
-//// defaultCreateValidatorMsg makes a createValidator message for testing.
+//// defaultMsgCreateValidator makes a createValidator message for testing.
 //// Returned message could be treated as a copy of a valid message prototype.
-//func defaultCreateValidatorMsg() *staking.CreateValidator {
+//func defaultMsgCreateValidator() *staking.CreateValidator {
 //	desc := staking.Description{
 //		Name:            "SuperHero",
 //		Identity:        "YouWouldNotKnow",
@@ -574,19 +659,25 @@ func (g *BLSPubGetter) getPub() shard.BLSPublicKey {
 
 // fakeChainContext is the fake structure of ChainContext for testing
 type fakeChainContext struct {
-	validators []common.Address
+	vWrappers map[common.Address]staking.ValidatorWrapper
 }
 
-func makeFakeChainContext(validators []common.Address) *fakeChainContext {
+func makeFakeChainContext(ws []staking.ValidatorWrapper) *fakeChainContext {
+	m := make(map[common.Address]staking.ValidatorWrapper)
+	for _, w := range ws {
+		m[w.Address] = staketest.CopyValidatorWrapper(w)
+	}
 	return &fakeChainContext{
-		validators: validators,
+		vWrappers: m,
 	}
 }
 
 func (chain *fakeChainContext) ReadValidatorList() ([]common.Address, error) {
-	validators := make([]common.Address, len(chain.validators))
-	copy(validators, chain.validators)
-	return validators, nil
+	vs := make([]common.Address, 0, len(chain.vWrappers))
+	for addr := range chain.vWrappers {
+		vs = append(vs, addr)
+	}
+	return vs, nil
 }
 
 func (chain *fakeChainContext) Engine() consensus_engine.Engine {
@@ -601,8 +692,16 @@ func (chain *fakeChainContext) ReadDelegationsByDelegator(common.Address) (staki
 	return nil, nil
 }
 
-func (chain *fakeChainContext) ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error) {
-	return nil, nil
+func (chain *fakeChainContext) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error) {
+	w, ok := chain.vWrappers[addr]
+	if !ok {
+		return nil, fmt.Errorf("addr not exist in snapshot")
+	}
+	cp := staketest.CopyValidatorWrapper(w)
+	return &staking.ValidatorSnapshot{
+		Validator: &cp,
+		Epoch:     big.NewInt(defaultEpoch),
+	}, nil
 }
 
 type fakeErrChainContext struct{}
@@ -624,7 +723,7 @@ func (chain *fakeErrChainContext) ReadDelegationsByDelegator(common.Address) (st
 }
 
 func (chain *fakeErrChainContext) ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error) {
-	return nil, nil
+	return nil, errors.New("error intended")
 }
 
 func makeIdentityStr(item interface{}) string {

@@ -35,7 +35,7 @@ var (
 					DelegatorAddress: validatorPrototype.Address,
 					Amount:           DefaultDelAmount,
 					Reward:           common.Big0,
-					Undelegations:    nil,
+					Undelegations:    staking.Undelegations{},
 				},
 			},
 			BlockReward: common.Big0,
