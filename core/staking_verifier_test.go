@@ -33,6 +33,7 @@ var (
 
 	createValidatorAddr = makeTestAddr("validator")
 	validatorAddr       = makeTestAddr(0)
+	delegatorAddr       = makeTestAddr(1)
 )
 
 var (
@@ -157,7 +158,8 @@ func TestCheckDuplicateFields(t *testing.T) {
 			bc: func() *fakeChainContext {
 				chain := makeDefaultFakeChainContext()
 				addr := makeTestAddr("not exist in state")
-				chain.vWrappers[addr] = staketest.GetDefaultValidatorWrapper()
+				w := staketest.GetDefaultValidatorWrapper()
+				chain.vWrappers[addr] = &w
 				return chain
 			}(),
 			sdb:       makeDefaultStateDB(t),
@@ -209,7 +211,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 		expErr     error
 	}{
 		{
-			// valid request
+			// 0: valid request
 			sdb:      makeDefaultStateDB(t),
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -219,7 +221,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expWrapper: defaultExpWrapperCreateValidator(),
 		},
 		{
-			// nil state db
+			// 1: nil state db
 			sdb:      nil,
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -229,7 +231,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errStateDBIsMissing,
 		},
 		{
-			// nil chain context
+			// 2: nil chain context
 			sdb:      makeDefaultStateDB(t),
 			chain:    nil,
 			epoch:    big.NewInt(defaultEpoch),
@@ -239,7 +241,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errChainContextMissing,
 		},
 		{
-			// nil epoch
+			// 3: nil epoch
 			sdb:      makeDefaultStateDB(t),
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    nil,
@@ -249,7 +251,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errEpochMissing,
 		},
 		{
-			// nil block number
+			// 4: nil block number
 			sdb:      makeDefaultStateDB(t),
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -259,7 +261,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errBlockNumMissing,
 		},
 		{
-			// negative amount
+			// 5: negative amount
 			sdb:      makeDefaultStateDB(t),
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -272,7 +274,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errNegativeAmount,
 		},
 		{
-			// the address isValidatorFlag is true
+			// 6: the address isValidatorFlag is true
 			sdb: func() *state.DB {
 				sdb := makeDefaultStateDB(t)
 				sdb.SetValidatorFlag(createValidatorAddr)
@@ -286,7 +288,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errValidatorExist,
 		},
 		{
-			// bls collision (checkDuplicateFields)
+			// 7: bls collision (checkDuplicateFields)
 			sdb:      makeDefaultStateDB(t),
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -300,7 +302,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errors.New("BLS key exists"),
 		},
 		{
-			// insufficient balance
+			// 8: insufficient balance
 			sdb: func() *state.DB {
 				sdb := makeDefaultStateDB(t)
 				bal := new(big.Int).Sub(staketest.DefaultDelAmount, common.Big1)
@@ -315,7 +317,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errInsufficientBalanceForStake,
 		},
 		{
-			// incorrect signature
+			// 9: incorrect signature
 			sdb:      makeDefaultStateDB(t),
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -329,7 +331,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errors.New("bls keys and corresponding signatures"),
 		},
 		{
-			// small self delegation amount (fail sanity check)
+			// 10: small self delegation amount (fail sanity check)
 			sdb:      makeDefaultStateDB(t),
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -343,7 +345,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			expErr: errors.New("self delegation can not be less than min_self_delegation"),
 		},
 		{
-			// amount exactly minSelfDelegation. Should not return error
+			// 11: amount exactly minSelfDelegation. Should not return error
 			sdb:      makeDefaultStateDB(t),
 			chain:    makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -432,7 +434,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 		expErr          error
 	}{
 		{
-			// positive case
+			// 0: positive case
 			sdb:      makeDefaultStateDB(t),
 			bc:       makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -442,7 +444,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expWrapper: defaultExpWrapperEditValidator(),
 		},
 		{
-			// If the rate is not changed, UpdateHeight is not update
+			// 1: If the rate is not changed, UpdateHeight is not update
 			sdb:      makeDefaultStateDB(t),
 			bc:       makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -461,7 +463,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			}(),
 		},
 		{
-			// nil state db
+			// 2: nil state db
 			sdb:      nil,
 			bc:       makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -471,7 +473,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errStateDBIsMissing,
 		},
 		{
-			// nil chain
+			// 3: nil chain
 			sdb:      makeDefaultStateDB(t),
 			bc:       nil,
 			epoch:    big.NewInt(defaultEpoch),
@@ -481,7 +483,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errChainContextMissing,
 		},
 		{
-			// nil block number
+			// 4: nil block number
 			sdb:      makeDefaultStateDB(t),
 			bc:       makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -491,7 +493,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errBlockNumMissing,
 		},
 		{
-			// edited validator flag not set in state
+			// 5: edited validator flag not set in state
 			sdb:      makeDefaultStateDB(t),
 			bc:       makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -505,7 +507,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errValidatorNotExist,
 		},
 		{
-			// bls key collision
+			// 6: bls key collision
 			sdb:      makeDefaultStateDB(t),
 			bc:       makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -520,7 +522,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errDupBlsKey,
 		},
 		{
-			// validatorWrapper not in state
+			// 7: validatorWrapper not in state
 			sdb: func() *state.DB {
 				sdb := makeDefaultStateDB(t)
 				sdb.SetValidatorFlag(makeTestAddr("someone"))
@@ -529,7 +531,8 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			bc: func() *fakeChainContext {
 				chain := makeDefaultFakeChainContext()
 				addr := makeTestAddr("someone")
-				chain.vWrappers[addr] = staketest.GetDefaultValidatorWrapperWithAddr(addr, nil)
+				w := staketest.GetDefaultValidatorWrapperWithAddr(addr, nil)
+				chain.vWrappers[addr] = &w
 				return chain
 			}(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -543,7 +546,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errors.New("address not present in state"),
 		},
 		{
-			// signature cannot be verified
+			// 8: signature cannot be verified
 			sdb:      makeDefaultStateDB(t),
 			bc:       makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -557,7 +560,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errors.New("bls keys and corresponding signatures could not be verified"),
 		},
 		{
-			// Rate is greater the maxRate
+			// 9: Rate is greater the maxRate
 			sdb: makeDefaultStateDB(t),
 			bc: func() *fakeChainContext {
 				chain := makeDefaultFakeChainContext()
@@ -577,7 +580,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errCommissionRateChangeTooHigh,
 		},
 		{
-			// validator not in snapshot
+			// 10: validator not in snapshot
 			sdb: makeDefaultStateDB(t),
 			bc: func() *fakeChainContext {
 				chain := makeDefaultFakeChainContext()
@@ -591,7 +594,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errors.New("validator snapshot not found"),
 		},
 		{
-			// rate is greater than maxChangeRate
+			// 11: rate is greater than maxChangeRate
 			sdb:      makeDefaultStateDB(t),
 			bc:       makeDefaultFakeChainContext(),
 			epoch:    big.NewInt(defaultEpoch),
@@ -605,7 +608,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expErr: errCommissionRateChangeTooFast,
 		},
 		{
-			// fails in sanity check (rate below zero)
+			// 12: fails in sanity check (rate below zero)
 			sdb: makeDefaultStateDB(t),
 			bc: func() *fakeChainContext {
 				chain := makeDefaultFakeChainContext()
@@ -623,6 +626,27 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			}(),
 
 			expErr: errors.New("change rate and max rate should be within 0-100 percent"),
+		},
+		{
+			// 13: cannot update a banned validator
+			sdb: func(t *testing.T) *state.DB {
+				sdb := makeDefaultStateDB(t)
+				vw, err := sdb.ValidatorWrapper(validatorAddr)
+				if err != nil {
+					t.Fatal(err)
+				}
+				vw.Status = effective.Banned
+				if err := sdb.UpdateValidatorWrapper(validatorAddr, vw); err != nil {
+					t.Fatal(err)
+				}
+				return sdb
+			}(t),
+			bc:       makeDefaultFakeChainContext(),
+			epoch:    big.NewInt(defaultEpoch),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg:      defaultMsgEditValidator(),
+
+			expErr: errors.New("banned status"),
 		},
 	}
 	for i, test := range tests {
@@ -690,6 +714,44 @@ func defaultExpWrapperEditValidator() staking.ValidatorWrapper {
 	return w
 }
 
+func TestVerifyAndDelegateFromMsg(t *testing.T) {
+	tests := []struct {
+		sdb vm.StateDB
+		msg staking.Delegate
+
+		expVWrapper staking.ValidatorWrapper
+		expAmt      *big.Int
+		expErr      error
+	}{
+		{},
+	}
+	for i, test := range tests {
+		w, amt, err := VerifyAndDelegateFromMsg(test.sdb, &test.msg)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+
+		if amt.Cmp(test.expAmt) != 0 {
+			t.Errorf("Test %v: unexpected amount %v / %v", i, amt, test.expAmt)
+		}
+		if !reflect.DeepEqual(w, test.expVWrapper) {
+			t.Errorf("Test %v: vWrapper not expected", i)
+		}
+	}
+}
+
+func defaultDelegateMsg() staking.Delegate {
+	return staking.Delegate{
+		DelegatorAddress: delegatorAddr,
+		ValidatorAddress: validatorAddr,
+		Amount:           new(big.Int).Set(tenKOnes),
+	}
+}
+
 func makeDefaultFakeChainContext() *fakeChainContext {
 	ws := makeDefaultCurrentStateVWrappers(defNumWrappersInState, defNumPubPerAddr)
 	return makeFakeChainContext(ws)
@@ -701,24 +763,20 @@ func makeDefaultStateDB(t *testing.T) *state.DB {
 		t.Fatal(err)
 	}
 	ws := makeDefaultCurrentStateVWrappers(defNumWrappersInState, defNumPubPerAddr)
-
 	if err := updateStateVWrappers(sdb, ws); err != nil {
 		t.Fatalf("make default state: %v", err)
 	}
 
-	sdb.AddBalance(createValidatorAddr, hundredKOnes)
-	sdb.AddBalance(validatorAddr, hundredKOnes)
+	sdb.IntermediateRoot(true)
 
-	if _, err := sdb.Commit(true); err != nil {
-		t.Fatalf("state db commit: %v", err)
-	}
 	return sdb
 }
 
-func updateStateVWrappers(sdb *state.DB, ws []staking.ValidatorWrapper) error {
+func updateStateVWrappers(sdb *state.DB, ws []*staking.ValidatorWrapper) error {
 	for i, w := range ws {
 		sdb.SetValidatorFlag(w.Address)
-		if err := sdb.UpdateValidatorWrapper(w.Address, &w); err != nil {
+		sdb.AddBalance(w.Address, hundredKOnes)
+		if err := sdb.UpdateValidatorWrapper(w.Address, w); err != nil {
 			return fmt.Errorf("update %v vw error: %v", i, err)
 		}
 	}
@@ -731,11 +789,12 @@ func newTestStateDB() (*state.DB, error) {
 
 // makeDefaultCurrentStateVWrappers makes the default staking.ValidatorWrappers for
 // initialization of default state db
-func makeDefaultCurrentStateVWrappers(num, numPubsPerVal int) []staking.ValidatorWrapper {
-	ws := make([]staking.ValidatorWrapper, 0, num)
+func makeDefaultCurrentStateVWrappers(num, numPubsPerVal int) []*staking.ValidatorWrapper {
+	ws := make([]*staking.ValidatorWrapper, 0, num)
 	pubGetter := newBLSPubGetter(blsKeys)
 	for i := 0; i != num; i++ {
-		ws = append(ws, makeStateVWrapperFromGetter(i, numPubsPerVal, pubGetter))
+		w := makeStateVWrapperFromGetter(i, numPubsPerVal, pubGetter)
+		ws = append(ws, &w)
 	}
 	return ws
 }
@@ -850,13 +909,14 @@ func (g *BLSPubGetter) getPub() shard.BLSPublicKey {
 
 // fakeChainContext is the fake structure of ChainContext for testing
 type fakeChainContext struct {
-	vWrappers map[common.Address]staking.ValidatorWrapper
+	vWrappers map[common.Address]*staking.ValidatorWrapper
 }
 
-func makeFakeChainContext(ws []staking.ValidatorWrapper) *fakeChainContext {
-	m := make(map[common.Address]staking.ValidatorWrapper)
+func makeFakeChainContext(ws []*staking.ValidatorWrapper) *fakeChainContext {
+	m := make(map[common.Address]*staking.ValidatorWrapper)
 	for _, w := range ws {
-		m[w.Address] = staketest.CopyValidatorWrapper(w)
+		wCpy := staketest.CopyValidatorWrapper(*w)
+		m[w.Address] = &wCpy
 	}
 	return &fakeChainContext{
 		vWrappers: m,
@@ -888,7 +948,7 @@ func (chain *fakeChainContext) ReadValidatorSnapshot(addr common.Address) (*stak
 	if !ok {
 		return nil, fmt.Errorf("addr not exist in snapshot")
 	}
-	cp := staketest.CopyValidatorWrapper(w)
+	cp := staketest.CopyValidatorWrapper(*w)
 	return &staking.ValidatorSnapshot{
 		Validator: &cp,
 		Epoch:     big.NewInt(defaultEpoch),
