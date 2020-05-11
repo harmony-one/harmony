@@ -396,6 +396,7 @@ dryrun)
   REL=DRYRUN
   network_type=mainnet
   dns_zone=dry.hmny.io
+  syncdir=dryrun
   ;;
 *)
   err 64 "${network}: invalid network"
