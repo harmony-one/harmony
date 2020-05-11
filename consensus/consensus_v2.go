@@ -334,7 +334,7 @@ func (consensus *Consensus) Start(
 	blockChannel chan *types.Block, stopChan, stoppedChan, startChannel chan struct{},
 ) {
 	go func() {
-		toStart := make(chan struct{})
+		toStart := make(chan struct{}, 1)
 		isInitialLeader := consensus.IsLeader()
 		if isInitialLeader {
 			consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Waiting for consensus start")
