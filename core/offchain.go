@@ -235,6 +235,7 @@ func (bc *BlockChain) CommitOffChainData(
 						stats, err = bc.ReadValidatorStats(paid[i].Addr)
 						if err != nil {
 							utils.Logger().Info().Err(err).
+								Str("addr", paid[i].Addr.Hex()).
 								Str("bls-earning-key", paid[i].EarningKey.Hex()).
 								Msg("could not read validator stats to update for earning per key")
 							continue

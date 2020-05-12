@@ -116,6 +116,7 @@ var (
 	errAlreadyBannedValidator  = errors.New("cannot slash on already banned validator")
 	errSignerKeyNotRightSize   = errors.New("bls keys from slash candidate not right side")
 	errSlashFromFutureEpoch    = errors.New("cannot have slash from future epoch")
+	errSlashBeforeStakingEpoch = errors.New("cannot have slash before staking epoch")
 	errSlashBlockNoConflict    = errors.New("cannot slash for signing on non-conflicting blocks")
 )
 
@@ -150,6 +151,10 @@ func Verify(
 	wrapper, err := state.ValidatorWrapper(candidate.Evidence.Offender)
 	if err != nil {
 		return err
+	}
+
+	if !chain.Config().IsStaking(candidate.Evidence.Epoch) {
+		return errSlashBeforeStakingEpoch
 	}
 
 	if wrapper.Status == effective.Banned {
@@ -244,9 +249,9 @@ func Verify(
 
 		// slash verification only happens in staking era, therefore want commit payload for staking epoch
 		commitPayload := consensus_sig.ConstructCommitPayload(chain,
-			chain.Config().StakingEpoch, ballot.BlockHeaderHash, candidate.Evidence.Height, candidate.Evidence.ViewID)
+			candidate.Evidence.Epoch, ballot.BlockHeaderHash, candidate.Evidence.Height, candidate.Evidence.ViewID)
 		utils.Logger().Debug().
-			Uint64("epoch", chain.Config().StakingEpoch.Uint64()).
+			Uint64("epoch", candidate.Evidence.Epoch.Uint64()).
 			Uint64("block-number", candidate.Evidence.Height).
 			Uint64("view-id", candidate.Evidence.ViewID).
 			Msgf("[COMMIT-PAYLOAD] doubleSignVerify %v", hex.EncodeToString(commitPayload))
