@@ -51,10 +51,10 @@ type Backend interface {
 	// GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
 	GetPoolTransactions() (types.PoolTransactions, error)
 	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
+	GetPoolStats() (pendingCount, queuedCount int)
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	// Get account nonce
 	GetAccountNonce(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error)
-	// Stats() (pending int, queued int)
 	// TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 	ChainConfig() *params.ChainConfig
@@ -77,10 +77,11 @@ type Backend interface {
 	GetValidatorInformation(addr common.Address, block *types.Block) (*staking.ValidatorRPCEnchanced, error)
 	GetDelegationsByValidator(validator common.Address) []*staking.Delegation
 	GetDelegationsByDelegator(delegator common.Address) ([]common.Address, []*staking.Delegation)
+	GetDelegationsByDelegatorByBlock(delegator common.Address, block *types.Block) ([]common.Address, []*staking.Delegation)
 	GetValidatorSelfDelegation(addr common.Address) *big.Int
 	GetShardState() (*shard.State, error)
-	GetCurrentStakingErrorSink() []staking.RPCTransactionError
-	GetCurrentTransactionErrorSink() []types.RPCTransactionError
+	GetCurrentStakingErrorSink() types.TransactionErrorReports
+	GetCurrentTransactionErrorSink() types.TransactionErrorReports
 	GetMedianRawStakeSnapshot() (*committee.CompletedEPoSRound, error)
 	GetPendingCXReceipts() []*types.CXReceiptsProof
 	GetCurrentUtilityMetrics() (*network.UtilityMetric, error)

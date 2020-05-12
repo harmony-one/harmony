@@ -129,8 +129,6 @@ func (w *Worker) CommitTransactions(
 	// STAKING - only beaconchain process staking transaction
 	if w.chain.ShardID() == shard.BeaconChainShardID {
 		for _, tx := range pendingStaking {
-			// TODO: merge staking transaction processing with normal transaction processing.
-			// <<THESE CODE ARE DUPLICATED AS ABOVE
 			// If we don't have enough gas for any further transactions then we're done
 			if w.current.gasPool.Gas() < params.TxGas {
 				utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("Not enough gas for further transactions")
@@ -182,6 +180,9 @@ func (w *Worker) commitStakingTransaction(
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
+		utils.Logger().Error().
+			Err(err).Interface("stkTxn", tx).
+			Msg("Staking transaction failed commitment")
 		return nil, err
 	}
 	if receipt == nil {
@@ -217,8 +218,8 @@ func (w *Worker) commitTransaction(
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		utils.Logger().Error().
-			Err(err).Str("stakingTxId", tx.Hash().Hex()).
-			Msg("Offchain ValidatorMap Read/Write Error")
+			Err(err).Interface("txn", tx).
+			Msg("Transaction failed commitment")
 		return nil, errNilReceipt
 	}
 	if receipt == nil {

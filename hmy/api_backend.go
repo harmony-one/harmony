@@ -229,7 +229,6 @@ func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscripti
 }
 
 // GetPoolTransactions returns pool transactions.
-// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	pending, err := b.hmy.txPool.Pending()
 	if err != nil {
@@ -240,6 +239,11 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 		txs = append(txs, batch...)
 	}
 	return txs, nil
+}
+
+// GetPoolStats returns the number of pending and queued transactions
+func (b *APIBackend) GetPoolStats() (pendingCount, queuedCount int) {
+	return b.hmy.txPool.Stats()
 }
 
 // GetAccountNonce returns the nonce value of the given address for the given block number
@@ -446,25 +450,32 @@ func (b *APIBackend) GetValidatorInformation(
 
 	// calculate last APRHistoryLength epochs for averaging APR
 	epochFrom := bc.Config().StakingEpoch
-	nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength))
-	if nowMinus100.Cmp(epochFrom) > 0 {
-		epochFrom = nowMinus100
+	nowMinus := big.NewInt(0).Sub(now, big.NewInt(staking.APRHistoryLength))
+	if nowMinus.Cmp(epochFrom) > 0 {
+		epochFrom = nowMinus
 	}
 
+	if len(stats.APRs) > 0 && stats.APRs[0].Epoch.Cmp(epochFrom) > 0 {
+		epochFrom = stats.APRs[0].Epoch
+	}
+
+	epochToAPRs := map[int64]numeric.Dec{}
+	for i := 0; i < len(stats.APRs); i++ {
+		entry := stats.APRs[i]
+		epochToAPRs[entry.Epoch.Int64()] = entry.Value
+	}
+
+	// at this point, validator is active and has apr's for the recent 100 epochs
 	// compute average apr over history
 	if avgAPR, err := b.SingleFlightRequest(
 		key, func() (interface{}, error) {
 			total := numeric.ZeroDec()
 			count := 0
-			activated := false
-			for i := nowMinus100.Int64(); i < now.Int64(); i++ {
-				if apr, ok := stats.APRs[i]; ok {
+			for i := epochFrom.Int64(); i < now.Int64(); i++ {
+				if apr, ok := epochToAPRs[i]; ok {
 					total = total.Add(apr)
-					activated = true
 				}
-				if activated {
-					count = count + 1
-				}
+				count++
 			}
 			if count == 0 {
 				return nil, errors.New("no apr snapshots available")
@@ -570,20 +581,21 @@ func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*stak
 	return delegations
 }
 
-// GetDelegationsByDelegator returns all delegation information of a delegator
-func (b *APIBackend) GetDelegationsByDelegator(
-	delegator common.Address,
+// GetDelegationsByDelegatorByBlock returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegatorByBlock(
+	delegator common.Address, block *types.Block,
 ) ([]common.Address, []*staking.Delegation) {
 	addresses := []common.Address{}
 	delegations := []*staking.Delegation{}
-	delegationIndexes, err := b.hmy.BlockChain().ReadDelegationsByDelegator(delegator)
+	delegationIndexes, err := b.hmy.BlockChain().
+		ReadDelegationsByDelegatorAt(delegator, block.Number())
 	if err != nil {
 		return nil, nil
 	}
 
 	for i := range delegationIndexes {
-		wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(
-			delegationIndexes[i].ValidatorAddress,
+		wrapper, err := b.hmy.BlockChain().ReadValidatorInformationAt(
+			delegationIndexes[i].ValidatorAddress, block.Root(),
 		)
 		if err != nil || wrapper == nil {
 			return nil, nil
@@ -597,6 +609,14 @@ func (b *APIBackend) GetDelegationsByDelegator(
 		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
 	}
 	return addresses, delegations
+}
+
+// GetDelegationsByDelegator returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegator(
+	delegator common.Address,
+) ([]common.Address, []*staking.Delegation) {
+	block := b.hmy.BlockChain().CurrentBlock()
+	return b.GetDelegationsByDelegatorByBlock(delegator, block)
 }
 
 // GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
@@ -617,13 +637,13 @@ func (b *APIBackend) GetShardState() (*shard.State, error) {
 }
 
 // GetCurrentStakingErrorSink ..
-func (b *APIBackend) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
+func (b *APIBackend) GetCurrentStakingErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportStakingErrorSink()
 }
 
 // GetCurrentTransactionErrorSink ..
-func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredTransactionSink()
+func (b *APIBackend) GetCurrentTransactionErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportPlainErrorSink()
 }
 
 // GetPendingCXReceipts ..
@@ -778,6 +798,8 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 			blsKeys = append(blsKeys, key.SerializeToHexStr())
 		}
 	}
+	c := commonRPC.C{}
+	c.TotalKnownPeers, c.Connected, c.NotConnected = b.hmy.nodeAPI.PeerConnectivity()
 
 	return commonRPC.NodeMetadata{
 		blsKeys,
@@ -792,5 +814,6 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 		cfg.DNSZone,
 		cfg.GetArchival(),
 		b.hmy.nodeAPI.GetNodeBootTime(),
+		c,
 	}
 }

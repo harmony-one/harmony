@@ -41,6 +41,7 @@ var (
 	oneKOnes        = new(big.Int).Mul(big.NewInt(1000), oneBig)
 	fiveKOnes       = new(big.Int).Mul(big.NewInt(5000), oneBig)
 	tenKOnes        = new(big.Int).Mul(big.NewInt(10000), oneBig)
+	twelveKOnes     = new(big.Int).Mul(big.NewInt(12000), oneBig)
 	fifteenOnes     = new(big.Int).Mul(big.NewInt(15000), oneBig)
 	twentyKOnes     = new(big.Int).Mul(big.NewInt(20000), oneBig)
 	twentyFiveKOnes = new(big.Int).Mul(big.NewInt(25000), oneBig)
@@ -625,7 +626,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 				return msg
 			}(),
 
-			expErr: errors.New("change rate and max rate should be within 0-100 percent"),
+			expErr: errors.New("rate should be a value ranging from 0.0 to 1.0"),
 		},
 		{
 			// 13: cannot update a banned validator
@@ -802,16 +803,17 @@ func makeDefaultStateDB(t *testing.T) *state.DB {
 		t.Fatal(err)
 	}
 	ws := makeDefaultCurrentStateVWrappers(defNumWrappersInState, defNumPubPerAddr)
-	if err := updateStateVWrappers(sdb, ws); err != nil {
+	if err := updateStateValidators(sdb, ws); err != nil {
 		t.Fatalf("make default state: %v", err)
 	}
+	sdb.AddBalance(createValidatorAddr, hundredKOnes)
 
 	sdb.IntermediateRoot(true)
 
 	return sdb
 }
 
-func updateStateVWrappers(sdb *state.DB, ws []*staking.ValidatorWrapper) error {
+func updateStateValidators(sdb *state.DB, ws []*staking.ValidatorWrapper) error {
 	for i, w := range ws {
 		sdb.SetValidatorFlag(w.Address)
 		sdb.AddBalance(w.Address, hundredKOnes)

@@ -2388,19 +2388,17 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				} else {
 					now := currentEpochSuperCommittee.Epoch
 					// only insert if APR for current epoch does not exists
-					if _, ok := stats.APRs[now.Int64()]; !ok {
-						stats.APRs[now.Int64()] = *aprComputed
-						// check and clean aprs for epochs prior to current minus APRHistoryLength
-						nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength)).Int64()
-						keysToRemove := []int64{}
-						for i := range stats.APRs {
-							if i < nowMinus100 {
-								keysToRemove = append(keysToRemove, i)
-							}
-						}
-						for i := range keysToRemove {
-							delete(stats.APRs, keysToRemove[i])
-						}
+					aprEntry := staking.APREntry{now, *aprComputed}
+					l := len(stats.APRs)
+					// first time inserting apr for validator or
+					// apr for current epoch does not exists
+					// check the last entry's epoch, if not same, insert
+					if l == 0 || stats.APRs[l-1].Epoch.Cmp(now) != 0 {
+						stats.APRs = append(stats.APRs, aprEntry)
+					}
+					// if history is more than staking.APRHistoryLength, pop front
+					if l > staking.APRHistoryLength {
+						stats.APRs = stats.APRs[1:]
 					}
 				}
 			} else {
@@ -2488,6 +2486,33 @@ func (bc *BlockChain) ReadDelegationsByDelegator(
 		}
 	}
 	blockNum := bc.CurrentBlock().Number()
+	for _, index := range rawResult {
+		if index.BlockNum.Cmp(blockNum) <= 0 {
+			m = append(m, index)
+		} else {
+			// Filter out index that's created beyond current height of chain.
+			// This only happens when there is a chain rollback.
+			utils.Logger().Warn().Msgf("Future delegation index encountered. Skip: %+v", index)
+		}
+	}
+	return m, nil
+}
+
+// ReadDelegationsByDelegatorAt reads the addresses of validators delegated by a delegator at a given block
+func (bc *BlockChain) ReadDelegationsByDelegatorAt(
+	delegator common.Address, blockNum *big.Int,
+) (m staking.DelegationIndexes, err error) {
+	rawResult := staking.DelegationIndexes{}
+	if cached, ok := bc.validatorListByDelegatorCache.Get(string(delegator.Bytes())); ok {
+		by := cached.([]byte)
+		if err := rlp.DecodeBytes(by, &rawResult); err != nil {
+			return nil, err
+		}
+	} else {
+		if rawResult, err = rawdb.ReadDelegationsByDelegator(bc.db, delegator); err != nil {
+			return nil, err
+		}
+	}
 	for _, index := range rawResult {
 		if index.BlockNum.Cmp(blockNum) <= 0 {
 			m = append(m, index)
@@ -2624,11 +2649,15 @@ func (bc *BlockChain) prepareStakingMetaData(
 				blockNum,
 			}
 			delegations, ok := newDelegations[createValidator.ValidatorAddress]
-			if ok {
-				delegations = append(delegations, selfIndex)
-			} else {
-				delegations = staking.DelegationIndexes{selfIndex}
+			if !ok {
+				// If the cache doesn't have it, load it from DB for the first time.
+				delegations, err = bc.ReadDelegationsByDelegator(createValidator.ValidatorAddress)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
+
+			delegations = append(delegations, selfIndex)
 			newDelegations[createValidator.ValidatorAddress] = delegations
 		case staking.DirectiveEditValidator:
 		case staking.DirectiveDelegate:

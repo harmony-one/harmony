@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -99,6 +100,8 @@ func VerifyAndCreateValidatorFromMsg(
 		msg.SlotPubKeys); err != nil {
 		return nil, err
 	}
+	fmt.Println("have balance", stateDB.GetBalance(msg.ValidatorAddress))
+	fmt.Println("request balance", msg.Amount)
 	if !CanTransfer(stateDB, msg.ValidatorAddress, msg.Amount) {
 		return nil, errInsufficientBalanceForStake
 	}
@@ -192,7 +195,7 @@ const oneThousand = 1000
 var (
 	oneAsBigInt           = big.NewInt(denominations.One)
 	minimumDelegation     = new(big.Int).Mul(oneAsBigInt, big.NewInt(oneThousand))
-	errDelegationTooSmall = errors.New("minimum delegation amount for a delegator has to be at least 1000 ONE")
+	errDelegationTooSmall = errors.New("minimum delegation amount for a delegator has to be greater than or equal to 1000 ONE")
 )
 
 // VerifyAndDelegateFromMsg verifies the delegate message using the stateDB
@@ -206,14 +209,14 @@ func VerifyAndDelegateFromMsg(
 	if stateDB == nil {
 		return nil, nil, errStateDBIsMissing
 	}
+	if !stateDB.IsValidator(msg.ValidatorAddress) {
+		return nil, nil, errValidatorNotExist
+	}
 	if msg.Amount.Sign() == -1 {
 		return nil, nil, errNegativeAmount
 	}
 	if msg.Amount.Cmp(minimumDelegation) < 0 {
 		return nil, nil, errDelegationTooSmall
-	}
-	if !stateDB.IsValidator(msg.ValidatorAddress) {
-		return nil, nil, errValidatorNotExist
 	}
 	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
 	if err != nil {

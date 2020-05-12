@@ -163,8 +163,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Msg("[OnPrepared] Prepared message and block added")
 
 	consensus.tryCatchup()
-	if consensus.current.Mode() == ViewChanging {
-		consensus.getLogger().Debug().Msg("[OnPrepared] Still in ViewChanging mode, Exiting!!")
+	if consensus.current.Mode() != Normal {
+		// don't sign the block that is not verified
+		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
 		return
 	}
 

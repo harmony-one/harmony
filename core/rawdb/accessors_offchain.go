@@ -242,6 +242,7 @@ func WriteValidatorList(
 }
 
 // ReadDelegationsByDelegator retrieves the list of validators delegated by a delegator
+// Returns empty results instead of error if there is not data found.
 func ReadDelegationsByDelegator(db DatabaseReader, delegator common.Address) (staking.DelegationIndexes, error) {
 	data, err := db.Get(delegatorValidatorListKey(delegator))
 	if err != nil || len(data) == 0 {

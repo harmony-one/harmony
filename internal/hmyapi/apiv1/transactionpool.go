@@ -16,11 +16,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	// ErrInvalidChainID when ChainID of signer does not match that of running node
-	errInvalidChainID = errors.New("invalid chain id for signer")
-)
-
 // TxHistoryArgs is struct to make GetTransactionsHistory request
 type TxHistoryArgs struct {
 	Address   string `json:"address"`
@@ -216,7 +211,7 @@ func (s *PublicTransactionPoolAPI) SendRawStakingTransaction(
 	c := s.b.ChainConfig().ChainID
 	if id := tx.ChainID(); id.Cmp(c) != 0 {
 		return common.Hash{}, errors.Wrapf(
-			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
 		)
 	}
 	return SubmitStakingTransaction(ctx, s.b, tx)
@@ -238,7 +233,7 @@ func (s *PublicTransactionPoolAPI) SendRawTransaction(
 	c := s.b.ChainConfig().ChainID
 	if id := tx.ChainID(); id.Cmp(c) != 0 {
 		return common.Hash{}, errors.Wrapf(
-			errInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
 		)
 	}
 	return SubmitTransaction(ctx, s.b, tx)
@@ -337,16 +332,27 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	return fields, nil
 }
 
+// GetPoolStats returns stats for the tx-pool
+func (s *PublicTransactionPoolAPI) GetPoolStats() map[string]interface{} {
+	pendingCount, queuedCount := s.b.GetPoolStats()
+	return map[string]interface{}{
+		"executable-count":     pendingCount,
+		"non-executable-count": queuedCount,
+	}
+}
+
 // PendingTransactions returns the plain transactions that are in the transaction pool
 func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
 	pending, err := s.b.GetPoolTransactions()
 	if err != nil {
 		return nil, err
 	}
-	transactions := make([]*RPCTransaction, len(pending))
+	transactions := make([]*RPCTransaction, 0)
 	for i := range pending {
 		if plainTx, ok := pending[i].(*types.Transaction); ok {
-			transactions[i] = newRPCPendingTransaction(plainTx)
+			if tx := newRPCTransaction(plainTx, common.Hash{}, 0, 0, 0); tx != nil {
+				transactions = append(transactions, tx)
+			}
 		} else if _, ok := pending[i].(*staking.StakingTransaction); ok {
 			continue // Do not return staking transactions here.
 		} else {
@@ -362,12 +368,14 @@ func (s *PublicTransactionPoolAPI) PendingStakingTransactions() ([]*RPCStakingTr
 	if err != nil {
 		return nil, err
 	}
-	transactions := make([]*RPCStakingTransaction, len(pending))
+	transactions := make([]*RPCStakingTransaction, 0)
 	for i := range pending {
 		if _, ok := pending[i].(*types.Transaction); ok {
 			continue // Do not return plain transactions here
 		} else if stakingTx, ok := pending[i].(*staking.StakingTransaction); ok {
-			transactions[i] = newRPCPendingStakingTransaction(stakingTx)
+			if tx := newRPCStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0); tx != nil {
+				transactions = append(transactions, tx)
+			}
 		} else {
 			return nil, types.ErrUnknownPoolTxType
 		}
@@ -376,12 +384,12 @@ func (s *PublicTransactionPoolAPI) PendingStakingTransactions() ([]*RPCStakingTr
 }
 
 // GetCurrentTransactionErrorSink ..
-func (s *PublicTransactionPoolAPI) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
+func (s *PublicTransactionPoolAPI) GetCurrentTransactionErrorSink() types.TransactionErrorReports {
 	return s.b.GetCurrentTransactionErrorSink()
 }
 
 // GetCurrentStakingErrorSink ..
-func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
+func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() types.TransactionErrorReports {
 	return s.b.GetCurrentStakingErrorSink()
 }
 

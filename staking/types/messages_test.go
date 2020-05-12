@@ -142,6 +142,7 @@ func TestUndelegate_Copy(t *testing.T) {
 	}
 	for i, test := range tests {
 		cp := test.u.Copy().(Undelegate)
+
 		if err := assertUndelegateDeepCopy(cp, test.u); err != nil {
 			t.Errorf("Test %v: %v", i, err)
 		}

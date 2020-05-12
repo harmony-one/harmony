@@ -261,6 +261,8 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	vcMsg := msg.GetViewchange()
 	pbftMsg.ViewID = vcMsg.ViewId
 	pbftMsg.BlockNum = vcMsg.BlockNum
+	pbftMsg.Block = make([]byte, len(vcMsg.PreparedBlock))
+	copy(pbftMsg.Block[:], vcMsg.PreparedBlock[:])
 	pbftMsg.Payload = make([]byte, len(vcMsg.Payload))
 	copy(pbftMsg.Payload[:], vcMsg.Payload[:])
 
@@ -309,6 +311,8 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 	FBFTMsg.BlockNum = vcMsg.BlockNum
 	FBFTMsg.Payload = make([]byte, len(vcMsg.Payload))
 	copy(FBFTMsg.Payload[:], vcMsg.Payload[:])
+	FBFTMsg.Block = make([]byte, len(vcMsg.PreparedBlock))
+	copy(FBFTMsg.Block[:], vcMsg.PreparedBlock[:])
 
 	pubKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
 	if err != nil {

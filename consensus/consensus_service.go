@@ -422,6 +422,18 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	curHeader := consensus.ChainReader.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
+
+	// Overwrite nextEpoch if the shard state has a epoch number
+	if len(curHeader.ShardState()) > 0 {
+		nextShardState, err := curHeader.GetShardState()
+		if err != nil {
+			return Syncing
+		}
+		if nextShardState.Epoch != nil {
+			nextEpoch = nextShardState.Epoch
+		}
+	}
+
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
 		len(curHeader.ShardState()) > 0 &&
 		!consensus.ChainReader.Config().IsStaking(curEpoch)
@@ -452,7 +464,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
-	if len(curHeader.ShardState()) > 0 {
+	// genesis block is a special case that will have shard state and needs to skip processing
+	isNotGenesisBlock := curHeader.Number().Cmp(big.NewInt(0)) > 0
+	if len(curHeader.ShardState()) > 0 && isNotGenesisBlock {
 		// increase curEpoch by one if it's the last block
 		consensus.SetEpochNum(curEpoch.Uint64() + 1)
 		consensus.getLogger().Info().
@@ -527,9 +541,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		Uint32("shard-id", consensus.ShardID).
 		Msg("[UpdateConsensusInformation] changing committee")
 
-	// take care of possible leader change during the curEpoch
-	if !shard.Schedule.IsLastBlock(curHeader.Number().Uint64()) &&
-		curHeader.Number().Uint64() != 0 {
+	// take care of possible leader change during the epoch
+	if len(curHeader.ShardState()) == 0 && curHeader.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).

@@ -15,6 +15,8 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
+	libp2p_metrics "github.com/libp2p/go-libp2p-core/metrics"
+	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -33,7 +35,8 @@ type Host interface {
 	ConnectHostPeer(Peer) error
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-	AllTopics() []*libp2p_pubsub.Topic
+	AllTopics() []NamedTopic
+	C() (int, int, int)
 }
 
 // Peer is the object for a p2p peer (node)
@@ -63,9 +66,14 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		return nil, errors.Wrapf(err,
 			"cannot create listen multiaddr from port %#v", self.Port)
 	}
+
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
-		libp2p.ListenAddrs(listenAddr), libp2p.Identity(key),
+		libp2p.ListenAddrs(listenAddr),
+		libp2p.Identity(key),
+		// libp2p.DisableRelay(),
+		libp2p.EnableNATService(),
+		libp2p.ForceReachabilityPublic(),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
@@ -88,6 +96,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 
 	self.PeerID = p2pHost.ID()
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
+
 	// has to save the private key for host
 	h := &HostV2{
 		h:      p2pHost,
@@ -131,6 +140,23 @@ type HostV2 struct {
 	lock   sync.Mutex
 	// logger
 	logger *zerolog.Logger
+	// metrics
+	metrics *libp2p_metrics.BandwidthCounter
+}
+
+// C .. -> (total known peers, connected, not connected)
+func (host *HostV2) C() (int, int, int) {
+	connected, not := 0, 0
+	peers := host.h.Peerstore().Peers()
+	for _, peer := range peers {
+		result := host.h.Network().Connectedness(peer)
+		if result == libp2p_network.Connected {
+			connected++
+		} else if result == libp2p_network.NotConnected {
+			not++
+		}
+	}
+	return len(peers), connected, not
 }
 
 func (host *HostV2) getTopic(topic string) (*libp2p_pubsub.Topic, error) {
@@ -150,6 +176,7 @@ func (host *HostV2) getTopic(topic string) (*libp2p_pubsub.Topic, error) {
 // It returns a nil error if and only if it has succeeded to schedule the given
 // message for sending.
 func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) (err error) {
+
 	for _, group := range groups {
 		t, e := host.getTopic(string(group))
 		if e != nil {
@@ -162,6 +189,7 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 			continue
 		}
 	}
+
 	return err
 }
 
@@ -239,13 +267,19 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	return nil
 }
 
+// NamedTopic ..
+type NamedTopic struct {
+	Name  string
+	Topic *libp2p_pubsub.Topic
+}
+
 // AllTopics ..
-func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
+func (host *HostV2) AllTopics() []NamedTopic {
 	host.lock.Lock()
 	defer host.lock.Unlock()
-	topics := []*libp2p_pubsub.Topic{}
-	for _, g := range host.joined {
-		topics = append(topics, g)
+	var topics []NamedTopic
+	for k, g := range host.joined {
+		topics = append(topics, NamedTopic{k, g})
 	}
 	return topics
 }

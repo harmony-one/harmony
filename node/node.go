@@ -1,7 +1,6 @@
 package node
 
 import (
-	"container/ring"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -38,6 +38,7 @@ import (
 	"github.com/harmony-one/harmony/webhooks"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -139,8 +140,6 @@ type Node struct {
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-	// Duplicated Ping Message Received
-	duplicatedPing sync.Map
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
 	// node configuration, including group ID, shard ID, etc
@@ -148,19 +147,15 @@ type Node struct {
 	// Chain configuration.
 	chainConfig params.ChainConfig
 	// map of service type to its message channel.
-	serviceMessageChan map[service.Type]chan *msg_pb.Message
-	isFirstTime        bool // the node was started with a fresh database
-	// Last 1024 staking transaction error, only in memory
-	errorSink struct {
-		sync.Mutex
-		failedStakingTxns *ring.Ring
-		failedTxns        *ring.Ring
-	}
+	serviceMessageChan  map[service.Type]chan *msg_pb.Message
+	isFirstTime         bool // the node was started with a fresh database
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
 	KeysToAddrs      map[string]common.Address
 	keysToAddrsEpoch *big.Int
 	keysToAddrsMutex sync.Mutex
+	// TransactionErrorSink contains error messages for any failed transaction, in memory only
+	TransactionErrorSink *types.TransactionErrorSink
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -361,43 +356,134 @@ func (node *Node) Start() error {
 	if len(allTopics) == 0 {
 		return errors.New("have no topics to listen to")
 	}
-	weighted := make([]*semaphore.Weighted, len(allTopics))
-	const maxMessageHandlers = 200
-	ctx := context.Background()
+
+	const (
+		maxMessageHandlers = 200
+		threshold          = maxMessageHandlers / 2
+		lastLine           = 20
+		throttle           = 100 * time.Millisecond
+		emrgThrottle       = 250 * time.Millisecond
+	)
+
 	ownID := node.host.GetID()
 	errChan := make(chan error)
 
-	for i, topic := range allTopics {
-		sub, err := topic.Subscribe()
+	for i := range allTopics {
+		sub, err := allTopics[i].Topic.Subscribe()
 		if err != nil {
 			return err
 		}
-		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
+		topicNamed := allTopics[i].Name
+		sem := semaphore.NewWeighted(maxMessageHandlers)
 		msgChan := make(chan *libp2p_pubsub.Message)
+		needThrottle, releaseThrottle :=
+			make(chan time.Duration), make(chan struct{})
 
-		go func(msgChan chan *libp2p_pubsub.Message, sem *semaphore.Weighted) {
+		go func() {
+			soFar := int32(maxMessageHandlers)
+
+			sampled := utils.Logger().Sample(
+				zerolog.LevelSampler{
+					DebugSampler: &zerolog.BurstSampler{
+						Burst:       1,
+						Period:      36 * time.Second,
+						NextSampler: &zerolog.BasicSampler{N: 1000},
+					},
+				},
+			).With().Str("pubsub-topic", topicNamed).Logger()
+
 			for msg := range msgChan {
-				payload := msg.GetData()
-				if len(payload) < p2pMsgPrefixSize {
-					continue
-				}
-				if sem.TryAcquire(1) {
-					go func() {
-						node.HandleMessage(
-							payload[p2pMsgPrefixSize:], msg.GetFrom(),
-						)
-						sem.Release(1)
-					}()
-				} else {
-					utils.Logger().Info().
-						Msg("could not acquire semaphore to process incoming message")
-				}
-			}
-		}(msgChan, weighted[i])
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				msg := msg
 
-		go func(msgChan chan *libp2p_pubsub.Message) {
+				go func() {
+					defer cancel()
+					defer atomic.AddInt32(&soFar, 1)
+
+					current := atomic.AddInt32(&soFar, -1)
+					using := maxMessageHandlers - current
+
+					if using > 1 {
+						sampled.Info().
+							Int32("currently-using", using).
+							Msg("sampling message handling")
+					}
+
+					if current == 0 {
+						utils.Logger().Debug().Msg("no available semaphores to handle p2p messages")
+						return
+					}
+
+					var cost int64 = 1
+
+					if current <= threshold {
+						cost = 2
+						if current == threshold {
+							go func() {
+								needThrottle <- throttle
+							}()
+						} else if current == lastLine {
+							go func() {
+								needThrottle <- emrgThrottle
+							}()
+						}
+					} else {
+						if current == threshold+1 {
+							cost = 1
+							go func() {
+								releaseThrottle <- struct{}{}
+							}()
+						}
+					}
+
+					if sem.TryAcquire(cost) {
+						defer sem.Release(cost)
+						payload := msg.GetData()
+						if len(payload) < p2pMsgPrefixSize {
+							cancel()
+							// TODO understand why this happens
+							return
+						}
+						select {
+						case <-ctx.Done():
+							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+								utils.Logger().Info().
+									Str("topic", topicNamed).Msg("exceeded deadline")
+							}
+							errChan <- ctx.Err()
+						default:
+							node.HandleMessage(
+								payload[p2pMsgPrefixSize:], msg.GetFrom(),
+							)
+						}
+					}
+				}()
+
+			}
+		}()
+
+		go func() {
+			slowDown, coolDown := false, throttle
+
 			for {
-				nextMsg, err := sub.Next(ctx)
+
+				select {
+				case s := <-needThrottle:
+					slowDown = true
+					coolDown = s
+					utils.Logger().Info().
+						Dur("throttle-delay-miliseconds", s.Round(time.Millisecond)).
+						Msg("throttle needed on acceptance of messages")
+				case <-releaseThrottle:
+					utils.Logger().Info().Msg("p2p throttle released")
+					slowDown = false
+				default:
+					if slowDown {
+						<-time.After(coolDown)
+					}
+				}
+
+				nextMsg, err := sub.Next(context.Background())
 				if err != nil {
 					errChan <- err
 					continue
@@ -407,7 +493,7 @@ func (node *Node) Start() error {
 				}
 				msgChan <- nextMsg
 			}
-		}(msgChan)
+		}()
 	}
 
 	for err := range errChan {
@@ -432,12 +518,7 @@ func New(
 ) *Node {
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
-	const sinkSize = 4096
-	node.errorSink = struct {
-		sync.Mutex
-		failedStakingTxns *ring.Ring
-		failedTxns        *ring.Ring
-	}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)}
+	node.TransactionErrorSink = types.NewTransactionErrorSink()
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -489,26 +570,7 @@ func New(
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 		txPoolConfig.Blacklist = blacklist
-		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain,
-			func(payload []types.RPCTransactionError) {
-				if len(payload) > 0 {
-					node.errorSink.Lock()
-					for i := range payload {
-						node.errorSink.failedTxns.Value = payload[i]
-						node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
-					}
-					node.errorSink.Unlock()
-				}
-			},
-			func(payload []staking.RPCTransactionError) {
-				node.errorSink.Lock()
-				for i := range payload {
-					node.errorSink.failedStakingTxns.Value = payload[i]
-					node.errorSink.failedStakingTxns = node.errorSink.failedStakingTxns.Next()
-				}
-				node.errorSink.Unlock()
-			},
-		)
+		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 
