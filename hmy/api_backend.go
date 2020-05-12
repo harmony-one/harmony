@@ -456,7 +456,7 @@ func (b *APIBackend) GetValidatorInformation(
 			count := 0
 			for i := range stats.APRs {
 				total = total.Add(stats.APRs[i].Value)
-				count = count + 1
+				count++
 			}
 			if count == 0 {
 				return nil, errors.New("no apr snapshots available")

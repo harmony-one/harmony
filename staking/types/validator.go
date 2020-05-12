@@ -125,7 +125,7 @@ func NewComputed(
 // NewEmptyStats ..
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
-		make([]APREntry, 0),
+		[]APREntry{},
 		numeric.ZeroDec(),
 		[]VoteWithCurrentEpochEarning{},
 		effective.Booted,

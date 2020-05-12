@@ -2390,25 +2390,20 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 					// only insert if APR for current epoch does not exists
 					aprEntry := staking.APREntry{now, *aprComputed}
 					l := len(stats.APRs)
-					if l == 0 {
-						// first time inserting apr for validator
-						stats.APRs = append(stats.APRs, aprEntry)
-					} else {
-						// check the last entry's epoch, if not same, insert
-						if stats.APRs[l-1].Epoch.Cmp(now) != 0 {
-							// cleanup
-							index := 0
-							nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength))
-							for i := range stats.APRs {
-								if stats.APRs[i].Epoch.Cmp(nowMinus100) < 0 {
-									index = index + 1
-									continue
-								}
-								stats.APRs = stats.APRs[index:]
-								break
+					// first time inserting apr for validator or
+					// check the last entry's epoch, if not same, insert
+					if l == 0 || stats.APRs[l-1].Epoch.Cmp(now) != 0 {
+						// cleanup
+						nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength))
+						for index, i := 0, 0; i < l; i++ {
+							if stats.APRs[i].Epoch.Cmp(nowMinus100) < 0 {
+								index++
+								continue
 							}
-							stats.APRs = append(stats.APRs, aprEntry)
+							stats.APRs = stats.APRs[index:]
+							break
 						}
+						stats.APRs = append(stats.APRs, aprEntry)
 					}
 				}
 			} else {
