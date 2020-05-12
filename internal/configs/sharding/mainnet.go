@@ -12,9 +12,9 @@ const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14 (the last block of epoch 0)
 	blocksPerEpoch     = 16384  // 2^14
 
-	mainnetPrestakingEpochFirstBlock = 3336833 // TBD
+	mainnetPrestakingEpochFirstBlock = 3221794 // TBD
 	blocksPerEpochStaking            = 450     // 1 hour
-	lastEpochBeforePrestaking        = 177
+	lastEpochBeforePrestaking        = 176
 
 	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.1)
@@ -32,8 +32,8 @@ const (
 	mainnetV1_3Epoch = 36
 	mainnetV1_4Epoch = 46
 	mainnetV1_5Epoch = 54
-	mainnetV2_0Epoch = 178
-	mainnetV2_1Epoch = 179
+	mainnetV2_0Epoch = 177
+	mainnetV2_1Epoch = 178
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "https://api.s%d.dry.hmny.io"
@@ -93,10 +93,6 @@ func (mainnetSchedule) BlocksPerEpoch() uint64 {
 	return blocksPerEpoch
 }
 
-func (mainnetSchedule) BlocksPerEpochStaking() uint64 {
-	return blocksPerEpochStaking
-}
-
 func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	blocks := ms.BlocksPerEpoch()
 	if blockNum < mainnetPrestakingEpochFirstBlock {
@@ -107,7 +103,7 @@ func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 			return big.NewInt(0)
 		}
 	} else {
-		stakingBlocks := ms.BlocksPerEpochStaking()
+		stakingBlocks := uint64(blocksPerEpochStaking)
 		return big.NewInt(int64((blockNum-mainnetPrestakingEpochFirstBlock)/stakingBlocks) + lastEpochBeforePrestaking + 1)
 	}
 }
@@ -124,7 +120,7 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 			return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)
 		}
 	} else {
-		stakingBlocks := ms.BlocksPerEpochStaking()
+		stakingBlocks := uint64(blocksPerEpochStaking)
 		switch {
 		case blockNum == mainnetPrestakingEpochFirstBlock-1:
 			return true
@@ -144,7 +140,7 @@ func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 			return mainnetEpochBlock1 - 1 + blocks*epochNum
 		}
 	} else {
-		stakingBlocks := ms.BlocksPerEpochStaking()
+		stakingBlocks := uint64(blocksPerEpochStaking)
 		switch {
 		case epochNum == lastEpochBeforePrestaking:
 			return mainnetPrestakingEpochFirstBlock - 1
@@ -192,6 +188,6 @@ var (
 	mainnetV1_3 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_3, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 	mainnetV1_4 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_4, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 	mainnetV1_5 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
-	mainnetV2_0 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochStaking())
-	mainnetV2_1 = MustNewInstance(4, 250, 170, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochStaking())
+	mainnetV2_0 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, blocksPerEpochStaking)
+	mainnetV2_1 = MustNewInstance(4, 250, 170, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, blocksPerEpochStaking)
 )
