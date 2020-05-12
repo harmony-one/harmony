@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -327,10 +326,10 @@ func (node *Node) Start() error {
 		emrgThrottle         = 250 * time.Millisecond
 	)
 
-	var (
-		errNoConsensusHandlers = errors.New("no available semaphores to handle p2p consensus messages")
-		errNoClientHandlers    = errors.New("no available semaphores to handle p2p client messages")
-	)
+	// var (
+	// 	errNoConsensusHandlers = errors.New("no available semaphores to handle p2p consensus messages")
+	// 	errNoClientHandlers    = errors.New("no available semaphores to handle p2p client messages")
+	// )
 
 	ownID := node.host.GetID()
 	errChan := make(chan error)
@@ -349,18 +348,18 @@ func (node *Node) Start() error {
 			make(chan time.Duration), make(chan struct{})
 
 		go func() {
-			soFarConsensus := int32(setAsideForConsensus)
-			soFarElse := int32(setAsideOtherwise)
+			// soFarConsensus := int32(setAsideForConsensus)
+			// soFarElse := int32(setAsideOtherwise)
 
-			sampled := utils.Logger().Sample(
-				zerolog.LevelSampler{
-					DebugSampler: &zerolog.BurstSampler{
-						Burst:       1,
-						Period:      36 * time.Second,
-						NextSampler: &zerolog.BasicSampler{N: 1000},
-					},
-				},
-			).With().Str("pubsub-topic", topicNamed).Logger()
+			// sampled := utils.Logger().Sample(
+			// 	zerolog.LevelSampler{
+			// 		DebugSampler: &zerolog.BurstSampler{
+			// 			Burst:       1,
+			// 			Period:      36 * time.Second,
+			// 			NextSampler: &zerolog.BasicSampler{N: 1000},
+			// 		},
+			// 	},
+			// ).With().Str("pubsub-topic", topicNamed).Logger()
 
 			miniS := utils.Logger().Sample(
 				zerolog.LevelSampler{
@@ -375,7 +374,7 @@ func (node *Node) Start() error {
 			var total, consens, nodeB uint64 = 0, 0, 0
 
 			for msg := range msgChan {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				msg := msg
 
 				payload := msg.GetData()
@@ -405,35 +404,35 @@ func (node *Node) Start() error {
 
 				go func() {
 					defer cancel()
-					var (
-						current, using int32
-						// belowThreshold bool
-					)
+					// var (
+					// 	current, using int32
+					// belowThreshold bool
+					// )
 
-					if isConsensusBound {
-						defer atomic.AddInt32(&soFarConsensus, 1)
-						current = atomic.AddInt32(&soFarConsensus, -1)
-						using = setAsideForConsensus - current
-					} else {
-						defer atomic.AddInt32(&soFarElse, 1)
-						current = atomic.AddInt32(&soFarElse, -1)
-						using = setAsideOtherwise - current
-					}
+					// if isConsensusBound {
+					// defer atomic.AddInt32(&soFarConsensus, 1)
+					// current = atomic.AddInt32(&soFarConsensus, -1)
+					// using = setAsideForConsensus - current
+					// } else {
+					// defer atomic.AddInt32(&soFarElse, 1)
+					// current = atomic.AddInt32(&soFarElse, -1)
+					// using = setAsideOtherwise - current
+					// }
 
-					if current == 0 {
-						if isConsensusBound {
-							errChan <- errNoConsensusHandlers
-						} else {
-							errChan <- errNoClientHandlers
-						}
-						return
-					}
+					// if current == 0 {
+					// 	if isConsensusBound {
+					// 		errChan <- errNoConsensusHandlers
+					// 	} else {
+					// 		errChan <- errNoClientHandlers
+					// 	}
+					// 	return
+					// }
 
-					if using > 1 {
-						sampled.Info().
-							Int32("currently-using", using).
-							Msg("sampling message handling")
-					}
+					// if using > 1 {
+					// 	sampled.Info().
+					// 		Int32("currently-using", using).
+					// 		Msg("sampling message handling")
+					// }
 
 					// if current <= threshold {
 					// 	if current == threshold {
