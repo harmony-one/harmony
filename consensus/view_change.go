@@ -196,21 +196,23 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			msg_pb.MessageType_PREPARED, recvMsg.BlockNum,
 		)
 		preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
-		block := consensus.FBFTLog.GetBlockByHash(preparedMsg.BlockHash)
-		if preparedMsg == nil || block == nil {
-			consensus.getLogger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
-			for i, key := range consensus.PubKey.PublicKey {
-				priKey := consensus.priKey.PrivateKey[i]
-				consensus.nilSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(NIL)
-				consensus.nilBitmap[recvMsg.ViewID].SetKey(key, true)
-			}
-		} else {
+
+		if preparedMsg != nil && consensus.FBFTLog.GetBlockByHash(
+			preparedMsg.BlockHash,
+		) != nil {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M1 type messaage")
 			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
 				consensus.bhpSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(msgToSign)
 				consensus.bhpBitmap[recvMsg.ViewID].SetKey(key, true)
+			}
+		} else {
+			consensus.getLogger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
+			for i, key := range consensus.PubKey.PublicKey {
+				priKey := consensus.priKey.PrivateKey[i]
+				consensus.nilSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(NIL)
+				consensus.nilBitmap[recvMsg.ViewID].SetKey(key, true)
 			}
 		}
 	}

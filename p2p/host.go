@@ -35,12 +35,8 @@ type Host interface {
 	ConnectHostPeer(Peer) error
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-	AllTopics() []*libp2p_pubsub.Topic
+	AllTopics() []NamedTopic
 	C() (int, int, int)
-	// libp2p.metrics related
-	GetBandwidthTotals() libp2p_metrics.Stats
-	LogRecvMessage(msg []byte)
-	ResetMetrics()
 }
 
 // Peer is the object for a p2p peer (node)
@@ -70,9 +66,14 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		return nil, errors.Wrapf(err,
 			"cannot create listen multiaddr from port %#v", self.Port)
 	}
+
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
-		libp2p.ListenAddrs(listenAddr), libp2p.Identity(key),
+		libp2p.ListenAddrs(listenAddr),
+		libp2p.Identity(key),
+		// libp2p.DisableRelay(),
+		libp2p.EnableNATService(),
+		libp2p.ForceReachabilityPublic(),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
@@ -96,17 +97,14 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	self.PeerID = p2pHost.ID()
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 
-	newMetrics := libp2p_metrics.NewBandwidthCounter()
-
 	// has to save the private key for host
 	h := &HostV2{
-		h:       p2pHost,
-		joiner:  topicJoiner{pubsub},
-		joined:  map[string]*libp2p_pubsub.Topic{},
-		self:    *self,
-		priKey:  key,
-		logger:  &subLogger,
-		metrics: newMetrics,
+		h:      p2pHost,
+		joiner: topicJoiner{pubsub},
+		joined: map[string]*libp2p_pubsub.Topic{},
+		self:   *self,
+		priKey: key,
+		logger: &subLogger,
 	}
 
 	if err != nil {
@@ -190,13 +188,7 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 			err = e
 			continue
 		}
-		// log out-going metrics
-		host.metrics.LogSentMessage(int64(len(msg)))
 	}
-	host.logger.Info().
-		Int64("TotalOut", host.GetBandwidthTotals().TotalOut).
-		Float64("RateOut", host.GetBandwidthTotals().RateOut).
-		Msg("[metrics][p2p] traffic out in bytes")
 
 	return err
 }
@@ -253,21 +245,6 @@ func (host *HostV2) GetPeerCount() int {
 	return host.h.Peerstore().Peers().Len()
 }
 
-// GetBandwidthTotals returns total bandwidth of a node
-func (host *HostV2) GetBandwidthTotals() libp2p_metrics.Stats {
-	return host.metrics.GetBandwidthTotals()
-}
-
-// LogRecvMessage logs received message on node
-func (host *HostV2) LogRecvMessage(msg []byte) {
-	host.metrics.LogRecvMessage(int64(len(msg)))
-}
-
-// ResetMetrics resets metrics counters
-func (host *HostV2) ResetMetrics() {
-	host.metrics.Reset()
-}
-
 // ConnectHostPeer connects to peer host
 func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	ctx := context.Background()
@@ -290,13 +267,19 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	return nil
 }
 
+// NamedTopic ..
+type NamedTopic struct {
+	Name  string
+	Topic *libp2p_pubsub.Topic
+}
+
 // AllTopics ..
-func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
+func (host *HostV2) AllTopics() []NamedTopic {
 	host.lock.Lock()
 	defer host.lock.Unlock()
-	topics := []*libp2p_pubsub.Topic{}
-	for _, g := range host.joined {
-		topics = append(topics, g)
+	var topics []NamedTopic
+	for k, g := range host.joined {
+		topics = append(topics, NamedTopic{k, g})
 	}
 	return topics
 }
