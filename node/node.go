@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/client"
+	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
@@ -381,7 +382,7 @@ func (node *Node) Start() error {
 
 		go func() {
 			soFar := int32(maxMessageHandlers)
-
+			subsetConsensus := int32(0)
 			sampled := utils.Logger().Sample(
 				zerolog.LevelSampler{
 					DebugSampler: &zerolog.BurstSampler{
@@ -391,10 +392,57 @@ func (node *Node) Start() error {
 					},
 				},
 			).With().Str("pubsub-topic", topicNamed).Logger()
+			// consensusMA, elseMA := ewma.NewMovingAverage(50), ewma.NewMovingAverage(50)
+
+			miniS := utils.Logger().Sample(
+				zerolog.LevelSampler{
+					DebugSampler: &zerolog.BurstSampler{
+						Burst:       1,
+						Period:      4 * time.Second,
+						NextSampler: &zerolog.BasicSampler{N: 300},
+					},
+				},
+			).With().Str("pubsub-topic", topicNamed).Logger()
+
+			var total uint64 = 1
+			var consens uint64 = 1
 
 			for msg := range msgChan {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 				msg := msg
+
+				payload := msg.GetData()
+				cat := proto.MessageCategory(
+					payload[p2pMsgPrefixSize:][proto.MessageCategoryBytes-1],
+				)
+
+				isConsensusBound := cat == proto.Consensus
+				total++
+
+				if isConsensusBound {
+					consens++
+				}
+
+				// if consens < total {
+				// 	fmt.Println("werido topic->", topicNamed, node.NodeConfig.Role().String())
+				// }
+
+				miniS.Info().
+					Uint64("consensus-count", consens).
+					Uint64("total", total).
+					Float64("as-percentage", float64(consens)/float64(total)).
+					Msg("proportion under spamming")
+
+				// if currentlyUsing := float64(maxMessageHandlers - atomic.LoadInt32(&soFar)); isConsensusBound {
+
+				// 	consensusMA.Add(float64(atomic.LoadInt32(&subsetConsensus)) / currentlyUsing)
+				// 	// consensusMA.Add(
+				// 	// 	float64(atomic.LoadInt32(&subsetConsensus)) / currentlyUsing),					)
+				// 	fmt.Println("consensus bound message", consensusMA.Value())
+				// } else {
+				// 	elseMA.Add(float64(int32(currentlyUsing)-atomic.LoadInt32(&subsetConsensus)) / currentlyUsing)
+				// 	fmt.Println("otherwise bound message", elseMA.Value())
+				// }
 
 				go func() {
 					defer cancel()
@@ -402,6 +450,14 @@ func (node *Node) Start() error {
 
 					current := atomic.AddInt32(&soFar, -1)
 					using := maxMessageHandlers - current
+
+					if isConsensusBound {
+						_ = atomic.AddInt32(&subsetConsensus, 1)
+						defer atomic.AddInt32(&subsetConsensus, -1)
+						// fmt.Println("the percentage that is consensus is: ", usingC, using, topicNamed)
+					} else {
+
+					}
 
 					if using > 1 {
 						sampled.Info().
@@ -438,12 +494,7 @@ func (node *Node) Start() error {
 
 					if sem.TryAcquire(cost) {
 						defer sem.Release(cost)
-						payload := msg.GetData()
-						if len(payload) < p2pMsgPrefixSize {
-							cancel()
-							// TODO understand why this happens
-							return
-						}
+
 						select {
 						case <-ctx.Done():
 							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -458,7 +509,6 @@ func (node *Node) Start() error {
 						}
 					}
 				}()
-
 			}
 		}()
 
@@ -466,7 +516,6 @@ func (node *Node) Start() error {
 			slowDown, coolDown := false, throttle
 
 			for {
-
 				select {
 				case s := <-needThrottle:
 					slowDown = true
@@ -488,6 +537,13 @@ func (node *Node) Start() error {
 					errChan <- err
 					continue
 				}
+
+				payload := nextMsg.GetData()
+				if len(payload) < p2pMsgPrefixSize {
+					// TODO understand why this happens
+					continue
+				}
+
 				if nextMsg.GetFrom() == ownID {
 					continue
 				}

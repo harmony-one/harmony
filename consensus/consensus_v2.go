@@ -23,11 +23,14 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	if len(payload) == 0 {
 		return
 	}
-	msg := &msg_pb.Message{}
-	if err := protobuf.Unmarshal(payload, msg); err != nil {
+	var m msg_pb.Message
+
+	if err := protobuf.Unmarshal(payload, &m); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("Failed to unmarshal message payload.")
 		return
 	}
+
+	msg := &m
 
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
