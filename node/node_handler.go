@@ -288,6 +288,9 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are
 // running consensus on
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
+	if newBlock == nil || newBlock.Header() == nil {
+		return errors.New("nil header or block asked to verify")
+	}
 	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
