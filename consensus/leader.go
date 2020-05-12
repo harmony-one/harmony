@@ -16,7 +16,6 @@ import (
 func (consensus *Consensus) announce(block *types.Block) {
 	blockHash := block.Hash()
 	copy(consensus.blockHash[:], blockHash[:])
-	consensus.epoch = block.Epoch().Uint64()
 
 	// prepare message and broadcast to validators
 	encodedBlock, err := rlp.EncodeToBytes(block)
