@@ -23,7 +23,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 )
 
-// validator is an interface which defines the standard for block validation. It
+// Validator is an interface which defines the standard for block validation. It
 // is only responsible for validating block contents, as the header validation is
 // done by the specific consensus engines.
 //

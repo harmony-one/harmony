@@ -473,7 +473,7 @@ func (bc *BlockChain) SetValidator(validator Validator) {
 	bc.validator = validator
 }
 
-// validator returns the current validator.
+// Validator returns the current validator.
 func (bc *BlockChain) Validator() Validator {
 	bc.procmu.RLock()
 	defer bc.procmu.RUnlock()
