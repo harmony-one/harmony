@@ -27,7 +27,7 @@ const (
 	MaxDetailsLength         = 280
 	BLSVerificationStr       = "harmony-one"
 	TenThousand              = 10000
-	APRHistoryLength         = 100
+	APRHistoryLength         = 30
 )
 
 var (
@@ -125,7 +125,7 @@ func NewComputed(
 // NewEmptyStats ..
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
-		map[int64]numeric.Dec{},
+		[]APREntry{},
 		numeric.ZeroDec(),
 		[]VoteWithCurrentEpochEarning{},
 		effective.Booted,
@@ -182,10 +182,16 @@ type VoteWithCurrentEpochEarning struct {
 	Earned *big.Int                    `json:"earned-reward"`
 }
 
+// APREntry ..
+type APREntry struct {
+	Epoch *big.Int
+	Value numeric.Dec
+}
+
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// APRs is the APR history containing APR's of epochs
-	APRs map[int64]numeric.Dec `json:"-"`
+	APRs []APREntry `json:"-"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `json:"-"`
 	// MetricsPerShard ..
