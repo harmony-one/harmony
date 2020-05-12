@@ -49,10 +49,10 @@ type mainnetSchedule struct{}
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(big.NewInt(mainnetV2_1Epoch)) >= 0:
-		// 179 staking epoch
+		// 178 staking epoch
 		return mainnetV2_1
 	case epoch.Cmp(big.NewInt(mainnetV2_0Epoch)) >= 0:
-		// 178 prestaking epoch
+		// 177 prestaking epoch
 		return mainnetV2_0
 	case epoch.Cmp(big.NewInt(mainnetV1_5Epoch)) >= 0:
 		// 54 resharding epoch (for shard 0) around 23/10/2019 ~10:05 PDT
