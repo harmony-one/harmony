@@ -39,7 +39,7 @@ var (
 const (
 	// validator creation parameters
 	doubleSignShardID     = 0
-	doubleSignEpoch       = 3
+	doubleSignEpoch       = 4
 	doubleSignBlockNumber = 37
 	doubleSignViewID      = 38
 
@@ -162,7 +162,7 @@ func TestVerify(t *testing.T) {
 			// error from blockchain.ReadShardState (fakeChainErrEpoch)
 			r: func() Record {
 				r := defaultSlashRecord()
-				r.Evidence.Epoch = big.NewInt(fakeChainErrEpoch)
+				r.Evidence.Epoch = big.NewInt(currentEpoch)
 				return r
 			}(),
 			sdb:   defaultTestStateDB(),

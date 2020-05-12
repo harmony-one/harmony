@@ -1,10 +1,8 @@
 package consensus
 
 import (
-	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -18,6 +16,7 @@ import (
 func (consensus *Consensus) announce(block *types.Block) {
 	blockHash := block.Hash()
 	copy(consensus.blockHash[:], blockHash[:])
+
 	// prepare message and broadcast to validators
 	encodedBlock, err := rlp.EncodeToBytes(block)
 	if err != nil {
@@ -62,9 +61,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 			quorum.Prepare,
 			key,
 			consensus.priKey.PrivateKey[i].SignHash(consensus.blockHash[:]),
-			common.BytesToHash(consensus.blockHash[:]),
-			consensus.blockNum,
-			consensus.viewID,
+			block.Hash(),
+			block.NumberU64(),
+			block.Header().ViewID().Uint64(),
 		); err != nil {
 			return
 		}
@@ -222,9 +221,18 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return
 	}
-
+	// Must have the corresponding block to verify committed message.
+	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+	if blockObj == nil {
+		consensus.getLogger().Debug().
+			Uint64("blockNum", recvMsg.BlockNum).
+			Uint64("viewID", recvMsg.ViewID).
+			Str("blockHash", recvMsg.BlockHash.Hex()).
+			Msg("[OnCommit] Failed finding a matching block for committed message")
+		return
+	}
 	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash, recvMsg.BlockNum, consensus.viewID)
+		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	logger = logger.With().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).

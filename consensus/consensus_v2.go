@@ -197,7 +197,7 @@ func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, err
 	if err != nil ||
 		len(lastCommits) < shard.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
-			msg_pb.MessageType_COMMITTED, consensus.blockNum-1,
+			msg_pb.MessageType_COMMITTED, blockNum,
 		)
 		if len(msgs) != 1 {
 			consensus.getLogger().Error().

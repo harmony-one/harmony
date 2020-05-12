@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"math/big"
 	"sync"
 	"time"
 
@@ -395,7 +394,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				return
 			}
 			commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-				new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, block.Header().ViewID().Uint64())
+				block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
 				if _, err := consensus.Decider.SubmitVote(
@@ -403,8 +402,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 					key,
 					priKey.SignHash(commitPayload),
 					common.BytesToHash(consensus.blockHash[:]),
-					consensus.blockNum,
-					recvMsg.ViewID,
+					block.NumberU64(),
+					block.Header().ViewID().Uint64(),
 				); err != nil {
 					consensus.getLogger().Debug().Msg("submit vote on viewchange commit failed")
 					return
@@ -592,7 +591,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			return
 		}
 		commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-			new(big.Int).SetUint64(consensus.epoch), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
+			preparedBlock.Epoch(), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
 		groupID := []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 		for i, key := range consensus.PubKey.PublicKey {
