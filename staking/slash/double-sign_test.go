@@ -39,7 +39,7 @@ var (
 const (
 	// validator creation parameters
 	doubleSignShardID     = 0
-	doubleSignEpoch       = 3
+	doubleSignEpoch       = 1
 	doubleSignBlockNumber = 37
 	doubleSignViewID      = 38
 
