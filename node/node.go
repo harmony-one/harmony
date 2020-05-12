@@ -336,6 +336,7 @@ func (node *Node) Start() error {
 
 	for i := range allTopics {
 		sub, err := allTopics[i].Topic.Subscribe()
+
 		if err != nil {
 			return err
 		}
@@ -348,18 +349,6 @@ func (node *Node) Start() error {
 			make(chan time.Duration), make(chan struct{})
 
 		go func() {
-			// soFarConsensus := int32(setAsideForConsensus)
-			// soFarElse := int32(setAsideOtherwise)
-
-			// sampled := utils.Logger().Sample(
-			// 	zerolog.LevelSampler{
-			// 		DebugSampler: &zerolog.BurstSampler{
-			// 			Burst:       1,
-			// 			Period:      36 * time.Second,
-			// 			NextSampler: &zerolog.BasicSampler{N: 1000},
-			// 		},
-			// 	},
-			// ).With().Str("pubsub-topic", topicNamed).Logger()
 
 			miniS := utils.Logger().Sample(
 				zerolog.LevelSampler{
@@ -374,7 +363,7 @@ func (node *Node) Start() error {
 			var total, consens, nodeB uint64 = 0, 0, 0
 
 			for msg := range msgChan {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				msg := msg
 
 				payload := msg.GetData()
@@ -404,53 +393,6 @@ func (node *Node) Start() error {
 
 				go func() {
 					defer cancel()
-					// var (
-					// 	current, using int32
-					// belowThreshold bool
-					// )
-
-					// if isConsensusBound {
-					// defer atomic.AddInt32(&soFarConsensus, 1)
-					// current = atomic.AddInt32(&soFarConsensus, -1)
-					// using = setAsideForConsensus - current
-					// } else {
-					// defer atomic.AddInt32(&soFarElse, 1)
-					// current = atomic.AddInt32(&soFarElse, -1)
-					// using = setAsideOtherwise - current
-					// }
-
-					// if current == 0 {
-					// 	if isConsensusBound {
-					// 		errChan <- errNoConsensusHandlers
-					// 	} else {
-					// 		errChan <- errNoClientHandlers
-					// 	}
-					// 	return
-					// }
-
-					// if using > 1 {
-					// 	sampled.Info().
-					// 		Int32("currently-using", using).
-					// 		Msg("sampling message handling")
-					// }
-
-					// if current <= threshold {
-					// 	if current == threshold {
-					// 		go func() {
-					// 			needThrottle <- throttle
-					// 		}()
-					// 	} else if current == lastLine {
-					// 		go func() {
-					// 			needThrottle <- emrgThrottle
-					// 		}()
-					// 	}
-					// } else {
-					// 	if current == threshold+1 {
-					// 		go func() {
-					// 			releaseThrottle <- struct{}{}
-					// 		}()
-					// 	}
-					// }
 
 					if sem.TryAcquire(1) {
 						defer sem.Release(1)
