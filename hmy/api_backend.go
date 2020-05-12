@@ -450,9 +450,9 @@ func (b *APIBackend) GetValidatorInformation(
 
 	// calculate last APRHistoryLength epochs for averaging APR
 	epochFrom := bc.Config().StakingEpoch
-	nowMinus100 := big.NewInt(0).Sub(now, big.NewInt(staking.APRHistoryLength))
-	if nowMinus100.Cmp(epochFrom) > 0 {
-		epochFrom = nowMinus100
+	nowMinus := big.NewInt(0).Sub(now, big.NewInt(staking.APRHistoryLength))
+	if nowMinus.Cmp(epochFrom) > 0 {
+		epochFrom = nowMinus
 	}
 
 	if len(stats.APRs) > 0 && stats.APRs[0].Epoch.Cmp(epochFrom) > 0 {

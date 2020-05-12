@@ -27,7 +27,7 @@ const (
 	MaxDetailsLength         = 280
 	BLSVerificationStr       = "harmony-one"
 	TenThousand              = 10000
-	APRHistoryLength         = 100
+	APRHistoryLength         = 30
 )
 
 var (
