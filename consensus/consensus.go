@@ -33,8 +33,6 @@ type Consensus struct {
 	phase FBFTPhase
 	// current indicates what state a node is in
 	current State
-	// epoch: current epoch number
-	epoch uint64
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64

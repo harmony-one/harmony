@@ -2388,19 +2388,17 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				} else {
 					now := currentEpochSuperCommittee.Epoch
 					// only insert if APR for current epoch does not exists
-					if _, ok := stats.APRs[now.Int64()]; !ok {
-						stats.APRs[now.Int64()] = *aprComputed
-						// check and clean aprs for epochs prior to current minus APRHistoryLength
-						nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength)).Int64()
-						keysToRemove := []int64{}
-						for i := range stats.APRs {
-							if i < nowMinus100 {
-								keysToRemove = append(keysToRemove, i)
-							}
-						}
-						for i := range keysToRemove {
-							delete(stats.APRs, keysToRemove[i])
-						}
+					aprEntry := staking.APREntry{now, *aprComputed}
+					l := len(stats.APRs)
+					// first time inserting apr for validator or
+					// apr for current epoch does not exists
+					// check the last entry's epoch, if not same, insert
+					if l == 0 || stats.APRs[l-1].Epoch.Cmp(now) != 0 {
+						stats.APRs = append(stats.APRs, aprEntry)
+					}
+					// if history is more than staking.APRHistoryLength, pop front
+					if l > staking.APRHistoryLength {
+						stats.APRs = stats.APRs[1:]
 					}
 				}
 			} else {
