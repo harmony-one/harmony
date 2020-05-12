@@ -48,53 +48,14 @@ type State byte
 
 // All constants except the NodeLeader below are for validators only.
 const (
-	NodeInit              State = iota // Node just started, before contacting BeaconChain
-	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
+	NodeWaitToJoin        State = iota // Node contacted BeaconChain, wait to join Shard
 	NodeNotInSync                      // Node out of sync, might be just joined Shard or offline for a period of time
-	NodeOffline                        // Node is offline
 	NodeReadyForConsensus              // Node is ready for doing consensus
-	NodeDoingConsensus                 // Node is already doing consensus
-	NodeLeader                         // Node is the leader of some shard.
 )
 
 const (
 	// NumTryBroadCast is the number of times trying to broadcast
-	NumTryBroadCast = 3
-	// ClientRxQueueSize is the number of client messages to queue before tail-dropping.
-	ClientRxQueueSize = 16384
-	// ShardRxQueueSize is the number of shard messages to queue before tail-dropping.
-	ShardRxQueueSize = 16384
-	// GlobalRxQueueSize is the number of global messages to queue before tail-dropping.
-	GlobalRxQueueSize = 16384
-	// ClientRxWorkers is the number of concurrent client message handlers.
-	ClientRxWorkers = 8
-	// ShardRxWorkers is the number of concurrent shard message handlers.
-	ShardRxWorkers = 32
-	// GlobalRxWorkers is the number of concurrent global message handlers.
-	GlobalRxWorkers = 32
-)
-
-func (state State) String() string {
-	switch state {
-	case NodeInit:
-		return "NodeInit"
-	case NodeWaitToJoin:
-		return "NodeWaitToJoin"
-	case NodeNotInSync:
-		return "NodeNotInSync"
-	case NodeOffline:
-		return "NodeOffline"
-	case NodeReadyForConsensus:
-		return "NodeReadyForConsensus"
-	case NodeDoingConsensus:
-		return "NodeDoingConsensus"
-	case NodeLeader:
-		return "NodeLeader"
-	}
-	return "Unknown"
-}
-
-const (
+	NumTryBroadCast         = 3
 	maxBroadcastNodes       = 10              // broadcast at most maxBroadcastNodes peers that need in sync
 	broadcastTimeout  int64 = 60 * 1000000000 // 1 mins
 	//SyncIDLength is the length of bytes for syncID

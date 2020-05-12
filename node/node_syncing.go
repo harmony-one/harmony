@@ -414,8 +414,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		defer node.stateMutex.Unlock()
 		if node.State != NodeNotInSync {
 			utils.Logger().Debug().
-				Str("state", node.State.String()).
-				Msg("[SYNC] new block received, but state is")
+				Msgf("[SYNC] new block received, but state is %v", node.State)
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
