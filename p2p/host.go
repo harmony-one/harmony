@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"sync"
 
@@ -15,7 +14,6 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
-	libp2p_metrics "github.com/libp2p/go-libp2p-core/metrics"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
@@ -36,6 +34,7 @@ type Host interface {
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 	AllTopics() []NamedTopic
+	PubSub() *libp2p_pubsub.PubSub
 	C() (int, int, int)
 }
 
@@ -46,17 +45,6 @@ type Peer struct {
 	ConsensusPubKey *bls.PublicKey // Public key of the peer, used for consensus signing
 	Addrs           []ma.Multiaddr // MultiAddress of the peer
 	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
-}
-
-func (p Peer) String() string {
-	BLSPubKey := "nil"
-	if p.ConsensusPubKey != nil {
-		BLSPubKey = p.ConsensusPubKey.SerializeToHexStr()
-	}
-	return fmt.Sprintf(
-		"BLSPubKey:%s-%s/%s[%d]", BLSPubKey,
-		net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs),
-	)
 }
 
 // NewHost ..
@@ -78,17 +66,11 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
-	traceFile := os.Getenv("P2P_TRACEFILE")
 
-	const MaxSize = 2_145_728
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithPeerOutboundQueueSize(64),
-		libp2p_pubsub.WithMaxMessageSize(MaxSize),
 	}
-	if len(traceFile) > 0 {
-		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
-		options = append(options, libp2p_pubsub.WithEventTracer(tracer))
-	}
+
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p pubsub")
@@ -100,7 +82,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	// has to save the private key for host
 	h := &HostV2{
 		h:      p2pHost,
-		joiner: topicJoiner{pubsub},
+		pubsub: pubsub,
 		joined: map[string]*libp2p_pubsub.Topic{},
 		self:   *self,
 		priKey: key,
@@ -110,6 +92,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	utils.Logger().Info().
 		Str("self", net.JoinHostPort(self.IP, self.Port)).
 		Interface("PeerID", self.PeerID).
@@ -118,30 +101,20 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	return h, nil
 }
 
-type topicJoiner struct {
-	pubsub *libp2p_pubsub.PubSub
-}
-
-func (tj topicJoiner) JoinTopic(topic string) (*libp2p_pubsub.Topic, error) {
-	th, err := tj.pubsub.Join(topic)
-	if err != nil {
-		return nil, err
-	}
-	return th, nil
-}
-
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
 	h      libp2p_host.Host
-	joiner topicJoiner
+	pubsub *libp2p_pubsub.PubSub
 	joined map[string]*libp2p_pubsub.Topic
 	self   Peer
 	priKey libp2p_crypto.PrivKey
 	lock   sync.Mutex
-	// logger
 	logger *zerolog.Logger
-	// metrics
-	metrics *libp2p_metrics.BandwidthCounter
+}
+
+// PubSub ..
+func (host *HostV2) PubSub() *libp2p_pubsub.PubSub {
+	return host.pubsub
 }
 
 // C .. -> (total known peers, connected, not connected)
@@ -164,7 +137,7 @@ func (host *HostV2) getTopic(topic string) (*libp2p_pubsub.Topic, error) {
 	defer host.lock.Unlock()
 	if t, ok := host.joined[topic]; ok {
 		return t, nil
-	} else if t, err := host.joiner.JoinTopic(topic); err != nil {
+	} else if t, err := host.pubsub.Join(topic); err != nil {
 		return nil, errors.Wrapf(err, "cannot join pubsub topic %x", topic)
 	} else {
 		host.joined[topic] = t
@@ -279,6 +252,7 @@ func (host *HostV2) AllTopics() []NamedTopic {
 	defer host.lock.Unlock()
 	var topics []NamedTopic
 	for k, g := range host.joined {
+
 		topics = append(topics, NamedTopic{k, g})
 	}
 	return topics
