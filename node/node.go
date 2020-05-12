@@ -320,8 +320,8 @@ func (node *Node) Start() error {
 	}
 
 	const (
-		setAsideForConsensus = 150
-		setAsideOtherwise    = 50
+		setAsideForConsensus = 2500
+		setAsideOtherwise    = 200
 		maxMessageHandlers   = setAsideForConsensus + setAsideOtherwise
 		throttle             = 100 * time.Millisecond
 		emrgThrottle         = 250 * time.Millisecond
@@ -405,40 +405,37 @@ func (node *Node) Start() error {
 
 				go func() {
 					defer cancel()
+					var (
+						current, using int32
+						// belowThreshold bool
+					)
 
 					if isConsensusBound {
 						defer atomic.AddInt32(&soFarConsensus, 1)
-						current := atomic.AddInt32(&soFarConsensus, -1)
-						using := setAsideForConsensus - current
-						if current == 0 {
-							errChan <- errNoConsensusHandlers
-							return
-						}
-						if using > 1 {
-							sampled.Info().
-								Int32("currently-using", using).
-								Msg("sampling message handling")
-						}
-
+						current = atomic.AddInt32(&soFarConsensus, -1)
+						using = setAsideForConsensus - current
 					} else {
 						defer atomic.AddInt32(&soFarElse, 1)
-						current := atomic.AddInt32(&soFarElse, -1)
-						using := setAsideOtherwise - current
-						if current == 0 {
-							errChan <- errNoClientHandlers
-							return
-						}
-						if using > 1 {
-							sampled.Info().
-								Int32("currently-using", using).
-								Msg("sampling message handling")
-						}
+						current = atomic.AddInt32(&soFarElse, -1)
+						using = setAsideOtherwise - current
 					}
 
-					// var cost int64 = 1
+					if current == 0 {
+						if isConsensusBound {
+							errChan <- errNoConsensusHandlers
+						} else {
+							errChan <- errNoClientHandlers
+						}
+						return
+					}
+
+					if using > 1 {
+						sampled.Info().
+							Int32("currently-using", using).
+							Msg("sampling message handling")
+					}
 
 					// if current <= threshold {
-					// 	cost = 2
 					// 	if current == threshold {
 					// 		go func() {
 					// 			needThrottle <- throttle
@@ -450,7 +447,6 @@ func (node *Node) Start() error {
 					// 	}
 					// } else {
 					// 	if current == threshold+1 {
-					// 		cost = 1
 					// 		go func() {
 					// 			releaseThrottle <- struct{}{}
 					// 		}()
