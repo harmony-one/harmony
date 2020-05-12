@@ -334,7 +334,7 @@ func (consensus *Consensus) Start(
 	blockChannel chan *types.Block, stopChan, stoppedChan, startChannel chan struct{},
 ) {
 	go func() {
-		toStart := make(chan struct{}, 1)
+		toStart := false
 		isInitialLeader := consensus.IsLeader()
 		if isInitialLeader {
 			consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Waiting for consensus start")
@@ -342,7 +342,7 @@ func (consensus *Consensus) Start(
 			// this signal is consumed by node object to create a new block and in turn trigger a new consensus on it
 			go func() {
 				<-startChannel
-				toStart <- struct{}{}
+				toStart = true
 				consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
 				consensus.ReadySignal <- struct{}{}
 			}()
@@ -360,15 +360,11 @@ func (consensus *Consensus) Start(
 		vdfInProgress := false
 		// Set up next block due time.
 		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-		start := false
-
 		for {
 			select {
-			case <-toStart:
-				start = true
 			case <-ticker.C:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ticker")
-				if !start && isInitialLeader {
+				if !toStart && isInitialLeader {
 					continue
 				}
 				for k, v := range consensus.consensusTimeout {

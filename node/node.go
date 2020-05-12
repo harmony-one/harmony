@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -38,7 +37,6 @@ import (
 	"github.com/harmony-one/harmony/webhooks"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -140,6 +138,8 @@ type Node struct {
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
+	// Duplicated Ping Message Received
+	duplicatedPing sync.Map
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
 	// node configuration, including group ID, shard ID, etc
@@ -356,134 +356,43 @@ func (node *Node) Start() error {
 	if len(allTopics) == 0 {
 		return errors.New("have no topics to listen to")
 	}
-
-	const (
-		maxMessageHandlers = 200
-		threshold          = maxMessageHandlers / 2
-		lastLine           = 20
-		throttle           = 100 * time.Millisecond
-		emrgThrottle       = 250 * time.Millisecond
-	)
-
+	weighted := make([]*semaphore.Weighted, len(allTopics))
+	const maxMessageHandlers = 200
+	ctx := context.Background()
 	ownID := node.host.GetID()
 	errChan := make(chan error)
 
-	for i := range allTopics {
-		sub, err := allTopics[i].Topic.Subscribe()
+	for i, topic := range allTopics {
+		sub, err := topic.Subscribe()
 		if err != nil {
 			return err
 		}
-		topicNamed := allTopics[i].Name
-		sem := semaphore.NewWeighted(maxMessageHandlers)
+		weighted[i] = semaphore.NewWeighted(maxMessageHandlers)
 		msgChan := make(chan *libp2p_pubsub.Message)
-		needThrottle, releaseThrottle :=
-			make(chan time.Duration), make(chan struct{})
 
-		go func() {
-			soFar := int32(maxMessageHandlers)
-
-			sampled := utils.Logger().Sample(
-				zerolog.LevelSampler{
-					DebugSampler: &zerolog.BurstSampler{
-						Burst:       1,
-						Period:      36 * time.Second,
-						NextSampler: &zerolog.BasicSampler{N: 1000},
-					},
-				},
-			).With().Str("pubsub-topic", topicNamed).Logger()
-
+		go func(msgChan chan *libp2p_pubsub.Message, sem *semaphore.Weighted) {
 			for msg := range msgChan {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-				msg := msg
-
-				go func() {
-					defer cancel()
-					defer atomic.AddInt32(&soFar, 1)
-
-					current := atomic.AddInt32(&soFar, -1)
-					using := maxMessageHandlers - current
-
-					if using > 1 {
-						sampled.Info().
-							Int32("currently-using", using).
-							Msg("sampling message handling")
-					}
-
-					if current == 0 {
-						utils.Logger().Debug().Msg("no available semaphores to handle p2p messages")
-						return
-					}
-
-					var cost int64 = 1
-
-					if current <= threshold {
-						cost = 2
-						if current == threshold {
-							go func() {
-								needThrottle <- throttle
-							}()
-						} else if current == lastLine {
-							go func() {
-								needThrottle <- emrgThrottle
-							}()
-						}
-					} else {
-						if current == threshold+1 {
-							cost = 1
-							go func() {
-								releaseThrottle <- struct{}{}
-							}()
-						}
-					}
-
-					if sem.TryAcquire(cost) {
-						defer sem.Release(cost)
-						payload := msg.GetData()
-						if len(payload) < p2pMsgPrefixSize {
-							cancel()
-							// TODO understand why this happens
-							return
-						}
-						select {
-						case <-ctx.Done():
-							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-								utils.Logger().Info().
-									Str("topic", topicNamed).Msg("exceeded deadline")
-							}
-							errChan <- ctx.Err()
-						default:
-							node.HandleMessage(
-								payload[p2pMsgPrefixSize:], msg.GetFrom(),
-							)
-						}
-					}
-				}()
-
-			}
-		}()
-
-		go func() {
-			slowDown, coolDown := false, throttle
-
-			for {
-
-				select {
-				case s := <-needThrottle:
-					slowDown = true
-					coolDown = s
-					utils.Logger().Info().
-						Dur("throttle-delay-miliseconds", s.Round(time.Millisecond)).
-						Msg("throttle needed on acceptance of messages")
-				case <-releaseThrottle:
-					utils.Logger().Info().Msg("p2p throttle released")
-					slowDown = false
-				default:
-					if slowDown {
-						<-time.After(coolDown)
-					}
+				payload := msg.GetData()
+				if len(payload) < p2pMsgPrefixSize {
+					continue
 				}
+				if sem.TryAcquire(1) {
+					go func() {
+						node.HandleMessage(
+							payload[p2pMsgPrefixSize:], msg.GetFrom(),
+						)
+						sem.Release(1)
+					}()
+				} else {
+					utils.Logger().Info().
+						Msg("could not acquire semaphore to process incoming message")
+				}
+			}
+		}(msgChan, weighted[i])
 
-				nextMsg, err := sub.Next(context.Background())
+		go func(msgChan chan *libp2p_pubsub.Message) {
+			for {
+				nextMsg, err := sub.Next(ctx)
 				if err != nil {
 					errChan <- err
 					continue
@@ -493,7 +402,7 @@ func (node *Node) Start() error {
 				}
 				msgChan <- nextMsg
 			}
-		}()
+		}(msgChan)
 	}
 
 	for err := range errChan {
