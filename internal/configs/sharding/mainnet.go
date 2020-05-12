@@ -12,7 +12,7 @@ const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14 (the last block of epoch 0)
 	blocksPerEpoch     = 16384  // 2^14
 
-	mainnetPrestakingEpochFirstBlock = 3221794 // TBD
+	mainnetPrestakingEpochFirstBlock = 3221570 // TBD
 	blocksPerEpochStaking            = 450     // 1 hour
 	lastEpochBeforePrestaking        = 176
 
