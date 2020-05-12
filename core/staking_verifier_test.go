@@ -723,7 +723,20 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		expAmt      *big.Int
 		expErr      error
 	}{
-		{},
+		{
+			sdb: makeDefaultStateDB(t),
+			msg: defaultMsgDelegate(),
+
+			expVWrapper: defaultExpVWrapperDelegate(),
+			expAmt:      tenKOnes,
+		},
+		{
+			sdb: makeDefaultStateDB(t),
+			msg: defaultMsgSelfDelegate(),
+
+			expVWrapper: defaultExpVWrapperSelfDelegate(),
+			expAmt:      tenKOnes,
+		},
 	}
 	for i, test := range tests {
 		w, amt, err := VerifyAndDelegateFromMsg(test.sdb, &test.msg)
@@ -738,18 +751,44 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		if amt.Cmp(test.expAmt) != 0 {
 			t.Errorf("Test %v: unexpected amount %v / %v", i, amt, test.expAmt)
 		}
-		if !reflect.DeepEqual(w, test.expVWrapper) {
+		if !reflect.DeepEqual(w, &test.expVWrapper) {
 			t.Errorf("Test %v: vWrapper not expected", i)
 		}
 	}
 }
 
-func defaultDelegateMsg() staking.Delegate {
+func defaultMsgDelegate() staking.Delegate {
 	return staking.Delegate{
 		DelegatorAddress: delegatorAddr,
 		ValidatorAddress: validatorAddr,
 		Amount:           new(big.Int).Set(tenKOnes),
 	}
+}
+
+func defaultExpVWrapperDelegate() staking.ValidatorWrapper {
+	pub := []shard.BLSPublicKey{blsKeys[0].pub, blsKeys[1].pub}
+	w := staketest.GetDefaultValidatorWrapperWithAddr(validatorAddr, pub)
+	w.Identity = makeIdentityStr(0)
+	w.UpdateHeight = big.NewInt(defaultSnapBlockNumber)
+	w.Delegations = append(w.Delegations, staking.NewDelegation(delegatorAddr, tenKOnes))
+	return w
+}
+
+func defaultMsgSelfDelegate() staking.Delegate {
+	return staking.Delegate{
+		DelegatorAddress: delegatorAddr,
+		ValidatorAddress: delegatorAddr,
+		Amount:           new(big.Int).Set(tenKOnes),
+	}
+}
+
+func defaultExpVWrapperSelfDelegate() staking.ValidatorWrapper {
+	pub := []shard.BLSPublicKey{blsKeys[2].pub, blsKeys[3].pub}
+	w := staketest.GetDefaultValidatorWrapperWithAddr(delegatorAddr, pub)
+	w.Identity = makeIdentityStr(1)
+	w.UpdateHeight = big.NewInt(defaultSnapBlockNumber)
+	w.Delegations[0].Amount = new(big.Int).Add(tenKOnes, staketest.DefaultDelAmount)
+	return w
 }
 
 func makeDefaultFakeChainContext() *fakeChainContext {
