@@ -121,9 +121,13 @@ var (
 func initSetup() {
 
 	// Setup pprof
-	if addr := *pprof; addr != "" {
-		go func() { http.ListenAndServe(addr, nil) }()
-	}
+	// if *port == "9000" {
+	go func() { http.ListenAndServe(":6060", nil) }()
+	// }
+
+	// if *port == "9001" {
+	// 	go func() { http.ListenAndServe(":6061", nil) }()
+	// }
 
 	// maybe request passphrase for bls key.
 	if *cmkEncryptedBLSKey == "" {
@@ -610,6 +614,14 @@ func main() {
 
 	flag.Var(&p2p.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
+
+	// if err := profiler.Start(profiler.Config{
+	// 	Service:        "indexing-service",
+	// 	ServiceVersion: "1.0",
+	// 	ProjectID:      "bamboo-project-606", // optional on GCP
+	// }); err != nil {
+	// 	panic("Cannot start the profiler: " + err.Error())
+	// }
 
 	switch *nodeType {
 	case "validator":

@@ -365,8 +365,7 @@ func (node *Node) Start() error {
 				},
 			).With().Str("pubsub-topic", topicNamed).Logger()
 
-			var total uint64 = 1
-			var consens uint64 = 1
+			var total, consens, nodeB uint64 = 0, 0, 0
 
 			for msg := range msgChan {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -378,20 +377,30 @@ func (node *Node) Start() error {
 				)
 
 				isConsensusBound := cat == proto.Consensus
+				isNodeBound := cat == proto.Node
 				total++
 
 				if isConsensusBound {
 					consens++
 				}
 
-				// if consens < total {
-				// 	fmt.Println("werido topic->", topicNamed, node.NodeConfig.Role().String())
-				// }
+				if isNodeBound {
+					nodeB++
+				}
+
+				// fmt.Printf(
+				// 	"current distribution-> consensus %d nodeB %d total %d \t consensus %.2f%% \t node %.2f%%\n",
+				// 	consens, nodeB, total,
+				// 	float64(consens)/float64(total),
+				// 	float64(nodeB)/float64(total),
+				// )
 
 				miniS.Info().
 					Uint64("consensus-count", consens).
+					Uint64("nodeb", nodeB).
 					Uint64("total", total).
-					Float64("as-percentage", float64(consens)/float64(total)).
+					Float64("as-percentage-cons", float64(consens)/float64(total)).
+					Float64("as-percentage-nodeB", float64(nodeB)/float64(total)).
 					Msg("proportion under spamming")
 
 				// if currentlyUsing := float64(maxMessageHandlers - atomic.LoadInt32(&soFar)); isConsensusBound {
