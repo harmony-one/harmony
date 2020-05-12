@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"encoding/hex"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -187,26 +185,6 @@ func (consensus *Consensus) ResetState() {
 	consensus.commitBitmap = commitBitmap
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
-}
-
-// Returns a string representation of this consensus
-func (consensus *Consensus) String() string {
-	duty := ""
-	if consensus.IsLeader() {
-		duty = "leader"
-	} else {
-		duty = "validator"
-	}
-
-	return fmt.Sprintf(
-		"[Duty:%s Pub:%s Header:%s Num:%d View:%d Shard:%d]",
-		duty,
-		consensus.PubKey.SerializeToHexStr(),
-		hex.EncodeToString(consensus.blockHeader),
-		consensus.blockNum,
-		consensus.viewID,
-		consensus.ShardID,
-	)
 }
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
