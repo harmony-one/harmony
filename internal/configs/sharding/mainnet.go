@@ -9,8 +9,12 @@ import (
 )
 
 const (
-	mainnetEpochBlock1 = 344064 // 21 * 2^14
+	mainnetEpochBlock1 = 344064 // 21 * 2^14 (the last block of epoch 0)
 	blocksPerEpoch     = 16384  // 2^14
+
+	mainnetPrestakingEpochFirstBlock = 3221570 // TBD
+	blocksPerEpochStaking            = 450     // 1 hour
+	lastEpochBeforePrestaking        = 176
 
 	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.1)
@@ -28,7 +32,8 @@ const (
 	mainnetV1_3Epoch = 36
 	mainnetV1_4Epoch = 46
 	mainnetV1_5Epoch = 54
-	mainnetV2Epoch   = 179
+	mainnetV2_0Epoch = 177
+	mainnetV2_1Epoch = 178
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "https://api.s%d.dry.hmny.io"
@@ -43,9 +48,12 @@ type mainnetSchedule struct{}
 
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
-	case epoch.Cmp(big.NewInt(mainnetV2Epoch)) >= 0:
-		// 177 pre-staking epoch
-		return mainnetV2
+	case epoch.Cmp(big.NewInt(mainnetV2_1Epoch)) >= 0:
+		// 178 staking epoch
+		return mainnetV2_1
+	case epoch.Cmp(big.NewInt(mainnetV2_0Epoch)) >= 0:
+		// 177 prestaking epoch
+		return mainnetV2_0
 	case epoch.Cmp(big.NewInt(mainnetV1_5Epoch)) >= 0:
 		// 54 resharding epoch (for shard 0) around 23/10/2019 ~10:05 PDT
 		return mainnetV1_5
@@ -87,33 +95,58 @@ func (mainnetSchedule) BlocksPerEpoch() uint64 {
 
 func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	blocks := ms.BlocksPerEpoch()
-	switch {
-	case blockNum >= mainnetEpochBlock1:
-		return big.NewInt(int64((blockNum-mainnetEpochBlock1)/blocks) + 1)
-	default:
-		return big.NewInt(0)
+	if blockNum < mainnetPrestakingEpochFirstBlock {
+		switch {
+		case blockNum >= mainnetEpochBlock1:
+			return big.NewInt(int64((blockNum-mainnetEpochBlock1)/blocks) + 1)
+		default:
+			return big.NewInt(0)
+		}
+	} else {
+		stakingBlocks := uint64(blocksPerEpochStaking)
+		return big.NewInt(int64((blockNum-mainnetPrestakingEpochFirstBlock)/stakingBlocks) + lastEpochBeforePrestaking + 1)
 	}
 }
 
 func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	blocks := ms.BlocksPerEpoch()
-	switch {
-	case blockNum < mainnetEpochBlock1-1:
-		return false
-	case blockNum == mainnetEpochBlock1-1:
-		return true
-	default:
-		return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)
+	if blockNum < mainnetPrestakingEpochFirstBlock-1 {
+		switch {
+		case blockNum < mainnetEpochBlock1-1:
+			return false
+		case blockNum == mainnetEpochBlock1-1:
+			return true
+		default:
+			return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)
+		}
+	} else {
+		stakingBlocks := uint64(blocksPerEpochStaking)
+		switch {
+		case blockNum == mainnetPrestakingEpochFirstBlock-1:
+			return true
+		default:
+			return ((blockNum-mainnetPrestakingEpochFirstBlock)%stakingBlocks == stakingBlocks-1)
+		}
 	}
 }
 
 func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	blocks := ms.BlocksPerEpoch()
-	switch {
-	case epochNum == 0:
-		return mainnetEpochBlock1 - 1
-	default:
-		return mainnetEpochBlock1 - 1 + blocks*epochNum
+	if epochNum < lastEpochBeforePrestaking {
+		switch {
+		case epochNum == 0:
+			return mainnetEpochBlock1 - 1
+		default:
+			return mainnetEpochBlock1 - 1 + blocks*epochNum
+		}
+	} else {
+		stakingBlocks := uint64(blocksPerEpochStaking)
+		switch {
+		case epochNum == lastEpochBeforePrestaking:
+			return mainnetPrestakingEpochFirstBlock - 1
+		default:
+			return mainnetPrestakingEpochFirstBlock - 1 + stakingBlocks*(epochNum-lastEpochBeforePrestaking)
+		}
 	}
 }
 
@@ -141,7 +174,7 @@ func (ms mainnetSchedule) GetShardingStructure(numShard, shardID int) []map[stri
 	return genShardingStructure(numShard, shardID, MainNetHTTPPattern, MainNetWSPattern)
 }
 
-var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch), big.NewInt(mainnetV1_3Epoch), big.NewInt(mainnetV1_4Epoch), big.NewInt(mainnetV1_5Epoch)}
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch), big.NewInt(mainnetV1_3Epoch), big.NewInt(mainnetV1_4Epoch), big.NewInt(mainnetV1_5Epoch), big.NewInt(mainnetV2_0Epoch), big.NewInt(mainnetV2_1Epoch)}
 
 var (
 	mainnetV0   = MustNewInstance(4, 150, 112, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
@@ -155,5 +188,6 @@ var (
 	mainnetV1_3 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_3, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 	mainnetV1_4 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_4, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 	mainnetV1_5 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
-	mainnetV2   = MustNewInstance(4, 250, 170, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV2_0 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, blocksPerEpochStaking)
+	mainnetV2_1 = MustNewInstance(4, 250, 170, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, blocksPerEpochStaking)
 )

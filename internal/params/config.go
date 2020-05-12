@@ -27,9 +27,9 @@ var (
 	MainnetChainConfig = &ChainConfig{
 		ChainID:         MainnetChainID,
 		CrossTxEpoch:    big.NewInt(28),
-		CrossLinkEpoch:  big.NewInt(179),
-		StakingEpoch:    big.NewInt(179),
-		PreStakingEpoch: big.NewInt(178),
+		CrossLinkEpoch:  big.NewInt(178),
+		StakingEpoch:    big.NewInt(178),
+		PreStakingEpoch: big.NewInt(177),
 		EIP155Epoch:     big.NewInt(28),
 		S3Epoch:         big.NewInt(28),
 		ReceiptLogEpoch: big.NewInt(101),
