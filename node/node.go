@@ -320,11 +320,16 @@ func (node *Node) Start() error {
 	}
 
 	const (
-		maxMessageHandlers = 200
-		threshold          = maxMessageHandlers / 2
-		lastLine           = 20
-		throttle           = 100 * time.Millisecond
-		emrgThrottle       = 250 * time.Millisecond
+		setAsideForConsensus = 150
+		setAsideOtherwise    = 50
+		maxMessageHandlers   = setAsideForConsensus + setAsideOtherwise
+		throttle             = 100 * time.Millisecond
+		emrgThrottle         = 250 * time.Millisecond
+	)
+
+	var (
+		errNoConsensusHandlers = errors.New("no available semaphores to handle p2p consensus messages")
+		errNoClientHandlers    = errors.New("no available semaphores to handle p2p client messages")
 	)
 
 	ownID := node.host.GetID()
@@ -336,14 +341,17 @@ func (node *Node) Start() error {
 			return err
 		}
 		topicNamed := allTopics[i].Name
+
 		sem := semaphore.NewWeighted(maxMessageHandlers)
+
 		msgChan := make(chan *libp2p_pubsub.Message)
 		needThrottle, releaseThrottle :=
 			make(chan time.Duration), make(chan struct{})
 
 		go func() {
-			soFar := int32(maxMessageHandlers)
-			subsetConsensus := int32(0)
+			soFarConsensus := int32(setAsideForConsensus)
+			soFarElse := int32(setAsideOtherwise)
+
 			sampled := utils.Logger().Sample(
 				zerolog.LevelSampler{
 					DebugSampler: &zerolog.BurstSampler{
@@ -353,7 +361,6 @@ func (node *Node) Start() error {
 					},
 				},
 			).With().Str("pubsub-topic", topicNamed).Logger()
-			// consensusMA, elseMA := ewma.NewMovingAverage(50), ewma.NewMovingAverage(50)
 
 			miniS := utils.Logger().Sample(
 				zerolog.LevelSampler{
@@ -388,13 +395,6 @@ func (node *Node) Start() error {
 					nodeB++
 				}
 
-				// fmt.Printf(
-				// 	"current distribution-> consensus %d nodeB %d total %d \t consensus %.2f%% \t node %.2f%%\n",
-				// 	consens, nodeB, total,
-				// 	float64(consens)/float64(total),
-				// 	float64(nodeB)/float64(total),
-				// )
-
 				miniS.Info().
 					Uint64("consensus-count", consens).
 					Uint64("nodeb", nodeB).
@@ -403,67 +403,62 @@ func (node *Node) Start() error {
 					Float64("as-percentage-nodeB", float64(nodeB)/float64(total)).
 					Msg("proportion under spamming")
 
-				// if currentlyUsing := float64(maxMessageHandlers - atomic.LoadInt32(&soFar)); isConsensusBound {
-
-				// 	consensusMA.Add(float64(atomic.LoadInt32(&subsetConsensus)) / currentlyUsing)
-				// 	// consensusMA.Add(
-				// 	// 	float64(atomic.LoadInt32(&subsetConsensus)) / currentlyUsing),					)
-				// 	fmt.Println("consensus bound message", consensusMA.Value())
-				// } else {
-				// 	elseMA.Add(float64(int32(currentlyUsing)-atomic.LoadInt32(&subsetConsensus)) / currentlyUsing)
-				// 	fmt.Println("otherwise bound message", elseMA.Value())
-				// }
-
 				go func() {
 					defer cancel()
-					defer atomic.AddInt32(&soFar, 1)
-
-					current := atomic.AddInt32(&soFar, -1)
-					using := maxMessageHandlers - current
 
 					if isConsensusBound {
-						_ = atomic.AddInt32(&subsetConsensus, 1)
-						defer atomic.AddInt32(&subsetConsensus, -1)
-						// fmt.Println("the percentage that is consensus is: ", usingC, using, topicNamed)
-					} else {
-
-					}
-
-					if using > 1 {
-						sampled.Info().
-							Int32("currently-using", using).
-							Msg("sampling message handling")
-					}
-
-					if current == 0 {
-						utils.Logger().Debug().Msg("no available semaphores to handle p2p messages")
-						return
-					}
-
-					var cost int64 = 1
-
-					if current <= threshold {
-						cost = 2
-						if current == threshold {
-							go func() {
-								needThrottle <- throttle
-							}()
-						} else if current == lastLine {
-							go func() {
-								needThrottle <- emrgThrottle
-							}()
+						defer atomic.AddInt32(&soFarConsensus, 1)
+						current := atomic.AddInt32(&soFarConsensus, -1)
+						using := setAsideForConsensus - current
+						if current == 0 {
+							errChan <- errNoConsensusHandlers
+							return
 						}
+						if using > 1 {
+							sampled.Info().
+								Int32("currently-using", using).
+								Msg("sampling message handling")
+						}
+
 					} else {
-						if current == threshold+1 {
-							cost = 1
-							go func() {
-								releaseThrottle <- struct{}{}
-							}()
+						defer atomic.AddInt32(&soFarElse, 1)
+						current := atomic.AddInt32(&soFarElse, -1)
+						using := setAsideOtherwise - current
+						if current == 0 {
+							errChan <- errNoClientHandlers
+							return
+						}
+						if using > 1 {
+							sampled.Info().
+								Int32("currently-using", using).
+								Msg("sampling message handling")
 						}
 					}
 
-					if sem.TryAcquire(cost) {
-						defer sem.Release(cost)
+					// var cost int64 = 1
+
+					// if current <= threshold {
+					// 	cost = 2
+					// 	if current == threshold {
+					// 		go func() {
+					// 			needThrottle <- throttle
+					// 		}()
+					// 	} else if current == lastLine {
+					// 		go func() {
+					// 			needThrottle <- emrgThrottle
+					// 		}()
+					// 	}
+					// } else {
+					// 	if current == threshold+1 {
+					// 		cost = 1
+					// 		go func() {
+					// 			releaseThrottle <- struct{}{}
+					// 		}()
+					// 	}
+					// }
+
+					if sem.TryAcquire(1) {
+						defer sem.Release(1)
 
 						select {
 						case <-ctx.Done():
