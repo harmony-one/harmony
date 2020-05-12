@@ -448,27 +448,15 @@ func (b *APIBackend) GetValidatorInformation(
 	// delete entry for previous epoch
 	b.apiCache.Forget(prevKey)
 
-	// calculate last APRHistoryLength epochs for averaging APR
-	epochFrom := bc.Config().StakingEpoch
-	nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength))
-	if nowMinus100.Cmp(epochFrom) > 0 {
-		epochFrom = nowMinus100
-	}
-
+	// at this point, validator is active and has apr's for the recent 100 epochs
 	// compute average apr over history
 	if avgAPR, err := b.SingleFlightRequest(
 		key, func() (interface{}, error) {
 			total := numeric.ZeroDec()
 			count := 0
-			activated := false
-			for i := nowMinus100.Int64(); i < now.Int64(); i++ {
-				if apr, ok := stats.APRs[i]; ok {
-					total = total.Add(apr)
-					activated = true
-				}
-				if activated {
-					count = count + 1
-				}
+			for i := range stats.APRs {
+				total = total.Add(stats.APRs[i].Value)
+				count = count + 1
 			}
 			if count == 0 {
 				return nil, errors.New("no apr snapshots available")
