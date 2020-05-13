@@ -4,6 +4,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 )
 
@@ -141,6 +142,11 @@ func PercentageForTimeStamp(ts int64) numeric.Dec {
 		i++
 		j++
 	}
+
+	utils.Logger().Info().
+		Str("percent of total-supply used", bucket.share.Mul(numeric.NewDec(100)).String()).
+		Str("for-time", time.Unix(ts, 0).String()).
+		Msg("Picked Percentage for timestamp")
 
 	return bucket.share
 }

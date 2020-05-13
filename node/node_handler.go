@@ -57,6 +57,13 @@ func (node *Node) processSkippedMsgTypeByteValue(
 
 // HandleMessage parses the message and dispatch the actions.
 func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
+	// log in-coming metrics
+	node.host.LogRecvMessage(content)
+	utils.Logger().Info().
+		Int64("TotalIn", node.host.GetBandwidthTotals().TotalIn).
+		Float64("RateIn", node.host.GetBandwidthTotals().RateIn).
+		Msg("[metrics][p2p] traffic in in bytes")
+
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
@@ -288,9 +295,6 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are
 // running consensus on
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
-	if newBlock == nil || newBlock.Header() == nil {
-		return errors.New("nil header or block asked to verify")
-	}
 	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
@@ -446,6 +450,10 @@ func (node *Node) PostConsensusProcessing(
 
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
+
+	// Clear metrics after one consensus cycle
+	node.host.ResetMetrics()
+	utils.Logger().Info().Msg("[metrics][p2p] Reset after 1 consensus cycle")
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
