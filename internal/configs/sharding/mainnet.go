@@ -28,6 +28,7 @@ const (
 	mainnetV1_3Epoch = 36
 	mainnetV1_4Epoch = 46
 	mainnetV1_5Epoch = 54
+	mainnetV2_0Epoch = 185 // prestaking epoch
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "https://api.s%d.t.hmny.io"
@@ -42,6 +43,9 @@ type mainnetSchedule struct{}
 
 func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case epoch.Cmp(big.NewInt(mainnetV2_0Epoch)) >= 0:
+		// 185 resharding epoch (for shard 0) around 14/05/2020 ~15:00 PDT
+		return mainnetV2_0
 	case epoch.Cmp(big.NewInt(mainnetV1_5Epoch)) >= 0:
 		// 54 resharding epoch (for shard 0) around 23/10/2019 ~10:05 PDT
 		return mainnetV1_5
@@ -137,7 +141,7 @@ func (ms mainnetSchedule) GetShardingStructure(numShard, shardID int) []map[stri
 	return genShardingStructure(numShard, shardID, MainNetHTTPPattern, MainNetWSPattern)
 }
 
-var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch), big.NewInt(mainnetV1_3Epoch), big.NewInt(mainnetV1_4Epoch), big.NewInt(mainnetV1_5Epoch)}
+var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch), big.NewInt(mainnetV1_3Epoch), big.NewInt(mainnetV1_4Epoch), big.NewInt(mainnetV1_5Epoch), big.NewInt(mainnetV2_0Epoch)}
 
 var (
 	mainnetV0   = MustNewInstance(4, 150, 112, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
@@ -151,4 +155,5 @@ var (
 	mainnetV1_3 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_3, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 	mainnetV1_4 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_4, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 	mainnetV1_5 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV2_0 = MustNewInstance(4, 250, 170, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 )
