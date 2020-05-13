@@ -3,8 +3,8 @@ package consensus
 import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // MaxBlockNumDiff limits the received block number to only 100 further from the current block number
@@ -16,14 +16,14 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
 		Msg("[validatorSanityChecks] Checking new message")
-	senderKey, err := consensus.verifySenderKey(msg)
+
+	// TODO can remove this as already verified but later below is some logic
+	// NOTE can assume this won't explode, already past validation
+	senderKey, err := bls_cosi.BytesToBLSPublicKey(
+		msg.GetConsensus().GetSenderPubkey(),
+	)
+
 	if err != nil {
-		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().
-				Msg("sender key not in this slot's subcommittee")
-		} else {
-			consensus.getLogger().Error().Err(err).Msg("VerifySenderKey failed")
-		}
 		return false
 	}
 
@@ -137,31 +137,6 @@ func (consensus *Consensus) onPreparedSanityChecks(
 		}
 	}
 
-	return true
-}
-
-func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
-	if msg.GetViewchange() == nil {
-		consensus.getLogger().Warn().Msg("[viewChangeSanityCheck] malformed message")
-		return false
-	}
-	consensus.getLogger().Debug().
-		Msg("[viewChangeSanityCheck] Checking new message")
-	_, err := consensus.verifyViewChangeSenderKey(msg)
-	if err != nil {
-		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().Msgf(
-				"[%s] sender key not in this slot's subcommittee",
-				msg.GetType().String(),
-			)
-		} else {
-			consensus.getLogger().Error().Err(err).Msgf(
-				"[%s] VerifySenderKey Failed",
-				msg.GetType().String(),
-			)
-		}
-		return false
-	}
 	return true
 }
 

@@ -191,33 +191,6 @@ func VerifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 	return nil
 }
 
-// verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
-func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
-	consensusMsg := msg.GetConsensus()
-	senderKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
-	if err != nil {
-		return nil, err
-	}
-
-	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, shard.ErrValidNotInCommittee
-	}
-	return senderKey, nil
-}
-
-func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
-	vcMsg := msg.GetViewchange()
-	senderKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
-	if err != nil {
-		return nil, err
-	}
-
-	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, shard.ErrValidNotInCommittee
-	}
-	return senderKey, nil
-}
-
 // SetViewID set the viewID to the height of the blockchain
 func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID = height

@@ -703,11 +703,6 @@ func (node *Node) initNodeConfiguration() error {
 	return nil
 }
 
-// ServiceManager ...
-func (node *Node) ServiceManager() *service.Manager {
-	return node.serviceManager
-}
-
 // ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.
 func (node *Node) ShutDown() {
 	node.Blockchain().Stop()
