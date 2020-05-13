@@ -2,6 +2,7 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"math/rand"
 	"time"
 
@@ -462,8 +463,9 @@ func (node *Node) PostConsensusProcessing(
 				computed := availability.ComputeCurrentSigning(
 					snapshot.Validator, wrapper,
 				)
-				beaconChainBlocks := uint64(node.Beaconchain().CurrentBlock().Header().Number().Int64()) %
-					shard.Schedule.BlocksPerEpoch()
+				beaconChainBlocks := uint64(
+					node.Beaconchain().CurrentBlock().Header().Number().Int64(),
+				) % shard.Schedule.BlocksPerEpoch()
 				computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
 
 				if err != nil && computed.IsBelowThreshold {
@@ -477,22 +479,38 @@ func (node *Node) PostConsensusProcessing(
 	}
 }
 
-// bootstrapConsensus is the a goroutine to check number of peers and start the consensus
-func (node *Node) bootstrapConsensus() {
-	tick := time.NewTicker(5 * time.Second)
-	defer tick.Stop()
-	for range tick.C {
-		numPeersNow := node.host.GetPeerCount()
-		if numPeersNow >= node.Consensus.MinPeers {
-			utils.Logger().Info().Msg("[bootstrap] StartConsensus")
-			node.startConsensus <- struct{}{}
-			return
+// BootstrapConsensus is the a goroutine to check number of peers and start the consensus
+func (node *Node) BootstrapConsensus() error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	min := node.Consensus.MinPeers
+	needFriends := make(chan struct{})
+	const checkEvery = 5 * time.Second
+	go func() {
+		for {
+			<-time.After(checkEvery)
+			numPeersNow := node.host.GetPeerCount()
+			if numPeersNow >= min {
+				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
+				needFriends <- struct{}{}
+				return
+			}
+			utils.Logger().Info().
+				Int("numPeersNow", numPeersNow).
+				Int("targetNumPeers", min).
+				Dur("next-peer-count-check-in-seconds", checkEvery).
+				Msg("do not have enough min peers yet in bootstrap of consensus")
 		}
-		utils.Logger().Info().
-			Int("numPeersNow", numPeersNow).
-			Int("targetNumPeers", node.Consensus.MinPeers).
-			Int("next-peer-count-check-in-seconds", 5).
-			Msg("do not have enough min peers yet in bootstrap of consensus")
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-needFriends:
+		go func() {
+			node.startConsensus <- struct{}{}
+		}()
+		return nil
 	}
 }
 

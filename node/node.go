@@ -500,13 +500,15 @@ func New(
 	isArchival bool,
 ) *Node {
 	node := Node{
-		BlockChannel:          make(chan *types.Block),
-		ConfirmedBlockChannel: make(chan *types.Block),
-		BeaconBlockChannel:    make(chan *types.Block),
-		unixTimeAtNodeStart:   time.Now().Unix(),
-		TransactionErrorSink:  types.NewTransactionErrorSink(),
-		serviceManager:        &service.Manager{},
-		serviceMessageChan:    map[service.Type]chan *msg_pb.Message{},
+		BlockChannel:           make(chan *types.Block),
+		ConfirmedBlockChannel:  make(chan *types.Block),
+		BeaconBlockChannel:     make(chan *types.Block),
+		peerRegistrationRecord: map[string]*syncConfig{},
+		startConsensus:         make(chan struct{}),
+		unixTimeAtNodeStart:    time.Now().Unix(),
+		TransactionErrorSink:   types.NewTransactionErrorSink(),
+		serviceManager:         &service.Manager{},
+		serviceMessageChan:     map[service.Type]chan *msg_pb.Message{},
 	}
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
@@ -588,9 +590,6 @@ func New(
 		Interface("genesis block header", node.Blockchain().GetHeaderByNumber(0)).
 		Msg("Genesis block hash")
 	// Setup initial state of syncing.
-	node.peerRegistrationRecord = map[string]*syncConfig{}
-	node.startConsensus = make(chan struct{})
-	go node.bootstrapConsensus()
 	// Broadcast double-signers reported by consensus
 	if node.Consensus != nil {
 		go func() {
