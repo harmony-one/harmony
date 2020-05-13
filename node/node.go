@@ -322,8 +322,8 @@ func (node *Node) Start() error {
 	pubsub := node.host.PubSub()
 
 	const (
-		setAsideForConsensus = 2500
-		setAsideOtherwise    = 200
+		setAsideForConsensus = 12500
+		setAsideOtherwise    = 2000
 		maxMessageHandlers   = setAsideForConsensus + setAsideOtherwise
 	)
 
