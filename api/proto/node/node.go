@@ -2,10 +2,8 @@ package node
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
@@ -14,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 )
 
 // MessageType is to indicate the specific type of message under Node category
@@ -29,22 +26,6 @@ const (
 	PING       // node send ip/pki to register with leader
 	ShardState // Deprecated
 	Staking
-)
-
-// BlockchainSyncMessage is a struct for blockchain sync message.
-type BlockchainSyncMessage struct {
-	BlockHeight int
-	BlockHashes []common.Hash
-}
-
-// BlockchainSyncMessageType represents BlockchainSyncMessageType type.
-type BlockchainSyncMessageType int
-
-// Constant of blockchain sync-up message subtype
-const (
-	Done BlockchainSyncMessageType = iota
-	GetLastBlockHashes
-	GetBlock
 )
 
 // TransactionMessageType representa the types of messages used for Node/Transaction
@@ -73,21 +54,6 @@ func (r RoleType) String() string {
 		return "Client"
 	}
 	return "Unknown"
-}
-
-// Info refers to Peer struct in p2p/peer.go
-// this is basically a simplified version of Peer
-// for network transportation
-type Info struct {
-	IP     string
-	Port   string
-	PubKey []byte
-	Role   RoleType
-	PeerID libp2p_peer.ID // Peerstore ID
-}
-
-func (info Info) String() string {
-	return fmt.Sprintf("Info:%v/%v=>%v", info.IP, info.Port, info.PeerID.Pretty())
 }
 
 // BlockMessageType represents the type of messages used for Node/Block
