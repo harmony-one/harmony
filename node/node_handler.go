@@ -408,9 +408,6 @@ func (node *Node) PostConsensusProcessing(
 		Str("hash", newBlock.Header().Hash().Hex()).
 		Msg("Added New Block to Blockchain!!!")
 
-	// Update last consensus time for metrics
-	// TODO: randomly selected a few validators to broadcast messages instead of only leader broadcast
-	// TODO: refactor the asynchronous calls to separate go routine.
 	if node.Consensus.IsLeader() {
 		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)

@@ -58,7 +58,7 @@ const (
 // New returns role conversion service.  If dataStorePath is not empty, it
 // points to a persistent database directory to use.
 func New(
-	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
+	h p2p.Host, rendezvous nodeconfig.GroupID,
 	bootnodes p2p.AddrList, dataStorePath string,
 ) (*Service, error) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -87,7 +87,6 @@ func New(
 		cancel:      cancel,
 		stopChan:    make(chan struct{}),
 		stoppedChan: make(chan struct{}),
-		peerChan:    peerChan,
 		bootnodes:   bootnodes,
 		discovery:   nil,
 		started:     false,
@@ -96,10 +95,10 @@ func New(
 
 // MustNew is a panic-on-error version of New.
 func MustNew(
-	h p2p.Host, rendezvous nodeconfig.GroupID, peerChan chan p2p.Peer,
+	h p2p.Host, rendezvous nodeconfig.GroupID,
 	bootnodes p2p.AddrList, dataStorePath string,
 ) *Service {
-	service, err := New(h, rendezvous, peerChan, bootnodes, dataStorePath)
+	service, err := New(h, rendezvous, bootnodes, dataStorePath)
 	if err != nil {
 		panic(err)
 	}

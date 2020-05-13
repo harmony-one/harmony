@@ -329,7 +329,17 @@ func (node *Node) Start() error {
 	)
 
 	ownID := node.host.GetID()
-	errChan := make(chan error)
+
+	type withError struct {
+		err     error
+		payload interface{}
+	}
+
+	nodeBeaconTopic := string(nodeconfig.NewGroupIDByShardID(
+		nodeconfig.ShardID(shard.BeaconChainShardID),
+	))
+
+	errChan := make(chan withError)
 
 	for i := range allTopics {
 		sub, err := allTopics[i].Topic.Subscribe()
@@ -337,6 +347,14 @@ func (node *Node) Start() error {
 			return err
 		}
 		topicNamed := allTopics[i].Name
+
+		if node.Consensus.ShardID != shard.BeaconChainShardID {
+			pubsub.RegisterTopicValidator(nodeBeaconTopic,
+				func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
+					return true
+				},
+			)
+		}
 
 		if nodeconfig.GroupID(topicNamed) == nodeconfig.NewGroupIDByShardID(
 			nodeconfig.ShardID(node.Consensus.ShardID),
@@ -358,7 +376,7 @@ func (node *Node) Start() error {
 					)
 
 					if err := protobuf.Unmarshal(cnsMsg, &m); err != nil {
-						errChan <- err
+						errChan <- withError{err, msg}
 						return false
 					}
 
@@ -367,7 +385,7 @@ func (node *Node) Start() error {
 							c.GetSenderPubkey(),
 						)
 						if err != nil {
-							errChan <- err
+							errChan <- withError{err, msg}
 							return false
 						}
 						senderKey = key
@@ -375,7 +393,7 @@ func (node *Node) Start() error {
 
 					if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
 						pubsub.BlacklistPeer(peer)
-						errChan <- err
+						errChan <- withError{err, m}
 						return false
 					}
 
@@ -408,7 +426,7 @@ func (node *Node) Start() error {
 								utils.Logger().Info().
 									Str("topic", topicNamed).Msg("exceeded deadline")
 							}
-							errChan <- ctx.Err()
+							errChan <- withError{ctx.Err(), nil}
 						default:
 							payload := msg.GetData()
 							node.HandleMessage(
@@ -425,7 +443,7 @@ func (node *Node) Start() error {
 			for {
 				nextMsg, err := sub.Next(context.Background())
 				if err != nil {
-					errChan <- err
+					errChan <- withError{err, nil}
 					continue
 				}
 
@@ -442,8 +460,10 @@ func (node *Node) Start() error {
 		}()
 	}
 
-	for err := range errChan {
-		utils.Logger().Info().Err(err).Msg("issue while handling incoming p2p message")
+	for e := range errChan {
+		utils.Logger().Info().Err(e.err).
+			Interface("item", e.payload).
+			Msg("issue while handling incoming p2p message")
 	}
 	// NOTE never gets here
 	return nil
@@ -646,46 +666,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	return nil
 }
 
-// AddPeers adds neighbors nodes
-func (node *Node) AddPeers(peers []*p2p.Peer) int {
-	for _, p := range peers {
-		key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-		_, ok := node.Neighbors.LoadOrStore(key, *p)
-		if !ok {
-			// !ok means new peer is stored
-			node.host.AddPeer(p)
-			continue
-		}
-	}
-
-	return node.host.GetPeerCount()
-}
-
-// AddBeaconPeer adds beacon chain neighbors nodes
-// Return false means new neighbor peer was added
-// Return true means redundant neighbor peer wasn't added
-func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
-	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
-	return ok
-}
-
-func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {
-	chanPeer := make(chan p2p.Peer)
-	nodeConfig := service.NodeConfig{
-		IsClient:     node.NodeConfig.IsClient(),
-		Beacon:       nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
-		ShardGroupID: node.NodeConfig.GetShardGroupID(),
-		Actions:      map[nodeconfig.GroupID]nodeconfig.ActionType{},
-	}
-
-	if nodeConfig.IsClient {
-		nodeConfig.Actions[nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID)] =
-			nodeconfig.ActionStart
-	} else {
-		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = nodeconfig.ActionStart
-	}
-
+func (node *Node) initNodeConfiguration() error {
 	groups := []nodeconfig.GroupID{
 		node.NodeConfig.GetShardGroupID(),
 		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
@@ -694,10 +675,10 @@ func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, er
 
 	// force the side effect of topic join
 	if err := node.host.SendMessageToGroups(groups, []byte{}); err != nil {
-		return nodeConfig, nil, err
+		return err
 	}
 
-	return nodeConfig, chanPeer, nil
+	return nil
 }
 
 // ServiceManager ...
