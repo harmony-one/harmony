@@ -28,7 +28,7 @@ var (
 		ChainID:         MainnetChainID,
 		CrossTxEpoch:    big.NewInt(28),
 		CrossLinkEpoch:  big.NewInt(186),
-		StakingEpoch:    big.NewInt(185),
+		StakingEpoch:    big.NewInt(186),
 		PreStakingEpoch: big.NewInt(185),
 		EIP155Epoch:     big.NewInt(28),
 		S3Epoch:         big.NewInt(28),
