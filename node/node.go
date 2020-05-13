@@ -339,55 +339,53 @@ func (node *Node) Start() error {
 		}
 		topicNamed := allTopics[i].Name
 
-		if nodeconfig.GroupID(topicNamed) == node.NodeConfig.GetShardGroupID() {
+		if nodeconfig.GroupID(topicNamed) == nodeconfig.NewGroupIDByShardID(
+			nodeconfig.ShardID(node.Consensus.ShardID),
+		) {
+
 			pubsub.RegisterTopicValidator(
 				topicNamed,
 				func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
-					payload := msg.GetData()
-					if len(payload) < p2pMsgPrefixSize {
+					sig2 := msg.GetData()
+					if len(sig2) < p2pMsgPrefixSize {
 						return true
 					}
 
-					cat := proto.MessageCategory(
-						payload[p2pMsgPrefixSize:][proto.MessageCategoryBytes-1],
+					cnsMsg := sig2[p2pMsgPrefixSize:][proto.MessageCategoryBytes:]
+
+					var (
+						m         msg_pb.Message
+						senderKey *bls.PublicKey
 					)
 
-					isConsensusBound := cat == proto.Consensus
-					if isConsensusBound {
-						cnsMsg := payload[p2pMsgPrefixSize:][proto.MessageCategoryBytes:]
-						var (
-							m         msg_pb.Message
-							senderKey *bls.PublicKey
-						)
-
-						if err := protobuf.Unmarshal(cnsMsg, &m); err != nil {
-							errChan <- err
-							return false
-						}
-
-						if c := m.GetConsensus(); c.GetSenderPubkey() != nil {
-							key, err := bls_cosi.BytesToBLSPublicKey(
-								c.GetSenderPubkey(),
-							)
-							if err != nil {
-								errChan <- err
-								return false
-							}
-							senderKey = key
-						}
-
-						if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
-							pubsub.BlacklistPeer(peer)
-							errChan <- err
-							return false
-						}
-
+					if err := protobuf.Unmarshal(cnsMsg, &m); err != nil {
+						errChan <- err
+						return false
 					}
+
+					if c := m.GetConsensus(); c.GetSenderPubkey() != nil {
+						key, err := bls_cosi.BytesToBLSPublicKey(
+							c.GetSenderPubkey(),
+						)
+						if err != nil {
+							errChan <- err
+							return false
+						}
+						senderKey = key
+					}
+
+					if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
+						pubsub.BlacklistPeer(peer)
+						errChan <- err
+						return false
+					}
+
 					return true
 
 				},
 				libp2p_pubsub.WithValidatorTimeout(24),
-				libp2p_pubsub.WithValidatorConcurrency(4096),
+				libp2p_pubsub.WithValidatorConcurrency(8096),
+				libp2p_pubsub.WithValidatorInline(true),
 			)
 		}
 
