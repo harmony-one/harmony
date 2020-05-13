@@ -276,12 +276,6 @@ func (node *Node) SupportSyncing() {
 		joinConsensus = true
 	}
 
-	// Send new block to unsync node if the current node is not explorer node.
-	// TODO: leo this pushing logic has to be removed
-	if joinConsensus {
-		go node.SendNewBlockToUnsync()
-	}
-
 	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
 }
 
@@ -297,40 +291,6 @@ func (node *Node) StartSyncingServer() {
 	utils.Logger().Info().Msg("[SYNC] support_syncing: StartSyncingServer")
 	if node.downloaderServer.GrpcServer == nil {
 		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
-	}
-}
-
-// SendNewBlockToUnsync send latest verified block to unsync, registered nodes
-func (node *Node) SendNewBlockToUnsync() {
-	for {
-		block := <-node.Consensus.VerifiedNewBlock
-		blockHash, err := rlp.EncodeToBytes(block)
-		if err != nil {
-			utils.Logger().Warn().Msg("[SYNC] unable to encode block to hashes")
-			continue
-		}
-
-		node.stateMutex.Lock()
-		for peerID, config := range node.peerRegistrationRecord {
-			elapseTime := time.Now().UnixNano() - config.timestamp
-			if elapseTime > broadcastTimeout {
-				utils.Logger().Warn().Str("peerID", peerID).Msg("[SYNC] SendNewBlockToUnsync to peer timeout")
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-				continue
-			}
-			response, err := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
-			// close the connection if cannot push new block to unsync node
-			if err != nil {
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-			}
-			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-			}
-		}
-		node.stateMutex.Unlock()
 	}
 }
 

@@ -485,7 +485,7 @@ func (node *Node) BootstrapConsensus() error {
 	defer cancel()
 	min := node.Consensus.MinPeers
 	needFriends := make(chan struct{})
-	const checkEvery = 5 * time.Second
+	const checkEvery = 3 * time.Second
 	go func() {
 		for {
 			<-time.After(checkEvery)
