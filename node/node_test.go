@@ -200,24 +200,10 @@ func TestAddBeaconPeer(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	consensus, err := consensus.New(
+	_, err = consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsKey), decider,
 	)
 	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
-	}
-
-	node := New(host, consensus, testDBFactory, nil, false)
-	for _, p := range peers1 {
-		ret := node.AddBeaconPeer(p)
-		if ret {
-			t.Errorf("AddBeaconPeer Failed, expecting false, got %v, peer %v", ret, p)
-		}
-	}
-	for _, p := range peers1 {
-		ret := node.AddBeaconPeer(p)
-		if !ret {
-			t.Errorf("AddBeaconPeer Failed, expecting true, got %v, peer %v", ret, p)
-		}
+		t.Fatalf("Cannot create consensus: %v", err)
 	}
 }
