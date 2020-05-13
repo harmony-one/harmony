@@ -384,7 +384,6 @@ func (node *Node) Start() error {
 				},
 				libp2p_pubsub.WithValidatorTimeout(24),
 				libp2p_pubsub.WithValidatorConcurrency(8096),
-				// libp2p_pubsub.WithValidatorInline(true),
 			)
 		}
 
