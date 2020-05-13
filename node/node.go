@@ -36,6 +36,7 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -318,18 +319,13 @@ func (node *Node) Start() error {
 		return errors.New("have no topics to listen to")
 	}
 
+	pubsub := node.host.PubSub()
+
 	const (
 		setAsideForConsensus = 2500
 		setAsideOtherwise    = 200
 		maxMessageHandlers   = setAsideForConsensus + setAsideOtherwise
-		throttle             = 100 * time.Millisecond
-		emrgThrottle         = 250 * time.Millisecond
 	)
-
-	// var (
-	// 	errNoConsensusHandlers = errors.New("no available semaphores to handle p2p consensus messages")
-	// 	errNoClientHandlers    = errors.New("no available semaphores to handle p2p client messages")
-	// )
 
 	ownID := node.host.GetID()
 	errChan := make(chan error)
@@ -342,11 +338,20 @@ func (node *Node) Start() error {
 		}
 		topicNamed := allTopics[i].Name
 
-		sem := semaphore.NewWeighted(maxMessageHandlers)
+		if nodeconfig.GroupID(topicNamed) == node.NodeConfig.GetShardGroupID() {
+			pubsub.RegisterTopicValidator(
+				topicNamed,
+				func(context.Context, libp2p_peer.ID, *libp2p_pubsub.Message) bool {
+					return true
+				},
+				libp2p_pubsub.WithValidatorTimeout(24),
+			)
 
+			// fmt.Println("indeed got my group id->", topicNamed)
+		}
+
+		sem := semaphore.NewWeighted(maxMessageHandlers)
 		msgChan := make(chan *libp2p_pubsub.Message)
-		needThrottle, releaseThrottle :=
-			make(chan time.Duration), make(chan struct{})
 
 		go func() {
 
@@ -415,24 +420,8 @@ func (node *Node) Start() error {
 		}()
 
 		go func() {
-			slowDown, coolDown := false, throttle
 
 			for {
-				select {
-				case s := <-needThrottle:
-					slowDown = true
-					coolDown = s
-					utils.Logger().Info().
-						Dur("throttle-delay-miliseconds", s.Round(time.Millisecond)).
-						Msg("throttle needed on acceptance of messages")
-				case <-releaseThrottle:
-					utils.Logger().Info().Msg("p2p throttle released")
-					slowDown = false
-				default:
-					if slowDown {
-						<-time.After(coolDown)
-					}
-				}
 
 				nextMsg, err := sub.Next(context.Background())
 				if err != nil {

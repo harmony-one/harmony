@@ -444,12 +444,12 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	})
 
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
+		fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
 	commitDelay, err := time.ParseDuration(*delayCommit)
 	if err != nil || commitDelay < 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", *delayCommit)
+		fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", *delayCommit)
 		os.Exit(1)
 	}
 	currentConsensus.SetCommitDelay(commitDelay)
@@ -615,20 +615,12 @@ func main() {
 	flag.Var(&p2p.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
 	flag.Parse()
 
-	// if err := profiler.Start(profiler.Config{
-	// 	Service:        "indexing-service",
-	// 	ServiceVersion: "1.0",
-	// 	ProjectID:      "bamboo-project-606", // optional on GCP
-	// }); err != nil {
-	// 	panic("Cannot start the profiler: " + err.Error())
-	// }
-
 	switch *nodeType {
 	case "validator":
 	case "explorer":
 		break
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
+		fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
 		os.Exit(1)
 	}
 
@@ -662,13 +654,12 @@ func main() {
 		devnetConfig, err := shardingconfig.NewInstance(
 			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
-				err)
+			fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s", err)
 			os.Exit(1)
 		}
 		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
+		fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
 		os.Exit(2)
 	}
 

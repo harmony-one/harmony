@@ -252,7 +252,6 @@ func (host *HostV2) AllTopics() []NamedTopic {
 	defer host.lock.Unlock()
 	var topics []NamedTopic
 	for k, g := range host.joined {
-
 		topics = append(topics, NamedTopic{k, g})
 	}
 	return topics
