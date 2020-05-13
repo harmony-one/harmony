@@ -59,7 +59,7 @@ func (node *Node) processSkippedMsgTypeByteValue(
 func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 	// log in-coming metrics
 	node.host.LogRecvMessage(content)
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		Int64("TotalIn", node.host.GetBandwidthTotals().TotalIn).
 		Float64("RateIn", node.host.GetBandwidthTotals().RateIn).
 		Msg("[metrics][p2p] traffic in in bytes")
@@ -453,7 +453,7 @@ func (node *Node) PostConsensusProcessing(
 
 	// Clear metrics after one consensus cycle
 	node.host.ResetMetrics()
-	utils.Logger().Info().Msg("[metrics][p2p] Reset after 1 consensus cycle")
+	utils.Logger().Debug().Msg("[metrics][p2p] Reset after 1 consensus cycle")
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {

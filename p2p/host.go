@@ -193,7 +193,7 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 		// log out-going metrics
 		host.metrics.LogSentMessage(int64(len(msg)))
 	}
-	host.logger.Info().
+	host.logger.Debug().
 		Int64("TotalOut", host.GetBandwidthTotals().TotalOut).
 		Float64("RateOut", host.GetBandwidthTotals().RateOut).
 		Msg("[metrics][p2p] traffic out in bytes")
