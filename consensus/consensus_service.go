@@ -169,8 +169,8 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
-// Verify the signature of the message are valid from the signer's public key.
-func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
+// VerifyMessageSig the signature of the message are valid from the signer's public key.
+func VerifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(message)

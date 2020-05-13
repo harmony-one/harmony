@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/client"
 	"github.com/harmony-one/harmony/api/proto"
@@ -23,6 +24,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -332,7 +334,6 @@ func (node *Node) Start() error {
 
 	for i := range allTopics {
 		sub, err := allTopics[i].Topic.Subscribe()
-
 		if err != nil {
 			return err
 		}
@@ -341,13 +342,53 @@ func (node *Node) Start() error {
 		if nodeconfig.GroupID(topicNamed) == node.NodeConfig.GetShardGroupID() {
 			pubsub.RegisterTopicValidator(
 				topicNamed,
-				func(context.Context, libp2p_peer.ID, *libp2p_pubsub.Message) bool {
+				func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
+					payload := msg.GetData()
+					if len(payload) < p2pMsgPrefixSize {
+						return true
+					}
+
+					cat := proto.MessageCategory(
+						payload[p2pMsgPrefixSize:][proto.MessageCategoryBytes-1],
+					)
+
+					isConsensusBound := cat == proto.Consensus
+					if isConsensusBound {
+						cnsMsg := payload[p2pMsgPrefixSize:][proto.MessageCategoryBytes:]
+						var (
+							m         msg_pb.Message
+							senderKey *bls.PublicKey
+						)
+
+						if err := protobuf.Unmarshal(cnsMsg, &m); err != nil {
+							errChan <- err
+							return false
+						}
+
+						if c := m.GetConsensus(); c.GetSenderPubkey() != nil {
+							key, err := bls_cosi.BytesToBLSPublicKey(
+								c.GetSenderPubkey(),
+							)
+							if err != nil {
+								errChan <- err
+								return false
+							}
+							senderKey = key
+						}
+
+						if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
+							pubsub.BlacklistPeer(peer)
+							errChan <- err
+							return false
+						}
+
+					}
 					return true
+
 				},
 				libp2p_pubsub.WithValidatorTimeout(24),
+				libp2p_pubsub.WithValidatorConcurrency(4096),
 			)
-
-			// fmt.Println("indeed got my group id->", topicNamed)
 		}
 
 		sem := semaphore.NewWeighted(maxMessageHandlers)

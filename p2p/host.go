@@ -59,6 +59,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	p2pHost, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(listenAddr),
 		libp2p.Identity(key),
+		libp2p.NoSecurity,
 		// libp2p.DisableRelay(),
 		libp2p.EnableNATService(),
 		libp2p.ForceReachabilityPublic(),
@@ -68,7 +69,8 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	}
 
 	options := []libp2p_pubsub.Option{
-		libp2p_pubsub.WithPeerOutboundQueueSize(64),
+		libp2p_pubsub.WithValidateQueueSize(64),
+		libp2p_pubsub.WithPeerOutboundQueueSize(32),
 	}
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)

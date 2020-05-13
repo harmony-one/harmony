@@ -23,6 +23,7 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 	if len(payload) == 0 {
 		return
 	}
+
 	var m msg_pb.Message
 
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
@@ -62,9 +63,8 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		}
 	}
 
-	intendedForValidator, intendedForLeader :=
-		!consensus.IsLeader(),
-		consensus.IsLeader()
+	intendedForLeader := consensus.IsLeader()
+	intendedForValidator := !intendedForLeader
 
 	switch t := msg.Type; true {
 	// Handle validator intended messages first
@@ -81,13 +81,9 @@ func (consensus *Consensus) handleMessageUpdate(payload []byte) {
 		consensus.validatorSanityChecks(msg):
 		consensus.onCommitted(msg)
 	// Handle leader intended messages now
-	case t == msg_pb.MessageType_PREPARE &&
-		intendedForLeader &&
-		consensus.leaderSanityChecks(msg):
+	case t == msg_pb.MessageType_PREPARE && intendedForLeader:
 		consensus.onPrepare(msg)
-	case t == msg_pb.MessageType_COMMIT &&
-		intendedForLeader &&
-		consensus.leaderSanityChecks(msg):
+	case t == msg_pb.MessageType_COMMIT && intendedForLeader:
 		consensus.onCommit(msg)
 	case t == msg_pb.MessageType_VIEWCHANGE &&
 		consensus.viewChangeSanityCheck(msg):
