@@ -393,7 +393,7 @@ func (node *Node) Start() error {
 		go func() {
 
 			for msg := range msgChan {
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 				msg := msg
 
 				go func() {

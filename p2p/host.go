@@ -59,8 +59,6 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	p2pHost, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(listenAddr),
 		libp2p.Identity(key),
-		// libp2p.NoSecurity,
-		// libp2p.DisableRelay(),
 		libp2p.EnableNATService(),
 		libp2p.ForceReachabilityPublic(),
 	)
