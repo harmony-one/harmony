@@ -195,16 +195,29 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			msg_pb.MessageType_PREPARED, recvMsg.BlockNum,
 		)
 		preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
-
-		if preparedMsg != nil && consensus.FBFTLog.GetBlockByHash(
-			preparedMsg.BlockHash,
-		) != nil {
+		hasBlock := false
+		if preparedMsg != nil {
+			if preparedBlock := consensus.FBFTLog.GetBlockByHash(
+				preparedMsg.BlockHash,
+			); preparedBlock != nil {
+				if consensus.BlockVerifier(preparedBlock); err != nil {
+					consensus.getLogger().Error().Err(err).Msg("[onViewChange] My own prepared block verification failed")
+				} else {
+					hasBlock = true
+				}
+			}
+		}
+		if hasBlock {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M1 type messaage")
 			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
 				consensus.bhpSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(msgToSign)
 				consensus.bhpBitmap[recvMsg.ViewID].SetKey(key, true)
+			}
+			// if m1Payload is empty, we just add one
+			if len(consensus.m1Payload) == 0 {
+				consensus.m1Payload = append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 			}
 		} else {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
@@ -357,7 +370,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	consensus.viewIDBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey, true)
 	consensus.getLogger().Debug().
 		Int("have", len(consensus.viewIDSigs[recvMsg.ViewID])).
-		Int64("needed", consensus.Decider.TwoThirdsSignersCount()).
+		Int64("total", consensus.Decider.ParticipantsCount()).
 		Msg("[onViewChange]")
 
 	// received enough view change messages, change state to normal consensus
