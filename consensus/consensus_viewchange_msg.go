@@ -32,20 +32,28 @@ func (consensus *Consensus) constructViewChangeMessage(pubKey *bls.PublicKey, pr
 	// next leader key already updated
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
 
-	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
-		msg_pb.MessageType_PREPARED, consensus.blockNum, consensus.blockHash,
+	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
+		msg_pb.MessageType_PREPARED, consensus.blockNum,
 	)
 	preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
 	var encodedBlock []byte
 	if preparedMsg != nil {
 		block := consensus.FBFTLog.GetBlockByHash(preparedMsg.BlockHash)
+		utils.Logger().Debug().
+			Interface("Block", block).
+			Interface("preparedMsg", preparedMsg).
+			Msg("[constructViewChangeMessage] found prepared msg")
 		if block != nil {
-			tmpEncoded, err := rlp.EncodeToBytes(block)
-			if err != nil {
-				consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed encoding block")
+			if err := consensus.BlockVerifier(block); err == nil {
+				tmpEncoded, err := rlp.EncodeToBytes(block)
+				if err != nil {
+					consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed encoding block")
+				}
+				encodedBlock = tmpEncoded
+			} else {
+				consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed validating prepared block")
 			}
-			encodedBlock = tmpEncoded
 		}
 	}
 
