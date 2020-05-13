@@ -41,7 +41,6 @@ import (
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -385,7 +384,7 @@ func (node *Node) Start() error {
 				},
 				libp2p_pubsub.WithValidatorTimeout(24),
 				libp2p_pubsub.WithValidatorConcurrency(8096),
-				libp2p_pubsub.WithValidatorInline(true),
+				// libp2p_pubsub.WithValidatorInline(true),
 			)
 		}
 
@@ -394,46 +393,9 @@ func (node *Node) Start() error {
 
 		go func() {
 
-			miniS := utils.Logger().Sample(
-				zerolog.LevelSampler{
-					DebugSampler: &zerolog.BurstSampler{
-						Burst:       1,
-						Period:      4 * time.Second,
-						NextSampler: &zerolog.BasicSampler{N: 300},
-					},
-				},
-			).With().Str("pubsub-topic", topicNamed).Logger()
-
-			var total, consens, nodeB uint64 = 0, 0, 0
-
 			for msg := range msgChan {
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				msg := msg
-
-				payload := msg.GetData()
-				cat := proto.MessageCategory(
-					payload[p2pMsgPrefixSize:][proto.MessageCategoryBytes-1],
-				)
-
-				isConsensusBound := cat == proto.Consensus
-				isNodeBound := cat == proto.Node
-				total++
-
-				if isConsensusBound {
-					consens++
-				}
-
-				if isNodeBound {
-					nodeB++
-				}
-
-				miniS.Info().
-					Uint64("consensus-count", consens).
-					Uint64("nodeb", nodeB).
-					Uint64("total", total).
-					Float64("as-percentage-cons", float64(consens)/float64(total)).
-					Float64("as-percentage-nodeB", float64(nodeB)/float64(total)).
-					Msg("proportion under spamming")
 
 				go func() {
 					defer cancel()
@@ -449,6 +411,7 @@ func (node *Node) Start() error {
 							}
 							errChan <- ctx.Err()
 						default:
+							payload := msg.GetData()
 							node.HandleMessage(
 								payload[p2pMsgPrefixSize:], msg.GetFrom(),
 							)
@@ -461,7 +424,6 @@ func (node *Node) Start() error {
 		go func() {
 
 			for {
-
 				nextMsg, err := sub.Next(context.Background())
 				if err != nil {
 					errChan <- err
@@ -470,7 +432,6 @@ func (node *Node) Start() error {
 
 				payload := nextMsg.GetData()
 				if len(payload) < p2pMsgPrefixSize {
-					// TODO understand why this happens
 					continue
 				}
 
