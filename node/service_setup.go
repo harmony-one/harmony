@@ -57,8 +57,8 @@ func (node *Node) setupForExplorerNode() {
 	)
 }
 
-// ServiceManagerSetup setups service store.
-func (node *Node) ServiceManagerSetup() {
+// RunServices runs registered services.
+func (node *Node) RunServices() {
 	node.initNodeConfiguration()
 
 	switch node.NodeConfig.Role() {
@@ -67,11 +67,8 @@ func (node *Node) ServiceManagerSetup() {
 	case nodeconfig.ExplorerNode:
 		node.setupForExplorerNode()
 	}
-	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
-}
 
-// RunServices runs registered services.
-func (node *Node) RunServices() {
+	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
 	node.serviceManager.RunServices()
 }
 
