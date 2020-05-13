@@ -72,11 +72,6 @@ func (node *Node) RunServices() {
 	node.serviceManager.RunServices()
 }
 
-// StopServices runs registered services.
-func (node *Node) StopServices() {
-	node.serviceManager.StopServicesByRole([]service.Type{})
-}
-
 func (node *Node) networkInfoDHTPath() string {
 	return fmt.Sprintf(".dht-%s-%s-c%s",
 		node.SelfPeer.IP,
