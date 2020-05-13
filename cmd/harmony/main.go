@@ -121,14 +121,9 @@ var (
 func initSetup() {
 
 	// Setup pprof
-	// if *port == "9000" {
-	go func() { http.ListenAndServe(":6060", nil) }()
-	// }
-
-	// if *port == "9001" {
-	// 	go func() { http.ListenAndServe(":6061", nil) }()
-	// }
-
+	if addr := *pprof; addr != "" {
+		go func() { http.ListenAndServe(addr, nil) }()
+	}
 	// maybe request passphrase for bls key.
 	if *cmkEncryptedBLSKey == "" {
 		passphraseForBLS()
