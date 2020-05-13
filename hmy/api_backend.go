@@ -720,8 +720,11 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 	validatorSpreads := map[common.Address]numeric.Dec{}
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
-		if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
-			return nil, err
+		// before staking skip computing
+		if b.hmy.BlockChain().Config().IsStaking(prevCommittee.Epoch) {
+			if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
+				return nil, err
+			}
 		}
 		rawStakes = b.readAndUpdateRawStakes(thenE, decider, comm, rawStakes, validatorSpreads)
 		then.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
@@ -733,7 +736,12 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(
+				err,
+				"committee is only available from staking epoch: %v, current epoch: %v",
+				b.hmy.BlockChain().Config().StakingEpoch,
+				b.hmy.BlockChain().CurrentHeader().Epoch(),
+			)
 		}
 		rawStakes = b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
 		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
