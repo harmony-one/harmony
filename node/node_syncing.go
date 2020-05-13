@@ -266,8 +266,13 @@ func (node *Node) SupportBeaconSyncing() {
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
 func (node *Node) SupportSyncing() {
-	node.InitSyncingServer()
-	node.StartSyncingServer()
+	if node.downloaderServer == nil {
+		node.downloaderServer = downloader.NewServer(node)
+	}
+	utils.Logger().Info().Msg("[SYNC] support_syncing: StartSyncingServer")
+	if node.downloaderServer.GrpcServer == nil {
+		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
+	}
 
 	joinConsensus := false
 	// Check if the current node is explorer node.
@@ -277,21 +282,6 @@ func (node *Node) SupportSyncing() {
 	}
 
 	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
-}
-
-// InitSyncingServer starts downloader server.
-func (node *Node) InitSyncingServer() {
-	if node.downloaderServer == nil {
-		node.downloaderServer = downloader.NewServer(node)
-	}
-}
-
-// StartSyncingServer starts syncing server.
-func (node *Node) StartSyncingServer() {
-	utils.Logger().Info().Msg("[SYNC] support_syncing: StartSyncingServer")
-	if node.downloaderServer.GrpcServer == nil {
-		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
-	}
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
