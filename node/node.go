@@ -320,6 +320,8 @@ func (node *Node) Start() error {
 		return errors.New("have no topics to listen to")
 	}
 
+	errNotRightKeySize := errors.New("key received over wire is wrong size")
+	errNoSenderPubKey := errors.New("no sender public BLS key in message")
 	pubsub := node.host.PubSub()
 
 	const (
@@ -380,16 +382,31 @@ func (node *Node) Start() error {
 						return false
 					}
 
-					if c := m.GetConsensus(); c.GetSenderPubkey() != nil {
-						key, err := bls_cosi.BytesToBLSPublicKey(
-							c.GetSenderPubkey(),
-						)
-						if err != nil {
-							errChan <- withError{err, msg}
-							return false
-						}
-						senderKey = key
+					var senderPubKeyViaWire []byte
+					maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
+
+					if maybeCon != nil {
+						senderPubKeyViaWire = maybeCon.GetSenderPubkey()
+					} else if maybeVC != nil {
+						senderPubKeyViaWire = maybeVC.GetSenderPubkey()
+					} else {
+						errChan <- withError{errNoSenderPubKey, nil}
+						return false
 					}
+
+					if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
+						errChan <- withError{errNotRightKeySize, nil}
+						return false
+					}
+
+					key, err := bls_cosi.BytesToBLSPublicKey(
+						senderPubKeyViaWire,
+					)
+					if err != nil {
+						errChan <- withError{err, msg}
+						return false
+					}
+					senderKey = key
 
 					if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
 						pubsub.BlacklistPeer(peer)
@@ -482,9 +499,15 @@ func New(
 	blacklist map[common.Address]struct{},
 	isArchival bool,
 ) *Node {
-	node := Node{}
-	node.unixTimeAtNodeStart = time.Now().Unix()
-	node.TransactionErrorSink = types.NewTransactionErrorSink()
+	node := Node{
+		BlockChannel:          make(chan *types.Block),
+		ConfirmedBlockChannel: make(chan *types.Block),
+		BeaconBlockChannel:    make(chan *types.Block),
+		unixTimeAtNodeStart:   time.Now().Unix(),
+		TransactionErrorSink:  types.NewTransactionErrorSink(),
+		serviceManager:        &service.Manager{},
+		serviceMessageChan:    map[service.Type]chan *msg_pb.Message{},
+	}
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -531,12 +554,11 @@ func New(
 			os.Exit(-1)
 		}
 
-		node.BlockChannel = make(chan *types.Block)
-		node.ConfirmedBlockChannel = make(chan *types.Block)
-		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 		txPoolConfig.Blacklist = blacklist
-		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
+		node.TxPool = core.NewTxPool(
+			txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink,
+		)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 

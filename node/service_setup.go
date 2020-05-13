@@ -3,7 +3,6 @@ package node
 import (
 	"fmt"
 
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
 	"github.com/harmony-one/harmony/api/service/clientsupport"
@@ -11,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 func (node *Node) setupForValidator() {
@@ -61,8 +59,6 @@ func (node *Node) setupForExplorerNode() {
 
 // ServiceManagerSetup setups service store.
 func (node *Node) ServiceManagerSetup() {
-	node.serviceManager = &service.Manager{}
-	node.serviceMessageChan = make(map[service.Type]chan *msg_pb.Message)
 	node.initNodeConfiguration()
 
 	switch node.NodeConfig.Role() {
@@ -76,19 +72,11 @@ func (node *Node) ServiceManagerSetup() {
 
 // RunServices runs registered services.
 func (node *Node) RunServices() {
-	if node.serviceManager == nil {
-		utils.Logger().Info().Msg("Service manager is not set up yet.")
-		return
-	}
 	node.serviceManager.RunServices()
 }
 
 // StopServices runs registered services.
 func (node *Node) StopServices() {
-	if node.serviceManager == nil {
-		utils.Logger().Info().Msg("Service manager is not set up yet.")
-		return
-	}
 	node.serviceManager.StopServicesByRole([]service.Type{})
 }
 
