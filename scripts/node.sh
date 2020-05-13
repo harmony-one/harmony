@@ -493,7 +493,7 @@ download_binaries() {
       verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
       msg "downloaded ${bin}"
    done
-   chmod +x "${outdir}/harmony"
+   chmod +x "${outdir}/harmony" "${outdir}/node.sh"
    (cd "${outdir}" && exec openssl sha256 $(cut -c35- md5sum.txt)) > "${outdir}/harmony-checksums.txt"
 }
 
