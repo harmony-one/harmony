@@ -35,6 +35,7 @@ func (bc *BlockChain) CommitOffChainData(
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
 	isBeaconChain := bc.CurrentHeader().ShardID() == shard.BeaconChainShardID
 	isStaking := bc.chainConfig.IsStaking(block.Epoch())
+	isPreStaking := bc.chainConfig.IsPreStaking(block.Epoch())
 	header := block.Header()
 	isNewEpoch := len(header.ShardState()) > 0
 	// Cross-shard txns
@@ -253,34 +254,8 @@ func (bc *BlockChain) CommitOffChainData(
 
 				}
 			}
-			type t struct {
-				addr  common.Address
-				stats *staking.ValidatorStats
-			}
 
-			sortedStats, i := make([]t, len(tempValidatorStats)), 0
-			for key := range tempValidatorStats {
-				sortedStats[i] = t{key, tempValidatorStats[key]}
-				i++
-			}
-
-			sort.SliceStable(
-				sortedStats,
-				func(i, j int) bool {
-					return bytes.Compare(
-						sortedStats[i].addr[:], sortedStats[j].addr[:],
-					) == -1
-				},
-			)
-			for _, stat := range sortedStats {
-				if err := rawdb.WriteValidatorStats(
-					batch, stat.addr, stat.stats,
-				); err != nil {
-					utils.Logger().Info().Err(err).
-						Str("validator address", stat.addr.Hex()).
-						Msg("could not update stats for validator")
-				}
-			}
+			bc.writeValidatorStats(tempValidatorStats, batch)
 
 			records := slash.Records{}
 			if s := header.Slashes(); len(s) > 0 {
@@ -291,6 +266,10 @@ func (bc *BlockChain) CommitOffChainData(
 					utils.Logger().Debug().Err(err).Msg("could not deleting pending slashes")
 				}
 			}
+		} else if isNewEpoch && isPreStaking {
+			// if prestaking and last block, write out the validator stats
+			// so that it is available for the staking epoch
+			bc.writeValidatorStats(tempValidatorStats, batch)
 		} else {
 			// block reward never accumulate before staking
 			bc.WriteBlockRewardAccumulator(batch, common.Big0, block.Number().Uint64())
@@ -298,6 +277,40 @@ func (bc *BlockChain) CommitOffChainData(
 	}
 
 	return CanonStatTy, nil
+}
+
+func (bc *BlockChain) writeValidatorStats(
+	tempValidatorStats map[common.Address]*staking.ValidatorStats,
+	batch rawdb.DatabaseWriter,
+) {
+	type t struct {
+		addr  common.Address
+		stats *staking.ValidatorStats
+	}
+
+	sortedStats, i := make([]t, len(tempValidatorStats)), 0
+	for key := range tempValidatorStats {
+		sortedStats[i] = t{key, tempValidatorStats[key]}
+		i++
+	}
+
+	sort.SliceStable(
+		sortedStats,
+		func(i, j int) bool {
+			return bytes.Compare(
+				sortedStats[i].addr[:], sortedStats[j].addr[:],
+			) == -1
+		},
+	)
+	for _, stat := range sortedStats {
+		if err := rawdb.WriteValidatorStats(
+			batch, stat.addr, stat.stats,
+		); err != nil {
+			utils.Logger().Info().Err(err).
+				Str("validator address", stat.addr.Hex()).
+				Msg("could not update stats for validator")
+		}
+	}
 }
 
 func (bc *BlockChain) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
