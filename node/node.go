@@ -261,7 +261,7 @@ func (node *Node) AddPendingStakingTransaction(
 		return nil
 	}
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-		errs := node.addPendingStakingTransactions([]*staking.StakingTransaction{newStakingTx})
+		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
 		for i := range errs {
 			if errs[i] != nil {
 				return errs[i]
