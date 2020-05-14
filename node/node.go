@@ -472,6 +472,10 @@ func (node *Node) Start() error {
 							errChan <- withError{ctx.Err(), nil}
 						default:
 							payload := msg.GetData()
+							if len(payload) < p2pMsgPrefixSize {
+								errChan <- withError{errMsgHadNoHMYPayLoadAssumption, msg}
+								return
+							}
 							node.HandleMessage(
 								payload[p2pMsgPrefixSize:], msg.GetFrom(),
 							)
