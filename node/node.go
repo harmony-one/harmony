@@ -315,6 +315,20 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 // Start kicks off the node message handling
 func (node *Node) Start() error {
+
+	groups := []nodeconfig.GroupID{
+		node.NodeConfig.GetShardGroupID(),
+		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
+		node.NodeConfig.GetClientGroupID(),
+	}
+
+	for i := range groups {
+		s := string(groups[i])
+		if _, err := node.host.GetOrJoin(s); err != nil {
+			return err
+		}
+	}
+
 	allTopics := node.host.AllTopics()
 	if len(allTopics) == 0 {
 		return errors.New("have no topics to listen to")
@@ -684,21 +698,6 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			return nil
 		}
 	}
-	return nil
-}
-
-func (node *Node) initNodeConfiguration() error {
-	groups := []nodeconfig.GroupID{
-		node.NodeConfig.GetShardGroupID(),
-		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
-		node.NodeConfig.GetClientGroupID(),
-	}
-
-	// force the side effect of topic join
-	if err := node.host.SendMessageToGroups(groups, []byte{}); err != nil {
-		return err
-	}
-
 	return nil
 }
 

@@ -14,13 +14,6 @@ import (
 
 func (node *Node) setupForValidator() {
 
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(
-		service.NetworkInfo,
-		networkinfo.MustNew(
-			node.host, node.NodeConfig.GetShardGroupID(), nil, node.networkInfoDHTPath(),
-		),
-	)
 	// Register consensus service.
 	node.serviceManager.RegisterService(
 		service.Consensus,
@@ -43,7 +36,8 @@ func (node *Node) setupForValidator() {
 	}
 }
 
-func (node *Node) setupForExplorerNode() {
+// RunServices runs registered services.
+func (node *Node) RunServices() {
 
 	// Register networkinfo service.
 	node.serviceManager.RegisterService(
@@ -51,21 +45,14 @@ func (node *Node) setupForExplorerNode() {
 		networkinfo.MustNew(
 			node.host, node.NodeConfig.GetShardGroupID(), nil, node.networkInfoDHTPath()),
 	)
-	// Register explorer service.
-	node.serviceManager.RegisterService(
-		service.SupportExplorer, explorer.New(&node.SelfPeer),
-	)
-}
-
-// RunServices runs registered services.
-func (node *Node) RunServices() {
-	node.initNodeConfiguration()
 
 	switch node.NodeConfig.Role() {
 	case nodeconfig.Validator:
 		node.setupForValidator()
 	case nodeconfig.ExplorerNode:
-		node.setupForExplorerNode()
+		node.serviceManager.RegisterService(
+			service.SupportExplorer, explorer.New(&node.SelfPeer),
+		)
 	}
 
 	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
