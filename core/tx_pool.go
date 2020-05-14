@@ -920,7 +920,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		pool.priced.Put(tx)
 		pool.journalTx(from, tx)
 
-		logger.Warn().
+		logger.Info().
 			Str("hash", tx.Hash().Hex()).
 			Interface("from", from).
 			Interface("to", tx.To()).
@@ -945,7 +945,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 	}
 	pool.journalTx(from, tx)
 
-	logger.Warn().
+	logger.Info().
 		Str("hash", hash.Hex()).
 		Interface("from", from).
 		Interface("to", tx.To()).
@@ -1220,7 +1220,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		nonce := pool.currentState.GetNonce(addr)
 		for _, tx := range list.Forward(nonce) {
 			hash := tx.Hash()
-			logger.Warn().Str("hash", hash.Hex()).Msg("Removed old queued transaction")
+			logger.Info().Str("hash", hash.Hex()).Msg("Removed old queued transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 		}
@@ -1237,7 +1237,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
 			hash := tx.Hash()
 			if pool.promoteTx(addr, hash, tx) {
-				logger.Warn().Str("hash", hash.Hex()).Msg("Promoting queued transaction")
+				logger.Info().Str("hash", hash.Hex()).Msg("Promoting queued transaction")
 				promoted = append(promoted, tx)
 			}
 		}
@@ -1391,7 +1391,7 @@ func (pool *TxPool) demoteUnexecutables() {
 		// Drop all transactions that are deemed too old (low nonce)
 		for _, tx := range list.Forward(nonce) {
 			hash := tx.Hash()
-			logger.Warn().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
+			logger.Info().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 		}
@@ -1406,7 +1406,7 @@ func (pool *TxPool) demoteUnexecutables() {
 		}
 		for _, tx := range invalids {
 			hash := tx.Hash()
-			logger.Warn().Str("hash", hash.Hex()).Msg("Demoting pending transaction")
+			logger.Info().Str("hash", hash.Hex()).Msg("Demoting pending transaction")
 			if _, err := pool.enqueueTx(hash, tx); err != nil {
 				pool.txErrorSink.Add(tx, err)
 			}
