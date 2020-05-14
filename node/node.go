@@ -411,6 +411,7 @@ func (node *Node) Start() error {
 					)
 
 					if err := protobuf.Unmarshal(cnsMsg, &m); err != nil {
+						pubsub.BlacklistPeer(peer)
 						errChan <- withError{errors.WithStack(err), msg}
 						return false
 					}
@@ -517,9 +518,9 @@ func (node *Node) Start() error {
 	}
 
 	for e := range errChan {
-		utils.Logger().Debug().Err(e.err).
+		utils.Logger().Debug().
 			Interface("item", e.payload).
-			Msgf("issue while handling incoming p2p message")
+			Msgf("issue while handling incoming p2p message %v", e.err)
 	}
 	// NOTE never gets here
 	return nil
