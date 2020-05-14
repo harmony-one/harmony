@@ -315,26 +315,39 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 // Start kicks off the node message handling
 func (node *Node) Start() error {
-	groups := map[nodeconfig.GroupID]struct{}{}
-	for _, t := range []nodeconfig.GroupID{
-		node.NodeConfig.GetShardGroupID(),
-		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
-		node.NodeConfig.GetClientGroupID(),
+	type t struct {
+		tp    nodeconfig.GroupID
+		isCon bool
+	}
+	groups := map[nodeconfig.GroupID]bool{}
+	for _, t := range []t{
+		{node.NodeConfig.GetShardGroupID(), true},
+		{nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID), false},
+		{node.NodeConfig.GetClientGroupID(), false},
 	} {
-		if _, ok := groups[t]; !ok {
-			groups[t] = struct{}{}
+		if _, ok := groups[t.tp]; !ok {
+			groups[t.tp] = t.isCon
 		}
 	}
 
-	var allTopics []p2p.NamedTopic
+	type u struct {
+		p2p.NamedTopic
+		consensusBound bool
+	}
 
-	for i := range groups {
-		s := string(i)
-		topicHandle, err := node.host.GetOrJoin(s)
+	var allTopics []u
+
+	for key, isCon := range groups {
+		topicHandle, err := node.host.GetOrJoin(string(key))
 		if err != nil {
 			return err
 		}
-		allTopics = append(allTopics, p2p.NamedTopic{s, topicHandle})
+		allTopics = append(
+			allTopics, u{
+				NamedTopic:     p2p.NamedTopic{string(key), topicHandle},
+				consensusBound: isCon,
+			},
+		)
 	}
 
 	errNotRightKeySize := errors.New("key received over wire is wrong size")
@@ -482,14 +495,10 @@ func (node *Node) Start() error {
 					continue
 				}
 
-				payload := nextMsg.GetData()
-				if len(payload) < p2pMsgPrefixSize {
-					continue
-				}
-
 				if nextMsg.GetFrom() == ownID {
 					continue
 				}
+
 				msgChan <- nextMsg
 			}
 		}()
