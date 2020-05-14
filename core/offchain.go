@@ -266,11 +266,12 @@ func (bc *BlockChain) CommitOffChainData(
 					utils.Logger().Debug().Err(err).Msg("could not deleting pending slashes")
 				}
 			}
-		} else if isNewEpoch && isPreStaking {
-			// if prestaking and last block, write out the validator stats
-			// so that it is available for the staking epoch
-			bc.writeValidatorStats(tempValidatorStats, batch)
 		} else {
+			if isNewEpoch && isPreStaking {
+				// if prestaking and last block, write out the validator stats
+				// so that it is available for the staking epoch
+				bc.writeValidatorStats(tempValidatorStats, batch)
+			}
 			// block reward never accumulate before staking
 			bc.WriteBlockRewardAccumulator(batch, common.Big0, block.Number().Uint64())
 		}
