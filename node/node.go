@@ -234,9 +234,8 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) []error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
-		node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
-		poolTxs := types.PoolTransactions{}
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID && node.isPreStakingEpoch() {
+		poolTxs := make(types.PoolTransactions, 0, len(newStakingTxs))
 		for _, tx := range newStakingTxs {
 			poolTxs = append(poolTxs, tx)
 		}
@@ -256,17 +255,26 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 func (node *Node) AddPendingStakingTransaction(
 	newStakingTx *staking.StakingTransaction,
 ) error {
+	if !node.isPreStakingEpoch() {
+		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).
+			Msg("Drop Staking Tx while not in Staking Epoch")
+		return nil
+	}
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
-		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+		errs := node.addPendingStakingTransactions([]*staking.StakingTransaction{newStakingTx})
 		for i := range errs {
 			if errs[i] != nil {
 				return errs[i]
 			}
 		}
-		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
-		node.tryBroadcastStaking(newStakingTx)
 	}
+	utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
+	node.tryBroadcastStaking(newStakingTx)
 	return nil
+}
+
+func (node *Node) isPreStakingEpoch() bool {
+	return node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch())
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
