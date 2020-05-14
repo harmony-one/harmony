@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -66,9 +67,18 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 
+	const (
+		setAsideForConsensus = 1 << 14
+		setAsideOtherwise    = 1 << 12
+		maxMessageHandlers   = setAsideForConsensus + setAsideOtherwise
+	)
+
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithValidateQueueSize(64),
 		libp2p_pubsub.WithPeerOutboundQueueSize(32),
+		// okay to use more than cores - we are using async validation
+		libp2p_pubsub.WithValidateWorkers(runtime.NumCPU() * 2),
+		libp2p_pubsub.WithValidateThrottle(maxMessageHandlers),
 	}
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)

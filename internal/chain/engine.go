@@ -209,29 +209,35 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 			return err
 		}
 		if !d.IsQuorumAchievedByMask(mask) {
-			return errors.New(
-				"[VerifySeal] Not enough voting power in LastCommitSignature from Block Header",
-			)
+			return errors.WithStack(errors.New(
+				"not enough voting power in LastCommitSignature from Block Header",
+			))
 		}
 	} else {
 		parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
 		if err != nil {
-			return errors.Wrapf(err,
-				"cannot calculate quorum for block %s", header.Number())
+			return errors.WithStack(errors.Wrapf(
+				err, "cannot calculate quorum for block %s", header.Number(),
+			))
 		}
 		if count := utils.CountOneBits(mask.Bitmap); count < int64(parentQuorum) {
-			return errors.Errorf(
-				"[VerifySeal] need %d signature in LastCommitSignature have %d",
+			return errors.WithStack(errors.Errorf(
+				"need %d signature in LastCommitSignature have %d",
 				parentQuorum, count,
-			)
+			))
 		}
 	}
 
-	lastCommitPayload := signature.ConstructCommitPayload(chain,
-		parentHeader.Epoch(), parentHeader.Hash(), parentHeader.Number().Uint64(), parentHeader.ViewID().Uint64())
+	lastCommitPayload := signature.ConstructCommitPayload(
+		chain,
+		parentHeader.Epoch(),
+		parentHeader.Hash(),
+		parentHeader.Number().Uint64(),
+		parentHeader.ViewID().Uint64(),
+	)
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
-		const msg = "[VerifySeal] Unable to verify aggregated signature from last block"
-		return errors.New(msg)
+		const msg = "unable to verify aggregated signature from last block"
+		return errors.WithStack(errors.New(msg))
 	}
 	return nil
 }

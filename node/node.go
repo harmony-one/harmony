@@ -362,8 +362,8 @@ func (node *Node) Start() error {
 	pubsub := node.host.PubSub()
 
 	const (
-		setAsideForConsensus = 12500
-		setAsideOtherwise    = 2000
+		setAsideForConsensus = 1 << 14
+		setAsideOtherwise    = 1 << 12
 		maxMessageHandlers   = setAsideForConsensus + setAsideOtherwise
 	)
 
@@ -389,7 +389,7 @@ func (node *Node) Start() error {
 				Str("topic", topicNamed).
 				Msg("enabled topic validation on consensus bound messages")
 
-			pubsub.RegisterTopicValidator(
+			if err := pubsub.RegisterTopicValidator(
 				topicNamed,
 				func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
 
@@ -452,8 +452,10 @@ func (node *Node) Start() error {
 
 				},
 				libp2p_pubsub.WithValidatorTimeout(24),
-				libp2p_pubsub.WithValidatorConcurrency(8096),
-			)
+				libp2p_pubsub.WithValidatorConcurrency(setAsideForConsensus),
+			); err != nil {
+				return err
+			}
 		}
 
 		sem := semaphore.NewWeighted(maxMessageHandlers)
