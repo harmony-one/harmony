@@ -392,7 +392,9 @@ func (node *Node) Start() error {
 
 					if len(hmyMsg) < p2pMsgPrefixSize {
 						pubsub.BlacklistPeer(peer)
-						errChan <- withError{errMsgHadNoHMYPayLoadAssumption, nil}
+						errChan <- withError{
+							errors.WithStack(errMsgHadNoHMYPayLoadAssumption), nil,
+						}
 						return false
 					}
 
@@ -404,7 +406,7 @@ func (node *Node) Start() error {
 					)
 
 					if err := protobuf.Unmarshal(cnsMsg, &m); err != nil {
-						errChan <- withError{err, msg}
+						errChan <- withError{errors.WithStack(err), msg}
 						return false
 					}
 
@@ -416,12 +418,12 @@ func (node *Node) Start() error {
 					} else if maybeVC != nil {
 						senderPubKeyViaWire = maybeVC.GetSenderPubkey()
 					} else {
-						errChan <- withError{errNoSenderPubKey, nil}
+						errChan <- withError{errors.WithStack(errNoSenderPubKey), nil}
 						return false
 					}
 
 					if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
-						errChan <- withError{errNotRightKeySize, nil}
+						errChan <- withError{errors.WithStack(errNotRightKeySize), nil}
 						return false
 					}
 
@@ -429,14 +431,14 @@ func (node *Node) Start() error {
 						senderPubKeyViaWire,
 					)
 					if err != nil {
-						errChan <- withError{err, msg}
+						errChan <- withError{errors.WithStack(err), msg}
 						return false
 					}
 					senderKey = key
 
 					if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
 						pubsub.BlacklistPeer(peer)
-						errChan <- withError{err, m}
+						errChan <- withError{errors.WithStack(err), m}
 						return false
 					}
 
@@ -469,13 +471,15 @@ func (node *Node) Start() error {
 								utils.Logger().Info().
 									Str("topic", topicNamed).Msg("exceeded deadline")
 							}
-							errChan <- withError{ctx.Err(), nil}
+							errChan <- withError{errors.WithStack(ctx.Err()), nil}
 						default:
 							payload := msg.GetData()
 
 							if c := len(payload); c < p2pMsgPrefixSize {
 								errChan <- withError{
-									errors.Wrapf(errMsgHadNoHMYPayLoadAssumption, "len was %d", c),
+									errors.WithStack(
+										errors.Wrapf(errMsgHadNoHMYPayLoadAssumption, "len was %d", c),
+									),
 									msg,
 								}
 								return
@@ -494,7 +498,7 @@ func (node *Node) Start() error {
 			for {
 				nextMsg, err := sub.Next(context.Background())
 				if err != nil {
-					errChan <- withError{err, nil}
+					errChan <- withError{errors.WithStack(err), nil}
 					continue
 				}
 
@@ -508,9 +512,9 @@ func (node *Node) Start() error {
 	}
 
 	for e := range errChan {
-		utils.Logger().Info().Err(e.err).
+		utils.Logger().Debug().Err(e.err).
 			Interface("item", e.payload).
-			Msg("issue while handling incoming p2p message")
+			Msgf("issue while handling incoming p2p message")
 	}
 	// NOTE never gets here
 	return nil
