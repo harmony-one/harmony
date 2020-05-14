@@ -36,6 +36,7 @@ type Host interface {
 	AllTopics() []NamedTopic
 	PubSub() *libp2p_pubsub.PubSub
 	C() (int, int, int)
+	GetOrJoin(topic string) (*libp2p_pubsub.Topic, error)
 }
 
 // Peer is the object for a p2p peer (node)
@@ -132,7 +133,8 @@ func (host *HostV2) C() (int, int, int) {
 	return len(peers), connected, not
 }
 
-func (host *HostV2) getTopic(topic string) (*libp2p_pubsub.Topic, error) {
+// GetOrJoin ..
+func (host *HostV2) GetOrJoin(topic string) (*libp2p_pubsub.Topic, error) {
 	host.lock.Lock()
 	defer host.lock.Unlock()
 	if t, ok := host.joined[topic]; ok {
@@ -151,7 +153,8 @@ func (host *HostV2) getTopic(topic string) (*libp2p_pubsub.Topic, error) {
 func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) (err error) {
 
 	for _, group := range groups {
-		t, e := host.getTopic(string(group))
+		s := string(group)
+		t, e := host.GetOrJoin(s)
 		if e != nil {
 			err = e
 			continue
