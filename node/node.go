@@ -315,23 +315,26 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 
 // Start kicks off the node message handling
 func (node *Node) Start() error {
-
-	groups := []nodeconfig.GroupID{
+	groups := map[nodeconfig.GroupID]struct{}{}
+	for _, t := range []nodeconfig.GroupID{
 		node.NodeConfig.GetShardGroupID(),
 		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
 		node.NodeConfig.GetClientGroupID(),
-	}
-
-	for i := range groups {
-		s := string(groups[i])
-		if _, err := node.host.GetOrJoin(s); err != nil {
-			return err
+	} {
+		if _, ok := groups[t]; !ok {
+			groups[t] = struct{}{}
 		}
 	}
 
-	allTopics := node.host.AllTopics()
-	if len(allTopics) == 0 {
-		return errors.New("have no topics to listen to")
+	var allTopics []p2p.NamedTopic
+
+	for i := range groups {
+		s := string(i)
+		topicHandle, err := node.host.GetOrJoin(s)
+		if err != nil {
+			return err
+		}
+		allTopics = append(allTopics, p2p.NamedTopic{s, topicHandle})
 	}
 
 	errNotRightKeySize := errors.New("key received over wire is wrong size")
@@ -379,6 +382,7 @@ func (node *Node) Start() error {
 			pubsub.RegisterTopicValidator(
 				topicNamed,
 				func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
+					return true
 					sig2 := msg.GetData()
 					if len(sig2) < p2pMsgPrefixSize {
 						return true
