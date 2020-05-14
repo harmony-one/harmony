@@ -33,7 +33,6 @@ type Host interface {
 	ConnectHostPeer(Peer) error
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-	AllTopics() []NamedTopic
 	PubSub() *libp2p_pubsub.PubSub
 	C() (int, int, int)
 	GetOrJoin(topic string) (*libp2p_pubsub.Topic, error)
@@ -247,17 +246,6 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 type NamedTopic struct {
 	Name  string
 	Topic *libp2p_pubsub.Topic
-}
-
-// AllTopics ..
-func (host *HostV2) AllTopics() []NamedTopic {
-	host.lock.Lock()
-	defer host.lock.Unlock()
-	var topics []NamedTopic
-	for k, g := range host.joined {
-		topics = append(topics, NamedTopic{k, g})
-	}
-	return topics
 }
 
 // ConstructMessage constructs the p2p message as [messageType, contentSize, content]
