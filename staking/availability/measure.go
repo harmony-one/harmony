@@ -205,6 +205,7 @@ func ComputeAndMutateEPOSStatus(
 		wrapper.Status = effective.Inactive
 		utils.Logger().Info().
 			Str("threshold", measure.String()).
+			Interface("computed", computed).
 			Msg("validator failed availability threshold, set to inactive")
 	default:
 		// Default is no-op so validator who wants
