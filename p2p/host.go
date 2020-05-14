@@ -158,6 +158,13 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 			err = e
 			continue
 		}
+
+		if len(msg) == 0 {
+			utils.Logger().Debug().
+				Interface("topics", groups).
+				Msg("bad behavior of sending a p2p message with empty data payload")
+		}
+
 		e = t.Publish(context.Background(), msg)
 		if e != nil {
 			err = e

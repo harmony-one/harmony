@@ -337,6 +337,11 @@ func (node *Node) Start() error {
 
 	var allTopics []u
 
+	utils.Logger().Debug().
+		Interface("topics-ended-up-with", groups).
+		Uint32("shard-id", node.Consensus.ShardID).
+		Msg("starting with these topics")
+
 	for key, isCon := range groups {
 		topicHandle, err := node.host.GetOrJoin(string(key))
 		if err != nil {
