@@ -374,6 +374,10 @@ func (node *Node) Start() error {
 		payload interface{}
 	}
 
+	type validated struct {
+		consensusBound bool
+	}
+
 	errChan := make(chan withError)
 
 	for i := range allTopics {
@@ -383,79 +387,81 @@ func (node *Node) Start() error {
 		}
 
 		topicNamed := allTopics[i].Name
+		isConsensusBound := allTopics[i].consensusBound
 
-		if allTopics[i].consensusBound {
-			utils.Logger().Info().
-				Str("topic", topicNamed).
-				Msg("enabled topic validation on consensus bound messages")
+		utils.Logger().Info().
+			Str("topic", topicNamed).
+			Msg("enabled topic validation on consensus bound messages")
 
-			if err := pubsub.RegisterTopicValidator(
-				topicNamed,
-				func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
+		if err := pubsub.RegisterTopicValidator(
+			topicNamed,
+			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
 
-					hmyMsg := msg.GetData()
+				msg.ValidatorData = validated{isConsensusBound}
 
-					if len(hmyMsg) < p2pMsgPrefixSize {
-						pubsub.BlacklistPeer(peer)
-						errChan <- withError{
-							errors.WithStack(errMsgHadNoHMYPayLoadAssumption), nil,
-						}
-						return false
+				return true
+				hmyMsg := msg.GetData()
+
+				if len(hmyMsg) < p2pMsgPrefixSize {
+					pubsub.BlacklistPeer(peer)
+					errChan <- withError{
+						errors.WithStack(errMsgHadNoHMYPayLoadAssumption), nil,
 					}
+					return false
+				}
 
-					cnsMsg := hmyMsg[p2pMsgPrefixSize:][proto.MessageCategoryBytes:]
+				cnsMsg := hmyMsg[p2pMsgPrefixSize:][proto.MessageCategoryBytes:]
 
-					var (
-						m         msg_pb.Message
-						senderKey *bls.PublicKey
-					)
+				var (
+					m         msg_pb.Message
+					senderKey *bls.PublicKey
+				)
 
-					if err := protobuf.Unmarshal(cnsMsg, &m); err != nil {
-						pubsub.BlacklistPeer(peer)
-						errChan <- withError{errors.WithStack(err), msg}
-						return false
-					}
+				if err := protobuf.Unmarshal(cnsMsg, &m); err != nil {
+					pubsub.BlacklistPeer(peer)
+					errChan <- withError{errors.WithStack(err), msg}
+					return false
+				}
 
-					var senderPubKeyViaWire []byte
-					maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
+				var senderPubKeyViaWire []byte
+				maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
 
-					if maybeCon != nil {
-						senderPubKeyViaWire = maybeCon.GetSenderPubkey()
-					} else if maybeVC != nil {
-						senderPubKeyViaWire = maybeVC.GetSenderPubkey()
-					} else {
-						errChan <- withError{errors.WithStack(errNoSenderPubKey), nil}
-						return false
-					}
+				if maybeCon != nil {
+					senderPubKeyViaWire = maybeCon.GetSenderPubkey()
+				} else if maybeVC != nil {
+					senderPubKeyViaWire = maybeVC.GetSenderPubkey()
+				} else {
+					errChan <- withError{errors.WithStack(errNoSenderPubKey), nil}
+					return false
+				}
 
-					if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
-						errChan <- withError{errors.WithStack(errNotRightKeySize), nil}
-						return false
-					}
+				if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
+					errChan <- withError{errors.WithStack(errNotRightKeySize), nil}
+					return false
+				}
 
-					key, err := bls_cosi.BytesToBLSPublicKey(
-						senderPubKeyViaWire,
-					)
-					if err != nil {
-						errChan <- withError{errors.WithStack(err), msg}
-						return false
-					}
-					senderKey = key
+				key, err := bls_cosi.BytesToBLSPublicKey(
+					senderPubKeyViaWire,
+				)
+				if err != nil {
+					errChan <- withError{errors.WithStack(err), msg}
+					return false
+				}
+				senderKey = key
 
-					if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
-						pubsub.BlacklistPeer(peer)
-						errChan <- withError{errors.WithStack(err), m}
-						return false
-					}
+				if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
+					pubsub.BlacklistPeer(peer)
+					errChan <- withError{errors.WithStack(err), m}
+					return false
+				}
 
-					return true
+				return true
 
-				},
-				libp2p_pubsub.WithValidatorTimeout(24),
-				libp2p_pubsub.WithValidatorConcurrency(setAsideForConsensus),
-			); err != nil {
-				return err
-			}
+			},
+			libp2p_pubsub.WithValidatorTimeout(24),
+			libp2p_pubsub.WithValidatorConcurrency(setAsideForConsensus),
+		); err != nil {
+			return err
 		}
 
 		sem := semaphore.NewWeighted(maxMessageHandlers)
@@ -514,6 +520,9 @@ func (node *Node) Start() error {
 					continue
 				}
 
+				// if validatedMessage, ok := nextMsg.ValidatorData.(validated); ok {
+				// 	fmt.Println("here is thing", validatedMessage)
+				// }
 				msgChan <- nextMsg
 			}
 		}()
