@@ -352,6 +352,8 @@ func (node *Node) Start() error {
 
 	errNotRightKeySize := errors.New("key received over wire is wrong size")
 	errNoSenderPubKey := errors.New("no sender public BLS key in message")
+	errMsgHadNoHMYPayLoadAssumption := errors.New("did not have sufficient size for hmy msg")
+
 	pubsub := node.host.PubSub()
 
 	const (
@@ -367,10 +369,6 @@ func (node *Node) Start() error {
 		payload interface{}
 	}
 
-	nodeBeaconTopic := string(nodeconfig.NewGroupIDByShardID(
-		nodeconfig.ShardID(shard.BeaconChainShardID),
-	))
-
 	errChan := make(chan withError)
 
 	for i := range allTopics {
@@ -378,30 +376,27 @@ func (node *Node) Start() error {
 		if err != nil {
 			return err
 		}
+
 		topicNamed := allTopics[i].Name
 
-		if node.Consensus.ShardID != shard.BeaconChainShardID {
-			pubsub.RegisterTopicValidator(nodeBeaconTopic,
-				func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
-					return true
-				},
-			)
-		}
-
-		if nodeconfig.GroupID(topicNamed) == nodeconfig.NewGroupIDByShardID(
-			nodeconfig.ShardID(node.Consensus.ShardID),
-		) {
+		if allTopics[i].consensusBound {
+			utils.Logger().Info().
+				Str("topic", topicNamed).
+				Msg("enabled topic validation on consensus bound messages")
 
 			pubsub.RegisterTopicValidator(
 				topicNamed,
 				func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
-					return true
-					sig2 := msg.GetData()
-					if len(sig2) < p2pMsgPrefixSize {
-						return true
+
+					hmyMsg := msg.GetData()
+
+					if len(hmyMsg) < p2pMsgPrefixSize {
+						pubsub.BlacklistPeer(peer)
+						errChan <- withError{errMsgHadNoHMYPayLoadAssumption, nil}
+						return false
 					}
 
-					cnsMsg := sig2[p2pMsgPrefixSize:][proto.MessageCategoryBytes:]
+					cnsMsg := hmyMsg[p2pMsgPrefixSize:][proto.MessageCategoryBytes:]
 
 					var (
 						m         msg_pb.Message
