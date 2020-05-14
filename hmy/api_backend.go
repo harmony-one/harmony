@@ -433,6 +433,12 @@ func (b *APIBackend) GetValidatorInformation(
 	) % shard.Schedule.BlocksPerEpoch()
 	computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
 
+	if defaultReply.CurrentlyInCommittee {
+		defaultReply.Performance = &staking.CurrentEpochPerformance{
+			CurrentSigningPercentage: *computed,
+		}
+	}
+
 	stats, err := bc.ReadValidatorStats(addr)
 	if err != nil {
 		// when validator has no stats, default boot-status to not booted
@@ -491,9 +497,6 @@ func (b *APIBackend) GetValidatorInformation(
 	}
 
 	if defaultReply.CurrentlyInCommittee {
-		defaultReply.Performance = &staking.CurrentEpochPerformance{
-			CurrentSigningPercentage: *computed,
-		}
 		defaultReply.ComputedMetrics = stats
 		defaultReply.EPoSWinningStake = &stats.TotalEffectiveStake
 	}
