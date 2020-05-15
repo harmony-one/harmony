@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/client"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	protonode "github.com/harmony-one/harmony/api/proto/protonode"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
@@ -145,7 +146,7 @@ func (node *Node) Beaconchain() *core.BlockChain {
 
 // TODO: make this batch more transactions
 func (node *Node) tryBroadcast(tx *types.Transaction) {
-	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
+	msg := protonode.ConstructTransactionListMessageAccount(types.Transactions{tx})
 
 	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(tx.ShardID()))
 	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
@@ -161,7 +162,7 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 }
 
 func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
-	msg := proto_node.ConstructStakingTransactionListMessageAccount(staking.StakingTransactions{stakingTx})
+	msg := protonode.ConstructStakingTransactionListMessageAccount(staking.StakingTransactions{stakingTx})
 
 	shardGroupID := nodeconfig.NewGroupIDByShardID(
 		nodeconfig.ShardID(shard.BeaconChainShardID),
@@ -374,11 +375,19 @@ func (node *Node) Start() error {
 		payload interface{}
 	}
 
+	errChan := make(chan withError)
+
+	type p2pHandler func(
+		ctx context.Context,
+		isConsensusBound bool,
+		msgPayload []byte,
+	) error
+
 	type validated struct {
 		consensusBound bool
+		handle         p2pHandler
+		payload        []byte
 	}
-
-	errChan := make(chan withError)
 
 	for i := range allTopics {
 		sub, err := allTopics[i].Topic.Subscribe()
@@ -396,12 +405,7 @@ func (node *Node) Start() error {
 		if err := pubsub.RegisterTopicValidator(
 			topicNamed,
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
-
-				msg.ValidatorData = validated{isConsensusBound}
-
-				return true
 				hmyMsg := msg.GetData()
-
 				if len(hmyMsg) < p2pMsgPrefixSize {
 					pubsub.BlacklistPeer(peer)
 					errChan <- withError{
@@ -410,17 +414,61 @@ func (node *Node) Start() error {
 					return false
 				}
 
-				cnsMsg := hmyMsg[p2pMsgPrefixSize:][proto.MessageCategoryBytes:]
+				var (
+					payload []byte
+					openBox = hmyMsg[p2pMsgPrefixSize:]
+				)
+
+				switch proto.MessageCategory(openBox[proto.MessageCategoryBytes-1]) {
+				case proto.Consensus:
+					payload = openBox[proto.MessageCategoryBytes:]
+				case proto.Node:
+					msgType := byte(openBox[proto.MessageCategoryBytes+proto.MessageTypeBytes-1])
+					payload := openBox[proto.MessageCategoryBytes+proto.MessageTypeBytes:]
+					switch protonode.MessageType(msgType) {
+					case protonode.Transaction:
+					case protonode.Block:
+						blockT := protonode.BlockMessageType(payload[0])
+						switch blockT {
+						case protonode.Sync:
+							var blocks []*types.Block
+							if err := rlp.DecodeBytes(payload[1:], &blocks); err != nil {
+								return false
+							}
+
+							fmt.Println("got the payload - was blocks", blocks)
+						}
+						// fmt.Println("look actually was a block", msg.String())
+					case protonode.Staking:
+					default:
+
+					}
+					fmt.Println("msgtype is->", msgType)
+					return true
+					payload = hmyMsg[proto.MessageCategoryBytes+proto.MessageTypeBytes:]
+				default:
+					pubsub.BlacklistPeer(peer)
+					return false
+				}
 
 				var (
 					m         msg_pb.Message
 					senderKey *bls.PublicKey
 				)
 
-				if err := protobuf.Unmarshal(cnsMsg, &m); err != nil {
-					pubsub.BlacklistPeer(peer)
+				if err := protobuf.Unmarshal(payload, &m); err != nil {
+
+					fmt.Println("could not deserialie", err.Error(), msg.String())
+
+					// pubsub.BlacklistPeer(peer)
 					errChan <- withError{errors.WithStack(err), msg}
 					return false
+				}
+
+				msg.ValidatorData = validated{
+					isConsensusBound,
+					node.handleClientMessage,
+					payload,
 				}
 
 				var senderPubKeyViaWire []byte
@@ -431,6 +479,8 @@ func (node *Node) Start() error {
 				} else if maybeVC != nil {
 					senderPubKeyViaWire = maybeVC.GetSenderPubkey()
 				} else {
+					fmt.Println("what is this other message?", m.String())
+
 					errChan <- withError{errors.WithStack(errNoSenderPubKey), nil}
 					return false
 				}
@@ -465,7 +515,7 @@ func (node *Node) Start() error {
 		}
 
 		sem := semaphore.NewWeighted(maxMessageHandlers)
-		msgChan := make(chan *libp2p_pubsub.Message)
+		msgChan := make(chan validated)
 
 		go func() {
 
@@ -487,20 +537,14 @@ func (node *Node) Start() error {
 							}
 							errChan <- withError{errors.WithStack(ctx.Err()), nil}
 						default:
-							payload := msg.GetData()
-
-							if c := len(payload); c < p2pMsgPrefixSize {
+							if err := msg.handle(
+								ctx, msg.consensusBound, msg.payload,
+							); err != nil {
 								errChan <- withError{
-									errors.WithStack(
-										errors.Wrapf(errMsgHadNoHMYPayLoadAssumption, "len was %d", c),
-									),
-									msg,
+									errors.WithStack(err), msg,
 								}
 								return
 							}
-							node.HandleMessage(
-								payload[p2pMsgPrefixSize:], msg.GetFrom(),
-							)
 						}
 					}
 				}()
@@ -520,10 +564,10 @@ func (node *Node) Start() error {
 					continue
 				}
 
-				// if validatedMessage, ok := nextMsg.ValidatorData.(validated); ok {
-				// 	fmt.Println("here is thing", validatedMessage)
-				// }
-				msgChan <- nextMsg
+				if validatedMessage, ok := nextMsg.ValidatorData.(validated); ok {
+					fmt.Println("here is thing", validatedMessage)
+					msgChan <- validatedMessage
+				}
 			}
 		}()
 	}

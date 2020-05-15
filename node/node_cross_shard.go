@@ -3,7 +3,7 @@ package node
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	proto_node "github.com/harmony-one/harmony/api/proto/node"
+	protonode "github.com/harmony-one/harmony/api/proto/protonode"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -83,7 +83,7 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 		Msg("[BroadcastCXReceiptsWithShardID] ReadCXReceipts and MerkleProof ready. Sending CX receipts...")
 	// TODO ek – limit concurrency
 	go node.host.SendMessageToGroups([]nodeconfig.GroupID{groupID},
-		p2p.ConstructMessage(proto_node.ConstructCXReceiptsProof(cxReceiptsProof)),
+		p2p.ConstructMessage(protonode.ConstructCXReceiptsProof(cxReceiptsProof)),
 	)
 }
 

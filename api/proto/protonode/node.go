@@ -1,4 +1,4 @@
-package node
+package protonode
 
 import (
 	"bytes"
