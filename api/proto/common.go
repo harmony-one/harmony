@@ -30,8 +30,8 @@ const (
 	Consensus MessageCategory = iota
 	// Node ..
 	Node
-	_ // used to be
-	_ // used to be
+	_ // used to be Client
+	_ // used to be DRand
 )
 
 const (

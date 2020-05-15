@@ -48,6 +48,15 @@ type Peer struct {
 	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
 }
 
+const (
+	// SetAsideForConsensus ..
+	SetAsideForConsensus = 1 << 14
+	// SetAsideOtherwise ..
+	SetAsideOtherwise = 1 << 12
+	// MaxMessageHandlers ..
+	MaxMessageHandlers = SetAsideForConsensus + SetAsideOtherwise
+)
+
 // NewHost ..
 func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
@@ -67,18 +76,12 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 
-	const (
-		setAsideForConsensus = 1 << 14
-		setAsideOtherwise    = 1 << 12
-		maxMessageHandlers   = setAsideForConsensus + setAsideOtherwise
-	)
-
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithValidateQueueSize(64),
 		libp2p_pubsub.WithPeerOutboundQueueSize(32),
 		// okay to use more than cores - we are using async validation
 		libp2p_pubsub.WithValidateWorkers(runtime.NumCPU() + 4),
-		libp2p_pubsub.WithValidateThrottle(maxMessageHandlers),
+		libp2p_pubsub.WithValidateThrottle(MaxMessageHandlers),
 	}
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
@@ -166,17 +169,10 @@ func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte)
 	}
 
 	for _, group := range groups {
-		s := string(group)
-		t, e := host.GetOrJoin(s)
+		t, e := host.GetOrJoin(string(group))
 		if e != nil {
 			err = e
 			continue
-		}
-
-		if len(msg) == 0 {
-			utils.Logger().Debug().
-				Interface("topics", groups).
-				Msg("bad behavior of sending a p2p message with empty data payload")
 		}
 
 		e = t.Publish(context.Background(), msg)

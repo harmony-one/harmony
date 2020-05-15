@@ -410,15 +410,7 @@ func (node *Node) Start() error {
 	errConsensusMessageOnUnexpectedTopic := errors.New("received consensus on wrong topic")
 
 	pubsub := node.host.PubSub()
-
-	const (
-		setAsideForConsensus = 1 << 14
-		setAsideOtherwise    = 1 << 12
-		maxMessageHandlers   = setAsideForConsensus + setAsideOtherwise
-	)
-
 	ownID := node.host.GetID()
-
 	errChan := make(chan withError)
 
 	type p2pHandlerConsensus func(
@@ -508,12 +500,12 @@ func (node *Node) Start() error {
 
 			},
 			libp2p_pubsub.WithValidatorTimeout(24),
-			libp2p_pubsub.WithValidatorConcurrency(setAsideForConsensus),
+			libp2p_pubsub.WithValidatorConcurrency(p2p.SetAsideForConsensus),
 		); err != nil {
 			return err
 		}
 
-		sem := semaphore.NewWeighted(maxMessageHandlers)
+		sem := semaphore.NewWeighted(p2p.MaxMessageHandlers)
 		msgChan := make(chan validated)
 
 		go func() {
