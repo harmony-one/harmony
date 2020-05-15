@@ -431,6 +431,8 @@ func (node *Node) Start() error {
 		handleEArg     []byte
 	}
 
+	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
+
 	for i := range allTopics {
 		sub, err := allTopics[i].Topic.Subscribe()
 		if err != nil {
@@ -521,10 +523,16 @@ func (node *Node) Start() error {
 						defer sem.Release(1)
 
 						if msg.consensusBound {
-							// TODO 	// 	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
-							// 		node.ExplorerMessageHandler(msgPayload)
-							if err := msg.handleC(ctx, msg.handleCArg); err != nil {
-								errChan <- withError{err, nil}
+							if isThisNodeAnExplorerNode {
+								if err := node.explorerMessageHandler(
+									ctx, msg.handleCArg,
+								); err != nil {
+									errChan <- withError{err, nil}
+								}
+							} else {
+								if err := msg.handleC(ctx, msg.handleCArg); err != nil {
+									errChan <- withError{err, nil}
+								}
 							}
 						} else {
 							if err := msg.handleE(ctx, msg.handleEArg); err != nil {
