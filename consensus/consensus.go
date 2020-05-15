@@ -36,8 +36,6 @@ type Consensus struct {
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
-	// channel to receive consensus message
-	MsgChan chan []byte
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 	// Consensus rounds whose commit phase finished
@@ -171,14 +169,15 @@ func New(
 	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey *multibls.PrivateKey,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
-	consensus := Consensus{}
-	consensus.Decider = Decider
-	consensus.host = host
-	consensus.msgSender = NewMessageSender(host)
-	consensus.BlockNumLowChan = make(chan struct{})
-	// FBFT related
-	consensus.FBFTLog = NewFBFTLog()
-	consensus.phase = FBFTAnnounce
+	consensus := Consensus{
+		Decider:         Decider,
+		host:            host,
+		msgSender:       NewMessageSender(host),
+		BlockNumLowChan: make(chan struct{}),
+		FBFTLog:         NewFBFTLog(),
+		phase:           FBFTAnnounce,
+	}
+
 	// TODO Refactor consensus.block* into State?
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
@@ -199,7 +198,6 @@ func New(
 	// displayed on explorer as Height right now
 	consensus.viewID = 0
 	consensus.ShardID = shard
-	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)
