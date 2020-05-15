@@ -248,11 +248,12 @@ func (e *engineImpl) Finalize(
 
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
+	inPreStakingEra := chain.Config().IsPreStaking(header.Epoch())
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 
 	// Process Undelegations, set LastEpochInCommittee and set EPoS status
 	// Needs to be before AccumulateRewardsAndCountSigs
-	if isBeaconChain && isNewEpoch && inStakingEra {
+	if isBeaconChain && isNewEpoch && inPreStakingEra {
 		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, err
 		}
