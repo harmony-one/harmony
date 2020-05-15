@@ -256,8 +256,6 @@ func (node *Node) AddPendingStakingTransaction(
 	newStakingTx *staking.StakingTransaction,
 ) error {
 	if !node.isPreStakingEpoch() {
-		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).
-			Msg("Drop Staking Tx while not in Staking Epoch")
 		return nil
 	}
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
@@ -274,7 +272,13 @@ func (node *Node) AddPendingStakingTransaction(
 }
 
 func (node *Node) isPreStakingEpoch() bool {
-	return node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch())
+	if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
+		node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+		// Side chain explorer doesn't necessarily has data on beacon chain. Return true in
+		// this case.
+		return true
+	}
+	return node.Beaconchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch())
 }
 
 // AddPendingTransaction adds one new transaction to the pending transaction list.
