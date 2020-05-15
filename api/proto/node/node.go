@@ -37,25 +37,6 @@ const (
 	Unlock
 )
 
-// RoleType defines the role of the node
-type RoleType int
-
-// Type of roles of a node
-const (
-	ValidatorRole RoleType = iota
-	ClientRole
-)
-
-func (r RoleType) String() string {
-	switch r {
-	case ValidatorRole:
-		return "Validator"
-	case ClientRole:
-		return "Client"
-	}
-	return "Unknown"
-}
-
 // BlockMessageType represents the type of messages used for Node/Block
 type BlockMessageType int
 
