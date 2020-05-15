@@ -142,13 +142,13 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 	}
 
 	switch msgCategory {
-	case proto.Consensus:
-		msgPayload, _ := proto.GetConsensusMessagePayload(content)
-		if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
-			node.ExplorerMessageHandler(msgPayload)
-		} else {
-			node.ConsensusMessageHandler(msgPayload)
-		}
+	// case proto.Consensus:
+	// 	msgPayload, _ := proto.GetConsensusMessagePayload(content)
+	// 	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+	// 		node.ExplorerMessageHandler(msgPayload)
+	// 	} else {
+	// 		node.ConsensusMessageHandler(msgPayload)
+	// 	}
 	case proto.Node:
 		actionType := protonode.MessageType(msgType)
 		switch actionType {
@@ -572,9 +572,4 @@ func (node *Node) BootstrapConsensus() error {
 		}()
 		return nil
 	}
-}
-
-// ConsensusMessageHandler passes received message in node_handler to consensus
-func (node *Node) ConsensusMessageHandler(msgPayload []byte) {
-	node.Consensus.MsgChan <- msgPayload
 }

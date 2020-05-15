@@ -314,6 +314,57 @@ func (node *Node) AddPendingReceipts(receipts *types.CXReceiptsProof) {
 		Msg("Got ONE more receipt message")
 }
 
+type withError struct {
+	err     error
+	payload interface{}
+}
+
+var (
+	errNotRightKeySize = errors.New("key received over wire is wrong size")
+	errNoSenderPubKey  = errors.New("no sender public BLS key in message")
+)
+
+func validateShardBoundMessage(
+	ctx context.Context, payload []byte,
+) (*msg_pb.Message, error) {
+	var (
+		m         msg_pb.Message
+		senderKey *bls.PublicKey
+	)
+
+	if err := protobuf.Unmarshal(payload, &m); err != nil {
+		return nil, errors.WithStack(err)
+	}
+	var senderPubKeyViaWire []byte
+	maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
+
+	if maybeCon != nil {
+		senderPubKeyViaWire = maybeCon.GetSenderPubkey()
+	} else if maybeVC != nil {
+		senderPubKeyViaWire = maybeVC.GetSenderPubkey()
+	} else {
+		return nil, errors.WithStack(errNoSenderPubKey)
+	}
+
+	if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
+		return nil, errors.WithStack(errNotRightKeySize)
+	}
+
+	key, err := bls_cosi.BytesToBLSPublicKey(
+		senderPubKeyViaWire,
+	)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	senderKey = key
+
+	if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return &m, nil
+}
+
 // Start kicks off the node message handling
 func (node *Node) Start() error {
 	type t struct {
@@ -356,9 +407,8 @@ func (node *Node) Start() error {
 		)
 	}
 
-	errNotRightKeySize := errors.New("key received over wire is wrong size")
-	errNoSenderPubKey := errors.New("no sender public BLS key in message")
 	errMsgHadNoHMYPayLoadAssumption := errors.New("did not have sufficient size for hmy msg")
+	errConsensusMessageOnUnexpectedTopic := errors.New("received consensus on wrong topic")
 
 	pubsub := node.host.PubSub()
 
@@ -370,23 +420,24 @@ func (node *Node) Start() error {
 
 	ownID := node.host.GetID()
 
-	type withError struct {
-		err     error
-		payload interface{}
-	}
-
 	errChan := make(chan withError)
 
-	type p2pHandler func(
+	type p2pHandlerConsensus func(
 		ctx context.Context,
-		isConsensusBound bool,
-		msgPayload []byte,
+		msg *msg_pb.Message,
+	) error
+
+	type p2pHandlerElse func(
+		ctx context.Context,
+		rlpPayload []byte,
 	) error
 
 	type validated struct {
 		consensusBound bool
-		handle         p2pHandler
-		payload        []byte
+		handleC        p2pHandlerConsensus
+		handleCArg     *msg_pb.Message
+		handleE        p2pHandlerElse
+		handleEArg     []byte
 	}
 
 	for i := range allTopics {
@@ -414,14 +465,34 @@ func (node *Node) Start() error {
 					return false
 				}
 
-				var (
-					payload []byte
-					openBox = hmyMsg[p2pMsgPrefixSize:]
-				)
+				openBox := hmyMsg[p2pMsgPrefixSize:]
 
 				switch proto.MessageCategory(openBox[proto.MessageCategoryBytes-1]) {
 				case proto.Consensus:
-					payload = openBox[proto.MessageCategoryBytes:]
+					if !isConsensusBound {
+						errChan <- withError{
+							errors.WithStack(errConsensusMessageOnUnexpectedTopic), msg,
+						}
+						return false
+					}
+
+					validMsg, err := validateShardBoundMessage(
+						context.TODO(), openBox[proto.MessageCategoryBytes:],
+					)
+
+					if err != nil {
+						errChan <- withError{
+							errors.WithStack(errMsgHadNoHMYPayLoadAssumption), msg,
+						}
+						return false
+					}
+					msg.ValidatorData = validated{
+						consensusBound: true,
+						handleC:        node.Consensus.HandleMessageUpdate,
+						handleCArg:     validMsg,
+					}
+					return true
+
 				case proto.Node:
 					msgType := byte(openBox[proto.MessageCategoryBytes+proto.MessageTypeBytes-1])
 					payload := openBox[proto.MessageCategoryBytes+proto.MessageTypeBytes:]
@@ -451,60 +522,6 @@ func (node *Node) Start() error {
 					return false
 				}
 
-				var (
-					m         msg_pb.Message
-					senderKey *bls.PublicKey
-				)
-
-				if err := protobuf.Unmarshal(payload, &m); err != nil {
-
-					fmt.Println("could not deserialie", err.Error(), msg.String())
-
-					// pubsub.BlacklistPeer(peer)
-					errChan <- withError{errors.WithStack(err), msg}
-					return false
-				}
-
-				msg.ValidatorData = validated{
-					isConsensusBound,
-					node.handleClientMessage,
-					payload,
-				}
-
-				var senderPubKeyViaWire []byte
-				maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
-
-				if maybeCon != nil {
-					senderPubKeyViaWire = maybeCon.GetSenderPubkey()
-				} else if maybeVC != nil {
-					senderPubKeyViaWire = maybeVC.GetSenderPubkey()
-				} else {
-					fmt.Println("what is this other message?", m.String())
-
-					errChan <- withError{errors.WithStack(errNoSenderPubKey), nil}
-					return false
-				}
-
-				if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
-					errChan <- withError{errors.WithStack(errNotRightKeySize), nil}
-					return false
-				}
-
-				key, err := bls_cosi.BytesToBLSPublicKey(
-					senderPubKeyViaWire,
-				)
-				if err != nil {
-					errChan <- withError{errors.WithStack(err), msg}
-					return false
-				}
-				senderKey = key
-
-				if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
-					pubsub.BlacklistPeer(peer)
-					errChan <- withError{errors.WithStack(err), m}
-					return false
-				}
-
 				return true
 
 			},
@@ -529,6 +546,16 @@ func (node *Node) Start() error {
 					if sem.TryAcquire(1) {
 						defer sem.Release(1)
 
+						if msg.consensusBound {
+							if err := msg.handleC(ctx, msg.handleCArg); err != nil {
+								errChan <- withError{err, nil}
+							}
+						} else {
+							if err := msg.handleE(ctx, msg.handleEArg); err != nil {
+								errChan <- withError{err, nil}
+							}
+						}
+
 						select {
 						case <-ctx.Done():
 							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -537,14 +564,7 @@ func (node *Node) Start() error {
 							}
 							errChan <- withError{errors.WithStack(ctx.Err()), nil}
 						default:
-							if err := msg.handle(
-								ctx, msg.consensusBound, msg.payload,
-							); err != nil {
-								errChan <- withError{
-									errors.WithStack(err), msg,
-								}
-								return
-							}
+							return
 						}
 					}
 				}()
