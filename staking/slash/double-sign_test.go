@@ -630,7 +630,6 @@ func (tc *applyTestCase) makeData(t *testing.T) {
 		}
 	}
 	tc.stateSnap = tc.state.Copy()
-	return
 }
 
 func (tc *applyTestCase) apply() {

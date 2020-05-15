@@ -11,10 +11,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	fakeChainErrEpoch = 1
-)
-
 var (
 	errFakeChainUnexpectEpoch = errors.New("epoch not expected")
 )

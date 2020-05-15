@@ -290,7 +290,7 @@ func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMul
 		os.Exit(100)
 	}
 
-	keyFiles := []os.FileInfo{}
+	var keyFiles []os.FileInfo
 	legacyBLSFile := true
 
 	if len(awsEncryptedBLSKeyFiles) > 0 {

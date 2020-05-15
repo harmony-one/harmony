@@ -470,10 +470,7 @@ func checkIncWrapperVerified(snapWrapper, curWrapper *staking.ValidatorWrapper) 
 	}
 	snapToSign := snapWrapper.Counters.NumBlocksToSign
 	curToSign := curWrapper.Counters.NumBlocksToSign
-	if curToSign.Cmp(new(big.Int).Add(snapToSign, common.Big1)) != 0 {
-		return false
-	}
-	return true
+	return curToSign.Cmp(new(big.Int).Add(snapToSign, common.Big1)) == 0
 }
 
 // checkIncWrapperMissing is the compare function to check whether validator wrapper
@@ -486,10 +483,7 @@ func checkIncWrapperMissing(snapWrapper, curWrapper *staking.ValidatorWrapper) b
 	}
 	snapToSign := snapWrapper.Counters.NumBlocksToSign
 	curToSign := curWrapper.Counters.NumBlocksToSign
-	if curToSign.Cmp(new(big.Int).Add(snapToSign, common.Big1)) != 0 {
-		return false
-	}
-	return true
+	return curToSign.Cmp(new(big.Int).Add(snapToSign, common.Big1)) == 0
 }
 
 type computeEPOSTestCtx struct {
