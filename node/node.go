@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/client"
@@ -494,29 +493,12 @@ func (node *Node) Start() error {
 					return true
 
 				case proto.Node:
-					msgType := byte(openBox[proto.MessageCategoryBytes+proto.MessageTypeBytes-1])
-					payload := openBox[proto.MessageCategoryBytes+proto.MessageTypeBytes:]
-					switch protonode.MessageType(msgType) {
-					case protonode.Transaction:
-					case protonode.Block:
-						blockT := protonode.BlockMessageType(payload[0])
-						switch blockT {
-						case protonode.Sync:
-							var blocks []*types.Block
-							if err := rlp.DecodeBytes(payload[1:], &blocks); err != nil {
-								return false
-							}
-
-							fmt.Println("got the payload - was blocks", blocks)
-						}
-						// fmt.Println("look actually was a block", msg.String())
-					case protonode.Staking:
-					default:
-
+					// TODO push the message parsing here, so can ban
+					msg.ValidatorData = validated{
+						consensusBound: false,
+						handleE:        node.HandleNodeMessage,
+						handleEArg:     openBox,
 					}
-					fmt.Println("msgtype is->", msgType)
-					return true
-					payload = hmyMsg[proto.MessageCategoryBytes+proto.MessageTypeBytes:]
 				default:
 					pubsub.BlacklistPeer(peer)
 					return false
@@ -547,6 +529,8 @@ func (node *Node) Start() error {
 						defer sem.Release(1)
 
 						if msg.consensusBound {
+							// TODO 	// 	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+							// 		node.ExplorerMessageHandler(msgPayload)
 							if err := msg.handleC(ctx, msg.handleCArg); err != nil {
 								errChan <- withError{err, nil}
 							}
@@ -585,9 +569,9 @@ func (node *Node) Start() error {
 				}
 
 				if validatedMessage, ok := nextMsg.ValidatorData.(validated); ok {
-					fmt.Println("here is thing", validatedMessage)
 					msgChan <- validatedMessage
 				}
+
 			}
 		}()
 	}

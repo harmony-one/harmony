@@ -22,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 )
 
@@ -116,95 +115,70 @@ func (node *Node) handleClientMessage(
 	return nil
 }
 
-// HandleMessage parses the message and dispatch the actions.
-func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
-	msgCategory, err := proto.GetMessageCategory(content)
-	if err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("HandleMessage get message category failed")
-		return
-	}
-	msgType, err := proto.GetMessageType(content)
-	if err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("HandleMessage get message type failed")
-		return
-	}
+var (
+	errWrongBlockMsgSize = errors.New("invalid block message size")
+)
 
-	msgPayload, err := proto.GetMessagePayload(content)
-	if err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("HandleMessage get message payload failed")
-		return
-	}
+// HandleNodeMessage parses the message and dispatch the actions.
+func (node *Node) HandleNodeMessage(
+	ctx context.Context,
+	payload []byte,
+) error {
 
-	switch msgCategory {
-	// case proto.Consensus:
-	// 	msgPayload, _ := proto.GetConsensusMessagePayload(content)
-	// 	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
-	// 		node.ExplorerMessageHandler(msgPayload)
-	// 	} else {
-	// 		node.ConsensusMessageHandler(msgPayload)
-	// 	}
-	case proto.Node:
-		actionType := protonode.MessageType(msgType)
-		switch actionType {
-		case protonode.Transaction:
-			utils.Logger().Debug().Msg("NET: received message: Node/Transaction")
-			node.transactionMessageHandler(msgPayload)
-		case protonode.Staking:
-			utils.Logger().Debug().Msg("NET: received message: Node/Staking")
-			node.stakingMessageHandler(msgPayload)
-		case protonode.Block:
-			utils.Logger().Debug().Msg("NET: received message: Node/Block")
-			if len(msgPayload) < 1 {
-				utils.Logger().Debug().Msgf("Invalid block message size")
-				return
+	msgPayload := payload[proto.MessageCategoryBytes+proto.MessageTypeBytes:]
+	msgType := byte(payload[proto.MessageCategoryBytes+proto.MessageTypeBytes-1])
+	actionType := protonode.MessageType(msgType)
+
+	switch actionType {
+	case protonode.Transaction:
+		utils.Logger().Debug().Msg("NET: received message: Node/Transaction")
+		node.transactionMessageHandler(msgPayload)
+	case protonode.Staking:
+		utils.Logger().Debug().Msg("NET: received message: Node/Staking")
+		node.stakingMessageHandler(msgPayload)
+	case protonode.Block:
+		utils.Logger().Debug().Msg("NET: received message: Node/Block")
+		if len(msgPayload) < 1 {
+			utils.Logger().Debug().Msgf("Invalid block message size")
+			return errors.WithStack(errWrongBlockMsgSize)
+		}
+
+		switch blockMsgType := protonode.BlockMessageType(msgPayload[0]); blockMsgType {
+		case protonode.Sync:
+			utils.Logger().Debug().Msg("NET: received message: Node/Sync")
+			blocks := []*types.Block{}
+			if err := rlp.DecodeBytes(msgPayload[1:], &blocks); err != nil {
+				return err
 			}
-
-			switch blockMsgType := protonode.BlockMessageType(msgPayload[0]); blockMsgType {
-			case protonode.Sync:
-				utils.Logger().Debug().Msg("NET: received message: Node/Sync")
-				blocks := []*types.Block{}
-				if err := rlp.DecodeBytes(msgPayload[1:], &blocks); err != nil {
-					utils.Logger().Error().
-						Err(err).
-						Msg("block sync")
-				} else {
-					// for non-beaconchain node, subscribe to beacon block broadcast
-					if node.Blockchain().ShardID() != shard.BeaconChainShardID &&
-						node.NodeConfig.Role() != nodeconfig.ExplorerNode {
-						for _, block := range blocks {
-							if block.ShardID() == 0 {
-								utils.Logger().Info().
-									Uint64("block", blocks[0].NumberU64()).
-									Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
-								go func(blk *types.Block) {
-									node.BeaconBlockChannel <- blk
-								}(block)
-							}
-						}
-					}
-					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
-						utils.Logger().Info().Msg("Block being handled by client")
-						node.Client.UpdateBlocks(blocks)
+			// for non-beaconchain node, subscribe to beacon block broadcast
+			if node.Blockchain().ShardID() != shard.BeaconChainShardID &&
+				node.NodeConfig.Role() != nodeconfig.ExplorerNode {
+				for _, block := range blocks {
+					if block.ShardID() == 0 {
+						utils.Logger().Info().
+							Uint64("block", blocks[0].NumberU64()).
+							Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
+						go func(blk *types.Block) {
+							node.BeaconBlockChannel <- blk
+						}(block)
 					}
 				}
-			case
-				protonode.SlashCandidate,
-				protonode.Receipt,
-				protonode.CrossLink:
-				// skip first byte which is blockMsgType
-				node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 			}
+			if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
+				utils.Logger().Info().Msg("Block being handled by client")
+				node.Client.UpdateBlocks(blocks)
+			}
+
+		case
+			protonode.SlashCandidate,
+			protonode.Receipt,
+			protonode.CrossLink:
+			// skip first byte which is blockMsgType
+			node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 		}
-	default:
-		utils.Logger().Error().
-			Str("Unknown MsgCateogry", string(msgCategory))
 	}
+
+	return nil
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
