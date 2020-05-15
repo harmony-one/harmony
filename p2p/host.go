@@ -77,7 +77,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		libp2p_pubsub.WithValidateQueueSize(64),
 		libp2p_pubsub.WithPeerOutboundQueueSize(32),
 		// okay to use more than cores - we are using async validation
-		libp2p_pubsub.WithValidateWorkers(runtime.NumCPU() * 2),
+		libp2p_pubsub.WithValidateWorkers(runtime.NumCPU() + 4),
 		libp2p_pubsub.WithValidateThrottle(maxMessageHandlers),
 	}
 
@@ -160,6 +160,10 @@ func (host *HostV2) GetOrJoin(topic string) (*libp2p_pubsub.Topic, error) {
 // It returns a nil error if and only if it has succeeded to schedule the given
 // message for sending.
 func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) (err error) {
+
+	if len(msg) == 0 {
+		return errors.New("cannot send out empty message")
+	}
 
 	for _, group := range groups {
 		s := string(group)

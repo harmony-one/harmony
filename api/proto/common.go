@@ -25,12 +25,11 @@ n - 2 bytes       - actual message payload
 // MessageCategory defines the message category enum
 type MessageCategory byte
 
-//Consensus and other message categories
 const (
+	// Consensus ..
 	Consensus MessageCategory = iota
+	// Node ..
 	Node
-	Client
-	DRand
 )
 
 const (
