@@ -72,6 +72,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 			return
 		}
 
+		block.SetCurrentCommitSig(recvMsg.Payload)
 		node.AddNewBlockForExplorer(block)
 		node.commitBlockForExplorer(block)
 	} else if msg.Type == msg_pb.MessageType_PREPARED {
@@ -96,6 +97,19 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		)
 		// If found, then add the new block into blockchain db.
 		if len(msgs) > 0 {
+			var committedMsg *consensus.FBFTMessage
+			for i := range msgs {
+				if blockObj.Hash() != msgs[i].BlockHash {
+					continue
+				}
+				committedMsg = msgs[i]
+				break
+			}
+			if committedMsg == nil {
+				utils.Logger().Error().Err(err).Msg("[Explorer] Failed finding a valid committed message.")
+				return
+			}
+			blockObj.SetCurrentCommitSig(committedMsg.Payload)
 			node.AddNewBlockForExplorer(blockObj)
 			node.commitBlockForExplorer(blockObj)
 		}

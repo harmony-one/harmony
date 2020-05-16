@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -202,9 +201,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		copy(consensus.blockHash[:], blockHash[:])
 	}
 
-	// local viewID may not be constant with other, so use received msg viewID.
+	// Sign commit signature on the received block
 	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, recvMsg.ViewID)
+		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	groupID := []nodeconfig.GroupID{
 		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 	}
@@ -259,9 +258,18 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	// Received msg must be about same epoch, otherwise it's invalid anyways.
+	// Must have the corresponding block to verify committed message.
+	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+	if blockObj == nil {
+		consensus.getLogger().Debug().
+			Uint64("blockNum", recvMsg.BlockNum).
+			Uint64("viewID", recvMsg.ViewID).
+			Str("blockHash", recvMsg.BlockHash.Hex()).
+			Msg("[OnCommitted] Failed finding a matching block for committed message")
+		return
+	}
 	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash, recvMsg.BlockNum, recvMsg.ViewID)
+		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		consensus.getLogger().Error().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).

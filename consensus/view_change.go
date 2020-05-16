@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"math/big"
 	"sync"
 	"time"
 
@@ -196,16 +195,29 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			msg_pb.MessageType_PREPARED, recvMsg.BlockNum,
 		)
 		preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
-
-		if preparedMsg != nil && consensus.FBFTLog.GetBlockByHash(
-			preparedMsg.BlockHash,
-		) != nil {
+		hasBlock := false
+		if preparedMsg != nil {
+			if preparedBlock := consensus.FBFTLog.GetBlockByHash(
+				preparedMsg.BlockHash,
+			); preparedBlock != nil {
+				if consensus.BlockVerifier(preparedBlock); err != nil {
+					consensus.getLogger().Error().Err(err).Msg("[onViewChange] My own prepared block verification failed")
+				} else {
+					hasBlock = true
+				}
+			}
+		}
+		if hasBlock {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M1 type messaage")
 			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
 				consensus.bhpSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(msgToSign)
 				consensus.bhpBitmap[recvMsg.ViewID].SetKey(key, true)
+			}
+			// if m1Payload is empty, we just add one
+			if len(consensus.m1Payload) == 0 {
+				consensus.m1Payload = append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 			}
 		} else {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
@@ -229,6 +241,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 
 	preparedBlock := &types.Block{}
+	hasBlock := false
 	if len(recvMsg.Payload) != 0 && len(recvMsg.Block) != 0 {
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
 			consensus.getLogger().Warn().
@@ -237,10 +250,11 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				Msg("[onViewChange] Unparseable prepared block data")
 			return
 		}
+		hasBlock = true
 	}
 
 	// m2 type message
-	if preparedBlock == nil {
+	if !hasBlock {
 		_, ok := consensus.nilSigs[recvMsg.ViewID][senderKey.SerializeToHexStr()]
 		if ok {
 			consensus.getLogger().Debug().
@@ -356,7 +370,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	consensus.viewIDBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey, true)
 	consensus.getLogger().Debug().
 		Int("have", len(consensus.viewIDSigs[recvMsg.ViewID])).
-		Int64("needed", consensus.Decider.TwoThirdsSignersCount()).
+		Int64("total", consensus.Decider.ParticipantsCount()).
 		Msg("[onViewChange]")
 
 	// received enough view change messages, change state to normal consensus
@@ -395,7 +409,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				return
 			}
 			commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-				new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, block.Header().ViewID().Uint64())
+				block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
 			for i, key := range consensus.PubKey.PublicKey {
 				priKey := consensus.priKey.PrivateKey[i]
 				if _, err := consensus.Decider.SubmitVote(
@@ -403,8 +417,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 					key,
 					priKey.SignHash(commitPayload),
 					common.BytesToHash(consensus.blockHash[:]),
-					consensus.blockNum,
-					recvMsg.ViewID,
+					block.NumberU64(),
+					block.Header().ViewID().Uint64(),
 				); err != nil {
 					consensus.getLogger().Debug().Msg("submit vote on viewchange commit failed")
 					return
@@ -508,6 +522,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 	// check when M3 sigs > M2 sigs, then M1 (recvMsg.Payload) should not be empty
 	preparedBlock := &types.Block{}
+	hasBlock := false
 	if len(recvMsg.Payload) != 0 && len(recvMsg.Block) != 0 {
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
 			consensus.getLogger().Warn().
@@ -527,6 +542,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 				Msg("[onNewView] Prepared block hash doesn't match msg block hash.")
 			return
 		}
+		hasBlock = true
 	}
 
 	if m2Mask == nil || m2Mask.Bitmap == nil ||
@@ -566,7 +582,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		preparedMsg.SenderPubkey = senderKey
 		consensus.FBFTLog.AddMessage(&preparedMsg)
 
-		consensus.FBFTLog.AddBlock(preparedBlock)
+		if hasBlock {
+			consensus.FBFTLog.AddBlock(preparedBlock)
+		}
 	}
 
 	// newView message verified success, override my state
@@ -585,14 +603,14 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// NewView message is verified, change state to normal consensus
-	if preparedBlock != nil {
+	if hasBlock {
 		// Construct and send the commit message
 		if consensus.BlockVerifier(preparedBlock); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[onNewView] Prepared block verification failed")
 			return
 		}
 		commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-			new(big.Int).SetUint64(consensus.epoch), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
+			preparedBlock.Epoch(), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
 		groupID := []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 		for i, key := range consensus.PubKey.PublicKey {

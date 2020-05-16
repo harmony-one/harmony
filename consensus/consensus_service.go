@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"encoding/hex"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -189,27 +187,6 @@ func (consensus *Consensus) ResetState() {
 	consensus.aggregatedCommitSig = nil
 }
 
-// Returns a string representation of this consensus
-func (consensus *Consensus) String() string {
-	duty := ""
-	if consensus.IsLeader() {
-		duty = "leader"
-	} else {
-		duty = "validator"
-	}
-
-	return fmt.Sprintf(
-		"[Duty:%s Pub:%s Header:%s Num:%d View:%d Shard:%d Epoch:%d]",
-		duty,
-		consensus.PubKey.SerializeToHexStr(),
-		hex.EncodeToString(consensus.blockHeader),
-		consensus.blockNum,
-		consensus.viewID,
-		consensus.ShardID,
-		consensus.epoch,
-	)
-}
-
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
 func (consensus *Consensus) ToggleConsensusCheck() {
 	consensus.infoMutex.Lock()
@@ -333,13 +310,6 @@ func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 	consensus.blockNum = blockNum
 }
 
-// SetEpochNum sets the epoch in consensus object
-func (consensus *Consensus) SetEpochNum(epoch uint64) {
-	consensus.infoMutex.Lock()
-	defer consensus.infoMutex.Unlock()
-	consensus.epoch = epoch
-}
-
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
 func (consensus *Consensus) ReadSignatureBitmapPayload(
 	recvPayload []byte, offset int,
@@ -356,7 +326,6 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
-		Uint64("myEpoch", consensus.epoch).
 		Uint64("myBlock", consensus.blockNum).
 		Uint64("myViewID", consensus.viewID).
 		Interface("phase", consensus.phase).
@@ -467,11 +436,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	// genesis block is a special case that will have shard state and needs to skip processing
 	isNotGenesisBlock := curHeader.Number().Cmp(big.NewInt(0)) > 0
 	if len(curHeader.ShardState()) > 0 && isNotGenesisBlock {
-		// increase curEpoch by one if it's the last block
-		consensus.SetEpochNum(curEpoch.Uint64() + 1)
-		consensus.getLogger().Info().
-			Uint64("headerNum", curHeader.Number().Uint64()).
-			Msg("Epoch updated for nextEpoch curEpoch")
 
 		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
 			nextEpoch, consensus.ChainReader,
@@ -496,7 +460,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		committeeToSet = subComm
 		epochToSet = nextEpoch
 	} else {
-		consensus.SetEpochNum(curEpoch.Uint64())
 		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
 		if err != nil {
 			utils.Logger().Error().

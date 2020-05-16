@@ -384,6 +384,9 @@ func NewBlockWithHeader(header *block.Header) *Block {
 // CopyHeader creates a deep copy of a block header to prevent side effects from
 // modifying a header variable.
 func CopyHeader(h *block.Header) *block.Header {
+	if h == nil {
+		return nil
+	}
 	cpy := *h
 	cpy.Header = cpy.Header.Copy()
 	return &cpy

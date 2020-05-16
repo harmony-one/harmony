@@ -35,7 +35,7 @@ func (bc *fakeBlockChain) CurrentBlock() *types.Block {
 }
 
 func (bc *fakeBlockChain) ReadShardState(epoch *big.Int) (*shard.State, error) {
-	if epoch.Cmp(big.NewInt(fakeChainErrEpoch)) == 0 {
+	if epoch.Cmp(big.NewInt(currentEpoch)) == 0 {
 		return nil, errFakeChainUnexpectEpoch
 	}
 	return &bc.superCommittee, nil

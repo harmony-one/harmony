@@ -1,12 +1,11 @@
 package consensus
 
 import (
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -38,8 +37,16 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// Leader add commit phase signature
+	var blockObj types.Block
+	if err := rlp.DecodeBytes(consensus.block, &blockObj); err != nil {
+		consensus.getLogger().Warn().
+			Err(err).
+			Uint64("BlockNum", consensus.blockNum).
+			Msg("[didReachPrepareQuorum] Unparseable block data")
+		return err
+	}
 	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), consensus.blockHash, consensus.blockNum, consensus.viewID)
+		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 
 	// so by this point, everyone has committed to the blockhash of this block
 	// in prepare and so this is the actual block.
@@ -48,9 +55,9 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			quorum.Commit,
 			key,
 			consensus.priKey.PrivateKey[i].SignHash(commitPayload),
-			common.BytesToHash(consensus.blockHash[:]),
-			consensus.blockNum,
-			consensus.viewID,
+			blockObj.Hash(),
+			blockObj.NumberU64(),
+			blockObj.Header().ViewID().Uint64(),
 		); err != nil {
 			return err
 		}
