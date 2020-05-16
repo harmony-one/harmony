@@ -21,7 +21,7 @@ require (
 	github.com/golang/protobuf v1.3.5
 	github.com/golangci/golangci-lint v1.22.2
 	github.com/gorilla/handlers v1.4.0 // indirect
-	github.com/gorilla/mux v1.7.2
+	github.com/gorilla/mux v1.7.4
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
 	github.com/harmony-one/bls v0.0.6
 	github.com/harmony-one/taggedrlp v0.1.4
@@ -34,18 +34,18 @@ require (
 	github.com/karalabe/hid v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/libp2p/go-addr-util v0.0.2 // indirect
-	github.com/libp2p/go-libp2p v0.8.2
+	github.com/libp2p/go-libp2p v0.8.3
 	github.com/libp2p/go-libp2p-core v0.5.3
 	github.com/libp2p/go-libp2p-crypto v0.1.0
-	github.com/libp2p/go-libp2p-discovery v0.3.0
+	github.com/libp2p/go-libp2p-discovery v0.4.0
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-kad-dht v0.5.0
 	github.com/libp2p/go-libp2p-net v0.1.0
 	github.com/libp2p/go-libp2p-peer v0.2.0
 	github.com/libp2p/go-libp2p-peerstore v0.2.3
-	github.com/libp2p/go-libp2p-pubsub v0.2.7-0.20200325112436-d3d43e32bef3
-	github.com/multiformats/go-multiaddr v0.2.1
-	github.com/multiformats/go-multiaddr-net v0.1.4
+	github.com/libp2p/go-libp2p-pubsub v0.2.7
+	github.com/multiformats/go-multiaddr v0.2.2
+	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
