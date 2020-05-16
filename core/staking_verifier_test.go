@@ -883,6 +883,23 @@ func defaultExpVWrapperSelfDelegate() staking.ValidatorWrapper {
 	return w
 }
 
+func makeDefaultStateForUndelegate(t *testing.T) *state.DB {
+	sdb := makeDefaultStateDB(t)
+	w, err := sdb.ValidatorWrapper(validatorAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Delegations = append(w.Delegations, staking.NewDelegation(delegatorAddr, twentyKOnes))
+	w.Delegations[0] = staking.Undelegations{staking.Undelegation{
+		Amount: fiveKOnes,
+		Epoch:  big.NewInt(defaultEpoch),
+	}}
+	if err := sdb.UpdateValidatorWrapper(validatorAddr, w); err != nil {
+		t.Fatal(err)
+	}
+	return sdb
+}
+
 func makeDefaultFakeChainContext() *fakeChainContext {
 	ws := makeDefaultCurrentStateVWrappers(defNumWrappersInState, defNumPubPerAddr)
 	return makeFakeChainContext(ws)
