@@ -725,6 +725,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		expErr      error
 	}{
 		{
+			// 0: new delegate
 			sdb: makeDefaultStateDB(t),
 			msg: defaultMsgDelegate(),
 
@@ -732,11 +733,101 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			expAmt:      tenKOnes,
 		},
 		{
+			// 1: add amount to current delegate
 			sdb: makeDefaultStateDB(t),
 			msg: defaultMsgSelfDelegate(),
 
 			expVWrapper: defaultExpVWrapperSelfDelegate(),
 			expAmt:      tenKOnes,
+		},
+		{
+			// 2: nil state db
+			sdb: nil,
+			msg: defaultMsgDelegate(),
+
+			expErr: errStateDBIsMissing,
+		},
+		{
+			// 3: validatorFlag not set
+			sdb: makeDefaultStateDB(t),
+			msg: func() staking.Delegate {
+				msg := defaultMsgDelegate()
+				msg.ValidatorAddress = makeTestAddr("not in state")
+				return msg
+			}(),
+
+			expErr: errValidatorNotExist,
+		},
+		{
+			// 4: negative amount
+			sdb: makeDefaultStateDB(t),
+			msg: func() staking.Delegate {
+				msg := defaultMsgDelegate()
+				msg.Amount = big.NewInt(-1)
+				return msg
+			}(),
+
+			expErr: errNegativeAmount,
+		},
+		{
+			// 5: small amount
+			sdb: makeDefaultStateDB(t),
+			msg: func() staking.Delegate {
+				msg := defaultMsgDelegate()
+				msg.Amount = big.NewInt(100)
+				return msg
+			}(),
+
+			expErr: errDelegationTooSmall,
+		},
+		{
+			// 6: missing validator wrapper
+			sdb: func() *state.DB {
+				sdb := makeDefaultStateDB(t)
+				sdb.SetValidatorFlag(createValidatorAddr)
+				return sdb
+			}(),
+			msg: func() staking.Delegate {
+				d := defaultMsgDelegate()
+				d.ValidatorAddress = createValidatorAddr
+				return d
+			}(),
+
+			expErr: errors.New("address not present in state"),
+		},
+		{
+			// 7: cannot transfer since not enough amount
+			sdb: func() *state.DB {
+				sdb := makeDefaultStateDB(t)
+				sdb.SetBalance(delegatorAddr, big.NewInt(100))
+				return sdb
+			}(),
+			msg: defaultMsgDelegate(),
+
+			expErr: errInsufficientBalanceForStake,
+		},
+		{
+			// 8: self delegation not pass sanity check
+			sdb: makeDefaultStateDB(t),
+			msg: func() staking.Delegate {
+				d := defaultMsgSelfDelegate()
+				d.Amount = hundredKOnes
+				return d
+			}(),
+
+			expErr: errors.New(" total delegation can not be bigger than max_total_delegation"),
+		},
+		{
+			// 9: Delegation does not pass sanity check
+			sdb: makeDefaultStateDB(t),
+
+			msg: func() staking.Delegate {
+				d := defaultMsgDelegate()
+				d.Amount = hundredKOnes
+				return d
+			}(),
+
+			expErr: errors.New(" total delegation can not be bigger than max_total_delegation"),
 		},
 	}
 	for i, test := range tests {

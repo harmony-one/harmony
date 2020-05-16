@@ -2,7 +2,6 @@ package core
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -100,8 +99,6 @@ func VerifyAndCreateValidatorFromMsg(
 		msg.SlotPubKeys); err != nil {
 		return nil, err
 	}
-	fmt.Println("have balance", stateDB.GetBalance(msg.ValidatorAddress))
-	fmt.Println("request balance", msg.Amount)
 	if !CanTransfer(stateDB, msg.ValidatorAddress, msg.Amount) {
 		return nil, errInsufficientBalanceForStake
 	}
