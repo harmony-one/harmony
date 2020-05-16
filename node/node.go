@@ -453,7 +453,9 @@ func (node *Node) Start() error {
 				if len(hmyMsg) < p2pMsgPrefixSize {
 					pubsub.BlacklistPeer(peer)
 					errChan <- withError{
-						errors.WithStack(errMsgHadNoHMYPayLoadAssumption), nil,
+						errors.WithStack(errors.Wrapf(
+							errMsgHadNoHMYPayLoadAssumption, "on topic %s", topicNamed,
+						)), nil,
 					}
 					return false
 				}
