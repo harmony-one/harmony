@@ -26,14 +26,17 @@ import (
 const (
 	defNumWrappersInState = 5
 	defNumPubPerAddr      = 2
+
+	validatorIndex = 0
+	delegatorIndex = 1
 )
 
 var (
 	blsKeys = makeKeyPairs(20)
 
 	createValidatorAddr = makeTestAddr("validator")
-	validatorAddr       = makeTestAddr(0)
-	delegatorAddr       = makeTestAddr(1)
+	validatorAddr       = makeTestAddr(validatorIndex)
+	delegatorAddr       = makeTestAddr(delegatorIndex)
 )
 
 var (
@@ -61,6 +64,7 @@ var (
 
 const (
 	defaultEpoch           = 5
+	defaultNextEpoch       = 6
 	defaultSnapBlockNumber = 90
 	defaultBlockNumber     = 100
 )
@@ -660,6 +664,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
+
 		if !reflect.DeepEqual(w, &test.expWrapper) {
 			t.Errorf("Test %v: wrapper not expected", i)
 		}
@@ -706,8 +711,8 @@ func defaultMsgEditValidator() staking.EditValidator {
 }
 
 func defaultExpWrapperEditValidator() staking.ValidatorWrapper {
-	newPubs := []shard.BLSPublicKey{blsKeys[1].pub, blsKeys[12].pub}
-	w := staketest.GetDefaultValidatorWrapperWithAddr(makeTestAddr(0), newPubs)
+	w := getDefaultSnapVWrapperByIndex(validatorIndex)
+	w.SlotPubKeys = append(w.SlotPubKeys[1:], blsKeys[12].pub)
 	w.Description = editExpDesc
 	w.Rate = pointTwoDec
 	w.UpdateHeight = big.NewInt(defaultBlockNumber)
@@ -820,7 +825,6 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		{
 			// 9: Delegation does not pass sanity check
 			sdb: makeDefaultStateDB(t),
-
 			msg: func() staking.Delegate {
 				d := defaultMsgDelegate()
 				d.Amount = hundredKOnes
@@ -831,6 +835,9 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
+		if i != 1 {
+			continue
+		}
 		w, amt, err := VerifyAndDelegateFromMsg(test.sdb, &test.msg)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
@@ -858,10 +865,7 @@ func defaultMsgDelegate() staking.Delegate {
 }
 
 func defaultExpVWrapperDelegate() staking.ValidatorWrapper {
-	pub := []shard.BLSPublicKey{blsKeys[0].pub, blsKeys[1].pub}
-	w := staketest.GetDefaultValidatorWrapperWithAddr(validatorAddr, pub)
-	w.Identity = makeIdentityStr(0)
-	w.UpdateHeight = big.NewInt(defaultSnapBlockNumber)
+	w := getDefaultSnapVWrapperByIndex(validatorIndex)
 	w.Delegations = append(w.Delegations, staking.NewDelegation(delegatorAddr, tenKOnes))
 	return w
 }
@@ -875,12 +879,65 @@ func defaultMsgSelfDelegate() staking.Delegate {
 }
 
 func defaultExpVWrapperSelfDelegate() staking.ValidatorWrapper {
-	pub := []shard.BLSPublicKey{blsKeys[2].pub, blsKeys[3].pub}
-	w := staketest.GetDefaultValidatorWrapperWithAddr(delegatorAddr, pub)
-	w.Identity = makeIdentityStr(1)
-	w.UpdateHeight = big.NewInt(defaultSnapBlockNumber)
+	w := getDefaultSnapVWrapperByIndex(delegatorIndex)
 	w.Delegations[0].Amount = new(big.Int).Add(tenKOnes, staketest.DefaultDelAmount)
 	return w
+}
+
+func TestVerifyAndUndelegateFromMsg(t *testing.T) {
+	tests := []struct {
+		sdb   vm.StateDB
+		epoch *big.Int
+		msg   staking.Undelegate
+
+		expVWrapper staking.ValidatorWrapper
+		expErr      error
+	}{
+		{
+			// 1: Undelegate at delegation with an entry already exist at the same epoch.
+			// Will increase the amount in undelegate entry
+			sdb:   makeDefaultStateForUndelegate(t),
+			epoch: big.NewInt(defaultEpoch),
+			msg:   defaultUndelegate(),
+
+			expVWrapper: defaultVWrapperUndelegateSameEpoch(),
+		},
+		{
+			// 2: Undelegate with undelegation entry exist but not in same epoch.
+			// Will create a new undelegate entry
+			sdb:   makeDefaultStateForUndelegate(t),
+			epoch: big.NewInt(defaultNextEpoch),
+			msg:   defaultUndelegate(),
+
+			expVWrapper: defaultVWrapperUndelegateNextEpoch(),
+		},
+		{
+			// 3: Undelegate from a delegation record with no undelegation entry.
+			// Will create a new undelegate entry
+			sdb:   makeDefaultStateForUndelegate(t),
+			epoch: big.NewInt(defaultEpoch),
+			msg:   defaultSelfUndelegate(),
+
+			expVWrapper: defaultVWrapperSelfUndelegate(),
+		},
+	}
+	for i, test := range tests {
+		if i != 0 {
+			continue
+		}
+		w, err := VerifyAndUndelegateFromMsg(test.sdb, test.epoch, &test.msg)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+
+		if !reflect.DeepEqual(*w, test.expVWrapper) {
+			t.Errorf("Test %v: validator wrapper not expected", i)
+		}
+	}
 }
 
 func makeDefaultStateForUndelegate(t *testing.T) *state.DB {
@@ -890,14 +947,67 @@ func makeDefaultStateForUndelegate(t *testing.T) *state.DB {
 		t.Fatal(err)
 	}
 	w.Delegations = append(w.Delegations, staking.NewDelegation(delegatorAddr, twentyKOnes))
-	w.Delegations[0] = staking.Undelegations{staking.Undelegation{
-		Amount: fiveKOnes,
-		Epoch:  big.NewInt(defaultEpoch),
-	}}
+	w.Delegations[1].Undelegations = staking.Undelegations{
+		staking.Undelegation{Amount: fiveKOnes, Epoch: big.NewInt(defaultEpoch)},
+	}
+	w.Delegations[1].Amount = new(big.Int).Sub(w.Delegations[1].Amount, fiveKOnes)
+
 	if err := sdb.UpdateValidatorWrapper(validatorAddr, w); err != nil {
 		t.Fatal(err)
 	}
+	sdb.IntermediateRoot(true)
 	return sdb
+}
+
+// undelegate from delegator which has already go one entry for undelegation
+func defaultUndelegate() staking.Undelegate {
+	return staking.Undelegate{
+		DelegatorAddress: delegatorAddr,
+		ValidatorAddress: validatorAddr,
+		Amount:           fiveKOnes,
+	}
+}
+
+func defaultVWrapperUndelegateSameEpoch() staking.ValidatorWrapper {
+	w := getDefaultSnapVWrapperByIndex(validatorIndex)
+	w.Delegations = append(w.Delegations, staking.NewDelegation(delegatorAddr, twentyKOnes))
+	w.Delegations[1].Undelegations = staking.Undelegations{
+		staking.Undelegation{Amount: tenKOnes, Epoch: big.NewInt(defaultEpoch)},
+	}
+	w.Delegations[1].Amount = new(big.Int).Sub(w.Delegations[1].Amount, tenKOnes)
+	return w
+}
+
+func defaultVWrapperUndelegateNextEpoch() staking.ValidatorWrapper {
+	w := getDefaultSnapVWrapperByIndex(validatorIndex)
+	w.Delegations = append(w.Delegations, staking.NewDelegation(delegatorAddr, twentyKOnes))
+	w.Delegations[1].Undelegations = staking.Undelegations{
+		staking.Undelegation{Amount: fiveKOnes, Epoch: big.NewInt(defaultEpoch)},
+		staking.Undelegation{Amount: fiveKOnes, Epoch: big.NewInt(defaultNextEpoch)},
+	}
+	w.Delegations[1].Amount = new(big.Int).Sub(w.Delegations[1].Amount, tenKOnes)
+
+	return w
+}
+
+// undelegate from self undelegation (new undelegates)
+func defaultSelfUndelegate() staking.Undelegate {
+	return staking.Undelegate{
+		DelegatorAddress: validatorAddr,
+		ValidatorAddress: validatorAddr,
+		Amount:           fiveKOnes,
+	}
+}
+
+func defaultVWrapperSelfUndelegate() staking.ValidatorWrapper {
+	w := getDefaultSnapVWrapperByIndex(validatorIndex)
+	w.Delegations = append(w.Delegations, staking.NewDelegation(delegatorAddr, twentyKOnes))
+	w.Delegations[0].Undelegations = staking.Undelegations{
+		staking.Undelegation{Amount: fiveKOnes, Epoch: big.NewInt(defaultEpoch)},
+	}
+	w.Delegations[0].Amount = new(big.Int).Sub(w.Delegations[0].Amount, fiveKOnes)
+
+	return w
 }
 
 func makeDefaultFakeChainContext() *fakeChainContext {
@@ -930,6 +1040,12 @@ func updateStateValidators(sdb *state.DB, ws []*staking.ValidatorWrapper) error 
 		}
 	}
 	return nil
+}
+
+func getDefaultSnapVWrapperByIndex(index int) staking.ValidatorWrapper {
+	pubGetter := newBLSPubGetter(blsKeys[index*defNumPubPerAddr:])
+
+	return makeStateVWrapperFromGetter(index, defNumPubPerAddr, pubGetter)
 }
 
 func newTestStateDB() (*state.DB, error) {
@@ -1165,13 +1281,13 @@ func makeBLSKeyPair() blsPubSigPair {
 
 func assertError(got, expect error) error {
 	if (got == nil) != (expect == nil) {
-		return fmt.Errorf("unexpected error %v / %v", got, expect)
+		return fmt.Errorf("unexpected error [%v] / [%v]", got, expect)
 	}
 	if (got == nil) || (expect == nil) {
 		return nil
 	}
 	if !strings.Contains(got.Error(), expect.Error()) {
-		return fmt.Errorf("unexpected error %v / %v", got, expect)
+		return fmt.Errorf("unexpected error [%v] / [%v]", got, expect)
 	}
 	return nil
 }
