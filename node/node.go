@@ -357,7 +357,7 @@ func (node *Node) Start() error {
 		return errors.New("have no topics to listen to")
 	}
 	weighted := make([]*semaphore.Weighted, len(allTopics))
-	const maxMessageHandlers = 200
+	const maxMessageHandlers = 2000
 	ctx := context.Background()
 	ownID := node.host.GetID()
 	errChan := make(chan error)
