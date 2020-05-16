@@ -418,7 +418,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.Decider = decider
 	}
 
-	committeeToSet := &shard.Committee{}
+	var committeeToSet *shard.Committee
 	epochToSet := curEpoch
 	hasError := false
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(

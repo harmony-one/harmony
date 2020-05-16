@@ -26,11 +26,8 @@ var (
 )
 
 var (
-	zeroDec     = numeric.ZeroDec()
-	oneThirdDec = numeric.NewDecWithPrec(33, 2)
-	halfDec     = numeric.NewDecWithPrec(5, 1)
-	twoThirdDec = numeric.NewDecWithPrec(66, 2)
-	oneDec      = numeric.OneDec()
+	zeroDec = numeric.ZeroDec()
+	oneDec  = numeric.OneDec()
 )
 
 var (
