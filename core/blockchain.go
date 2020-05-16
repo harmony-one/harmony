@@ -833,14 +833,15 @@ func (bc *BlockChain) Stop() {
 		for _, offset := range []uint64{0, 1, triesInMemory - 1} {
 			if number := bc.CurrentBlock().NumberU64(); number > offset {
 				recent := bc.GetHeaderByNumber(number - offset)
-
-				utils.Logger().Info().
-					Str("block", recent.Number().String()).
-					Str("hash", recent.Hash().Hex()).
-					Str("root", recent.Root().Hex()).
-					Msg("Writing cached state to disk")
-				if err := triedb.Commit(recent.Root(), true); err != nil {
-					utils.Logger().Error().Err(err).Msg("Failed to commit recent state trie")
+				if recent != nil {
+					utils.Logger().Info().
+						Str("block", recent.Number().String()).
+						Str("hash", recent.Hash().Hex()).
+						Str("root", recent.Root().Hex()).
+						Msg("Writing cached state to disk")
+					if err := triedb.Commit(recent.Root(), true); err != nil {
+						utils.Logger().Error().Err(err).Msg("Failed to commit recent state trie")
+					}
 				}
 			}
 		}
@@ -1137,32 +1138,34 @@ func (bc *BlockChain) WriteBlockWithState(
 			}
 			// Find the next state trie we need to commit
 			header := bc.GetHeaderByNumber(current - triesInMemory)
-			chosen := header.Number().Uint64()
+			if header != nil {
+				chosen := header.Number().Uint64()
 
-			// If we exceeded out time allowance, flush an entire trie to disk
-			if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
-				// If we're exceeding limits but haven't reached a large enough memory gap,
-				// warn the user that the system is becoming unstable.
-				if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
-					utils.Logger().Info().
-						Dur("time", bc.gcproc).
-						Dur("allowance", bc.cacheConfig.TrieTimeLimit).
-						Float64("optimum", float64(chosen-lastWrite)/triesInMemory).
-						Msg("State in memory for too long, committing")
+				// If we exceeded out time allowance, flush an entire trie to disk
+				if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
+					// If we're exceeding limits but haven't reached a large enough memory gap,
+					// warn the user that the system is becoming unstable.
+					if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
+						utils.Logger().Info().
+							Dur("time", bc.gcproc).
+							Dur("allowance", bc.cacheConfig.TrieTimeLimit).
+							Float64("optimum", float64(chosen-lastWrite)/triesInMemory).
+							Msg("State in memory for too long, committing")
+					}
+					// Flush an entire trie and restart the counters
+					triedb.Commit(header.Root(), true)
+					lastWrite = chosen
+					bc.gcproc = 0
 				}
-				// Flush an entire trie and restart the counters
-				triedb.Commit(header.Root(), true)
-				lastWrite = chosen
-				bc.gcproc = 0
-			}
-			// Garbage collect anything below our required write retention
-			for !bc.triegc.Empty() {
-				root, number := bc.triegc.Pop()
-				if uint64(-number) > chosen {
-					bc.triegc.Push(root, number)
-					break
+				// Garbage collect anything below our required write retention
+				for !bc.triegc.Empty() {
+					root, number := bc.triegc.Pop()
+					if uint64(-number) > chosen {
+						bc.triegc.Push(root, number)
+						break
+					}
+					triedb.Dereference(root.(common.Hash))
 				}
-				triedb.Dereference(root.(common.Hash))
 			}
 		}
 	}
@@ -2128,6 +2131,9 @@ func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	}
 
 	previousHeader := bc.GetHeaderByNumber(block.NumberU64() - 1)
+	if previousHeader == nil {
+		return false
+	}
 	return block.Coinbase() == previousHeader.Coinbase()
 }
 
