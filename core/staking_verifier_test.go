@@ -27,8 +27,9 @@ const (
 	defNumWrappersInState = 5
 	defNumPubPerAddr      = 2
 
-	validatorIndex = 0
-	delegatorIndex = 6
+	validatorIndex  = 0
+	validator2Index = 1
+	delegatorIndex  = 6
 )
 
 var (
@@ -36,6 +37,7 @@ var (
 
 	createValidatorAddr = makeTestAddr("validator")
 	validatorAddr       = makeTestAddr(validatorIndex)
+	validatorAddr2      = makeTestAddr(validator2Index)
 	delegatorAddr       = makeTestAddr(delegatorIndex)
 )
 
@@ -1145,6 +1147,126 @@ func defaultVWrapperSelfUndelegate(t *testing.T) staking.ValidatorWrapper {
 	return w
 }
 
+var (
+	reward00 = twentyKOnes
+	reward01 = tenKOnes
+	reward10 = thirtyKOnes
+	reward11 = twentyFiveKOnes
+)
+
+func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
+	tests := []struct {
+		sdb vm.StateDB
+		ds  []staking.DelegationIndex
+
+		expVWrappers    []*staking.ValidatorWrapper
+		expTotalRewards *big.Int
+		expErr          error
+	}{
+		{
+			sdb: makeStateForReward(t),
+			ds:  makeMsgCollectRewards(),
+
+			expVWrappers:    expVWrappersForReward(),
+			expTotalRewards: new(big.Int).Add(reward01, reward11),
+		},
+		{
+			sdb: makeDefaultStateDB(t),
+			ds:  []staking.DelegationIndex{{ValidatorAddress: validatorAddr2, Index: 0}},
+
+			expErr: errNoRewardsToCollect,
+		},
+	}
+	for i, test := range tests {
+		ws, tReward, err := VerifyAndCollectRewardsFromDelegation(test.sdb, test.ds)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, err)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		fmt.Println(ws)
+		fmt.Println(test.expVWrappers)
+		if !reflect.DeepEqual(ws[0].Delegations[1].Reward, test.expVWrappers[0].Delegations[1].Reward) {
+			fmt.Println(ws[0].Delegations[1].Reward, test.expVWrappers[0].Delegations[1].Reward)
+			fmt.Printf("%+v, %+v\n", ws[0].Delegations[1].Reward, test.expVWrappers[0].Delegations[1].Reward)
+			t.Errorf("xxxxxx")
+		}
+		if !reflect.DeepEqual(ws, test.expVWrappers) {
+			t.Errorf("Test %v: vWrappers unexpected", i)
+		}
+		if tReward.Cmp(test.expTotalRewards) != 0 {
+			t.Errorf("Test %v: total Rewards unexpected: %v / %v", i, tReward, test.expTotalRewards)
+		}
+	}
+}
+
+func makeMsgCollectRewards() []staking.DelegationIndex {
+	dis := []staking.DelegationIndex{
+		{
+			ValidatorAddress: validatorAddr,
+			Index:            1,
+			BlockNum:         big.NewInt(defaultBlockNumber),
+		}, {
+			ValidatorAddress: validatorAddr2,
+			Index:            1,
+			BlockNum:         big.NewInt(defaultBlockNumber),
+		},
+	}
+	return dis
+}
+
+func makeStateForReward(t *testing.T) *state.DB {
+	sdb := makeDefaultStateDB(t)
+
+	rewards0 := []*big.Int{reward00, reward01}
+	if err := addStateRewardForAddr(sdb, validatorAddr, rewards0); err != nil {
+		t.Fatal(err)
+	}
+	rewards1 := []*big.Int{reward10, reward11}
+	if err := addStateRewardForAddr(sdb, validatorAddr2, rewards1); err != nil {
+		t.Fatal(err)
+	}
+
+	sdb.IntermediateRoot(true)
+	return sdb
+}
+
+func addStateRewardForAddr(sdb *state.DB, addr common.Address, rewards []*big.Int) error {
+	w, err := sdb.ValidatorWrapper(addr)
+	if err != nil {
+		return err
+	}
+	w.Delegations = append(w.Delegations,
+		staking.NewDelegation(delegatorAddr, new(big.Int).Set(twentyKOnes)),
+	)
+	w.Delegations[1].Undelegations = staking.Undelegations{}
+	w.Delegations[0].Reward = new(big.Int).Set(rewards[0])
+	w.Delegations[1].Reward = new(big.Int).Set(rewards[1])
+
+	return sdb.UpdateValidatorWrapper(addr, w)
+}
+
+func expVWrappersForReward() []*staking.ValidatorWrapper {
+	w1 := makeDefaultSnapVWrapperByIndex(validatorIndex)
+	w1.Delegations = append(w1.Delegations,
+		staking.NewDelegation(delegatorAddr, new(big.Int).Set(twentyKOnes)),
+	)
+	w1.Delegations[1].Undelegations = staking.Undelegations{}
+	w1.Delegations[0].Reward = new(big.Int).Set(reward00)
+	w1.Delegations[1].Reward = new(big.Int).SetUint64(0)
+
+	w2 := makeDefaultSnapVWrapperByIndex(validator2Index)
+	w2.Delegations = append(w2.Delegations,
+		staking.NewDelegation(delegatorAddr, new(big.Int).Set(twentyKOnes)),
+	)
+	w2.Delegations[1].Undelegations = staking.Undelegations{}
+	w2.Delegations[0].Reward = new(big.Int).Set(reward10)
+	w2.Delegations[1].Reward = new(big.Int).SetUint64(0)
+	return []*staking.ValidatorWrapper{&w1, &w2}
+}
+
 func makeDefaultFakeChainContext() *fakeChainContext {
 	ws := makeDefaultCurrentStateVWrappers(defNumWrappersInState, defNumPubPerAddr)
 	return makeFakeChainContext(ws)
@@ -1160,6 +1282,7 @@ func makeDefaultStateDB(t *testing.T) *state.DB {
 		t.Fatalf("make default state: %v", err)
 	}
 	sdb.AddBalance(createValidatorAddr, hundredKOnes)
+	sdb.AddBalance(delegatorAddr, hundredKOnes)
 
 	sdb.IntermediateRoot(true)
 
