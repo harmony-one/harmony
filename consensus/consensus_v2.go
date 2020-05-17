@@ -349,7 +349,7 @@ func (consensus *Consensus) Start(
 		}
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		defer close(stoppedChan)
-		ticker := time.NewTicker(3 * time.Second)
+		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		consensus.getLogger().Debug().
