@@ -203,7 +203,8 @@ func (node *Node) DoBeaconSyncing() {
 	}
 }
 
-// DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
+// DoSyncing keep the node in sync with other peers,
+// willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	ticker := time.NewTicker(time.Duration(SyncFrequency) * time.Second)
 	// TODO ek – infinite loop; add shutdown/cleanup logic
@@ -220,7 +221,9 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+		node.stateSync = syncing.CreateStateSync(
+			node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID(),
+		)
 		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 	}
 	if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
@@ -240,7 +243,9 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 				Msg("[SYNC] create peers error")
 			return
 		}
-		utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
+		utils.Logger().Debug().
+			Int("len", node.stateSync.GetActivePeerNumber()).
+			Msg("[SYNC] Get Active Peers")
 	}
 	// TODO: treat fake maximum height
 	if node.stateSync.IsOutOfSync(bc) {
@@ -263,83 +268,36 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 	node.stateMutex.Unlock()
 }
 
-// SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node
+// SupportBeaconSyncing sync with beacon chain
+// for archival node in beacon chan or non-beacon node
 func (node *Node) SupportBeaconSyncing() {
 	go node.DoBeaconSyncing()
 }
 
 // SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
 func (node *Node) SupportSyncing() {
-	node.InitSyncingServer()
-	node.StartSyncingServer()
-
-	joinConsensus := false
-	// Check if the current node is explorer node.
-	switch node.NodeConfig.Role() {
-	case nodeconfig.Validator:
-		joinConsensus = true
-	}
-
-	// Send new block to unsync node if the current node is not explorer node.
-	// TODO: leo this pushing logic has to be removed
-	if joinConsensus {
-		go node.SendNewBlockToUnsync()
-	}
-
-	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
-}
-
-// InitSyncingServer starts downloader server.
-func (node *Node) InitSyncingServer() {
 	if node.downloaderServer == nil {
 		node.downloaderServer = downloader.NewServer(node)
 	}
-}
-
-// StartSyncingServer starts syncing server.
-func (node *Node) StartSyncingServer() {
 	utils.Logger().Info().Msg("[SYNC] support_syncing: StartSyncingServer")
 	if node.downloaderServer.GrpcServer == nil {
-		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
+		node.downloaderServer.Start(
+			node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port),
+		)
 	}
-}
 
-// SendNewBlockToUnsync send latest verified block to unsync, registered nodes
-func (node *Node) SendNewBlockToUnsync() {
-	for {
-		block := <-node.Consensus.VerifiedNewBlock
-		blockHash, err := rlp.EncodeToBytes(block)
-		if err != nil {
-			utils.Logger().Warn().Msg("[SYNC] unable to encode block to hashes")
-			continue
-		}
-
-		node.stateMutex.Lock()
-		for peerID, config := range node.peerRegistrationRecord {
-			elapseTime := time.Now().UnixNano() - config.timestamp
-			if elapseTime > broadcastTimeout {
-				utils.Logger().Warn().Str("peerID", peerID).Msg("[SYNC] SendNewBlockToUnsync to peer timeout")
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-				continue
-			}
-			response, err := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
-			// close the connection if cannot push new block to unsync node
-			if err != nil {
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-			}
-			if response != nil && response.Type == downloader_pb.DownloaderResponse_INSYNC {
-				node.peerRegistrationRecord[peerID].client.Close()
-				delete(node.peerRegistrationRecord, peerID)
-			}
-		}
-		node.stateMutex.Unlock()
-	}
+	go node.DoSyncing(
+		node.Blockchain(),
+		node.Worker,
+		node.NodeConfig.Role() == nodeconfig.Validator,
+	)
 }
 
 // CalculateResponse implements DownloadInterface on Node object.
-func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, incomingPeer string) (*downloader_pb.DownloaderResponse, error) {
+func (node *Node) CalculateResponse(
+	request *downloader_pb.DownloaderRequest,
+	incomingPeer string,
+) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_BLOCKHASH:
@@ -347,14 +305,18 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request BlockHash is NIL")
 		}
 		if request.Size == 0 || request.Size > syncing.SyncLoopBatchSize {
-			return response, fmt.Errorf("[SYNC] GetBlockHashes Request contains invalid Size %v", request.Size)
+			return response, errors.Errorf(
+				"[SYNC] GetBlockHashes Request contains invalid Size %v", request.Size,
+			)
 		}
 		size := uint64(request.Size)
 		var startHashHeader common.Hash
 		copy(startHashHeader[:], request.BlockHash[:])
 		startHeader := node.Blockchain().GetHeaderByHash(startHashHeader)
 		if startHeader == nil {
-			return response, fmt.Errorf("[SYNC] GetBlockHashes Request cannot find startHash %s", startHashHeader.Hex())
+			return response, errors.Errorf(
+				"sync issue, GetBlockHashes Request cannot find startHash %s", startHashHeader.Hex(),
+			)
 		}
 		startHeight := startHeader.Number().Uint64()
 		endHeight := node.Blockchain().CurrentBlock().NumberU64()
@@ -416,8 +378,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
 		if node.State != NodeNotInSync {
 			utils.Logger().Debug().
-				Str("state", node.State.String()).
-				Msg("[SYNC] new block received, but state is")
+				Msgf("[SYNC] new block received, but state is %v", node.State)
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}

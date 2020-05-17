@@ -3,31 +3,28 @@ package consensus
 import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
-	"github.com/harmony-one/harmony/shard"
+	"github.com/pkg/errors"
 )
 
 // MaxBlockNumDiff limits the received block number to only 100 further from the current block number
 const MaxBlockNumDiff = 100
 
 func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
-	if msg.GetConsensus() == nil {
-		consensus.getLogger().Warn().Msg("[validatorSanityChecks] malformed message")
-		return false
-	}
 	consensus.getLogger().Debug().
 		Uint64("blockNum", msg.GetConsensus().BlockNum).
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
 		Msg("[validatorSanityChecks] Checking new message")
-	senderKey, err := consensus.verifySenderKey(msg)
+
+	// TODO can remove this as already verified but later below is some logic
+	// NOTE can assume this won't explode, already past validation
+	senderKey, err := bls_cosi.BytesToBLSPublicKey(
+		msg.GetConsensus().GetSenderPubkey(),
+	)
+
 	if err != nil {
-		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().
-				Msg("sender key not in this slot's subcommittee")
-		} else {
-			consensus.getLogger().Error().Err(err).Msg("VerifySenderKey failed")
-		}
 		return false
 	}
 
@@ -40,64 +37,19 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		return false
 	}
 
-	if err := verifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msg(
-			"Failed to verify sender's signature",
-		)
-		return false
-	}
-
 	return true
 }
 
-func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
-	if msg.GetConsensus() == nil {
-		consensus.getLogger().Warn().Msg("[leaderSanityChecks] malformed message")
-		return false
+func (consensus *Consensus) isRightBlockNumAndViewID(
+	recvMsg *FBFTMessage,
+) error {
+	if recvMsg.ViewID != consensus.viewID {
+		return errViewIDCheckFail
 	}
-	consensus.getLogger().Debug().
-		Uint64("blockNum", msg.GetConsensus().BlockNum).
-		Uint64("viewID", msg.GetConsensus().ViewId).
-		Str("msgType", msg.Type.String()).
-		Msg("[leaderSanityChecks] Checking new message")
-	senderKey, err := consensus.verifySenderKey(msg)
-	if err != nil {
-		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().Msgf(
-				"[%s] sender key not in this slot's subcommittee",
-				msg.GetType().String(),
-			)
-		} else {
-			consensus.getLogger().Error().Err(err).Msgf(
-				"[%s] verifySenderKey failed",
-				msg.GetType().String(),
-			)
-		}
-		return false
+	if recvMsg.BlockNum != consensus.blockNum {
+		return errWrongBlockNum
 	}
-	if err = verifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msgf(
-			"[%s] Failed to verify sender's signature",
-			msg.GetType().String(),
-		)
-		return false
-	}
-
-	return true
-}
-
-func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
-) bool {
-	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
-		consensus.getLogger().Debug().
-			Uint64("MsgViewID", recvMsg.ViewID).
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
-			Str("ValidatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
-			Msg("[OnCommit] BlockNum/viewID not match")
-		return false
-	}
-	return true
+	return nil
 }
 
 func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
@@ -187,52 +139,31 @@ func (consensus *Consensus) onPreparedSanityChecks(
 	return true
 }
 
-func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
-	if msg.GetViewchange() == nil {
-		consensus.getLogger().Warn().Msg("[viewChangeSanityCheck] malformed message")
-		return false
-	}
-	consensus.getLogger().Debug().
-		Msg("[viewChangeSanityCheck] Checking new message")
-	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
-	if err != nil {
-		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().Msgf(
-				"[%s] sender key not in this slot's subcommittee",
-				msg.GetType().String(),
-			)
-		} else {
-			consensus.getLogger().Error().Err(err).Msgf(
-				"[%s] VerifySenderKey Failed",
-				msg.GetType().String(),
-			)
-		}
-		return false
-	}
-	if err := verifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msgf(
-			"[%s] Failed To Verify Sender's Signature",
-			msg.GetType().String(),
-		)
-		return false
-	}
-	return true
-}
+var (
+	errLowBlockNum          = errors.New("message blockNum is low")
+	errNewLeaderLowBlockNum = errors.New("new leader has lower blocknum")
+	errViewChangeIDLow      = errors.New("viewChanging ID Is Low")
+	errVCIDDiffToLarge      = errors.New(
+		"received viewID that is MaxViewIDDiff (100) further from the current viewID",
+	)
+)
 
-func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
+func (consensus *Consensus) onViewChangeSanityCheck(
+	recvMsg *FBFTMessage,
+) error {
 	// TODO: if difference is only one, new leader can still propose the same committed block to avoid another view change
 	// TODO: new leader catchup without ignore view change message
 	if consensus.blockNum > recvMsg.BlockNum {
 		consensus.getLogger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[onViewChange] Message BlockNum Is Low")
-		return false
+		return errLowBlockNum
 	}
 	if consensus.blockNum < recvMsg.BlockNum {
 		consensus.getLogger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[onViewChange] New Leader Has Lower Blocknum")
-		return false
+		return errNewLeaderLowBlockNum
 	}
 	if consensus.current.Mode() == ViewChanging &&
 		consensus.current.ViewID() > recvMsg.ViewID {
@@ -240,30 +171,39 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 			Uint64("MyViewChangingID", consensus.current.ViewID()).
 			Uint64("MsgViewChangingID", recvMsg.ViewID).
 			Msg("[onViewChange] ViewChanging ID Is Low")
-		return false
+		return errViewChangeIDLow
 	}
 	if recvMsg.ViewID-consensus.current.ViewID() > MaxViewIDDiff {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("CurrentViewID", consensus.current.ViewID()).
 			Msg("Received viewID that is MaxViewIDDiff (100) further from the current viewID!")
-		return false
+		return errVCIDDiffToLarge
 	}
-	return true
+	return nil
 }
 
-func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
+var (
+	errNewViewSanityCheck = errors.New(
+		"viewID should be larger than the viewID of the last successful consensus",
+	)
+	errNotInVCMode = errors.New("not in ViewChanging mode, ignoring the new view message")
+)
+
+func (consensus *Consensus) onNewViewSanityCheck(
+	recvMsg *FBFTMessage,
+) error {
 	if recvMsg.ViewID <= consensus.viewID {
 		consensus.getLogger().Warn().
 			Uint64("LastSuccessfulConsensusViewID", consensus.viewID).
 			Uint64("MsgViewChangingID", recvMsg.ViewID).
 			Msg("[onNewView] ViewID should be larger than the viewID of the last successful consensus")
-		return false
+		return errNewViewSanityCheck
 	}
 	if consensus.current.Mode() != ViewChanging {
 		consensus.getLogger().Warn().
 			Msg("[onNewView] Not in ViewChanging mode, ignoring the new view message")
-		return false
+		return errNotInVCMode
 	}
-	return true
+	return nil
 }

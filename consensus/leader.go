@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/pkg/errors"
 )
 
 func (consensus *Consensus) announce(block *types.Block) {
@@ -98,20 +99,24 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.switchPhase(FBFTPrepare, true)
 }
 
-func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
+var (
+	errInvalidBLSSign         = errors.New("onPrepare received an invalid BLS signature")
+	errFailOnCommitVerifyHash = errors.New("leader cannot verify commit message")
+)
+
+func (consensus *Consensus) onPrepare(msg *msg_pb.Message) error {
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnPrepare] Unparseable validator message")
-		return
+		return err
 	}
 
-	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
-		consensus.getLogger().Debug().
-			Uint64("MsgViewID", recvMsg.ViewID).
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[OnPrepare] Message ViewId or BlockNum not match")
-		return
+	if recvMsg.ViewID != consensus.viewID {
+		return errViewIDCheckFail
+	}
+
+	if recvMsg.BlockNum != consensus.blockNum {
+		return errWrongBlockNum
 	}
 
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
@@ -139,13 +144,13 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	if signed != nil {
 		logger.Debug().
 			Msg("[OnPrepare] Already Received prepare message from the validator")
-		return
+		return nil
 	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		// already have enough signatures
 		logger.Debug().Msg("[OnPrepare] Received Additional Prepare Message")
-		return
+		return nil
 	}
 
 	// Check BLS signature for the multi-sig
@@ -154,11 +159,11 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Msg("[OnPrepare] Failed to deserialize bls signature")
-		return
+		return err
 	}
 	if !sign.VerifyHash(recvMsg.SenderPubkey, consensus.blockHash[:]) {
 		consensus.getLogger().Error().Msg("[OnPrepare] Received invalid BLS signature")
-		return
+		return errInvalidBLSSign
 	}
 
 	logger = logger.With().
@@ -171,33 +176,34 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		recvMsg.BlockNum, recvMsg.ViewID,
 	); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("submit vote prepare failed")
-		return
+		return err
 	}
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
-		return
+		return err
 	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		// NOTE Let it handle its own logs
 		if err := consensus.didReachPrepareQuorum(); err != nil {
-			return
+			return err
 		}
 		consensus.switchPhase(FBFTCommit, true)
 	}
+	return nil
 }
 
-func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
+func (consensus *Consensus) onCommit(msg *msg_pb.Message) error {
 	recvMsg, err := ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Parse pbft message failed")
-		return
+		return err
 	}
 
 	// NOTE let it handle its own log
-	if !consensus.isRightBlockNumAndViewID(recvMsg) {
-		return
+	if err := consensus.isRightBlockNumAndViewID(recvMsg); err != nil {
+		return err
 	}
 
 	consensus.mutex.Lock()
@@ -205,7 +211,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	// Check for potential double signing
 	if consensus.checkDoubleSign(recvMsg) {
-		return
+		return errors.New("could be a double signer")
 	}
 
 	validatorPubKey, commitSig, commitBitmap :=
@@ -219,7 +225,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	var sign bls.Sign
 	if err := sign.Deserialize(commitSig); err != nil {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
-		return
+		return err
 	}
 	// Must have the corresponding block to verify committed message.
 	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
@@ -229,10 +235,13 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			Uint64("viewID", recvMsg.ViewID).
 			Str("blockHash", recvMsg.BlockHash.Hex()).
 			Msg("[OnCommit] Failed finding a matching block for committed message")
-		return
+		return errFailFindMatchBlock
 	}
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
+	commitPayload := signature.ConstructCommitPayload(
+		consensus.ChainReader,
+		blockObj.Epoch(), blockObj.Hash(),
+		blockObj.NumberU64(), blockObj.Header().ViewID().Uint64(),
+	)
 	logger = logger.With().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -240,7 +249,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	if !sign.VerifyHash(recvMsg.SenderPubkey, commitPayload) {
 		logger.Error().Msg("[OnCommit] Cannot verify commit message")
-		return
+		return errFailOnCommitVerifyHash
 	}
 
 	logger = logger.With().
@@ -253,13 +262,13 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		&sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
 	); err != nil {
-		return
+		return err
 	}
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey, true); err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[OnCommit] commitBitmap.SetKey failed")
-		return
+		return err
 	}
 
 	quorumIsMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
@@ -286,4 +295,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			logger.Info().Msg("[OnCommit] 100% Enough commits received")
 		}(consensus.viewID)
 	}
+
+	return nil
 }

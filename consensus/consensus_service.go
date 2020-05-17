@@ -15,10 +15,8 @@ import (
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
@@ -66,19 +64,6 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 		return empty, err
 	}
 	return marshaledMessage, nil
-}
-
-// GetNodeIDs returns Node IDs of all nodes in the same shard
-func (consensus *Consensus) GetNodeIDs() []libp2p_peer.ID {
-	nodes := []libp2p_peer.ID{consensus.host.GetID()}
-	consensus.validators.Range(func(k, v interface{}) bool {
-		if peer, ok := v.(p2p.Peer); ok {
-			nodes = append(nodes, peer.PeerID)
-			return true
-		}
-		return false
-	})
-	return nodes
 }
 
 // GetViewID returns the consensus ID
@@ -135,21 +120,6 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
 	return nil
 }
 
-// GetValidatorPeers returns list of validator peers.
-func (consensus *Consensus) GetValidatorPeers() []p2p.Peer {
-	validatorPeers := []p2p.Peer{}
-
-	consensus.validators.Range(func(k, v interface{}) bool {
-		if peer, ok := v.(p2p.Peer); ok {
-			validatorPeers = append(validatorPeers, peer)
-			return true
-		}
-		return false
-	})
-
-	return validatorPeers
-}
-
 // GetViewIDSigsArray returns the signatures for viewID in viewchange
 func (consensus *Consensus) GetViewIDSigsArray(viewID uint64) []*bls.Sign {
 	sigs := []*bls.Sign{}
@@ -199,8 +169,8 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
-// Verify the signature of the message are valid from the signer's public key.
-func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
+// VerifyMessageSig the signature of the message are valid from the signer's public key.
+func VerifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(message)
@@ -219,33 +189,6 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 	}
 	message.Signature = signature
 	return nil
-}
-
-// verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
-func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
-	consensusMsg := msg.GetConsensus()
-	senderKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
-	if err != nil {
-		return nil, err
-	}
-
-	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, shard.ErrValidNotInCommittee
-	}
-	return senderKey, nil
-}
-
-func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
-	vcMsg := msg.GetViewchange()
-	senderKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
-	if err != nil {
-		return nil, err
-	}
-
-	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, shard.ErrValidNotInCommittee
-	}
-	return senderKey, nil
 }
 
 // SetViewID set the viewID to the height of the blockchain
@@ -418,7 +361,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.Decider = decider
 	}
 
-	committeeToSet := &shard.Committee{}
+	var committeeToSet *shard.Committee
 	epochToSet := curEpoch
 	hasError := false
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(

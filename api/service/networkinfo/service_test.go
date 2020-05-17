@@ -26,7 +26,7 @@ func TestService(t *testing.T) {
 		t.Fatal("unable to new host in harmony")
 	}
 
-	s, err := New(host, nodeconfig.GroupIDBeaconClient, nil, nil, "")
+	s, err := New(host, nodeconfig.GroupIDBeaconClient, nil, "")
 	if err != nil {
 		t.Fatalf("New() failed: %s", err)
 	}

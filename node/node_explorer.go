@@ -1,41 +1,47 @@
 package node
 
 import (
+	"context"
 	"sort"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/pkg/errors"
 )
 
 var once sync.Once
 
-// ExplorerMessageHandler passes received message in node_handler to explorer service
-func (node *Node) ExplorerMessageHandler(payload []byte) {
-	if len(payload) == 0 {
-		utils.Logger().Error().Msg("Payload is empty")
-		return
-	}
-	msg := &msg_pb.Message{}
-	err := protobuf.Unmarshal(payload, msg)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to unmarshal message payload.")
-		return
-	}
+var (
+	errBlockBeforeCommit = errors.New(
+		"explorer hasnt received the block before the committed msg",
+	)
+	errFailVerifyMultiSign = errors.New(
+		"explorer failed to verify the multi signature for commit phase",
+	)
+	errFailFindingValidCommit = errors.New(
+		"explorer failed finding a valid committed message",
+	)
+)
+
+// explorerMessageHandler passes received message in node_handler to explorer service
+func (node *Node) explorerMessageHandler(
+	ctx context.Context,
+	msg *msg_pb.Message,
+) error {
 
 	if msg.Type == msg_pb.MessageType_COMMITTED {
 		recvMsg, err := consensus.ParseFBFTMessage(msg)
 		if err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("[Explorer] onCommitted unable to parse msg")
-			return
+			return err
 		}
 
 		aggSig, mask, err := node.Consensus.ReadSignatureBitmapPayload(
@@ -44,12 +50,12 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		if err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("[Explorer] readSignatureBitmapPayload failed")
-			return
+			return err
 		}
 
 		if !node.Consensus.Decider.IsQuorumAchievedByMask(mask) {
 			utils.Logger().Error().Msg("[Explorer] not have enough signature power")
-			return
+			return nil
 		}
 
 		block := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
@@ -59,7 +65,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 				Uint64("msgBlock", recvMsg.BlockNum).
 				Msg("[Explorer] Haven't received the block before the committed msg")
 			node.Consensus.FBFTLog.AddMessage(recvMsg)
-			return
+			return errBlockBeforeCommit
 		}
 
 		commitPayload := signature.ConstructCommitPayload(node.Blockchain(),
@@ -69,7 +75,7 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 				Error().Err(err).
 				Uint64("msgBlock", recvMsg.BlockNum).
 				Msg("[Explorer] Failed to verify the multi signature for commit phase")
-			return
+			return errFailVerifyMultiSign
 		}
 
 		block.SetCurrentCommitSig(recvMsg.Payload)
@@ -80,12 +86,12 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 		recvMsg, err := consensus.ParseFBFTMessage(msg)
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("[Explorer] Unable to parse Prepared msg")
-			return
+			return err
 		}
 		block, blockObj := recvMsg.Block, &types.Block{}
 		if err := rlp.DecodeBytes(block, blockObj); err != nil {
 			utils.Logger().Error().Err(err).Msg("explorer could not rlp decode block")
-			return
+			return err
 		}
 		// Add the block into FBFT log.
 		node.Consensus.FBFTLog.AddBlock(blockObj)
@@ -106,14 +112,15 @@ func (node *Node) ExplorerMessageHandler(payload []byte) {
 				break
 			}
 			if committedMsg == nil {
-				utils.Logger().Error().Err(err).Msg("[Explorer] Failed finding a valid committed message.")
-				return
+				utils.Logger().Error().Msg("[Explorer] Failed finding a valid committed message")
+				return errFailFindingValidCommit
 			}
 			blockObj.SetCurrentCommitSig(committedMsg.Payload)
 			node.AddNewBlockForExplorer(blockObj)
 			node.commitBlockForExplorer(blockObj)
 		}
 	}
+	return nil
 }
 
 // AddNewBlockForExplorer add new block for explorer.

@@ -28,7 +28,6 @@ const (
 	Consensus
 	BlockProposal
 	NetworkInfo
-	PeerDiscovery
 )
 
 func (t Type) String() string {
@@ -43,8 +42,6 @@ func (t Type) String() string {
 		return "BlockProposal"
 	case NetworkInfo:
 		return "NetworkInfo"
-	case PeerDiscovery:
-		return "PeerDiscovery"
 	default:
 		return "Unknown"
 	}
@@ -52,7 +49,8 @@ func (t Type) String() string {
 
 // Constants for timing.
 const (
-	// WaitForStatusUpdate is the delay time to update new status. Currently set 1 second for development. Should be 30 minutes for production.
+	// WaitForStatusUpdate is the delay time to update new status.
+	// Currently set 1 second for development. Should be 30 minutes for production.
 	WaitForStatusUpdate = time.Minute * 1
 )
 
