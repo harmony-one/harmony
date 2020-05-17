@@ -2,6 +2,7 @@ package quorum
 
 import (
 	"encoding/json"
+	errors2 "errors"
 	"math/big"
 
 	"github.com/harmony-one/harmony/consensus/votepower"
@@ -78,8 +79,6 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	return (*currentTotalPower).GT(threshold)
 }
 func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, error) {
-	w := shard.BLSPublicKey{}
-	members := v.Participants()
 	ballot := func() *voteBox {
 		switch p {
 		case Prepare:
@@ -94,10 +93,14 @@ func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, erro
 		}
 	}()
 
+	members := v.Participants()
+	membersKeys := v.ParticipantsKeyBytes()
+	if len(members) != len(membersKeys) {
+		return nil, errors2.New("Participant keys are not matching")
+	}
+
 	for i := range members {
-		if err := w.FromLibBLSPublicKey(members[i]); err != nil {
-			return nil, err
-		}
+		w := membersKeys[i]
 		if _, didVote := ballot.voters[w]; !didVote &&
 			v.ReadBallot(p, members[i]) != nil {
 			ballot.currentTotal = ballot.currentTotal.Add(
