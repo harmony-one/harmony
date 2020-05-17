@@ -195,13 +195,22 @@ func (s *Service) DoService() {
 		case <-s.stopChan:
 			return
 		case <-tick.C:
-			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-			// 0 is beacon chain FIXME: use a constant
-			libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
+			var g sync.WaitGroup
+			g.Add(2)
+			go func() {
+				defer g.Done()
+				libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
+			}()
+			go func() {
+				defer g.Done()
+				libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
+			}()
+
+			g.Wait()
 			utils.Logger().Info().
 				Str("Rendezvous", string(s.Rendezvous)).
 				Msg("Successfully announced!")
-		default:
+		case <-time.After(findPeerInterval):
 			var err error
 			s.peerInfo, err = s.discovery.FindPeers(
 				ctx, string(s.Rendezvous), coredis.Limit(discoveryLimit),
@@ -210,9 +219,7 @@ func (s *Service) DoService() {
 				utils.Logger().Error().Err(err).Msg("FindPeers")
 				return
 			}
-
 			s.findPeers(ctx)
-			time.Sleep(findPeerInterval)
 		}
 	}
 }
