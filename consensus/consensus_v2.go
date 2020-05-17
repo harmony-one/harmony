@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
@@ -88,7 +89,11 @@ func (consensus *Consensus) HandleMessageUpdate(
 		return consensus.onNewView(msg)
 	}
 
-	return errUnhandledCNSMsg
+	utils.Logger().Warn().
+		Interface("consensus-proto-msg", msg).
+		Msg("unhandled consensus message")
+
+	return errors.WithStack(errUnhandledCNSMsg)
 
 }
 
