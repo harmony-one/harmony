@@ -756,7 +756,7 @@ func main() {
 		).
 		Msg(startMsg)
 
-	go currentNode.SupportSyncing()
+	currentNode.SupportSyncing()
 	currentNode.RunServices()
 	// RPC for SDK not supported for mainnet.
 	if err := currentNode.StartRPC(*port); err != nil {
