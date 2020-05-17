@@ -68,6 +68,7 @@ func (p Policy) String() string {
 // ParticipantTracker ..
 type ParticipantTracker interface {
 	Participants() []*bls.PublicKey
+	ParticipantsKeyBytes() []shard.BLSPublicKey
 	IndexOf(*bls.PublicKey) int
 	ParticipantsCount() int64
 	NextAfter(*bls.PublicKey) (bool, *bls.PublicKey)
@@ -145,9 +146,10 @@ type Transition struct {
 // and values are BLS private key signed signatures
 type cIdentities struct {
 	// Public keys of the committee including leader and validators
-	publicKeys []*bls.PublicKey
-	prepare    *votepower.Round
-	commit     *votepower.Round
+	publicKeys     []*bls.PublicKey
+	publicKeysByte []shard.BLSPublicKey
+	prepare        *votepower.Round
+	commit         *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewChange *votepower.Round
@@ -196,12 +198,20 @@ func (s *cIdentities) Participants() []*bls.PublicKey {
 	return s.publicKeys
 }
 
+func (s *cIdentities) ParticipantsKeyBytes() []shard.BLSPublicKey {
+	return s.publicKeysByte
+}
+
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
+	keyBytes := []shard.BLSPublicKey{}
 	for i := range pubKeys {
 		k := shard.BLSPublicKey{}
 		k.FromLibBLSPublicKey(pubKeys[i])
+
+		keyBytes = append(keyBytes, k)
 	}
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
+	s.publicKeysByte = keyBytes
 }
 
 func (s *cIdentities) ParticipantsCount() int64 {
@@ -306,10 +316,11 @@ func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 
 func newBallotsBackedSignatureReader() *cIdentities {
 	return &cIdentities{
-		publicKeys: []*bls.PublicKey{},
-		prepare:    votepower.NewRound(),
-		commit:     votepower.NewRound(),
-		viewChange: votepower.NewRound(),
+		publicKeys:     []*bls.PublicKey{},
+		publicKeysByte: []shard.BLSPublicKey{},
+		prepare:        votepower.NewRound(),
+		commit:         votepower.NewRound(),
+		viewChange:     votepower.NewRound(),
 	}
 }
 
