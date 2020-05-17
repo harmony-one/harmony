@@ -451,7 +451,6 @@ func (node *Node) Start() error {
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
 				hmyMsg := msg.GetData()
 				if len(hmyMsg) < p2pMsgPrefixSize {
-					pubsub.BlacklistPeer(peer)
 					errChan <- withError{
 						errors.WithStack(errors.Wrapf(
 							errMsgHadNoHMYPayLoadAssumption, "on topic %s", topicNamed,
@@ -496,7 +495,6 @@ func (node *Node) Start() error {
 						handleEArg:     openBox,
 					}
 				default:
-					pubsub.BlacklistPeer(peer)
 					return false
 				}
 
