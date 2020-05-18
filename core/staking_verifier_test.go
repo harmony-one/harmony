@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -381,8 +380,8 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(*w, test.expWrapper) {
-			t.Errorf("Test %v: vWrapper not deep equal", i)
+		if err := staketest.CheckValidatorWrapperEqual(*w, test.expWrapper); err != nil {
+			t.Errorf("Test %v: %v", i, err)
 		}
 	}
 }
@@ -667,8 +666,8 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(w, &test.expWrapper) {
-			t.Errorf("Test %v: wrapper not expected", i)
+		if err := staketest.CheckValidatorWrapperEqual(*w, test.expWrapper); err != nil {
+			t.Errorf("Test %v: %v", i, err)
 		}
 	}
 }
@@ -849,8 +848,8 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		if amt.Cmp(test.expAmt) != 0 {
 			t.Errorf("Test %v: unexpected amount %v / %v", i, amt, test.expAmt)
 		}
-		if !reflect.DeepEqual(w, &test.expVWrapper) {
-			t.Errorf("Test %v: vWrapper not expected", i)
+		if err := staketest.CheckValidatorWrapperEqual(*w, test.expVWrapper); err != nil {
+			t.Errorf("Test %v: %v", i, err)
 		}
 	}
 }
@@ -1068,8 +1067,8 @@ func TestVerifyAndUndelegateFromMsg(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(w, &test.expVWrapper) {
-			t.Errorf("Test %v: validator wrapper not expected", i)
+		if err := staketest.CheckValidatorWrapperEqual(*w, test.expVWrapper); err != nil {
+			t.Errorf("Test %v: %v", i, err)
 		}
 	}
 }
@@ -1186,15 +1185,14 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		fmt.Println(ws)
-		fmt.Println(test.expVWrappers)
-		if !reflect.DeepEqual(ws[0].Delegations[1].Reward, test.expVWrappers[0].Delegations[1].Reward) {
-			fmt.Println(ws[0].Delegations[1].Reward, test.expVWrappers[0].Delegations[1].Reward)
-			fmt.Printf("%+v, %+v\n", ws[0].Delegations[1].Reward, test.expVWrappers[0].Delegations[1].Reward)
-			t.Errorf("xxxxxx")
+
+		if len(ws) != len(test.expVWrappers) {
+			t.Fatalf("vwrapper size unexpected: %v / %v", len(ws), len(test.expVWrappers))
 		}
-		if !reflect.DeepEqual(ws, test.expVWrappers) {
-			t.Errorf("Test %v: vWrappers unexpected", i)
+		for wi := range ws {
+			if err := staketest.CheckValidatorWrapperEqual(*ws[wi], *test.expVWrappers[wi]); err != nil {
+				t.Errorf("%v wrapper: %v", wi, err)
+			}
 		}
 		if tReward.Cmp(test.expTotalRewards) != 0 {
 			t.Errorf("Test %v: total Rewards unexpected: %v / %v", i, tReward, test.expTotalRewards)
