@@ -9,7 +9,7 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// CheckValidatorEqual checks the equality of staking.ValidatorWrapper. If not equal, an
+// CheckValidatorWrapperEqual checks the equality of staking.ValidatorWrapper. If not equal, an
 // error is returned. Note nil pointer is treated as zero in this compare function.
 func CheckValidatorWrapperEqual(w1, w2 staking.ValidatorWrapper) error {
 	if err := checkValidatorWrapperEqual(w1, w2); err != nil {
