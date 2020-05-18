@@ -42,7 +42,6 @@ var (
 
 var (
 	oneBig          = big.NewInt(1e18)
-	oneKOnes        = new(big.Int).Mul(big.NewInt(1000), oneBig)
 	fiveKOnes       = new(big.Int).Mul(big.NewInt(5000), oneBig)
 	tenKOnes        = new(big.Int).Mul(big.NewInt(10000), oneBig)
 	twelveKOnes     = new(big.Int).Mul(big.NewInt(12000), oneBig)
@@ -53,7 +52,6 @@ var (
 	hundredKOnes    = new(big.Int).Mul(big.NewInt(100000), oneBig)
 
 	negRate           = numeric.NewDecWithPrec(-1, 10)
-	zeroDec           = numeric.ZeroDec()
 	pointOneDec       = numeric.NewDecWithPrec(1, 1)
 	pointTwoDec       = numeric.NewDecWithPrec(2, 1)
 	pointFiveDec      = numeric.NewDecWithPrec(5, 1)
