@@ -91,7 +91,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks))
 
 		for i, cl := range crosslinks {
-			if i > crossLinkBatchSize*10 { // A sanity check to prevent spamming
+			if i > crossLinkBatchSize*2 { // A sanity check to prevent spamming
 				break
 			}
 
