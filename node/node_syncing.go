@@ -168,6 +168,9 @@ func (node *Node) DoBeaconSyncing() {
 				)
 				if err != nil {
 					node.beaconSync.AddLastMileBlock(beaconBlock)
+				} else if node.Consensus.IsLeader() {
+					// Only leader broadcast crosslink to avoid spamming p2p
+					node.BroadcastCrossLink()
 				}
 			}
 		}

@@ -1,22 +1,32 @@
 package node
 
 import (
+	"fmt"
+	"math/big"
+	"time"
+
+	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/verify"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
 	maxPendingCrossLinkSize = 1000
-	crossLinkBatchSize      = 10
+	crossLinkBatchSize      = 3
 )
 
 var (
 	errAlreadyExist = errors.New("crosslink already exist")
+	deciderCache    singleflight.Group
+	committeeCache  singleflight.Group
 )
 
 // VerifyBlockCrossLinks verifies the cross links of the block
@@ -63,6 +73,11 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			return
 		}
 
+		existingCLs := map[common2.Hash]struct{}{}
+		for _, pending := range pendingCLs {
+			existingCLs[pending.Hash()] = struct{}{}
+		}
+
 		crosslinks := []types.CrossLink{}
 		if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
 			utils.Logger().Error().
@@ -76,9 +91,17 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks))
 
 		for i, cl := range crosslinks {
-			if i > crossLinkBatchSize {
+			if i > crossLinkBatchSize*2 { // A sanity check to prevent spamming
 				break
 			}
+
+			if _, ok := existingCLs[cl.Hash()]; ok {
+				utils.Logger().Err(err).
+					Msgf("[ProcessingCrossLink] Cross Link already exists in pending queue, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d",
+						node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
+				continue
+			}
+
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
 				utils.Logger().Err(err).
@@ -122,19 +145,6 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 		)
 	}
 
-	// Verify signature of the new cross link header
-	// TODO: check whether to recalculate shard state
-	shardState, err := node.Blockchain().ReadShardState(cl.Epoch())
-	if err != nil {
-		return err
-	}
-
-	committee, err := shardState.FindCommitteeByID(cl.ShardID())
-
-	if err != nil {
-		return err
-	}
-
 	aggSig := &bls.Sign{}
 	sig := cl.Signature()
 	if err := aggSig.Deserialize(sig[:]); err != nil {
@@ -144,7 +154,86 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 		)
 	}
 
+	committee, err := node.lookupCommittee(cl.Epoch(), cl.ShardID())
+	if err != nil {
+		return err
+	}
+	decider, err := node.lookupDecider(cl.Epoch(), cl.ShardID())
+	if err != nil {
+		return err
+	}
+
 	return verify.AggregateSigForCommittee(
-		node.Blockchain(), committee, aggSig, cl.Hash(), cl.BlockNum(), cl.ViewID().Uint64(), cl.Epoch(), cl.Bitmap(),
+		node.Blockchain(), committee, decider, aggSig, cl.Hash(), cl.BlockNum(), cl.ViewID().Uint64(), cl.Epoch(), cl.Bitmap(),
 	)
+}
+
+func (node *Node) lookupDecider(
+	epoch *big.Int, shardID uint32,
+) (quorum.Decider, error) {
+
+	key := fmt.Sprintf("decider-%d-%d", epoch.Uint64(), shardID)
+	result, err, _ := deciderCache.Do(
+		key, func() (interface{}, error) {
+
+			committee, err := node.lookupCommittee(epoch, shardID)
+			if err != nil {
+				return nil, err
+			}
+
+			decider := quorum.NewDecider(
+				quorum.SuperMajorityStake, committee.ShardID,
+			)
+
+			decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
+				return nil, nil
+			})
+
+			if _, err := decider.SetVoters(committee, epoch); err != nil {
+				return nil, err
+			}
+
+			go func() {
+				time.Sleep(120 * time.Minute)
+				deciderCache.Forget(key)
+			}()
+			return decider, nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.(quorum.Decider), nil
+}
+
+func (node *Node) lookupCommittee(
+	epoch *big.Int, shardID uint32,
+) (*shard.Committee, error) {
+
+	key := fmt.Sprintf("committee-%d-%d", epoch.Uint64(), shardID)
+	result, err, _ := committeeCache.Do(
+		key, func() (interface{}, error) {
+			shardState, err := node.Blockchain().ReadShardState(epoch)
+			if err != nil {
+				return nil, err
+			}
+
+			committee, err := shardState.FindCommitteeByID(shardID)
+			if err != nil {
+				return nil, err
+			}
+
+			go func() {
+				time.Sleep(120 * time.Minute)
+				committeeCache.Forget(key)
+			}()
+			return committee, nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.(*shard.Committee), nil
 }
