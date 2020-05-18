@@ -20,6 +20,8 @@ var (
 	ErrInsufficientEpoch = errors.New("insufficient past epochs to compute apr")
 	// ErrCouldNotRetreiveHeaderByNumber is returned when fail to retrieve header by number
 	ErrCouldNotRetreiveHeaderByNumber = errors.New("could not retrieve header by number")
+	// ErrZeroStakeOneEpochAgo is returned when total delegation is zero for one epoch ago
+	ErrZeroStakeOneEpochAgo = errors.New("zero total delegation one epoch ago")
 )
 
 // Reader ..
@@ -132,7 +134,16 @@ func ComputeForValidator(
 		return &zero, nil
 	}
 
-	total := numeric.NewDecFromBigInt(validatorNow.TotalDelegation())
+	total := numeric.NewDecFromBigInt(oneSnapshotAgo.Validator.TotalDelegation())
+	if total.IsZero() {
+		return nil, errors.Wrapf(
+			ErrZeroStakeOneEpochAgo,
+			"current epoch %d, one-epoch-ago %d",
+			block.Epoch().Uint64(),
+			oneEpochAgo.Uint64(),
+		)
+	}
+
 	result := numeric.NewDecFromBigInt(estimatedRewardPerYear).Quo(
 		total,
 	)
