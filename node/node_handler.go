@@ -288,8 +288,8 @@ func (node *Node) BroadcastCrossLink() {
 		}
 
 		// Cap at a sane size to avoid overload network
-		if batchSize > crossLinkBatchSize*10 {
-			batchSize = crossLinkBatchSize * 10
+		if batchSize > crossLinkBatchSize*2 {
+			batchSize = crossLinkBatchSize * 2
 		}
 
 		for blockNum := latestBlockNum + 1; blockNum <= curBlock.NumberU64(); blockNum++ {
