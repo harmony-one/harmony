@@ -329,25 +329,15 @@ mainnet)
   dns_zone=t.hmny.io
   syncdir=mainnet.min
   ;;
-testnet)  # TODO: update Testnet configs once LRTN is upgraded
+testnet)
   bootnodes=(
-    /ip4/54.218.73.167/tcp/9876/p2p/QmWBVCPXQmc2ULigm3b9ayCZa15gj25kywiQQwPhHCZeXj
-    /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
+    /ip4/54.86.126.90/tcp/9850/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/52.40.84.2/tcp/9850/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
   )
   REL=testnet
   network_type=testnet
-  dns_zone=p.hmny.io
+  dns_zone=b.hmny.io
   syncdir=lrtn
-  ;;
-tnet)
-  bootnodes=(
-    /ip4/54.86.126.90/tcp/9889/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/52.40.84.2/tcp/9889/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
-  )
-  REL=tnet
-  network_type=testnet
-  dns_zone=tn.hmny.io
-  syncdir=tnet
   ;;
 staking)
   bootnodes=(
@@ -377,16 +367,6 @@ stn|stress|stressnet)
   network_type=stressnet
   dns_zone=stn.hmny.io
   syncdir=stn
-  ;;
-devnet)
-  bootnodes=(
-    /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/52.40.84.2/tcp/9870/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
-  )
-  REL=devnet
-  network_type=devnet
-  dns_zone=pga.hmny.io
-  syncdir=devnet
   ;;
 *)
   err 64 "${network}: invalid network"
