@@ -9,7 +9,7 @@ export GO111MODULE:=on
 .PHONY: all libs exe test
 
 all: libs
-	./scripts/go_executable_build.sh
+	./scripts/go_executable_build.sh -S
 
 libs:
 	make -C $(TOP)/mcl -j8
