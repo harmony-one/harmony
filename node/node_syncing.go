@@ -379,18 +379,22 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		var hash common.Hash
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
-			encodedBlockHeader, _ := node.getEncodedBlockHeaderByHash(hash)
+			encodedBlockHeader, err := node.getEncodedBlockHeaderByHash(hash)
 
-			response.Payload = append(response.Payload, encodedBlockHeader)
+			if err == nil {
+				response.Payload = append(response.Payload, encodedBlockHeader)
+			}
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCK:
 		var hash common.Hash
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
-			encodedBlock, _ := node.getEncodedBlockByHash(hash)
+			encodedBlock, err := node.getEncodedBlockByHash(hash)
 
-			response.Payload = append(response.Payload, encodedBlock)
+			if err == nil {
+				response.Payload = append(response.Payload, encodedBlock)
+			}
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
