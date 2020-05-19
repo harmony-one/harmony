@@ -379,30 +379,18 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		var hash common.Hash
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
-			blockHeader := node.Blockchain().GetHeaderByHash(hash)
-			if blockHeader == nil {
-				continue
-			}
-			encodedBlockHeader, err := rlp.EncodeToBytes(blockHeader)
+			encodedBlockHeader, _ := node.getEncodedBlockHeaderByHash(hash)
 
-			if err == nil {
-				response.Payload = append(response.Payload, encodedBlockHeader)
-			}
+			response.Payload = append(response.Payload, encodedBlockHeader)
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCK:
 		var hash common.Hash
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
-			block := node.Blockchain().GetBlockByHash(hash)
-			if block == nil {
-				continue
-			}
-			encodedBlock, err := rlp.EncodeToBytes(block)
+			encodedBlock, _ := node.getEncodedBlockByHash(hash)
 
-			if err == nil {
-				response.Payload = append(response.Payload, encodedBlock)
-			}
+			response.Payload = append(response.Payload, encodedBlock)
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
@@ -476,4 +464,33 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 	}
 	return response, nil
+}
+
+var (
+	errHeaderNotExist = errors.New("header not exist")
+	errBlockNotExist  = errors.New("block not exist")
+)
+
+func (node *Node) getEncodedBlockHeaderByHash(hash common.Hash) ([]byte, error) {
+	key := fmt.Sprintf("%x", hash)
+	b, err, _ := node.blockHeaderSF.Do(key, func() (interface{}, error) {
+		h := node.Blockchain().GetHeaderByHash(hash)
+		if h == nil {
+			return nil, errHeaderNotExist
+		}
+		return rlp.EncodeToBytes(h)
+	})
+	return b.([]byte), err
+}
+
+func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
+	key := fmt.Sprintf("%x", hash)
+	b, err, _ := node.blockSF.Do(key, func() (interface{}, error) {
+		blk := node.Blockchain().GetBlockByHash(hash)
+		if blk == nil {
+			return nil, errBlockNotExist
+		}
+		return rlp.EncodeToBytes(blk)
+	})
+	return b.([]byte), err
 }
