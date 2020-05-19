@@ -484,6 +484,9 @@ func (node *Node) getEncodedBlockHeaderByHash(hash common.Hash) ([]byte, error) 
 		}
 		return rlp.EncodeToBytes(h)
 	})
+	if err != nil {
+		node.headerGroup.Forget(key)
+	}
 	return b.([]byte), err
 }
 
@@ -496,5 +499,8 @@ func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
 		}
 		return rlp.EncodeToBytes(blk)
 	})
+	if err != nil {
+		node.blockGroup.Forget(key)
+	}
 	return b.([]byte), err
 }
