@@ -1052,7 +1052,7 @@ func (pool *TxPool) promoteTx(addr common.Address, tx types.PoolTransaction) boo
 		utils.Logger().Info().
 			Str("hash", old.Hash().String()).
 			Str("existing-tx-hash", tx.Hash().String()).
-			Msg("Did not promote to executable, new transaction had higher price")
+			Msg("Did not promote to executable, new transaction has higher price")
 	}
 	// Failsafe to work around direct pending inserts (tests)
 	if pool.all.Get(tx.Hash()) == nil {
@@ -1431,7 +1431,7 @@ func (pool *TxPool) demoteUnexecutables() {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			pool.priced.Removed()
-			logger.Warn().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
+			logger.Info().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
 			// Do not report to error sink as old txs are on chain or meaningful error caught elsewhere.
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
