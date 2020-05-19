@@ -158,8 +158,8 @@ type Node struct {
 	// TransactionErrorSink contains error messages for any failed transaction, in memory only
 	TransactionErrorSink *types.TransactionErrorSink
 	// caching fields for node requests
-	blockHeaderSF singleflight.Group
-	blockSF       singleflight.Group
+	headerGroup singleflight.Group
+	blockGroup  singleflight.Group
 }
 
 // Blockchain returns the blockchain for the node's current shard.

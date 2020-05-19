@@ -473,7 +473,7 @@ var (
 
 func (node *Node) getEncodedBlockHeaderByHash(hash common.Hash) ([]byte, error) {
 	key := fmt.Sprintf("%x", hash)
-	b, err, _ := node.blockHeaderSF.Do(key, func() (interface{}, error) {
+	b, err, _ := node.headerGroup.Do(key, func() (interface{}, error) {
 		h := node.Blockchain().GetHeaderByHash(hash)
 		if h == nil {
 			return nil, errHeaderNotExist
@@ -485,7 +485,7 @@ func (node *Node) getEncodedBlockHeaderByHash(hash common.Hash) ([]byte, error) 
 
 func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
 	key := fmt.Sprintf("%x", hash)
-	b, err, _ := node.blockSF.Do(key, func() (interface{}, error) {
+	b, err, _ := node.blockGroup.Do(key, func() (interface{}, error) {
 		blk := node.Blockchain().GetBlockByHash(hash)
 		if blk == nil {
 			return nil, errBlockNotExist
