@@ -505,7 +505,7 @@ func TestTransactionQueue(t *testing.T) {
 	from, _ := deriveSender(tx)
 	pool.currentState.AddBalance(from, big.NewInt(1000))
 	pool.lockedReset(nil, nil)
-	pool.enqueueTx(tx.Hash(), tx)
+	pool.enqueueTx(tx)
 
 	pool.promoteExecutables([]common.Address{from})
 	if len(pool.pending) != 1 {
@@ -515,7 +515,7 @@ func TestTransactionQueue(t *testing.T) {
 	tx = transaction(0, 1, 100, key)
 	from, _ = deriveSender(tx)
 	pool.currentState.SetNonce(from, 2)
-	pool.enqueueTx(tx.Hash(), tx)
+	pool.enqueueTx(tx)
 	pool.promoteExecutables([]common.Address{from})
 	if _, ok := pool.pending[from].txs.items[tx.Nonce()]; ok {
 		t.Error("expected transaction to be in tx pool")
@@ -535,9 +535,9 @@ func TestTransactionQueue(t *testing.T) {
 	pool.currentState.AddBalance(from, big.NewInt(1000))
 	pool.lockedReset(nil, nil)
 
-	pool.enqueueTx(tx.Hash(), tx1)
-	pool.enqueueTx(tx.Hash(), tx2)
-	pool.enqueueTx(tx.Hash(), tx3)
+	pool.enqueueTx(tx1)
+	pool.enqueueTx(tx2)
+	pool.enqueueTx(tx3)
 
 	pool.promoteExecutables([]common.Address{from})
 
@@ -718,12 +718,12 @@ func TestTransactionDropping(t *testing.T) {
 		tx11 = transaction(0, 11, 200, key)
 		tx12 = transaction(0, 12, 300, key)
 	)
-	pool.promoteTx(account, tx0.Hash(), tx0)
-	pool.promoteTx(account, tx1.Hash(), tx1)
-	pool.promoteTx(account, tx2.Hash(), tx2)
-	pool.enqueueTx(tx10.Hash(), tx10)
-	pool.enqueueTx(tx11.Hash(), tx11)
-	pool.enqueueTx(tx12.Hash(), tx12)
+	pool.promoteTx(account, tx0)
+	pool.promoteTx(account, tx1)
+	pool.promoteTx(account, tx2)
+	pool.enqueueTx(tx10)
+	pool.enqueueTx(tx11)
+	pool.enqueueTx(tx12)
 
 	// Check that pre and post validations leave the pool as is
 	if pool.pending[account].Len() != 3 {
@@ -1524,7 +1524,7 @@ func benchmarkPendingDemotion(b *testing.B, size int) {
 
 	for i := 0; i < size; i++ {
 		tx := transaction(0, uint64(i), 100000, key)
-		pool.promoteTx(account, tx.Hash(), tx)
+		pool.promoteTx(account, tx)
 	}
 	// Benchmark the speed of pool validation
 	b.ResetTimer()
@@ -1549,7 +1549,7 @@ func benchmarkFuturePromotion(b *testing.B, size int) {
 
 	for i := 0; i < size; i++ {
 		tx := transaction(0, uint64(1+i), 100000, key)
-		pool.enqueueTx(tx.Hash(), tx)
+		pool.enqueueTx(tx)
 	}
 	// Benchmark the speed of pool validation
 	b.ResetTimer()
