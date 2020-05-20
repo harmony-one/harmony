@@ -1,0 +1,60 @@
+swagger: "2.0"
+schemes:
+- http
+- https
+basePath: /
+produces:
+- application/json
+consumes:
+- application/json
+host: 54.201.207.240:9599
+info:
+  contact:
+    email: s@harmony.one
+    name: Stephen Tse
+    url: http://harmony.one
+  description: |-
+    the purpose of this application is to provide all APIs needed
+    to interact with harmony
+  license:
+    name: MIT
+    url: http://opensource.org/licenses/MIT
+  title: harmony API.
+  version: 0.0.1
+paths:
+  /#net_peerCount:
+    post:
+      summary: Request the number of peers.
+      parameters:
+        - in: body
+          name: peerCount
+          description: The number of peers.
+          schema:
+            type: object 
+            required: 
+              - peerCount
+            properties:
+              jsonrpc:
+                type: string
+                example: "2.0"
+              method:
+                type: string
+                example: "net_peerCount"
+              id:
+                type: integer
+                example: 1
+      responses:
+        200:
+          description: peerCount
+          schema:
+            type: object
+            properties:
+              jsonrpc:
+                type: string
+                example: "2.0"
+              id:
+                type: integer
+                example: 1
+              result:
+                type: string
+                example: "0x17"

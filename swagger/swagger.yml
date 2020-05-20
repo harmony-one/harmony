@@ -1,0 +1,145 @@
+openapi: 3.0.0
+info:
+  contact:
+    email: s@harmony.one
+    name: Stephen Tse
+    url: http://harmony.one
+  description: |-
+    the purpose of this application is to provide all APIs needed
+    to interact with harmony
+  license:
+    name: MIT
+    url: http://opensource.org/licenses/MIT
+  title: harmony API.
+  version: 0.0.1
+servers: 
+  - url: http://54.201.207.240:9599/
+    description: John's aws desktop.
+tags:
+  - name: v1-protocol
+    description: protocol APIs returning hex.
+  - name: v1-block
+    description: block APIs returning hex.
+  - name: v2-protocol
+    description: protocol API returning decimal.
+  - name: v2-block
+    description: block APIs returning decimal.
+paths:
+  /#net_version:
+    post:
+      summary: request the network version.
+      tags:
+        - v1-protocol
+      requestBody:
+        description: request the network version.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#components/schemas/net_version'
+            example:
+              jsonrpc: '2.0'
+              id: 1
+              method: 'net_version'
+      responses:
+        '200':
+          description: network version.
+          content:
+            application/json:
+              schema:
+                $ref: '#components/schemas/net_version_resp'
+              example: 
+                jsonrpc: '2.0'
+                id: 1
+                result: '1'
+  /#net_peerCount:
+    post:
+      summary: request the number of peers. 
+      tags:
+        - v1-protocol
+      requestBody:
+        description: the number of peers.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#components/schemas/net_peerCount'
+            example:
+              jsonrpc: '2.0'
+              id: 1
+              method: 'net_peerCount'
+      responses:
+        '200':
+          description: network peer count.
+          content:
+            application/json:
+              schema:
+                $ref: '#components/schemas/net_version_resp'
+              example:
+                jsonrpc: '2.0'
+                id: 1
+                result: '0x17'
+components:
+  schemas:
+    request:
+      type: object
+      required:
+        - jsonrpc
+        - id
+      properties:
+        jsonrpc:
+          type: string
+          enum: ['2.0']
+        id:
+          type: integer
+          enum: [1]
+    response:
+      type: object
+      required: 
+        - jsonrpc
+        - id
+      properties:
+         jsronrpc:
+           type: string
+           enum: ['2.0']
+         id:
+           type: integer
+           enum: [1]
+    net_version:
+      allOf: 
+        - $ref: '#/components/schemas/request'
+        - type: object
+          required: 
+            - method
+          properties:
+            method:
+              type: string
+              enum: ['net_version']
+    net_version_resp:
+      allOf:
+        - $ref: '#/components/schemas/response'
+        - type: object
+          required:
+            - method
+          properties:
+            result:
+              type: string
+    net_peerCount:
+      allOf:
+        - $ref: '#/components/schemas/request'
+        - type: object
+          required:
+            - method
+          properties:
+            method:
+              type: string
+              enum: ['net_peerCount']
+    net_peerCount_resp:
+      allOf:
+        - $ref: '#/components/schemas/response'
+        - type: object
+          required:
+            - method
+          properties:
+            result:
+              type: string

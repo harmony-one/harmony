@@ -1,0 +1,79 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "http",
+    "https"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "description": "the purpose of this application is to provide all APIs needed\nto interact with harmony",
+    "title": "harmony API.",
+    "contact": {
+      "name": "Stephen Tse",
+      "url": "http://harmony.one",
+      "email": "s@harmony.one"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "http://opensource.org/licenses/MIT"
+    },
+    "version": "0.0.1"
+  },
+  "host": "http://localhost:9599",
+  "basePath": "/",
+  "paths": {
+    "/": {
+      "post": {
+	"operationId": "PeerCount",
+          "description": "Returns the number of connected peers",
+          "parameters": [
+	   {
+              "type": "string",
+              "description": "json rpc version",
+              "name": "jsonrpc",
+              "in": "query"
+          },
+	  {
+              "type": "string",
+              "description": "harmony api method",
+              "name": "method",
+              "in": "query"
+          },
+	  {  
+              "type": "integer",
+              "description": "identifier",
+              "name": "identifier",
+              "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "uint64",
+            "description": "the network version",
+            "name": "NetworkVersion",
+            "in": "query"
+          },
+	  {
+              "type": "array",
+              "description": "paramaters for the API call",
+              "name": "params",
+              "in": "query"
+	  }
+          ],
+          "responses": {
+            "200": {
+              "description": "number of connected peers",
+              "schema": {
+                "type": "string",
+                "format": "hexutil.Uint"
+              }
+            }
+          }
+      }
+    }
+}
+}
