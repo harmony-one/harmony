@@ -186,10 +186,7 @@ func (bc *BlockChain) CommitOffChainData(
 		for i, c := uint32(0), shard.Schedule.InstanceForEpoch(
 			epoch,
 		).NumShards(); i < c; i++ {
-			if err := bc.LastContinuousCrossLink(batch, i); err != nil {
-				utils.Logger().Info().
-					Err(err).Msg("Could not roll up last continuous crosslink")
-			}
+			bc.LastContinuousCrossLink(batch, i)
 		}
 	}
 
