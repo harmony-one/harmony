@@ -780,7 +780,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			return
 		}
-		utils.Logger().Debug().
+		utils.Logger().Info().
 			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 				isBeacon, bc.ShardID(), otherHeight, currentHeight)
 
