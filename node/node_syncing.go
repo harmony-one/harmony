@@ -472,8 +472,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 }
 
 const (
-	headerCacheSize = 50000000
-	blockCacheSize  = 100000000
+	headerCacheSize = 100000
+	blockCacheSize  = 100000
 )
 
 var (
