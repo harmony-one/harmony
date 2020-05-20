@@ -1,0 +1,6 @@
+=============== May 1, 2020 (UTC) ===============
+01:53:38.462105 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+01:53:38.465827 db@open opening
+01:53:38.466521 version@stat F·[] S·0B[] Sc·[]
+01:53:38.468473 db@janitor F·2 G·0
+01:53:38.468495 db@open done T·2.652248ms

@@ -40,6 +40,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 	"github.com/pkg/errors"
+	_ "github.com/harmony-one/harmony/docs"
 )
 
 // Version string variables
