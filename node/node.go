@@ -40,7 +40,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/semaphore"
-	"golang.org/x/sync/singleflight"
 )
 
 // State is a state of a node.
@@ -157,9 +156,6 @@ type Node struct {
 	keysToAddrsMutex sync.Mutex
 	// TransactionErrorSink contains error messages for any failed transaction, in memory only
 	TransactionErrorSink *types.TransactionErrorSink
-	// caching fields for node requests
-	headerGroup singleflight.Group
-	blockGroup  singleflight.Group
 }
 
 // Blockchain returns the blockchain for the node's current shard.

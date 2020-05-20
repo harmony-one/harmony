@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )
 
@@ -470,37 +471,48 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	return response, nil
 }
 
+const (
+	headerCacheSize = 50000000
+	blockCacheSize  = 100000000
+)
+
 var (
+	// Cached fields for block header and block requests
+	headerReqCache, _ = lru.New(headerCacheSize)
+	blockReqCache, _  = lru.New(blockCacheSize)
+
 	errHeaderNotExist = errors.New("header not exist")
 	errBlockNotExist  = errors.New("block not exist")
 )
 
 func (node *Node) getEncodedBlockHeaderByHash(hash common.Hash) ([]byte, error) {
-	key := fmt.Sprintf("%x", hash)
-	b, err, _ := node.headerGroup.Do(key, func() (interface{}, error) {
-		h := node.Blockchain().GetHeaderByHash(hash)
-		if h == nil {
-			return nil, errHeaderNotExist
-		}
-		return rlp.EncodeToBytes(h)
-	})
-	if err != nil {
-		node.headerGroup.Forget(key)
+	if b, ok := headerReqCache.Get(hash); ok {
+		return b.([]byte), nil
 	}
-	return b.([]byte), err
+	h := node.Blockchain().GetHeaderByHash(hash)
+	if h == nil {
+		return nil, errHeaderNotExist
+	}
+	b, err := rlp.EncodeToBytes(h)
+	if err != nil {
+		return nil, err
+	}
+	headerReqCache.Add(hash, b)
+	return b, nil
 }
 
 func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
-	key := fmt.Sprintf("%x", hash)
-	b, err, _ := node.blockGroup.Do(key, func() (interface{}, error) {
-		blk := node.Blockchain().GetBlockByHash(hash)
-		if blk == nil {
-			return nil, errBlockNotExist
-		}
-		return rlp.EncodeToBytes(blk)
-	})
-	if err != nil {
-		node.blockGroup.Forget(key)
+	if b, ok := blockReqCache.Get(hash); ok {
+		return b.([]byte), nil
 	}
-	return b.([]byte), err
+	blk := node.Blockchain().GetBlockByHash(hash)
+	if blk == nil {
+		return nil, errBlockNotExist
+	}
+	b, err := rlp.EncodeToBytes(blk)
+	if err != nil {
+		return nil, err
+	}
+	blockReqCache.Add(hash, b)
+	return b, nil
 }
