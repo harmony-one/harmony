@@ -225,10 +225,11 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 
 	pendingCount, queueCount := node.TxPool.Stats()
 	utils.Logger().Info().
+		Interface("err", errs).
 		Int("length of newTxs", len(newTxs)).
 		Int("totalPending", pendingCount).
 		Int("totalQueued", queueCount).
-		Msg("Got more transactions")
+		Msg("[addPendingTransactions] Adding more transactions")
 	return errs
 }
 
@@ -276,6 +277,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 		errs := node.addPendingTransactions(types.Transactions{newTx})
 		for i := range errs {
 			if errs[i] != nil {
+				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingTransaction] Failed adding new transaction")
 				return errs[i]
 			}
 		}

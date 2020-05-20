@@ -45,7 +45,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 				for node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(SleepPeriod)
 
-					utils.Logger().Debug().
+					utils.Logger().Info().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
@@ -56,7 +56,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 
 					err = node.Blockchain().Validator().ValidateHeader(newBlock, true)
 					if err == nil {
-						utils.Logger().Debug().
+						utils.Logger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
 							Uint64("epoch", newBlock.Epoch().Uint64()).
 							Uint64("viewID", newBlock.Header().ViewID().Uint64()).
@@ -197,7 +197,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
-			utils.Logger().Debug().
+			utils.Logger().Info().
 				Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
 					len(crossLinksToPropose), len(allPending),
 				)

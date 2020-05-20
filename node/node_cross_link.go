@@ -96,7 +96,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			}
 
 			if _, ok := existingCLs[cl.Hash()]; ok {
-				utils.Logger().Err(err).
+				utils.Logger().Debug().Err(err).
 					Msgf("[ProcessingCrossLink] Cross Link already exists in pending queue, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d",
 						node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
 				continue
@@ -104,7 +104,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
-				utils.Logger().Err(err).
+				utils.Logger().Debug().Err(err).
 					Msgf("[ProcessingCrossLink] Cross Link already exists, pass. Beacon Epoch: %d, Block num: %d, Epoch: %d, shardID %d", node.Blockchain().CurrentHeader().Epoch(), cl.Number(), cl.Epoch(), cl.ShardID())
 				continue
 			}
