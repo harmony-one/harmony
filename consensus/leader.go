@@ -164,7 +164,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	logger = logger.With().
 		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
-	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
+	logger.Debug().Msg("[OnPrepare] Received New Prepare Signature")
 	if _, err := consensus.Decider.SubmitVote(
 		quorum.Prepare, validatorPubKey,
 		&sign, recvMsg.BlockHash,
@@ -224,7 +224,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	// Must have the corresponding block to verify committed message.
 	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 	if blockObj == nil {
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Uint64("blockNum", recvMsg.BlockNum).
 			Uint64("viewID", recvMsg.ViewID).
 			Str("blockHash", recvMsg.BlockHash.Hex()).
@@ -246,7 +246,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	logger = logger.With().
 		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).
 		Logger()
-	logger.Info().Msg("[OnCommit] Received new commit message")
+	logger.Debug().Msg("[OnCommit] Received new commit message")
 
 	if _, err := consensus.Decider.SubmitVote(
 		quorum.Commit, validatorPubKey,
@@ -266,14 +266,14 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		go func(viewID uint64) {
-			consensus.getLogger().Debug().Msg("[OnCommit] Starting Grace Period")
+			consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
 			// Always wait for 2 seconds as minimum grace period
 			time.Sleep(2 * time.Second)
 			if n := time.Now(); n.Before(consensus.NextBlockDue) {
 				// Sleep to wait for the full block time
 				time.Sleep(consensus.NextBlockDue.Sub(n))
 			}
-			logger.Debug().Msg("[OnCommit] Commit Grace Period Ended")
+			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 			consensus.commitFinishChan <- viewID
 		}(consensus.viewID)
 
