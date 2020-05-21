@@ -82,4 +82,4 @@ db-127.0.0.1-*
 .tern-port
 
 # swagger-ui
-./swagger/swagger-ui/
+swagger/swagger-ui/
