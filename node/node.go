@@ -264,7 +264,7 @@ func (node *Node) AddPendingStakingTransaction(
 		var err error
 		for i := range errs {
 			if errs[i] != nil {
-        utils.Logger().Info().Err(errs[i]).Msg("[AddPendingStakingTransaction] Failed adding new staking transaction")
+				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingStakingTransaction] Failed adding new staking transaction")
 				err = errs[i]
 				break
 			}
@@ -286,10 +286,10 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 		var err error
 		for i := range errs {
 			if errs[i] != nil {
-        utils.Logger().Info().Err(errs[i]).Msg("[AddPendingTransaction] Failed adding new transaction")
+				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingTransaction] Failed adding new transaction")
 				err = errs[i]
-				break			
-      }
+				break
+			}
 		}
 		if err == nil || node.BroadcastInvalidTx {
 			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
