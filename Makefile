@@ -16,7 +16,7 @@ libs:
 	make -C $(TOP)/bls BLS_SWAP_G=1 -j8
 
 exe:
-	./scripts/go_executable_build.sh
+	./scripts/go_executable_build.sh -S
 
 race:
 	./scripts/go_executable_build.sh -r
