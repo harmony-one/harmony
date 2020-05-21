@@ -240,14 +240,11 @@ func (bc *BlockChain) CommitOffChainData(
 										continue
 									}
 								}
-								if len(stats.APRs) <= 0 {
-									continue
+								for i := range stats.APRs {
+									if stats.APRs[i].Epoch.Cmp(stakingEpoch) == 0 {
+										stats.APRs[i] = staking.APREntry{stakingEpoch, *aprComputed}
+									}
 								}
-								// take care of first apr not being staking apr
-								if stats.APRs[0].Epoch.Cmp(stakingEpoch) > 0 {
-									continue
-								}
-								stats.APRs[0] = staking.APREntry{stakingEpoch, *aprComputed}
 								tempValidatorStats[addr] = stats
 							}
 						}
