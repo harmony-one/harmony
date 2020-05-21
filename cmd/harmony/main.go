@@ -72,6 +72,7 @@ var (
 	onlyLogTps  = flag.Bool("only_log_tps", false, "Only log TPS if true")
 	dnsZone     = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
 	dnsFlag     = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
+	dnsPort     = flag.String("dns_port", "9000", "port of dns node")
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers = flag.Int("min_peers", 32, "Minimal number of Peers in shard")
 	// Key file to store the private key
@@ -476,9 +477,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
 			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
 	case *dnsZone != "":
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*port))
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*dnsPort))
 	case *dnsFlag:
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider("t.hmny.io", syncing.GetSyncingPort(*port))
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider("t.hmny.io", syncing.GetSyncingPort(*dnsPort))
 	default:
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 
