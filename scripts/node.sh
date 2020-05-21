@@ -184,7 +184,6 @@ options:
    -n port        specify the public base port of the node (default: 9000)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
-   -b             download harmony_db files from shard specified by -i <shardid> (default: off)
    -a dbfile      specify the db file to download (default:off)
    -U FOLDER      specify the upgrade folder to download binaries
    -P             enable public rpc end point (default:off)
@@ -252,7 +251,7 @@ usage() {
 BUCKET=pub.harmony.one
 OS=$(uname -s)
 
-unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id download_harmony_db db_file_to_dl
+unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id db_file_to_dl
 unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers max_bls_keys_per_node log_level
 start_clean=false
 loop=true
@@ -262,7 +261,6 @@ download_only=false
 network=mainnet
 node_type=validator
 shard_id=-1
-download_harmony_db=false
 public_rpc=false
 staking_mode=false
 multi_key=false
@@ -280,12 +278,11 @@ ${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDN:T:i:ba:U:PvVyzn:MAIB:r:Y:f:R:m:L: opt
+while getopts :1chk:sSp:dDN:T:i:a:U:PvVyzn:MAIB:r:Y:f:R:m:L: opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
-   b) download_harmony_db=true;;
    c) start_clean=true;;
    1) loop=false;;
    h) print_usage; exit 0;;
@@ -552,58 +549,6 @@ _curl_download() {
    fi
 }
 
-download_harmony_db_file() {
-   local shard_id
-   shard_id="${1}"
-   local file_to_dl="${2}"
-   local outdir=db
-   if ! check_free_disk; then
-      err 70 "do not have enough free disk space to download db tarball"
-   fi
-
-   url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/md5sum.txt"
-   rm -f "${outdir}/md5sum.txt"
-   if ! _curl_download $url "${outdir}" md5sum.txt; then
-      err 70 "cannot download md5sum.txt"
-   fi
-
-   if [ -n "${file_to_dl}" ]; then
-      if grep -q "${file_to_dl}" "${outdir}/md5sum.txt"; then
-         url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/${file_to_dl}"
-         if _curl_download $url "${outdir}" ${file_to_dl}; then
-            verify_checksum "${outdir}" "${file_to_dl}" md5sum.txt || return $?
-            msg "downloaded ${file_to_dl}, extracting ..."
-            tar -C "${outdir}" -xvf "${outdir}/${file_to_dl}"
-         else
-            msg "can't download ${file_to_dl}"
-         fi
-      fi
-      return
-   fi
-
-   files=$(awk '{ print $2 }' ${outdir}/md5sum.txt)
-   echo "[available harmony db files for shard ${shard_id}]"
-   grep -oE "harmony_db_${shard_id}"-.*.tar "${outdir}/md5sum.txt"
-   echo
-   for file in $files; do
-      if [[ $file =~ "harmony_db_${shard_id}" ]]; then
-         echo -n "Do you want to download ${file} (choose one only) [y/n]?"
-         read yesno
-         if [[ "$yesno" = "y" || "$yesno" = "Y" ]]; then
-            url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/$file"
-            if _curl_download $url "${outdir}" $file; then
-               verify_checksum "${outdir}" "${file}" md5sum.txt || return $?
-               msg "downloaded $file, extracting ..."
-               tar -C "${outdir}" -xvf "${outdir}/${file}"
-            else
-               msg "can't download $file"
-            fi
-            break
-         fi
-      fi
-   done
-}
-
 any_new_binaries() {
    local outdir
    ${do_not_download} && return 0
@@ -634,11 +579,6 @@ if ${download_only}; then
       download_binaries staging || err 69 "download node software failed"
       msg "downloaded files are in staging direectory"
    fi
-   exit 0
-fi
-
-if ${download_harmony_db}; then
-   download_harmony_db_file "${shard_id}" "${db_file_to_dl}" || err 70 "download harmony_db file failed"
    exit 0
 fi
 
@@ -688,8 +628,6 @@ fi
 
 NODE_PORT=${pub_port:-9000}
 PUB_IP=
-PUSHGATEWAY_IP=
-PUSHGATEWAY_PORT=
 
 if [ "$OS" == "Linux" ]; then
    if ${run_as_root}; then
