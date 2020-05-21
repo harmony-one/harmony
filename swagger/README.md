@@ -1,7 +1,13 @@
 # Swagger API Documentation
 
 ## Overview
-The goal of the OpenAPI initiative is to provide comprehensive API documentation for Hamony API's including interative testing playground and the ability to generate clients or code from the specification moving forward.
+
+The goal of the OpenAPI initiative is to
+ 
+1. Provide comprehensive API documentation for Hamony API's
+2. Provide an interactive UI for developers protoytping on Harmony
+3. Provide an automation suite for testing
+4. Provide  the ability to generate clients or code from the specification moving forward.
 
 ### Phases 
 The delivery will be broken down into the following milestones.
@@ -12,7 +18,48 @@ The delivery will be broken down into the following milestones.
 5. Generate clients automatically
 6. Optionally generate code from the open API spec
 
-### Prototyping
+### Approach and Progress
+
+Note: openapi typically has unique endpoints for each method as Harmony uses one endpoint for all API's workaround was done to create the documentation by suffixing method names.
+
+1. Generate [OpenAPI 3.0 specification](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md) for Harmony API's
+
+First approach - geneate from code
+* This is the [Redux](https://prototype.johnwhitton.dev/docs).
+* The site is generated using [runredux.sh](https://github.com/johnwhitton/harmony/blob/swagger-update/swagger/runredux.sh)
+* `swagger generate spec -w ../cmd/harmony/ -o swagger.json` : reads through the codebase and genrates swagger.json
+* Documentation was added to
+  * [doc.go](https://github.com/johnwhitton/harmony/blob/swagger-update/docs/doc.go): high level project information  
+  * [net.go](https://github.com/johnwhitton/harmony/blob/swagger-update/internal/hmyapi/apiv1/net.go#L10): API specific documentation
+* Notes : goswagger only supports openAPI spec 2.0 and is not actively maintained
+
+Second approach: document all APIs in swagger.yml and generate UI from this
+* This is the [Swaagger](https://prototype.johnwhitton.dev/swagger/swaggerui/) site which is interactive
+* The site is generated using [runSwagger.sh](https://github.com/johnwhitton/harmony/blob/swagger-update/swagger/runSwagger.sh)
+* High level process flow is
+  * manually document the APIs in swagger.yml
+  * we clone the swager ui repository
+  * point the ui to our swagger.yml by copyin a modified [index.html](https://github.com/johnwhitton/harmony/blob/swagger-update/swagger/index.html#L42)
+  * turn the updated sit into a go package using statik
+  * build the swagger ui and run it
+
+2. Generate Postman Collection from Open API Specification
+
+* The generated Postman collection can be found here
+* This was done by [manually importing the swagger.yml](https://stackoverflow.com/questions/39072216/how-to-import-swagger-apis-into-postman) and publishing it
+3. Generate an Interactive developer playground using Swagger
+4. Generate the [OpenAPI 3.0 specification](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md) from the codebase
+5. Generate clients automatically
+6. Optionally generate code from the open API spec
+
+### Hosted Endpoints
+
+Currently there are two hosted endpoints
+
+1. [Swaagger](https://prototype.johnwhitton.dev/swagger/swaggerui/): This allows interactive prototyping for developers
+2. [Redux](https://prototype.johnwhitton.dev/docs): This provides developer documentation but is not interactive.
+3. [Postman - openapi](
+4. [Postman complete documentation](
 Initial prototyping is using a local deploy on an aws instance and can be viewd [here](http://54.201.207.240:8080/swaggerui/).
 
 

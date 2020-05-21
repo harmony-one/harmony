@@ -1,9 +1,9 @@
 openapi: 3.0.0
 info:
   contact:
-    email: s@harmony.one
-    name: Stephen Tse
-    url: http://harmony.one
+    email: john@johnwhitton.com
+    name: John Whitton
+    url: http://johnwhitton.dev
   description: |-
     the purpose of this application is to provide all APIs needed
     to interact with harmony
