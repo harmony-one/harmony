@@ -633,8 +633,6 @@ if [ "$OS" == "Linux" ]; then
    if ${run_as_root}; then
       setup_env
    fi
-# Kill existing soldier/node
-   fuser -k -n tcp $NODE_PORT
 fi
 
 # find my public ip address
