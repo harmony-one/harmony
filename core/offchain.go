@@ -240,7 +240,7 @@ func (bc *BlockChain) CommitOffChainData(
 										continue
 									}
 								}
-								if len(stats.APRs) < 0 {
+								if len(stats.APRs) <= 0 {
 									continue
 								}
 								stats.APRs[0] = staking.APREntry{stakingEpoch, *aprComputed}
